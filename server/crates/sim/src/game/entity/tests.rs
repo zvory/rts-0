@@ -34,7 +34,7 @@ fn unit_kinds_have_exact_state_groups() {
             groups(true, true, false, false, false, false),
         ),
         (
-            EntityKind::AtTeam,
+            EntityKind::AntiTankGun,
             groups(true, true, false, false, false, false),
         ),
         (

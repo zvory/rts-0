@@ -335,7 +335,7 @@ fn vehicle_route_context(
 
 fn vehicle_route_lookahead_px(kind: EntityKind) -> f32 {
     match kind {
-        EntityKind::Tank | EntityKind::AtTeam => PIVOT_VEHICLE_LOOKAHEAD_PX,
+        EntityKind::Tank | EntityKind::AntiTankGun => PIVOT_VEHICLE_LOOKAHEAD_PX,
         _ => SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
     }
 }

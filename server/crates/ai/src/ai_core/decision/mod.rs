@@ -781,7 +781,7 @@ fn visible_combat_target_for_wave(observation: &AiObservation, unit_ids: &[u32])
 fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
     match kind {
         EntityKind::Tank => 0,
-        EntityKind::MachineGunner | EntityKind::AtTeam => 1,
+        EntityKind::MachineGunner | EntityKind::AntiTankGun => 1,
         EntityKind::Rifleman | EntityKind::ScoutCar => 2,
         _ => 3,
     }

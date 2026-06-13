@@ -5,8 +5,8 @@ import {
   STATS,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
-  AT_GUN_DEPLOYED_RANGE_TILES,
-  AT_GUN_FIELD_OF_FIRE_RAD,
+  ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
+  ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
@@ -22,7 +22,7 @@ import {
   angleLerp,
   clamp01,
   dashedLine,
-  drawAtGun,
+  drawAntiTankGun,
   drawFacingWedge,
   drawFreeRotatedRect,
   drawGunTire,
@@ -329,7 +329,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     ? recoilVector(weaponFacing, recoil * 0.85)
     : e.kind === KIND.ARTILLERY
       ? recoilVector(weaponFacing, recoil * 0.65)
-    : e.kind === KIND.AT_TEAM
+    : e.kind === KIND.ANTI_TANK_GUN
       ? recoilVector(weaponFacing, recoil * 0.42)
       : e.kind === KIND.MORTAR_TEAM
         ? recoilVector(weaponFacing, recoil * 0.28)
@@ -359,8 +359,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     } else {
       drawInfantryMachineGun(g, r, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
     }
-  } else if (e.kind === KIND.AT_TEAM) {
-    drawAtGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+  } else if (e.kind === KIND.ANTI_TANK_GUN) {
+    drawAntiTankGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
   } else if (e.kind === KIND.MORTAR_TEAM) {
     drawMortarTeam(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
   } else if (e.kind === KIND.ARTILLERY) {
@@ -425,7 +425,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   if (
     e.kind !== KIND.RIFLEMAN &&
     e.kind !== KIND.MACHINE_GUNNER &&
-    e.kind !== KIND.AT_TEAM &&
+    e.kind !== KIND.ANTI_TANK_GUN &&
     e.kind !== KIND.MORTAR_TEAM &&
     e.kind !== KIND.ARTILLERY &&
     e.kind !== KIND.SCOUT_CAR &&

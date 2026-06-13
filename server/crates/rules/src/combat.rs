@@ -59,25 +59,25 @@ pub fn is_ap(kind: EntityKind) -> bool {
     weapon(kind) == WeaponClass::AntiTank
 }
 
-/// AT teams prefer armored targets over all others.
+/// Anti-Tank Guns prefer armored targets over all others.
 pub fn prefers_armored_targets(kind: EntityKind) -> bool {
     defs::unit_def(kind)
         .map(|d| d.target_priority == TargetPriority::PrefersArmored)
         .unwrap_or(false)
 }
 
-/// Miss probability [0.0, 1.0) for an attack. AT guns have a high miss rate against
+/// Miss probability [0.0, 1.0) for an attack. anti-tank guns have a high miss rate against
 /// infantry-sized targets — the shell flies straight through without finding anyone.
 /// Hits that do connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
-    if attacker_kind == EntityKind::AtTeam && at_team_miss_target(victim_kind) {
+    if attacker_kind == EntityKind::AntiTankGun && anti_tank_gun_miss_target(victim_kind) {
         0.65
     } else {
         0.0
     }
 }
 
-fn at_team_miss_target(kind: EntityKind) -> bool {
+fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
         EntityKind::Worker | EntityKind::Rifleman | EntityKind::MachineGunner
@@ -127,7 +127,7 @@ pub fn facing_damage_multiplier(
     if victim_kind != EntityKind::Tank {
         return 1.0;
     }
-    if !matches!(attacker_kind, EntityKind::Tank | EntityKind::AtTeam) {
+    if !matches!(attacker_kind, EntityKind::Tank | EntityKind::AntiTankGun) {
         return 1.0;
     }
     match facing {
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn ap_vs_armored_full_damage() {
         assert_eq!(
-            effective_damage(EntityKind::AtTeam, EntityKind::Tank, 40, None),
+            effective_damage(EntityKind::AntiTankGun, EntityKind::Tank, 40, None),
             40
         );
     }
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn ap_vs_small_full_damage_on_hit() {
         assert_eq!(
-            effective_damage(EntityKind::AtTeam, EntityKind::Rifleman, 20, None),
+            effective_damage(EntityKind::AntiTankGun, EntityKind::Rifleman, 20, None),
             20
         );
     }
@@ -248,7 +248,7 @@ mod tests {
             (EntityKind::Worker, false, false, false),
             (EntityKind::Rifleman, false, false, false),
             (EntityKind::MachineGunner, false, false, false),
-            (EntityKind::AtTeam, false, true, true),
+            (EntityKind::AntiTankGun, false, true, true),
             (EntityKind::MortarTeam, false, false, false),
             (EntityKind::ScoutCar, false, false, false),
             (EntityKind::Tank, true, true, false),
@@ -274,24 +274,24 @@ mod tests {
     }
 
     #[test]
-    fn at_team_miss_chance_applies_only_to_infantry_sized_targets() {
-        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::Worker), 0.65);
-        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::Rifleman), 0.65);
+    fn anti_tank_gun_miss_chance_applies_only_to_infantry_sized_targets() {
+        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Worker), 0.65);
+        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman), 0.65);
         assert_eq!(
-            miss_chance(EntityKind::AtTeam, EntityKind::MachineGunner),
+            miss_chance(EntityKind::AntiTankGun, EntityKind::MachineGunner),
             0.65
         );
 
-        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::ScoutCar), 0.0);
-        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::AtTeam), 0.0);
-        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::Tank), 0.0);
+        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar), 0.0);
+        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun), 0.0);
+        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Tank), 0.0);
     }
 
     #[test]
     fn tank_front_hit_uses_normal_at_damage() {
         assert_eq!(
             effective_damage_with_facing(
-                EntityKind::AtTeam,
+                EntityKind::AntiTankGun,
                 EntityKind::Tank,
                 48,
                 None,
@@ -307,7 +307,7 @@ mod tests {
     fn tank_side_hit_boosts_at_damage() {
         assert_eq!(
             effective_damage_with_facing(
-                EntityKind::AtTeam,
+                EntityKind::AntiTankGun,
                 EntityKind::Tank,
                 48,
                 None,
@@ -323,7 +323,7 @@ mod tests {
     fn tank_rear_hit_boosts_at_damage() {
         assert_eq!(
             effective_damage_with_facing(
-                EntityKind::AtTeam,
+                EntityKind::AntiTankGun,
                 EntityKind::Tank,
                 48,
                 None,

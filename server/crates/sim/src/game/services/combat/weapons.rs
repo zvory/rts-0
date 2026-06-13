@@ -4,7 +4,7 @@ use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
 
 use super::{
-    AT_GUN_FIRE_TOLERANCE_RAD, AT_GUN_TURN_RATE_RAD_PER_TICK, TANK_TURRET_FIRE_TOLERANCE_RAD,
+    ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK, TANK_TURRET_FIRE_TOLERANCE_RAD,
     TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
@@ -48,11 +48,11 @@ pub(super) fn mirror_weapon_to_body(e: &mut Entity, angle: f32) {
     e.set_weapon_facing(angle);
 }
 
-pub(super) fn rotate_at_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
+pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
     if !target_angle.is_finite() {
         return false;
     }
-    let desired = deployed_at_gun_desired_facing(e, target_angle);
+    let desired = deployed_anti_tank_gun_desired_facing(e, target_angle);
     e.set_desired_weapon_facing(desired);
     let current = e
         .weapon_facing()
@@ -65,23 +65,23 @@ pub(super) fn rotate_at_gun_for_combat(e: &mut Entity, target_angle: f32) -> boo
                 0.0
             }
         });
-    let rotated = rotate_toward(current, desired, AT_GUN_TURN_RATE_RAD_PER_TICK);
+    let rotated = rotate_toward(current, desired, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     } else {
         return false;
     }
-    at_gun_target_inside_field_of_fire(e, target_angle)
-        && angle_delta(rotated, target_angle).abs() <= AT_GUN_FIRE_TOLERANCE_RAD
+    anti_tank_gun_target_inside_field_of_fire(e, target_angle)
+        && angle_delta(rotated, target_angle).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
 }
 
 pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
     if !requires_weapon_setup(e.kind) {
         return;
     }
-    rotate_at_gun_toward_setup_facing(e);
-    maybe_begin_at_gun_setup_after_alignment(e);
+    rotate_anti_tank_gun_toward_setup_facing(e);
+    maybe_begin_anti_tank_gun_setup_after_alignment(e);
     e.tick_weapon_setup();
 }
 
@@ -109,7 +109,7 @@ pub(super) fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32)
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
-    if !requires_weapon_setup(e.kind) || e.kind == EntityKind::AtTeam {
+    if !requires_weapon_setup(e.kind) || e.kind == EntityKind::AntiTankGun {
         return true;
     }
     match e.weapon_setup() {
@@ -147,7 +147,7 @@ pub(super) fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32)
 
 pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
-        EntityKind::AtTeam => config::AT_TEAM_SETUP_TICKS,
+        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
         EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
         EntityKind::MortarTeam => config::MORTAR_TEAM_SETUP_TICKS,
         _ => config::MACHINE_GUNNER_SETUP_TICKS,
@@ -158,7 +158,7 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
     matches!(
         kind,
         EntityKind::MachineGunner
-            | EntityKind::AtTeam
+            | EntityKind::AntiTankGun
             | EntityKind::MortarTeam
             | EntityKind::Artillery
     )
@@ -166,7 +166,7 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
 
 pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
     matches!(e.kind, EntityKind::MachineGunner | EntityKind::MortarTeam)
-        || (e.kind == EntityKind::AtTeam && !matches!(e.weapon_setup(), WeaponSetup::Packed))
+        || (e.kind == EntityKind::AntiTankGun && !matches!(e.weapon_setup(), WeaponSetup::Packed))
         || (e.kind == EntityKind::Artillery && !matches!(e.weapon_setup(), WeaponSetup::Packed))
 }
 
@@ -179,43 +179,43 @@ pub(super) fn moving_fire_miss_chance(_e: &Entity) -> f32 {
     0.0
 }
 
-pub(super) fn at_gun_can_chase(e: &Entity) -> bool {
-    !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+pub(super) fn anti_tank_gun_can_chase(e: &Entity) -> bool {
+    !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery)
         || matches!(e.weapon_setup(), WeaponSetup::Packed)
 }
 
 pub(super) fn effective_attack_profile(e: &Entity) -> combat_rules::AttackProfile {
     let mut profile = combat_rules::attack_profile(e.kind);
-    if e.kind != EntityKind::AtTeam {
+    if e.kind != EntityKind::AntiTankGun {
         return profile;
     }
     match e.weapon_setup() {
         WeaponSetup::Packed => {
-            profile.range_tiles = config::AT_GUN_PACKED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES;
             profile.dmg =
-                ((profile.dmg as f32) * config::AT_GUN_PACKED_DAMAGE_MULTIPLIER).round() as u32;
+                ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER).round() as u32;
         }
         WeaponSetup::Deployed => {
-            profile.range_tiles = config::AT_GUN_DEPLOYED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES;
         }
         WeaponSetup::SettingUp { .. }
         | WeaponSetup::TearingDown { .. }
         | WeaponSetup::TearingDownToRedeploy { .. } => {
-            profile.range_tiles = config::AT_GUN_PACKED_RANGE_TILES;
+            profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES;
             profile.dmg = 0;
         }
     }
     profile
 }
 
-fn deployed_at_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
+fn deployed_anti_tank_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
     if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
         return target_angle;
     }
-    let Some(center) = at_gun_field_center(e) else {
+    let Some(center) = anti_tank_gun_field_center(e) else {
         return target_angle;
     };
-    let half = config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5;
+    let half = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5;
     let delta = angle_delta(center, target_angle);
     if delta.abs() <= half {
         target_angle
@@ -224,24 +224,24 @@ fn deployed_at_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
     }
 }
 
-fn at_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
+fn anti_tank_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
     if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
         return true;
     }
-    let Some(center) = at_gun_field_center(e) else {
+    let Some(center) = anti_tank_gun_field_center(e) else {
         return true;
     };
-    angle_delta(center, target_angle).abs() <= config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5
+    angle_delta(center, target_angle).abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
-fn at_gun_field_center(e: &Entity) -> Option<f32> {
+fn anti_tank_gun_field_center(e: &Entity) -> Option<f32> {
     e.emplacement_facing()
         .or_else(|| e.weapon_facing())
         .filter(|facing| facing.is_finite())
 }
 
-fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
-    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery) {
+fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
+    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
         return;
     }
     let target = match e.weapon_setup() {
@@ -254,15 +254,15 @@ fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
     };
     e.set_desired_weapon_facing(target);
     let current = e.facing();
-    let rotated = rotate_toward(current, target, AT_GUN_TURN_RATE_RAD_PER_TICK);
+    let rotated = rotate_toward(current, target, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     }
 }
 
-fn maybe_begin_at_gun_setup_after_alignment(e: &mut Entity) {
-    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
+    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery)
         || !matches!(e.weapon_setup(), WeaponSetup::Packed)
     {
         return;
@@ -277,7 +277,7 @@ fn maybe_begin_at_gun_setup_after_alignment(e: &mut Entity) {
         .weapon_facing()
         .filter(|facing| facing.is_finite())
         .unwrap_or_else(|| e.facing());
-    if angle_delta(current, target).abs() <= AT_GUN_FIRE_TOLERANCE_RAD {
+    if angle_delta(current, target).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD {
         e.set_weapon_setup(WeaponSetup::SettingUp {
             ticks: setup_ticks_for(e.kind),
         });

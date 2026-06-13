@@ -149,7 +149,7 @@ pub(crate) fn apply_commands(
                     tick,
                 );
             }
-            SimCommand::SetupAtGuns {
+            SimCommand::SetupAntiTankGuns {
                 units,
                 x,
                 y,
@@ -158,7 +158,7 @@ pub(crate) fn apply_commands(
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
-                    order: planner::RequestedOrder::SetupAtGuns {
+                    order: planner::RequestedOrder::SetupAntiTankGuns {
                         face_toward: planner::Point::new(x, y),
                     },
                 };
@@ -181,7 +181,7 @@ pub(crate) fn apply_commands(
                     tick,
                 );
             }
-            SimCommand::TearDownAtGuns { units } => {
+            SimCommand::TearDownAntiTankGuns { units } => {
                 for id in dedupe_cap_units(units) {
                     if !owns_unit(entities, player, id) || is_constructing(entities, id) {
                         continue;
@@ -189,7 +189,7 @@ pub(crate) fn apply_commands(
                     let Some(e) = entities.get_mut(id) else {
                         continue;
                     };
-                    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery) {
+                    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery) {
                         continue;
                     }
                     if matches!(
@@ -500,7 +500,7 @@ fn planner_facts(
             facts.can_attack = e.can_attack();
             facts.can_gather = e.kind == EntityKind::Worker;
             facts.can_build = e.kind == EntityKind::Worker || build_notice_compat;
-            facts.can_setup_at_gun = matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery);
+            facts.can_setup_anti_tank_gun = matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
             if let Some(ability) = ability {
                 if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
                     && ability.tech_ready
@@ -598,12 +598,12 @@ fn apply_planned_unit_order(
                         && attack_unit_can_target(
                             entities, teams, fog, smokes, player, unit, target,
                         )
-                        && !deployed_at_gun_target_outside_arc(entities, unit, target)
+                        && !deployed_anti_tank_gun_target_outside_arc(entities, unit, target)
                     {
                         if let Some(e) = entities.get_mut(unit) {
                             e.clear_queued_orders();
                         }
-                        clear_staged_at_gun_setup(entities, &[unit]);
+                        clear_staged_anti_tank_gun_setup(entities, &[unit]);
                         coordinator.order_attack(entities, unit, target);
                     }
                 }
@@ -637,9 +637,9 @@ fn apply_planned_unit_order(
                         events,
                     );
                 }
-                planner::OrderIntent::SetupAtGuns { face_toward } => {
+                planner::OrderIntent::SetupAntiTankGuns { face_toward } => {
                     if immediate_unit_can_replace(entities, player, unit) {
-                        execute_at_gun_setup(entities, unit, face_toward.x, face_toward.y);
+                        execute_anti_tank_gun_setup(entities, unit, face_toward.x, face_toward.y);
                     }
                 }
                 planner::OrderIntent::WorldAbility { ability, target } => {
@@ -669,7 +669,7 @@ fn apply_planned_unit_order(
                     if let Some(e) = entities.get_mut(unit) {
                         e.clear_queued_orders();
                     }
-                    clear_staged_at_gun_setup(entities, &[unit]);
+                    clear_staged_anti_tank_gun_setup(entities, &[unit]);
                     order_or_launch_world_ability(
                         map,
                         entities,
@@ -790,13 +790,13 @@ fn apply_planned_unit_order(
 
     if let Some(goal) = move_goal {
         clear_queued_orders(entities, &move_units);
-        clear_staged_at_gun_setup(entities, &move_units);
+        clear_staged_anti_tank_gun_setup(entities, &move_units);
         coordinator.order_group_move(entities, player, &move_units, goal, false);
         begin_artillery_teardown_for_movement(entities, &move_units);
     }
     if let Some(goal) = attack_move_goal {
         clear_queued_orders(entities, &attack_move_units);
-        clear_staged_at_gun_setup(entities, &attack_move_units);
+        clear_staged_anti_tank_gun_setup(entities, &attack_move_units);
         coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
         begin_artillery_teardown_for_movement(entities, &attack_move_units);
     }
@@ -875,8 +875,8 @@ fn entity_order_intent_from_planner(intent: planner::OrderIntent) -> Option<Orde
         planner::OrderIntent::SelfAbility { ability } => {
             ability_from_planner(ability).map(OrderIntent::self_ability)
         }
-        planner::OrderIntent::SetupAtGuns { face_toward } => {
-            Some(OrderIntent::setup_at_guns(face_toward.x, face_toward.y))
+        planner::OrderIntent::SetupAntiTankGuns { face_toward } => {
+            Some(OrderIntent::setup_anti_tank_guns(face_toward.x, face_toward.y))
         }
     }
 }
@@ -1380,11 +1380,11 @@ pub(crate) fn artillery_point_fire_system(
     }
 }
 
-fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
+fn execute_anti_tank_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery)
         || e.under_construction()
         || !x.is_finite()
         || !y.is_finite()
@@ -1419,7 +1419,7 @@ fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> 
 fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
-        _ => config::AT_TEAM_SETUP_TICKS,
+        _ => config::ANTI_TANK_GUN_SETUP_TICKS,
     }
 }
 
@@ -1473,12 +1473,12 @@ fn is_constructing(entities: &EntityStore, id: u32) -> bool {
     )
 }
 
-fn clear_staged_at_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
+fn clear_staged_anti_tank_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
     for id in ids {
         let Some(e) = entities.get_mut(*id) else {
             continue;
         };
-        if e.kind == EntityKind::AtTeam {
+        if e.kind == EntityKind::AntiTankGun {
             e.set_emplacement_facing(None);
             e.set_pending_redeploy_facing(None);
         }
@@ -1502,11 +1502,11 @@ fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, ids: &[u32]
     }
 }
 
-fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
+fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
     let Some(attacker) = entities.get(id) else {
         return false;
     };
-    if attacker.kind != EntityKind::AtTeam
+    if attacker.kind != EntityKind::AntiTankGun
         || !matches!(attacker.weapon_setup(), WeaponSetup::Deployed)
     {
         return false;
@@ -1525,7 +1525,7 @@ fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u
     if !target_angle.is_finite() {
         return true;
     }
-    angle_delta(center, target_angle).abs() > config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5
+    angle_delta(center, target_angle).abs() > config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 /// Issue a build order under the "reserve on arrival" model. Validates intent, emits
@@ -2096,13 +2096,13 @@ mod tests {
     }
 
     #[test]
-    fn at_gun_and_tank_training_require_finished_unlock_upgrades() {
+    fn anti_tank_gun_and_tank_training_require_finished_unlock_upgrades() {
         let map = flat_map(24);
         for (producer, unit, upgrade, setup_extra) in [
             (
                 EntityKind::Steelworks,
-                EntityKind::AtTeam,
-                UpgradeKind::AtGunUnlock,
+                EntityKind::AntiTankGun,
+                UpgradeKind::AntiTankGunUnlock,
                 None,
             ),
             (
@@ -2156,7 +2156,7 @@ mod tests {
     fn advanced_unlocks_research_only_at_research_complex() {
         let map = flat_map(24);
         for (wrong_building_kind, upgrade) in [
-            (EntityKind::Steelworks, UpgradeKind::AtGunUnlock),
+            (EntityKind::Steelworks, UpgradeKind::AntiTankGunUnlock),
             (EntityKind::Steelworks, UpgradeKind::ArtilleryUnlock),
             (EntityKind::Factory, UpgradeKind::TankUnlock),
             (EntityKind::Steelworks, UpgradeKind::MortarAutocast),
@@ -2172,7 +2172,7 @@ mod tests {
                 .expect("research complex should spawn");
             let mut players = vec![player_state(1), player_state(2)];
             if upgrade == UpgradeKind::ArtilleryUnlock {
-                players[0].upgrades.insert(UpgradeKind::AtGunUnlock);
+                players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
             }
 
             let events = apply_with_players(
@@ -2260,7 +2260,7 @@ mod tests {
     }
 
     #[test]
-    fn artillery_research_requires_at_gun_research() {
+    fn artillery_research_requires_anti_tank_gun_research() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
@@ -2289,7 +2289,7 @@ mod tests {
             Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
         ));
 
-        players[0].upgrades.insert(UpgradeKind::AtGunUnlock);
+        players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
         apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
         let queue = entities
             .get(research_complex)
@@ -3720,17 +3720,17 @@ mod tests {
     }
 
     #[test]
-    fn setup_at_guns_filters_mixed_selection_and_records_facing() {
+    fn setup_anti_tank_guns_filters_mixed_selection_and_records_facing() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let at = entities
-            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
             .expect("at gun should spawn");
         let rifle = entities
             .spawn_unit(1, EntityKind::Rifleman, 120.0, 100.0)
             .expect("rifleman should spawn");
         let enemy_at = entities
-            .spawn_unit(2, EntityKind::AtTeam, 140.0, 100.0)
+            .spawn_unit(2, EntityKind::AntiTankGun, 140.0, 100.0)
             .expect("enemy at gun should spawn");
 
         apply(
@@ -3738,7 +3738,7 @@ mod tests {
             &mut entities,
             vec![(
                 1,
-                SimCommand::SetupAtGuns {
+                SimCommand::SetupAntiTankGuns {
                     units: vec![at, rifle, enemy_at, at],
                     x: 100.0,
                     y: 140.0,
@@ -3756,7 +3756,7 @@ mod tests {
         );
         assert!(
             at.facing().abs() < 0.001,
-            "setup command should not snap the AT gun body to the target facing"
+            "setup command should not snap the anti-tank gun body to the target facing"
         );
         assert_eq!(
             entities
@@ -3764,7 +3764,7 @@ mod tests {
                 .expect("rifleman should exist")
                 .weapon_setup(),
             WeaponSetup::Packed,
-            "non-AT units in the selected list are ignored"
+            "non-setup-capable units in the selected list are ignored"
         );
         assert_eq!(
             entities
@@ -3772,16 +3772,16 @@ mod tests {
                 .expect("enemy at gun should exist")
                 .weapon_setup(),
             WeaponSetup::Packed,
-            "enemy AT guns are ignored"
+            "enemy anti-tank guns are ignored"
         );
     }
 
     #[test]
-    fn queued_setup_at_guns_filters_to_at_teams_and_preserves_later_attack_move() {
+    fn queued_setup_anti_tank_guns_filters_to_anti_tank_guns_and_preserves_later_attack_move() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let at = entities
-            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
             .expect("at gun should spawn");
         let rifle = entities
             .spawn_unit(1, EntityKind::Rifleman, 120.0, 100.0)
@@ -3793,7 +3793,7 @@ mod tests {
             vec![
                 (
                     1,
-                    SimCommand::SetupAtGuns {
+                    SimCommand::SetupAntiTankGuns {
                         units: vec![at, rifle],
                         x: 100.0,
                         y: 140.0,
@@ -3814,13 +3814,13 @@ mod tests {
 
         assert!(matches!(
             entities.get(at).unwrap().queued_orders()[0],
-            OrderIntent::SetupAtGuns(_)
+            OrderIntent::SetupAntiTankGuns(_)
         ));
         assert_eq!(entities.get(at).unwrap().queued_orders().len(), 2);
         assert_eq!(
             entities.get(rifle).unwrap().queued_orders().len(),
             1,
-            "non-AT units skip setup but keep later compatible stages"
+            "non-setup-capable units skip setup but keep later compatible stages"
         );
     }
 
@@ -4002,14 +4002,14 @@ mod tests {
     }
 
     #[test]
-    fn teardown_at_guns_only_affects_setting_up_or_deployed_at_guns() {
+    fn teardown_anti_tank_guns_only_affects_setting_up_or_deployed_anti_tank_guns() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let deployed = entities
-            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
             .expect("at gun should spawn");
         let packed = entities
-            .spawn_unit(1, EntityKind::AtTeam, 130.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 130.0, 100.0)
             .expect("at gun should spawn");
         entities
             .get_mut(deployed)
@@ -4025,7 +4025,7 @@ mod tests {
             &mut entities,
             vec![(
                 1,
-                SimCommand::TearDownAtGuns {
+                SimCommand::TearDownAntiTankGuns {
                     units: vec![deployed, packed],
                 },
             )],
@@ -4042,19 +4042,19 @@ mod tests {
         assert_eq!(
             entities.get(packed).unwrap().emplacement_facing(),
             None,
-            "teardown should cancel a packed AT gun's staged setup facing"
+            "teardown should cancel a packed anti-tank gun's staged setup facing"
         );
     }
 
     #[test]
-    fn move_order_tears_down_deployed_at_guns_before_moving() {
+    fn move_order_tears_down_deployed_anti_tank_guns_before_moving() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let deployed = entities
-            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
             .expect("at gun should spawn");
         let packed = entities
-            .spawn_unit(1, EntityKind::AtTeam, 130.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 130.0, 100.0)
             .expect("at gun should spawn");
         {
             let at = entities.get_mut(deployed).unwrap();
@@ -4086,15 +4086,15 @@ mod tests {
         assert_eq!(
             deployed.facing(),
             0.25,
-            "move order should not instantly rotate a deployed AT gun before it moves"
+            "move order should not instantly rotate a deployed anti-tank gun before it moves"
         );
         assert!(
             matches!(deployed.order(), Order::Move(_)),
-            "move should replace the deployed AT gun order"
+            "move should replace the deployed anti-tank gun order"
         );
         assert!(
             deployed.path_goal().is_some(),
-            "move should preserve the movement destination while the AT gun tears down"
+            "move should preserve the movement destination while the anti-tank gun tears down"
         );
         assert_eq!(deployed.emplacement_facing(), None);
         assert_eq!(deployed.pending_redeploy_facing(), None);
@@ -4102,16 +4102,16 @@ mod tests {
         let packed = entities.get(packed).expect("packed at gun should exist");
         assert!(
             matches!(packed.order(), Order::Move(_)),
-            "packed AT guns should still accept move orders"
+            "packed anti-tank guns should still accept move orders"
         );
     }
 
     #[test]
-    fn attack_move_order_tears_down_deployed_at_guns_before_moving() {
+    fn attack_move_order_tears_down_deployed_anti_tank_guns_before_moving() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let deployed = entities
-            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
             .expect("at gun should spawn");
         {
             let at = entities.get_mut(deployed).unwrap();
@@ -4143,26 +4143,26 @@ mod tests {
         assert_eq!(
             deployed.facing(),
             -0.5,
-            "attack-move should not instantly rotate a deployed AT gun before it moves"
+            "attack-move should not instantly rotate a deployed anti-tank gun before it moves"
         );
         assert!(
             matches!(deployed.order(), Order::AttackMove(_)),
-            "attack-move should replace the deployed AT gun order"
+            "attack-move should replace the deployed anti-tank gun order"
         );
         assert!(
             deployed.path_goal().is_some(),
-            "attack-move should preserve the movement destination while the AT gun tears down"
+            "attack-move should preserve the movement destination while the anti-tank gun tears down"
         );
         assert_eq!(deployed.emplacement_facing(), None);
         assert_eq!(deployed.pending_redeploy_facing(), None);
     }
 
     #[test]
-    fn deployed_at_gun_rejects_explicit_attack_outside_field_of_fire() {
+    fn deployed_anti_tank_gun_rejects_explicit_attack_outside_field_of_fire() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let at = entities
-            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
             .expect("at gun should spawn");
         let front_target = entities
             .spawn_unit(2, EntityKind::Tank, 220.0, 100.0)
@@ -4190,7 +4190,7 @@ mod tests {
         );
         assert!(
             !matches!(entities.get(at).unwrap().order(), Order::Attack(_)),
-            "out-of-arc attack should be ignored for the deployed AT gun"
+            "out-of-arc attack should be ignored for the deployed anti-tank gun"
         );
 
         apply(

@@ -242,13 +242,13 @@ pub fn project_entity(
     if matches!(
         entity.kind,
         EntityKind::MachineGunner
-            | EntityKind::AtTeam
+            | EntityKind::AntiTankGun
             | EntityKind::MortarTeam
             | EntityKind::Artillery
     ) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
-    if matches!(entity.kind, EntityKind::AtTeam | EntityKind::Artillery) && owner_or_ally {
+    if matches!(entity.kind, EntityKind::AntiTankGun | EntityKind::Artillery) && owner_or_ally {
         view.setup_facing = entity.emplacement_facing();
     }
 
@@ -458,7 +458,7 @@ fn intent_plan_marker(
             self_position.0,
             self_position.1,
         ),
-        OrderIntent::SetupAtGuns(point) => point_marker("setupAtGuns", point.x, point.y),
+        OrderIntent::SetupAntiTankGuns(point) => point_marker("setupAntiTankGuns", point.x, point.y),
     }
 }
 

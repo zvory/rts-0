@@ -59,7 +59,7 @@ export function _ownBuildingsOfKindInViewport(kind) {
 
 export function _unitSelectionGroup(e) {
   if (!e) return "";
-  if (e.kind !== KIND.AT_TEAM) return e.kind;
+  if (e.kind !== KIND.ANTI_TANK_GUN) return e.kind;
   return `${e.kind}:${e.setupState || SETUP.PACKED}`;
 }
 
@@ -199,7 +199,7 @@ export function _worldPointHitsEntity(e, wx, wy, tileSize) {
       wy <= e.y + halfH + HIT_PAD_PX
     );
   }
-  if (e.kind === KIND.AT_TEAM) return pointHitsOrientedVehicle(e, wx, wy, 0);
+  if (e.kind === KIND.ANTI_TANK_GUN) return pointHitsOrientedVehicle(e, wx, wy, 0);
   if (isVehicleBodyKind(e.kind)) return pointHitsOrientedVehicle(e, wx, wy, HIT_PAD_PX);
   const radius = (stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS) + HIT_PAD_PX;
   return Math.hypot(wx - e.x, wy - e.y) <= radius;

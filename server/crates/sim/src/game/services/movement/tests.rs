@@ -20,7 +20,7 @@ use rayon::prelude::*;
 
 use super::collision::COLLISION_EPS_PX;
 use super::pivot_drive::{
-    pivot_drive_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, PIVOT_VEHICLE_LOOKAHEAD_PX,
+    pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK, PIVOT_VEHICLE_LOOKAHEAD_PX,
     VEHICLE_REVERSE_GOAL_DISTANCE_PX,
 };
 use super::scout_car::{
@@ -425,8 +425,8 @@ fn tank_body_half_width() -> f32 {
     config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX
 }
 
-fn at_gun_body_radius() -> f32 {
-    config::AT_GUN_BODY_WIDTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX
+fn anti_tank_gun_body_radius() -> f32 {
+    config::ANTI_TANK_GUN_BODY_WIDTH_PX * 0.5 + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX
 }
 
 fn scout_car_body_half_width() -> f32 {
@@ -681,14 +681,14 @@ fn tank_infantry_overlap_resolves_from_oriented_hull() {
 }
 
 #[test]
-fn at_gun_infantry_overlap_resolves_from_circular_body() {
+fn anti_tank_gun_infantry_overlap_resolves_from_circular_body() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (cx, cy) = map.tile_center(20, 20);
-    let at_gun = entities
-        .spawn_unit(1, EntityKind::AtTeam, cx, cy)
-        .expect("AT gun spawn");
-    if let Some(e) = entities.get_mut(at_gun) {
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, cx, cy)
+        .expect("anti-tank gun spawn");
+    if let Some(e) = entities.get_mut(anti_tank_gun) {
         e.set_facing(0.0);
     }
     let rifle_radius = config::unit_stats(EntityKind::Rifleman)
@@ -698,36 +698,36 @@ fn at_gun_infantry_overlap_resolves_from_circular_body() {
         .spawn_unit(
             2,
             EntityKind::Rifleman,
-            cx + at_gun_body_radius() + rifle_radius - 4.0,
+            cx + anti_tank_gun_body_radius() + rifle_radius - 4.0,
             cy,
         )
         .expect("rifleman spawn");
     assert_eq!(
-        unit_body_with_facing(EntityKind::AtTeam, cx, cy, 0.0),
-        unit_body_with_facing(EntityKind::AtTeam, cx, cy, std::f32::consts::FRAC_PI_2),
-        "AT gun collision body should not change with facing"
+        unit_body_with_facing(EntityKind::AntiTankGun, cx, cy, 0.0),
+        unit_body_with_facing(EntityKind::AntiTankGun, cx, cy, std::f32::consts::FRAC_PI_2),
+        "anti-tank gun collision body should not change with facing"
     );
     mark_moving(&mut entities, rifleman, (cx + 128.0, cy));
-    let at_gun_before = pos(&entities, at_gun);
+    let anti_tank_gun_before = pos(&entities, anti_tank_gun);
     let rifleman_before = pos(&entities, rifleman);
 
     let occ = Occupancy::build(&map, &entities);
     let spatial = SpatialIndex::build(&entities, map.size);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
-    let at_gun_after = pos(&entities, at_gun);
+    let anti_tank_gun_after = pos(&entities, anti_tank_gun);
     let rifleman_after = pos(&entities, rifleman);
     assert!(
-        body_overlap_depth(&entities, at_gun, rifleman) <= COLLISION_EPS_PX,
-        "circular AT gun body and infantry circle should separate"
+        body_overlap_depth(&entities, anti_tank_gun, rifleman) <= COLLISION_EPS_PX,
+        "circular anti-tank gun body and infantry circle should separate"
     );
     assert!(
-        (at_gun_after.1 - at_gun_before.1).abs() <= 0.001,
-        "head-on collision should not sidestep the AT gun sideways"
+        (anti_tank_gun_after.1 - anti_tank_gun_before.1).abs() <= 0.001,
+        "head-on collision should not sidestep the anti-tank gun sideways"
     );
     assert!(
         rifleman_after.0 > rifleman_before.0,
-        "soft infantry should absorb the AT gun overlap"
+        "soft infantry should absorb the anti-tank gun overlap"
     );
 }
 
@@ -1464,8 +1464,8 @@ const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::Rifleman, 4, 2_322),
     (EntityKind::MachineGunner, 1, 2_883),
     (EntityKind::MachineGunner, 4, 2_927),
-    (EntityKind::AtTeam, 1, 3_169),
-    (EntityKind::AtTeam, 4, 3_318),
+    (EntityKind::AntiTankGun, 1, 3_169),
+    (EntityKind::AntiTankGun, 4, 3_318),
     (EntityKind::ScoutCar, 1, 1_577),
     (EntityKind::ScoutCar, 4, 1_647),
     (EntityKind::Tank, 1, 1_953),
@@ -1477,19 +1477,19 @@ const SNAKING_CORRIDOR_VEHICLE_SLOT_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::Tank, 1, 1_993),
     (EntityKind::Tank, 2, 2_049),
     (EntityKind::Tank, 3, 2_102),
-    (EntityKind::AtTeam, 0, 3_139),
-    (EntityKind::AtTeam, 1, 3_201),
-    (EntityKind::AtTeam, 2, 3_259),
-    (EntityKind::AtTeam, 3, 3_318),
+    (EntityKind::AntiTankGun, 0, 3_139),
+    (EntityKind::AntiTankGun, 1, 3_201),
+    (EntityKind::AntiTankGun, 2, 3_259),
+    (EntityKind::AntiTankGun, 3, 3_318),
 ];
 
 const WALL_CHOKEPOINT_MAX_TICKS: u32 = 3_000;
 const WALL_CHOKEPOINT_SCORE_BASELINES: &[(EntityKind, usize, u32)] = &[
-    (EntityKind::AtTeam, 3, 332),
-    (EntityKind::AtTeam, 5, 392),
-    (EntityKind::AtTeam, 6, 368),
-    (EntityKind::AtTeam, 10, 432),
-    (EntityKind::AtTeam, 15, 528),
+    (EntityKind::AntiTankGun, 3, 332),
+    (EntityKind::AntiTankGun, 5, 392),
+    (EntityKind::AntiTankGun, 6, 368),
+    (EntityKind::AntiTankGun, 10, 432),
+    (EntityKind::AntiTankGun, 15, 528),
     (EntityKind::ScoutCar, 3, 156),
     (EntityKind::ScoutCar, 5, 176),
     (EntityKind::ScoutCar, 6, 175),
@@ -1584,7 +1584,7 @@ fn scout_car_wall_chokepoint_map(
     let center_world_x = gap_right_x as f32 * ts;
     let start_y = (wall_y as f32 + 10.5) * ts;
     let spacing = match unit {
-        EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
+        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_BODY_WIDTH_PX + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX * 4.0,
         EntityKind::ScoutCar => {
             config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0
         }
@@ -1761,9 +1761,9 @@ fn wall_chokepoint_score_baseline(unit: EntityKind, unit_count: usize) -> u32 {
 
 fn snaking_corridor_spawn_spacing(unit: EntityKind) -> (f32, f32) {
     match unit {
-        EntityKind::AtTeam => (
-            config::AT_GUN_BODY_WIDTH_PX * 1.5,
-            config::AT_GUN_BODY_LENGTH_PX * 1.5,
+        EntityKind::AntiTankGun => (
+            config::ANTI_TANK_GUN_BODY_WIDTH_PX * 1.5,
+            config::ANTI_TANK_GUN_BODY_LENGTH_PX * 1.5,
         ),
         EntityKind::ScoutCar => (
             config::SCOUT_CAR_BODY_WIDTH_PX * 1.5,
@@ -2008,8 +2008,8 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
         (EntityKind::Rifleman, 4usize),
         (EntityKind::MachineGunner, 1usize),
         (EntityKind::MachineGunner, 4usize),
-        (EntityKind::AtTeam, 1usize),
-        (EntityKind::AtTeam, 4usize),
+        (EntityKind::AntiTankGun, 1usize),
+        (EntityKind::AntiTankGun, 4usize),
         (EntityKind::ScoutCar, 1usize),
         (EntityKind::ScoutCar, 4usize),
         (EntityKind::Tank, 1usize),
@@ -2062,7 +2062,7 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
 
 #[test]
 fn snaking_corridor_vehicle_slot_clear_times_regression() {
-    let scenarios = [(EntityKind::Tank, 4usize), (EntityKind::AtTeam, 4usize)];
+    let scenarios = [(EntityKind::Tank, 4usize), (EntityKind::AntiTankGun, 4usize)];
     let results: Vec<_> = scenarios
         .par_iter()
         .map(|&(unit, count)| measure_snaking_corridor_unit_clear_times(unit, count, &[0, 1, 2, 3]))
@@ -2228,8 +2228,8 @@ fn snaking_corridor_clear_times_all_units() {
         (EntityKind::Rifleman, 4usize),
         (EntityKind::MachineGunner, 1usize),
         (EntityKind::MachineGunner, 4usize),
-        (EntityKind::AtTeam, 1usize),
-        (EntityKind::AtTeam, 4usize),
+        (EntityKind::AntiTankGun, 1usize),
+        (EntityKind::AntiTankGun, 4usize),
         (EntityKind::ScoutCar, 1usize),
         (EntityKind::ScoutCar, 4usize),
         (EntityKind::Tank, 1usize),
@@ -4438,32 +4438,32 @@ fn tank_body_facing_turns_gradually_along_path() {
 }
 
 #[test]
-fn at_gun_body_uses_pivot_drive_turning_along_path() {
+fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
     let (_, gy) = map.tile_center(20, 26);
-    let at_gun = entities
-        .spawn_unit(1, EntityKind::AtTeam, sx, sy)
-        .expect("AT gun should spawn");
-    if let Some(e) = entities.get_mut(at_gun) {
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, sx, sy)
+        .expect("anti-tank gun should spawn");
+    if let Some(e) = entities.get_mut(anti_tank_gun) {
         e.set_facing(0.0);
     }
-    set_path_direct(&mut entities, at_gun, vec![(sx, gy)]);
+    set_path_direct(&mut entities, anti_tank_gun, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
     let spatial = SpatialIndex::build(&entities, map.size);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
-    let e = entities.get(at_gun).expect("AT gun should exist");
+    let e = entities.get(anti_tank_gun).expect("anti-tank gun should exist");
     assert!(
-        e.facing() > 0.0 && e.facing() <= AT_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
-        "AT gun body should turn by at most the support-weapon turn-rate constant, got {:.4}",
+        e.facing() > 0.0 && e.facing() <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+        "anti-tank gun body should turn by at most the support-weapon turn-rate constant, got {:.4}",
         e.facing()
     );
     assert!(
         moved_distance((sx, sy), (e.pos_x, e.pos_y)) < 0.01,
-        "AT gun should pivot before driving when the target is far off its facing"
+        "anti-tank gun should pivot before driving when the target is far off its facing"
     );
 }
 
@@ -4736,30 +4736,30 @@ fn rifleman_facing_remains_instant_for_path_segment() {
 }
 
 #[test]
-fn at_team_facing_turns_gradually_along_path() {
+fn anti_tank_gun_facing_turns_gradually_along_path() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
     let (_, gy) = map.tile_center(20, 26);
-    let at_team = entities
-        .spawn_unit(1, EntityKind::AtTeam, sx, sy)
-        .expect("at team should spawn");
-    if let Some(e) = entities.get_mut(at_team) {
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, sx, sy)
+        .expect("anti-tank gun should spawn");
+    if let Some(e) = entities.get_mut(anti_tank_gun) {
         e.set_facing(0.0);
     }
-    set_path_direct(&mut entities, at_team, vec![(sx, gy)]);
+    set_path_direct(&mut entities, anti_tank_gun, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
     let spatial = SpatialIndex::build(&entities, map.size);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let facing = entities
-        .get(at_team)
-        .expect("at team should exist")
+        .get(anti_tank_gun)
+        .expect("anti-tank gun should exist")
         .facing();
     assert!(
-        facing > 0.0 && facing <= AT_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
-        "AT gun should turn by at most the turn-rate constant, got {facing:.4}"
+        facing > 0.0 && facing <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+        "anti-tank gun should turn by at most the turn-rate constant, got {facing:.4}"
     );
 }
 
@@ -4786,7 +4786,7 @@ fn mortar_team_facing_turns_gradually_along_path() {
         .expect("mortar should exist")
         .facing();
     assert!(
-        facing > 0.0 && facing <= AT_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+        facing > 0.0 && facing <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
         "mortar should turn by at most the support-weapon turn-rate constant, got {facing:.4}"
     );
 }

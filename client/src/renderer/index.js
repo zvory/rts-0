@@ -34,7 +34,7 @@ import {
   _drawArtilleryImpacts,
   _drawArtilleryLaunches,
   _drawArtilleryTargets,
-  _drawAtGunSetupPreview,
+  _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
   _drawDebugPathOverlay,
   _drawMuzzleFlashes,
@@ -234,7 +234,7 @@ export class Renderer {
     this._drawArtilleryImpacts(state);
     this._drawSelectedMortarRanges(state);
     this._drawAbilityTargetPreview(state);
-    this._drawAtGunSetupPreview(state);
+    this._drawAntiTankGunSetupPreview(state);
     this._drawOrderPlan(state);
     this._drawDebugPathOverlay(state, regularEntities);
     this._drawRallyPoints(state);
@@ -357,7 +357,7 @@ export class Renderer {
    * @private
    */
   /** Draw short-lived local markers for issued move / attack commands. @private */
-  /** Draw AT gun setup and selected deployed field-of-fire wedges. @private */
+  /** Draw anti-tank gun setup and selected deployed field-of-fire wedges. @private */
   /** Draw selected own units' server-accepted active + queued order plan. @private */
   /**
    * Draw rally-point markers for selected own unit-producing buildings: a faint line from the
@@ -369,7 +369,7 @@ export class Renderer {
   /**
    * Draw a brief muzzle flash on the attacker plus a yellow tracer line to the
    * target, then a fainter continuation past the target for overpenetration.
-   * Size scales by attacker kind (tank > AT gun > MG > rifleman).
+   * Size scales by attacker kind (tank > anti-tank gun > MG > rifleman).
    * @private
    */
   /**
@@ -467,7 +467,7 @@ Object.assign(Renderer.prototype, {
   _drawAbilityTargetPreview,
   _drawSelectedMortarRanges,
   _drawSmokes,
-  _drawAtGunSetupPreview,
+  _drawAntiTankGunSetupPreview,
   _drawOrderPlan,
   _drawDebugPathOverlay,
   _drawRallyPoints,

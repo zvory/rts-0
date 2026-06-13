@@ -178,7 +178,7 @@ fn apply_overpenetration(
     }
 
     let overpenetration_factor = match entities.get(attacker).map(|e| e.kind) {
-        Some(EntityKind::AtTeam) => 0.50,
+        Some(EntityKind::AntiTankGun) => 0.50,
         _ => 0.25,
     };
     let overpenetration_limit = dist + range_px * overpenetration_factor;

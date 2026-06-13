@@ -28,13 +28,13 @@ pub enum SimCommand {
         target: u32,
         queued: bool,
     },
-    SetupAtGuns {
+    SetupAntiTankGuns {
         units: Vec<u32>,
         x: f32,
         y: f32,
         queued: bool,
     },
-    TearDownAtGuns {
+    TearDownAntiTankGuns {
         units: Vec<u32>,
     },
     UseAbility {
@@ -140,18 +140,18 @@ impl SimCommand {
                 target,
                 queued,
             },
-            protocol::Command::SetupAtGuns {
+            protocol::Command::SetupAntiTankGuns {
                 units,
                 x,
                 y,
                 queued,
-            } => SimCommand::SetupAtGuns {
+            } => SimCommand::SetupAntiTankGuns {
                 units,
                 x,
                 y,
                 queued,
             },
-            protocol::Command::TearDownAtGuns { units } => SimCommand::TearDownAtGuns { units },
+            protocol::Command::TearDownAntiTankGuns { units } => SimCommand::TearDownAntiTankGuns { units },
             protocol::Command::Charge { units } => SimCommand::UseAbility {
                 ability: AbilityKind::Charge,
                 units,
@@ -288,18 +288,18 @@ impl SimCommand {
                 target: *target,
                 queued: *queued,
             },
-            SimCommand::SetupAtGuns {
+            SimCommand::SetupAntiTankGuns {
                 units,
                 x,
                 y,
                 queued,
-            } => protocol::Command::SetupAtGuns {
+            } => protocol::Command::SetupAntiTankGuns {
                 units: units.clone(),
                 x: *x,
                 y: *y,
                 queued: *queued,
             },
-            SimCommand::TearDownAtGuns { units } => protocol::Command::TearDownAtGuns {
+            SimCommand::TearDownAntiTankGuns { units } => protocol::Command::TearDownAntiTankGuns {
                 units: units.clone(),
             },
             SimCommand::UseAbility {
@@ -470,8 +470,8 @@ mod tests {
     }
 
     #[test]
-    fn protocol_at_gun_setup_commands_round_trip() {
-        let setup = protocol::Command::SetupAtGuns {
+    fn protocol_anti_tank_gun_setup_commands_round_trip() {
+        let setup = protocol::Command::SetupAntiTankGuns {
             units: vec![3, 5],
             x: 100.0,
             y: 200.0,
@@ -479,7 +479,7 @@ mod tests {
         };
         assert_eq!(
             SimCommand::from_protocol(setup.clone()),
-            SimCommand::SetupAtGuns {
+            SimCommand::SetupAntiTankGuns {
                 units: vec![3, 5],
                 x: 100.0,
                 y: 200.0,
@@ -491,10 +491,10 @@ mod tests {
             Some(setup)
         );
 
-        let teardown = protocol::Command::TearDownAtGuns { units: vec![7] };
+        let teardown = protocol::Command::TearDownAntiTankGuns { units: vec![7] };
         assert_eq!(
             SimCommand::from_protocol(teardown.clone()),
-            SimCommand::TearDownAtGuns { units: vec![7] }
+            SimCommand::TearDownAntiTankGuns { units: vec![7] }
         );
         assert_eq!(
             SimCommand::from_protocol(teardown.clone()).to_protocol(),

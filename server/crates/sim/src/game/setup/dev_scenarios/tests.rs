@@ -35,13 +35,13 @@ fn blocker_label(blocker: Option<EntityKind>) -> &'static str {
         Some(EntityKind::Worker) => "worker",
         Some(EntityKind::Rifleman) => "rifleman",
         Some(EntityKind::MachineGunner) => "machine_gunner",
-        Some(EntityKind::AtTeam) => "at_team",
+        Some(EntityKind::AntiTankGun) => "anti_tank_gun",
         Some(_) => "unsupported",
     }
 }
 
 const VEHICLE_SMALL_BLOCK_BASELINES: &[(EntityKind, usize, Option<EntityKind>, u32)] = &[
-    (EntityKind::ScoutCar, 1, Some(EntityKind::AtTeam), 291),
+    (EntityKind::ScoutCar, 1, Some(EntityKind::AntiTankGun), 291),
     (
         EntityKind::ScoutCar,
         1,
@@ -51,7 +51,7 @@ const VEHICLE_SMALL_BLOCK_BASELINES: &[(EntityKind, usize, Option<EntityKind>, u
     (EntityKind::ScoutCar, 1, None, 272),
     (EntityKind::ScoutCar, 1, Some(EntityKind::Rifleman), 272),
     (EntityKind::ScoutCar, 1, Some(EntityKind::Worker), 272),
-    (EntityKind::ScoutCar, 3, Some(EntityKind::AtTeam), 326),
+    (EntityKind::ScoutCar, 3, Some(EntityKind::AntiTankGun), 326),
     (
         EntityKind::ScoutCar,
         3,
@@ -61,7 +61,7 @@ const VEHICLE_SMALL_BLOCK_BASELINES: &[(EntityKind, usize, Option<EntityKind>, u
     (EntityKind::ScoutCar, 3, None, 298),
     (EntityKind::ScoutCar, 3, Some(EntityKind::Rifleman), 298),
     (EntityKind::ScoutCar, 3, Some(EntityKind::Worker), 298),
-    (EntityKind::ScoutCar, 5, Some(EntityKind::AtTeam), 367),
+    (EntityKind::ScoutCar, 5, Some(EntityKind::AntiTankGun), 367),
     (
         EntityKind::ScoutCar,
         5,
@@ -71,17 +71,17 @@ const VEHICLE_SMALL_BLOCK_BASELINES: &[(EntityKind, usize, Option<EntityKind>, u
     (EntityKind::ScoutCar, 5, None, 333),
     (EntityKind::ScoutCar, 5, Some(EntityKind::Rifleman), 333),
     (EntityKind::ScoutCar, 5, Some(EntityKind::Worker), 333),
-    (EntityKind::Tank, 1, Some(EntityKind::AtTeam), 330),
+    (EntityKind::Tank, 1, Some(EntityKind::AntiTankGun), 330),
     (EntityKind::Tank, 1, Some(EntityKind::MachineGunner), 330),
     (EntityKind::Tank, 1, None, 320),
     (EntityKind::Tank, 1, Some(EntityKind::Rifleman), 320),
     (EntityKind::Tank, 1, Some(EntityKind::Worker), 320),
-    (EntityKind::Tank, 3, Some(EntityKind::AtTeam), 466),
+    (EntityKind::Tank, 3, Some(EntityKind::AntiTankGun), 466),
     (EntityKind::Tank, 3, Some(EntityKind::MachineGunner), 462),
     (EntityKind::Tank, 3, None, 446),
     (EntityKind::Tank, 3, Some(EntityKind::Rifleman), 446),
     (EntityKind::Tank, 3, Some(EntityKind::Worker), 446),
-    (EntityKind::Tank, 5, Some(EntityKind::AtTeam), 546),
+    (EntityKind::Tank, 5, Some(EntityKind::AntiTankGun), 546),
     (EntityKind::Tank, 5, Some(EntityKind::MachineGunner), 513),
     (EntityKind::Tank, 5, None, 525),
     (EntityKind::Tank, 5, Some(EntityKind::Rifleman), 525),
@@ -258,7 +258,7 @@ fn measure_vehicle_small_block_clear_time(
 
 #[test]
 fn direct_reverse_order_scenario_faces_unit_east_and_orders_goal_behind() {
-    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
         let setup = Game::new_direct_reverse_order_scenario(unit, 1, 0x5150_0003)
             .expect("scenario setup should succeed");
         let unit_id = *setup.units.first().expect("scenario should spawn one unit");
@@ -361,7 +361,7 @@ fn vehicle_corner_wall_scenario_matches_authored_layout() {
 
 #[test]
 fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
-    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
         for count in [1usize, 3, 5] {
             let setup = Game::new_vehicle_corner_wall_scenario(unit, count, 0x5150_0006)
                 .expect("scenario setup should succeed");
@@ -373,7 +373,7 @@ fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
 
 #[test]
 fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
-    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
         let setup = Game::new_factory_zero_gap_perpendicular_scenario(unit, 1, 0x5150_0009)
             .expect("scenario setup should succeed");
         assert_eq!(setup.issue_after_ticks, config::TICK_HZ / 2);
@@ -424,7 +424,7 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
 #[test]
 fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
     let mut results = Vec::new();
-    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
         let setup = Game::new_direct_reverse_order_scenario(unit, 1, 0x5150_0007)
             .expect("scenario setup should succeed");
         results.push(measure_dev_scenario_clear_time(
@@ -434,7 +434,7 @@ fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
             setup,
         ));
     }
-    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
         for count in [1usize, 3, 5] {
             let setup = Game::new_vehicle_corner_wall_scenario(unit, count, 0x5150_0008)
                 .expect("scenario setup should succeed");
@@ -480,7 +480,7 @@ fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
 #[test]
 fn experimental_factory_zero_gap_perpendicular_clear_time_matrix() {
     let mut results = Vec::new();
-    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
         let setup = Game::new_factory_zero_gap_perpendicular_scenario(unit, 1, 0x5150_0010)
             .expect("scenario setup should succeed");
         results.push(measure_dev_scenario_clear_time(
@@ -539,7 +539,7 @@ fn assert_vehicle_small_block_baseline_setup(
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
-        EntityKind::AtTeam,
+        EntityKind::AntiTankGun,
     ] {
         let expected = (blocker == Some(kind)).then_some(pair_count).unwrap_or(0);
         assert_eq!(
@@ -664,7 +664,7 @@ fn vehicle_small_block_baseline_supports_blocker_variants() {
         Some(EntityKind::Worker),
         Some(EntityKind::Rifleman),
         Some(EntityKind::MachineGunner),
-        Some(EntityKind::AtTeam),
+        Some(EntityKind::AntiTankGun),
     ] {
         assert_vehicle_small_block_baseline_setup(EntityKind::ScoutCar, 3, blocker);
         assert_vehicle_small_block_baseline_setup(EntityKind::Tank, 3, blocker);
@@ -682,7 +682,7 @@ fn vehicle_small_block_baseline_clear_time_matrix() {
                     Some(EntityKind::Worker),
                     Some(EntityKind::Rifleman),
                     Some(EntityKind::MachineGunner),
-                    Some(EntityKind::AtTeam),
+                    Some(EntityKind::AntiTankGun),
                 ]
                 .into_iter()
                 .map(move |blocker| (vehicle, pair_count, blocker))

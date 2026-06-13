@@ -18,9 +18,9 @@ unit modest.
 - Training Centre is the shared base tech structure.
 - Training Centre eventually unlocks Machine Gunners and Stormtroopers.
 - Stormtroopers are not urgent for the first implementation pass.
-- Superior Firepower path entry should allow play with Mortar Teams before AT Guns.
+- Superior Firepower path entry should allow play with Mortar Teams before Anti-Tank Guns.
 - Mobile Warfare path entry should allow play with Scout Cars before Tanks.
-- AT Guns and Tanks both require additional investment beyond the path-entry building.
+- Anti-Tank Guns and Tanks both require additional investment beyond the path-entry building.
 - Mobile Warfare should have a strong stage-two surge when Tanks unlock.
 - Superior Firepower should be trying to survive that surge and reach Artillery.
 - If Superior Firepower reaches Artillery, it should be able to grind down Mobile Warfare positions
@@ -32,7 +32,7 @@ unit modest.
 |-------|--------------------|----------------|
 | Shared | Training Centre: Machine Gunner, later Stormtrooper | Training Centre: Machine Gunner, later Stormtrooper |
 | Path entry | Gun Works: Mortar Team | Vehicle Works: Scout Car |
-| Commitment unlock | R&D Complex upgrade: AT Gun | R&D Complex upgrade: Tank |
+| Commitment unlock | R&D Complex upgrade: Anti-Tank Gun | R&D Complex upgrade: Tank |
 | Late power | R&D Complex upgrade: Artillery | R&D Complex upgrade: Command Car |
 
 ## Unit Notes
@@ -60,7 +60,7 @@ unit modest.
 - Player can disable autocast and aim manually.
 - Like Machine Gunners, must set up to shoot; setup happens automatically after 1 second.
 
-### AT Gun
+### Anti-Tank Gun
 
 - Built at Gun Works.
 - Requires a Gun Works upgrade before training.
@@ -83,7 +83,7 @@ unit modest.
 - Built at Gun Works.
 - Late Superior Firepower capstone.
 - Costs 300 steel / 100 oil.
-- Larger, slower AT Gun-style weapon that must set up before firing and tear down before moving.
+- Larger, slower Anti-Tank Gun-style weapon that must set up before firing and tear down before moving.
 - Shoots at a point rather than at a unit.
 - Has 10-50 tile range, a 20-degree field of fire, a 3-second reload, and costs 10 steel per shot
   when the shot fires.
@@ -102,8 +102,8 @@ unit modest.
 ## Phase Index
 
 1. [Phase 1 - Tech Spine and Vehicle Works Framing](phase-1-tech-spine.md)
-2. [Phase 2 - AT Gun and Tank Unlock Upgrades](phase-2-at-tank-unlocks.md)
-3. [Phase 3 - Gun Works AT Gun Production](phase-3-steelworks-at-gun.md)
+2. [Phase 2 - Anti-Tank Gun and Tank Unlock Upgrades](phase-2-at-tank-unlocks.md)
+3. [Phase 3 - Gun Works Anti-Tank Gun Production](phase-3-steelworks-at-gun.md)
 4. [Phase 4 - Mortar Team](phase-4-mortar-team.md)
 5. Phase 5 - Stage Timing and Playtest Balance (no standalone phase file; track tuning notes in
    this plan or the active balance/playtest notes)
@@ -112,7 +112,7 @@ unit modest.
 
 ## Deferred Work
 
-- Stormtroopers should wait until the two-path spine, Mortar Team, AT Gun unlock, and Tank unlock
+- Stormtroopers should wait until the two-path spine, Mortar Team, Anti-Tank Gun unlock, and Tank unlock
   are playable.
 - Hard mutual exclusivity between paths is not part of the first pass. Prefer economic and timing
   pressure first: players may access both paths, but doing so should delay power spikes.

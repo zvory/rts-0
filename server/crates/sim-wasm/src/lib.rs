@@ -374,8 +374,8 @@ impl CorePredictor {
                 self.note_disabled("buildPredictionUnsupported");
             }
             Command::Attack { .. }
-            | Command::SetupAtGuns { .. }
-            | Command::TearDownAtGuns { .. }
+            | Command::SetupAntiTankGuns { .. }
+            | Command::TearDownAntiTankGuns { .. }
             | Command::Charge { .. }
             | Command::UseAbility { .. }
             | Command::SetAutocast { .. }
@@ -710,8 +710,8 @@ fn command_kind(command: &Command) -> &'static str {
         Command::Move { .. } => "move",
         Command::AttackMove { .. } => "attackMove",
         Command::Attack { .. } => "attack",
-        Command::SetupAtGuns { .. } => "setupAtGuns",
-        Command::TearDownAtGuns { .. } => "tearDownAtGuns",
+        Command::SetupAntiTankGuns { .. } => "setupAntiTankGuns",
+        Command::TearDownAntiTankGuns { .. } => "tearDownAntiTankGuns",
         Command::Charge { .. } => "charge",
         Command::UseAbility { .. } => "useAbility",
         Command::SetAutocast { .. } => "setAutocast",

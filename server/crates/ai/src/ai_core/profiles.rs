@@ -202,10 +202,10 @@ pub(crate) struct TankResourcePolicy {
 const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
 const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
 const TANK_ONLY: [EntityKind; 1] = [EntityKind::Tank];
-const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AtTeam];
+const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AntiTankGun];
 const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
     EntityKind::MachineGunner,
-    EntityKind::AtTeam,
+    EntityKind::AntiTankGun,
     EntityKind::Rifleman,
 ];
 
@@ -737,7 +737,7 @@ mod tests {
         );
         assert_eq!(
             STEEL_EXPANSION_TANKS.production.unit_priorities,
-            &[EntityKind::MachineGunner, EntityKind::AtTeam]
+            &[EntityKind::MachineGunner, EntityKind::AntiTankGun]
         );
         assert!(STEEL_EXPANSION_TANKS.production.balance_unit_priorities);
         assert_eq!(expansion.target_city_centres, 2);

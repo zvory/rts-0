@@ -39,10 +39,10 @@ use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
 use projection::friendly_hard_blocker_between;
 use weapons::{
-    at_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
+    anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
     mirror_weapon_to_body, moving_fire_miss_chance, relax_vehicle_weapon_toward_body,
-    rotate_at_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
+    rotate_anti_tank_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
     uses_stationary_weapon_aggro,
 };
 
@@ -50,8 +50,8 @@ use weapons::{
 pub(super) const RANGE_SLACK: f32 = 4.0;
 pub(super) const TANK_TURRET_TURN_RATE_RAD_PER_TICK: f32 = 0.070;
 pub(super) const TANK_TURRET_FIRE_TOLERANCE_RAD: f32 = 0.18;
-pub(super) const AT_GUN_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
-pub(super) const AT_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
+pub(super) const ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
+pub(super) const ANTI_TANK_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
 pub(super) const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
 pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
@@ -209,8 +209,8 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 if fires_while_moving(e.kind) {
                     rotate_vehicle_weapon_for_combat(e, target_angle);
-                } else if e.kind == EntityKind::AtTeam {
-                    rotate_at_gun_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::AntiTankGun {
+                    rotate_anti_tank_gun_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::MortarTeam {
                     rotate_mortar_for_fire(e, target_angle);
                 } else if target_angle.is_finite() {
@@ -230,8 +230,8 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 if fires_while_moving(e.kind) {
                     weapon_aligned = rotate_vehicle_weapon_for_combat(e, target_angle);
-                } else if e.kind == EntityKind::AtTeam {
-                    weapon_aligned = rotate_at_gun_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::AntiTankGun {
+                    weapon_aligned = rotate_anti_tank_gun_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::MortarTeam {
                     weapon_aligned = rotate_mortar_for_fire(e, target_angle);
                 } else if target_angle.is_finite() {
@@ -317,8 +317,8 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 if fires_while_moving(e.kind) {
                     rotate_vehicle_weapon_for_combat(e, target_angle);
-                } else if e.kind == EntityKind::AtTeam {
-                    rotate_at_gun_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::AntiTankGun {
+                    rotate_anti_tank_gun_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::MortarTeam {
                     rotate_mortar_for_fire(e, target_angle);
                 } else if target_angle.is_finite() {
@@ -326,7 +326,7 @@ pub(crate) fn combat_system(
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Chasing);
-                can_chase = at_gun_can_chase(e);
+                can_chase = anti_tank_gun_can_chase(e);
             }
             if !can_chase {
                 continue;

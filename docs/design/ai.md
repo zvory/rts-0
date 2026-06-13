@@ -77,9 +77,9 @@ can still be finished. Once the first completed Barracks has had enough time to 
 Riflemen, using the current Rifleman training time from shared unit stats, the profile stops
 treating the rush as a pure all-in: it resumes worker production toward main steel saturation,
 starts oil workers after a steel floor, adds a home
-Barracks, builds a Training Centre, and switches production toward Machine Gunners / AT teams with
+Barracks, builds a Training Centre, and switches production toward Machine Gunners / Anti-Tank Guns with
 Riflemen as the fallback until support tech is ready. Machine Gunners come online with the Training
-Centre; AT teams train from the follow-up Gun Works (`steelworks` kind) after AT Gun Crews
+Centre; Anti-Tank Guns train from the follow-up Gun Works (`steelworks` kind) after Anti-Tank Gun Crews
 research.
 `rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
 workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
@@ -94,10 +94,10 @@ All profiles share a defensive panic mode. Visible enemy units near the AI's bas
 line, or workers temporarily suspend expansion, worker training, and non-defensive tech spending
 only when their steel+oil value is at least 75% of the AI's own local unit value. While panicking,
 the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+ of visible
-local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine Gunners, mixed
+local DPS) prioritizes Anti-Tank Guns, infantry-dominated pressure prioritizes Machine Gunners, mixed
 pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support panic only uses
-already-completed support tech: Machine Gunners need a Training Centre and AT teams need a
-Gun Works plus AT Gun Crews research. It may pull workers onto oil for those support counters; if
+already-completed support tech: Machine Gunners need a Training Centre and Anti-Tank Guns need a
+Gun Works plus Anti-Tank Gun Crews research. It may pull workers onto oil for those support counters; if
 the relevant support tech is absent, production falls back to Riflemen and panic mode does not
 create tech buildings.
 If the pressure persists through the panic window, the AI asks for an additional Barracks before
@@ -107,10 +107,10 @@ Centre near a neutral steel expansion before building any non-Depot tech structu
 expansion sites must cover the full local resource line, then are ranked by own distance divided
 by nearest living enemy-start distance so similarly close naturals prefer the base farther from
 enemies. Once that expansion City Centre is planned, it builds Barracks and Training Centre tech, staffs
-oil, produces Machine Gunners before Gun Works and then AT teams from Gun Works toward a one-for-one support mix, and keeps those
+oil, produces Machine Gunners before Gun Works and then Anti-Tank Guns from Gun Works toward a one-for-one support mix, and keeps those
 support units staged in a short line on the enemy-facing side of its main-base steel cluster
 instead of launching outbound attack waves.
-After 50 supply used, it switches to a Vehicle Works tech path, stops Machine Gunner / AT team
+After 50 supply used, it switches to a Vehicle Works tech path, stops Machine Gunner / Anti-Tank Gun
 production, trains tanks, and launches outbound tank groups only once at least three tanks are
 ready. After the expansion City Centre is complete, its worker resource assignment is locally bounded so
 main-base workers do not walk to expansion patches, and expansion workers do not walk back to

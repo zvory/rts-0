@@ -33,10 +33,10 @@ pub(super) const DEFENSIVE_PANIC_MG_UNITS: [EntityKind; 2] =
     [EntityKind::MachineGunner, EntityKind::Rifleman];
 
 pub(super) const DEFENSIVE_PANIC_AT_UNITS: [EntityKind; 2] =
-    [EntityKind::AtTeam, EntityKind::Rifleman];
+    [EntityKind::AntiTankGun, EntityKind::Rifleman];
 
 pub(super) const DEFENSIVE_PANIC_SUPPORT_MIX_UNITS: [EntityKind; 3] = [
-    EntityKind::AtTeam,
+    EntityKind::AntiTankGun,
     EntityKind::MachineGunner,
     EntityKind::Rifleman,
 ];
@@ -44,7 +44,7 @@ pub(super) const DEFENSIVE_PANIC_SUPPORT_MIX_UNITS: [EntityKind; 3] = [
 pub(super) const ALL_COMBAT_UNITS: [EntityKind; 5] = [
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
-    EntityKind::AtTeam,
+    EntityKind::AntiTankGun,
     EntityKind::ScoutCar,
     EntityKind::Tank,
 ];
@@ -54,7 +54,7 @@ pub(super) enum DefensivePanicResponse {
     #[default]
     Riflemen,
     MachineGunners,
-    AtTeams,
+    AntiTankGuns,
     SupportMix,
 }
 
@@ -98,7 +98,7 @@ pub(super) fn defensive_panic_plan(
             },
             oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
         },
-        DefensivePanicResponse::AtTeams if at_tech_ready => DefensivePanicPlan {
+        DefensivePanicResponse::AntiTankGuns if at_tech_ready => DefensivePanicPlan {
             required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
             production: ProductionPolicy {
                 queue_depth: 3,
@@ -119,7 +119,7 @@ pub(super) fn defensive_panic_plan(
             oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
         },
         DefensivePanicResponse::MachineGunners
-        | DefensivePanicResponse::AtTeams
+        | DefensivePanicResponse::AntiTankGuns
         | DefensivePanicResponse::SupportMix => defensive_panic_rifle_plan(),
     }
 }
@@ -226,7 +226,7 @@ impl DefensiveThreatScores {
             return DefensivePanicResponse::Riflemen;
         }
         if self.armored_dps / total >= DEFENSIVE_PANIC_DPS_DOMINANCE {
-            DefensivePanicResponse::AtTeams
+            DefensivePanicResponse::AntiTankGuns
         } else if self.infantry_dps / total >= DEFENSIVE_PANIC_DPS_DOMINANCE {
             DefensivePanicResponse::MachineGunners
         } else {

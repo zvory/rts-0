@@ -348,4 +348,4 @@ Use this index when deciding whether a TODO can start.
 - Shrink buildings so they don't take up their whole tile size, but leave some margin pixels on the sides — marginal, not enough for units to squeeze through, but enough for pathing to get easier.
 - Worker mining animation.
 - Create a sound system and a basic system for minimap alerts, for example when being attacked.
-- Add an urban area in the center of the map that is hard to path through, with cover that tanks struggle with and that AT gunners and machine gunners can hide in.
+- Add an urban area in the center of the map that is hard to path through, with cover that tanks struggle with and that anti-tank gunners and machine gunners can hide in.

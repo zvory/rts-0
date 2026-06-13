@@ -52,7 +52,7 @@ pub struct UnitFacts {
     pub can_attack: bool,
     pub can_gather: bool,
     pub can_build: bool,
-    pub can_setup_at_gun: bool,
+    pub can_setup_anti_tank_gun: bool,
     pub queue_terminal: bool,
     pub abilities: Vec<AbilityFacts>,
 }
@@ -69,7 +69,7 @@ impl UnitFacts {
             can_attack: false,
             can_gather: false,
             can_build: false,
-            can_setup_at_gun: false,
+            can_setup_anti_tank_gun: false,
             queue_terminal: false,
             abilities: Vec::new(),
         }
@@ -137,7 +137,7 @@ pub enum RequestedOrder {
         target: Point,
         placement_valid: bool,
     },
-    SetupAtGuns {
+    SetupAntiTankGuns {
         face_toward: Point,
     },
     UseAbility {
@@ -179,7 +179,7 @@ pub enum OrderIntent {
         tile_x: u32,
         tile_y: u32,
     },
-    SetupAtGuns {
+    SetupAntiTankGuns {
         face_toward: Point,
     },
     WorldAbility {
@@ -276,12 +276,12 @@ pub fn plan_order(
             tile_y,
             target,
         ),
-        RequestedOrder::SetupAtGuns { face_toward } if face_toward.valid() => plan_filtered_units(
+        RequestedOrder::SetupAntiTankGuns { face_toward } if face_toward.valid() => plan_filtered_units(
             config,
             request.mode,
             &ordered_facts,
-            |u| u.can_setup_at_gun,
-            OrderIntent::SetupAtGuns { face_toward },
+            |u| u.can_setup_anti_tank_gun,
+            OrderIntent::SetupAntiTankGuns { face_toward },
         ),
         RequestedOrder::UseAbility { ability, target } => {
             plan_ability(config, request.mode, &ordered_facts, ability, target)
@@ -859,27 +859,27 @@ mod tests {
     }
 
     #[test]
-    fn setup_at_guns_is_queueable_and_filters_to_setup_capable_units() {
+    fn setup_anti_tank_guns_is_queueable_and_filters_to_setup_capable_units() {
         let config = PlannerConfig::default();
-        let mut at_gun = unit(1);
-        at_gun.can_setup_at_gun = true;
+        let mut anti_tank_gun = unit(1);
+        anti_tank_gun.can_setup_anti_tank_gun = true;
         let rifle = unit(2);
         let request = OrderRequest {
             units: vec![1, 2],
             mode: IssueMode::Queue,
-            order: RequestedOrder::SetupAtGuns {
+            order: RequestedOrder::SetupAntiTankGuns {
                 face_toward: Point::new(400.0, 200.0),
             },
         };
 
-        let out = plan_order(config, &[at_gun, rifle], &request);
+        let out = plan_order(config, &[anti_tank_gun, rifle], &request);
 
         assert_eq!(queued_units(&out), vec![1]);
         assert_eq!(
             out.actions,
             vec![PlannedAction::AppendQueued {
                 unit: 1,
-                intent: OrderIntent::SetupAtGuns {
+                intent: OrderIntent::SetupAntiTankGuns {
                     face_toward: Point::new(400.0, 200.0),
                 },
             }]

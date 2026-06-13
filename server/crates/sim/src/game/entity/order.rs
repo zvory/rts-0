@@ -119,7 +119,7 @@ pub enum OrderIntent {
     Build(BuildIntent),
     WorldAbility(AbilityIntent),
     SelfAbility(SelfAbilityIntent),
-    SetupAtGuns(PointIntent),
+    SetupAntiTankGuns(PointIntent),
     PointFire(PointIntent),
 }
 
@@ -156,8 +156,8 @@ impl OrderIntent {
         OrderIntent::SelfAbility(SelfAbilityIntent { ability })
     }
 
-    pub fn setup_at_guns(x: f32, y: f32) -> Self {
-        OrderIntent::SetupAtGuns(PointIntent { x, y })
+    pub fn setup_anti_tank_guns(x: f32, y: f32) -> Self {
+        OrderIntent::SetupAntiTankGuns(PointIntent { x, y })
     }
 
     pub fn point_fire(x: f32, y: f32) -> Self {

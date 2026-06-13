@@ -14,7 +14,7 @@ use super::standability::{footing_profile, footing_resistance, FootingProfile};
 use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
 pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
-pub(super) const AT_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
+pub(super) const ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const PIVOT_VEHICLE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
 pub(super) const VEHICLE_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 const PIVOT_VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
@@ -171,8 +171,8 @@ pub(super) fn vehicle_traffic_adjustment(
 
 fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
     match kind {
-        EntityKind::AtTeam | EntityKind::MortarTeam => {
-            config::AT_GUN_BODY_WIDTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX
+        EntityKind::AntiTankGun | EntityKind::MortarTeam => {
+            config::ANTI_TANK_GUN_BODY_WIDTH_PX * 0.5 + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX
         }
         EntityKind::Artillery => {
             config::ARTILLERY_BODY_WIDTH_PX * 0.5 + config::ARTILLERY_BODY_CLEARANCE_PX
@@ -191,8 +191,8 @@ fn traffic_body_half_width(ego_kind: EntityKind, neighbor_kind: EntityKind) -> O
 
 pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
     match kind {
-        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::Artillery => {
-            AT_GUN_BODY_TURN_RATE_RAD_PER_TICK
+        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery => {
+            ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK
         }
         _ => TANK_BODY_TURN_RATE_RAD_PER_TICK,
     }

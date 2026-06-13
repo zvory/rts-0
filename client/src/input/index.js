@@ -37,9 +37,9 @@ import {
   _onRightClick,
   _quickCastCommandTarget,
   _refreshAbilityTargetPreview,
-  _refreshAtGunSetupPreview,
+  _refreshAntiTankGunSetupPreview,
   _refreshResourceMiningPreview,
-  _selectedOwnAtGunIds,
+  _selectedOwnAntiTankGunIds,
   _selectedOwnUnitIds,
   _selectedProducerBuildingIds,
   _selectedWorkerIds,
@@ -239,24 +239,24 @@ export class Input {
     this._flushPointerLockCursor();
     if (this.state.placement) {
       this.state.updateResourceMiningPreview(null);
-      this.state.updateAtGunSetupPreview(null);
+      this.state.updateAntiTankGunSetupPreview(null);
       this._refreshPlacement();
       return;
     }
-    if (this.state.commandTarget === "setupAtGuns") {
+    if (this.state.commandTarget === "setupAntiTankGuns") {
       this.state.updateResourceMiningPreview(null);
       this.state.updateAbilityTargetPreview(null);
-      this._refreshAtGunSetupPreview();
+      this._refreshAntiTankGunSetupPreview();
       return;
     }
     if (this.state.commandTarget?.kind === "ability") {
       this.state.updateResourceMiningPreview(null);
-      this.state.updateAtGunSetupPreview(null);
+      this.state.updateAntiTankGunSetupPreview(null);
       this._refreshAbilityTargetPreview();
       return;
     }
     this.state.updateAbilityTargetPreview(null);
-    this.state.updateAtGunSetupPreview(null);
+    this.state.updateAntiTankGunSetupPreview(null);
     this._refreshResourceMiningPreview();
   }
 
@@ -897,7 +897,7 @@ export class Input {
   /** Ids of currently-selected entities owned by us that are units. */
   /** Ids of currently-selected own unit-producing buildings (eligible for rally points). */
   /** Ids of currently-selected own workers (subset used for gather/build). */
-  /** Ids of currently-selected own AT guns. */
+  /** Ids of currently-selected own anti-tank guns. */
   // --- Entity hit-testing -------------------------------------------------
 
   /**
@@ -957,8 +957,8 @@ Object.assign(Input.prototype, {
   _selectedOwnUnitIds,
   _selectedProducerBuildingIds,
   _selectedWorkerIds,
-  _selectedOwnAtGunIds,
-  _refreshAtGunSetupPreview,
+  _selectedOwnAntiTankGunIds,
+  _refreshAntiTankGunSetupPreview,
   _refreshAbilityTargetPreview,
   _refreshResourceMiningPreview,
   _nearestOwnCompletedCityCentre,

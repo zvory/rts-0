@@ -20,7 +20,7 @@ Completed tasks moved from PLAN.md.
 - Defeat screen keeps latest map visible.
 - Larger command card.
 - Non-rifleman/non-worker units require oil.
-- Slower infantry, workers, and AT gun.
+- Slower infantry, workers, and anti-tank gun.
 - Darker silhouette for impassable terrain.
 - Larger tanks.
 - Fix workers getting stuck inside buildings after construction.

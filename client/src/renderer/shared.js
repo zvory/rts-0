@@ -8,7 +8,7 @@ import { WEAPON_RECOIL_PX, ZERO_OFFSET } from "./palette.js";
 export function muzzleFlashRadius(kind) {
   if (kind === KIND.ARTILLERY) return 11;
   if (kind === KIND.TANK) return 18;
-  if (kind === KIND.AT_TEAM) return 15;
+  if (kind === KIND.ANTI_TANK_GUN) return 15;
   if (kind === KIND.SCOUT_CAR || kind === KIND.COMMAND_CAR) return 9;
   if (kind === KIND.MACHINE_GUNNER) return 9;
   if (kind === KIND.RIFLEMAN) return 7;
@@ -165,7 +165,7 @@ export function tankBodyVisual(stat = {}) {
 }
 
 export function isVehicleBodyKind(kind) {
-  return kind === KIND.AT_TEAM ||
+  return kind === KIND.ANTI_TANK_GUN ||
     kind === KIND.ARTILLERY ||
     kind === KIND.TANK ||
     kind === KIND.SCOUT_CAR ||
@@ -555,7 +555,7 @@ export function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil
   }
 }
 
-export function drawAtGun(g, r, tint, facing, weaponFacing, setup, recoil) {
+export function drawAntiTankGun(g, r, tint, facing, weaponFacing, setup, recoil) {
   const deploy = clamp01(setup.prongFactor);
   const a = angleLerp(facing, weaponFacing, smoothstep01(deploy));
   const barrelKick = recoilVector(a, recoil);

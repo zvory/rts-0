@@ -152,8 +152,8 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
     match command {
         Command::Attack { .. } | Command::AttackMove { .. } => true,
         Command::Move { units, .. } => units.iter().any(|id| combat_intent_units.contains(id)),
-        Command::SetupAtGuns { .. }
-        | Command::TearDownAtGuns { .. }
+        Command::SetupAntiTankGuns { .. }
+        | Command::TearDownAntiTankGuns { .. }
         | Command::UseAbility { .. }
         | Command::SetAutocast { .. }
         | Command::Gather { .. }

@@ -52,8 +52,8 @@ export const CMD = Object.freeze({
   MOVE: "move",
   ATTACK_MOVE: "attackMove",
   ATTACK: "attack",
-  SETUP_AT_GUNS: "setupAtGuns",
-  TEAR_DOWN_AT_GUNS: "tearDownAtGuns",
+  SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
+  TEAR_DOWN_ANTI_TANK_GUNS: "tearDownAntiTankGuns",
   CHARGE: "charge",
   USE_ABILITY: "useAbility",
   SET_AUTOCAST: "setAutocast",
@@ -75,7 +75,7 @@ export const KIND = Object.freeze({
   WORKER: "worker",
   RIFLEMAN: "rifleman",
   MACHINE_GUNNER: "machine_gunner",
-  AT_TEAM: "at_team",
+  ANTI_TANK_GUN: "anti_tank_gun",
   MORTAR_TEAM: "mortar_team",
   ARTILLERY: "artillery",
   SCOUT_CAR: "scout_car",
@@ -95,7 +95,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.WORKER,
   KIND.RIFLEMAN,
   KIND.MACHINE_GUNNER,
-  KIND.AT_TEAM,
+  KIND.ANTI_TANK_GUN,
   KIND.MORTAR_TEAM,
   KIND.ARTILLERY,
   KIND.SCOUT_CAR,
@@ -177,7 +177,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
   [KIND.RIFLEMAN]: 2,
   [KIND.MACHINE_GUNNER]: 3,
-  [KIND.AT_TEAM]: 4,
+  [KIND.ANTI_TANK_GUN]: 4,
   [KIND.MORTAR_TEAM]: 15,
   [KIND.ARTILLERY]: 16,
   [KIND.TANK]: 5,
@@ -214,7 +214,7 @@ export const SETUP_CODE = Object.freeze({
 
 export const UPGRADE = Object.freeze({
   METHAMPHETAMINES: "methamphetamines",
-  AT_GUN_UNLOCK: "at_gun_unlock",
+  ANTI_TANK_GUN_UNLOCK: "anti_tank_gun_unlock",
   TANK_UNLOCK: "tank_unlock",
   ARTILLERY_UNLOCK: "artillery_unlock",
   COMMAND_CAR_UNLOCK: "command_car_unlock",
@@ -223,7 +223,7 @@ export const UPGRADE = Object.freeze({
 
 export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.METHAMPHETAMINES]: 1,
-  [UPGRADE.AT_GUN_UNLOCK]: 2,
+  [UPGRADE.ANTI_TANK_GUN_UNLOCK]: 2,
   [UPGRADE.TANK_UNLOCK]: 3,
   [UPGRADE.ARTILLERY_UNLOCK]: 4,
   [UPGRADE.MORTAR_AUTOCAST]: 5,
@@ -253,7 +253,7 @@ export const ORDER_STAGE = Object.freeze({
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
   BREAKTHROUGH: "breakthrough",
-  SETUP_AT_GUNS: "setupAtGuns",
+  SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
 
 export const ORDER_STAGE_CODE = Object.freeze({
@@ -263,7 +263,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.GATHER]: 4,
   [ORDER_STAGE.BUILD]: 5,
   [ORDER_STAGE.SMOKE]: 6,
-  [ORDER_STAGE.SETUP_AT_GUNS]: 7,
+  [ORDER_STAGE.SETUP_ANTI_TANK_GUNS]: 7,
   [ORDER_STAGE.CHARGE]: 8,
   [ORDER_STAGE.MORTAR_FIRE]: 9,
   [ORDER_STAGE.POINT_FIRE]: 10,
@@ -853,9 +853,9 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
   attack: (units, target, queued = false) =>
     withQueued({ c: CMD.ATTACK, units, target }, queued),
-  setupAtGuns: (units, x, y, queued = false) =>
-    withQueued({ c: CMD.SETUP_AT_GUNS, units, x, y }, queued),
-  tearDownAtGuns: (units) => ({ c: CMD.TEAR_DOWN_AT_GUNS, units }),
+  setupAntiTankGuns: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.SETUP_ANTI_TANK_GUNS, units, x, y }, queued),
+  tearDownAntiTankGuns: (units) => ({ c: CMD.TEAR_DOWN_ANTI_TANK_GUNS, units }),
   charge: (units) => ({ c: CMD.CHARGE, units }),
   useAbility: (ability, units, x = null, y = null, queued = false) => {
     const command = { c: CMD.USE_ABILITY, ability, units };

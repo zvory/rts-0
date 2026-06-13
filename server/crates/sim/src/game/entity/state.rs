@@ -128,7 +128,7 @@ pub struct CombatState {
     pub weapon_facing: f32,
     /// Target weapon/barrel facing in radians. Useful for projection/debugging and future arcs.
     pub desired_weapon_facing: f32,
-    /// Fixed center of a manually emplaced AT gun's field of fire.
+    /// Fixed center of a manually emplaced anti-tank gun's field of fire.
     pub emplacement_facing: Option<f32>,
     /// Pending facing to apply when a TearingDownToRedeploy phase completes.
     pub pending_redeploy_facing: Option<f32>,

@@ -48,7 +48,7 @@ impl Game {
     ) -> Result<DevScenarioSetup, String> {
         if !matches!(
             unit,
-            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+            EntityKind::AntiTankGun | EntityKind::ScoutCar | EntityKind::Tank
         ) {
             return Err(format!("unsupported direct-reverse-order unit {unit}"));
         }
@@ -100,7 +100,7 @@ impl Game {
     ) -> Result<DevScenarioSetup, String> {
         if !matches!(
             unit,
-            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+            EntityKind::AntiTankGun | EntityKind::ScoutCar | EntityKind::Tank
         ) {
             return Err(format!("unsupported wall-chokepoint unit {unit}"));
         }
@@ -139,7 +139,7 @@ impl Game {
     ) -> Result<DevScenarioSetup, String> {
         if !matches!(
             unit,
-            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+            EntityKind::AntiTankGun | EntityKind::ScoutCar | EntityKind::Tank
         ) {
             return Err(format!("unsupported vehicle-corner-wall unit {unit}"));
         }
@@ -188,7 +188,7 @@ impl Game {
                 EntityKind::Worker
                     | EntityKind::Rifleman
                     | EntityKind::MachineGunner
-                    | EntityKind::AtTeam
+                    | EntityKind::AntiTankGun
             ) {
                 return Err(format!(
                     "unsupported vehicle-small-block-baseline blocker {blocker}"
@@ -233,7 +233,7 @@ impl Game {
     ) -> Result<DevScenarioSetup, String> {
         if !matches!(
             unit,
-            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+            EntityKind::AntiTankGun | EntityKind::ScoutCar | EntityKind::Tank
         ) {
             return Err(format!("unsupported factory-zero-gap unit {unit}"));
         }

@@ -37,7 +37,7 @@ Working checklist for `plans/archive/tech/phase-6-capstones.md`, following
   - Point-fire orders outside the deployed arc, inside minimum range, or outside maximum range are
     rejected with normal command-failure feedback; the unit should not move or redeploy to satisfy
     that order.
-  - The shared AT Gun-style deploy command should support redeploying Artillery when already
+  - The shared Anti-Tank Gun-style deploy command should support redeploying Artillery when already
     deployed.
   - Point fire is terminal for the current queue: once Artillery starts firing at a position, it
     continues firing there and later queued orders should not be accepted after that point-fire
@@ -60,7 +60,7 @@ Working checklist for `plans/archive/tech/phase-6-capstones.md`, following
   - Gun Works can research Unlock Artillery for 200 steel / 200 oil over 30 seconds.
   - Artillery is planned as a 300 steel / 100 oil, 5-supply siege unit with 150 HP, 10-50 tile point
     fire, a 20-degree firing arc, 3-second reload, and 10 steel ammunition cost per fired shot.
-  - Artillery has 4-tile sight, tank-length build time, and moves 20% slower than AT Guns.
+  - Artillery has 4-tile sight, tank-length build time, and moves 20% slower than Anti-Tank Guns.
   - Artillery uses tank-style oriented pivot movement, uses the same footprint/selection size as a
     tank, and has a new Hard armor class that reduces non-armor-piercing damage by 25%.
   - Artillery automatically sets up toward point-fire targets, takes 3 seconds to set up or tear
@@ -110,7 +110,7 @@ Read: `docs/context/balance.md`, `docs/design/balance.md`.
   - Collision implementation uses a tank-sized oriented body so the unit remains usable in
     snaking/depth pathing scenarios.
 - [x] Movement speed is specified.
-  - 20% slower than AT Guns. Current AT Gun speed is 1.152 px/tick, so Artillery target speed is
+  - 20% slower than Anti-Tank Guns. Current Anti-Tank Gun speed is 1.152 px/tick, so Artillery target speed is
     0.922 px/tick before final constant rounding.
 - [x] Movement semantics are specified: ground, blocked-by-terrain, ignores collision, setup mode,
       cannot move while attacking, transport-like, or other special behavior.
@@ -274,8 +274,8 @@ Exit criteria:
 Read `docs/context/client-ui.md` before changing rendering, HUD, input, or match modules.
 
 - [x] Wire Artillery into client HUD training/research affordances.
-  - Gun Works command card mirrors the server train order: Mortar Team (`Q`), AT Gun (`W`),
-    Artillery (`E`), with AT Gun Crews (`S`) and Unlock Artillery (`D`) below their unlocked
+  - Gun Works command card mirrors the server train order: Mortar Team (`Q`), Anti-Tank Gun (`W`),
+    Artillery (`E`), with Anti-Tank Gun Crews (`S`) and Unlock Artillery (`D`) below their unlocked
     units.
 - [x] Add Point Fire command UI for selected Artillery via `useAbility` / `pointFire`.
   - Selected Artillery exposes Point Fire on `X`; issuing it uses `cmd.pointFire(...)`.
@@ -304,7 +304,7 @@ Read `docs/context/client-ui.md` before changing rendering, HUD, input, or match
     shell cue during the 5-second travel delay.
 - [x] Setup, deployed, channeling, ability, construction, damaged, and death states are specified if
       relevant.
-  - Setup/teardown reuses the AT Gun-style support-weapon animation timing; deployed Artillery
+  - Setup/teardown reuses the Anti-Tank Gun-style support-weapon animation timing; deployed Artillery
     spreads rear spades/feet and keeps the barrel visible on its setup facing.
   - Construction, damage, and death continue to use existing generic unit visuals for this pass.
 - [x] Facing, turret, barrel, projectile, tracer, recoil, muzzle flash, impact, and area indicators

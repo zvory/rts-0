@@ -29,7 +29,7 @@ pub const SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX: f32 = TILE_SIZE as f32 * 2.0;
 pub const SCOUT_CAR_RECOVERY_COOLDOWN_TICKS: u16 = TICK_HZ as u16;
 
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
-pub const AT_TEAM_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
+pub const ANTI_TANK_GUN_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
 pub const MORTAR_TEAM_SETUP_TICKS: u16 = TICK_HZ as u16;
 pub const MORTAR_SHELL_DELAY_TICKS: u32 = (TICK_HZ * 9 + 2) / 4;
 pub const MORTAR_OUTER_RADIUS_TILES: f32 = 1.5;
@@ -37,10 +37,10 @@ pub const MORTAR_INNER_RADIUS_TILES: f32 = 0.5;
 pub const MORTAR_OUTER_DAMAGE: u32 = 30;
 pub const MORTAR_INNER_DAMAGE: u32 = 60;
 pub const MORTAR_AUTOFIRE_ERROR_TILES: f32 = 0.35;
-pub const AT_GUN_PACKED_RANGE_TILES: u32 = 5;
-pub const AT_GUN_DEPLOYED_RANGE_TILES: u32 = 12;
-pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
-pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = 40.0_f32 * std::f32::consts::PI / 180.0;
+pub const ANTI_TANK_GUN_PACKED_RANGE_TILES: u32 = 5;
+pub const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES: u32 = 12;
+pub const ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
+pub const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD: f32 = 40.0_f32 * std::f32::consts::PI / 180.0;
 pub const ARTILLERY_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3;
 pub const ARTILLERY_RELOAD_TICKS: u32 = TICK_HZ * 3;
 pub const ARTILLERY_SHELL_DELAY_TICKS: u32 = TICK_HZ * 5;
@@ -68,9 +68,9 @@ pub const METHAMPHETAMINES_COST_OIL: u32 = 100;
 pub const METHAMPHETAMINES_RESEARCH_TICKS: u32 = TICK_HZ * 20;
 pub const METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR: u32 = 3;
 pub const METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR: u32 = 4;
-pub const AT_GUN_UNLOCK_COST_STEEL: u32 = 200;
-pub const AT_GUN_UNLOCK_COST_OIL: u32 = 75;
-pub const AT_GUN_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 20;
+pub const ANTI_TANK_GUN_UNLOCK_COST_STEEL: u32 = 200;
+pub const ANTI_TANK_GUN_UNLOCK_COST_OIL: u32 = 75;
+pub const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 20;
 pub const ARTILLERY_UNLOCK_COST_STEEL: u32 = 300;
 pub const ARTILLERY_UNLOCK_COST_OIL: u32 = 200;
 pub const ARTILLERY_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 30;
@@ -131,9 +131,9 @@ pub const SUPPLY_CAP_MAX: u32 = 200;
 pub const TANK_BODY_LENGTH_PX: f32 = 50.4;
 pub const TANK_BODY_WIDTH_PX: f32 = 28.8;
 pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
-pub const AT_GUN_BODY_LENGTH_PX: f32 = 42.0;
-pub const AT_GUN_BODY_WIDTH_PX: f32 = 24.0;
-pub const AT_GUN_BODY_CLEARANCE_PX: f32 = 1.0;
+pub const ANTI_TANK_GUN_BODY_LENGTH_PX: f32 = 42.0;
+pub const ANTI_TANK_GUN_BODY_WIDTH_PX: f32 = 24.0;
+pub const ANTI_TANK_GUN_BODY_CLEARANCE_PX: f32 = 1.0;
 pub const ARTILLERY_BODY_LENGTH_PX: f32 = TANK_BODY_LENGTH_PX;
 pub const ARTILLERY_BODY_WIDTH_PX: f32 = TANK_BODY_WIDTH_PX;
 pub const ARTILLERY_BODY_CLEARANCE_PX: f32 = TANK_BODY_CLEARANCE_PX;
@@ -170,7 +170,7 @@ impl UnitStats {
 pub fn unit_radius_tiles(kind: EntityKind) -> u32 {
     if matches!(
         kind,
-        EntityKind::AtTeam
+        EntityKind::AntiTankGun
             | EntityKind::MortarTeam
             | EntityKind::Artillery
             | EntityKind::ScoutCar

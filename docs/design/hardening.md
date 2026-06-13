@@ -125,10 +125,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   bounded maneuver latched to the immediate waypoint: nearby final waypoints and injected recovery
   waypoints can be reached by backing up, but route lookahead alone cannot put the car into reverse.
   Farther behind goals make the scout car drive through a broad forward turn instead of
-  backtracking. Scout cars, tanks, and AT teams use the same clearance-aware player-move route
+  backtracking. Scout cars, tanks, and Anti-Tank Guns use the same clearance-aware player-move route
   shape: coarse A* still works on tiles, but vehicles add static-clearance, turn,
   adjacent-blocker, and corner-graze costs so open alternatives are preferred before local movement
-  gets close to walls. Tank-style pivot vehicles (tanks and AT teams) expand each diagonal A* tile
+  gets close to walls. Tank-style pivot vehicles (tanks and Anti-Tank Guns) expand each diagonal A* tile
   step into an L-shaped pair of orthogonal tile-center waypoints, choosing the lower-clearance-cost
   elbow when both elbows are passable. This makes pivoting vehicles clear corners before retargeting
   the next leg instead of stopping near an inside corner and immediately rotating toward a diagonal
@@ -142,7 +142,7 @@ The server treats every client as potentially hostile. Limits live next to the c
   vehicle's swept oriented body from its current legal body position. Scout-car drive intent uses a
   3-tile lookahead on the current statically legal route segment, so a car that comes alongside the
   route can continue to a drivable point ahead instead of oscillating around a point it cannot
-  laterally reach; tanks and AT teams use a 5-tile lookahead with pivot-drive locomotion. The
+  laterally reach; tanks and Anti-Tank Guns use a 5-tile lookahead with pivot-drive locomotion. The
   lookahead never skips through terrain or building occupancy that fails oriented-body segment
   legality. A final
   move waypoint can settle inside `SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX` (0.375 tiles) only when the
@@ -175,12 +175,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
   use the charging movement/fire model permanently, move at tank speed, and attack 25% faster.
   Legacy `charge` commands remain decodable but have no eligible carriers.
-- **Stage-two unit unlock research**: R&D Complex can queue `at_gun_unlock` for 200 steel / 75 oil
-  over 600 ticks, unlocking AT Gun training at Gun Works for that player. R&D Complex can queue
+- **Stage-two unit unlock research**: R&D Complex can queue `anti_tank_gun_unlock` for 200 steel / 75 oil
+  over 600 ticks, unlocking Anti-Tank Gun training at Gun Works for that player. R&D Complex can queue
   `tank_unlock` for 150 steel / 100 oil over 600 ticks, unlocking Tank training at Vehicle Works
   for that player. Server-side train validation checks both the producer kind and the completed
   player upgrade set, so clients cannot bypass these locks by sending `train` commands directly.
-- **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
+- **Tank armor facing**: tank and Anti-Tank Gun attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
   Infantry damage, building damage, non-tank victims, and non-anti-tank attackers ignore armor
@@ -213,19 +213,19 @@ The server treats every client as potentially hostile. Limits live next to the c
   still keep the intermediate waypoint until the swept segment is legal. Oriented vehicles
   additionally keep their facing-specific guard so a waypoint behind the hull, including scout-car
   reverse recovery, must be physically reached.
-- **Vehicle clearance pathing**: player-issued scout-car, tank, and AT-team `Move` / `AttackMove`
+- **Vehicle clearance pathing**: player-issued scout-car, tank, and Anti-Tank Gun `Move` / `AttackMove`
   path requests use the shared clearance-aware tile A* route shape. The route shape adds finite
   static-clearance, turn, adjacent-blocker, and corner-graze costs so open alternatives are
   preferred before local movement gets close to walls. Path cache keys include the route-shaping
   mode so clearance-shaped movement paths do not share cached routes with normal interaction
   pathing. The returned route is still used for reachability, then snaps the reverse-ordered final
   waypoint to the exact command goal. Scout cars simplify straight segments up to their route
-  lookahead window; tanks and AT teams keep their L-expanded tile-center route so corner-clearing
+  lookahead window; tanks and Anti-Tank Guns keep their L-expanded tile-center route so corner-clearing
   waypoints are not collapsed back into diagonal shortcuts. Interaction paths for attack chasing,
   gathering, and build staging remain tile-guided `Normal` routing so combat, mining, construction
   range checks, and infantry/worker traffic stay controlled by their existing logic.
 - **Vehicle diagonal-pinch avoidance**: A* passability for oriented-vehicle bodies (tanks, scout
-  cars, AT teams) rejects tiles wedged between two diagonally-opposite blocked corners — i.e. (NW
+  cars, Anti-Tank Guns) rejects tiles wedged between two diagonally-opposite blocked corners — i.e. (NW
   blocked AND SE blocked) OR (NE blocked AND SW blocked). The rotating hull cannot legally thread
   such 1-tile gaps at any intermediate heading, so routing through them used to deadlock at the
   static-blocked-repath threshold. Infantry pathing is unaffected; legitimate 2-tile-wide corridors
@@ -234,8 +234,8 @@ The server treats every client as potentially hostile. Limits live next to the c
   behavior, but candidate tiles are accepted only when the specific unit kind can stand there under
   `standability::unit_static_standable`. This prevents large units from being assigned a center tile
   whose body would clip terrain or a building footprint; dynamic unit traffic is still handled by
-  steering and collision after movement. AT-team group moves use the same deterministic candidate
-  search but first prefer goal tiles with one open tile between assigned AT teams, falling back to
+  steering and collision after movement. Anti-Tank Gun group moves use the same deterministic candidate
+  search but first prefer goal tiles with one open tile between assigned Anti-Tank Guns, falling back to
   ordinary unique tiles when terrain or buildings leave no spaced slot.
 - **Local steering**: before taking a partial path step for a plain `Move` order, non-vehicle movement
   computes a short-range separation proposal away from nearby firm/braced/heavy mobile units.

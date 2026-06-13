@@ -20,7 +20,7 @@ consistent stream of increasingly sophisticated attacks.
 - Keep the current first attack timing in the same broad window as the existing saturation AI.
 - Do not use workers offensively for 1.0.
 - The 1.0 unit arc is Riflemen first, Scout Cars for flanking steel-line harassment second, then
-  Tanks. Machine Gunners, AT Teams, Artillery, and Command Cars are optional/future unless needed
+  Tanks. Machine Gunners, Anti-Tank Guns, Artillery, and Command Cars are optional/future unless needed
   as simple defensive support once tank production is running.
 - The AI must expand and tech. It should generally expand earlier than the current saturation AI
   because oil becomes a serious constraint on tech.

@@ -5,8 +5,8 @@ import {
   STATS,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
-  AT_GUN_DEPLOYED_RANGE_TILES,
-  AT_GUN_FIELD_OF_FIRE_RAD,
+  ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
+  ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
@@ -20,7 +20,7 @@ import {
   angleDelta,
   clamp01,
   dashedLine,
-  drawAtGun,
+  drawAntiTankGun,
   drawFacingWedge,
   drawImpassableEdge,
   drawInfantryBase,

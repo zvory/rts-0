@@ -47,7 +47,7 @@ const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
 const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
-const AT_TEAM_FORMATION_GAP_TILES: u32 = 1;
+const ANTI_TANK_GUN_FORMATION_GAP_TILES: u32 = 1;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
@@ -696,7 +696,7 @@ fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
     }
     if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
         let ticks = match e.kind {
-            EntityKind::AtTeam => config::AT_TEAM_SETUP_TICKS,
+            EntityKind::AntiTankGun => config::ANTI_TANK_GUN_SETUP_TICKS,
             _ => config::MACHINE_GUNNER_SETUP_TICKS,
         };
         e.set_weapon_setup(WeaponSetup::TearingDown { ticks });
@@ -704,7 +704,7 @@ fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
 }
 
 fn requires_weapon_setup(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::MachineGunner | EntityKind::AtTeam)
+    matches!(kind, EntityKind::MachineGunner | EntityKind::AntiTankGun)
 }
 
 // ---------------------------------------------------------------------------
@@ -909,7 +909,7 @@ fn preferred_goal_spacing_clear(
 
 fn preferred_gap_tiles(kind: EntityKind) -> u32 {
     match kind {
-        EntityKind::AtTeam => AT_TEAM_FORMATION_GAP_TILES,
+        EntityKind::AntiTankGun => ANTI_TANK_GUN_FORMATION_GAP_TILES,
         _ => 0,
     }
 }
@@ -1209,14 +1209,14 @@ mod tests {
     }
 
     #[test]
-    fn at_team_group_move_prefers_one_tile_gap_between_final_goals() {
+    fn anti_tank_gun_group_move_prefers_one_tile_gap_between_final_goals() {
         let map = flat_map(40);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
         let units = vec![
-            formation_unit_kind(1, EntityKind::AtTeam, &map, (10, 10)),
-            formation_unit_kind(2, EntityKind::AtTeam, &map, (11, 10)),
-            formation_unit_kind(3, EntityKind::AtTeam, &map, (10, 11)),
+            formation_unit_kind(1, EntityKind::AntiTankGun, &map, (10, 10)),
+            formation_unit_kind(2, EntityKind::AntiTankGun, &map, (11, 10)),
+            formation_unit_kind(3, EntityKind::AntiTankGun, &map, (10, 11)),
         ];
         let click = map.tile_center(20, 20);
 
@@ -1227,32 +1227,32 @@ mod tests {
                 let a = map.tile_of(goals[i].0, goals[i].1);
                 let b = map.tile_of(goals[j].0, goals[j].1);
                 assert!(
-                    tile_chebyshev_distance(a, b) > AT_TEAM_FORMATION_GAP_TILES,
-                    "AT gun final goals should leave one open tile between them, got {a:?} and {b:?}"
+                    tile_chebyshev_distance(a, b) > ANTI_TANK_GUN_FORMATION_GAP_TILES,
+                    "anti-tank gun final goals should leave one open tile between them, got {a:?} and {b:?}"
                 );
             }
         }
     }
 
     #[test]
-    fn at_team_goal_spacing_is_preferred_but_relaxable() {
+    fn anti_tank_gun_goal_spacing_is_preferred_but_relaxable() {
         let map = flat_map(40);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
-        let unit = formation_unit_kind(2, EntityKind::AtTeam, &map, (10, 10));
+        let unit = formation_unit_kind(2, EntityKind::AntiTankGun, &map, (10, 10));
         let assigned = vec![FormationAssignment {
-            kind: EntityKind::AtTeam,
+            kind: EntityKind::AntiTankGun,
             tile: (20, 20),
         }];
         let adjacent = (21, 20);
 
         assert!(
             !is_free_goal(&map, &occ, &unit, adjacent, &assigned, true),
-            "preferred spacing should reject adjacent AT gun goals"
+            "preferred spacing should reject adjacent anti-tank gun goals"
         );
         assert!(
             is_free_goal(&map, &occ, &unit, adjacent, &assigned, false),
-            "relaxed fallback should still accept an otherwise legal adjacent AT gun goal"
+            "relaxed fallback should still accept an otherwise legal adjacent anti-tank gun goal"
         );
     }
 
@@ -1767,7 +1767,7 @@ mod tests {
             starts: vec![],
             expansion_sites: vec![],
         };
-        for kind in [EntityKind::ScoutCar, EntityKind::Tank, EntityKind::AtTeam] {
+        for kind in [EntityKind::ScoutCar, EntityKind::Tank, EntityKind::AntiTankGun] {
             let mut entities = EntityStore::new();
             let start = map.tile_center(10, 10);
             let unit = entities

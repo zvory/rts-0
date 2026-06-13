@@ -471,11 +471,11 @@ fn acquisition_against_buildings_ignores_allied_buildings() {
 }
 
 #[test]
-fn at_team_tank_preference_ignores_allied_tanks() {
+fn anti_tank_gun_tank_preference_ignores_allied_tanks() {
     let mut entities = EntityStore::new();
-    let at_team = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
     let allied_tank = entities
         .spawn_unit(2, EntityKind::Tank, 120.0, 100.0)
         .expect("allied tank should spawn");
@@ -487,7 +487,7 @@ fn at_team_tank_preference_ignores_allied_tanks() {
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
-    let attacker = entities.get(at_team).expect("at team should exist");
+    let attacker = entities.get(anti_tank_gun).expect("anti-tank gun should exist");
 
     let target = resolve_target(
         &map,
@@ -497,7 +497,7 @@ fn at_team_tank_preference_ignores_allied_tanks() {
         &los,
         &fog,
         &smokes,
-        at_team,
+        anti_tank_gun,
         attacker.owner,
         attacker.pos_x,
         attacker.pos_y,
@@ -641,7 +641,7 @@ fn smoke_blocks_explicit_attack_damage_until_shot_is_clear() {
     let enemy_pos = map.tile_center(8, 4);
     let smoke_pos = map.tile_center(5, 4);
     let attacker_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, attacker_pos.0, attacker_pos.1)
+        .spawn_unit(1, EntityKind::AntiTankGun, attacker_pos.0, attacker_pos.1)
         .expect("attacker should spawn");
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Tank, enemy_pos.0, enemy_pos.1)
@@ -673,7 +673,7 @@ fn smoke_blocks_explicit_attack_damage_until_shot_is_clear() {
             .values()
             .flatten()
             .all(|event| !matches!(event, Event::Attack { .. })),
-        "smoke-blocked AT gun shots should not emit attack tracers"
+        "smoke-blocked anti-tank gun shots should not emit attack tracers"
     );
 }
 
@@ -1413,29 +1413,29 @@ fn machine_gunner_waits_to_deploy_before_first_shot() {
 }
 
 #[test]
-fn idle_at_team_does_not_auto_setup() {
+fn idle_anti_tank_gun_does_not_auto_setup() {
     let mut entities = EntityStore::new();
     let at_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
 
     run_combat_tick(&mut entities);
 
     assert_eq!(
         entities
             .get(at_id)
-            .expect("at team should exist")
+            .expect("anti-tank gun should exist")
             .weapon_setup(),
         WeaponSetup::Packed
     );
 }
 
 #[test]
-fn packed_at_team_fires_with_shorter_range_and_reduced_damage() {
+fn packed_anti_tank_gun_fires_with_shorter_range_and_reduced_damage() {
     let mut entities = EntityStore::new();
     entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
     let tank_id = entities
         .spawn_unit(2, EntityKind::Tank, 220.0, 100.0)
         .expect("enemy tank should spawn");
@@ -1450,16 +1450,16 @@ fn packed_at_team_fires_with_shorter_range_and_reduced_damage() {
     assert_eq!(
         entities.get(tank_id).expect("enemy should exist").hp,
         enemy_hp - 45,
-        "packed AT gun should deal 75% of its deployed 60 damage"
+        "packed anti-tank gun should deal 75% of its deployed 60 damage"
     );
 }
 
 #[test]
-fn deployed_at_team_fires_at_long_range() {
+fn deployed_anti_tank_gun_fires_at_long_range() {
     let mut entities = EntityStore::new();
     let at_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
     let tank_id = entities
         .spawn_unit(2, EntityKind::Tank, 310.0, 100.0)
         .expect("enemy tank should spawn");
@@ -1479,7 +1479,7 @@ fn deployed_at_team_fires_at_long_range() {
 
     assert!(
         entities.get(tank_id).expect("enemy should exist").hp < enemy_hp,
-        "deployed AT team should fire at range 7"
+        "deployed Anti-Tank Gun should fire at range 7"
     );
     assert!(
         events.get(&2).is_some_and(|events| events.iter().any(|event| {
@@ -1492,22 +1492,22 @@ fn deployed_at_team_fires_at_long_range() {
                     to_pos: Some(to_pos),
                 } if *from == at_id
                     && *to == tank_id
-                    && reveal.kind == crate::protocol::kind_to_wire(EntityKind::AtTeam)
+                    && reveal.kind == crate::protocol::kind_to_wire(EntityKind::AntiTankGun)
                     && reveal.setup_state.as_deref() == Some(WeaponSetup::Deployed.to_protocol_str())
                     && *to_pos == [310.0, 100.0]
             )
         })),
-        "AT attack event should carry shooter reveal and target position for visual feedback"
+        "anti-tank attack event should carry shooter reveal and target position for visual feedback"
     );
 }
 
 #[test]
-fn deployed_at_team_does_not_auto_acquire_targets_hidden_by_fog() {
+fn deployed_anti_tank_gun_does_not_auto_acquire_targets_hidden_by_fog() {
     let map = open_map(24);
     let mut entities = EntityStore::new();
     let at_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
     let tank_id = entities
         .spawn_unit(2, EntityKind::Tank, 356.0, 100.0)
         .expect("enemy tank should spawn");
@@ -1530,7 +1530,7 @@ fn deployed_at_team_does_not_auto_acquire_targets_hidden_by_fog() {
             entities.get(tank_id).expect("tank should exist").pos_x,
             entities.get(tank_id).expect("tank should exist").pos_y,
         ),
-        "test setup requires the tank to be outside the AT owner's sight"
+        "test setup requires the tank to be outside the Anti-Tank Gun owner's sight"
     );
     let enemy_hp = entities.get(tank_id).expect("enemy should exist").hp;
 
@@ -1543,12 +1543,12 @@ fn deployed_at_team_does_not_auto_acquire_targets_hidden_by_fog() {
     assert_eq!(
         entities.get(tank_id).expect("enemy should exist").hp,
         enemy_hp,
-        "deployed AT guns must not fire at targets hidden by fog"
+        "deployed anti-tank guns must not fire at targets hidden by fog"
     );
     assert_eq!(
         entities
             .get(at_id)
-            .expect("at team should exist")
+            .expect("anti-tank gun should exist")
             .target_id(),
         None,
         "hidden targets should not be retained as combat targets"
@@ -1563,11 +1563,11 @@ fn deployed_at_team_does_not_auto_acquire_targets_hidden_by_fog() {
 }
 
 #[test]
-fn at_team_turns_slowly_before_firing() {
+fn anti_tank_gun_turns_slowly_before_firing() {
     let mut entities = EntityStore::new();
     let at_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Tank, 100.0, 20.0)
         .expect("enemy tank should spawn");
@@ -1582,14 +1582,14 @@ fn at_team_turns_slowly_before_firing() {
 
     let at = entities.get(at_id).expect("at should exist");
     assert!(
-        at.facing().abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-        "AT gun should only slew by its turn-rate cap, got {:.4}",
+        at.facing().abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "anti-tank gun should only slew by its turn-rate cap, got {:.4}",
         at.facing()
     );
     assert_eq!(
         entities.get(enemy_id).expect("enemy should exist").hp,
         enemy_hp,
-        "AT gun should not fire until its barrel is aligned"
+        "anti-tank gun should not fire until its barrel is aligned"
     );
 }
 
@@ -1655,7 +1655,7 @@ fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
-        EntityKind::AtTeam,
+        EntityKind::AntiTankGun,
         EntityKind::MortarTeam,
         EntityKind::Tank,
         EntityKind::ScoutCar,
@@ -1691,7 +1691,7 @@ fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
-        EntityKind::AtTeam,
+        EntityKind::AntiTankGun,
         EntityKind::MortarTeam,
         EntityKind::Tank,
         EntityKind::ScoutCar,
@@ -2082,11 +2082,11 @@ fn mortar_autocast_requires_research_even_if_entity_flag_is_enabled() {
 }
 
 #[test]
-fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
+fn deployed_anti_tank_gun_clamps_to_field_edge_and_does_not_fire_outside_arc() {
     let mut entities = EntityStore::new();
     let at_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Tank, 100.0, 180.0)
         .expect("enemy tank should spawn");
@@ -2103,23 +2103,23 @@ fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
     }
 
     let at = entities.get(at_id).expect("at should exist");
-    let edge = config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5;
+    let edge = config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5;
     assert!(
-        (at.facing() - edge).abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-        "AT gun should clamp to the nearest arc edge, got {:.4}",
+        (at.facing() - edge).abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "anti-tank gun should clamp to the nearest arc edge, got {:.4}",
         at.facing()
     );
     assert_eq!(
         entities.get(enemy_id).expect("enemy should exist").hp,
         enemy_hp,
-        "AT gun should not fire outside its deployed field of fire"
+        "anti-tank gun should not fire outside its deployed field of fire"
     );
 }
 
 #[test]
 fn support_weapon_redeploy_rotates_after_teardown_completes() {
     for (kind, setup_ticks, label) in [
-        (EntityKind::AtTeam, config::AT_TEAM_SETUP_TICKS, "AT gun"),
+        (EntityKind::AntiTankGun, config::ANTI_TANK_GUN_SETUP_TICKS, "anti-tank gun"),
         (
             EntityKind::Artillery,
             config::ARTILLERY_SETUP_TICKS,
@@ -2168,7 +2168,7 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
 
         let unit = entities.get(id).expect("support weapon should exist");
         assert!(
-            unit.facing() > 0.0 && unit.facing() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+            unit.facing() > 0.0 && unit.facing() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
             "{label} should start rotating only after it is packed, got {:.4}",
             unit.facing()
         );
@@ -2180,7 +2180,7 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
         let unit = entities.get(id).expect("support weapon should exist");
         assert_eq!(unit.weapon_setup(), WeaponSetup::Deployed);
         assert!(
-            (unit.facing() - target).abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+            (unit.facing() - target).abs() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
             "{label} should finish redeploy facing the requested direction, got {:.4}",
             unit.facing()
         );
@@ -2188,11 +2188,11 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
 }
 
 #[test]
-fn packed_at_team_rotates_before_setup_animation_begins() {
+fn packed_anti_tank_gun_rotates_before_setup_animation_begins() {
     let mut entities = EntityStore::new();
     let at_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
     let target = std::f32::consts::FRAC_PI_2;
     if let Some(at) = entities.get_mut(at_id) {
         at.set_weapon_setup(WeaponSetup::Packed);
@@ -2208,11 +2208,11 @@ fn packed_at_team_rotates_before_setup_animation_begins() {
     assert_eq!(
         at.weapon_setup(),
         WeaponSetup::Packed,
-        "AT gun should stay packed until it has rotated into setup tolerance"
+        "anti-tank gun should stay packed until it has rotated into setup tolerance"
     );
     assert!(
-        at.facing() > 0.0 && at.facing() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-        "AT gun should begin rotating while still packed, got {:.4}",
+        at.facing() > 0.0 && at.facing() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "anti-tank gun should begin rotating while still packed, got {:.4}",
         at.facing()
     );
 
@@ -2226,8 +2226,8 @@ fn packed_at_team_rotates_before_setup_animation_begins() {
         ) {
             saw_setting_up = true;
             assert!(
-                angle_delta(at.facing(), target).abs() <= AT_GUN_FIRE_TOLERANCE_RAD + 0.001,
-                "setup animation should begin only after the AT gun is aligned, got {:.4}",
+                angle_delta(at.facing(), target).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD + 0.001,
+                "setup animation should begin only after the anti-tank gun is aligned, got {:.4}",
                 at.facing()
             );
             break;
@@ -2235,7 +2235,7 @@ fn packed_at_team_rotates_before_setup_animation_begins() {
     }
     assert!(
         saw_setting_up,
-        "AT gun should eventually start setup once it rotates into tolerance"
+        "anti-tank gun should eventually start setup once it rotates into tolerance"
     );
 }
 
@@ -2437,7 +2437,7 @@ fn tank_front_and_rear_hits_take_different_damage() {
     fn tank_hp_after_at_hit(attacker_pos: (f32, f32)) -> u32 {
         let mut entities = EntityStore::new();
         let attacker = entities
-            .spawn_unit(1, EntityKind::AtTeam, attacker_pos.0, attacker_pos.1)
+            .spawn_unit(1, EntityKind::AntiTankGun, attacker_pos.0, attacker_pos.1)
             .expect("attacker should spawn");
         let victim = entities
             .spawn_unit(2, EntityKind::Tank, 100.0, 100.0)
@@ -2474,7 +2474,7 @@ fn tank_front_and_rear_hits_take_different_damage() {
     assert_eq!(rear_hp, 208);
     assert!(
         front_hp > rear_hp,
-        "rear AT hits should deal more damage than front hits"
+        "rear anti-tank hits should deal more damage than front hits"
     );
 }
 
@@ -2605,7 +2605,7 @@ fn allied_damage_does_not_update_last_damage_signal() {
 fn missed_primary_shot_still_emits_attack_event() {
     let mut entities = EntityStore::new();
     let attacker = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
         .expect("attacker should spawn");
     let victim = entities
         .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
@@ -2632,7 +2632,7 @@ fn missed_primary_shot_still_emits_attack_event() {
     assert_eq!(
         entities.get(victim).expect("victim should exist").hp,
         victim_hp,
-        "seeded AT shot should miss the infantry target"
+        "seeded anti-tank shot should miss the infantry target"
     );
     assert!(
             events
@@ -2655,10 +2655,10 @@ fn missed_primary_shot_still_emits_attack_event() {
 }
 
 #[test]
-fn at_team_seeded_shot_hits_scout_car_without_miss_roll() {
+fn anti_tank_gun_seeded_shot_hits_scout_car_without_miss_roll() {
     let mut entities = EntityStore::new();
     let attacker = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
         .expect("attacker should spawn");
     let victim = entities
         .spawn_unit(2, EntityKind::ScoutCar, 140.0, 100.0)
@@ -2685,7 +2685,7 @@ fn at_team_seeded_shot_hits_scout_car_without_miss_roll() {
     assert_eq!(
         entities.get(victim).expect("victim should exist").hp,
         victim_hp.saturating_sub(48),
-        "seeded AT shot should not miss the scout car target"
+        "seeded anti-tank shot should not miss the scout car target"
     );
 }
 

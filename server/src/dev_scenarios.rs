@@ -55,13 +55,13 @@ const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 4,
         blocker: None,
     },
@@ -94,7 +94,7 @@ const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
 const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
     DevScenarioLaunch {
         id: "direct_reverse_order",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
     },
@@ -115,31 +115,31 @@ const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
 const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 3,
         blocker: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 5,
         blocker: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 6,
         blocker: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 10,
         blocker: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 15,
         blocker: None,
     },
@@ -208,19 +208,19 @@ const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
 const VEHICLE_CORNER_WALL_LAUNCHES: [DevScenarioLaunch; 9] = [
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 3,
         blocker: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 5,
         blocker: None,
     },
@@ -339,19 +339,19 @@ const VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES: [DevScenarioLaunch; 30] = [
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 1,
-        blocker: Some(EntityKind::AtTeam),
+        blocker: Some(EntityKind::AntiTankGun),
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 3,
-        blocker: Some(EntityKind::AtTeam),
+        blocker: Some(EntityKind::AntiTankGun),
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 5,
-        blocker: Some(EntityKind::AtTeam),
+        blocker: Some(EntityKind::AntiTankGun),
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
@@ -429,26 +429,26 @@ const VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES: [DevScenarioLaunch; 30] = [
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 1,
-        blocker: Some(EntityKind::AtTeam),
+        blocker: Some(EntityKind::AntiTankGun),
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 3,
-        blocker: Some(EntityKind::AtTeam),
+        blocker: Some(EntityKind::AntiTankGun),
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 5,
-        blocker: Some(EntityKind::AtTeam),
+        blocker: Some(EntityKind::AntiTankGun),
     },
 ];
 
 const FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES: [DevScenarioLaunch; 3] = [
     DevScenarioLaunch {
         id: "factory_zero_gap_perpendicular",
-        unit: EntityKind::AtTeam,
+        unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
     },
@@ -556,7 +556,7 @@ pub fn parse_dev_scenario_blocker(id: &str, blocker: Option<&str>) -> Option<Opt
                 EntityKind::Worker
                     | EntityKind::Rifleman
                     | EntityKind::MachineGunner
-                    | EntityKind::AtTeam
+                    | EntityKind::AntiTankGun
             )
             .then_some(Some(kind))
         }
@@ -570,7 +570,7 @@ pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
         EntityKind::Worker => "worker",
         EntityKind::Rifleman => "rifleman",
         EntityKind::MachineGunner => "machine gunner",
-        EntityKind::AtTeam => "AT gun",
+        EntityKind::AntiTankGun => "anti-tank gun",
         EntityKind::ScoutCar => "scout car",
         EntityKind::Tank => "tank",
         _ => "unit",
@@ -583,7 +583,7 @@ pub fn dev_scenario_blocker_label(blocker: Option<EntityKind>) -> &'static str {
         Some(EntityKind::Worker) => "worker",
         Some(EntityKind::Rifleman) => "rifleman",
         Some(EntityKind::MachineGunner) => "machine gunner",
-        Some(EntityKind::AtTeam) => "AT gun",
+        Some(EntityKind::AntiTankGun) => "anti-tank gun",
         Some(_) => "unsupported",
     }
 }
@@ -613,19 +613,19 @@ mod tests {
             })
         );
         assert_eq!(
-            parse_dev_scenario_room("direct_reverse_order:unit=at_team:count=1"),
+            parse_dev_scenario_room("direct_reverse_order:unit=anti_tank_gun:count=1"),
             Some(DevScenarioLaunch {
                 id: "direct_reverse_order",
-                unit: EntityKind::AtTeam,
+                unit: EntityKind::AntiTankGun,
                 count: 1,
                 blocker: None,
             })
         );
         assert_eq!(
-            parse_dev_scenario_room("scout_car_wall_chokepoint:unit=at_team:count=15"),
+            parse_dev_scenario_room("scout_car_wall_chokepoint:unit=anti_tank_gun:count=15"),
             Some(DevScenarioLaunch {
                 id: "scout_car_wall_chokepoint",
-                unit: EntityKind::AtTeam,
+                unit: EntityKind::AntiTankGun,
                 count: 15,
                 blocker: None,
             })
@@ -649,10 +649,10 @@ mod tests {
             })
         );
         assert_eq!(
-            parse_dev_scenario_room("vehicle_corner_wall:unit=at_team:count=5"),
+            parse_dev_scenario_room("vehicle_corner_wall:unit=anti_tank_gun:count=5"),
             Some(DevScenarioLaunch {
                 id: "vehicle_corner_wall",
-                unit: EntityKind::AtTeam,
+                unit: EntityKind::AntiTankGun,
                 count: 5,
                 blocker: None,
             })

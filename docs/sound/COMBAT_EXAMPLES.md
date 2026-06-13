@@ -25,5 +25,5 @@ links are retained for auditability.
 
 - Launch/fire examples are cannon, bang, and shot source material from a fireworks/cannon pack.
 - Explosion examples are retro/game-style CC0 source material and should be auditioned before use in the realistic RTS mix.
-- Tank and AT hit examples are metal impact source material, not literal armor-piercing field recordings.
+- Tank and anti-tank hit examples are metal impact source material, not literal armor-piercing field recordings.
 - OGG source files were converted to 44.1 kHz mono MP3 to match the current project asset format.

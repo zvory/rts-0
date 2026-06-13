@@ -411,8 +411,8 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
                 player.first_attack_command_tick.get_or_insert(entry.tick);
             }
             WireCommand::Move { .. }
-            | WireCommand::SetupAtGuns { .. }
-            | WireCommand::TearDownAtGuns { .. }
+            | WireCommand::SetupAntiTankGuns { .. }
+            | WireCommand::TearDownAntiTankGuns { .. }
             | WireCommand::Charge { .. }
             | WireCommand::UseAbility { .. }
             | WireCommand::SetAutocast { .. }
@@ -564,8 +564,8 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         rts_sim::game::command::SimCommand::Move { units, .. }
         | rts_sim::game::command::SimCommand::AttackMove { units, .. }
         | rts_sim::game::command::SimCommand::Attack { units, .. }
-        | rts_sim::game::command::SimCommand::SetupAtGuns { units, .. }
-        | rts_sim::game::command::SimCommand::TearDownAtGuns { units }
+        | rts_sim::game::command::SimCommand::SetupAntiTankGuns { units, .. }
+        | rts_sim::game::command::SimCommand::TearDownAntiTankGuns { units }
         | rts_sim::game::command::SimCommand::UseAbility { units, .. }
         | rts_sim::game::command::SimCommand::SetAutocast { units, .. }
         | rts_sim::game::command::SimCommand::Gather { units, .. }

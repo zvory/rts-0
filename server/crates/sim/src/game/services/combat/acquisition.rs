@@ -85,7 +85,7 @@ pub(super) fn resolve_target(
         return Some(target);
     }
 
-    // AT teams prefer tanks over all other targets; fall back to nearest enemy if no tank
+    // Anti-Tank Guns prefer tanks over all other targets; fall back to nearest enemy if no tank
     // is in range.
     let prefers_armored = entities
         .get(self_id)
