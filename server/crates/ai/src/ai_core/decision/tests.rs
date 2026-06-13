@@ -2667,6 +2667,7 @@ fn frontal_wave_readiness_reports_required_tank_gate() {
         TECH_TO_TANKS.attack,
         &mut memory,
         &TECH_TO_TANKS,
+        &BTreeSet::new(),
     );
 
     assert_eq!(
@@ -3420,6 +3421,145 @@ fn moving_rifle_raid_ignores_visible_buildings_until_arrival() {
         }),
         "moving rifle raids should keep moving past buildings"
     );
+}
+
+#[test]
+fn scout_car_harassment_target_approaches_enemy_steel_line_from_back_side() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = with_enemy_main_resources(observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 30,
+            supply_cap: 60,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            combat_at(30, EntityKind::ScoutCar, 20.0 * ts, 20.0 * ts),
+        ],
+    ));
+    observation.tick = 1_000;
+    let enemy_base = enemy_base_fact(&observation);
+    let steel_center = enemy_main_steel_center(&observation, enemy_base)
+        .expect("enemy steel line should be public from start payload resources");
+
+    let decision = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    let harassment_move = decision.commands.iter().find_map(|command| match command {
+        Command::Move { units, x, y, .. } if units.as_slice() == [30] => Some((*x, *y)),
+        _ => None,
+    });
+    let target = harassment_move.expect("Scout Car should receive a harassment move");
+    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let forward = normalized_direction(own_base, (enemy_base.x, enemy_base.y)).unwrap();
+    let behind_progress =
+        (target.0 - steel_center.0) * forward.0 + (target.1 - steel_center.1) * forward.1;
+
+    assert!(
+        behind_progress > 6.0 * ts,
+        "harassment target should be behind the enemy main steel line"
+    );
+    assert!(
+        point_line_distance2(target, own_base, (enemy_base.x, enemy_base.y)) > squared(6.0 * ts),
+        "harassment target should be offset from the direct frontal approach"
+    );
+}
+
+#[test]
+fn scout_car_harassment_reserves_units_from_frontal_wave() {
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![
+        building(10, EntityKind::CityCentre, Some(0)),
+        building(11, EntityKind::Barracks, Some(0)),
+        building(12, EntityKind::TrainingCentre, None),
+        building(13, EntityKind::ResearchComplex, None),
+        building(14, EntityKind::Factory, Some(0)),
+        combat_at(30, EntityKind::ScoutCar, 20.0 * ts, 20.0 * ts),
+        combat_at(31, EntityKind::ScoutCar, 20.5 * ts, 20.0 * ts),
+        combat_at(40, EntityKind::Tank, 18.0 * ts, 18.0 * ts),
+    ];
+    owned.extend((0..5).map(|i| combat_at(41 + i, EntityKind::Rifleman, 18.0 * ts, 19.0 * ts)));
+    let mut observation = with_enemy_main_resources(observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 50,
+            supply_cap: 90,
+        },
+        owned,
+    ));
+    observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
+
+    let decision = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Move { units, .. } if units.as_slice() == [30, 31]
+        )
+    }));
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::AttackMove { units, .. } if units.as_slice() == [40, 41, 42, 43, 44, 45]
+        )
+    }));
+    assert!(
+        !decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::AttackMove { units, .. } if units.contains(&30) || units.contains(&31)
+            )
+        }),
+        "reserved Scout Cars should not be counted in the frontal wave"
+    );
+}
+
+#[test]
+fn scout_car_harassment_attacks_visible_combat_threats() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = with_enemy_main_resources(observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 30,
+            supply_cap: 60,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            combat_at(30, EntityKind::ScoutCar, 44.0 * ts, 44.0 * ts),
+            combat_at(31, EntityKind::ScoutCar, 44.5 * ts, 44.0 * ts),
+        ],
+    ));
+    observation
+        .visible_enemies
+        .push(enemy(80, EntityKind::Worker, 44.5 * ts, 44.5 * ts));
+    observation
+        .visible_enemies
+        .push(enemy(90, EntityKind::ScoutCar, 45.0 * ts, 44.5 * ts));
+
+    let decision = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Attack { units, target, .. }
+                if units.as_slice() == [30, 31] && *target == 90
+        )
+    }));
 }
 
 #[test]

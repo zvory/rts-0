@@ -16,6 +16,7 @@ pub(crate) struct AiProfile {
     pub(crate) buildings: BuildingPolicy,
     pub(crate) production: ProductionPolicy,
     pub(crate) attack: AttackPolicy,
+    pub(crate) harassment: Option<HarassmentPolicy>,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
     pub(crate) recovery_transition: Option<RecoveryTransitionPolicy>,
@@ -165,6 +166,16 @@ pub(crate) struct AttackPolicy {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct HarassmentPolicy {
+    pub(crate) unit_kind: EntityKind,
+    pub(crate) group_size: usize,
+    pub(crate) reissue_cadence_ticks: u32,
+    pub(crate) back_offset_tiles: f32,
+    pub(crate) side_offset_tiles: f32,
+    pub(crate) visible_threat_radius_tiles: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TechTransitionPolicy {
     pub(crate) supply_used_threshold: u32,
     pub(crate) required_tech_path: &'static [EntityKind],
@@ -280,6 +291,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         unit_kinds: &RIFLE_ONLY,
         required_unit: None,
     },
+    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 10,
         oil_after_full_steel_saturation: false,
@@ -414,6 +426,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         unit_kinds: &RIFLE_ONLY,
         required_unit: None,
     },
+    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 10,
         oil_after_full_steel_saturation: true,
@@ -496,6 +509,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         unit_kinds: &TANK_AND_RIFLE,
         required_unit: Some(EntityKind::Tank),
     },
+    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
@@ -558,6 +572,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         unit_kinds: &SUPPORT_WEAPONS,
         required_unit: None,
     },
+    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
@@ -638,6 +653,14 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         unit_kinds: &RIFLE_ONLY,
         required_unit: None,
     },
+    harassment: Some(HarassmentPolicy {
+        unit_kind: EntityKind::ScoutCar,
+        group_size: 2,
+        reissue_cadence_ticks: 90,
+        back_offset_tiles: 8.0,
+        side_offset_tiles: 12.0,
+        visible_threat_radius_tiles: 12.0,
+    }),
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,

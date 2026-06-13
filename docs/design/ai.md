@@ -97,7 +97,14 @@ and treats a single completed tank as a valid minimum attack wave.
 opens with four-Rifleman frontal waves, expands off a completed Training Centre, builds Research
 Complex and Factory without adding Machine Gunners, Anti-Tank Guns, Artillery, or Command Cars,
 produces Scout Cars while Tank research or Methamphetamines is blocked or pending, then prioritizes
-Tanks once both Tank research and Methamphetamines complete. Tank frontal waves require a Tank in
+Tanks once both Tank research and Methamphetamines complete. It reserves up to two completed Scout
+Cars for harassment before frontal-wave readiness is calculated, so those cars do not satisfy Tank
+wave sizes. The harassment manager chooses the nearest living enemy public start, derives the enemy
+main steel-line center from public start-resource locations plus visible resource deltas, and moves
+the Scout Cars to a back-side, off-axis point beyond that steel line. If the harassment group sees
+enemy combat units near its route, it issues an ordinary fog-respecting `Attack`; otherwise it
+reissues the harassment `Move` on a short cadence. It does not focus workers, ignore hidden
+buildings, retreat, regroup, or use Scout Car smoke in AI 1.0. Tank frontal waves require a Tank in
 the ready group and Methamphetamines before launch; while waiting, ready Tank groups stage toward
 the enemy instead of dribbling into attack orders. Methamphetamines is enforced before first Tank
 production, not only before Tank attack launch, so Tank production and Tank-wave readiness cannot
@@ -107,7 +114,10 @@ gate was added, it issued its first Rifleman attack at tick 1703, planned/comple
 7571/8432, completed its first Scout Car at 9179, and completed its first Tank at 10409. With the
 Phase 5 gate in the same bounded sample, first Rifleman attack stayed at tick 1703,
 planned/completed expansion stayed at 7571/8432, first Scout Car moved to 9227, and first Tank
-moved to 10457.
+moved to 10457. With Phase 6 Scout Car harassment enabled in the same bounded sample, first Rifleman
+attack stayed at tick 1703, expansion stayed at 7571/8432, first Scout Car stayed at 9227, first
+Scout Car harassment command was issued at 9227, and first Tank stayed at 10457. The replay
+verified at the 14,000 tick cap with no elimination.
 All profiles share a defensive panic mode. Visible enemy units near the AI's base, home resource
 line, or workers temporarily suspend expansion, worker training, and non-defensive tech spending
 only when their steel+oil value is at least 75% of the AI's own local unit value. While panicking,

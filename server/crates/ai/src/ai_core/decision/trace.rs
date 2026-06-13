@@ -168,6 +168,9 @@ pub(super) struct TraceInput<'a> {
     pub(super) frontal_wave_blockers: &'a [FrontalWaveBlocker],
     pub(super) rifle_raid_policy: bool,
     pub(super) rifle_raid_units: usize,
+    pub(super) harassment_policy: bool,
+    pub(super) harassment_units: usize,
+    pub(super) harassment_selected: bool,
     pub(super) required_tech_path: &'a [EntityKind],
 }
 
@@ -197,7 +200,12 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
     let intents = match goal {
         StrategicGoal::LocalDefense if !input.local_threat_active => Vec::new(),
         StrategicGoal::FrontalAttack if input.rifle_raid_policy => Vec::new(),
-        StrategicGoal::Harassment if !input.rifle_raid_policy => Vec::new(),
+        StrategicGoal::Harassment if !input.rifle_raid_policy && !input.harassment_policy => {
+            Vec::new()
+        }
+        StrategicGoal::Harassment if input.harassment_policy && !input.harassment_selected => {
+            Vec::new()
+        }
         _ => intents_for_goal(goal, input.intents),
     };
     let selected = match goal {
@@ -235,7 +243,7 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
                 })
         }
         StrategicGoal::Harassment => {
-            input.rifle_raid_policy
+            (input.rifle_raid_policy || input.harassment_selected)
                 && input
                     .intents
                     .iter()
@@ -354,11 +362,11 @@ fn blockers_for_goal(
             }
         }
         StrategicGoal::Harassment => {
-            if !input.rifle_raid_policy {
+            if !input.rifle_raid_policy && !input.harassment_policy {
                 blockers.push(GoalBlocker::MissingPrerequisite(
                     "harassment_policy_inactive",
                 ));
-            } else if input.rifle_raid_units == 0 {
+            } else if input.rifle_raid_units == 0 && input.harassment_units == 0 {
                 blockers.push(GoalBlocker::NoReadyUnits);
             }
         }
