@@ -19,5 +19,7 @@ name is short, lowercase, and descriptive.
   begins.
 - When a phase is complete, mark that phase document as done in the implementation commit for that
   phase.
+- For executor-only automation, `scripts/phase-runner.sh` can run existing phase files in isolated
+  worktrees. Planning and final review remain manual.
 
 See [plans/README.md](../../plans/README.md) for the full convention.
