@@ -4,23 +4,24 @@ Status: Designed, not implemented.
 
 ## Objective
 
-Implement the second faction's start, resource model, and first production path from the approved
-brief/spec. This phase should produce a narrow playable economy slice, not the full faction.
+Implement the second faction's start, Steel/Oil/Supply tuning, and first production path from the
+approved brief/spec. This phase should produce a narrow playable economy slice, not the full
+faction.
 
 ## Scope
 
 - Add the real second faction id and Rust catalog entry.
-- Add the approved starting loadout, starting resources, supply/capacity rules, and first production
-  anchor.
+- Add the approved starting loadout, starting Steel/Oil/Supply values, supply/capacity rules, and
+  first production anchor.
 - Add the minimum builder/producer path or equivalent mechanic needed to create one basic unit path.
-- Add client resource display, command-card entries, hotkeys, and readable placeholder/final art for
-  the start and first production path.
+- Add client command-card entries, hotkeys, and readable placeholder/final art for the start and
+  first production path while keeping the shared Steel/Oil/Supply HUD.
 - Keep server catalog strictness: reject current-faction build/train/research/economy commands from
   second-faction players and reject second-faction commands from current-faction players.
 - Keep AI unable to select or be assigned the second faction.
 - Disable prediction for the second faction unless the approved brief and implementation explicitly
   add WASM support.
-- Collect factual patch-note bullets for resource, start, production, and UI changes.
+- Collect factual patch-note bullets for Steel/Oil/Supply costs, start, production, and UI changes.
 
 ## Expected Touch Points
 
@@ -42,17 +43,19 @@ brief/spec. This phase should produce a narrow playable economy slice, not the f
 
 ## Verification
 
-- Rust tests for second-faction start loadout, resources, supply/capacity, and production legality.
+- Rust tests for second-faction start loadout, Steel/Oil/Supply values, supply/capacity, and
+  production legality.
 - Rust command tests for illegal cross-faction commands in both directions.
-- Protocol parity tests for new faction/resource/kind ids touched by this slice.
+- Protocol parity tests for new faction/kind ids touched by this slice and unchanged resource
+  payload assumptions.
 - Client command-card descriptor tests for start/economy/production commands.
 - Server integration test for mixed current-faction plus second-faction match start.
 - Prediction-disable test for second-faction starts if WASM is not updated.
-- Balance docs updated with player-facing start/economy/production data.
+- Balance docs updated with player-facing Steel/Oil/Supply start/economy/production data.
 
 ## Manual Testing Focus
 
-Start a local match as the second faction and verify start entities, resource display, first
+Start a local match as the second faction and verify start entities, Steel/Oil/Supply display, first
 production path, command legality, AI restriction, and prediction-disabled state. Also start a
 current-faction match and verify the original start and economy were not regressed.
 

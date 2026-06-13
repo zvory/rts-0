@@ -4,27 +4,26 @@ Status: Designed, not implemented.
 
 ## Objective
 
-Move starting entities, starting resources, supply rules, opening upgrades, and resource-node usage
-into faction loadout definitions. Prove that a fixture faction can start with a different economy
-and no steel/oil mining dependency without implementing the real second faction roster.
+Move starting entities, starting Steel/Oil/Supply values, supply rules, opening upgrades, and
+resource-node usage into faction loadout definitions. Prove that a fixture faction can start with a
+different loadout and command set inside the existing economy without implementing the real second
+faction roster.
 
 ## Scope
 
 - Define faction loadout data in the Rust-authoritative faction catalog.
 - Move current-faction City Centre, Worker ring, starting resources, and starting supply into the
   current faction loadout.
-- Allow loadouts to define starting units, buildings, completed construction state, initial
-  resources, initial capacities, opening upgrades/flags, and debug-mode additions.
-- Make map resource spawning loadout-aware enough that factions can ignore universal steel/oil
-  resources without breaking current-faction opponents.
-- Avoid faction-specific map resource objects unless an approved faction brief explicitly requires
-  them.
-- Add a fixture faction or test-only fixture loadout with a different resource set and no steel/oil
-  mining requirement.
+- Allow loadouts to define starting units, buildings, completed construction state, initial Steel,
+  initial Oil, initial supply capacity, opening upgrades/flags, and debug-mode additions.
+- Keep map resource spawning on the current universal Steel/Oil nodes.
+- Do not add faction-specific map resource objects in this plan.
+- Add a fixture faction or test-only fixture loadout with different starting entities, resources,
+  supply, and legal commands while still using Steel/Oil/Supply.
 - Enforce illegal cross-faction economy/build/train/research commands with server-side notices or
   no-ops.
-- Keep match history and score calculations sensible for fixture entities and zero/alternate-cost
-  definitions.
+- Keep match history and score calculations sensible for fixture entities and zero/alternate
+  Steel/Oil-cost definitions.
 - Keep AI slots current-faction-only; fixture factions are human/dev/test only.
 
 ## Expected Touch Points
@@ -52,28 +51,29 @@ and no steel/oil mining dependency without implementing the real second faction 
 
 - Rust tests for default current-faction start parity: starting entities, resources, supply,
   upgrades, fog, and resource nodes.
-- Rust tests for fixture-faction starts with alternate resources and no steel/oil mining
-  dependency.
+- Rust tests for fixture-faction starts with alternate Steel/Oil/Supply values and no illegal
+  current-faction command access.
 - Server integration test for mixed current-faction plus fixture-faction match start.
 - Command tests proving fixture players cannot issue current-faction-only economy/build/train
   commands.
-- Fog tests proving resource node visibility and fixture economy data do not leak hidden enemy
-  state.
-- Client HUD tests for fixture resource display if the fixture is exposed through a dev path.
+- Fog tests proving resource node visibility and fixture start data do not leak hidden enemy state.
+- Client HUD tests proving fixture starts still display the shared Steel/Oil/Supply resources if the
+  fixture is exposed through a dev path.
 
 ## Manual Testing Focus
 
 Verify current-faction gathering and spending still work. If a fixture faction is exposed in a dev
-path, verify it starts with its fixture loadout, shows the right resources, does not need steel/oil
-mining, and cannot issue current-faction commands.
+path, verify it starts with its fixture loadout, shows Steel/Oil/Supply correctly, and cannot issue
+current-faction commands.
 
 ## Handoff Expectations
 
 The handoff must describe the loadout schema, current-faction parity evidence, fixture faction
-limitations, any remaining resource-node assumptions, and the mixed-faction test command/result.
+limitations, the explicit Steel/Oil map-resource assumption, and the mixed-faction test
+command/result.
 It should tell Phase 5 how abilities attach to faction catalog definitions.
 
 ## Player-Facing Outcome
 
 The current faction should play unchanged. Internally, starting state is faction-defined and test
-fixtures prove alternate economy starts are possible.
+fixtures prove alternate faction starts are possible without changing the global economy.

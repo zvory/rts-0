@@ -15,7 +15,7 @@ trying to complete the whole roster.
 - Add the approved signature ability-heavy unit and its ability or abilities.
 - Use existing ability registry and effect hooks where possible; add only tightly scoped hooks if
   the approved ability cannot be implemented cleanly.
-- Add fog-safe events, notices, cooldown/charge projection, resource costs, and client visuals for
+- Add fog-safe events, notices, cooldown/charge projection, Steel/Oil costs, and client visuals for
   the signature ability.
 - Keep AI blocked for the new faction unless explicitly approved.
 - Keep prediction disabled for the new faction unless WASM support is intentionally implemented.
@@ -44,7 +44,7 @@ trying to complete the whole roster.
 - Rust ability tests for carrier eligibility, target mode, costs, cooldowns, charges, events, and
   wrong-faction rejection.
 - Fog/security regression tests for every new event or reveal.
-- Protocol parity tests for every new kind, ability, event, upgrade, or resource id.
+- Protocol parity tests for every new kind, ability, event, or upgrade id.
 - Client command-card descriptor tests for the new combat and ability units.
 - Targeted client smoke or dev scenario test for rendering and command issuance.
 - Balance docs updated with player-facing stats and ability behavior.
@@ -52,7 +52,7 @@ trying to complete the whole roster.
 ## Manual Testing Focus
 
 Play a short local/dev match as the new faction and verify production, combat readability, ability
-targeting, cooldown/charges, resource cost, fog behavior, defeat/win behavior, and current-faction
+targeting, cooldown/charges, Steel/Oil cost, fog behavior, defeat/win behavior, and current-faction
 regression.
 
 ## Handoff Expectations

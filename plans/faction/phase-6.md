@@ -4,21 +4,22 @@ Status: Designed, not implemented.
 
 ## Objective
 
-Add only the reusable ability effect hooks needed by known current abilities and the approved second
-faction mechanics. Avoid building a generic scripting engine before the faction brief proves the
+Add only the reusable ability effect hooks needed by known current abilities or architecture
+fixtures. This phase must not depend on the real second-faction brief, which is approved later in
+Phase 8, and it should avoid building a generic scripting engine before real mechanics prove the
 needed shapes.
 
 ## Scope
 
-- Identify from the approved brief or fixture needs which reusable effect classes are required.
-- Add focused hooks for concrete patterns such as:
+- Identify from current ability parity and fixture needs which reusable effect classes are required.
+- Add focused hooks only when current parity or fixture coverage needs concrete patterns such as:
   - self buff
   - targeted world effect
   - delayed projectile or delayed impact
   - area effect
   - toggle/autocast
   - limited charges
-  - resource-consuming activation
+- Steel/Oil-consuming activation
 - Keep complex one-off implementations acceptable when they remain clearer than generic hooks.
 - Ensure hooks receive faction/player context so wrong-faction effects cannot trigger.
 - Ensure every effect event remains fog-safe and does not reveal hidden enemy entities or positions.
@@ -61,9 +62,10 @@ autocast state, and fog behavior are unchanged.
 ## Handoff Expectations
 
 The handoff must list the hooks that exist, the effect code intentionally left one-off, and the
-specific path Phase 10 should follow to add the second faction's signature ability.
+specific extension points Phase 10 may use if the approved second-faction signature ability needs
+additional tightly scoped hooks.
 
 ## Player-Facing Outcome
 
-No intended current-faction balance change. The ability system has practical extension points for
-the second faction without becoming a general scripting system.
+No intended current-faction balance change. The ability system has practical extension points, but
+second-faction-specific hooks wait until the faction brief is approved and Phase 10 needs them.

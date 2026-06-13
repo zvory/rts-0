@@ -14,7 +14,7 @@ longer assume one global tech tree.
 - Represent the current faction's units, buildings, upgrades, buildables, trainables, and tech
   requirements through that catalog.
 - Keep runtime/wire identity global for now: catalogs refer to global `EntityKind`, upgrade ids,
-  ability ids, and resource ids rather than introducing faction-scoped kind ids.
+  ability ids, and Steel/Oil/Supply cost fields rather than introducing faction-scoped kind ids.
 - Establish the generated or mechanically checked JS mirror path for faction catalog data. The
   client may still import local descriptors, but their contents must be checked against the
   Rust-authoritative catalog.
@@ -68,7 +68,7 @@ Training Centre unlocks, R&D upgrades, Vehicle Works units, and Gun Works units.
 
 The handoff must describe the catalog API, the generated/mechanically checked client mirror path,
 remaining compatibility helpers, and any hardcoded current-faction assumptions still allowed after
-Phase 2. It should tell Phase 3 how resource ids and costs attach to faction catalog entries.
+Phase 2. It should tell Phase 3 how Steel/Oil/Supply costs attach to faction catalog entries.
 
 ## Player-Facing Outcome
 

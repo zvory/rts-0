@@ -1,32 +1,30 @@
-# Phase 3 - Generic Resource Contract
+# Phase 3 - Steel/Oil Resource Policy Hardening
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Replace fixed steel/oil economy payload assumptions with a generic resource contract that can
-represent completely different faction economies. Current-faction gameplay should remain the same,
-but old replay artifacts, compact snapshot versions, and old clients may break.
+Keep Steel, Oil, and Supply as the shared economy contract for all factions in this plan, and make
+that decision explicit in code, docs, and tests. Current-faction gameplay and wire resource payloads
+should remain unchanged while command validation, costs, supply, scoring, replay analysis, and HUD
+mirrors become ready for faction-specific catalogs that still price things in Steel/Oil/Supply.
 
 ## Scope
 
-- Introduce typed resource ids and definitions in the Rust-authoritative rules/faction catalog.
-- Represent current Steel, Oil, and Supply through the new resource contract.
-- Decide the exact semantic split between spendable resources and capacity resources such as
-  supply. Supply may remain a specialized resource type, but it should still be faction-defined.
-- Replace or wrap fixed `steel`, `oil`, `supplyUsed`, and `supplyCap` snapshot/player-resource
-  assumptions with generic resource payloads.
-- Bump compact snapshot and prediction protocol versions as needed without migration shims.
-- Update replay artifacts, replay start metadata, match-history replay serialization, branch
-  keyframes, and dev session starts to use the new schema.
-- Update HUD/resource rendering for the current faction through the generic payload while keeping
-  player-visible Steel/Oil/Supply presentation unchanged.
-- Add server-side affordability/spend/refund helpers that operate on resource ids instead of
-  steel/oil pairs.
-- Add architecture-check pressure against new direct `steel`/`oil` economy fields outside approved
-  compatibility shims during migration.
-- Disable prediction for non-default or generic-resource fixture factions until the WASM adapter is
-  intentionally updated.
+- Document Steel, Oil, and Supply as the global faction economy contract for this plan.
+- Keep fixed `steel`, `oil`, `supplyUsed`, and `supplyCap` snapshot/player-resource payloads.
+- Keep start-payload map resource nodes as Steel/Oil nodes.
+- Keep replay artifacts, match-history replay payloads, branch keyframes, replay analysis, score
+  screens, and compact snapshots on the current Steel/Oil/Supply schema.
+- Move or wrap cost, affordability, spend, refund, and supply helpers so gameplay callers can pass
+  faction-catalog cost data while still using Steel/Oil/Supply fields.
+- Add server-side validation proving a player can only spend resources on kinds, upgrades, and
+  abilities legal for that player's faction.
+- Add tests or architecture-check notes identifying the approved modules where direct Steel/Oil/
+  Supply references are expected, so future generic-resource work has a clear migration inventory.
+- Keep prediction/WASM unchanged for the current faction and disabled for non-default factions
+  unless an explicit later phase updates it.
+- Add a short deferred-generic-resources note to the relevant design docs if this phase edits them.
 
 ## Expected Touch Points
 
@@ -35,44 +33,40 @@ but old replay artifacts, compact snapshot versions, and old clients may break.
 - `server/crates/sim/src/game/services/economy.rs`
 - `server/crates/sim/src/game/services/construction.rs`
 - `server/crates/sim/src/game/services/production.rs`
-- `server/crates/sim/src/game/snapshot.rs`
-- `server/crates/sim/src/game/replay.rs`
-- `server/crates/contract/src/lib.rs`
-- `server/crates/protocol/src/lib.rs`
-- `server/src/lobby/`
-- `client/src/protocol.js`
-- `client/src/state.js`
-- `client/src/hud.js`
+- `server/crates/sim/src/game/scoring.rs`
+- `server/crates/sim/src/game/analysis.rs`
 - `client/src/config.js`
-- `tests/protocol_parity.mjs`
+- `client/src/hud_command_card.js`
+- `client/src/replay_analysis_overlay.js`
 - `tests/sim_wasm_smoke.mjs`
-- `docs/design/protocol.md`
 - `docs/design/balance.md`
+- `docs/design/protocol.md` only if documenting the deferred generic-resource decision there
 
 ## Verification
 
-- Rust tests proving current-faction Steel/Oil/Supply values match the old start and spend behavior.
-- Rust tests for generic affordability, spending, refunding, capacity checks, and spectator
-  per-player resource projection.
-- Protocol parity tests for resource ids, generic resource payloads, and compact snapshot version.
-- Client HUD/resource tests proving current-faction resource display is unchanged.
-- Replay/branch serialization tests proving the new schema round-trips; no old replay compatibility
-  test is required.
-- Prediction/WASM test or client contract proving unsupported faction/resource payloads disable
-  prediction with a clear reason.
+- Rust tests proving current-faction Steel/Oil/Supply start, spend, refund, supply reservation, and
+  score behavior remain unchanged.
+- Rust command tests proving faction-illegal build/train/research/ability attempts do not spend
+  Steel/Oil or reserve Supply.
+- Rust or JS tests proving replay analysis and score values still report Steel/Oil consistently.
+- Client command-card tests proving current-faction costs, affordability, and shortage display are
+  unchanged.
+- Prediction/WASM smoke or client contract proving non-default factions remain prediction-disabled
+  unless explicitly supported.
 
 ## Manual Testing Focus
 
 Start a normal current-faction match and verify Steel, Oil, Supply, gathering, spending, training,
-researching, spectator resource rows, and post-match replay display still look correct.
+researching, spectator resource rows, score screens, and replay-analysis display still look correct.
 
 ## Handoff Expectations
 
-The handoff must document the resource payload shape, compact snapshot version change, replay schema
-change, which fixed steel/oil helpers remain temporarily, and how Phase 4 should define faction
-starting resources and supply rules.
+The handoff must document that Steel/Oil/Supply remain the resource payload shape, name the approved
+direct-resource modules, list any helper wrappers added for faction-catalog costs, and tell Phase 4
+how to define faction starting Steel/Oil/Supply and supply rules.
 
 ## Player-Facing Outcome
 
-The current faction should look and play unchanged, but the underlying economy contract can now
-represent factions that do not use Steel/Oil.
+The current faction should look and play unchanged. The faction architecture now explicitly supports
+different costs and starts within the existing Steel/Oil/Supply economy, with truly generic
+resources deferred to a later standalone migration.

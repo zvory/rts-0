@@ -6,7 +6,7 @@ Status: Designed, not implemented.
 
 Make the browser client render and command different faction catalogs using the generated or
 mechanically checked client mirror. Preserve the current HUD while adding fixture-faction coverage
-for alternate resources, build menus, production, and abilities.
+for alternate build menus, production, and abilities within the shared Steel/Oil/Supply economy.
 
 ## Scope
 
@@ -15,13 +15,14 @@ for alternate resources, build menus, production, and abilities.
   client descriptors.
 - Support faction-specific build menus instead of one global `WORKER_BUILDABLE` list.
 - Support faction-specific train/research/ability buttons.
-- Update HUD resource rendering for the generic resource payload introduced in Phase 3.
+- Keep HUD resource rendering on the existing Steel/Oil/Supply payload while ensuring catalog costs
+  and affordability checks are faction-aware.
 - Add visual fallbacks for unknown or fixture units/buildings so protocol additions do not render
   blank.
 - Update hotkey profile behavior so new faction command ids are stable and do not collide
   accidentally.
-- Disable prediction in the client when the start payload says the selected faction/resource model
-  is unsupported by WASM.
+- Disable prediction in the client when the start payload says the selected faction is unsupported
+  by WASM.
 - Keep no-framework/no-build-step client conventions.
 - Preserve current faction command card DOM/classes/hotkeys unless a documented migration is
   required.
@@ -49,7 +50,8 @@ for alternate resources, build menus, production, and abilities.
 
 - Command-card descriptor tests for current faction parity.
 - Command-card descriptor tests for fixture faction build/train/research/ability cards.
-- Client protocol parity tests for faction/resource/ability fields.
+- Client protocol parity tests for faction and ability fields, plus unchanged Steel/Oil/Supply
+  resource decoding.
 - Generated-client-catalog or parity tests proving JS descriptors match Rust.
 - Hotkey profile tests for new command ids.
 - Prediction-disable test for unsupported non-default factions.
@@ -60,7 +62,7 @@ for alternate resources, build menus, production, and abilities.
 
 Start current-faction debug mode and verify the command card, build placement, resources, training,
 researching, ability buttons, and prediction status. If fixture faction is exposed in a dev path,
-verify its resource display and command card show only fixture-legal actions.
+verify its Steel/Oil/Supply display and command card show only fixture-legal actions.
 
 ## Handoff Expectations
 
@@ -71,4 +73,5 @@ temporary. It should tell Phase 8 what real faction UI data the brief/spec must 
 ## Player-Facing Outcome
 
 The current UI should look and behave unchanged. The client becomes capable of presenting a
-different faction's tech tree, resource set, and ability set through data-backed descriptors.
+different faction's tech tree and ability set through data-backed descriptors while keeping the
+shared Steel/Oil/Supply HUD.

@@ -19,8 +19,7 @@ remaining balance risks.
 - Audit replay, branch, match history, spectator, debug mode, quickstart, dev scenario, and
   post-match flows under the new non-backcompat schema.
 - Run fog/security checks for every second-faction ability and event.
-- Review performance impact of extra catalog lookups, generic resources, ability systems, and
-  renderer additions.
+- Review performance impact of extra catalog lookups, ability systems, and renderer additions.
 - Update design docs and context capsules so future faction work starts from the new architecture.
 - Decide whether faction choice is ready for normal selection or should remain dev/local only.
 

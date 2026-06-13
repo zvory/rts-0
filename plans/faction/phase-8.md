@@ -10,10 +10,10 @@ the user.
 
 ## Scope
 
-- Write or reference the faction brief, including theme, intended strategic identity, economy,
-  resource names, production model, strengths, weaknesses, and expected match pacing.
-- Define the starting loadout, resource model, supply/capacity model, and whether universal map
-  resources are ignored or used.
+- Write or reference the faction brief, including theme, intended strategic identity, how the
+  faction uses Steel/Oil/Supply, production model, strengths, weaknesses, and expected match pacing.
+- Define the starting loadout, starting Steel/Oil/Supply values, supply/capacity model, and how the
+  faction uses or ignores the existing universal Steel/Oil map resources.
 - Define the minimum playable implementation slices:
   - start, economy, and first production path
   - baseline combat unit
@@ -24,8 +24,10 @@ the user.
 - Define required client art/readability expectations for each initial unit/building.
 - Decide whether prediction remains disabled for the new faction, which should be the default.
 - Confirm AI remains blocked for the new faction unless the user explicitly approves AI work.
-- Identify every mechanic that needs a new ability hook, resource behavior, fog event, or protocol
-  field before Phase 9 starts.
+- Identify every mechanic that needs a new ability hook, Steel/Oil/Supply behavior, fog event, or
+  protocol field before Phase 9 starts.
+- Explicitly record that arbitrary new resources and faction-specific map resource objects are out
+  of scope for this faction rollout unless the user starts a separate generic-resource plan.
 - Do not implement Rust, JS, protocol, balance, art, tests, or other implementation files for the
   real faction in this phase.
 
