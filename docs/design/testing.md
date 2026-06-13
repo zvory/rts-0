@@ -85,6 +85,10 @@ suites.
   notes.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
   changed behavior that crosses the room/network boundary.
+- Team-aware authored start assignment is covered by `cargo test map --workspace` for deterministic
+  FFA compatibility, current authored map proximity, 1v2/1v3 team layouts, synthetic larger layouts,
+  start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
+  live lobby/start contract.
 - `rts-ai`: run AI package tests and `node tests/ai_integration.mjs`. Run
   `RTS_FULL_AI_TESTS=1 cargo test` or `tests/run-all.sh --full-ai` when strategy profiles,
   profile-backed self-play, replay determinism, or long-match balance behavior changed.

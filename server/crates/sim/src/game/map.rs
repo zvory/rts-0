@@ -12,6 +12,8 @@
 use std::path::PathBuf;
 
 mod authored;
+#[cfg(test)]
+mod team_assignment_tests;
 
 use crate::config;
 use crate::protocol::terrain;
@@ -30,6 +32,13 @@ const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 type Tile = (u32, u32);
 type BaseSlot = (Tile, Vec<Tile>);
+
+/// Ordered player/team data used internally to assign authored start slots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct StartAssignmentPlayer {
+    id: u32,
+    team_id: u32,
+}
 
 /// Radius around a player start site (even index) that must remain passable.
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
@@ -66,6 +75,17 @@ impl Map {
     pub fn generate(player_count: usize, seed: u32) -> Map {
         Self::from_authored_json_with_name(player_count, DEFAULT_MAP_NAME, DEFAULT_MAP_JSON, seed)
             .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
+    }
+
+    /// Load the deterministic handcrafted map and assign starts to the ordered players.
+    pub(crate) fn generate_for_players(players: &[(u32, u32)], seed: u32) -> Map {
+        Self::from_authored_json_with_name_for_players(
+            players,
+            DEFAULT_MAP_NAME,
+            DEFAULT_MAP_JSON,
+            seed,
+        )
+        .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
     }
 
     /// Return all available maps in `assets/maps/` as `(name, description)` entries. Only maps
@@ -139,6 +159,16 @@ impl Map {
         Self::from_authored_json_with_name(player_count, &name, &json, seed)
     }
 
+    /// Load a map by display name and assign starts to the ordered players.
+    pub fn load_for_players(
+        map_name: &str,
+        players: &[(u32, u32)],
+        seed: u32,
+    ) -> Result<Map, String> {
+        let (name, json) = Self::authored_json_for_name(map_name)?;
+        Self::from_authored_json_with_name_for_players(players, &name, &json, seed)
+    }
+
     pub fn metadata_for_name(map_name: &str) -> Result<MapMetadata, String> {
         let (name, json) = Self::authored_json_for_name(map_name)?;
         Ok(MapMetadata {
@@ -189,6 +219,15 @@ impl Map {
         Self::from_authored_json_with_name(player_count, DEFAULT_MAP_NAME, json, seed)
     }
 
+    #[cfg(test)]
+    fn from_authored_json_for_players(
+        players: &[(u32, u32)],
+        json: &str,
+        seed: u32,
+    ) -> Result<Map, String> {
+        Self::from_authored_json_with_name_for_players(players, DEFAULT_MAP_NAME, json, seed)
+    }
+
     fn from_authored_json_with_name(
         player_count: usize,
         _name: &str,
@@ -196,6 +235,22 @@ impl Map {
         seed: u32,
     ) -> Result<Map, String> {
         authored::load(player_count, json, seed)
+    }
+
+    fn from_authored_json_with_name_for_players(
+        players: &[(u32, u32)],
+        _name: &str,
+        json: &str,
+        seed: u32,
+    ) -> Result<Map, String> {
+        let players: Vec<_> = players
+            .iter()
+            .map(|(id, team_id)| StartAssignmentPlayer {
+                id: *id,
+                team_id: *team_id,
+            })
+            .collect();
+        authored::load_for_players(&players, json, seed)
     }
 
     #[inline]

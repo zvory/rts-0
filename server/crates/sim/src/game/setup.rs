@@ -238,7 +238,16 @@ impl Game {
         map_override: Option<Map>,
         map_metadata: MapMetadata,
     ) -> Game {
-        let map = map_override.unwrap_or_else(|| Map::generate(players.len(), seed));
+        let start_players: Vec<_> = players
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    super::teams::normalize_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map = map_override.unwrap_or_else(|| Map::generate_for_players(&start_players, seed));
         let fog = Fog::new(map.size);
         let mut entities = EntityStore::new();
 

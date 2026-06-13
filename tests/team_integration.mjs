@@ -25,6 +25,10 @@ function teamsFor(start) {
   return start.players.map((player) => player.teamId);
 }
 
+function startDistanceSq(a, b) {
+  return (a.startTileX - b.startTileX) ** 2 + (a.startTileY - b.startTileY) ** 2;
+}
+
 async function joinNamed(tag, room, name = tag, opts = {}) {
   const client = await connectClient(tag);
   client.send({ t: "join", name, room, ...opts });
@@ -94,6 +98,11 @@ async function twoVsTwoStartsWithHumanAndAis() {
   assertStartProtocol(ok, start, { playerId: A.playerId, expectedPlayers: 4, spectator: false });
   ok(JSON.stringify(teamsFor(start)) === JSON.stringify([1, 1, 2, 2]),
     `2v2 seats host+human on Team 1 and AIs on Team 2 (${teamsFor(start).join(",")})`);
+  const teamOneDistance = startDistanceSq(start.players[0], start.players[1]);
+  const teamTwoDistance = startDistanceSq(start.players[2], start.players[3]);
+  const oppositeCornerBaseline = 10000;
+  ok(teamOneDistance < oppositeCornerBaseline && teamTwoDistance < oppositeCornerBaseline,
+    `2v2 teammates spawn near each other (${teamOneDistance}, ${teamTwoDistance})`);
   closeClients(A, B);
 }
 
