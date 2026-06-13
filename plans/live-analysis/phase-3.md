@@ -1,6 +1,6 @@
 # Phase 3 - Live Spectator Analysis Delivery
 
-Status: Planned.
+Status: Done.
 
 ## Objective
 
@@ -59,4 +59,3 @@ the same message shape for live spectators and replay viewers.
 
 Live spectators have server-authored analysis data available, but the client overlay may still need
 Phase 4 before it is visible in the UI.
-

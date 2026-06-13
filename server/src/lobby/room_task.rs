@@ -2552,6 +2552,26 @@ impl RoomTask {
         self.broadcast(&msg);
     }
 
+    fn broadcast_live_observer_analysis_to_spectators(&self, game: &Game) {
+        let spectator_ids: Vec<u32> = self
+            .order
+            .iter()
+            .copied()
+            .filter(|id| self.players.get(id).is_some_and(|player| player.spectator))
+            .collect();
+        if spectator_ids.is_empty() {
+            return;
+        }
+
+        let msg = ServerMessage::ObserverAnalysis(game.observer_analysis());
+        for id in spectator_ids {
+            let Some(player) = self.players.get(&id) else {
+                continue;
+            };
+            send_or_log(&self.room, id, &player.msg_tx, msg.clone());
+        }
+    }
+
     fn broadcast_dev_watch_state(&self) {
         if !matches!(self.mode, RoomMode::DevScenario(_)) {
             return;
@@ -2797,6 +2817,7 @@ impl RoomTask {
         if let Some(perf) = perf.as_mut() {
             perf.record_phase("snapshot_fanout", fanout_start.elapsed());
         }
+        self.broadcast_live_observer_analysis_to_spectators(&game);
 
         // Check for game over. A 1-player match never ends (sandbox/exploration mode).
         let outcome_start = StdInstant::now();
@@ -3796,6 +3817,26 @@ mod tests {
         writer
     }
 
+    fn add_test_room_spectator(task: &mut RoomTask, id: u32) -> ConnectionWriter {
+        let (msg_tx, writer) = ConnectionSink::new();
+        task.order.push(id);
+        task.players.insert(
+            id,
+            RoomPlayer {
+                name: format!("Spectator {id}"),
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
+            },
+        );
+        writer
+    }
+
     fn add_branch_occupant(task: &mut RoomTask, id: u32) -> ConnectionWriter {
         let (msg_tx, writer) = ConnectionSink::new();
         task.order.push(id);
@@ -4251,6 +4292,40 @@ mod tests {
             msg,
             ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 1 && analysis.players.len() == 2
         )));
+    }
+
+    #[test]
+    fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
+        let mut task = RoomTask::new(
+            "live-spectator-analysis-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_test_room_player(&mut task, 1, true);
+        let mut writer_b = add_test_room_player(&mut task, 2, true);
+        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+
+        task.start_match();
+        while writer_a.reliable_rx.try_recv().is_ok() {}
+        while writer_b.reliable_rx.try_recv().is_ok() {}
+        while writer_spectator.reliable_rx.try_recv().is_ok() {}
+
+        task.on_tick(TokioInstant::now());
+
+        let spectator_messages: Vec<_> =
+            std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
+        assert!(spectator_messages.iter().any(|msg| matches!(
+            msg,
+            ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 1 && analysis.players.len() == 2
+        )));
+        let mut active_messages: Vec<_> =
+            std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
+        active_messages.extend(std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()));
+        assert!(!active_messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::ObserverAnalysis(_))));
     }
 
     #[test]

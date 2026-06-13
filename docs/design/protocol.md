@@ -544,9 +544,11 @@ default is the union of all replay players.
 `replayAnalysis` is the compatibility wire tag for reliable observer analysis overlay/tab data that
 cannot be derived safely from the browser's current projected snapshot. In replay playback it is
 sent to replay viewers after replay `start`/`replayState`, after accepted seeks, after replay
-vision changes, and during replay playback ticks. Live spectator delivery uses the same payload
-contract when enabled, but active live players must not receive this message; Phase 2 still sends it
-only during replay playback.
+vision changes, and during replay playback ticks. Live matches send the same payload every server
+tick, at the normal snapshot cadence, only when at least one spectator connection is present. The
+server computes the live payload once per tick and sends it only to connections whose room player
+state is `spectator: true`; active-player connections, including claimed branch-live seats, must
+not receive this message.
 ```
 {
   t: "replayAnalysis",
