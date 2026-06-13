@@ -53,6 +53,13 @@ The server treats every client as potentially hostile. Limits live next to the c
   vision, where entity views are marked `visionOnly` and remain non-actionable. Visibility is
   terrain-aware: stone blocks sight beyond itself on both the server fog grid and the client
   cosmetic fog overlay.
+- **Team-safe hostile command targeting**: explicit `Attack` commands, queued attack promotion, and
+  target acquisition reject allied owners through the authoritative team relationship snapshot,
+  not raw owner inequality. A malicious client can still send arbitrary entity ids, but allied,
+  neutral, dead, hidden, smoke-hidden, stale, or non-targetable ids remain no-ops and do not become
+  hostile attack orders or retained combat targets. Strict raw-owner checks are still required for
+  command authority and economy operations, and friendly-fire/damage/event/victory behavior is
+  covered by later team phases.
 - **Shot blocking and overpenetration**: ranged attacks first resolve against the first enemy tank
   body or building footprint intersecting the line from attacker to intended target. That blocker
   takes the shot damage and the intended target behind it is unharmed. Shots that hit ordinary

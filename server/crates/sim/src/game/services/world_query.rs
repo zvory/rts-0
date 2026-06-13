@@ -17,6 +17,7 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::teams::TeamRelations;
 use crate::rules::terrain::{self, TerrainKind};
 
 // --- Ownership scans --------------------------------------------------------
@@ -122,20 +123,23 @@ pub(crate) fn has_town_hall(entities: &EntityStore, player: u32) -> bool {
 /// Filters out self, neutrals, friendlies, dead, and non-targetable kinds.
 pub(crate) fn is_enemy_targetable(
     candidate: &Entity,
+    teams: &TeamRelations,
     attacker_owner: u32,
     attacker_id: u32,
 ) -> bool {
     candidate.id != attacker_id
-        && candidate.owner != attacker_owner
         && candidate.owner != NEUTRAL
+        && teams.is_enemy_owner(attacker_owner, candidate.owner)
         && candidate.is_targetable()
         && candidate.hp > 0
 }
 
 /// Nearest hostile entity (`is_enemy_targetable`) to `(px, py)` within `radius_px`.
 #[allow(dead_code)]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn nearest_enemy_in_range(
     entities: &EntityStore,
+    teams: &TeamRelations,
     spatial: &SpatialIndex,
     self_id: u32,
     owner: u32,
@@ -145,6 +149,7 @@ pub(crate) fn nearest_enemy_in_range(
 ) -> Option<u32> {
     nearest_matching_enemy_in_range(
         entities,
+        teams,
         spatial,
         self_id,
         owner,
@@ -161,6 +166,7 @@ pub(crate) fn nearest_enemy_in_range(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn nearest_enemy_unit_in_range_filtered(
     entities: &EntityStore,
+    teams: &TeamRelations,
     spatial: &SpatialIndex,
     self_id: u32,
     owner: u32,
@@ -171,6 +177,7 @@ pub(crate) fn nearest_enemy_unit_in_range_filtered(
 ) -> Option<u32> {
     nearest_matching_enemy_in_range(
         entities,
+        teams,
         spatial,
         self_id,
         owner,
@@ -186,6 +193,7 @@ pub(crate) fn nearest_enemy_unit_in_range_filtered(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn nearest_enemy_in_range_filtered(
     entities: &EntityStore,
+    teams: &TeamRelations,
     spatial: &SpatialIndex,
     self_id: u32,
     owner: u32,
@@ -196,6 +204,7 @@ pub(crate) fn nearest_enemy_in_range_filtered(
 ) -> Option<u32> {
     nearest_matching_enemy_in_range(
         entities,
+        teams,
         spatial,
         self_id,
         owner,
@@ -209,8 +218,10 @@ pub(crate) fn nearest_enemy_in_range_filtered(
 
 /// Nearest hostile Tank to `(px, py)` within `radius_px`, or `None` if no tank is in range.
 #[allow(dead_code)]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn nearest_tank_in_range(
     entities: &EntityStore,
+    teams: &TeamRelations,
     spatial: &SpatialIndex,
     self_id: u32,
     owner: u32,
@@ -220,6 +231,7 @@ pub(crate) fn nearest_tank_in_range(
 ) -> Option<u32> {
     nearest_matching_enemy_in_range(
         entities,
+        teams,
         spatial,
         self_id,
         owner,
@@ -235,6 +247,7 @@ pub(crate) fn nearest_tank_in_range(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn nearest_tank_in_range_filtered(
     entities: &EntityStore,
+    teams: &TeamRelations,
     spatial: &SpatialIndex,
     self_id: u32,
     owner: u32,
@@ -245,6 +258,7 @@ pub(crate) fn nearest_tank_in_range_filtered(
 ) -> Option<u32> {
     nearest_matching_enemy_in_range(
         entities,
+        teams,
         spatial,
         self_id,
         owner,
@@ -259,6 +273,7 @@ pub(crate) fn nearest_tank_in_range_filtered(
 #[allow(clippy::too_many_arguments)]
 fn nearest_matching_enemy_in_range(
     entities: &EntityStore,
+    teams: &TeamRelations,
     spatial: &SpatialIndex,
     self_id: u32,
     owner: u32,
@@ -273,7 +288,7 @@ fn nearest_matching_enemy_in_range(
         let Some(entity) = entities.get(id) else {
             continue;
         };
-        if !is_enemy_targetable(entity, owner, self_id)
+        if !is_enemy_targetable(entity, teams, owner, self_id)
             || !matches_kind(entity)
             || !target_filter(entity)
         {
@@ -315,6 +330,10 @@ mod tests {
     use super::*;
     use crate::game::entity::EntityStore;
 
+    fn ffa_teams() -> TeamRelations {
+        TeamRelations::from_player_teams([(1, 1), (2, 2)])
+    }
+
     fn store_with_two_players() -> EntityStore {
         let mut s = EntityStore::default();
         // P1: city centre (complete), barracks (under construction), worker.
@@ -353,11 +372,22 @@ mod tests {
         let p2_rifleman = s.iter().find(|e| e.owner == 2).unwrap();
         let p1_worker = s.iter().find(|e| e.owner == 1 && e.is_unit()).unwrap();
         let p1_cc = s.iter().find(|e| e.owner == 1 && e.is_building()).unwrap();
+        let teams = ffa_teams();
         // P1 attacker can target the P2 rifleman.
-        assert!(is_enemy_targetable(p2_rifleman, 1, p1_worker.id));
+        assert!(is_enemy_targetable(p2_rifleman, &teams, 1, p1_worker.id));
         // ... but not their own worker (self) or their own building.
-        assert!(!is_enemy_targetable(p1_worker, 1, p1_worker.id));
-        assert!(!is_enemy_targetable(p1_cc, 1, p1_worker.id));
+        assert!(!is_enemy_targetable(p1_worker, &teams, 1, p1_worker.id));
+        assert!(!is_enemy_targetable(p1_cc, &teams, 1, p1_worker.id));
+    }
+
+    #[test]
+    fn enemy_predicate_rejects_allies() {
+        let s = store_with_two_players();
+        let p2_rifleman = s.iter().find(|e| e.owner == 2).unwrap();
+        let p1_worker = s.iter().find(|e| e.owner == 1 && e.is_unit()).unwrap();
+        let teams = TeamRelations::from_player_teams([(1, 7), (2, 7)]);
+
+        assert!(!is_enemy_targetable(p2_rifleman, &teams, 1, p1_worker.id));
     }
 
     #[test]
@@ -368,9 +398,10 @@ mod tests {
         let higher_id = s.spawn_unit(2, EntityKind::Rifleman, 80.0, 100.0).unwrap();
         assert!(lower_id < higher_id);
         let spatial = SpatialIndex::build(&s, 10);
+        let teams = ffa_teams();
 
         assert_eq!(
-            nearest_enemy_in_range(&s, &spatial, attacker, 1, 100.0, 100.0, 50.0),
+            nearest_enemy_in_range(&s, &teams, &spatial, attacker, 1, 100.0, 100.0, 50.0),
             Some(lower_id)
         );
     }

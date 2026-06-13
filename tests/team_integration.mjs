@@ -95,6 +95,32 @@ async function twoVsTwoStartsWithHumanAndAis() {
   closeClients(A, B);
 }
 
+async function alliedAttackTargetCommandIsIgnored() {
+  const room = uniqueRoom("team-target");
+  const A = await joinNamed("target-A", room, "Alpha");
+  const B = await joinNamed("target-B", room, "Bravo");
+  await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "target human lobby");
+  await setTeamPreset(A, "2v2");
+  await addAiToTeam(A, 2);
+  await addAiToTeam(A, 2);
+  await readyPlayers([A, B]);
+  await startMatch(A, [A, B]);
+  const [snapA, snapB] = await Promise.all([
+    A.waitFor((msg) => msg.t === "snapshot" && msg.entities.some((e) => e.owner === A.playerId && e.kind === "worker"), 8000, "A units"),
+    B.waitFor((msg) => msg.t === "snapshot" && msg.entities.some((e) => e.owner === B.playerId && e.kind === "worker"), 8000, "B units"),
+  ]);
+  const attacker = snapA.entities.find((e) => e.owner === A.playerId && e.kind === "worker");
+  const alliedTarget = snapB.entities.find((e) => e.owner === B.playerId && e.kind === "worker");
+
+  A.command({ c: "attack", units: [attacker.id], target: alliedTarget.id });
+  await sleep(500);
+  const latest = A.msgs.filter((msg) => msg.t === "snapshot").at(-1);
+  const attackerAfter = latest?.entities.find((e) => e.id === attacker.id);
+  ok(attackerAfter && attackerAfter.targetId !== alliedTarget.id,
+    "malicious attack command cannot assign an allied entity id as a hostile target");
+  closeClients(A, B);
+}
+
 async function hostOnlyAndInvalidMutationsAreIgnored() {
   const room = uniqueRoom("team-invalid");
   const A = await joinNamed("invalid-A", room, "Alpha");
@@ -147,6 +173,7 @@ async function main() {
   await assertPresetStarts({ preset: "1v2", aiTeams: [2, 2], expectedTeams: [1, 2, 2] });
   await assertPresetStarts({ preset: "1v3", aiTeams: [2, 2, 2], expectedTeams: [1, 2, 2, 2] });
   await twoVsTwoStartsWithHumanAndAis();
+  await alliedAttackTargetCommandIsIgnored();
   await hostOnlyAndInvalidMutationsAreIgnored();
 
   await sleep(200);

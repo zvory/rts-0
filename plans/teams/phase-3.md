@@ -1,6 +1,6 @@
 # Phase 3 - Team-Safe Command Targeting
 
-Status: planned.
+Status: done.
 
 ## Goal
 

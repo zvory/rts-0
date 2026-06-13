@@ -5,6 +5,7 @@ use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::rules::combat as combat_rules;
 use crate::rules::terrain::TerrainKind;
 
@@ -40,6 +41,7 @@ pub(super) fn combat_mode(e: &Entity) -> CombatMode {
 pub(super) fn resolve_target(
     map: &Map,
     entities: &EntityStore,
+    teams: &TeamRelations,
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
     fog: &Fog,
@@ -61,7 +63,7 @@ pub(super) fn resolve_target(
                 if entities
                     .get(target)
                     .map(|t| {
-                        world_query::is_enemy_targetable(t, owner, self_id)
+                        world_query::is_enemy_targetable(t, teams, owner, self_id)
                             && target_visible_to_owner(fog, smokes, owner, t)
                     })
                     .unwrap_or(false)
@@ -78,7 +80,7 @@ pub(super) fn resolve_target(
     }
 
     if let Some(target) = retained_firing_target_for_shoot_while_moving_unit(
-        map, entities, los, fog, smokes, self_id, owner, px, py, acquire_px,
+        map, entities, teams, los, fog, smokes, self_id, owner, px, py, acquire_px,
     ) {
         return Some(target);
     }
@@ -92,6 +94,7 @@ pub(super) fn resolve_target(
     if prefers_armored {
         if let Some(id) = world_query::nearest_tank_in_range_filtered(
             entities,
+            teams,
             spatial,
             self_id,
             owner,
@@ -113,6 +116,7 @@ pub(super) fn resolve_target(
     if attacker_is_unit {
         if let Some(id) = world_query::nearest_enemy_unit_in_range_filtered(
             entities,
+            teams,
             spatial,
             self_id,
             owner,
@@ -133,6 +137,7 @@ pub(super) fn resolve_target(
     // buildings, sight range for mobile units so they chase).
     world_query::nearest_enemy_in_range_filtered(
         entities,
+        teams,
         spatial,
         self_id,
         owner,
@@ -151,6 +156,7 @@ pub(super) fn resolve_target(
 fn retained_firing_target_for_shoot_while_moving_unit(
     map: &Map,
     entities: &EntityStore,
+    teams: &TeamRelations,
     los: &LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -166,7 +172,7 @@ fn retained_firing_target_for_shoot_while_moving_unit(
     }
     let target_id = attacker.target_id()?;
     let target = entities.get(target_id)?;
-    if !world_query::is_enemy_targetable(target, owner, self_id) {
+    if !world_query::is_enemy_targetable(target, teams, owner, self_id) {
         return None;
     }
     let concealment =

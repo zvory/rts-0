@@ -10,6 +10,49 @@ pub(crate) fn normalize_team_id(player_id: u32, team_id: TeamId) -> TeamId {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct TeamRelations {
+    players: Vec<(u32, TeamId)>,
+}
+
+impl TeamRelations {
+    pub(crate) fn from_player_teams(
+        players: impl IntoIterator<Item = (u32, TeamId)>,
+    ) -> Self {
+        Self {
+            players: players.into_iter().collect(),
+        }
+    }
+
+    fn team_of_player(&self, player_id: u32) -> Option<TeamId> {
+        self.players
+            .iter()
+            .find(|(id, _)| *id == player_id)
+            .map(|(_, team_id)| *team_id)
+    }
+
+    fn same_team_player(&self, a: u32, b: u32) -> bool {
+        let Some(team_a) = self.team_of_player(a) else {
+            return false;
+        };
+        let Some(team_b) = self.team_of_player(b) else {
+            return false;
+        };
+        team_a != 0 && team_a == team_b
+    }
+
+    fn is_enemy_player(&self, a: u32, b: u32) -> bool {
+        a != b
+            && self.team_of_player(a).is_some()
+            && self.team_of_player(b).is_some()
+            && !self.same_team_player(a, b)
+    }
+
+    pub(crate) fn is_enemy_owner(&self, player_id: u32, owner: u32) -> bool {
+        owner != 0 && self.is_enemy_player(player_id, owner)
+    }
+}
+
 impl Game {
     pub fn team_of_player(&self, player_id: u32) -> Option<TeamId> {
         self.players
