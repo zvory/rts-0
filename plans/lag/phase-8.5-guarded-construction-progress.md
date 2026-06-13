@@ -1,12 +1,39 @@
 # Phase 8.5 - Guarded Construction Progress Extrapolation
 
-Status: Not implemented.
+Status: Considered; not implemented.
 
 ## Objective
 
 Evaluate whether already-started building construction progress can be locally extrapolated safely.
 This phase is separate from Phase 8 because construction progress depends on worker state and can
 pause or fail for more reasons than production/research timers.
+
+## Consideration Result
+
+Do not implement construction-progress extrapolation with the current snapshot contract.
+
+The client has enough mirrored data to draw authoritative construction progress:
+
+- `buildProgress` is already projected for visible scaffolds.
+- building `buildTicks` are mirrored in the client rules table.
+- completed-building behavior already keys off the absence of `buildProgress`.
+
+That is not enough to prove that construction is actively progressing between snapshots. Server
+construction advances only while at least one worker remains in `BuildPhase::Constructing` for a
+living, under-construction site. The current owner-visible snapshot can show a scaffold and its
+last `buildProgress`, but it does not expose an explicit owner-only "active builder is currently
+advancing this site" signal. Inferring activity from recent progress deltas would necessarily keep
+extrapolating for at least one snapshot gap after worker death, pull-away, blocking, cancellation,
+or site destruction until the next authoritative correction arrives.
+
+That correction risk is small visually but broad semantically: construction completion gates supply,
+tech prerequisites, command availability, production, pathing, and selection behavior. Even with a
+display-only clamp below completion, a moving scaffold bar during a real pause is misleading in
+the exact cases where construction feedback matters most. Leave construction progress
+authoritative-only unless a later phase adds an owner-only active-construction signal and scenario
+coverage proves that interrupted construction stops immediately.
+
+This consideration made no implementation changes.
 
 ## Prediction Scope
 
@@ -68,6 +95,12 @@ Avoid server changes unless existing snapshots cannot expose a safe owner-only "
 actively progressing" signal. If a signal is needed, keep it owner-only, compact, and tied to
 already-visible scaffolds; update protocol mirrors and docs in the same phase.
 
+Current assessment: such a signal is needed before this feature should ship. A future implementation
+should add the smallest owner-only metadata that answers "did the authoritative simulation advance
+this scaffold this tick or snapshot window?" without exposing hidden workers, enemy denial, or
+off-screen positions. Any added field must update `server/crates/protocol/src/lib.rs`,
+`server/src/protocol.rs`, `client/src/protocol.js`, and `docs/design/protocol.md` together.
+
 ## Verification
 
 - Unit tests for construction display extrapolation:
@@ -96,10 +129,14 @@ functionality before the server snapshot.
 ## Handoff Expectations
 
 At handoff, state whether construction progress extrapolation shipped, remained behind a flag, or
-was rejected as too state-dependent. List the exact stop conditions, correction behavior, and any
-owner-only metadata added.
+was rejected as too state-dependent. For this consideration pass, it is rejected for now because
+current snapshots do not expose a direct active-construction signal. List the exact stop
+conditions, correction behavior, and any owner-only metadata added if a future implementation
+reopens the feature.
 
 ## Player-Facing Outcome
 
-If the safety gates pass, already-started buildings look less frozen during brief jitter. If they do
-not pass, construction remains authoritative-only and the plan records why.
+Construction remains authoritative-only. Already-started buildings may still look frozen during
+brief jitter, but the client will not show a moving construction bar when the server may have
+paused the build because workers were interrupted, killed, blocked, pulled away, or the site was
+cancelled/destroyed.
