@@ -101,10 +101,11 @@ Tanks once both Tank research and Methamphetamines complete. It reserves up to t
 Cars for harassment before frontal-wave readiness is calculated, so those cars do not satisfy Tank
 wave sizes. The harassment manager chooses the nearest living enemy public start, derives the enemy
 main steel-line center from public start-resource locations plus visible resource deltas, and moves
-the Scout Cars to a back-side, off-axis point beyond that steel line. If the harassment group sees
-enemy combat units near its route, it issues an ordinary fog-respecting `Attack`; otherwise it
-reissues the harassment `Move` on a short cadence. It does not focus workers, ignore hidden
-buildings, retreat, regroup, or use Scout Car smoke in AI 1.0. Tank frontal waves require a Tank in
+the Scout Cars through an outer flank waypoint before queueing a back-side, off-axis point beyond
+that steel line. If the harassment group sees enemy combat units near its route, it breaks contact
+with a fog-respecting evasive `Move`; otherwise it reissues the harassment route on a short cadence.
+It does not focus workers, ignore hidden
+buildings, regroup, or use Scout Car smoke in AI 1.0. Tank frontal waves require a Tank in
 the ready group and Methamphetamines before launch; while waiting, ready Tank groups stage toward
 the enemy instead of dribbling into attack orders. Methamphetamines is enforced before first Tank
 production, not only before Tank attack launch, so Tank production and Tank-wave readiness cannot
