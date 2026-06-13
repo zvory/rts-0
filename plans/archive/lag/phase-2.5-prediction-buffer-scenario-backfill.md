@@ -1,5 +1,7 @@
 # Phase 2.5 - Prediction Buffer Scenario Backfill
 
+Status: Done.
+
 ## Objective
 
 Backfill artifact-backed scenario coverage for the command sequencing and prediction-buffer work

@@ -1,7 +1,7 @@
 # Phase 0 - Tri-State Scenario Harness
 
-Status: Designed, not implemented. Later prediction phases landed before this harness existed; use
-Phase 0.5 and the later `.5` backfill phases to build the harness around the current code.
+Status: Done. Later prediction phases landed before this harness existed; Phase 0.5 and the later
+`.5` backfill phases built the harness around the current code.
 
 ## Objective
 
