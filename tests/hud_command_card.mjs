@@ -6,6 +6,7 @@ import {
   commandCardActivationCandidates,
   duplicateCommandIdsForCard,
 } from "../client/src/hud_command_card.js";
+import { WORKER_BUILDABLE } from "../client/src/config.js";
 import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
 
 const researchComplex = {
@@ -133,8 +134,25 @@ function buttonSlots(card) {
 
 {
   const catalog = buildCommandCardContextCatalog();
-  assert(catalog.length >= 8, "catalog should include representative command-card contexts");
-  assert(catalog.some((entry) => entry.id === "mixed-army-support"), "catalog includes mixed support/ability context");
+  assert.deepEqual(catalog.map((entry) => entry.id), [
+    "empty",
+    "worker-main",
+    "worker-build",
+    "mixed-army-support",
+    "city-centre-train",
+    "factory-train",
+    "gun-works-train",
+    "research-complex",
+  ]);
+  assert.deepEqual(WORKER_BUILDABLE, [
+    KIND.CITY_CENTRE,
+    KIND.DEPOT,
+    KIND.BARRACKS,
+    KIND.TRAINING_CENTRE,
+    KIND.RESEARCH_COMPLEX,
+    KIND.FACTORY,
+    KIND.STEELWORKS,
+  ]);
   for (const entry of catalog) {
     assert.equal(duplicateCommandIdsForCard(entry.card).length, 0, `${entry.id} has duplicate command ids`);
     for (const slot of entry.card.slots) {

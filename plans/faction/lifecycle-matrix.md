@@ -1,7 +1,7 @@
 # Faction Lifecycle Matrix
 
-Status: Template, to be filled during Phase 0 and maintained by every later phase that touches a
-match lifecycle path.
+Status: Initial inventory complete in Phase 0. Every later phase that touches a match lifecycle
+path must keep this matrix updated.
 
 ## Purpose
 
@@ -25,14 +25,14 @@ or explicitly rejected.
 
 | Path | Faction source | Allowed factions | AI behavior | Prediction behavior | Replay/branch behavior | Tests | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Normal lobby start | Default assignment until selection UX exists | Current faction | Current-faction-only | Enabled only for supported faction/build | Record faction id in schema | TBD | Selection UX may remain hidden until rollout. |
-| Quickstart/debug start | Default assignment plus debug loadout policy | Current faction, fixture only if explicitly exposed | Current-faction-only | Disabled for unsupported fixtures | Record faction id and loadout | TBD | No implicit second-faction quickstart. |
-| AI add/remove/start | Server validation helper | Current faction only | Reject unsupported faction | Not applicable | Record AI faction if match starts | TBD | Must fail closed. |
-| Fixture/dev faction start | Explicit dev/test request | Fixture/dev factions only | Reject AI unless explicitly allowed | Disabled unless WASM supports fixture | Record fixture id/loadout if replayed | TBD | Used before real lobby selection exists. |
-| Replay playback | Recorded replay artifact schema | Recorded factions | No new AI assignment | Disabled for viewer prediction | Load from schema, never lobby state | TBD | Old artifacts may be incompatible. |
-| Replay branch staging/launch | Recorded branch seed schema and claimed seats | Recorded factions | Reject AI seats unless explicitly supported | Disabled unless supported by branch schema/WASM | Reconstruct from branch seed | TBD | Seat claims do not alter faction ids. |
-| Dev scenarios | Scenario definition | Scenario-declared faction or current default | Not applicable unless scenario declares AI | Disabled unless supported | Not replayed unless scenario recording exists | TBD | No arbitrary client spawning. |
-| Self-play | Self-play script/profile | Current faction until AI support expands | Current-faction-only | Not applicable | Artifact records faction ids | TBD | Separate AI plan needed for other factions. |
-| Match history replay | Stored match artifact | Recorded factions | From artifact only | Disabled for replay viewers | Load from persisted schema | TBD | Old persisted replays may be incompatible. |
-| Spectator/no-fog view | Live match state or replay schema | Match factions | Not applicable | Disabled | Preserve recorded faction metadata | TBD | Resource rows stay Steel/Oil/Supply. |
-| Post-match replay | Captured match artifact | Recorded factions | From artifact only | Disabled for replay viewers | Load from captured schema | TBD | Same schema as match history replay. |
+| Normal lobby start | Current implicit default in lobby room start | Current faction | Current-faction-only | Enabled only for supported faction/build | Future schema records faction id | `tests/server_integration.mjs`, future Phase 1 start contract test | Selection UX may remain hidden until rollout. |
+| Quickstart/debug start | Current implicit default plus debug loadout flag | Current faction; fixture only if explicitly exposed later | Current-faction-only | Disabled for unsupported fixtures | Future schema records faction id and loadout | `server/crates/sim/src/game/setup/tests.rs`, future Phase 1/5 tests | No implicit second-faction quickstart. |
+| AI add/remove/start | Current lobby AI seat creation with implicit faction | Current faction only | Reject unsupported faction once ids exist | Not applicable | Future schema records AI faction if match starts | `node tests/ai_integration.mjs`, future Phase 3 validation test | Must fail closed. |
+| Fixture/dev faction start | No explicit faction source yet | Not supported until a dev/test fixture phase | Reject AI unless explicitly allowed | Disabled unless WASM supports fixture | Record fixture id/loadout if replayed later | `scripts/check-faction-assumptions.mjs`, future fixture tests | Used before real lobby selection exists. |
+| Replay playback | Current replay artifact start resources and loadout mode | Current faction until schema is replaced | No new AI assignment | Disabled for viewer prediction | Load from artifact schema, never lobby state | `server/src/lobby/dev_replay.rs` tests, future Phase 1 replay schema test | Old artifacts may be incompatible. |
+| Replay branch staging/launch | Current branch seed/keyframe plus claimed seats | Current faction until schema is replaced | Reject AI seats unless explicitly supported later | Disabled unless supported by branch schema/WASM | Reconstruct from branch seed | `tests/protocol_parity.mjs`, future Phase 3 branch tests | Seat claims do not alter faction ids. |
+| Dev scenarios | Scenario definition plus current default start | Current faction | Not applicable unless scenario declares AI | Disabled unless supported | Not replayed unless scenario recording exists | `server/crates/sim/src/game/setup/dev_scenarios/tests.rs`, `docs/context/testing.md` | No arbitrary client spawning. |
+| Self-play | Self-play script/profile using current faction assumptions | Current faction until AI support expands | Current-faction-only | Not applicable | Artifact records faction ids after schema changes | `server/crates/ai/src/selfplay` tests, future Phase 3/12 artifact tests | Separate AI plan needed for other factions. |
+| Match history replay | Stored match artifact | Current faction until schema is replaced | From artifact only | Disabled for replay viewers | Load from persisted schema | `docs/design/match-history.md`, future Phase 3/12 match-history tests | Old persisted replays may be incompatible. |
+| Spectator/no-fog view | Live match state or replay schema | Match factions once schema exists | Not applicable | Disabled | Preserve recorded faction metadata | `tests/team_integration.mjs`, future observer faction metadata test | Resource rows stay Steel/Oil/Supply. |
+| Post-match replay | Captured match artifact | Current faction until schema is replaced | From artifact only | Disabled for replay viewers | Load from captured schema | `tests/server_integration.mjs`, future Phase 3 post-match replay test | Same schema as match history replay. |
