@@ -256,6 +256,8 @@ async function debugSoloStart(room) {
       c.send({ t: "join", name: "Fog" + c.playerId, room });
     }
     await clients[0].waitFor((m) => m.t === "lobby" && m.players.length === 4, 4000, "fog lobby(4)");
+    clients[0].send({ t: "selectMap", map: "No Terrain" });
+    await clients[0].waitFor((m) => m.t === "lobby" && m.map === "No Terrain", 4000, "fog map selection");
     for (const c of clients) c.send({ t: "ready", ready: true });
     await clients[0].waitFor((m) => m.t === "lobby" && m.canStart, 4000, "fog canStart");
     clients[0].send({ t: "start" });
@@ -306,8 +308,8 @@ async function debugSoloStart(room) {
       let combatMsg = null;
       try {
         combatMsg = await Promise.any([
-          left.waitFor(hasCombatEvent, 45000, "left hidden combat event"),
-          right.waitFor(hasCombatEvent, 45000, "right hidden combat event"),
+          left.waitFor(hasCombatEvent, 20000, "left hidden combat event"),
+          right.waitFor(hasCombatEvent, 20000, "right hidden combat event"),
         ]);
       } catch {
         // Keep the assertion below as the single failure report.

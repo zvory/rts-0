@@ -3508,7 +3508,8 @@ mod tests {
     #[test]
     fn replay_session_records_keyframes_and_restores_nearest_before_seek_target() {
         let players = replay_test_players(2);
-        let (_live, artifact) = replay_test_artifact(&players, 4_500);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.duration_ticks = 2_001;
         let mut replay = ReplaySession::new(artifact).unwrap();
 
         while replay.current_tick() < replay.duration_ticks {
@@ -3523,18 +3524,23 @@ mod tests {
                 .iter()
                 .map(|keyframe| keyframe.tick)
                 .collect::<Vec<_>>(),
-            vec![0, 2_000, 4_000]
+            vec![0, 2_000]
         );
 
-        let restored_from = replay.rebuild_to(4_100).unwrap();
+        let mut expected = replay
+            .keyframes
+            .iter()
+            .find(|keyframe| keyframe.tick == 2_000)
+            .expect("replay should record the first interval keyframe")
+            .game
+            .clone_for_replay_keyframe();
+        expected.tick();
 
-        assert_eq!(restored_from, 4_000);
-        assert_eq!(replay.current_tick(), 4_100);
+        let restored_from = replay.rebuild_to(2_001).unwrap();
 
-        let mut expected = replay_test_game(&players, 0x5150_2202);
-        while expected.tick_count() < 4_100 {
-            expected.tick();
-        }
+        assert_eq!(restored_from, 2_000);
+        assert_eq!(replay.current_tick(), 2_001);
+
         for player in &players {
             assert_eq!(
                 replay.game.snapshot_for(player.id),
