@@ -1,12 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use rand::rngs::SmallRng;
-use rand::seq::SliceRandom;
-use rand::SeedableRng;
 use serde::Deserialize;
 
+mod assignment;
+
 use super::{
-    BaseSlot, Map, BASE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
+    BaseSlot, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
     EXPANSION_PROTECTION_RADIUS_TILES,
 };
 use crate::protocol::terrain;
@@ -18,6 +17,20 @@ pub(super) fn schema_version(json: &str) -> Result<u32, String> {
 }
 
 pub(super) fn load(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {
+    let players: Vec<_> = (1..=player_count)
+        .map(|id| StartAssignmentPlayer {
+            id: id as u32,
+            team_id: id as u32,
+        })
+        .collect();
+    load_for_players(&players, json, seed)
+}
+
+pub(super) fn load_for_players(
+    players: &[StartAssignmentPlayer],
+    json: &str,
+    seed: u32,
+) -> Result<Map, String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
     if authored.version != CURRENT_MAP_VERSION {
@@ -29,9 +42,10 @@ pub(super) fn load(player_count: usize, json: &str, seed: u32) -> Result<Map, St
     let (size, terrain) = parse_terrain(&authored.terrain)?;
     let sites = parse_sites(size, &authored.sites)?;
 
-    if player_count == 0 {
+    if players.is_empty() {
         return Err("player_count must be at least 1".to_string());
     }
+    let player_count = players.len();
 
     validate_base_clearance(size, &terrain, &sites)?;
     if authored.layouts.is_empty() {
@@ -52,12 +66,7 @@ pub(super) fn load(player_count: usize, json: &str, seed: u32) -> Result<Map, St
         ));
     }
 
-    // Select a whole authored spawn layout first, then shuffle that layout's slots so lobby
-    // seat order stays random without breaking the authored main/naturals grouping for each slot.
-    let layout = matching_layouts[(seed as usize) % matching_layouts.len()];
-    let mut slots = parse_layout_pairs(layout, &sites)?;
-    let mut rng = SmallRng::seed_from_u64(seed as u64);
-    slots.shuffle(&mut rng);
+    let slots = assignment::assign_layout_slots(&matching_layouts, &sites, players, seed)?;
     let starts: Vec<_> = slots.iter().map(|(start, _)| *start).collect();
     let expansion_sites = slots
         .iter()

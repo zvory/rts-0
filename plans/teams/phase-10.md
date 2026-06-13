@@ -1,6 +1,6 @@
 # Phase 10 - Team-Aware Starts on Authored Maps
 
-Status: planned.
+Status: implemented.
 
 ## Goal
 
@@ -73,3 +73,25 @@ the automated distance assertions are hard to interpret.
 
 The phase handoff must describe the scoring algorithm, note any FFA behavior differences, and list
 the authored maps covered by tests.
+
+## Implementation Handoff
+
+- Authored maps now accept an ordered player/team vector for start assignment.
+- Singleton-team FFA keeps the previous behavior exactly: choose the matching authored layout by
+  `seed % layout_count`, shuffle complete main/natural slots with the seed, and assign in player
+  order.
+- Team games evaluate every matching authored layout and every slot assignment. The score prefers
+  lower teammate distance spread first, then higher nearest enemy-team distance, then lower exposure
+  imbalance, with a deterministic seed/player/layout hash as the final tie-break.
+- Slot assignment moves whole authored slots, so main/natural pairings stay intact and expansions
+  are not duplicated.
+- Automated map coverage includes the bundled `Default` map for 2v2, 1v2, 1v3, FFA compatibility,
+  start payload team ids, and replay reconstruction; `Low Econ` remains covered by the existing
+  adjacent-layout natural pairing test. A synthetic six-start authored map verifies arbitrary team
+  sizes without fixed four-corner arrays.
+
+## Patch Notes
+
+- Team matches on authored maps now bias teammates to spawn near each other instead of relying on
+  lobby seat order plus random slot shuffle.
+- FFA authored start randomization remains compatible with the previous seed behavior.

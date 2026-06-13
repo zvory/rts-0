@@ -34,6 +34,14 @@ struct PendingClientCommandAck {
     client_seq: u32,
 }
 
+fn normalize_start_team_id(player_id: u32, team_id: TeamId) -> TeamId {
+    if team_id == 0 {
+        player_id
+    } else {
+        team_id
+    }
+}
+
 /// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
 /// no socket — it is materialized into an AI-driven player only when the match starts.
 struct AiSlot {
@@ -501,7 +509,17 @@ impl ReplaySession {
                 err => Err(err),
             })
             .map_err(|err| err.to_string())?;
-        let map = Map::load(&artifact.map_name, artifact.players.len(), artifact.seed)
+        let replay_start_players: Vec<_> = artifact
+            .players
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    normalize_start_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map = Map::load_for_players(&artifact.map_name, &replay_start_players, artifact.seed)
             .map_err(|err| format!("cannot load replay map: {err}"))?;
         Ok(Game::new_for_replay_with_map_metadata(
             &artifact.players,
@@ -2133,7 +2151,16 @@ impl RoomTask {
                 return;
             }
         };
-        let map = match Map::load(&self.selected_map, inits.len(), seed) {
+        let start_players: Vec<_> = inits
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    normalize_start_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map = match Map::load_for_players(&self.selected_map, &start_players, seed) {
             Ok(m) => m,
             Err(err) => {
                 let msg = format!("Cannot load map \"{}\": {err}", self.selected_map);
