@@ -53,6 +53,8 @@ pub struct ReplayArtifactV1 {
     pub duration_ticks: u32,
     pub command_log: Vec<CommandLogEntry>,
     pub winner_id: Option<u32>,
+    #[serde(default)]
+    pub winner_team_id: Option<u32>,
     pub final_scores: Vec<PlayerScore>,
 }
 
@@ -78,6 +80,7 @@ impl ReplayArtifactV1 {
             duration_ticks: game.tick_count(),
             command_log: game.command_log().to_vec(),
             winner_id,
+            winner_team_id: winner_id.and_then(|id| game.team_of_player(id)),
             final_scores,
         }
     }
@@ -379,8 +382,40 @@ mod tests {
         assert_eq!(artifact.players, players);
         assert_eq!(artifact.duration_ticks, 1);
         assert_eq!(artifact.winner_id, Some(1));
+        assert_eq!(artifact.winner_team_id, Some(1));
         assert!(!artifact.final_scores.is_empty());
         assert_eq!(artifact.start_metadata().duration_ticks, 1);
+    }
+
+    #[test]
+    fn replay_artifact_defaults_missing_winner_team_for_old_json() {
+        let json = serde_json::json!({
+            "artifactSchemaVersion": REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+            "serverBuildSha": "test-sha",
+            "mapName": "Default",
+            "mapSchemaVersion": 1,
+            "mapContentHash": "hash",
+            "seed": 1,
+            "startingSteel": 75,
+            "startingOil": 0,
+            "startingLoadoutMode": "standard",
+            "players": [{
+                "id": 1,
+                "name": "Replay",
+                "color": "#fff",
+                "is_ai": false
+            }],
+            "durationTicks": 0,
+            "commandLog": [],
+            "winnerId": 1,
+            "finalScores": []
+        });
+
+        let artifact: ReplayArtifactV1 = serde_json::from_value(json).unwrap();
+
+        assert_eq!(artifact.players[0].team_id, 0);
+        assert_eq!(artifact.winner_id, Some(1));
+        assert_eq!(artifact.winner_team_id, None);
     }
 
     #[test]
