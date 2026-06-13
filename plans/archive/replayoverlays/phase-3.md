@@ -1,6 +1,6 @@
 # Phase 3 - Server Analysis Contract
 
-Status: Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -95,4 +95,3 @@ avoid adding client-side history reconstruction.
 
 No complete new tab UI is required in this phase, but the replay system now has authoritative data
 that remains correct across arbitrary seeking.
-

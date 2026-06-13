@@ -1,6 +1,6 @@
 # Phase 4 - Production and Units Tabs
 
-Status: Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -69,4 +69,3 @@ without changing the Phase 3 protocol unless a documented gap is found.
 ## Player-Facing Outcome
 
 Replay viewers can read current production and army composition from a dedicated analysis panel.
-
