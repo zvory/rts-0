@@ -2941,7 +2941,11 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
 
 #[test]
 fn wall_chokepoint_dev_scenario_supports_all_vehicles() {
-    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [
+        EntityKind::AntiTankGun,
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+    ] {
         let setup = Game::new_scout_car_wall_chokepoint_scenario(unit, 5, 0x5150_0004)
             .expect("scenario setup should succeed");
 
@@ -3076,7 +3080,7 @@ fn scores_record_kills_and_losses_on_death() {
 }
 
 #[test]
-fn replay_analysis_reports_authoritative_inventory_production_and_losses() {
+fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
     let players = human_vs_ai_players();
     let mut game =
         Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0xA11A_0001);
@@ -3123,7 +3127,7 @@ fn replay_analysis_reports_authoritative_inventory_production_and_losses() {
         tick,
     );
 
-    let analysis = game.replay_analysis();
+    let analysis = game.observer_analysis();
     assert_eq!(analysis.tick, game.tick_count());
     let player_one = analysis
         .players

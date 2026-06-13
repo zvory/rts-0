@@ -90,11 +90,11 @@ import {
   buildHotkeyCommandCatalog,
 } from "../client/src/hotkey_profiles.js";
 import {
-  REPLAY_ANALYSIS_TABS,
-  ReplayAnalysisOverlay,
+  OBSERVER_ANALYSIS_TABS,
+  ObserverAnalysisOverlay,
   calculateViewportArmyValue,
-  createReplayAnalysisOverlayPreferences,
-} from "../client/src/replay_analysis_overlay.js";
+  createObserverAnalysisOverlayPreferences,
+} from "../client/src/observer_analysis_overlay.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -5089,7 +5089,7 @@ function fakeAudioContext() {
 }
 
 // ---------------------------------------------------------------------------
-// Replay analysis overlay
+// Observer analysis overlay
 // ---------------------------------------------------------------------------
 {
   const players = [
@@ -5132,66 +5132,66 @@ function fakeAudioContext() {
   );
 
   const storage = fakeStorage();
-  const prefs = createReplayAnalysisOverlayPreferences(storage);
+  const prefs = createObserverAnalysisOverlayPreferences(storage);
   prefs.selectedTab = "units-lost";
   prefs.visible = false;
   prefs.collapsed = true;
 
-  const restored = createReplayAnalysisOverlayPreferences(storage);
-  assert(restored.selectedTab === "units-lost", "replay analysis selected tab persists");
-  assert(restored.visible === false, "replay analysis visible state persists");
-  assert(restored.collapsed === true, "replay analysis collapsed state persists");
+  const restored = createObserverAnalysisOverlayPreferences(storage);
+  assert(restored.selectedTab === "units-lost", "observer analysis selected tab persists");
+  assert(restored.visible === false, "observer analysis visible state persists");
+  assert(restored.collapsed === true, "observer analysis collapsed state persists");
 
   restored.selectedTab = "not-a-tab";
   assert(
-    restored.selectedTab === REPLAY_ANALYSIS_TABS[0].id,
-    "replay analysis rejects unknown tab ids",
+    restored.selectedTab === OBSERVER_ANALYSIS_TABS[0].id,
+    "observer analysis rejects unknown tab ids",
   );
 
   withFakeOverlayDocument(({ FakeElement }) => {
     const root = new FakeElement("section");
     restored.selectedTab = "army-value";
-    const overlay = new ReplayAnalysisOverlay({
+    const overlay = new ObserverAnalysisOverlay({
       root,
       preferences: restored,
       getPlayers: () => players,
       getCameraBounds: () => ({ x: 0, y: 0, width: 100, height: 100 }),
       getEntities: () => [{ id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 20, y: 20 }],
     });
-    assert(root.children.length === 1, "replay analysis overlay mounts generated DOM");
+    assert(root.children.length === 1, "observer analysis overlay mounts generated DOM");
     const overlayRoot = root.children[0];
-    assert(root.querySelector(".replay-army-value-row"), "replay analysis renders army value rows");
+    assert(root.querySelector(".replay-army-value-row"), "observer analysis renders army value rows");
 
     const unitsTab = root.querySelector(".replay-analysis-tab");
-    assert(unitsTab, "replay analysis renders tab buttons");
+    assert(unitsTab, "observer analysis renders tab buttons");
     overlayRoot.listeners.click?.({ target: unitsTab, preventDefault() {}, stopPropagation() {} });
     assert(
       restored.selectedTab === unitsTab.dataset.tabId,
-      "replay analysis tab clicks update shared preferences",
+      "observer analysis tab clicks update shared preferences",
     );
 
     const hide = root.querySelector(".replay-analysis-hide");
     overlayRoot.listeners.click?.({ target: hide, preventDefault() {}, stopPropagation() {} });
-    assert(restored.visible === false, "replay analysis hide action updates shared preferences");
+    assert(restored.visible === false, "observer analysis hide action updates shared preferences");
 
     const show = root.querySelector(".replay-analysis-show");
     overlayRoot.listeners.click?.({ target: show, preventDefault() {}, stopPropagation() {} });
-    assert(restored.visible === true, "replay analysis show action updates shared preferences");
-    assert(restored.collapsed === false, "replay analysis show expands the panel");
+    assert(restored.visible === true, "observer analysis show action updates shared preferences");
+    assert(restored.collapsed === false, "observer analysis show expands the panel");
 
     restored.selectedTab = "production";
     overlay.render();
     assert(
-      textWithin(root).includes("Waiting for replay analysis"),
+      textWithin(root).includes("Waiting for observer analysis"),
       "production tab shows a loading state before analysis arrives",
     );
-    overlay.applyReplayAnalysis({ tick: 1, players: [{ id: 1, units: [], production: [] }, { id: 2, units: [], production: [] }] });
+    overlay.applyObserverAnalysis({ tick: 1, players: [{ id: 1, units: [], production: [] }, { id: 2, units: [], production: [] }] });
     assert(
       textWithin(root).includes("No active production"),
       "production tab handles empty production cleanly",
     );
 
-    overlay.applyReplayAnalysis({
+    overlay.applyObserverAnalysis({
       tick: 12,
       players: [
         {
@@ -5238,7 +5238,7 @@ function fakeAudioContext() {
 
     restored.selectedTab = "units";
     overlay.render();
-    overlay.applyReplayAnalysis({
+    overlay.applyObserverAnalysis({
       tick: 20,
       players: [
         {
@@ -5262,7 +5262,7 @@ function fakeAudioContext() {
     assert(unitText.includes("Rifleman") && unitText.includes("Tank"), "units tab renders per-kind unit rows");
     assert(unitText.includes("Blue") && unitText.includes("Engineer"), "units tab renders multiple players");
 
-    overlay.applyReplayAnalysis({
+    overlay.applyObserverAnalysis({
       tick: 5,
       players: [{ id: 1, units: [{ kind: KIND.WORKER, count: 1, steelValue: 50, oilValue: 0 }], production: [] }],
     });
@@ -5276,7 +5276,7 @@ function fakeAudioContext() {
       textWithin(root).includes("No units lost"),
       "units lost tab handles analysis with no loss rows cleanly",
     );
-    overlay.applyReplayAnalysis({
+    overlay.applyObserverAnalysis({
       tick: 30,
       players: [
         {
@@ -5317,7 +5317,7 @@ function fakeAudioContext() {
         && resourcesLostText.includes("Total")
         && resourcesLostText.includes("550")
         && resourcesLostText.includes("150"),
-      "resources lost tab labels the narrow Phase 3 definition and totals killed unit value",
+      "resources lost tab labels the narrow observer analysis definition and totals killed unit value",
     );
     assert(
       resourcesLostText.includes("Red") && resourcesLostText.includes("Blue"),
@@ -5332,11 +5332,11 @@ function fakeAudioContext() {
       preventDefault() {},
       stopPropagation() {},
     });
-    assert(restored.selectedTab === "resources-lost", "replay analysis keyboard End selects the last tab");
-    assert(tabButtons[tabButtons.length - 1].focused === true, "replay analysis keyboard navigation focuses the selected tab");
+    assert(restored.selectedTab === "resources-lost", "observer analysis keyboard End selects the last tab");
+    assert(tabButtons[tabButtons.length - 1].focused === true, "observer analysis keyboard navigation focuses the selected tab");
 
     overlay.destroy();
-    assert(root.children.length === 0, "replay analysis overlay removes generated DOM on destroy");
+    assert(root.children.length === 0, "observer analysis overlay removes generated DOM on destroy");
   });
 }
 

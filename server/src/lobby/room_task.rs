@@ -1869,7 +1869,7 @@ impl RoomTask {
         let _ = ack.send(true);
         self.send_replay_start_to(player_id);
         self.send_replay_state_to(player_id);
-        self.send_replay_analysis_to(player_id);
+        self.send_observer_analysis_to(player_id);
     }
 
     fn on_join_replay_room(
@@ -1904,7 +1904,7 @@ impl RoomTask {
             Phase::ReplayViewer(_) => {
                 self.send_replay_start_to(player_id);
                 self.send_replay_state_to(player_id);
-                self.send_replay_analysis_to(player_id);
+                self.send_observer_analysis_to(player_id);
             }
             Phase::Lobby => match self.replay_session_for_mode() {
                 Ok(session) => self.transition_to_replay_viewer(session),
@@ -2527,7 +2527,7 @@ impl RoomTask {
         );
     }
 
-    fn send_replay_analysis_to(&self, watcher_id: u32) {
+    fn send_observer_analysis_to(&self, watcher_id: u32) {
         let Phase::ReplayViewer(session) = &self.phase else {
             return;
         };
@@ -2538,7 +2538,7 @@ impl RoomTask {
             &self.room,
             watcher_id,
             &player.msg_tx,
-            ServerMessage::ReplayAnalysis(session.game.replay_analysis()),
+            ServerMessage::ObserverAnalysis(session.game.observer_analysis()),
         );
     }
 
@@ -2547,8 +2547,8 @@ impl RoomTask {
         self.broadcast(&msg);
     }
 
-    fn broadcast_replay_analysis_for(&self, session: &ReplaySession) {
-        let msg = ServerMessage::ReplayAnalysis(session.game.replay_analysis());
+    fn broadcast_observer_analysis_for(&self, session: &ReplaySession) {
+        let msg = ServerMessage::ObserverAnalysis(session.game.observer_analysis());
         self.broadcast(&msg);
     }
 
@@ -3031,10 +3031,10 @@ impl RoomTask {
                 tick_start,
                 perf.as_mut(),
             );
-            self.broadcast_replay_analysis_for(&session);
+            self.broadcast_observer_analysis_for(&session);
         } else {
             self.broadcast_replay_state_for(&session);
-            self.broadcast_replay_analysis_for(&session);
+            self.broadcast_observer_analysis_for(&session);
         }
 
         self.finish_perf_tick(perf.as_ref(), &session.game, scheduler_lag, tick_start);
@@ -3097,13 +3097,13 @@ impl RoomTask {
                 return;
             }
             session.set_vision(player_id, vision);
-            let analysis = session.game.replay_analysis();
+            let analysis = session.game.observer_analysis();
             if let Some(player) = self.players.get(&player_id) {
                 send_or_log(
                     &self.room,
                     player_id,
                     &player.msg_tx,
-                    ServerMessage::ReplayAnalysis(analysis),
+                    ServerMessage::ObserverAnalysis(analysis),
                 );
             }
         }
@@ -3255,7 +3255,7 @@ impl RoomTask {
             let analysis = seek_result
                 .as_ref()
                 .ok()
-                .map(|_| session.game.replay_analysis());
+                .map(|_| session.game.observer_analysis());
             match seek_result {
                 Ok(_) => {
                     for (viewer_id, msg_tx, start) in starts {
@@ -3265,7 +3265,7 @@ impl RoomTask {
                         self.broadcast(&ServerMessage::ReplayState(state));
                     }
                     if let Some(analysis) = analysis {
-                        self.broadcast(&ServerMessage::ReplayAnalysis(analysis));
+                        self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
                     }
                 }
                 Err(err) => {
@@ -3304,7 +3304,7 @@ impl RoomTask {
             let analysis = seek_result
                 .as_ref()
                 .ok()
-                .map(|_| session.game.replay_analysis());
+                .map(|_| session.game.observer_analysis());
             match seek_result {
                 Ok(_) => {
                     for (viewer_id, msg_tx, start) in starts {
@@ -3314,7 +3314,7 @@ impl RoomTask {
                         self.broadcast(&ServerMessage::ReplayState(state));
                     }
                     if let Some(analysis) = analysis {
-                        self.broadcast(&ServerMessage::ReplayAnalysis(analysis));
+                        self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
                     }
                 }
                 Err(err) => {
@@ -3532,7 +3532,7 @@ impl RoomTask {
         for id in recipients {
             self.send_replay_start_to(id);
             self.send_replay_state_to(id);
-            self.send_replay_analysis_to(id);
+            self.send_observer_analysis_to(id);
         }
         crate::log_info!(
             room = %self.room,
@@ -4051,13 +4051,13 @@ mod tests {
     }
 
     #[test]
-    fn replay_analysis_restores_from_keyframe_without_accumulating_extra_losses() {
+    fn observer_analysis_restores_from_keyframe_without_accumulating_extra_losses() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 1);
         let mut replay = ReplaySession::new(artifact).unwrap();
 
         replay.game.eliminate(players[1].id);
-        let expected = replay.game.replay_analysis();
+        let expected = replay.game.observer_analysis();
         replay.keyframes[0] = ReplayKeyframe {
             tick: replay.current_tick(),
             game: Box::new(replay.game.clone_for_replay_keyframe()),
@@ -4067,7 +4067,7 @@ mod tests {
         replay.game.eliminate(players[0].id);
         replay.rebuild_to(0).unwrap();
 
-        assert_eq!(replay.game.replay_analysis(), expected);
+        assert_eq!(replay.game.observer_analysis(), expected);
     }
 
     #[test]
@@ -4236,12 +4236,12 @@ mod tests {
 
         task.send_replay_start_to(99);
         task.send_replay_state_to(99);
-        task.send_replay_analysis_to(99);
+        task.send_observer_analysis_to(99);
         let join_messages: Vec<_> =
             std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
         assert!(join_messages.iter().any(|msg| matches!(
             msg,
-            ServerMessage::ReplayAnalysis(analysis) if analysis.tick == 3 && analysis.players.len() == 2
+            ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 3 && analysis.players.len() == 2
         )));
 
         task.on_seek_replay_to(99, 1);
@@ -4249,7 +4249,7 @@ mod tests {
             std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
         assert!(seek_messages.iter().any(|msg| matches!(
             msg,
-            ServerMessage::ReplayAnalysis(analysis) if analysis.tick == 1 && analysis.players.len() == 2
+            ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 1 && analysis.players.len() == 2
         )));
     }
 

@@ -8,7 +8,7 @@ const UNITS_TAB_ID = "units";
 const UNITS_LOST_TAB_ID = "units-lost";
 const RESOURCES_LOST_TAB_ID = "resources-lost";
 
-export const REPLAY_ANALYSIS_TABS = Object.freeze([
+export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: ARMY_VALUE_TAB_ID, label: "Army value" },
   { id: "production", label: "Production" },
   { id: "units", label: "Units" },
@@ -16,9 +16,9 @@ export const REPLAY_ANALYSIS_TABS = Object.freeze([
   { id: "resources-lost", label: "Resources lost" },
 ]);
 
-export function createReplayAnalysisOverlayPreferences(storage = safeLocalStorage()) {
+export function createObserverAnalysisOverlayPreferences(storage = safeLocalStorage()) {
   const fallback = {
-    selectedTab: REPLAY_ANALYSIS_TABS[0].id,
+    selectedTab: OBSERVER_ANALYSIS_TABS[0].id,
     visible: true,
     collapsed: false,
   };
@@ -53,10 +53,10 @@ export function createReplayAnalysisOverlayPreferences(storage = safeLocalStorag
   };
 }
 
-export class ReplayAnalysisOverlay {
+export class ObserverAnalysisOverlay {
   constructor({
     root,
-    preferences = createReplayAnalysisOverlayPreferences(),
+    preferences = createObserverAnalysisOverlayPreferences(),
     getEntities = () => [],
     getCameraBounds = () => null,
     getPlayers = () => [],
@@ -84,7 +84,7 @@ export class ReplayAnalysisOverlay {
 
     this.el = document.createElement("aside");
     this.el.className = "replay-analysis-overlay";
-    this.el.setAttribute("aria-label", "Replay analysis");
+    this.el.setAttribute("aria-label", "Observer analysis");
     this.el.addEventListener("click", this.onClick);
     this.el.addEventListener("keydown", this.onKeyDown);
 
@@ -109,9 +109,9 @@ export class ReplayAnalysisOverlay {
     this.tabsEl = document.createElement("div");
     this.tabsEl.className = "replay-analysis-tabs";
     this.tabsEl.setAttribute("role", "tablist");
-    this.tabsEl.setAttribute("aria-label", "Replay analysis metrics");
+    this.tabsEl.setAttribute("aria-label", "Observer analysis metrics");
 
-    for (const tab of REPLAY_ANALYSIS_TABS) {
+    for (const tab of OBSERVER_ANALYSIS_TABS) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "replay-analysis-tab";
@@ -131,7 +131,7 @@ export class ReplayAnalysisOverlay {
     this.panel.append(header, this.tabsEl, this.bodyEl);
     this.el.appendChild(this.panel);
 
-    this.showButton = this.buildIconButton("Show replay analysis", "replay-analysis-show", "▣", { show: "1" });
+    this.showButton = this.buildIconButton("Show observer analysis", "replay-analysis-show", "▣", { show: "1" });
     this.el.appendChild(this.showButton);
     this.root.appendChild(this.el);
     this.render();
@@ -203,7 +203,7 @@ export class ReplayAnalysisOverlay {
     if (!this.el || !this.panel || !this.tabsEl || !this.bodyEl || !this.showButton) return;
     const selectedTab = validTabId(this.preferences.selectedTab)
       ? this.preferences.selectedTab
-      : REPLAY_ANALYSIS_TABS[0].id;
+      : OBSERVER_ANALYSIS_TABS[0].id;
     const visible = this.preferences.visible !== false;
     const collapsed = this.preferences.collapsed === true;
 
@@ -229,29 +229,29 @@ export class ReplayAnalysisOverlay {
       btn.tabIndex = selected ? 0 : -1;
     }
 
-    const tab = REPLAY_ANALYSIS_TABS.find((item) => item.id === selectedTab) || REPLAY_ANALYSIS_TABS[0];
+    const tab = OBSERVER_ANALYSIS_TABS.find((item) => item.id === selectedTab) || OBSERVER_ANALYSIS_TABS[0];
     this.bodyEl.setAttribute("aria-labelledby", `replay-analysis-tab-${tab.id}`);
     this.renderBody(tab);
   }
 
   update() {
     if (!this.bodyEl || this.bodyEl.hidden || this.preferences.selectedTab !== ARMY_VALUE_TAB_ID) return;
-    this.renderBody(REPLAY_ANALYSIS_TABS[0]);
+    this.renderBody(OBSERVER_ANALYSIS_TABS[0]);
   }
 
-  applyReplayAnalysis(payload) {
-    this.analysis = normalizeReplayAnalysisPayload(payload);
+  applyObserverAnalysis(payload) {
+    this.analysis = normalizeObserverAnalysisPayload(payload);
     if (!this.bodyEl || this.bodyEl.hidden) return;
     const selected = validTabId(this.preferences.selectedTab)
       ? this.preferences.selectedTab
-      : REPLAY_ANALYSIS_TABS[0].id;
+      : OBSERVER_ANALYSIS_TABS[0].id;
     if (
       selected === PRODUCTION_TAB_ID
       || selected === UNITS_TAB_ID
       || selected === UNITS_LOST_TAB_ID
       || selected === RESOURCES_LOST_TAB_ID
     ) {
-      const tab = REPLAY_ANALYSIS_TABS.find((item) => item.id === selected);
+      const tab = OBSERVER_ANALYSIS_TABS.find((item) => item.id === selected);
       this.renderBody(tab);
     }
   }
@@ -337,7 +337,7 @@ export class ReplayAnalysisOverlay {
     const wrap = this.renderAnalysisMetric("replay-production", "Current queues");
     const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
     if (!analysis) {
-      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
       return wrap;
     }
     if (!rows.some((row) => row.production.length > 0)) {
@@ -383,7 +383,7 @@ export class ReplayAnalysisOverlay {
     const wrap = this.renderAnalysisMetric("replay-units", "Current army");
     const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
     if (!analysis) {
-      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
       return wrap;
     }
     if (!rows.some((row) => row.units.length > 0)) {
@@ -429,7 +429,7 @@ export class ReplayAnalysisOverlay {
     const wrap = this.renderAnalysisMetric("replay-units-lost", "Destroyed units");
     const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
     if (!analysis) {
-      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
       return wrap;
     }
     if (!rows.some((row) => row.unitsLost.length > 0)) {
@@ -480,7 +480,7 @@ export class ReplayAnalysisOverlay {
 
     const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
     if (!analysis) {
-      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
       return wrap;
     }
     if (!rows.length) {
@@ -566,7 +566,7 @@ export class ReplayAnalysisOverlay {
   }
 }
 
-function normalizeReplayAnalysisPayload(payload) {
+function normalizeObserverAnalysisPayload(payload) {
   if (!payload || typeof payload !== "object") return null;
   return {
     tick: Math.max(0, Math.trunc(Number(payload.tick) || 0)),
@@ -832,7 +832,7 @@ function safeCssColor(color) {
 }
 
 function validTabId(id) {
-  return REPLAY_ANALYSIS_TABS.some((tab) => tab.id === id);
+  return OBSERVER_ANALYSIS_TABS.some((tab) => tab.id === id);
 }
 
 function normalizePreferences(state, fallback) {

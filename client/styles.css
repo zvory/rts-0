@@ -1871,7 +1871,7 @@ input[type="text"]:focus {
   bottom: 14px;
 }
 
-/* --- Replay analysis overlay --- */
+/* --- Observer analysis overlay --- */
 .replay-analysis-overlay {
   position: absolute;
   top: 58px;

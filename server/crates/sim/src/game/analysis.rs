@@ -2,22 +2,22 @@ use std::collections::BTreeMap;
 
 use super::*;
 use crate::protocol::{
-    ReplayAnalysisKindCount, ReplayAnalysisPayload, ReplayAnalysisPlayer, ReplayAnalysisProduction,
-    ReplayAnalysisResourcesLost,
+    ObserverAnalysisKindCount, ObserverAnalysisPayload, ObserverAnalysisPlayer,
+    ObserverAnalysisProduction, ObserverAnalysisResourcesLost,
 };
 
 impl Game {
-    /// Authoritative, replay-only analysis state for spectator overlays.
+    /// Authoritative analysis state for observer overlays.
     ///
     /// This is rebuilt from the current simulation state instead of stored in replay keyframes, so
     /// seek restore + fast-forward produces the same payload as normal playback at the target tick.
-    pub fn replay_analysis(&self) -> ReplayAnalysisPayload {
-        ReplayAnalysisPayload {
+    pub fn observer_analysis(&self) -> ObserverAnalysisPayload {
+        ObserverAnalysisPayload {
             tick: self.tick_count(),
             players: self
                 .players
                 .iter()
-                .map(|player| ReplayAnalysisPlayer {
+                .map(|player| ObserverAnalysisPlayer {
                     id: player.id,
                     units: self.current_unit_inventory(player.id),
                     production: self.current_production(player.id),
@@ -28,7 +28,7 @@ impl Game {
         }
     }
 
-    fn current_unit_inventory(&self, player_id: u32) -> Vec<ReplayAnalysisKindCount> {
+    fn current_unit_inventory(&self, player_id: u32) -> Vec<ObserverAnalysisKindCount> {
         let mut counts = BTreeMap::new();
         for entity in self.entities.iter() {
             if entity.owner == player_id && entity.kind.is_unit() && entity.hp > 0 {
@@ -38,14 +38,14 @@ impl Game {
         kind_count_rows(&counts)
     }
 
-    fn current_production(&self, player_id: u32) -> Vec<ReplayAnalysisProduction> {
+    fn current_production(&self, player_id: u32) -> Vec<ObserverAnalysisProduction> {
         let mut rows = Vec::new();
         for entity in self.entities.iter() {
             if entity.owner != player_id || !entity.kind.is_building() || entity.hp == 0 {
                 continue;
             }
             if let Some(item) = entity.prod_queue().first() {
-                rows.push(ReplayAnalysisProduction {
+                rows.push(ObserverAnalysisProduction {
                     building_id: entity.id,
                     building_kind: crate::protocol::kind_to_wire(entity.kind).to_string(),
                     item_kind: crate::protocol::kind_to_wire(item.unit).to_string(),
@@ -56,7 +56,7 @@ impl Game {
                 continue;
             }
             if let Some(item) = entity.research_queue().first() {
-                rows.push(ReplayAnalysisProduction {
+                rows.push(ObserverAnalysisProduction {
                     building_id: entity.id,
                     building_kind: crate::protocol::kind_to_wire(entity.kind).to_string(),
                     item_kind: item.upgrade.to_protocol_str().to_string(),
@@ -71,11 +71,11 @@ impl Game {
     }
 }
 
-fn unit_loss_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ReplayAnalysisKindCount> {
+fn unit_loss_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ObserverAnalysisKindCount> {
     kind_count_rows(counts)
 }
 
-fn kind_count_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ReplayAnalysisKindCount> {
+fn kind_count_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ObserverAnalysisKindCount> {
     counts
         .iter()
         .filter_map(|(&kind, &count)| {
@@ -83,7 +83,7 @@ fn kind_count_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ReplayAnalysisKind
                 return None;
             }
             let (steel, oil) = economy_rules::cost(kind);
-            Some(ReplayAnalysisKindCount {
+            Some(ObserverAnalysisKindCount {
                 kind: crate::protocol::kind_to_wire(kind).to_string(),
                 count,
                 steel_value: steel.saturating_mul(count),
@@ -93,7 +93,7 @@ fn kind_count_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ReplayAnalysisKind
         .collect()
 }
 
-fn resources_lost(counts: &BTreeMap<EntityKind, u32>) -> ReplayAnalysisResourcesLost {
+fn resources_lost(counts: &BTreeMap<EntityKind, u32>) -> ObserverAnalysisResourcesLost {
     let mut total_steel = 0u32;
     let mut total_oil = 0u32;
     for (&kind, &count) in counts {
@@ -101,7 +101,7 @@ fn resources_lost(counts: &BTreeMap<EntityKind, u32>) -> ReplayAnalysisResources
         total_steel = total_steel.saturating_add(steel.saturating_mul(count));
         total_oil = total_oil.saturating_add(oil.saturating_mul(count));
     }
-    ReplayAnalysisResourcesLost {
+    ObserverAnalysisResourcesLost {
         steel: total_steel,
         oil: total_oil,
     }

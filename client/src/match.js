@@ -13,7 +13,7 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
-import { ReplayAnalysisOverlay } from "./replay_analysis_overlay.js";
+import { ObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
@@ -95,12 +95,12 @@ export class Match {
     this.settings = options.settings || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
     this.replayViewer = !!options.replayViewer;
-    this.replayAnalysisOverlayPreferences = options.replayAnalysisOverlayPreferences || null;
+    this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
     this.replayControls = null;
-    this.replayAnalysisOverlay = null;
+    this.observerAnalysisOverlay = null;
     this.giveUpSent = false;
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
@@ -206,7 +206,7 @@ export class Match {
       this.handleSnapshotEvents(m.events || []);
     };
     this.onReplayState = (m) => this.applyReplayState(m);
-    this.onReplayAnalysis = (m) => this.replayAnalysisOverlay?.applyReplayAnalysis(m);
+    this.onObserverAnalysis = (m) => this.observerAnalysisOverlay?.applyObserverAnalysis(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
@@ -222,7 +222,7 @@ export class Match {
     }
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     this.net.on(S.REPLAY_STATE, this.onReplayState);
-    this.net.on(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
+    this.net.on(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
     if (!this.replayViewer) {
@@ -250,9 +250,9 @@ export class Match {
       });
     }
     if (this.replayViewer && isReplay) {
-      this.replayAnalysisOverlay = new ReplayAnalysisOverlay({
+      this.observerAnalysisOverlay = new ObserverAnalysisOverlay({
         root: dom.gameScreen,
-        preferences: this.replayAnalysisOverlayPreferences || undefined,
+        preferences: this.observerAnalysisOverlayPreferences || undefined,
         getEntities: () => this.state.entitiesInterpolated(1, { includePrediction: false }),
         getCameraBounds: () => this.cameraWorldBounds(),
         getPlayers: () => this.state.players,
@@ -925,7 +925,7 @@ export class Match {
     this.renderer.render(this.state, this.camera, this.fog, alpha);
     this.hud.update();
     this.minimap.render();
-    this.replayAnalysisOverlay?.update();
+    this.observerAnalysisOverlay?.update();
     this.health.publish();
 
     this.rafId = requestAnimationFrame(this.tickFn);
@@ -974,14 +974,14 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.REPLAY_STATE, this.onReplayState);
-    this.net.off(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
+    this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     this.replayControls?.destroy();
-    this.replayAnalysisOverlay?.destroy();
+    this.observerAnalysisOverlay?.destroy();
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;
-    this.replayAnalysisOverlay = null;
+    this.observerAnalysisOverlay = null;
     if (this.input && typeof this.input.destroy === "function") {
       this.input.destroy();
       this.input = null;
@@ -1005,7 +1005,7 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.REPLAY_STATE, this.onReplayState);
-    this.net.off(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
+    this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     if (!this.replayViewer) {
@@ -1013,11 +1013,11 @@ export class Match {
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     }
     this.replayControls?.destroy();
-    this.replayAnalysisOverlay?.destroy();
+    this.observerAnalysisOverlay?.destroy();
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;
-    this.replayAnalysisOverlay = null;
+    this.observerAnalysisOverlay = null;
     if (dom.commandCard) dom.commandCard.hidden = false;
     if (this.unregisterHudInputZone) {
       this.unregisterHudInputZone();

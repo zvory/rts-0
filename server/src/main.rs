@@ -1219,7 +1219,7 @@ async fn send_server_message(
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
         ServerMessage::ReplayState(_) => "replay_state",
-        ServerMessage::ReplayAnalysis(_) => "replay_analysis",
+        ServerMessage::ObserverAnalysis(_) => "observer_analysis",
         ServerMessage::JoinReplayPrompt { .. } => "join_replay_prompt",
         ServerMessage::ShutdownWarning { .. } => "shutdown_warning",
         ServerMessage::Error { .. } => "error",

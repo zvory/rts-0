@@ -1,6 +1,6 @@
 # Phase 2 - Shared Observer Analysis Contract
 
-Status: Planned.
+Status: Done.
 
 ## Objective
 
@@ -21,7 +21,7 @@ ever be used by replays.
   viewers and live spectators, with active-player exclusion called out directly.
 - Refresh `docs/context/protocol.md` section labels if the protocol design section heading changes.
 - Keep the Phase 1 observer camera/input contract intact. Do not reintroduce replay-only camera
-  listeners while renaming replay analysis client code.
+  listeners while renaming observer analysis client code.
 - Do not send analysis to live spectators yet.
 
 ## Expected Touch Points

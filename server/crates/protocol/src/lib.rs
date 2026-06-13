@@ -394,9 +394,10 @@ pub enum ServerMessage {
     Snapshot(Snapshot),
     /// Shared replay playback cursor/state. Sent reliably outside snapshot cadence.
     ReplayState(ReplayPlaybackState),
-    /// Authoritative replay analysis data for spectator overlays. Sent reliably for replay
-    /// playback only, beside replay cursor/start updates.
-    ReplayAnalysis(ReplayAnalysisPayload),
+    /// Authoritative observer analysis data for replay viewers and live spectators. The wire tag
+    /// remains `replayAnalysis` for compatibility while live delivery is gated by the room task.
+    #[serde(rename = "replayAnalysis")]
+    ObserverAnalysis(ObserverAnalysisPayload),
     /// The requested room is currently replay playback. The client should confirm before retrying
     /// `join` with `replayOk: true`.
     JoinReplayPrompt {
@@ -441,24 +442,24 @@ pub enum ServerMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplayAnalysisPayload {
+pub struct ObserverAnalysisPayload {
     pub tick: u32,
-    pub players: Vec<ReplayAnalysisPlayer>,
+    pub players: Vec<ObserverAnalysisPlayer>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplayAnalysisPlayer {
+pub struct ObserverAnalysisPlayer {
     pub id: u32,
-    pub units: Vec<ReplayAnalysisKindCount>,
-    pub production: Vec<ReplayAnalysisProduction>,
-    pub units_lost: Vec<ReplayAnalysisKindCount>,
-    pub resources_lost: ReplayAnalysisResourcesLost,
+    pub units: Vec<ObserverAnalysisKindCount>,
+    pub production: Vec<ObserverAnalysisProduction>,
+    pub units_lost: Vec<ObserverAnalysisKindCount>,
+    pub resources_lost: ObserverAnalysisResourcesLost,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplayAnalysisKindCount {
+pub struct ObserverAnalysisKindCount {
     pub kind: String,
     pub count: u32,
     pub steel_value: u32,
@@ -467,7 +468,7 @@ pub struct ReplayAnalysisKindCount {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplayAnalysisProduction {
+pub struct ObserverAnalysisProduction {
     pub building_id: u32,
     pub building_kind: String,
     pub item_kind: String,
@@ -480,7 +481,7 @@ pub struct ReplayAnalysisProduction {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplayAnalysisResourcesLost {
+pub struct ObserverAnalysisResourcesLost {
     pub steel: u32,
     pub oil: u32,
 }
@@ -1345,18 +1346,18 @@ mod tests {
     }
 
     #[test]
-    fn replay_analysis_serializes_contract_shape() {
-        let msg = ServerMessage::ReplayAnalysis(ReplayAnalysisPayload {
+    fn observer_analysis_serializes_contract_shape() {
+        let msg = ServerMessage::ObserverAnalysis(ObserverAnalysisPayload {
             tick: 77,
-            players: vec![ReplayAnalysisPlayer {
+            players: vec![ObserverAnalysisPlayer {
                 id: 1,
-                units: vec![ReplayAnalysisKindCount {
+                units: vec![ObserverAnalysisKindCount {
                     kind: kinds::RIFLEMAN.to_string(),
                     count: 3,
                     steel_value: 180,
                     oil_value: 0,
                 }],
-                production: vec![ReplayAnalysisProduction {
+                production: vec![ObserverAnalysisProduction {
                     building_id: 10,
                     building_kind: kinds::BARRACKS.to_string(),
                     item_kind: kinds::MACHINE_GUNNER.to_string(),
@@ -1364,16 +1365,16 @@ mod tests {
                     progress: 0.5,
                     queue_depth: 2,
                 }],
-                units_lost: vec![ReplayAnalysisKindCount {
+                units_lost: vec![ObserverAnalysisKindCount {
                     kind: kinds::WORKER.to_string(),
                     count: 1,
                     steel_value: 50,
                     oil_value: 0,
                 }],
-                resources_lost: ReplayAnalysisResourcesLost { steel: 50, oil: 0 },
+                resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
             }],
         });
-        let json = serde_json::to_value(msg).expect("replay analysis should serialize");
+        let json = serde_json::to_value(msg).expect("observer analysis should serialize");
 
         assert_eq!(json["t"], "replayAnalysis");
         assert_eq!(json["tick"], 77);
