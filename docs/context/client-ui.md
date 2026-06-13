@@ -19,7 +19,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `ui`: `hud.js`, `hud_command_card.js`, `hotkey_editor.js`, `hotkey_profiles.js`, `lobby.js`,
   `match_history.js`, `status_badge.js`, `minimap.js`, `branch_staging.js`,
   `settings_container.js`, `settings_panels.js` — DOM/HUD/lobby/minimap/settings surfaces.
-- `input`: `input/` plus `replay_camera_input.js` — input facade and area-local collaborators.
+- `input`: `input/` plus `replay_camera_input.js` — input facade, shared camera navigation, and
+  area-local collaborators.
 - `renderer`: `renderer/` — Pixi facade, layers, terrain, entity, fog, feedback, art helpers.
 - `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`
   — browser/platform services and camera/fog helpers.
@@ -37,6 +38,10 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - **Teardown.** Any module that holds DOM/window listeners or GPU resources must implement
   `destroy()`. `Match.destroy()` calls it on every module between matches — omitting it leaks
   listeners/WebGL contexts across rematches.
+- **Observer camera input.** `input/camera_navigation.js` owns shared command-free camera gestures:
+  mouse tracking, wheel zoom, pan keys, middle-drag, optional Space+left-drag, blur release, and
+  listener teardown. `Input` composes it for live games, while `ReplayCameraInput` wraps it without
+  exposing gameplay commands.
 - **Coordinates.** World pixels on the wire and in client code, except fields ending in `Tile`.
 - **Large-file ratchet.** Do not churn large files just to reduce line count. When adding behavior,
   prefer extracting a focused helper/collaborator; update checker baselines or allowlists only with

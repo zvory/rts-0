@@ -67,6 +67,7 @@ import {
   msg,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
+import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
@@ -1512,9 +1513,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     const camera = {
       zoom: 1,
       calls: [],
+      pans: [],
       setZoom(zoom, x, y) {
         this.calls.push({ zoom, x, y });
         this.zoom = zoom;
+      },
+      panByScreenDelta(dx, dy) {
+        this.pans.push({ dx, dy });
       },
     };
     globalThis.window = {
@@ -1549,12 +1554,106 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       });
       assertApprox(camera.zoom, 1, 0.000001, "Replay mouse wheel zooms out");
       assert(prevented === 2, "Replay wheel zoom prevents page scroll");
+      let dragPrevented = 0;
+      listeners.get("mousedown")({
+        button: 1,
+        clientX: 120,
+        clientY: 130,
+        preventDefault() {
+          dragPrevented += 1;
+        },
+      });
+      listeners.get("window:mousemove")({
+        clientX: 150,
+        clientY: 160,
+        preventDefault() {
+          dragPrevented += 1;
+        },
+      });
+      listeners.get("window:mouseup")({
+        button: 1,
+        preventDefault() {
+          dragPrevented += 1;
+        },
+      });
+      assert(camera.pans.length === 1, "Replay middle-drag pans through shared camera navigation");
+      assert(camera.pans[0].dx === 30 && camera.pans[0].dy === 30, "Replay middle-drag uses screen delta");
+      assert(dragPrevented === 3, "Replay middle-drag suppresses browser drag defaults");
+      listeners.get("window:keydown")({
+        code: "Space",
+        preventDefault() {},
+      });
+      listeners.get("mousedown")({
+        button: 0,
+        clientX: 170,
+        clientY: 175,
+        preventDefault() {},
+      });
+      listeners.get("window:mousemove")({
+        clientX: 160,
+        clientY: 165,
+        preventDefault() {},
+      });
+      listeners.get("window:mouseup")({
+        button: 0,
+        preventDefault() {},
+      });
+      listeners.get("window:keyup")({
+        code: "Space",
+        preventDefault() {},
+      });
+      assert(camera.pans.length === 2, "Replay Space+left-drag pans through shared camera navigation");
+      assert(camera.pans[1].dx === -10 && camera.pans[1].dy === -10, "Replay Space+left-drag uses screen delta");
       replayInput.destroy();
       assert(!listeners.has("wheel"), "Replay camera input removes wheel listener on destroy");
     } finally {
       if (priorWindowForReplayInput === undefined) delete globalThis.window;
       else globalThis.window = priorWindowForReplayInput;
     }
+  }
+  {
+    const listeners = new Map();
+    const viewport = {
+      addEventListener(type, handler) {
+        listeners.set(type, handler);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(type) === handler) listeners.delete(type);
+      },
+      getBoundingClientRect() {
+        return { left: 0, top: 0, width: 800, height: 600 };
+      },
+    };
+    const windowRef = {
+      addEventListener(type, handler) {
+        listeners.set(`window:${type}`, handler);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(`window:${type}`) === handler) listeners.delete(`window:${type}`);
+      },
+    };
+    const helper = new CameraNavigationInput(viewport, { zoom: 1 }, {
+      installListeners: true,
+      windowRef,
+      panKeyCodes: CameraNavigationInput.replayPanKeyCodes(),
+    });
+    let prevented = 0;
+    listeners.get("window:keydown")({
+      code: "KeyW",
+      preventDefault() {
+        prevented += 1;
+      },
+    });
+    assert(helper.keys.up, "Shared camera navigation maps configured pan keys");
+    listeners.get("window:keyup")({
+      code: "KeyW",
+      preventDefault() {
+        prevented += 1;
+      },
+    });
+    assert(!helper.keys.up && prevented === 2, "Shared camera navigation releases configured pan keys");
+    helper.destroy();
+    assert(!listeners.has("window:keydown"), "Shared camera navigation removes key listeners on destroy");
   }
   assert(!shouldWarnBeforeUnload(), "lobby state does not warn before unload");
   assert(shouldWarnBeforeUnload({ match: {} }), "live match warns before unload");

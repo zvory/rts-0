@@ -45,6 +45,7 @@ import {
   _selectedWorkerIds,
 } from "./commands.js";
 import { _handleBlur, _handleKeyDown, _handleKeyUp, _handleWheel } from "./camera_controls.js";
+import { CameraNavigationInput } from "./camera_navigation.js";
 import {
   _confirmPlacement,
   _footprintValid,
@@ -115,22 +116,23 @@ export class Input {
     this.inputRouter = inputRouter;
     this.hotkeyProfiles = hotkeyProfiles;
 
-    /**
-     * Continuous pan-key state, read by Camera.update(dt, input). Booleans for the
-     * four cardinal directions; the camera maps these to a pan velocity. Arrow keys
-     * feed the flags. This is the shared input-state object the
-     * design refers to (docs/design/client-ui.md §4.1 camera/input seam).
-     * @type {{up:boolean,down:boolean,left:boolean,right:boolean}}
-     */
-    this.keys = { up: false, down: false, left: false, right: false };
-
-    /**
-     * Last known cursor position in screen (viewport-local) pixels, or null when
-     * the pointer has not entered the viewport. Used by update() for placement
-     * hover and by edge logic the camera may consult.
-     * @type {{x:number,y:number}|null}
-     */
-    this.mouse = null;
+    this.cameraNavigation = new CameraNavigationInput(domElement, camera);
+    this.keys = this.cameraNavigation.keys;
+    Object.defineProperty(this, "mouse", {
+      configurable: true,
+      get: () => this.cameraNavigation.mouse,
+      set: (value) => { this.cameraNavigation.mouse = value; },
+    });
+    Object.defineProperty(this, "_spacePan", {
+      configurable: true,
+      get: () => this.cameraNavigation.spacePan,
+      set: (value) => { this.cameraNavigation.spacePan = !!value; },
+    });
+    Object.defineProperty(this, "_panDrag", {
+      configurable: true,
+      get: () => this.cameraNavigation.panDrag,
+      set: (value) => { this.cameraNavigation.panDrag = value; },
+    });
 
     // Active left-drag selection box, in screen pixels, or null when not dragging.
     // { x0, y0, x1, y1 } where (x0,y0) is the press anchor.
@@ -141,11 +143,6 @@ export class Input {
     this._lastClick = null;
     // Last recalled control-group slot for number-key double-tap camera jumps.
     this._lastControlGroupTap = null;
-    // Space held: left-drag pans instead of selecting/placing.
-    this._spacePan = false;
-    // Active direct camera pan, in screen pixels, or null when not panning.
-    // { x, y, button } where button is the pointer button that started the pan.
-    this._panDrag = null;
     // Cursor-lock state. While locked, `this.mouse` is a viewport-local virtual
     // cursor updated from movementX/movementY and drawn above the canvas.
     this.pointerLocked = false;
@@ -218,6 +215,7 @@ export class Input {
     document.removeEventListener("pointerlockerror", this._onPointerLockError);
     document.removeEventListener("webkitpointerlockchange", this._onPointerLockChange);
     document.removeEventListener("webkitpointerlockerror", this._onPointerLockError);
+    this.cameraNavigation.destroy();
     if (this._pointerLockCursor) {
       this._pointerLockCursor.remove();
       this._pointerLockCursor = null;
@@ -264,6 +262,7 @@ export class Input {
 
   /** Cursor position relative to the viewport element, in CSS pixels. */
   _screenPos(ev) {
+    if (this.cameraNavigation) return this.cameraNavigation.screenPos(ev);
     const r = this.dom.getBoundingClientRect();
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   }
@@ -276,12 +275,14 @@ export class Input {
 
   /** True when a viewport-local point is inside the viewport bounds. */
   _insideViewport(p) {
+    if (this.cameraNavigation) return this.cameraNavigation.insideViewport(p);
     return p.x >= 0 && p.y >= 0 && p.x <= this.dom.clientWidth && p.y <= this.dom.clientHeight;
   }
 
   /** Update the camera-facing mouse position from a viewport-local point. */
   _trackMouse(p) {
-    this.mouse = this._insideViewport(p) ? p : null;
+    if (this.cameraNavigation) this.cameraNavigation.trackMouse(p);
+    else this.mouse = this._insideViewport(p) ? p : null;
   }
 
   _viewportCenter() {
@@ -711,9 +712,7 @@ export class Input {
       ev.preventDefault();
       return;
     }
-    if (ev.button === 1 || (ev.button === 0 && this._spacePan)) {
-      this._startPanDrag(p, ev.button);
-      ev.preventDefault();
+    if (this.cameraNavigation ? this.cameraNavigation.handleMouseDown(ev, p) : this._handleCameraPanMouseDownFallback(ev, p)) {
       return;
     }
     if (ev.button === 0) {
@@ -737,11 +736,7 @@ export class Input {
       return;
     }
 
-    if (this._panDrag) {
-      this.camera.panByScreenDelta(p.x - this._panDrag.x, p.y - this._panDrag.y);
-      this._panDrag.x = p.x;
-      this._panDrag.y = p.y;
-      ev.preventDefault();
+    if (this.cameraNavigation ? this.cameraNavigation.handleMouseMove(ev, p) : this._handleCameraPanMouseMoveFallback(ev, p)) {
       return;
     }
 
@@ -762,9 +757,7 @@ export class Input {
   }
 
   _handleMouseUp(ev) {
-    if (this._panDrag && ev.button === this._panDrag.button) {
-      this._panDrag = null;
-      ev.preventDefault();
+    if (this.cameraNavigation ? this.cameraNavigation.handleMouseUp(ev) : this._handleCameraPanMouseUpFallback(ev)) {
       return;
     }
     if (ev.button !== 0) return;
@@ -857,14 +850,33 @@ export class Input {
     return true;
   }
 
-  _startPanDrag(p, button) {
-    this._panDrag = { x: p.x, y: p.y, button };
-  }
-
   _dragDistance() {
     const dx = this._drag.x1 - this._drag.x0;
     const dy = this._drag.y1 - this._drag.y0;
     return Math.hypot(dx, dy);
+  }
+
+  _handleCameraPanMouseDownFallback(ev, p) {
+    if (ev.button !== 1 && !(ev.button === 0 && this._spacePan)) return false;
+    this._panDrag = { x: p.x, y: p.y, button: ev.button };
+    ev.preventDefault();
+    return true;
+  }
+
+  _handleCameraPanMouseMoveFallback(ev, p) {
+    if (!this._panDrag) return false;
+    this.camera.panByScreenDelta(p.x - this._panDrag.x, p.y - this._panDrag.y);
+    this._panDrag.x = p.x;
+    this._panDrag.y = p.y;
+    ev.preventDefault();
+    return true;
+  }
+
+  _handleCameraPanMouseUpFallback(ev) {
+    if (!this._panDrag || ev.button !== this._panDrag.button) return false;
+    this._panDrag = null;
+    ev.preventDefault();
+    return true;
   }
 
   /** Drag rect normalized to {x,y,w,h} in screen pixels (top-left origin). */
