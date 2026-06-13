@@ -158,6 +158,26 @@ assert(
   rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 19") && COMPACT_SNAPSHOT_VERSION === 19,
   "compact snapshot version must match Rust",
 );
+assert(
+  rust.includes("SetTeamPreset") && C.SET_TEAM_PRESET === "setTeamPreset",
+  "setTeamPreset client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.setTeamPreset("2v2")) === JSON.stringify({ t: "setTeamPreset", preset: "2v2" }),
+  "setTeamPreset builder must emit the exact wire shape",
+);
+assert(
+  rust.includes("SetTeam") && C.SET_TEAM === "setTeam",
+  "setTeam client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.setTeam(7, 2)) === JSON.stringify({ t: "setTeam", id: 7, teamId: 2 }),
+  "setTeam builder must emit the exact wire shape",
+);
+assert(
+  rust.includes("AddAi") && JSON.stringify(msg.addAi(2)) === JSON.stringify({ t: "addAi", teamId: 2 }),
+  "addAi builder must support optional teamId",
+);
 const decodedAck = decodeServerMessage({
   t: "snapshot",
   v: COMPACT_SNAPSHOT_VERSION,

@@ -39,6 +39,58 @@ struct PendingClientCommandAck {
 struct AiSlot {
     id: u32,
     name: String,
+    team_id: TeamId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TeamPreset {
+    Solo,
+    Ffa,
+    OneVsTwo,
+    OneVsThree,
+    TwoVsTwo,
+}
+
+impl TeamPreset {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "solo" => Some(Self::Solo),
+            "ffa" => Some(Self::Ffa),
+            "1v2" => Some(Self::OneVsTwo),
+            "1v3" => Some(Self::OneVsThree),
+            "2v2" => Some(Self::TwoVsTwo),
+            _ => None,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Solo => "solo",
+            Self::Ffa => "ffa",
+            Self::OneVsTwo => "1v2",
+            Self::OneVsThree => "1v3",
+            Self::TwoVsTwo => "2v2",
+        }
+    }
+
+    fn template(self) -> Option<&'static [TeamId]> {
+        match self {
+            Self::Solo => Some(&[1]),
+            Self::Ffa => None,
+            Self::OneVsTwo => Some(&[1, 2, 2]),
+            Self::OneVsThree => Some(&[1, 2, 2, 2]),
+            Self::TwoVsTwo => Some(&[1, 1, 2, 2]),
+        }
+    }
+
+    fn required_count(self) -> Option<usize> {
+        self.template().map(|template| template.len())
+    }
+
+    fn team_capacity(self, team_id: TeamId) -> Option<usize> {
+        self.template()
+            .map(|template| template.iter().filter(|id| **id == team_id).count())
+    }
 }
 
 const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
@@ -693,6 +745,10 @@ pub(super) struct RoomTask {
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
     /// only when the room empties of humans.
     ai_players: Vec<AiSlot>,
+    /// Current lobby team preset. FFA remains the default for ordinary rooms.
+    team_preset: TeamPreset,
+    /// Per-human active-seat team assignment. Spectators are omitted and broadcast as team 0.
+    human_team_assignments: HashMap<u32, TeamId>,
     /// Lobby toggle: start matches with boosted opening resources.
     quickstart: bool,
     /// Name of the map the host has selected (display name from JSON `name` field).
@@ -754,6 +810,8 @@ impl RoomTask {
             order: Vec::new(),
             players: HashMap::new(),
             ai_players: Vec::new(),
+            team_preset: TeamPreset::Ffa,
+            human_team_assignments: HashMap::new(),
             quickstart: false,
             selected_map: "Default".to_string(),
             host_id: None,
@@ -869,7 +927,15 @@ impl RoomTask {
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),
-            RoomEvent::AddAi { player_id } => self.on_add_ai(player_id),
+            RoomEvent::SetTeamPreset { player_id, preset } => {
+                self.on_set_team_preset(player_id, preset)
+            }
+            RoomEvent::SetTeam {
+                player_id,
+                target,
+                team_id,
+            } => self.on_set_team(player_id, target, team_id),
+            RoomEvent::AddAi { player_id, team_id } => self.on_add_ai(player_id, team_id),
             RoomEvent::RemoveAi { player_id, target } => self.on_remove_ai(player_id, target),
             RoomEvent::SetQuickstart { player_id, enabled } => {
                 self.on_set_quickstart(player_id, enabled)
@@ -1045,6 +1111,9 @@ impl RoomTask {
             },
         );
         self.reassign_host_if_needed();
+        if !spectator {
+            self.assign_missing_team_for(player_id);
+        }
         crate::log_debug!(room = %self.room, player_id, "joined");
         // The player is now in the room; tell the connection it may mark itself joined.
         let _ = ack.send(true);
@@ -1077,6 +1146,7 @@ impl RoomTask {
         };
         let was_spectator = removed.spectator;
         self.order.retain(|&id| id != player_id);
+        self.human_team_assignments.remove(&player_id);
         self.outcome_sent.remove(&player_id);
         self.reassign_host_if_needed();
         crate::log_debug!(room = %self.room, player_id, "left");
@@ -1096,6 +1166,8 @@ impl RoomTask {
             // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
             // joiner under this room name should start from a clean lobby.
             self.ai_players.clear();
+            self.team_preset = TeamPreset::Ffa;
+            self.human_team_assignments.clear();
             self.dev_driver = None;
             self.dev_view_player_id = None;
             if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
@@ -1189,9 +1261,66 @@ impl RoomTask {
         self.start_match_countdown();
     }
 
+    fn on_set_team_preset(&mut self, player_id: u32, preset: String) {
+        if self.is_live_dev_watch() {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        let Some(preset) = TeamPreset::parse(preset.as_str()) else {
+            crate::log_debug!(room = %self.room, preset = %preset, "ignoring unknown team preset");
+            return;
+        };
+        self.team_preset = preset;
+        self.reassign_teams_for_preset();
+        crate::log_debug!(room = %self.room, preset = self.team_preset.as_str(), "team preset selected");
+        self.broadcast_lobby();
+    }
+
+    fn on_set_team(&mut self, player_id: u32, target: u32, team_id: TeamId) {
+        if self.is_live_dev_watch() {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        if team_id == 0 {
+            crate::log_debug!(room = %self.room, target, "ignoring zero team id");
+            return;
+        }
+        if self
+            .players
+            .get(&target)
+            .map(|player| player.spectator)
+            .unwrap_or(false)
+        {
+            crate::log_debug!(room = %self.room, target, "ignoring spectator team assignment");
+            return;
+        }
+        let known_target = self.human_team_assignments.contains_key(&target)
+            || self.ai_players.iter().any(|ai| ai.id == target);
+        if !known_target || !self.team_move_allowed(target, team_id) {
+            crate::log_debug!(room = %self.room, target, team_id, "ignoring invalid team assignment");
+            return;
+        }
+        if let Some(ai) = self.ai_players.iter_mut().find(|ai| ai.id == target) {
+            ai.team_id = team_id;
+        } else if self.players.contains_key(&target) {
+            self.human_team_assignments.insert(target, team_id);
+        }
+        self.broadcast_lobby();
+    }
+
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
     /// the room is full (humans + AI == [`MAX_PLAYERS`]).
-    fn on_add_ai(&mut self, player_id: u32) {
+    fn on_add_ai(&mut self, player_id: u32, requested_team_id: Option<TeamId>) {
         if self.is_live_dev_watch() {
             return;
         }
@@ -1207,7 +1336,16 @@ impl RoomTask {
         }
         let id = next_player_id();
         let name = format!("Computer {}", self.ai_players.len() + 1);
-        self.ai_players.push(AiSlot { id, name });
+        let team_id = if let Some(team_id) = requested_team_id {
+            if !self.team_move_allowed(id, team_id) {
+                crate::log_debug!(room = %self.room, team_id, "ignoring invalid AI team assignment");
+                return;
+            }
+            team_id
+        } else {
+            self.next_default_team_for_new_seat(id)
+        };
+        self.ai_players.push(AiSlot { id, name, team_id });
         crate::log_debug!(room = %self.room, ai_id = id, "AI opponent added");
         self.broadcast_lobby();
     }
@@ -1288,6 +1426,7 @@ impl RoomTask {
                 player.ready = false;
                 player.color = "#6f8fa8".to_string();
             }
+            self.human_team_assignments.remove(&player_id);
         } else {
             if self.total_player_count() >= MAX_PLAYERS {
                 crate::log_debug!(room = %self.room, player_id, "ignoring player role switch; room full");
@@ -1299,6 +1438,7 @@ impl RoomTask {
                 player.ready = false;
                 player.color = color;
             }
+            self.assign_missing_team_for(player_id);
         }
         self.broadcast_lobby();
     }
@@ -1320,6 +1460,162 @@ impl RoomTask {
             .iter()
             .copied()
             .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
+    }
+
+    fn active_seat_ids(&self) -> Vec<u32> {
+        let mut ids: Vec<u32> = self.active_human_ids().collect();
+        ids.extend(self.ai_players.iter().map(|ai| ai.id));
+        ids
+    }
+
+    fn assignment_order(&self) -> Vec<u32> {
+        let mut ids = Vec::new();
+        if let Some(host_id) = self.host_id {
+            if self
+                .players
+                .get(&host_id)
+                .map(|player| !player.spectator)
+                .unwrap_or(false)
+            {
+                ids.push(host_id);
+            }
+        }
+        ids.extend(
+            self.active_human_ids()
+                .filter(|id| Some(*id) != self.host_id),
+        );
+        ids.extend(self.ai_players.iter().map(|ai| ai.id));
+        ids
+    }
+
+    fn team_id_for_active_seat(&self, id: u32) -> TeamId {
+        if let Some(team_id) = self.human_team_assignments.get(&id) {
+            return *team_id;
+        }
+        if let Some(ai) = self.ai_players.iter().find(|ai| ai.id == id) {
+            return ai.team_id;
+        }
+        id
+    }
+
+    fn team_counts_except(&self, except_id: Option<u32>) -> HashMap<TeamId, usize> {
+        let mut counts = HashMap::new();
+        for id in self.active_seat_ids() {
+            if Some(id) == except_id {
+                continue;
+            }
+            let team_id = self.team_id_for_active_seat(id);
+            *counts.entry(team_id).or_insert(0) += 1;
+        }
+        counts
+    }
+
+    fn team_move_allowed(&self, target: u32, team_id: TeamId) -> bool {
+        if team_id == 0 {
+            return false;
+        }
+        let mut counts = self.team_counts_except(Some(target));
+        let new_count = counts
+            .entry(team_id)
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+        match self.team_preset {
+            TeamPreset::Ffa => *new_count <= 1,
+            preset => preset
+                .team_capacity(team_id)
+                .map(|capacity| *new_count <= capacity)
+                .unwrap_or(false),
+        }
+    }
+
+    fn next_default_team_for_new_seat(&self, new_id: u32) -> TeamId {
+        match self.team_preset {
+            TeamPreset::Ffa => new_id,
+            preset => {
+                let counts = self.team_counts_except(None);
+                preset
+                    .template()
+                    .and_then(|template| {
+                        template.iter().copied().find(|team_id| {
+                            counts.get(team_id).copied().unwrap_or(0)
+                                < preset.team_capacity(*team_id).unwrap_or(0)
+                        })
+                    })
+                    .unwrap_or(new_id)
+            }
+        }
+    }
+
+    fn assign_missing_team_for(&mut self, player_id: u32) {
+        if self.human_team_assignments.contains_key(&player_id) {
+            return;
+        }
+        let team_id = self.next_default_team_for_new_seat(player_id);
+        self.human_team_assignments.insert(player_id, team_id);
+    }
+
+    fn reassign_teams_for_preset(&mut self) {
+        if self.team_preset == TeamPreset::Ffa {
+            let active: HashSet<u32> = self.active_human_ids().collect();
+            self.human_team_assignments
+                .retain(|id, _| active.contains(id));
+            for id in active {
+                self.human_team_assignments.insert(id, id);
+            }
+            for ai in &mut self.ai_players {
+                ai.team_id = ai.id;
+            }
+            return;
+        }
+
+        let Some(template) = self.team_preset.template() else {
+            return;
+        };
+        let ordered = self.assignment_order();
+        let active_humans: HashSet<u32> = self.active_human_ids().collect();
+        self.human_team_assignments
+            .retain(|id, _| active_humans.contains(id));
+        for (idx, id) in ordered.iter().copied().enumerate() {
+            let team_id = template.get(idx).copied().unwrap_or(id);
+            if let Some(ai) = self.ai_players.iter_mut().find(|ai| ai.id == id) {
+                ai.team_id = team_id;
+            } else if active_humans.contains(&id) {
+                self.human_team_assignments.insert(id, team_id);
+            }
+        }
+    }
+
+    fn team_composition_valid(&self) -> bool {
+        let active_ids = self.active_seat_ids();
+        if active_ids.is_empty() || active_ids.len() > MAX_PLAYERS {
+            return false;
+        }
+        if let Some(required) = self.team_preset.required_count() {
+            if active_ids.len() != required {
+                return false;
+            }
+        }
+        let mut counts = HashMap::new();
+        for id in active_ids {
+            let team_id = self.team_id_for_active_seat(id);
+            if team_id == 0 {
+                return false;
+            }
+            *counts.entry(team_id).or_insert(0) += 1;
+        }
+        match self.team_preset {
+            TeamPreset::Ffa => counts.values().all(|count| *count == 1),
+            preset => {
+                let Some(template) = preset.template() else {
+                    return false;
+                };
+                let mut required = HashMap::new();
+                for team_id in template {
+                    *required.entry(*team_id).or_insert(0) += 1;
+                }
+                counts == required
+            }
+        }
     }
 
     fn spectator_visible_player_ids(&self) -> Vec<u32> {
@@ -1684,6 +1980,7 @@ impl RoomTask {
         }
         !self.drain.is_draining()
             && self.total_player_count() > 0
+            && self.team_composition_valid()
             && self
                 .players
                 .values()
@@ -1705,7 +2002,11 @@ impl RoomTask {
             .filter_map(|id| {
                 self.players.get(id).map(|p| LobbyPlayer {
                     id: *id,
-                    team_id: if p.spectator { 0 } else { *id },
+                    team_id: if p.spectator {
+                        0
+                    } else {
+                        self.team_id_for_active_seat(*id)
+                    },
                     name: p.name.clone(),
                     ready: p.ready,
                     color: p.color.clone(),
@@ -1717,7 +2018,7 @@ impl RoomTask {
         for (seat, ai) in self.ai_players.iter().enumerate() {
             players.push(LobbyPlayer {
                 id: ai.id,
-                team_id: ai.id,
+                team_id: ai.team_id,
                 name: ai.name.clone(),
                 ready: true,
                 color: Self::ai_color(seat),
@@ -1731,6 +2032,7 @@ impl RoomTask {
             players,
             can_start: self.can_start(),
             quickstart: self.quickstart,
+            team_preset: self.team_preset.as_str().to_string(),
             map: self.selected_map.clone(),
             maps: Map::list_available(),
         };
@@ -1791,7 +2093,7 @@ impl RoomTask {
             .filter_map(|id| {
                 self.players.get(&id).map(|p| PlayerInit {
                     id,
-                    team_id: id,
+                    team_id: self.team_id_for_active_seat(id),
                     name: p.name.clone(),
                     color: p.color.clone(),
                     is_ai: false,
@@ -1803,7 +2105,7 @@ impl RoomTask {
         for (seat, ai) in self.ai_players.iter().enumerate() {
             inits.push(PlayerInit {
                 id: ai.id,
-                team_id: ai.id,
+                team_id: ai.team_id,
                 name: ai.name.clone(),
                 color: Self::ai_color(seat),
                 is_ai: true,
@@ -4196,7 +4498,7 @@ mod tests {
         task.host_id = Some(100);
 
         task.on_ready(100, true);
-        task.on_add_ai(100);
+        task.on_add_ai(100, None);
         task.on_remove_ai(100, 999);
         task.on_set_quickstart(100, true);
         task.on_set_spectator(100, false);
