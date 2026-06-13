@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules::projection;
@@ -14,10 +15,12 @@ use crate::rules::projection;
 /// current fog still reflects who could see the unit while it was alive — exactly the players
 /// who should see it die. A dead building drops its queue implicitly by being removed. Workers
 /// building a since-removed site are reset elsewhere.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn death_system(
     entities: &mut EntityStore,
     fog: &Fog,
     smokes: &SmokeCloudStore,
+    teams: &TeamRelations,
     players: &mut [PlayerState],
     lingering_sight: &mut Vec<LingeringSightSource>,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -54,8 +57,8 @@ pub(crate) fn death_system(
         // so a death poof never reveals an entity hidden in a player's fog.
         let pids: Vec<u32> = events.keys().copied().collect();
         for pid in pids {
-            if !projection::event_visible_to_with_smoke(
-                pid, dead.x, dead.y, dead.owner, fog, smokes,
+            if !projection::event_visible_to_team_with_smoke(
+                pid, dead.x, dead.y, dead.owner, fog, teams, smokes,
             ) {
                 continue;
             }
@@ -79,7 +82,7 @@ pub(crate) fn death_system(
     for (id, x, y, kind) in depleted {
         let pids: Vec<u32> = events.keys().copied().collect();
         for pid in pids {
-            if !projection::event_visible_to_with_smoke(pid, x, y, 0, fog, smokes) {
+            if smokes.point_inside(x, y) || !projection::team_visible_world(pid, x, y, fog, teams) {
                 continue;
             }
             events.entry(pid).or_default().push(Event::Death {

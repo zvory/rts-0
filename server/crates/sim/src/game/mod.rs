@@ -398,14 +398,20 @@ impl Game {
 
     // --- internal helpers ------------------------------------------------------
     fn refresh_building_memory(&mut self, player_ids: &[u32]) {
+        let teams = self.team_relations();
         self.building_memory.refresh(
             player_ids,
             &self.entities,
             &self.fog,
             &self.map,
             &self.smokes,
+            &teams,
             self.tick,
         );
+    }
+
+    pub(crate) fn team_relations(&self) -> teams::TeamRelations {
+        teams::TeamRelations::from_player_teams(self.players.iter().map(|p| (p.id, p.team_id)))
     }
 
     #[allow(dead_code)]
@@ -418,6 +424,8 @@ impl Game {
     }
 }
 
+#[cfg(test)]
+mod phase7_privacy_tests;
 #[cfg(test)]
 mod snapshot_memory_tests;
 #[cfg(test)]

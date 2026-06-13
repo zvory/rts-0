@@ -1,0 +1,311 @@
+use super::*;
+use crate::game::command::SimCommand as Command;
+use crate::game::entity::{
+    EntityKind, Order, ProdItem, RallyIntent, RallyKind, ResearchItem, WeaponSetup,
+};
+use crate::game::{services, systems, SmokeCloudStore};
+use crate::protocol::{kinds, terrain, Event};
+
+fn empty_flat_game(players: &[PlayerInit]) -> Game {
+    let mut game = Game::new_for_replay(players, 0x1234_5678);
+    for tile in &mut game.map.terrain {
+        *tile = terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+    game.smokes = SmokeCloudStore::new();
+    game.mortar_shells = MortarShellStore::default();
+    game.artillery_shells = artillery::ArtilleryShellStore::default();
+    refresh_world(&mut game);
+    game
+}
+
+fn refresh_world(game: &mut Game) {
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+}
+
+fn phase7_players() -> [PlayerInit; 3] {
+    [
+        PlayerInit {
+            id: 1,
+            team_id: 7,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 7,
+            name: "Two".into(),
+            color: "#bbb".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            name: "Three".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ]
+}
+
+fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) {
+    let unit = game
+        .entities
+        .get_mut(artillery)
+        .expect("artillery should exist");
+    let facing = (target.1 - unit.pos_y).atan2(target.0 - unit.pos_x);
+    unit.set_weapon_setup(WeaponSetup::Deployed);
+    unit.set_emplacement_facing(Some(facing));
+    unit.set_weapon_facing(facing);
+}
+
+#[test]
+fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
+    let mut game = empty_flat_game(&phase7_players());
+    game.players
+        .iter_mut()
+        .find(|player| player.id == 2)
+        .expect("ally player should exist")
+        .upgrades
+        .insert(upgrade::UpgradeKind::Methamphetamines);
+    for (owner, tile) in [(1, (2, 2)), (2, (5, 2)), (3, (55, 55))] {
+        let pos = game.map.tile_center(tile.0, tile.1);
+        game.entities
+            .spawn_building(owner, EntityKind::CityCentre, pos.0, pos.1, true)
+            .expect("city centre should spawn");
+    }
+
+    let barracks_pos = game.map.tile_center(7, 2);
+    let barracks = game
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::Barracks,
+            barracks_pos.0,
+            barracks_pos.1,
+            true,
+        )
+        .expect("ally barracks should spawn");
+    {
+        let building = game.entities.get_mut(barracks).expect("barracks exists");
+        building.push_production(ProdItem {
+            unit: EntityKind::Rifleman,
+            progress: 30,
+            total: 120,
+        });
+        building.push_production(ProdItem {
+            unit: EntityKind::MachineGunner,
+            progress: 0,
+            total: 180,
+        });
+        building.set_rally_point(Some(RallyIntent::new(
+            RallyKind::AttackMove,
+            barracks_pos.0 + 64.0,
+            barracks_pos.1,
+        )));
+    }
+
+    let research_pos = game.map.tile_center(9, 2);
+    let research = game
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::ResearchComplex,
+            research_pos.0,
+            research_pos.1,
+            true,
+        )
+        .expect("ally research complex should spawn");
+    game.entities
+        .get_mut(research)
+        .expect("research complex exists")
+        .push_research(ResearchItem {
+            upgrade: upgrade::UpgradeKind::TankUnlock,
+            progress: 60,
+            total: 600,
+        });
+
+    let scaffold_pos = game.map.tile_center(11, 2);
+    let scaffold = game
+        .entities
+        .spawn_building(2, EntityKind::Depot, scaffold_pos.0, scaffold_pos.1, false)
+        .expect("ally scaffold should spawn");
+    game.entities
+        .get_mut(scaffold)
+        .expect("scaffold exists")
+        .set_construction_progress(10);
+
+    let mortar_pos = game.map.tile_center(13, 2);
+    let target_pos = game.map.tile_center(55, 50);
+    let mortar = game
+        .entities
+        .spawn_unit(2, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("ally mortar should spawn");
+    let hidden_enemy = game
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("hidden enemy should spawn");
+    {
+        let unit = game.entities.get_mut(mortar).expect("mortar exists");
+        unit.set_weapon_setup(WeaponSetup::Deployed);
+        unit.set_order(Order::attack(hidden_enemy));
+        unit.set_target_id(Some(hidden_enemy));
+        unit.set_weapon_facing(1.3);
+    }
+
+    refresh_world(&mut game);
+    let snapshot = game.snapshot_for(1);
+    let barracks_view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == barracks)
+        .expect("ally barracks should be visible");
+    assert_eq!(barracks_view.prod_kind.as_deref(), Some(kinds::RIFLEMAN));
+    assert_eq!(barracks_view.prod_queue, Some(2));
+    assert!(barracks_view.prod_progress.is_some());
+    assert_eq!(barracks_view.rally, None);
+    assert!(barracks_view.rally_plan.is_empty());
+    assert!(barracks_view.order_plan.is_empty());
+
+    let research_view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == research)
+        .expect("ally research complex should be visible");
+    assert_eq!(
+        research_view.prod_upgrade.as_deref(),
+        Some(upgrade::UpgradeKind::TankUnlock.to_protocol_str())
+    );
+    assert_eq!(research_view.prod_queue, Some(1));
+
+    let scaffold_view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == scaffold)
+        .expect("ally scaffold should be visible");
+    assert!(scaffold_view.build_progress.is_some());
+
+    let mortar_view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == mortar)
+        .expect("ally mortar should be visible");
+    assert_eq!(mortar_view.setup_state.as_deref(), Some("deployed"));
+    assert_eq!(mortar_view.target_id, None);
+    assert_eq!(mortar_view.weapon_facing, None);
+    assert!(mortar_view.abilities.is_empty());
+    assert!(snapshot
+        .upgrades
+        .iter()
+        .all(|upgrade| upgrade != upgrade::UpgradeKind::Methamphetamines.to_protocol_str()));
+    assert_eq!(snapshot.player_resources.len(), 0);
+}
+
+#[test]
+fn artillery_target_marker_is_visible_to_allies_not_hidden_enemies() {
+    let mut game = empty_flat_game(&phase7_players());
+    let pos = game.map.tile_center(10, 10);
+    let target = game.map.tile_center(22, 10);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+    deploy_artillery_toward(&mut game, artillery, target);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    let events = game.tick();
+    let ally_events = events
+        .iter()
+        .find(|(player_id, _)| *player_id == 2)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    let enemy_events = events
+        .iter()
+        .find(|(player_id, _)| *player_id == 3)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+
+    assert!(ally_events
+        .iter()
+        .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery)));
+    assert!(enemy_events
+        .iter()
+        .all(|event| !matches!(event, Event::ArtilleryTarget { .. } | Event::Attack { .. })));
+}
+
+#[test]
+fn manual_mortar_launch_and_impact_markers_are_visible_to_allies() {
+    let mut game = empty_flat_game(&phase7_players());
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(17, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    game.entities
+        .get_mut(mortar)
+        .expect("mortar should exist")
+        .set_weapon_setup(WeaponSetup::Deployed);
+    game.entities
+        .spawn_unit(3, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    refresh_world(&mut game);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: false,
+        },
+    );
+    let launch_events = game.tick();
+    let ally_launch = launch_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 2)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    let enemy_launch = launch_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 3)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    assert!(ally_launch
+        .iter()
+        .any(|event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar)));
+    assert!(enemy_launch
+        .iter()
+        .all(|event| !matches!(event, Event::MortarLaunch { .. })));
+
+    let mut impact_events = Vec::new();
+    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+        impact_events = game.tick();
+    }
+    let ally_impact = impact_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 2)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    assert!(ally_impact
+        .iter()
+        .any(|event| matches!(event, Event::MortarImpact { x, y, .. }
+            if (*x - target_pos.0).abs() < 0.001 && (*y - target_pos.1).abs() < 0.001)));
+}

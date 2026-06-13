@@ -31,6 +31,7 @@ pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackRevea
 pub(super) fn emit_attack_event(
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    teams: &TeamRelations,
     attacker: u32,
     victim: u32,
     attacker_owner: u32,
@@ -42,7 +43,16 @@ pub(super) fn emit_attack_event(
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        if !projection::attack_event_visible_to(pid, ax, ay, vx, vy, attacker_owner, fog) {
+        if !projection::attack_event_visible_to_team(
+            pid,
+            ax,
+            ay,
+            vx,
+            vy,
+            attacker_owner,
+            fog,
+            teams,
+        ) {
             continue;
         }
         events.entry(pid).or_default().push(Event::Attack {
@@ -68,7 +78,16 @@ pub(super) fn push_under_attack_notices_for_visible_attack(
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        if !projection::attack_event_visible_to(pid, ax, ay, vx, vy, attacker_owner, fog) {
+        if !projection::attack_event_visible_to_team(
+            pid,
+            ax,
+            ay,
+            vx,
+            vy,
+            attacker_owner,
+            fog,
+            teams,
+        ) {
             continue;
         }
         push_under_attack_notice(events, teams, pid, victim_owner, attacker_owner, vx, vy);

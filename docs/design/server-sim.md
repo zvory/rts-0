@@ -174,9 +174,12 @@ selected-unit ownership, production/research/cancel authority, build/gather owne
 control, supply, upgrades, and resource spending. Snapshot entity visibility and `visibleTiles`
 use the union of current fog from living teammates on the recipient's team. A defeated or
 disconnected teammate has no live entities and no longer contributes current sight; a defeated
-player whose team still has a living member still receives that surviving team vision. Remaining
-raw owner comparisons in command authority, economy, event fanout, remembered-building memory, and
-private projection details are intentionally owner-only for now. Victory resolution is team-aware:
+player whose team still has a living member still receives that surviving team vision. Allied
+visible entities project full read-only inspection details, but command authority, economy,
+resources/supply/upgrades, rally/order plans, ability controls, and debug path overlays remain
+exact-owner-only. Combat target ids and weapon facing for allied entities are projected only when
+the target is team-visible, so allied inspection does not reveal hidden enemy ids or directions.
+Victory resolution is team-aware:
 the room task ends 2+ player matches only when at most one nonzero team still has an alive member,
 and a defeated player does not receive an individual loss screen while any teammate keeps that team
 alive.
@@ -409,22 +412,24 @@ toward terrain- or smoke-blocked targets but cannot fire until the shot is clear
 visibility/cover rules should extend the terrain rules and this service instead of adding ad hoc
 checks to fog or combat.
 
-`Game` still recomputes raw live fog per player after each tick, because command validation,
-combat targeting, event visibility, and building-memory refreshes depend on owner-local current
-vision. Normal player snapshots then build a temporary team-current fog by unioning the raw live
-grids of living teammates only. Snapshot-only lingering death sight is layered after live fog and
-then unioned for projection, so lingering views remain non-actionable (`visionOnly`) and cannot
-validate commands or refresh remembered buildings. Neutral resource nodes never stamp vision.
+`Game` still recomputes raw live fog per player after each tick, because command validation and
+combat targeting depend on owner-local current vision. Event visibility and building-memory
+refreshes use team-current views derived from those raw live grids. Normal player snapshots then
+build a temporary team-current fog by unioning the raw live grids of living teammates only.
+Snapshot-only lingering death sight is layered after live fog and then unioned for projection, so
+lingering views remain non-actionable (`visionOnly`) and cannot validate commands or refresh
+remembered buildings. Neutral resource nodes never stamp vision.
 
 `game::building_memory::BuildingMemory` is server-only stale intel owned by `Game`. After live,
 smoke-aware fog is recomputed, the store records one latest-seen entry per
-`(viewer_player_id, enemy_building_entity_id)` for non-neutral buildings currently projectable to
-that viewer through actionable fog. Records copy id, owner, kind, center position, footprint tiles,
-hp/max hp, construction progress/completion state, and the tick observed. Snapshot-only lingering
-death vision is intentionally not used for refreshes, so it cannot create actionable intel for
-future commands. If a remembered building no longer exists, the record remains while its footprint
-is hidden and is removed once the viewer scouts any remembered footprint tile. This keeps hidden
-destruction stale until the location is checked without adding any wire-protocol fields.
+`(viewer_player_id, enemy_building_entity_id)` for non-neutral enemy buildings currently
+projectable to that viewer through team-current actionable fog. Records copy id, owner, kind,
+center position, footprint tiles, hp/max hp, construction progress/completion state, and the tick
+observed. Snapshot-only lingering death vision is intentionally not used for refreshes, so it
+cannot create actionable intel for future commands. If a remembered building no longer exists, the
+record remains while its footprint is hidden from the viewer's team and is removed once that team
+scouts any remembered footprint tile. This keeps hidden destruction stale until the location is
+checked without adding any wire-protocol fields.
 
 `services::geometry` owns shared body primitives: infantry unit bodies are circles centered on
 `(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their

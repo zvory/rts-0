@@ -350,7 +350,7 @@ impl Game {
             let snap = self.snapshot_for(pid);
             let live_fog = self.team_current_fog_for(pid, &self.fog);
             for v in &snap.entities {
-                if v.owner == pid || v.owner == NEUTRAL {
+                if v.owner == pid || v.owner == NEUTRAL || self.same_team_owner(pid, v.owner) {
                     continue;
                 }
                 let live_visible = live_fog.is_visible_world(pid, v.x, v.y);

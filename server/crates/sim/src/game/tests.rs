@@ -249,7 +249,7 @@ fn artillery_point_fire_queue_is_terminal() {
 }
 
 #[test]
-fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
+fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
@@ -259,6 +259,21 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
+    game.entities
+        .spawn_unit(
+            2,
+            EntityKind::Worker,
+            pos.0 + config::TILE_SIZE as f32,
+            pos.1,
+        )
+        .expect("enemy gun spotter should spawn");
+    game.entities
+        .spawn_unit(2, EntityKind::Worker, target.0, target.1)
+        .expect("enemy impact spotter should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
     deploy_artillery_toward(&mut game, artillery, target);
 
     game.enqueue(
@@ -310,7 +325,7 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
     assert!(owner_saw_impact, "owner should see delayed impact");
     assert!(
         enemy_saw_impact,
-        "enemy should see delayed impact as visual-only event"
+        "enemy should see delayed impact only with current vision at the impact"
     );
     assert!(
         game.players[0].steel <= initial_steel - config::ARTILLERY_AMMO_COST_STEEL,
@@ -557,6 +572,7 @@ fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
     game.artillery_shells.resolve_due(
         &mut game.entities,
         &teams,
+        &game.fog,
         &mut events,
         game.tick + config::ARTILLERY_SHELL_DELAY_TICKS,
     );
@@ -3031,10 +3047,12 @@ fn scores_record_kills_and_losses_on_death() {
         game.players.iter().map(|p| (p.id, Vec::new())).collect();
     let mut lingering_sight = Vec::new();
     let tick = game.tick_count();
+    let teams = game.team_relations();
     services::death::death_system(
         &mut game.entities,
         &game.fog,
         &game.smokes,
+        &teams,
         &mut game.players,
         &mut lingering_sight,
         &mut events,
@@ -3093,10 +3111,12 @@ fn replay_analysis_reports_authoritative_inventory_production_and_losses() {
         game.players.iter().map(|p| (p.id, Vec::new())).collect();
     let mut lingering_sight = Vec::new();
     let tick = game.tick_count();
+    let teams = game.team_relations();
     services::death::death_system(
         &mut game.entities,
         &game.fog,
         &game.smokes,
+        &teams,
         &mut game.players,
         &mut lingering_sight,
         &mut events,

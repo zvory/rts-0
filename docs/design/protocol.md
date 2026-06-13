@@ -287,10 +287,16 @@ For normal active-player snapshots, entity visibility and `visibleTiles` are pro
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
 team. A defeated/disconnected teammate stops contributing live sight; if that player's team still
 has a living member, their own connection continues to receive the surviving team's current
-visibility. `steel`, `oil`, supply, `upgrades`, owner-only production queues, rallies, ability
-state, and command authority remain recipient-local. Snapshot-only lingering death sight may make
-non-owned units/buildings visible as `visionOnly`; those views are visual intel only and do not
-refresh remembered buildings or validate targeted commands.
+visibility. Allied non-resource entities visible through team current fog expose full read-only
+inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
+construction progress, worker latched node, active Breakthrough status, and safe combat tracers.
+Combat `targetId` and `weaponFacing` for allied units are sent only when the target is visible in
+the recipient's team-current actionable fog, so allied units attacking hidden enemies do not reveal
+hidden target ids or target directions. `steel`, `oil`, supply, `upgrades`, rallies, order plans,
+ability controls/autocast toggles, debug paths, and command authority remain exact-owner-only.
+Snapshot-only lingering death sight may make non-owned units/buildings visible as `visionOnly`;
+those views are visual intel only and do not refresh remembered buildings or validate targeted
+commands.
 
 Live WebSocket snapshot frames are sent as compact JSON text, version 19. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
@@ -369,13 +375,14 @@ encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTick
 with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `RememberedBuilding`: `{ id, owner, kind, x, y, footprint, observedTick }`. These records are
-recipient-only last-seen enemy building memory, sent only when the building is not currently
-projected as a live visible entity. They are stale intel for normal building rendering below the
-fog overlay and coordinate targeting context; clients must not make them selectable live entities
-or issue entity-targeted commands against them. `footprint` is an array of `[tileX, tileY]` cells
-from the last visible state. The record intentionally omits hidden live HP, current build progress,
-and destruction state. Artillery `pointFire` remains a world-coordinate ability; remembered
-buildings help the player know where to aim but do not become target ids.
+recipient-only last-seen enemy building memory, refreshed from team-current actionable observations
+and sent only when the building is not currently projected as a live visible entity. They are stale
+intel for normal building rendering below the fog overlay and coordinate targeting context; clients
+must not make them selectable live entities or issue entity-targeted commands against them.
+`footprint` is an array of `[tileX, tileY]` cells from the last visible state. The record
+intentionally omits hidden live HP, current build progress, and destruction state. Artillery
+`pointFire` remains a world-coordinate ability; remembered buildings help the player know where to
+aim but do not become target ids.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
@@ -384,8 +391,8 @@ watch rooms receive all resource updates).
 
 `SmokeCloud`: `{ id: u32, x: f32, y: f32, radiusTiles: f32, expiresIn: u16 }`. Smoke clouds are
 neutral world effects, not entities. Normal player snapshots include only clouds that have at least
-one currently visible tile after smoke-suppressed fog is recomputed, plus any cloud currently
-containing one of that player's own non-resource entities; spectator/dev full-world
+one currently visible tile after smoke-suppressed team fog is recomputed, plus any cloud currently
+containing one of that player's allied non-resource entities; spectator/dev full-world
 snapshots may include all active clouds. Smoke-covered enemy units/buildings, target ids, death
 events, and positioned notices remain fog-gated and are withheld when smoke hides the position.
 
@@ -420,7 +427,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
-  setupFacing?: f32,             // at_team/artillery only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
+  setupFacing?: f32,             // at_team/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
   orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
     { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"smoke"|"mortarFire"|"pointFire"|"setupAtGuns", x: f32, y: f32 }
   ],
@@ -460,29 +467,35 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
 gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
 or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged enemy
-unit's position to the victim owner and same-team recipients that pass the normal event visibility
-filter. Same-team friendly-fire damage does not emit under-attack alerts. Unit attack events include
-`reveal` so a shooter
+unit's position to the victim owner and same-team recipients that pass team-current event
+visibility. Same-team friendly-fire damage does not emit under-attack alerts. Unit attack events
+are sent to the attacker's team and to enemy recipients whose team can currently see the shooter or
+target point. They include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
-Smoke launch events are owner-visible local feedback for the scout-car canister animation; the
-authoritative smoke cloud appears later in `smokes` after the reported launch delay. Mortar launch
-events are always sent to the firing player, with shooter id, shell origin, impact point, radius,
-and delay so the client can draw launch dust, recoil, the projectile, and the warning marker until
-detonation. Autocast mortar launch events are also sent to other recipients that currently see the
-mortar; manual launch events are owner-only so enemy clients do not receive the pre-impact warning
-marker. Mortar impact events are sent to the firing player, to recipients with current visibility
-at the impact point, and to enemy players whose entities were damaged by the shell. An enemy damaged
-victim owner receives `from` + `reveal` so the attacking mortar can be shown briefly above fog after
+Death events are sent to the dead entity's team and to enemy recipients whose team can currently see
+the death position; smoke-covered hidden death positions are withheld. Build completion events are
+sent to the completed building's team and to enemy recipients whose team currently sees the site.
+Smoke launch events are team-visible local feedback for the scout-car canister animation; enemies
+do not receive hidden smoke launch data. The authoritative smoke cloud appears later in `smokes`
+after the reported launch delay. Mortar launch events are always sent to the firing team, with
+shooter id, shell origin, impact point, radius, and delay so clients can draw launch dust, recoil,
+the projectile, and the warning marker until detonation. Autocast mortar launch events are also
+sent to enemy recipients whose team currently sees the mortar; manual launch events remain hidden
+from enemies without current team sight, so they do not receive pre-impact warning markers. Mortar
+impact events are sent to the firing team, to enemy recipients with team-current visibility at the
+impact point, and to enemy players whose entities were damaged by the shell. An enemy damaged victim
+owner receives `from` + `reveal` so the attacking mortar can be shown briefly above fog after
 indirect fire lands. Allied or owned entities can still take mortar splash damage, but that damage
 is unattributed and does not reveal the firing mortar as hostile. Enemy players do not receive
-hidden mortar launch data or hidden mortar impact markers unless their entities were hit.
-Artillery target events are sent only to the firing player so enemies never receive pre-impact
-markers, even if they have vision of the gun. The `from` id lets the firing client recoil the
-specific gun and draw launch dust. Other players receive a visual-only `attack` event with a
-shooter `reveal` when artillery fires, so the firing gun is briefly shown above fog without
-revealing terrain, exploration, or the target point. Artillery impact events are sent to every
-active recipient after impact as visual-only explosions; they do not reveal terrain, update
+hidden mortar launch data or hidden mortar impact markers unless their entities were hit or their
+team sees the relevant point.
+Artillery target events are sent to the firing team so enemies never receive pre-impact markers,
+even if they have vision of the gun. The `from` id lets allied clients recoil the specific gun and
+draw launch dust. Enemy players receive a visual-only `attack` event with a shooter `reveal` when
+their team currently sees the firing gun, so the gun can be shown briefly without revealing terrain,
+exploration, or the target point. Artillery impact events are sent to the firing team and to enemy
+recipients whose team currently sees the impact point; they do not reveal terrain, update
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
 friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.

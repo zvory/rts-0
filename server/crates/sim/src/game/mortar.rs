@@ -86,6 +86,7 @@ impl MortarShellStore {
         &mut self,
         events: &mut HashMap<u32, Vec<Event>>,
         fog: &Fog,
+        teams: &TeamRelations,
         owner: u32,
         attacker: u32,
         from_x: f32,
@@ -105,6 +106,7 @@ impl MortarShellStore {
         emit_launch(
             events,
             fog,
+            teams,
             owner,
             attacker,
             from_x,
@@ -141,6 +143,7 @@ impl MortarShellStore {
 fn emit_launch(
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    teams: &TeamRelations,
     owner: u32,
     attacker: u32,
     from_x: f32,
@@ -151,7 +154,10 @@ fn emit_launch(
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        if pid != owner && (!reveal_launch_to_enemies || !fog.is_visible_world(pid, from_x, from_y))
+        let allied = teams.same_team_or_same_owner(pid, owner);
+        if !allied
+            && (!reveal_launch_to_enemies
+                || !projection::team_visible_world(pid, from_x, from_y, fog, teams))
         {
             continue;
         }
@@ -237,6 +243,7 @@ fn resolve_shell(
     emit_impact(
         events,
         fog,
+        teams,
         shell.owner,
         shell.attacker,
         reveal.as_ref(),
@@ -275,6 +282,7 @@ fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
 fn emit_impact(
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    teams: &TeamRelations,
     owner: u32,
     attacker: u32,
     reveal: Option<&AttackReveal>,
@@ -285,7 +293,10 @@ fn emit_impact(
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
         let reveal_to_recipient = reveal_recipients.binary_search(&pid).is_ok();
-        if pid != owner && !reveal_to_recipient && !fog.is_visible_world(pid, x, y) {
+        if !teams.same_team_or_same_owner(pid, owner)
+            && !reveal_to_recipient
+            && !projection::team_visible_world(pid, x, y, fog, teams)
+        {
             continue;
         }
         events.entry(pid).or_default().push(Event::MortarImpact {
@@ -313,7 +324,7 @@ fn push_under_attack_notice(
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
         if !teams.same_team_or_same_owner(pid, victim_owner)
-            || !projection::event_visible_to(pid, x, y, attacker_owner, fog)
+            || !projection::event_visible_to_team(pid, x, y, attacker_owner, fog, teams)
         {
             continue;
         }

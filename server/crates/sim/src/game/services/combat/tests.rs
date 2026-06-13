@@ -764,8 +764,8 @@ fn visible_enemy_damage_alerts_victim_team_only() {
         .spawn_unit(2, EntityKind::Worker, 120.0, 100.0)
         .expect("victim should spawn");
     entities
-        .spawn_unit(3, EntityKind::Worker, 120.0, 132.0)
-        .expect("victim ally should spawn");
+        .spawn_unit(3, EntityKind::Worker, 700.0, 700.0)
+        .expect("victim ally should spawn outside individual fight vision");
     entities
         .get_mut(attacker_id)
         .expect("attacker should exist")
@@ -793,7 +793,15 @@ fn visible_enemy_damage_alerts_victim_team_only() {
             .expect("victim ally events should exist")
             .iter()
             .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")),
-        "victim ally should receive the team under-attack notice"
+        "victim ally should receive the team under-attack notice through shared team vision"
+    );
+    assert!(
+        events
+            .get(&3)
+            .expect("victim ally events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker_id && *to == victim_id)),
+        "victim ally should receive the attack event through teammate current vision"
     );
     assert!(
         events

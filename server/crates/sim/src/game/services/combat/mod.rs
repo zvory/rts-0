@@ -271,7 +271,8 @@ pub(crate) fn combat_system(
                     if mortar_autocast_would_hit_same_team_entity(entities, teams, owner, mx, my) {
                         continue;
                     }
-                    mortar_shells.schedule(events, fog, owner, id, px, py, mx, my, tick, true);
+                    mortar_shells
+                        .schedule(events, fog, teams, owner, id, px, py, mx, my, tick, true);
                     if let Some(e) = entities.get_mut(id) {
                         e.set_attack_cd(cd_reset);
                     }

@@ -10,6 +10,7 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::protocol;
 use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
@@ -25,6 +26,7 @@ pub struct EntityProjectionContext<'a> {
     pub entities: &'a EntityStore,
     pub target: Option<&'a Entity>,
     pub include_debug_path: bool,
+    pub teams: Option<&'a TeamRelations>,
 }
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
@@ -58,6 +60,57 @@ pub fn event_visible_to(
     viewer == attacker_owner || fog.is_visible_world(viewer, event_origin_x, event_origin_y)
 }
 
+pub fn team_visible_world(viewer: u32, x: f32, y: f32, fog: &Fog, teams: &TeamRelations) -> bool {
+    teams
+        .same_team_player_ids(viewer)
+        .into_iter()
+        .any(|player_id| fog.is_visible_world(player_id, x, y))
+}
+
+pub fn event_visible_to_team(
+    viewer: u32,
+    event_origin_x: f32,
+    event_origin_y: f32,
+    owner: u32,
+    fog: &Fog,
+    teams: &TeamRelations,
+) -> bool {
+    teams.same_team_or_same_owner(viewer, owner)
+        || team_visible_world(viewer, event_origin_x, event_origin_y, fog, teams)
+}
+
+pub fn event_visible_to_team_with_smoke(
+    viewer: u32,
+    event_origin_x: f32,
+    event_origin_y: f32,
+    owner: u32,
+    fog: &Fog,
+    teams: &TeamRelations,
+    smokes: &SmokeCloudStore,
+) -> bool {
+    if !teams.same_team_or_same_owner(viewer, owner)
+        && smokes.point_inside(event_origin_x, event_origin_y)
+    {
+        return false;
+    }
+    event_visible_to_team(viewer, event_origin_x, event_origin_y, owner, fog, teams)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn attack_event_visible_to_team(
+    viewer: u32,
+    attacker_x: f32,
+    attacker_y: f32,
+    target_x: f32,
+    target_y: f32,
+    attacker_owner: u32,
+    fog: &Fog,
+    teams: &TeamRelations,
+) -> bool {
+    event_visible_to_team(viewer, attacker_x, attacker_y, attacker_owner, fog, teams)
+        || team_visible_world(viewer, target_x, target_y, fog, teams)
+}
+
 pub fn event_visible_to_with_smoke(
     viewer: u32,
     event_origin_x: f32,
@@ -72,6 +125,7 @@ pub fn event_visible_to_with_smoke(
     event_visible_to(viewer, event_origin_x, event_origin_y, attacker_owner, fog)
 }
 
+#[allow(dead_code)]
 pub fn attack_event_visible_to(
     viewer: u32,
     attacker_x: f32,
@@ -131,8 +185,13 @@ pub fn project_entity(
     );
     let actionable_fog = context.actionable_fog.unwrap_or(context.fog);
     let private_detail_fog = context.private_detail_fog.unwrap_or(actionable_fog);
+    let owner_or_ally = context
+        .teams
+        .map(|teams| teams.same_team_or_same_owner(viewer, entity.owner))
+        .unwrap_or(entity.owner == viewer);
+    let exact_owner = entity.owner == viewer;
     let vision_only = context.fogged
-        && entity.owner != viewer
+        && !owner_or_ally
         && !entity.is_node()
         && !context
             .smokes
@@ -154,10 +213,10 @@ pub fn project_entity(
             .target
             .filter(|target| target.id == target_id)
             .map(|target| {
-                entity.owner == viewer
+                exact_owner
                     || !context.fogged
                     || (!vision_only
-                        && private_detail_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+                        && actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
                         && !context
                             .smokes
                             .map(|smokes| smokes.point_inside(target.pos_x, target.pos_y))
@@ -170,7 +229,7 @@ pub fn project_entity(
     let weapon_facing_useful = fires_while_moving(entity.kind) || active_combat_target;
     if weapon_facing_useful {
         if let Some(weapon_facing) = entity.weapon_facing() {
-            let weapon_facing_is_safe = entity.owner == viewer
+            let weapon_facing_is_safe = exact_owner
                 || !context.fogged
                 || entity.target_id().is_none()
                 || !active_combat_target
@@ -189,7 +248,7 @@ pub fn project_entity(
     ) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
-    if matches!(entity.kind, EntityKind::AtTeam | EntityKind::Artillery) && entity.owner == viewer {
+    if matches!(entity.kind, EntityKind::AtTeam | EntityKind::Artillery) && owner_or_ally {
         view.setup_facing = entity.emplacement_facing();
     }
 
@@ -202,7 +261,7 @@ pub fn project_entity(
                 front.progress as f32 / front.total as f32
             });
         }
-        if entity.owner == viewer {
+        if owner_or_ally {
             view.prod_queue = Some(entity.prod_queue().len() as u32);
         }
     }
@@ -215,7 +274,7 @@ pub fn project_entity(
                 front.progress as f32 / front.total as f32
             });
         }
-        if entity.owner == viewer {
+        if owner_or_ally {
             view.prod_queue = Some(entity.research_queue().len() as u32);
         }
     }
@@ -505,6 +564,7 @@ mod tests {
                 entities,
                 target,
                 include_debug_path,
+                teams: None,
             },
         )
     }

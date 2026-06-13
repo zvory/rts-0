@@ -5,6 +5,7 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::rules::projection;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -28,6 +29,7 @@ pub(crate) struct BuildingMemory {
 }
 
 impl BuildingMemory {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn refresh(
         &mut self,
         player_ids: &[u32],
@@ -35,12 +37,13 @@ impl BuildingMemory {
         fog: &Fog,
         map: &Map,
         smokes: &SmokeCloudStore,
+        teams: &TeamRelations,
         tick: u32,
     ) {
         for &player_id in player_ids {
-            self.remove_scouted_destroyed(player_id, entities, fog);
+            self.remove_scouted_destroyed(player_id, entities, fog, teams);
             for entity in entities.iter() {
-                if !visible_enemy_building(player_id, entity, fog, smokes) {
+                if !visible_enemy_building(player_id, entity, fog, smokes, teams) {
                     continue;
                 }
                 self.entries
@@ -49,15 +52,23 @@ impl BuildingMemory {
         }
     }
 
-    fn remove_scouted_destroyed(&mut self, player_id: u32, entities: &EntityStore, fog: &Fog) {
+    fn remove_scouted_destroyed(
+        &mut self,
+        player_id: u32,
+        entities: &EntityStore,
+        fog: &Fog,
+        teams: &TeamRelations,
+    ) {
         self.entries.retain(|(entry_player, entity_id), entry| {
             if *entry_player != player_id || entities.contains(*entity_id) {
                 return true;
             }
-            !entry
-                .footprint
-                .iter()
-                .any(|&(tx, ty)| fog.is_visible(player_id, tx, ty))
+            !entry.footprint.iter().any(|&(tx, ty)| {
+                teams
+                    .same_team_player_ids(player_id)
+                    .into_iter()
+                    .any(|team_player| fog.is_visible(team_player, tx, ty))
+            })
         });
     }
 
@@ -90,11 +101,17 @@ fn visible_enemy_building(
     entity: &Entity,
     fog: &Fog,
     smokes: &SmokeCloudStore,
+    teams: &TeamRelations,
 ) -> bool {
-    entity.owner != player_id
+    !teams.same_team_or_same_owner(player_id, entity.owner)
         && entity.owner != NEUTRAL
         && entity.is_building()
-        && projection::entity_visible_to_with_smoke(player_id, entity, fog, smokes)
+        && teams
+            .same_team_player_ids(player_id)
+            .into_iter()
+            .any(|team_player| {
+                projection::entity_visible_to_with_smoke(team_player, entity, fog, smokes)
+            })
 }
 
 fn entry_from_entity(entity: &Entity, map: &Map, observed_tick: u32) -> BuildingMemoryEntry {
@@ -142,7 +159,8 @@ mod tests {
         tick: u32,
     ) {
         fog.recompute_with_smoke(&PLAYERS, entities, map, smokes);
-        memory.refresh(&PLAYERS, entities, fog, map, smokes, tick);
+        let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+        memory.refresh(&PLAYERS, entities, fog, map, smokes, &teams, tick);
     }
 
     #[test]
