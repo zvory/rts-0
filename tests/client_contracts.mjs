@@ -1491,6 +1491,69 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   const { dom } = await import("../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
+  {
+    const priorWindowForReplayInput = globalThis.window;
+    const listeners = new Map();
+    const options = new Map();
+    const viewport = {
+      addEventListener(type, handler, opts) {
+        listeners.set(type, handler);
+        options.set(type, opts);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(type) === handler) listeners.delete(type);
+      },
+      getBoundingClientRect() {
+        return { left: 20, top: 30, width: 640, height: 480 };
+      },
+    };
+    const camera = {
+      zoom: 1,
+      calls: [],
+      setZoom(zoom, x, y) {
+        this.calls.push({ zoom, x, y });
+        this.zoom = zoom;
+      },
+    };
+    globalThis.window = {
+      addEventListener(type, handler) {
+        listeners.set(`window:${type}`, handler);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(`window:${type}`) === handler) listeners.delete(`window:${type}`);
+      },
+    };
+    try {
+      const replayInput = new ReplayCameraInput(viewport, camera);
+      assert(options.get("wheel")?.passive === false, "Replay camera wheel listener is non-passive");
+      let prevented = 0;
+      listeners.get("wheel")({
+        deltaY: -100,
+        clientX: 220,
+        clientY: 180,
+        preventDefault() {
+          prevented += 1;
+        },
+      });
+      assertApprox(camera.zoom, 1.12, 0.000001, "Replay mouse wheel zooms in");
+      assert(camera.calls[0].x === 200 && camera.calls[0].y === 150, "Replay wheel zoom anchors on cursor");
+      listeners.get("wheel")({
+        deltaY: 100,
+        clientX: 220,
+        clientY: 180,
+        preventDefault() {
+          prevented += 1;
+        },
+      });
+      assertApprox(camera.zoom, 1, 0.000001, "Replay mouse wheel zooms out");
+      assert(prevented === 2, "Replay wheel zoom prevents page scroll");
+      replayInput.destroy();
+      assert(!listeners.has("wheel"), "Replay camera input removes wheel listener on destroy");
+    } finally {
+      if (priorWindowForReplayInput === undefined) delete globalThis.window;
+      else globalThis.window = priorWindowForReplayInput;
+    }
+  }
   assert(!shouldWarnBeforeUnload(), "lobby state does not warn before unload");
   assert(shouldWarnBeforeUnload({ match: {} }), "live match warns before unload");
   assert(shouldWarnBeforeUnload({ inReplayPlayback: true }), "replay playback warns before unload");

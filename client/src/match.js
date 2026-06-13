@@ -170,7 +170,7 @@ export class Match {
     this.input = this._timeInit(
       "match.input",
       () => this.replayViewer
-        ? new ReplayCameraInput(dom.viewport)
+        ? new ReplayCameraInput(dom.viewport, this.camera)
         : new Input(
           dom.viewport,
           this.camera,
