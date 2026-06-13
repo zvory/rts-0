@@ -1,6 +1,6 @@
 # Phase 1 - Replay Overlay Shell
 
-Status: Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -68,4 +68,3 @@ placeholders and tell the next agent where to plug in the Phase 2 army-value dat
 
 Replay viewers gain a stable analysis panel shell, but no new strategic information is displayed
 yet.
-
