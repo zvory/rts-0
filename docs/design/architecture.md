@@ -33,6 +33,13 @@
 - The same Rust process serves the static client files, so development is a single
   `cargo run` and then open the printed local URL.
 
+### Compatibility policy
+
+The game is pre-alpha and latest-version-only. Do not preserve obsolete protocol, replay,
+client/server, map, or asset behavior just for backwards compatibility unless a specific migration
+or debugging workflow requires it. Breaking changes are acceptable when the design docs and all
+current Rust/JS mirrors are updated together.
+
 ### Workspace crate boundaries
 
 The Rust server workspace is split by dependency direction. Lower crates must not depend on higher

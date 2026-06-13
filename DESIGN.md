@@ -12,6 +12,14 @@ change an interface, update the relevant design file in the same change.
 Read the matching context capsule in `docs/context/` first. Capsules are task-scoped routing docs
 that point to the relevant design file and code.
 
+## Project Stage And Compatibility
+
+Bewegungskrieg is currently pre-alpha. There is no backwards compatibility guarantee for any
+internal or player-facing contract, including replay artifacts, saved match data, WebSocket wire
+messages, client/server expectations, map schemas, balance data, or local developer tooling.
+It is fine to make breaking changes when they simplify the current implementation or improve the
+game. Players and tooling are expected to run the latest compatible server, client, and assets.
+
 ## Design Docs
 
 | Contract area | Source of truth |
