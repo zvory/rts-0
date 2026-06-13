@@ -6,9 +6,9 @@ It incorporates the previous `TODO.md` and `ARCHITECTURE_PLAN.md`.
 Use this file as the operational source of truth. The main rule is simple: do not pull a large
 RTS feature forward unless its listed gates are complete.
 
-AI planning detail lives in [AI-PLAN.md](AI-PLAN.md). Keep the dependency chain summary here in
-`PLAN.md`, and keep the concrete AI architecture, rollout phases, and matchup-test details in the
-sub-plan so this file stays readable.
+AI planning detail lives in [plans/ai/plan.md](plans/ai/plan.md). Keep the dependency chain summary
+here in `PLAN.md`, and keep the concrete AI architecture, rollout phases, and matchup-test details
+in the sub-plan so this file stays readable.
 
 ## Coordination Rules
 
@@ -274,8 +274,8 @@ Depends on:
 
 ### 6.3 Advanced AI Tech Progression
 
-- [ ] Follow [AI-PLAN.md](AI-PLAN.md) for the detailed dependency chain and rollout order.
-- [ ] Use the AI phase table in [AI-PLAN.md](AI-PLAN.md) as the serial implementation handoff plan.
+- [ ] Follow [plans/ai/plan.md](plans/ai/plan.md) for the detailed dependency chain and rollout order.
+- [ ] Use the AI phase table in [plans/ai/plan.md](plans/ai/plan.md) as the serial implementation handoff plan.
 - [ ] Keep one shared AI knowledge and action layer used by both live AI and self-play.
 - [ ] Add at least three simple strategy profiles:
   `rifle_flood_fast`, `rifle_flood_full_saturation`, and `tech_to_tanks`.
