@@ -14,9 +14,15 @@ and client state without adding a second real faction or changing current gamepl
 - Carry faction id through lobby player setup or match initialization.
 - Add faction id to the simulation's player initialization/state boundary.
 - Expose faction id in start payload player metadata so the client can know each player's faction.
-- Preserve replay and branch playback compatibility by recording or defaulting faction ids.
+- Record faction id in replay artifacts, replay branch seeds, branch seats, dev starts, and
+  match-history replay payloads using the new schema. Do not preserve compatibility with old
+  pre-faction artifacts.
 - Update protocol docs and mirrors in the same commit as any wire contract changes.
 - Keep UI selection minimal: either hidden/defaulted, or a disabled/internal fixture only.
+- Keep AI slots current-faction-only; AI selection for other factions remains invalid until an
+  explicit AI phase.
+- Add the start-payload/client-state wiring needed to disable prediction for non-default factions
+  in later phases.
 
 ## Expected Touch Points
 
@@ -35,7 +41,8 @@ and client state without adding a second real faction or changing current gamepl
 
 - Rust tests proving `Game::new` defaults every player to the current faction.
 - Protocol parity tests for the added start-player faction field.
-- Replay/branch or serialization tests proving old/default faction data is stable.
+- Replay/branch serialization tests proving the new faction field is recorded in artifacts,
+  branch seats, and replay start payloads. No old-artifact compatibility test is required.
 - Focused server integration test that a normal match starts with unchanged starting entities,
   resources, and supply.
 
@@ -46,12 +53,11 @@ Workers, visible resources, command card, training, and gathering should be unch
 
 ## Handoff Expectations
 
-The handoff must name the faction id field locations, whether any replay defaulting behavior was
-added, and the exact tests that prove current starts are unchanged. It should tell Phase 2 where to
-attach faction-aware rules catalog lookups.
+The handoff must name the faction id field locations, the replay/artifact schema fields that were
+intentionally broken or replaced, and the exact tests that prove current starts are unchanged. It
+should tell Phase 2 where to attach faction-aware rules catalog lookups.
 
 ## Player-Facing Outcome
 
 No intended gameplay change. The current faction now has explicit identity that later phases can
 use to select tech trees and loadouts.
-
