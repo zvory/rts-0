@@ -111,6 +111,7 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/rules/src/combat.rs",
   "server/crates/rules/src/defs.rs",
   "server/crates/rules/src/economy.rs",
+  "server/crates/rules/src/faction.rs",
   "server/crates/rules/src/kind.rs",
   "server/crates/sim/src/game/ability.rs",
   "server/crates/sim/src/game/artillery.rs",

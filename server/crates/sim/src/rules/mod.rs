@@ -3,4 +3,4 @@
 pub mod projection;
 
 #[allow(unused_imports)]
-pub use rts_rules::{combat, defs, economy, terrain};
+pub use rts_rules::{combat, defs, economy, faction, terrain};

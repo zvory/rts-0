@@ -6,7 +6,7 @@ use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent,
-    RallyKind, ResearchItem, WeaponSetup, MAX_QUEUED_ORDERS,
+    ResearchItem, WeaponSetup, MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -53,6 +53,10 @@ pub(crate) fn apply_commands(
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     for (player, cmd) in pending {
+        let faction_id = faction_id_for(
+            players.iter().map(|p| (p.id, p.faction_id.as_str())),
+            player,
+        );
         match cmd {
             SimCommand::Move {
                 units,
@@ -80,7 +84,7 @@ pub(crate) fn apply_commands(
                     artillery_shells,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false, None),
+                    &planner_facts(entities, player, &faction_id, &units, false, None),
                     &request,
                     tick,
                 );
@@ -111,7 +115,7 @@ pub(crate) fn apply_commands(
                     artillery_shells,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false, None),
+                    &planner_facts(entities, player, &faction_id, &units, false, None),
                     &request,
                     tick,
                 );
@@ -144,7 +148,7 @@ pub(crate) fn apply_commands(
                     artillery_shells,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false, None),
+                    &planner_facts(entities, player, &faction_id, &units, false, None),
                     &request,
                     tick,
                 );
@@ -162,7 +166,7 @@ pub(crate) fn apply_commands(
                         face_toward: planner::Point::new(x, y),
                     },
                 };
-                let facts = planner_facts(entities, player, &units, false, None);
+                let facts = planner_facts(entities, player, &faction_id, &units, false, None);
                 apply_planned_unit_order(
                     map,
                     entities,
@@ -280,7 +284,7 @@ pub(crate) fn apply_commands(
                     artillery_shells,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false, None),
+                    &planner_facts(entities, player, &faction_id, &units, false, None),
                     &request,
                     tick,
                 );
@@ -317,7 +321,7 @@ pub(crate) fn apply_commands(
                     artillery_shells,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false, None),
+                    &planner_facts(entities, player, &faction_id, &units, false, None),
                     &request,
                     tick,
                 );
@@ -327,9 +331,18 @@ pub(crate) fn apply_commands(
             }
             SimCommand::Research { building, upgrade } => {
                 let definition = upgrade::definition(upgrade);
+                let Some(building_kind) = entities.get(building).map(|b| b.kind) else {
+                    notice(events, player, "Cannot research that here");
+                    continue;
+                };
                 let ok = matches!(entities.get(building), Some(b)
-                    if b.owner == player && b.is_building() && !b.under_construction()
-                    && b.kind == definition.researched_at);
+                if b.owner == player && b.is_building() && !b.under_construction()
+                && b.kind == definition.researched_at
+                && rules::economy::can_research_for_faction(
+                    &faction_id,
+                    upgrade.to_protocol_str(),
+                    building_kind,
+                ));
                 if !ok {
                     notice(events, player, "Cannot research that here");
                     continue;
@@ -417,7 +430,19 @@ pub(crate) fn apply_commands(
                 kind,
                 queued,
             } => {
-                order_set_rally(map, entities, player, building, (x, y), kind, queued);
+                if !x.is_finite() || !y.is_finite() {
+                    continue;
+                }
+                let max = (map.world_size_px() - 1.0).max(0.0);
+                let rally = RallyIntent::new(kind, x.clamp(0.0, max), y.clamp(0.0, max));
+                order_set_rally(
+                    entities,
+                    &faction_id,
+                    player,
+                    building,
+                    rally,
+                    queued,
+                );
             }
             SimCommand::Rejected { reason } => {
                 notice(events, player, reason.notice_message());
@@ -450,6 +475,13 @@ fn issue_mode(queued: bool) -> planner::IssueMode {
     }
 }
 
+fn faction_id_for<'a>(mut players: impl Iterator<Item = (u32, &'a str)>, player: u32) -> String {
+    players
+        .find(|(id, _)| *id == player)
+        .map(|(_, faction_id)| faction_id.to_string())
+        .unwrap_or_else(|| rules::faction::DEFAULT_FACTION_ID.to_string())
+}
+
 fn build_target_center(building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, f32) {
     let Some(stats) = config::building_stats(building) else {
         return (0.0, 0.0);
@@ -471,6 +503,7 @@ fn planner_config() -> planner::PlannerConfig {
 fn planner_facts(
     entities: &EntityStore,
     player: u32,
+    faction_id: &str,
     units: &[u32],
     build_notice_compat: bool,
     ability: Option<AbilityFactInput>,
@@ -498,8 +531,11 @@ fn planner_facts(
                 _ => planner::UnitActivity::Busy,
             };
             facts.can_attack = e.can_attack();
-            facts.can_gather = e.kind == EntityKind::Worker;
-            facts.can_build = e.kind == EntityKind::Worker || build_notice_compat;
+            facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
+            facts.can_build = rules::faction::catalog_for_or_default(faction_id)
+                .builders
+                .contains(&e.kind)
+                || build_notice_compat;
             facts.can_setup_anti_tank_gun =
                 matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
             if let Some(ability) = ability {
@@ -609,7 +645,7 @@ fn apply_planned_unit_order(
                     }
                 }
                 planner::OrderIntent::Gather(node) => {
-                    if gather_unit_can_use_node(entities, player, unit, node) {
+                    if gather_unit_can_use_node(entities, players, player, unit, node) {
                         if let Some(e) = entities.get_mut(unit) {
                             e.clear_queued_orders();
                         }
@@ -849,9 +885,19 @@ fn gather_node_valid(entities: &EntityStore, player: u32, node: u32) -> bool {
         && world_query::resource_has_completed_mining_cc(entities, player, node)
 }
 
-fn gather_unit_can_use_node(entities: &EntityStore, player: u32, unit: u32, node: u32) -> bool {
+fn gather_unit_can_use_node(
+    entities: &EntityStore,
+    players: &[PlayerState],
+    player: u32,
+    unit: u32,
+    node: u32,
+) -> bool {
+    let faction_id = faction_id_for(
+        players.iter().map(|p| (p.id, p.faction_id.as_str())),
+        player,
+    );
     owns_unit(entities, player, unit)
-        && matches!(entities.get(unit), Some(e) if e.kind == EntityKind::Worker)
+        && matches!(entities.get(unit), Some(e) if rules::economy::can_gather_for_faction(&faction_id, e.kind))
         && gather_node_valid(entities, player, node)
         && !matches!(entities.node_slot_holder(node), Some(holder) if holder != unit)
 }
@@ -1029,6 +1075,10 @@ fn use_ability(
     let facts = planner_facts(
         entities,
         player,
+        &faction_id_for(
+            players.iter().map(|p| (p.id, p.faction_id.as_str())),
+            player,
+        ),
         &units,
         false,
         Some(AbilityFactInput {
@@ -1552,7 +1602,13 @@ fn order_build(
     if !owns_unit(entities, player, worker) {
         return;
     }
-    if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
+    let faction_id = faction_id_for(
+        players.iter().map(|p| (p.id, p.faction_id.as_str())),
+        player,
+    );
+    let worker_kind = entities.get(worker).map(|e| e.kind);
+    if !matches!(worker_kind, Some(kind) if rules::economy::can_build_for_faction(&faction_id, kind, building))
+    {
         notice(events, player, "Only workers can build");
         return;
     }
@@ -1565,7 +1621,7 @@ fn order_build(
     }
 
     let owned = world_query::completed_building_kinds(entities, player);
-    if !rules::economy::build_requirement_met(building, &owned) {
+    if !rules::economy::build_requirement_met_for_faction(&faction_id, building, &owned) {
         notice(events, player, "Requirement not met");
         return;
     }
@@ -1618,15 +1674,19 @@ fn order_train(
     unit: EntityKind,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
+    let faction_id = faction_id_for(
+        players.iter().map(|p| (p.id, p.faction_id.as_str())),
+        player,
+    );
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
-        && rules::economy::trainable_units(b.kind).contains(&unit));
+        && rules::economy::trainable_units_for_faction(&faction_id, b.kind).contains(&unit));
     if !ok {
         notice(events, player, "Cannot train that here");
         return;
     }
     let owned_complete = world_query::completed_building_kinds(entities, player);
-    if !rules::economy::train_requirement_met(unit, &owned_complete) {
+    if !rules::economy::train_requirement_met_for_faction(&faction_id, unit, &owned_complete) {
         notice(events, player, "Requirement not met");
         return;
     }
@@ -1697,25 +1757,19 @@ fn order_train(
 /// completed producer; sanitizes/clamps the point to the map. Invalid requests are ignored
 /// silently (consistent with movement commands), so a hostile client cannot wedge the tick loop.
 fn order_set_rally(
-    map: &Map,
     entities: &mut EntityStore,
+    faction_id: &str,
     player: u32,
     building: u32,
-    point: (f32, f32),
-    kind: RallyKind,
+    rally: RallyIntent,
     queued: bool,
 ) {
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
-        && !rules::economy::trainable_units(b.kind).is_empty());
+        && rules::economy::can_act_as_production_anchor_for_faction(faction_id, b.kind));
     if !ok {
         return;
     }
-    if !point.0.is_finite() || !point.1.is_finite() {
-        return;
-    }
-    let max = (map.world_size_px() - 1.0).max(0.0);
-    let rally = RallyIntent::new(kind, point.0.clamp(0.0, max), point.1.clamp(0.0, max));
     if let Some(b) = entities.get_mut(building) {
         if queued {
             b.append_rally_stage(rally, MAX_RALLY_STAGES);
@@ -1803,7 +1857,9 @@ pub(crate) fn notice_positioned(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent, WeaponSetup};
+    use crate::game::entity::{
+        EntityKind, EntityStore, Order, OrderIntent, RallyKind, WeaponSetup,
+    };
     use crate::game::map::Map;
     use crate::game::services::move_coordinator::MoveCoordinator;
     use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
@@ -2221,6 +2277,92 @@ mod tests {
             assert_eq!(queue.len(), 1);
             assert_eq!(queue[0].upgrade, upgrade);
         }
+    }
+
+    #[test]
+    fn fixture_faction_rejects_global_build_train_and_research_commands() {
+        let map = flat_map(24);
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].faction_id = rules::faction::EMPTY_FIXTURE_FACTION_ID.to_string();
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 96.0, 96.0)
+            .expect("worker should spawn");
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 5, 5);
+        let city_centre = entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 10, 5);
+        let research_complex = entities
+            .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
+            .expect("research complex should spawn");
+
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![
+                (
+                    1,
+                    SimCommand::Build {
+                        units: vec![worker],
+                        building: EntityKind::Depot,
+                        tile_x: 8,
+                        tile_y: 8,
+                        queued: false,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Train {
+                        building: city_centre,
+                        unit: EntityKind::Worker,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Research {
+                        building: research_complex,
+                        upgrade: UpgradeKind::TankUnlock,
+                    },
+                ),
+            ],
+        );
+
+        assert!(
+            !matches!(
+                entities.get(worker).expect("worker").order(),
+                Order::Build(_)
+            ),
+            "fixture faction worker must not receive a current-faction build order"
+        );
+        assert!(
+            entities
+                .get(city_centre)
+                .expect("city centre")
+                .prod_queue()
+                .is_empty(),
+            "fixture faction must not train globally-defined current units"
+        );
+        assert!(
+            entities
+                .get(research_complex)
+                .expect("research complex")
+                .research_queue()
+                .is_empty(),
+            "fixture faction must not research globally-defined current upgrades"
+        );
+        let notices: Vec<_> = events
+            .get(&1)
+            .into_iter()
+            .flatten()
+            .filter_map(|event| match event {
+                Event::Notice { msg, .. } => Some(msg.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(notices.contains(&"Cannot train that here"));
+        assert!(notices.contains(&"Cannot research that here"));
     }
 
     #[test]

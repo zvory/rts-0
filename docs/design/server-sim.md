@@ -222,12 +222,20 @@ policy is centralized instead of scattered through services.
 - `rules::defs` — immutable unit/building/node definition tables keyed by `EntityKind`. These
   records are the source of truth for kind-specific stats, armor class, weapon class, target
   priority, production chains, tech requirements, and resource-node amounts.
+- `rules::faction` — faction catalogs keyed by stable faction id. Catalogs reference global
+  `EntityKind`, upgrade id, ability id, and Steel/Oil/Supply costs; reuse a global id across
+  factions only when gameplay semantics are identical for every faction that can use it. Divergent
+  behavior, stats, production role, or ability meaning requires a distinct global id gated through
+  catalog availability. The default catalog is `steel_vanguard`; `phase2_empty_fixture` exists only
+  as a command-validation test fixture.
 - `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
   `attack_profile(kind) -> AttackProfile`, and
   `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.
-- `rules::economy` — tech/production predicates (`trainable_units`, `build_requirement_met`,
-  `train_requirement_met`), resource-node amounts, and cost/supply wrappers (`cost`,
-  `supply_cost`, `supply_provided`).
+- `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
+  `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,
+  `can_research_for_faction`), resource-node amounts, and cost/supply wrappers (`cost`,
+  `supply_cost`, `supply_provided`). Legacy non-faction helpers remain as default-faction
+  compatibility surfaces for older call sites and tests.
 - `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
   opacity modifiers. It is intentionally small today (`Open` returns current defaults; raw stone
   terrain blocks LOS) so the forest/road/hill feature has one rules file to grow in.
