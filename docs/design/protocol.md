@@ -7,6 +7,10 @@ server-shell `server/src/protocol.rs` is an adapter for typed entity-kind conver
 imports. The browser mirror lives in `client/src/protocol.js` (builders + constants). Rust and JS
 MUST agree on every tag, field name, and compact transport shape.
 
+This is a pre-alpha, latest-version-only protocol. It may change incompatibly with older clients,
+servers, and replay artifacts; keep the current Rust and JS mirrors synchronized instead of
+carrying compatibility shims for old builds by default.
+
 `rts-protocol` may depend on `rts-contract` but must not depend on `rts-sim`, `rts-rules`,
 `rts-ai`, or `rts-server`. Domain kind conversion that needs `EntityKind` belongs in an adapter
 layer such as `server/src/protocol.rs` or `server/crates/sim/src/protocol.rs`, not in the wire DTO
