@@ -11,6 +11,7 @@ use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules;
@@ -28,6 +29,7 @@ pub(crate) fn order_or_launch_world_ability(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     fog: &Fog,
+    teams: &TeamRelations,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
@@ -70,6 +72,7 @@ pub(crate) fn order_or_launch_world_ability(
             entities,
             players,
             fog,
+            teams,
             smokes,
             mortar_shells,
             events,
@@ -100,6 +103,7 @@ pub(crate) fn launch_world_ability(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     fog: &Fog,
+    teams: &TeamRelations,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -161,7 +165,9 @@ pub(crate) fn launch_world_ability(
             if !preserve_active_order {
                 e.clear_active_order();
             }
-            mortar_shells.schedule(events, fog, player, caster, from_x, from_y, x, y, tick, false);
+            mortar_shells.schedule(
+                events, fog, teams, player, caster, from_x, from_y, x, y, tick, false,
+            );
             true
         }
         AbilityKind::Smoke => {
@@ -190,13 +196,18 @@ pub(crate) fn launch_world_ability(
                 config::SMOKE_CLOUD_DURATION_TICKS,
                 tick.saturating_add(delay_ticks),
             );
-            events.entry(player).or_default().push(Event::SmokeLaunch {
-                from_x: caster_pos.0,
-                from_y: caster_pos.1,
-                to_x: x,
-                to_y: y,
-                delay_ticks,
-            });
+            for pid in events.keys().copied().collect::<Vec<_>>() {
+                if !teams.same_team_or_same_owner(pid, player) {
+                    continue;
+                }
+                events.entry(pid).or_default().push(Event::SmokeLaunch {
+                    from_x: caster_pos.0,
+                    from_y: caster_pos.1,
+                    to_x: x,
+                    to_y: y,
+                    delay_ticks,
+                });
+            }
             notice_positioned(
                 events,
                 player,
@@ -245,7 +256,10 @@ pub(crate) fn launch_self_ability(
                 let Some(unit) = entities.get(id) else {
                     continue;
                 };
-                if unit.owner != player || unit.hp == 0 || !unit.is_unit() || unit.under_construction()
+                if unit.owner != player
+                    || unit.hp == 0
+                    || !unit.is_unit()
+                    || unit.under_construction()
                 {
                     continue;
                 }

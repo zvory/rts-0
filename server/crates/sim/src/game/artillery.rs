@@ -2,10 +2,12 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::fog::Fog;
 use crate::game::services::geometry::RectBody;
 use crate::game::teams::TeamRelations;
-use crate::protocol::Event;
+use crate::protocol::{Event, NoticeSeverity};
 use crate::rules::combat;
+use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
 
 #[derive(Debug, Clone)]
@@ -38,6 +40,7 @@ impl ArtilleryShellStore {
         &mut self,
         entities: &mut EntityStore,
         teams: &TeamRelations,
+        fog: &Fog,
         events: &mut HashMap<u32, Vec<Event>>,
         tick: u32,
     ) {
@@ -45,7 +48,7 @@ impl ArtilleryShellStore {
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
-                resolve_shell(entities, teams, events, &shell, tick);
+                resolve_shell(entities, teams, fog, events, &shell, tick);
             } else {
                 pending.push(shell);
             }
@@ -57,11 +60,12 @@ impl ArtilleryShellStore {
 fn resolve_shell(
     entities: &mut EntityStore,
     teams: &TeamRelations,
+    fog: &Fog,
     events: &mut HashMap<u32, Vec<Event>>,
     shell: &ArtilleryShell,
     tick: u32,
 ) {
-    emit_impact(events, shell.x, shell.y);
+    emit_impact(events, teams, fog, shell.owner, shell.x, shell.y);
 
     let outer_radius = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
     let inner_radius = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
@@ -89,13 +93,19 @@ fn resolve_shell(
         if damage == 0 {
             continue;
         }
+        let mut damaged_owner = None;
         if let Some(target) = entities.get_mut(id) {
             let attribution = teams.is_enemy_owner(shell.owner, target.owner).then_some((
                 shell.owner,
                 (shell.x, shell.y),
                 tick,
             ));
-            target.apply_damage(damage, attribution);
+            if target.apply_damage(damage, attribution) {
+                damaged_owner = Some((target.owner, target.pos_x, target.pos_y));
+            }
+        }
+        if let Some((victim_owner, x, y)) = damaged_owner {
+            push_under_attack_notice(events, teams, fog, shell.owner, victim_owner, x, y);
         }
     }
 }
@@ -164,13 +174,53 @@ fn point_rect_distance2(x: f32, y: f32, rect: RectBody) -> f32 {
     dx * dx + dy * dy
 }
 
-fn emit_impact(events: &mut HashMap<u32, Vec<Event>>, x: f32, y: f32) {
+fn emit_impact(
+    events: &mut HashMap<u32, Vec<Event>>,
+    teams: &TeamRelations,
+    fog: &Fog,
+    owner: u32,
+    x: f32,
+    y: f32,
+) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
+        if !teams.same_team_or_same_owner(pid, owner)
+            && !projection::team_visible_world(pid, x, y, fog, teams)
+        {
+            continue;
+        }
         events.entry(pid).or_default().push(Event::ArtilleryImpact {
             x,
             y,
             radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,
+        });
+    }
+}
+
+fn push_under_attack_notice(
+    events: &mut HashMap<u32, Vec<Event>>,
+    teams: &TeamRelations,
+    fog: &Fog,
+    attacker_owner: u32,
+    victim_owner: u32,
+    x: f32,
+    y: f32,
+) {
+    if victim_owner == 0 || !teams.is_enemy_owner(attacker_owner, victim_owner) {
+        return;
+    }
+    let player_ids: Vec<u32> = events.keys().copied().collect();
+    for pid in player_ids {
+        if !teams.same_team_or_same_owner(pid, victim_owner)
+            || !projection::event_visible_to_team(pid, x, y, attacker_owner, fog, teams)
+        {
+            continue;
+        }
+        events.entry(pid).or_default().push(Event::Notice {
+            msg: "alert:under_attack".to_string(),
+            x: Some(x),
+            y: Some(y),
+            severity: NoticeSeverity::Alert,
         });
     }
 }

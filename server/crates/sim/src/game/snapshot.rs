@@ -65,6 +65,7 @@ impl Game {
         include_player_resources: bool,
     ) -> Snapshot {
         let ps = self.player(player);
+        let teams = self.team_relations();
         let (steel, oil, supply_used, supply_cap) = match ps {
             Some(p) => (p.steel, p.oil, p.supply_used, p.supply_cap),
             None => (0, 0, 0, 0),
@@ -99,6 +100,7 @@ impl Game {
                     entities: &self.entities,
                     target,
                     include_debug_path: self.debug_path_overlays,
+                    teams: Some(&teams),
                 },
             ) {
                 entities.push(view);
@@ -108,7 +110,7 @@ impl Game {
         entities.sort_by_key(|v| v.id);
         resource_deltas.sort_by_key(|d| d.id);
         let remembered_buildings = if fogged {
-            self.remembered_building_views_for(player, fog)
+            self.remembered_building_views_for(player, fog, &teams)
         } else {
             Vec::new()
         };
@@ -117,7 +119,7 @@ impl Game {
                 .iter()
                 .filter(|cloud| {
                     self.smokes
-                        .visible_to_player(cloud, player, fog, &self.entities)
+                        .visible_to_player(cloud, player, fog, &self.entities, &teams)
                 })
                 .map(|cloud| crate::protocol::SmokeCloudView {
                     id: cloud.id,
@@ -190,7 +192,12 @@ impl Game {
         self.players.iter().find(|p| p.id == id)
     }
 
-    fn remembered_building_views_for(&self, player: u32, fog: &Fog) -> Vec<RememberedBuildingView> {
+    fn remembered_building_views_for(
+        &self,
+        player: u32,
+        fog: &Fog,
+        teams: &crate::game::teams::TeamRelations,
+    ) -> Vec<RememberedBuildingView> {
         let mut views = self
             .building_memory
             .entries_for_player(player)
@@ -208,6 +215,7 @@ impl Game {
                             entities: &self.entities,
                             target: None,
                             include_debug_path: false,
+                            teams: Some(teams),
                         },
                     )
                     .is_some()

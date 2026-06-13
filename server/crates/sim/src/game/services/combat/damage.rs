@@ -71,6 +71,7 @@ pub(super) fn apply_damage(
     emit_attack_event(
         events,
         fog,
+        teams,
         attacker,
         shot_victim,
         attacker_owner,
@@ -265,8 +266,16 @@ fn apply_overpenetration(
         }
         let reveal = attack_reveal_for(entities.get(attacker));
         for pid in &player_ids {
-            if !projection_rules::attack_event_visible_to(*pid, ax, ay, tx, ty, attacker_owner, fog)
-            {
+            if !projection_rules::attack_event_visible_to_team(
+                *pid,
+                ax,
+                ay,
+                tx,
+                ty,
+                attacker_owner,
+                fog,
+                teams,
+            ) {
                 continue;
             }
             events.entry(*pid).or_default().push(Event::Attack {

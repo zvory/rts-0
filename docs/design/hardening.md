@@ -50,9 +50,13 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
   visibility. Normal active-player snapshots use the union of current fog from living teammates,
-  while command validation, economy, remembered-building refreshes, private projection details, and
-  event fanout stay owner-local. Defeated/disconnected teammates stop contributing live sight, and
-  neutral resources never grant vision. Hidden enemies are never sent except inside explicit
+  while command validation and economy stay owner-local. Allied entity inspection exposes read-only
+  details, but resources, supply, upgrades, rally/order plans, ability controls, debug paths, and
+  command authority remain exact-owner-only. Event fanout and remembered-building refreshes use
+  team-current visibility; enemy recipients get combat, death, build, support-fire, smoke, and
+  under-attack events only when their team can currently see the relevant origin/target or when a
+  documented damage reveal applies. Defeated/disconnected teammates stop contributing live sight,
+  and neutral resources never grant vision. Hidden enemies are never sent except inside explicit
   one-second lingering death vision, where entity views are marked `visionOnly` and remain
   non-actionable. Visibility is terrain-aware: stone blocks sight beyond itself on both the server
   fog grid and the client cosmetic fog overlay.

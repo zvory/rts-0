@@ -651,6 +651,8 @@ fn apply_planned_unit_order(
                             map,
                             entities,
                             players,
+                            teams,
+                            fog,
                             artillery_shells,
                             events,
                             player,
@@ -673,6 +675,7 @@ fn apply_planned_unit_order(
                         entities,
                         players,
                         fog,
+                        teams,
                         coordinator,
                         smokes,
                         mortar_shells,
@@ -749,6 +752,8 @@ fn apply_planned_unit_order(
                                 map,
                                 entities,
                                 players,
+                                teams,
+                                fog,
                                 artillery_shells,
                                 events,
                                 player,
@@ -764,6 +769,7 @@ fn apply_planned_unit_order(
                             entities,
                             players,
                             fog,
+                            teams,
                             smokes,
                             mortar_shells,
                             events,
@@ -946,6 +952,7 @@ fn use_ability(
         let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
             return;
         };
+        let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         for unit in dedupe_cap_units(request.units) {
             if request.queued {
                 if artillery_point_fire_command_target(map, entities, player, unit, x, y).is_some()
@@ -965,6 +972,8 @@ fn use_ability(
                     map,
                     entities,
                     players,
+                    &teams,
+                    fog,
                     artillery_shells,
                     events,
                     player,
@@ -1062,6 +1071,8 @@ fn order_artillery_point_fire(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    teams: &TeamRelations,
+    fog: &Fog,
     artillery_shells: &mut ArtilleryShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
@@ -1097,6 +1108,8 @@ fn order_artillery_point_fire(
     try_fire_artillery(
         entities,
         players,
+        teams,
+        fog,
         artillery_shells,
         events,
         player,
@@ -1207,6 +1220,8 @@ fn artillery_point_fire_field_center(e: &Entity) -> Option<f32> {
 fn try_fire_artillery(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    teams: &TeamRelations,
+    fog: &Fog,
     artillery_shells: &mut ArtilleryShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
@@ -1257,20 +1272,25 @@ fn try_fire_artillery(
         setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
     });
     artillery_shells.schedule(player, unit, target_x, target_y, tick);
-    events
-        .entry(player)
-        .or_default()
-        .push(Event::ArtilleryTarget {
-            from: unit,
-            x: target_x,
-            y: target_y,
-            radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,
-            delay_ticks: config::ARTILLERY_SHELL_DELAY_TICKS,
-        });
+    for pid in events.keys().copied().collect::<Vec<_>>() {
+        if teams.same_team_or_same_owner(pid, player) {
+            events.entry(pid).or_default().push(Event::ArtilleryTarget {
+                from: unit,
+                x: target_x,
+                y: target_y,
+                radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,
+                delay_ticks: config::ARTILLERY_SHELL_DELAY_TICKS,
+            });
+        }
+    }
     if let Some(reveal) = reveal {
         let player_ids: Vec<u32> = events.keys().copied().collect();
         for pid in player_ids {
-            if pid == player {
+            if teams.same_team_or_same_owner(pid, player)
+                || !crate::rules::projection::team_visible_world(
+                    pid, reveal.x, reveal.y, fog, teams,
+                )
+            {
                 continue;
             }
             events.entry(pid).or_default().push(Event::Attack {
@@ -1310,8 +1330,10 @@ pub(crate) fn artillery_point_fire_system(
     players: &mut [PlayerState],
     artillery_shells: &mut ArtilleryShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
     tick: u32,
 ) {
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let orders: Vec<(u32, u32, f32, f32)> = entities
         .ids()
         .into_iter()
@@ -1345,6 +1367,8 @@ pub(crate) fn artillery_point_fire_system(
         try_fire_artillery(
             entities,
             players,
+            &teams,
+            fog,
             artillery_shells,
             events,
             owner,
@@ -1806,7 +1830,8 @@ mod tests {
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
-        let mut events = HashMap::new();
+        let mut events: HashMap<u32, Vec<Event>> =
+            players.iter().map(|player| (player.id, Vec::new())).collect();
 
         apply_commands(
             &map,
@@ -1878,7 +1903,8 @@ mod tests {
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
-        let mut events = HashMap::new();
+        let mut events: HashMap<u32, Vec<Event>> =
+            players.iter().map(|player| (player.id, Vec::new())).collect();
 
         apply_commands(
             &map,
@@ -4413,7 +4439,8 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], entities, map);
-        let mut events = HashMap::new();
+        let mut events: HashMap<u32, Vec<Event>> =
+            players.iter().map(|player| (player.id, Vec::new())).collect();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         apply_commands(

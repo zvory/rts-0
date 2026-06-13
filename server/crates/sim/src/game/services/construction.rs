@@ -2,13 +2,16 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::occupancy::{footprint_center, Occupancy};
 use crate::game::services::standability;
 use crate::game::services::{dist2, interact_range_for_kind};
+use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
+use crate::rules::projection;
 
 /// Advance build orders. Workers in `ToSite` that have walked into arrival range of their
 /// intended footprint re-validate placement and affordability, spawn the building, deduct
@@ -20,7 +23,9 @@ pub(crate) fn construction_system(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
 ) {
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     // ----- Arrival pass: ToSite workers that have reached their target -----
     let arrivals: Vec<(u32, EntityKind, u32, u32)> = entities
         .iter()
@@ -156,14 +161,21 @@ pub(crate) fn construction_system(
             b.advance_construction().unwrap_or(false)
         };
         if completed {
-            let (owner, kind) = entities
+            let (owner, kind, x, y) = entities
                 .get(site)
-                .map(|b| (b.owner, b.kind))
-                .unwrap_or((0, EntityKind::Worker));
-            events.entry(owner).or_default().push(Event::Build {
-                id: site,
-                kind: crate::protocol::kind_to_wire(kind).to_string(),
-            });
+                .map(|b| (b.owner, b.kind, b.pos_x, b.pos_y))
+                .unwrap_or((0, EntityKind::Worker, 0.0, 0.0));
+            for pid in events.keys().copied().collect::<Vec<_>>() {
+                if !teams.same_team_or_same_owner(pid, owner)
+                    && !projection::team_visible_world(pid, x, y, fog, &teams)
+                {
+                    continue;
+                }
+                events.entry(pid).or_default().push(Event::Build {
+                    id: site,
+                    kind: crate::protocol::kind_to_wire(kind).to_string(),
+                });
+            }
             defensively_eject_worker_from_static_overlap(map, entities, worker);
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_active_order();
@@ -267,7 +279,8 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        construction_system(&map, &mut entities, &mut players, &mut events);
+        let fog = Fog::new(map.size);
+        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
 
         assert!(
             entities
@@ -322,7 +335,8 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        construction_system(&map, &mut entities, &mut players, &mut events);
+        let fog = Fog::new(map.size);
+        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
 
         assert!(
             entities
@@ -415,7 +429,8 @@ mod tests {
         let starting_oil = players[0].oil;
         let mut events = HashMap::new();
 
-        construction_system(&map, &mut entities, &mut players, &mut events);
+        let fog = Fog::new(map.size);
+        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
 
         let owned_depots: Vec<_> = entities
             .iter()
@@ -477,7 +492,8 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        construction_system(&map, &mut entities, &mut players, &mut events);
+        let fog = Fog::new(map.size);
+        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
 
         let w = entities.get(worker).expect("worker should survive");
         assert!(
@@ -515,7 +531,8 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        construction_system(&map, &mut entities, &mut players, &mut events);
+        let fog = Fog::new(map.size);
+        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
 
         let w = entities.get(worker).expect("worker should survive");
         assert!(

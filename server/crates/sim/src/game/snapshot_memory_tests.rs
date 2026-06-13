@@ -44,8 +44,8 @@ fn empty_flat_game() -> Game {
 #[test]
 fn exposes_hidden_remembered_building_without_live_entity() {
     let mut game = empty_flat_game();
-    let scout_pos = game.map.tile_center(8, 8);
-    let depot_pos = game.map.tile_center(10, 8);
+    let scout_pos = game.map.tile_center(20, 20);
+    let depot_pos = game.map.tile_center(22, 20);
     let scout = game
         .entities
         .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
@@ -84,6 +84,94 @@ fn exposes_hidden_remembered_building_without_live_entity() {
     );
     assert_eq!((remembered.x, remembered.y), depot_pos);
     assert!(!remembered.footprint.is_empty());
+}
+
+#[test]
+fn remembered_buildings_use_team_visible_observations() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 7,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 7,
+            name: "Two".into(),
+            color: "#bbb".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            name: "Three".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new_for_replay(&players, 0xA11E_D001);
+    for tile in &mut game.map.terrain {
+        *tile = terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+    let p1_base = game.map.tile_center(2, 2);
+    let p2_base = game.map.tile_center(4, 2);
+    let p3_base = game.map.tile_center(55, 55);
+    game.entities
+        .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
+        .expect("p1 city centre should spawn");
+    game.entities
+        .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
+        .expect("p2 city centre should spawn");
+    game.entities
+        .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
+        .expect("p3 city centre should spawn");
+    let scout_pos = game.map.tile_center(20, 20);
+    let depot_pos = game.map.tile_center(22, 20);
+    let scout = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
+        .expect("ally scout should spawn");
+    let depot = game
+        .entities
+        .spawn_building(3, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
+        .expect("enemy depot should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    game.refresh_building_memory(&ids);
+
+    assert!(
+        game.snapshot_for(1)
+            .entities
+            .iter()
+            .any(|entity| entity.id == depot),
+        "team current sight should initially project the live enemy building"
+    );
+
+    game.entities.remove(scout);
+    let far = game.map.tile_center(40, 40);
+    game.entities
+        .spawn_unit(2, EntityKind::Rifleman, far.0, far.1)
+        .expect("far ally scout should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    let hidden = game.snapshot_for(1);
+    assert!(hidden.entities.iter().all(|entity| entity.id != depot));
+    assert!(
+        hidden
+            .remembered_buildings
+            .iter()
+            .any(|building| building.id == depot),
+        "player 1 should receive stale memory from player 2's team-visible observation"
+    );
 }
 
 #[test]

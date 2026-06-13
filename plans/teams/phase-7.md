@@ -1,6 +1,6 @@
 # Phase 7 - Projection, Memory, and Event Privacy
 
-Status: planned.
+Status: implemented.
 
 ## Goal
 
@@ -90,3 +90,22 @@ markers and fog dimming. Manual multi-tab setup should not be required.
 
 The phase handoff must identify the projection privacy rules, list event types audited, and note any
 event or entity field intentionally kept owner-only.
+
+## Handoff Notes
+
+- Projection privacy rules:
+  - Normal player snapshots use living-team current fog for entity visibility, resource deltas,
+    smoke cloud visibility, visible tiles, and remembered-building refreshes.
+  - Allied visible entities expose read-only inspection details: hp/state/facing/setup state,
+    production/research kind/progress/queue length, construction progress, worker latched node,
+    active status, and combat tracers only when the target is team-visible.
+  - Hidden enemy `targetId` and weapon-facing direction are withheld from allies and enemies unless
+    the target is visible through the recipient's team-current actionable fog.
+- Event types audited:
+  - `attack`, `death`, `build`, `smokeLaunch`, `mortarLaunch`, `mortarImpact`,
+    `artilleryTarget`, `artilleryImpact`, and `alert:under_attack` notices.
+  - Friendly/team events go to allies. Enemy delivery is gated on current team visibility of the
+    relevant origin or target, except documented damage reveals for mortar impacts.
+- Owner-only fields intentionally kept private:
+  - resources, supply, completed upgrades, rally/rallyPlan, orderPlan, ability controls/autocast
+    state, debugPath overlays, and command authority.

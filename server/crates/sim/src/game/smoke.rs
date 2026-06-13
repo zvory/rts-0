@@ -2,6 +2,7 @@ use crate::config;
 use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
+use crate::game::teams::TeamRelations;
 
 pub(crate) const MAX_ACTIVE_SMOKE_CLOUDS: usize = 256;
 
@@ -184,6 +185,7 @@ impl SmokeCloudStore {
         player: u32,
         fog: &Fog,
         entities: &EntityStore,
+        teams: &TeamRelations,
     ) -> bool {
         let radius_tiles = cloud.radius_tiles.ceil().max(0.0) as i32;
         let ts = config::TILE_SIZE as f32;
@@ -207,7 +209,7 @@ impl SmokeCloudStore {
             }
         }
         entities.iter().any(|entity| {
-            entity.owner == player
+            teams.same_team_or_same_owner(player, entity.owner)
                 && !entity.is_node()
                 && cloud.contains_point(entity.pos_x, entity.pos_y)
         })

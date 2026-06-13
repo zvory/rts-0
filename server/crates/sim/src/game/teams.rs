@@ -53,6 +53,19 @@ impl TeamRelations {
     pub(crate) fn same_team_or_same_owner(&self, a: u32, b: u32) -> bool {
         a == b || self.same_team_player(a, b)
     }
+
+    pub(crate) fn same_team_player_ids(&self, player_id: u32) -> Vec<u32> {
+        let Some(team_id) = self.team_of_player(player_id) else {
+            return Vec::new();
+        };
+        if team_id == 0 {
+            return Vec::new();
+        }
+        self.players
+            .iter()
+            .filter_map(|(id, candidate_team)| (*candidate_team == team_id).then_some(*id))
+            .collect()
+    }
 }
 
 impl Game {
@@ -138,9 +151,7 @@ impl Game {
         let alive_players = self.alive_players();
         self.players
             .iter()
-            .filter(|player| {
-                player.team_id == team_id && alive_players.contains(&player.id)
-            })
+            .filter(|player| player.team_id == team_id && alive_players.contains(&player.id))
             .map(|player| player.id)
             .collect()
     }
