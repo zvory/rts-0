@@ -94,6 +94,19 @@ export class BranchStaging {
 }
 ```
 
+`replay_analysis_overlay.js`
+```js
+export const REPLAY_ANALYSIS_TABS
+createReplayAnalysisOverlayPreferences(storage?)
+export class ReplayAnalysisOverlay {
+  constructor({ root, preferences })      // mounts replay-only analysis shell under root
+  destroy()
+}
+```
+`App` owns one replay analysis preference object and passes it through replay `Match` rebuilds so
+selected tab, visible state, and collapsed state survive replay seek-triggered `start` messages.
+The overlay owns its generated DOM and is read-only until later phases populate real metrics.
+
 `settings_container.js`
 ```js
 export class SettingsContainer {
@@ -453,7 +466,7 @@ baseline, rejects unclassified files, and rejects cross-area imports that are no
 by an explicit allowlist reason in the script.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, match health, replay viewer/control wiring.
+- `app-shell`: `main.js`, `app.js`, `match.js`, match health, replay viewer/control/analysis wiring.
 - `model`: `state.js`, `command_composer.js`.
 - `transport`: `net.js`, `protocol.js`.
 - `rules-mirror`: `config.js`.

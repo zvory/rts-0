@@ -556,6 +556,7 @@ input[type="text"]:focus {
 #game-screen.branch-background #minimap-wrap,
 #game-screen.branch-background #selection-area,
 #game-screen.branch-background #command-card,
+#game-screen.branch-background .replay-analysis-overlay,
 #game-screen.branch-background #replay-speed {
   opacity: 0;
   pointer-events: none;
@@ -1824,6 +1825,128 @@ input[type="text"]:focus {
 #replay-speed.replay-viewer-controls {
   bottom: 14px;
 }
+
+/* --- Replay analysis overlay --- */
+.replay-analysis-overlay {
+  position: absolute;
+  top: 58px;
+  right: 12px;
+  z-index: 24;
+  width: min(316px, calc(100vw - 24px));
+  color: var(--ink);
+  pointer-events: none;
+}
+.replay-analysis-panel {
+  pointer-events: auto;
+  padding: 10px;
+}
+.replay-analysis-header,
+.replay-analysis-actions,
+.replay-analysis-tabs {
+  display: flex;
+  align-items: center;
+}
+.replay-analysis-header {
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.replay-analysis-header h2 {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.replay-analysis-actions {
+  gap: 4px;
+}
+.replay-analysis-actions button,
+.replay-analysis-show {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.9);
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1;
+}
+.replay-analysis-actions button:hover,
+.replay-analysis-show:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.replay-analysis-tabs {
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.replay-analysis-tab {
+  appearance: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.72);
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 5px 7px;
+}
+.replay-analysis-tab:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.replay-analysis-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(17, 17, 15, 0.95);
+}
+.replay-analysis-body {
+  min-height: 54px;
+  border-top: 1px solid rgba(231, 223, 197, 0.14);
+  padding-top: 8px;
+}
+.replay-analysis-placeholder {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.replay-analysis-placeholder strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+.replay-analysis-placeholder span {
+  color: var(--ink-faint);
+}
+.replay-analysis-show {
+  pointer-events: auto;
+  margin-left: auto;
+}
+.replay-analysis-overlay:not(.is-hidden) .replay-analysis-show {
+  display: none;
+}
+.replay-analysis-overlay.is-hidden .replay-analysis-panel {
+  display: none;
+}
+.replay-analysis-overlay.is-collapsed {
+  width: min(180px, calc(100vw - 24px));
+}
+.replay-analysis-overlay.is-collapsed .replay-analysis-header {
+  margin-bottom: 0;
+}
+
 .replay-timeline {
   flex-basis: 100%;
   display: flex;
@@ -2141,6 +2264,11 @@ input[type="text"]:focus {
   }
   #game-menu {
     bottom: 250px;
+  }
+  .replay-analysis-overlay {
+    top: 12px;
+    right: 58px;
+    width: min(290px, calc(100vw - 70px));
   }
   .cmd-btn .cmd-icon {
     font-size: 20px;

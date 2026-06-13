@@ -14,6 +14,7 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
+import { ReplayAnalysisOverlay } from "./replay_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
@@ -99,10 +100,12 @@ export class Match {
     this.settings = options.settings || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
     this.replayViewer = !!options.replayViewer;
+    this.replayAnalysisOverlayPreferences = options.replayAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
     this.replayControls = null;
+    this.replayAnalysisOverlay = null;
     this.giveUpSent = false;
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
@@ -261,6 +264,12 @@ export class Match {
         replayViewer: this.replayViewer,
         isReplay,
         isScenario,
+      });
+    }
+    if (this.replayViewer && isReplay) {
+      this.replayAnalysisOverlay = new ReplayAnalysisOverlay({
+        root: dom.gameScreen,
+        preferences: this.replayAnalysisOverlayPreferences || undefined,
       });
     }
     this.applySpectatorUi();
@@ -1076,9 +1085,11 @@ export class Match {
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.replayControls?.destroy();
+    this.replayAnalysisOverlay?.destroy();
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;
+    this.replayAnalysisOverlay = null;
     if (this.input && typeof this.input.destroy === "function") {
       this.input.destroy();
       this.input = null;
@@ -1116,9 +1127,11 @@ export class Match {
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     }
     this.replayControls?.destroy();
+    this.replayAnalysisOverlay?.destroy();
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;
+    this.replayAnalysisOverlay = null;
     if (dom.commandCard) dom.commandCard.hidden = false;
     if (this.unregisterHudInputZone) {
       this.unregisterHudInputZone();

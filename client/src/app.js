@@ -27,6 +27,7 @@ import {
 import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
+import { createReplayAnalysisOverlayPreferences } from "./replay_analysis_overlay.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { StatusBadge } from "./status_badge.js";
 import {
@@ -110,6 +111,7 @@ export class App {
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
     this.predictionEnabled = readPredictionEnabled();
+    this.replayAnalysisOverlayPreferences = createReplayAnalysisOverlayPreferences();
     this.mountLobbySettings();
   }
 
@@ -271,6 +273,7 @@ export class App {
         settings: this.settings,
         predictionEnabled: this.predictionEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
+        replayAnalysisOverlayPreferences: this.replayAnalysisOverlayPreferences,
       },
     );
     diagnostics.mark("app.onStart.end");
