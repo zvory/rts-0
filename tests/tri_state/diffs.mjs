@@ -23,6 +23,11 @@ export function summarizeEntity(entity) {
     y: round(entity.y),
     hp: entity.hp,
     state: entity.state,
+    prodKind: entity.prodKind,
+    prodUpgrade: entity.prodUpgrade,
+    prodProgress: round(entity.prodProgress),
+    prodQueue: entity.prodQueue,
+    progressPredicted: entity.progressPredicted === true,
     orderPlan: summarizePlan(entity.orderPlan),
     rallyPlan: summarizePlan(entity.rallyPlan),
   };

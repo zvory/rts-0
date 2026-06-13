@@ -501,6 +501,7 @@ export class ClientLane {
       const match = window.__rts?.match;
       return {
         controller: match?.prediction?.debugSummary?.() || null,
+        progress: match?.state?.progressPredictionDebug?.() || null,
         wasm: match?.predictionAdapter?.diagnostics?.() || null,
         published: window.__rtsPredictionDebug || null,
       };

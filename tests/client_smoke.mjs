@@ -279,6 +279,42 @@ try {
     return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
   ok(trainBtn, "TRAIN CARD: selecting the City Centre shows a Worker train button");
+  await page.waitForFunction(() => {
+    const state = window.__rts?.match?.state;
+    const button = document.querySelector('#command-card button[data-hotkey="Q"]');
+    return state?.resources?.steel >= 50 &&
+      button &&
+      !button.disabled &&
+      !button.classList.contains("unaffordable");
+  }, { timeout: 10000 });
+  await page.click('#command-card button[data-hotkey="Q"]');
+  await page.waitForFunction(() => {
+    const s = window.__rts.match.state;
+    const cityCentre = s.entityById([...s.selection][0]);
+    return cityCentre?.prodQueue > 0 && cityCentre.prodProgress >= 0;
+  }, { timeout: 6000 });
+  const productionProgress = await page.evaluate(async () => {
+    const match = window.__rts.match;
+    const state = match.state;
+    const id = [...state.selection][0];
+    const before = state.entityById(id)?.prodProgress ?? 0;
+    match.net.off("snapshot", match.onSnapshot);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const after = state.entityById(id)?.prodProgress ?? 0;
+    match.net.on("snapshot", match.onSnapshot);
+    return {
+      before,
+      after,
+      predicted: state.entityById(id)?.progressPredicted === true,
+      queue: state.entityById(id)?.prodQueue ?? 0,
+    };
+  });
+  ok(
+    productionProgress.queue > 0 &&
+      productionProgress.predicted &&
+      productionProgress.after > productionProgress.before,
+    `PRODUCTION PROGRESS: selected train bar advances during snapshot gap (before=${productionProgress.before}, after=${productionProgress.after}, predicted=${productionProgress.predicted})`,
+  );
 
   await page.click("#settings-button");
   await page.waitForFunction(() => !document.getElementById("settings-menu")?.hidden, { timeout: 2000 });

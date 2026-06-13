@@ -146,6 +146,10 @@ export function assertClientOptimisticUi(options = {}) {
   return { op: "assertClientOptimisticUi", ...options };
 }
 
+export function assertClientRenderedProductionProgress(options = {}) {
+  return { op: "assertClientRenderedProductionProgress", ...options };
+}
+
 export function waitForClientPredictionReady(options = {}) {
   return { op: "waitForClientPredictionReady", timeoutMs: 8000, ...options };
 }
