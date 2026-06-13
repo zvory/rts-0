@@ -126,7 +126,8 @@
       }
 
       .actions,
-      .size-row {
+      .size-row,
+      .map-select-row {
         display: flex;
         gap: 8px;
         align-items: center;
@@ -135,6 +136,24 @@
 
       .actions button {
         padding: 0 11px;
+      }
+
+      .map-select-row {
+        margin-top: 8px;
+      }
+
+      .map-select-row label {
+        display: grid;
+        gap: 4px;
+        width: 100%;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .map-select-row select {
+        width: 100%;
       }
 
       .tool-grid {
@@ -313,6 +332,12 @@
         <button id="reset-map" type="button">Reload Default</button>
         <input id="file-input" class="file-input" type="file" accept="application/json,.json" />
       </div>
+      <div class="map-select-row">
+        <label>
+          Built-In Map
+          <select id="built-in-map"></select>
+        </label>
+      </div>
 
       <h2>Map</h2>
       <div class="size-row">
@@ -395,6 +420,12 @@
       const MIN_SIZE = 24;
       const MAX_SIZE = 160;
       const DEFAULT_MAP_URL = "/maps/default-handcrafted.json";
+      const MAP_CATALOG_URL = "/maps/catalog";
+      const FALLBACK_BUILT_IN_MAPS = Object.freeze([
+        { file: "default-handcrafted.json", name: "Default", description: "4-player three-base map with safer in-base naturals plus a standardized contested natural for each spawn." },
+        { file: "low-econ.json", name: "Low Econ", description: "Original lower-economy 4-player map with one natural expansion per spawn." },
+        { file: "no-terrain.json", name: "No Terrain", description: "All grass map." },
+      ]);
       const MAP_SCHEMA_VERSION = 2;
 
       const canvas = document.getElementById("map-canvas");
@@ -403,6 +434,7 @@
       const mapNameEl = document.getElementById("map-name");
       const sizeInput = document.getElementById("map-size");
       const fileInput = document.getElementById("file-input");
+      const builtInMapSelect = document.getElementById("built-in-map");
       const pairListEl = document.getElementById("pair-list");
       const naturalListEl = document.getElementById("natural-list");
 
@@ -415,6 +447,8 @@
       let dragStartTile = null;
       let dragPreviewTile = null;
       let cellSize = 10;
+      let builtInMaps = FALLBACK_BUILT_IN_MAPS.slice();
+      let currentBuiltInFile = "default-handcrafted.json";
 
       function cloneSite(site) {
         return { id: site.id, kind: site.kind, x: site.x, y: site.y };
@@ -598,6 +632,55 @@
       function setStatus(text, bad) {
         statusEl.textContent = text;
         statusEl.classList.toggle("bad", !!bad);
+      }
+
+      function renderBuiltInMapSelect() {
+        builtInMapSelect.replaceChildren();
+        for (const entry of builtInMaps) {
+          const opt = document.createElement("option");
+          opt.value = entry.file;
+          opt.textContent = entry.name;
+          opt.title = entry.description || entry.name;
+          builtInMapSelect.appendChild(opt);
+        }
+        builtInMapSelect.value = currentBuiltInFile;
+      }
+
+      async function loadMapUrl(url, label) {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        map = normalizeMap(await response.json());
+        selectedSiteId = map.sites[0].id;
+        selectedLayoutId = map.layouts[0].id;
+        map.sites.forEach(clearProtectedArea);
+        refresh();
+        setStatus("loaded " + label);
+      }
+
+      async function loadBuiltInMap(file) {
+        const entry = builtInMaps.find(function (mapEntry) { return mapEntry.file === file; }) || null;
+        currentBuiltInFile = file;
+        renderBuiltInMapSelect();
+        try {
+          await loadMapUrl("/maps/" + encodeURIComponent(file), entry ? entry.name : file);
+        } catch (err) {
+          setStatus("map fetch failed: " + err.message, true);
+        }
+      }
+
+      async function loadMapCatalog() {
+        try {
+          const response = await fetch(MAP_CATALOG_URL, { cache: "no-store" });
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          const data = await response.json();
+          const maps = Array.isArray(data.maps) ? data.maps.filter(function (entry) {
+            return entry && typeof entry.file === "string" && entry.file.endsWith(".json");
+          }) : [];
+          if (maps.length) builtInMaps = maps;
+        } catch (err) {
+          setStatus("map catalog unavailable; using fallback list", true);
+        }
+        renderBuiltInMapSelect();
       }
 
       function terrainAt(x, y) {
@@ -921,13 +1004,9 @@
 
       async function loadDefault() {
         try {
-          const response = await fetch(DEFAULT_MAP_URL, { cache: "no-store" });
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          map = normalizeMap(await response.json());
-          selectedSiteId = map.sites[0].id;
-          selectedLayoutId = map.layouts[0].id;
-          map.sites.forEach(clearProtectedArea);
-          refresh();
+          currentBuiltInFile = "default-handcrafted.json";
+          renderBuiltInMapSelect();
+          await loadMapUrl(DEFAULT_MAP_URL, "Default");
         } catch (err) {
           map = fallbackMap();
           selectedSiteId = map.sites[0].id;
@@ -1045,6 +1124,7 @@
           fileInput.value = "";
         }
       });
+      builtInMapSelect.addEventListener("change", function (event) { loadBuiltInMap(event.target.value); });
       document.getElementById("save-file").addEventListener("click", saveMap);
       document.getElementById("save-as-file").addEventListener("click", saveMapAs);
       document.getElementById("reset-map").addEventListener("click", loadDefault);
@@ -1052,6 +1132,8 @@
 
       syncToolButtons();
       syncModeButtons();
+      renderBuiltInMapSelect();
+      loadMapCatalog();
       loadDefault();
     </script>
   </body>

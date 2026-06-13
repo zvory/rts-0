@@ -135,6 +135,7 @@ async fn main() {
         .route("/dev/selfplay", get(dev_selfplay_handler))
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
+        .route("/maps/catalog", get(map_catalog_handler))
         .route("/maps/save", post(map_save_handler))
         .route("/api/matches", get(matches_handler))
         .route(
@@ -1616,6 +1617,76 @@ fn sanitize_name(name: String) -> String {
 struct MapSaveRequest {
     name: String,
     payload: serde_json::Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MapCatalogEntry {
+    file: String,
+    name: String,
+    description: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MapCatalogResponse {
+    maps: Vec<MapCatalogEntry>,
+}
+
+/// GET /maps/catalog — list built-in authored map JSON files for editor selection.
+async fn map_catalog_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let mut entries = match tokio::fs::read_dir(&state.maps_dir).await {
+        Ok(entries) => entries,
+        Err(e) => {
+            rts_server::log_warn!(%e, maps_dir = %state.maps_dir, "map catalog: read_dir failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "cannot read maps directory",
+            )
+                .into_response();
+        }
+    };
+    let mut maps = Vec::new();
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let Some(file) = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let Ok(json) = tokio::fs::read_to_string(&path).await else {
+            continue;
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) else {
+            continue;
+        };
+        if value.get("version").and_then(|v| v.as_u64()) != Some(2) {
+            continue;
+        }
+        let stem = file.trim_end_matches(".json");
+        let name = value
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(stem)
+            .to_string();
+        let description = value
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&name)
+            .to_string();
+        maps.push(MapCatalogEntry {
+            file,
+            name,
+            description,
+        });
+    }
+    maps.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.file.cmp(&b.file)));
+    Json(MapCatalogResponse { maps }).into_response()
 }
 
 /// POST /maps/save — write a map JSON file directly into the server's assets/maps directory.

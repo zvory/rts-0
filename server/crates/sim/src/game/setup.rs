@@ -650,7 +650,13 @@ fn debug_clockwise_adjacent_corner_tile(map: &Map, start: (u32, u32)) -> (u32, u
     let max_tile = map.size.saturating_sub(1);
     let start_x = start.0.min(max_tile);
     let start_y = start.1.min(max_tile);
-    (max_tile.saturating_sub(start_y), start_x)
+    let inset = DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES.ceil() as u32 + 1;
+    (
+        max_tile
+            .saturating_sub(start_y)
+            .clamp(inset, max_tile.saturating_sub(inset)),
+        start_x.clamp(inset, max_tile.saturating_sub(inset)),
+    )
 }
 
 fn debug_offset_world(
@@ -660,16 +666,33 @@ fn debug_offset_world(
     back_tiles: f32,
 ) -> (f32, f32) {
     let (hx, hy) = map.tile_center(start.0, start.1);
-    let mid = map.size / 2;
-    let back_x = if start.0 < mid { -1.0 } else { 1.0 };
-    let back_y = if start.1 < mid { -1.0 } else { 1.0 };
+    let back_x = debug_back_axis(map, start.0);
+    let back_y = debug_back_axis(map, start.1);
     let side_x = -back_y;
     let side_y = back_x;
     let ts = config::TILE_SIZE as f32;
-    (
+    clamp_debug_world(
+        map,
         hx + (side_x * side_tiles + back_x * back_tiles) * ts,
         hy + (side_y * side_tiles + back_y * back_tiles) * ts,
     )
+}
+
+fn debug_back_axis(map: &Map, coord: u32) -> f32 {
+    const EDGE_BUFFER_TILES: u32 = 24;
+    if coord < EDGE_BUFFER_TILES {
+        return 1.0;
+    }
+    if coord.saturating_add(EDGE_BUFFER_TILES) >= map.size {
+        return -1.0;
+    }
+    if coord < map.size / 2 { -1.0 } else { 1.0 }
+}
+
+fn clamp_debug_world(map: &Map, x: f32, y: f32) -> (f32, f32) {
+    let ts = config::TILE_SIZE as f32;
+    let max = (map.world_size_px() - ts).max(0.0);
+    (x.clamp(ts, max), y.clamp(ts, max))
 }
 
 fn debug_side_corner_world(map: &Map, start: (u32, u32), col: u32, row: u32) -> (f32, f32) {
