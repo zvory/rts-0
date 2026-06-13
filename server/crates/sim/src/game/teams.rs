@@ -16,9 +16,7 @@ pub(crate) struct TeamRelations {
 }
 
 impl TeamRelations {
-    pub(crate) fn from_player_teams(
-        players: impl IntoIterator<Item = (u32, TeamId)>,
-    ) -> Self {
+    pub(crate) fn from_player_teams(players: impl IntoIterator<Item = (u32, TeamId)>) -> Self {
         Self {
             players: players.into_iter().collect(),
         }
@@ -31,7 +29,7 @@ impl TeamRelations {
             .map(|(_, team_id)| *team_id)
     }
 
-    fn same_team_player(&self, a: u32, b: u32) -> bool {
+    pub(crate) fn same_team_player(&self, a: u32, b: u32) -> bool {
         let Some(team_a) = self.team_of_player(a) else {
             return false;
         };
@@ -50,6 +48,10 @@ impl TeamRelations {
 
     pub(crate) fn is_enemy_owner(&self, player_id: u32, owner: u32) -> bool {
         owner != 0 && self.is_enemy_player(player_id, owner)
+    }
+
+    pub(crate) fn same_team_or_same_owner(&self, a: u32, b: u32) -> bool {
+        a == b || self.same_team_player(a, b)
     }
 }
 

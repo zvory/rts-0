@@ -508,12 +508,55 @@ fn artillery_shell_outside_building_uses_footprint_distance_falloff() {
     assert_eq!(before - after, expected);
 }
 
+#[test]
+fn artillery_shell_damages_allied_entities_without_last_damage_attribution() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 7,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 7,
+            name: "Two".into(),
+            color: "#aaa".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let depot = game
+        .entities
+        .spawn_building(2, EntityKind::Depot, 160.0, 160.0, true)
+        .expect("allied depot should spawn");
+    let before = game.entities.get(depot).expect("depot exists").hp;
+
+    resolve_test_artillery_shell(&mut game, 160.0, 160.0);
+
+    let depot = game.entities.get(depot).expect("depot survives");
+    assert!(
+        depot.hp < before,
+        "same-team depot should take artillery splash damage"
+    );
+    assert_eq!(depot.last_damage_owner(), None);
+    assert_eq!(depot.last_damage_pos(), None);
+    assert_eq!(depot.last_damage_tick(), None);
+}
+
 fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
     let mut events = HashMap::new();
     events.insert(1, Vec::new());
+    let teams = teams::TeamRelations::from_player_teams(
+        game.players
+            .iter()
+            .map(|player| (player.id, player.team_id)),
+    );
     game.artillery_shells.schedule(1, 1, x, y, game.tick);
     game.artillery_shells.resolve_due(
         &mut game.entities,
+        &teams,
         &mut events,
         game.tick + config::ARTILLERY_SHELL_DELAY_TICKS,
     );
@@ -784,10 +827,7 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     {
-        let mortar_entity = game
-            .entities
-            .get_mut(mortar)
-            .expect("mortar should exist");
+        let mortar_entity = game.entities.get_mut(mortar).expect("mortar should exist");
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
         mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
     }
@@ -1082,6 +1122,88 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
         !game.entities.contains(enemy),
         "enemy machine gunner should take the matching lethal inner-radius hit"
     );
+}
+
+#[test]
+fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 7,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 7,
+            name: "Two".into(),
+            color: "#aaa".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            name: "Three".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(12, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    if let Some(mortar_entity) = game.entities.get_mut(mortar) {
+        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+    }
+    let ally = game
+        .entities
+        .spawn_unit(2, EntityKind::MachineGunner, target_pos.0, target_pos.1)
+        .expect("ally should spawn");
+    game.entities
+        .get_mut(ally)
+        .expect("ally should exist")
+        .set_last_damage_owner(Some(3));
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: false,
+        },
+    );
+    game.tick();
+    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+        game.tick();
+    }
+
+    assert!(
+        !game.entities.contains(ally),
+        "same-team machine gunner should take lethal mortar splash"
+    );
+    let scores = game.scores();
+    let attacker = scores.iter().find(|score| score.id == 1).unwrap();
+    let ally_owner = scores.iter().find(|score| score.id == 2).unwrap();
+    let stale_enemy = scores.iter().find(|score| score.id == 3).unwrap();
+    assert_eq!(
+        attacker.units_killed, 0,
+        "same-team mortar splash must not award kill credit"
+    );
+    assert_eq!(
+        stale_enemy.units_killed, 0,
+        "same-team lethal splash must clear stale enemy kill credit"
+    );
+    assert_eq!(ally_owner.units_lost, 1);
 }
 
 #[test]
@@ -1413,20 +1535,32 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
         color: "#fff".into(),
         is_ai: false,
     }];
-    let mut game = Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0x5150_0701);
+    let mut game =
+        Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0x5150_0701);
     for id in game.entities.ids() {
         game.entities.remove(id);
     }
     let city_centre_pos = game.map.tile_center(8, 12);
     let research_pos = game.map.tile_center(8, 8);
     let factory_pos = game.map.tile_center(12, 8);
-    game
-        .entities
-        .spawn_building(1, EntityKind::CityCentre, city_centre_pos.0, city_centre_pos.1, true)
+    game.entities
+        .spawn_building(
+            1,
+            EntityKind::CityCentre,
+            city_centre_pos.0,
+            city_centre_pos.1,
+            true,
+        )
         .expect("city centre should spawn");
     let research_complex = game
         .entities
-        .spawn_building(1, EntityKind::ResearchComplex, research_pos.0, research_pos.1, true)
+        .spawn_building(
+            1,
+            EntityKind::ResearchComplex,
+            research_pos.0,
+            research_pos.1,
+            true,
+        )
         .expect("research complex should spawn");
     let factory = game
         .entities
@@ -1522,12 +1656,13 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
     let car = game.entities.get(command_car).expect("command car");
     assert!(car.ability_cooldown_ticks(ability::AbilityKind::Breakthrough) > 0);
     assert!(car.breakthrough_ticks() > 0);
-    assert!(game
-        .entities
-        .get(nearby)
-        .expect("nearby unit")
-        .breakthrough_ticks()
-        > 0);
+    assert!(
+        game.entities
+            .get(nearby)
+            .expect("nearby unit")
+            .breakthrough_ticks()
+            > 0
+    );
     assert_eq!(
         game.entities
             .get(far)
@@ -1572,14 +1707,13 @@ fn breakthrough_smoke_synergy_speeds_units_more() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, smoke_pos.0, smoke_pos.1)
         .expect("smoked rifle should spawn");
-    game.smokes
-        .schedule(
-            smoke_pos.0,
-            smoke_pos.1,
-            crate::config::SMOKE_CLOUD_RADIUS_TILES,
-            crate::config::SMOKE_CLOUD_DURATION_TICKS,
-            game.tick,
-        );
+    game.smokes.schedule(
+        smoke_pos.0,
+        smoke_pos.1,
+        crate::config::SMOKE_CLOUD_RADIUS_TILES,
+        crate::config::SMOKE_CLOUD_DURATION_TICKS,
+        game.tick,
+    );
     game.smokes.spawn_due(game.tick);
     for id in [plain, smoked] {
         if let Some(e) = game.entities.get_mut(id) {

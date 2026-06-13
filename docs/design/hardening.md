@@ -58,14 +58,22 @@ The server treats every client as potentially hostile. Limits live next to the c
   not raw owner inequality. A malicious client can still send arbitrary entity ids, but allied,
   neutral, dead, hidden, smoke-hidden, stale, or non-targetable ids remain no-ops and do not become
   hostile attack orders or retained combat targets. Strict raw-owner checks are still required for
-  command authority and economy operations, and friendly-fire/damage/event/victory behavior is
-  covered by later team phases.
+  command authority and economy operations.
+- **Team-safe damage attribution**: direct-fire damage, shot interception, overpenetration, damage
+  metadata, worker-retreat triggers, under-attack notices, and kill credit use the authoritative
+  team relationship snapshot. Same-team entities are not legal direct-fire or overpenetration
+  victims, and same-team damage does not update `last_damage_*` metadata or award kill credit.
+  If unattributed damage deals the killing blow, stale prior damage attribution is cleared so an
+  older enemy hit cannot receive credit for a friendly-fire kill. Mortar and artillery splash remain
+  intentional friendly-fire surfaces: they can damage owned and allied entities in the blast radius,
+  but same-team splash stays unattributed.
 - **Shot blocking and overpenetration**: ranged attacks first resolve against the first enemy tank
   body or building footprint intersecting the line from attacker to intended target. That blocker
   takes the shot damage and the intended target behind it is unharmed. Shots that hit ordinary
-  units still overpenetrate past the primary target, but any tank body or building footprint hit
-  by that carry-through damage absorbs the shot and stops further overpenetration. Stone blocks
-  target acquisition and primary fire.
+  enemy units still overpenetrate past the primary target, but any enemy tank body or enemy building
+  footprint hit by that carry-through damage absorbs the shot and stops further overpenetration.
+  Allied entities behind the primary target are ignored by overpenetration. Stone blocks target
+  acquisition and primary fire.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate (`TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.035`) on
   movement paths; badly misaligned tanks pivot in place instead of sliding sideways at full speed.
@@ -170,12 +178,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
   Infantry damage, building damage, non-tank victims, and non-anti-tank attackers ignore armor
   facing.
-- **Worker direct-hit retreat**: combat stamps `last_damage_pos`/`last_damage_tick` on every
-  damaged entity but never mutates orders or paths. `Game::worker_retreat_commands_for(player)`
-  projects that private metadata into ordinary AI-owned worker `Move` commands for workers hit on
-  the previous tick. The room task passes those commands through `rts-ai`, then enqueues them via
-  the normal command path. Constructing workers stay latched, and human players receive no
-  automatic retreat.
+- **Worker direct-hit retreat**: combat stamps `last_damage_pos`/`last_damage_tick` only for enemy
+  damage and never mutates orders or paths. `Game::worker_retreat_commands_for(player)` projects
+  that private metadata into ordinary AI-owned worker `Move` commands for workers hit by enemy
+  damage on the previous tick. The room task passes those commands through `rts-ai`, then enqueues
+  them via the normal command path. Constructing workers stay latched, allied splash does not
+  trigger retreat, and human players receive no automatic retreat.
 - **Tolerant arrival**: a unit on a `Move` or `AttackMove` order in `MovePhase::Moving` that has not
   moved more than `STUCK_EPS_PX` per tick for `STUCK_ARRIVAL_TICKS` consecutive ticks (~0.5 s at
   30 Hz) and is within `TOLERANT_ARRIVAL_RADIUS_PX` (2 tiles) of its `path_goal` is immediately

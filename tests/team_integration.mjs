@@ -111,13 +111,18 @@ async function alliedAttackTargetCommandIsIgnored() {
   ]);
   const attacker = snapA.entities.find((e) => e.owner === A.playerId && e.kind === "worker");
   const alliedTarget = snapB.entities.find((e) => e.owner === B.playerId && e.kind === "worker");
+  const alliedHpBefore = alliedTarget.hp;
 
   A.command({ c: "attack", units: [attacker.id], target: alliedTarget.id });
-  await sleep(500);
+  await B.waitFor((msg) => msg.t === "snapshot" && msg.tick > snapB.tick + 8, 3000, "post allied attack snapshots");
   const latest = A.msgs.filter((msg) => msg.t === "snapshot").at(-1);
   const attackerAfter = latest?.entities.find((e) => e.id === attacker.id);
   ok(attackerAfter && attackerAfter.targetId !== alliedTarget.id,
     "malicious attack command cannot assign an allied entity id as a hostile target");
+  const latestB = B.msgs.filter((msg) => msg.t === "snapshot").at(-1);
+  const alliedAfter = latestB?.entities.find((e) => e.id === alliedTarget.id);
+  ok(alliedAfter && alliedAfter.hp === alliedHpBefore,
+    `malicious allied attack command did not damage allied target (${alliedHpBefore} -> ${alliedAfter?.hp})`);
   closeClients(A, B);
 }
 

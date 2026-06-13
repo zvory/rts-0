@@ -5,6 +5,7 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::protocol::Event;
 use crate::rules::combat as combat_rules;
 use crate::rules::projection as projection_rules;
@@ -25,6 +26,7 @@ use super::RANGE_SLACK;
 pub(super) fn apply_damage(
     map: &Map,
     entities: &mut EntityStore,
+    teams: &TeamRelations,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -44,7 +46,16 @@ pub(super) fn apply_damage(
     if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
         return;
     }
-    let shot_victim = resolve_shot_victim(map, entities, attacker, victim, attacker_owner, ax, ay);
+    let shot_victim = resolve_shot_victim(
+        map,
+        entities,
+        teams,
+        attacker,
+        victim,
+        attacker_owner,
+        ax,
+        ay,
+    );
     let Some(shot_victim) = shot_victim else {
         return;
     };
@@ -90,7 +101,11 @@ pub(super) fn apply_damage(
         _ => dmg,
     };
     let damaged = if let Some(v) = entities.get_mut(shot_victim) {
-        let attribution = (v.owner != attacker_owner).then_some((attacker_owner, (ax, ay), tick));
+        let attribution = teams.is_enemy_owner(attacker_owner, v.owner).then_some((
+            attacker_owner,
+            (ax, ay),
+            tick,
+        ));
         v.apply_damage(effective_dmg, attribution)
     } else {
         false
@@ -99,6 +114,7 @@ pub(super) fn apply_damage(
         apply_overpenetration(
             map,
             entities,
+            teams,
             events,
             fog,
             smokes,
@@ -116,6 +132,7 @@ pub(super) fn apply_damage(
         push_under_attack_notices_for_visible_attack(
             events,
             fog,
+            teams,
             victim_owner,
             attacker_owner,
             ax,
@@ -130,6 +147,7 @@ pub(super) fn apply_damage(
 fn apply_overpenetration(
     map: &Map,
     entities: &mut EntityStore,
+    teams: &TeamRelations,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -185,7 +203,8 @@ fn apply_overpenetration(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.is_node() || target.owner == attacker_owner || target.hp == 0 {
+        if target.is_node() || !teams.is_enemy_owner(attacker_owner, target.owner) || target.hp == 0
+        {
             continue;
         }
         let along = if target.kind == EntityKind::Tank || target.is_building() {
@@ -256,7 +275,7 @@ fn apply_overpenetration(
                 reveal: reveal.clone(),
                 to_pos: Some([tx, ty]),
             });
-            push_under_attack_notice(events, *pid, victim_owner, attacker_owner, tx, ty);
+            push_under_attack_notice(events, teams, *pid, victim_owner, attacker_owner, tx, ty);
         }
         if shot_blocked {
             break;

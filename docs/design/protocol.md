@@ -448,8 +448,10 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 ```
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
 gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
-or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged unit's
-position after normal fog/visibility filtering. Unit attack events include `reveal` so a shooter
+or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged enemy
+unit's position to the victim owner and same-team recipients that pass the normal event visibility
+filter. Same-team friendly-fire damage does not emit under-attack alerts. Unit attack events include
+`reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Smoke launch events are owner-visible local feedback for the scout-car canister animation; the
@@ -459,17 +461,20 @@ and delay so the client can draw launch dust, recoil, the projectile, and the wa
 detonation. Autocast mortar launch events are also sent to other recipients that currently see the
 mortar; manual launch events are owner-only so enemy clients do not receive the pre-impact warning
 marker. Mortar impact events are sent to the firing player, to recipients with current visibility
-at the impact point, and to players whose entities were damaged by the shell. A damaged victim
-owner receives `from` + `reveal` so the attacking mortar can be shown briefly above fog after
-indirect fire lands. Enemy players do not receive hidden mortar launch data or hidden mortar impact
-markers unless their entities were hit.
+at the impact point, and to enemy players whose entities were damaged by the shell. An enemy damaged
+victim owner receives `from` + `reveal` so the attacking mortar can be shown briefly above fog after
+indirect fire lands. Allied or owned entities can still take mortar splash damage, but that damage
+is unattributed and does not reveal the firing mortar as hostile. Enemy players do not receive
+hidden mortar launch data or hidden mortar impact markers unless their entities were hit.
 Artillery target events are sent only to the firing player so enemies never receive pre-impact
 markers, even if they have vision of the gun. The `from` id lets the firing client recoil the
 specific gun and draw launch dust. Other players receive a visual-only `attack` event with a
 shooter `reveal` when artillery fires, so the firing gun is briefly shown above fog without
 revealing terrain, exploration, or the target point. Artillery impact events are sent to every
 active recipient after impact as visual-only explosions; they do not reveal terrain, update
-exploration, or carry entity visibility.
+exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
+friendly-fire attribution rule as mortar splash: owned and allied entities in the radius can take
+damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 ### 2.6 Replay playback state and vision

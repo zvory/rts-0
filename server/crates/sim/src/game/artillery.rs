@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::services::geometry::RectBody;
+use crate::game::teams::TeamRelations;
 use crate::protocol::Event;
 use crate::rules::combat;
 use crate::rules::terrain::TerrainKind;
@@ -36,6 +37,7 @@ impl ArtilleryShellStore {
     pub(crate) fn resolve_due(
         &mut self,
         entities: &mut EntityStore,
+        teams: &TeamRelations,
         events: &mut HashMap<u32, Vec<Event>>,
         tick: u32,
     ) {
@@ -43,7 +45,7 @@ impl ArtilleryShellStore {
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
-                resolve_shell(entities, events, &shell, tick);
+                resolve_shell(entities, teams, events, &shell, tick);
             } else {
                 pending.push(shell);
             }
@@ -54,6 +56,7 @@ impl ArtilleryShellStore {
 
 fn resolve_shell(
     entities: &mut EntityStore,
+    teams: &TeamRelations,
     events: &mut HashMap<u32, Vec<Event>>,
     shell: &ArtilleryShell,
     tick: u32,
@@ -87,7 +90,12 @@ fn resolve_shell(
             continue;
         }
         if let Some(target) = entities.get_mut(id) {
-            target.apply_damage(damage, Some((shell.owner, (shell.x, shell.y), tick)));
+            let attribution = teams.is_enemy_owner(shell.owner, target.owner).then_some((
+                shell.owner,
+                (shell.x, shell.y),
+                tick,
+            ));
+            target.apply_damage(damage, attribution);
         }
     }
 }

@@ -149,16 +149,17 @@ on `Game` are available for future team-aware systems: `team_of_player`, `same_t
 `same_team_owner`, `is_enemy_player`, `is_enemy_owner`, and `allied_player_ids`. Neutral owner `0`
 is never allied with a player.
 
-Command validation, queued attack promotion, and combat target acquisition use the same
-`TeamRelations` snapshot derived from `PlayerState` at the start of the tick phase. Hostile target
+Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
+shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and
+under-attack notice routing use `TeamRelations` snapshots derived from `PlayerState`. Hostile target
 checks must call `is_enemy_owner` through that relationship surface rather than relying on raw
 `owner != player`; this covers explicit attack commands, ordered attack retention, attack-move and
-idle auto-acquisition, shoot-while-moving target retention, AT-team tank preference, and hostile
-building target acquisition. Raw `owner == player` checks remain correct for strict authority and
-economy surfaces such as selected-unit ownership, production/research/cancel authority, build/gather
-ownership, rally control, supply, upgrades, and resource spending. Raw owner comparisons in damage,
-shot blocking/overpenetration, mortar/artillery splash, kill credit, worker retreat, fog/event
-projection, under-attack notices, and victory remain intentionally classified as later team phases.
+idle auto-acquisition, shoot-while-moving target retention, AT-team tank preference, hostile
+building target acquisition, direct-fire damage attribution, and overpenetration victims. Raw
+`owner == player` checks remain correct for strict authority and economy surfaces such as
+selected-unit ownership, production/research/cancel authority, build/gather ownership, rally
+control, supply, upgrades, and resource spending. Remaining raw owner comparisons in fog/event
+projection and victory are intentionally owner-only or reserved for later team phases.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
@@ -237,15 +238,24 @@ wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the s
 defs.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
-They damage friendly and enemy units/buildings with the same falloff and armor rules; resource nodes
-are ignored. Idle/attack-move autocast is conservative and requires completed `mortar_autocast`
-research: before scheduling a shell, combat checks the predicted impact point against owned units
-and buildings at their current positions and holds fire if any would be inside the damaging radius.
-Manual mortar fire is intentionally allowed onto friendly positions, so players can still take risky
-shots deliberately. Mortar autocast is stored on the authoritative combat state, is enabled for
-current and future Mortar Teams when research completes, and can be disabled through
-`SetAutocast(mortarFire, enabled=false)`; disabled mortars still accept manual `mortarFire`
-commands.
+They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
+nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is
+unattributed: it does not update `last_damage_owner`/position/tick, does not trigger AI worker
+retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
+Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research: before
+scheduling a shell, combat checks the predicted impact point against owned and allied units/buildings
+at their current positions and holds fire if any would be inside the damaging radius. Manual mortar
+fire is intentionally allowed onto same-team positions, so players can still take risky shots
+deliberately. Mortar autocast is stored on the authoritative combat state, is enabled for current
+and future Mortar Teams when research completes, and can be disabled through
+`SetAutocast(mortarFire, enabled=false)`; disabled mortars still accept manual `mortarFire` commands.
+
+Artillery point-fire shells follow the same support-weapon friendly-fire contract: blast damage can
+hit owned and allied entities in the radius, but same-team damage is unattributed and cannot award
+enemy kill credit. Direct-fire weapons are the opposite rule: normal target selection, ordered
+attacks, shot interception, and overpenetration only damage enemies. Allied entities may block a
+direct line of fire through the friendly-blocker safety rule, but they are not legal direct-fire or
+overpenetration victims.
 
 `server/crates/archcheck` classifies each top-level service module before accepting
 service-to-service imports. The roles are intentionally coarse:

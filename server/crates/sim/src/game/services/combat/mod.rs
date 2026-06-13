@@ -266,7 +266,7 @@ pub(crate) fn combat_system(
                         continue;
                     }
                     let (mx, my) = mortar_aim_point(entities, tid, tick);
-                    if mortar_autocast_would_hit_owned_entity(entities, owner, mx, my) {
+                    if mortar_autocast_would_hit_same_team_entity(entities, teams, owner, mx, my) {
                         continue;
                     }
                     mortar_shells.schedule(events, fog, owner, id, px, py, mx, my, tick, true);
@@ -280,6 +280,7 @@ pub(crate) fn combat_system(
                 apply_damage(
                     map,
                     entities,
+                    teams,
                     events,
                     fog,
                     smokes,
@@ -368,8 +369,9 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
     (x, y)
 }
 
-fn mortar_autocast_would_hit_owned_entity(
+fn mortar_autocast_would_hit_same_team_entity(
     entities: &EntityStore,
+    teams: &TeamRelations,
     owner: u32,
     x: f32,
     y: f32,
@@ -378,7 +380,10 @@ fn mortar_autocast_would_hit_owned_entity(
     let outer2 = outer_radius * outer_radius;
     entities.ids().into_iter().any(|id| {
         entities.get(id).is_some_and(|e| {
-            e.owner == owner && e.hp > 0 && !e.is_node() && dist2(x, y, e.pos_x, e.pos_y) <= outer2
+            teams.same_team_or_same_owner(owner, e.owner)
+                && e.hp > 0
+                && !e.is_node()
+                && dist2(x, y, e.pos_x, e.pos_y) <= outer2
         })
     })
 }
