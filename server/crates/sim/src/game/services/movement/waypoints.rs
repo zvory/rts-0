@@ -186,7 +186,8 @@ pub(super) fn advance_moving_units(
                     // swept body can reach the next segment. Vehicles also keep their
                     // facing-specific guard so reverse/recovery waypoints are physically reached.
                     let route_accepts = entities.get(id).is_some_and(|e| {
-                        route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
+                        e.kind != EntityKind::Worker
+                            && route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
                     });
                     let legacy_infantry_accepts = if !uses_vehicle_movement && !route_accepts {
                         let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
