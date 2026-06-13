@@ -4,20 +4,27 @@ Status: planned.
 
 ## Goal
 
-Make damage resolution and combat feedback respect team relationships. Allies should not be damaged,
-credited, or treated as hostile through direct-fire, overpenetration, support-weapon, or damage
-reaction paths under the initial no-friendly-fire rule.
+Make damage resolution and combat feedback respect team relationships. Direct-fire, overpenetration,
+damage attribution, and damage reaction paths should not treat allies as hostile, while mortar and
+artillery area damage remain intentional friendly-fire surfaces: if a shell can damage the firing
+player's own entities, it must also damage allied entities on the same team.
 
 ## Scope
 
 - Replace hostile checks in direct damage and damage attribution with the relationship API.
 - Overpenetration must not damage allied entities behind an enemy.
-- Mortar and artillery area damage must not damage allies unless a future explicit friendly-fire rule
-  is added.
+- Mortar and artillery area damage must use the same splash victim rules for allied entities that
+  already apply to the firing player's own entities. Manual mortar fire, mortar autocast impact
+  resolution, and artillery point-fire impacts should be able to damage same-team units/buildings
+  inside the blast, including the firing player's own entities, instead of filtering them out as
+  non-hostile.
+- Mortar/autocast shot selection may still avoid unsafe shots according to its existing safety rule,
+  but that prediction must consider same-team entities if it considers owned entities.
 - Smoke, point-fire, mortar-fire, and other ability effect paths must classify allies separately from
   enemies where they interact with damage or attack feedback.
 - Last-damage owner, last-damage position, kill credit, and score increments should record only enemy
-  damage/kills.
+  damage/kills. Friendly-fire splash may reduce health or kill allied/owned entities, but should not
+  award enemy kill credit or combat score against that ally.
 - Worker retreat should react to enemy damage, not allied or non-hostile damage.
 - Under-attack notices should go to the victim's team where appropriate, but this phase should not
   broaden fog/event visibility beyond the owner/team recipients explicitly tested here.
@@ -50,7 +57,12 @@ node tests/team_integration.mjs
 Required Rust scenarios:
 
 - Overpenetration does not damage an allied entity behind an enemy.
-- Mortar and artillery area damage do not damage allies under the selected team rules.
+- Mortar area damage damages allied entities under the selected team rules, matching the existing
+  self-damage behavior for owned entities.
+- Artillery area damage damages allied entities under the selected team rules, matching the existing
+  self-damage behavior for owned entities.
+- Mortar/autocast friendly-fire prediction treats allied entities like owned entities when deciding
+  whether a shot would hit a same-team entity.
 - Kill credit is not awarded for allied or non-hostile damage.
 - Last-damage owner/position are not updated by allied or non-hostile damage.
 - Worker retreat is triggered by enemy damage and not by allied/non-hostile damage.
@@ -58,13 +70,17 @@ Required Rust scenarios:
 
 Required Node scenarios:
 
-- A malicious client cannot use allied attack ids or support-fire commands to damage allied units.
+- A malicious client cannot use allied direct attack ids to damage allied units.
+- Support-fire commands consistently apply the explicit mortar/artillery friendly-fire rule to
+  same-team entities in the blast radius.
 - FFA damage and scoring behavior remains compatible.
 
 ## Acceptance Criteria
 
 - Damage, score attribution, and damage reaction behavior use central relationship helpers.
-- Initial team games have no friendly fire through normal combat and support-weapon paths.
+- Initial team games have no friendly fire through normal direct combat paths.
+- Mortar and artillery splash intentionally keep self-damage and team-damage behavior, with tests
+  proving same-team entities are not filtered out of blast damage and are not scored as enemy kills.
 - Remaining raw owner comparisons are documented as strict ownership, neutral/resource logic, or
   explicit follow-up work.
 
@@ -76,4 +92,5 @@ dev scenario if visual inspection is needed.
 ## Handoff Requirements
 
 The phase handoff must list every damage/effect surface audited, describe the friendly-fire rule
-implemented, and call out any intentionally owner-only notices or feedback.
+implemented, explicitly call out mortar/artillery team damage versus direct-fire ally safety, and
+call out any intentionally owner-only notices or feedback.

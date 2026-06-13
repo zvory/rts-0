@@ -96,8 +96,10 @@ area effects, event delivery, fog, starts, or victory.
 
 Phase 4 handles the remaining hostile damage and feedback surfaces. Direct damage, overpenetration,
 mortar/artillery/smoke-related area effects, last-damage owner, kill credit, worker retreat, and
-under-attack notices are audited separately from command targeting. Tests should prove allies are
-not damaged or credited as enemies under the selected no-friendly-fire rule.
+under-attack notices are audited separately from command targeting. Tests should prove normal direct
+combat does not damage or credit allies as enemies, while mortar and artillery splash keeps its
+existing self-damage behavior and therefore also damages same-team entities inside the blast without
+awarding enemy kill credit.
 
 Phase 5 changes only team defeat, winner, score, and game-over semantics. A team stays alive while
 any member remains alive, one-player sandbox remains never-ending, and final results include
