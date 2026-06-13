@@ -14,10 +14,14 @@ cadence explicit and testable.
   stage or attack intents.
 - Define wave readiness using unit composition, minimum force, required-unit gates, and time/supply
   fallback signals.
+- Add a tech gate for Tank frontal waves: the AI must research Methamphetamines at the Training
+  Centre before attacking with Tanks. Prefer making this a prerequisite before producing the first
+  Tank if that is cleaner for the tech/production manager, so Tank production and Tank-wave readiness
+  cannot race ahead of the upgrade.
 - Preserve local defense priority so home threats can interrupt outgoing waves without breaking
   unrelated attack groups.
 - Add blocker and trace output for "waiting for units", "waiting for tank", "staging", "attacking",
-  and "reissuing".
+  "waiting for Methamphetamines", and "reissuing".
 - Keep retreat/regroup micro, focused unit targeting, mortar dodging, and split attacks out of AI
   1.0 unless later evidence requires them.
 
@@ -33,8 +37,8 @@ cadence explicit and testable.
 
 ## Verification
 
-- Add pure tests for wave readiness, staging positions, reissue cadence, required tank gates, and
-  visible combat target selection.
+- Add pure tests for wave readiness, staging positions, reissue cadence, required tank gates,
+  Methamphetamines-before-Tank-attack gating, and visible combat target selection.
 - Add scenario tests for early Rifleman waves and later tank-supported waves.
 - Run:
 
@@ -55,7 +59,8 @@ they should, and local defense still responds to visible pressure.
 
 The handoff must state the frontal-wave gates, expected first-attack timing window, and any matchup
 metrics that improved or regressed. It should tell Phase 6 how harassment groups can coexist with
-frontal-wave reservations.
+frontal-wave reservations. It must also state whether Methamphetamines is enforced before first
+Tank production or only before Tank attack launch, and include the observed timing impact.
 
 ## Player-Facing Outcome
 
