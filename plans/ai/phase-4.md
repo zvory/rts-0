@@ -1,6 +1,6 @@
 # Phase 4 - Tech and Production Managers
 
-Status: Not implemented.
+Status: Implemented.
 
 ## Objective
 
@@ -60,3 +60,33 @@ remaining tech blockers, and tell Phase 5 which combat units are ready for front
 
 A new selectable AI profile can tech and produce the required AI 1.0 unit arc. It should not become
 the live default yet.
+
+## Implementation Notes
+
+- Added selectable profile id `ai_1_0_tech`; `rifle_flood_full_saturation` remains unchanged and
+  the only live random-lobby profile.
+- `ai_1_0_tech` opens on Riflemen, expands off Training Centre, techs through Research Complex and
+  Factory, trains Scout Cars while Tank research is blocked or pending, then prioritizes Tanks once
+  Tank research completes.
+- Fixed AI observation so Research Complexes are available to the shared production/research action
+  path; without that, profile-backed live/self-play observations could build the tech structure but
+  never issue Tank research.
+- Added baseline scenario metadata for AI 1.0 early production, tech-blocked production, Scout Car
+  unlock, and Tank unlock.
+
+## Verification Results
+
+- `cd server && cargo test -p rts-ai` passed: 126 passed, 1 ignored.
+- Bounded matchup sample:
+  `cargo run -p rts-ai --bin ai-matchup -- ai_1_0_tech rifle_flood_full_saturation --ticks 14000 --seed 1090519044 --json`
+  passed replay verification and reached the required normal-start milestones before tick cap.
+- `ai_1_0_tech` milestone timing in that sample: first Rifleman attack command tick 1703, expansion
+  planned tick 7571, expansion completed tick 8432, first Scout Car tick 9179, first Tank tick 10409.
+
+## Handoff to Phase 5
+
+Phase 5 should build frontal-wave planning around Riflemen, Scout Cars, and Tanks for
+`ai_1_0_tech`. Machine Gunners, Anti-Tank Guns, Artillery, and Command Cars are still intentionally
+outside this profile's normal production arc. No remaining tech blocker is known after the Research
+Complex observation fix; watch playtests for late Tank count and whether Scout Car spending delays
+Tank mass too much.

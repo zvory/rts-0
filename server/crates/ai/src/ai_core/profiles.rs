@@ -6,6 +6,7 @@ pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
 pub(crate) const RIFLE_FLOOD_FULL_SATURATION_ID: &str = "rifle_flood_full_saturation";
 pub(crate) const TECH_TO_TANKS_ID: &str = "tech_to_tanks";
 pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
+pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
@@ -201,6 +202,11 @@ pub(crate) struct TankResourcePolicy {
 
 const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
 const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
+const TANK_SCOUT_RIFLE: [EntityKind; 3] = [
+    EntityKind::Tank,
+    EntityKind::ScoutCar,
+    EntityKind::Rifleman,
+];
 const TANK_ONLY: [EntityKind; 1] = [EntityKind::Tank];
 const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AntiTankGun];
 const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
@@ -217,6 +223,12 @@ const TANK_TECH_PATH: [EntityKind; 5] = [
     EntityKind::ResearchComplex,
     EntityKind::Factory,
     EntityKind::Steelworks,
+];
+const AI_1_0_TANK_TECH_PATH: [EntityKind; 4] = [
+    EntityKind::Barracks,
+    EntityKind::TrainingCentre,
+    EntityKind::ResearchComplex,
+    EntityKind::Factory,
 ];
 const SUPPORT_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
@@ -586,12 +598,93 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 4] {
+pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
+    id: AI_1_0_TECH_ID,
+    workers: WorkerPolicy {
+        steel_saturation_fraction: Ratio::new(1, 1),
+        steel_worker_cap: Some(18),
+        extra_oil_workers: 6,
+        pressure_worker_cap: None,
+        pressure_until_complete: None,
+    },
+    supply: SupplyPolicy {
+        free_supply_buffer: 7,
+        emergency_depot_threshold: 2,
+    },
+    buildings: BuildingPolicy {
+        barracks_curve: BarracksCurve {
+            before_steel_saturation: 1,
+            after_steel_saturation: 2,
+            banked_steel_threshold: 550,
+            banked_steel_step: 350,
+            max: 3,
+        },
+        proxy_barracks: None,
+        required_tech_path: &FULL_TECH_PATH,
+        max_pending_per_kind: 1,
+    },
+    production: ProductionPolicy {
+        queue_depth: 2,
+        unit_priorities: &RIFLE_ONLY,
+        save_for_first_tech_unit: None,
+        balance_unit_priorities: false,
+    },
+    attack: AttackPolicy {
+        first_attack_size: 4,
+        wave_growth: 2,
+        regroup_reset_ticks: 480,
+        reissue_cadence_ticks: 120,
+        stage_distance_tiles: 8.0,
+        unit_kinds: &RIFLE_ONLY,
+        required_unit: None,
+    },
+    resources: ResourcePolicy {
+        oil_after_steel_workers: 8,
+        oil_after_full_steel_saturation: false,
+        tank_adaptive: None,
+    },
+    expansion: Some(ExpansionPolicy {
+        target_city_centres: 2,
+        required_complete_building: EntityKind::TrainingCentre,
+        defensive_unit: EntityKind::Rifleman,
+        defensive_unit_count: 4,
+        pre_expansion_steel_worker_cap: 14,
+        post_expansion_steel_worker_cap: Some(30),
+        search_radius_tiles: 6,
+        trigger_steel: 350,
+        trigger_supply_used: 30,
+        blocks_tech_path: false,
+        oil_before_steel_in_expansion: true,
+    }),
+    recovery_transition: None,
+    tech_transition: Some(TechTransitionPolicy {
+        supply_used_threshold: 30,
+        required_tech_path: &AI_1_0_TANK_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 2,
+            unit_priorities: &TANK_SCOUT_RIFLE,
+            save_for_first_tech_unit: Some(EntityKind::Tank),
+            balance_unit_priorities: false,
+        },
+        attack: AttackPolicy {
+            first_attack_size: 6,
+            wave_growth: 2,
+            regroup_reset_ticks: 480,
+            reissue_cadence_ticks: 120,
+            stage_distance_tiles: 8.0,
+            unit_kinds: &TANK_SCOUT_RIFLE,
+            required_unit: Some(EntityKind::Tank),
+        },
+    }),
+};
+
+pub(crate) fn required_profiles() -> [&'static AiProfile; 5] {
     [
         &RIFLE_FLOOD_FAST,
         &RIFLE_FLOOD_FULL_SATURATION,
         &TECH_TO_TANKS,
         &STEEL_EXPANSION_TANKS,
+        &AI_1_0_TECH,
     ]
 }
 
@@ -615,7 +708,8 @@ mod tests {
                 RIFLE_FLOOD_FAST_ID,
                 RIFLE_FLOOD_FULL_SATURATION_ID,
                 TECH_TO_TANKS_ID,
-                STEEL_EXPANSION_TANKS_ID
+                STEEL_EXPANSION_TANKS_ID,
+                AI_1_0_TECH_ID
             ]
         );
         assert_eq!(

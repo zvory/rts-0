@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use rts_rules;
 use rts_sim::game::entity::{EntityKind, NEUTRAL};
-use rts_sim::game::upgrade::UpgradeKind;
+use rts_sim::game::upgrade::{self, UpgradeKind};
 use rts_sim::game::TeamId;
 use rts_sim::protocol::{states, EntityView, Snapshot, StartPayload};
 
@@ -359,7 +359,9 @@ impl AiResourceSummary {
 }
 
 fn production_queue_len(kind: EntityKind, queue_len: usize) -> Option<usize> {
-    (!rts_rules::economy::trainable_units(kind).is_empty()).then_some(queue_len)
+    (!rts_rules::economy::trainable_units(kind).is_empty()
+        || !upgrade::researchable_upgrades(kind).is_empty())
+    .then_some(queue_len)
 }
 
 fn snapshot_free_for_combat(state: AiEntityState, target_id: Option<u32>) -> bool {
@@ -559,6 +561,30 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![30]
         );
+    }
+
+    #[test]
+    fn research_buildings_are_available_to_production_facts() {
+        let mut research_complex = EntityView::new(
+            40,
+            1,
+            rts_sim::protocol::kind_to_wire(EntityKind::ResearchComplex),
+            128.0,
+            128.0,
+            1,
+            1,
+            states::IDLE,
+        );
+        research_complex.prod_queue = Some(0);
+        let mut snapshot = empty_snapshot(88);
+        snapshot.entities = vec![research_complex];
+        let start = start_payload();
+
+        let observation = AiObservation::from_selfplay_snapshot(&start, &snapshot, 1, []).unwrap();
+        let building = observation.owned.iter().find(|entity| entity.id == 40).unwrap();
+
+        assert_eq!(building.kind, EntityKind::ResearchComplex);
+        assert_eq!(building.production_queue_len, Some(0));
     }
 
     #[test]

@@ -19,7 +19,7 @@ use super::{
     SELFPLAY_FAILURE_DIR,
 };
 use crate::ai_core::profiles::{
-    RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
+    AI_1_0_TECH_ID, RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
 };
 use crate::config;
 use crate::{AiController, AiThinkContext};
@@ -683,6 +683,28 @@ fn tech_to_tanks_under_macro_rifle_pressure_goal() -> PlayerMilestoneGoal {
     .with_min_buildings(kinds::FACTORY, 1)
 }
 
+fn ai_1_0_tech_goal() -> PlayerMilestoneGoal {
+    PlayerMilestoneGoal {
+        require_gathering: true,
+        require_oil: true,
+        require_oil_worker_assignment: true,
+        require_depot_supply: true,
+        require_barracks_complete: true,
+        require_rifleman: true,
+        require_tank: true,
+        ..PlayerMilestoneGoal::default()
+    }
+    .with_min_workers(12)
+    .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_buildings(kinds::TRAINING_CENTRE, 1)
+    .with_min_buildings(kinds::RESEARCH_COMPLEX, 1)
+    .with_min_buildings(kinds::FACTORY, 1)
+    .with_min_buildings(kinds::CITY_CENTRE, 2)
+    .with_min_units(kinds::RIFLEMAN, 4)
+    .with_min_units(kinds::SCOUT_CAR, 1)
+    .with_min_units(kinds::TANK, 1)
+}
+
 fn player_milestones(milestones: &Milestones, player_id: u32) -> &PlayerMilestones {
     milestones
         .players
@@ -1027,6 +1049,38 @@ fn profile_backed_self_play_exercises_tech_to_tanks() {
             panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
         }
     }
+}
+
+#[test]
+fn profile_backed_self_play_exercises_ai_1_0_tech_arc() {
+    if crate::skip_unless_full_ai("profile_backed_self_play_exercises_ai_1_0_tech_arc") {
+        return;
+    }
+
+    run_profile_matchup(MatchupConfig {
+        artifact_name: "profile_backed_self_play_exercises_ai_1_0_tech_arc",
+        seed: 0x4100_0004,
+        max_ticks: 14_000,
+        players: [
+            MatchupPlayerSpec {
+                id: 1,
+                name: "AI 1.0 Tech",
+                color: "#4cc9f0",
+                profile_id: AI_1_0_TECH_ID,
+                goal: ai_1_0_tech_goal(),
+            },
+            MatchupPlayerSpec {
+                id: 2,
+                name: "Full Saturation",
+                color: "#f72585",
+                profile_id: RIFLE_FLOOD_FULL_SATURATION_ID,
+                goal: rifle_flood_full_saturation_goal()
+                    .allowing_elimination_before_milestones(),
+            },
+        ],
+        combat_goal: CombatGoal::damage(),
+        assert_outcome: |_| {},
+    });
 }
 
 #[test]

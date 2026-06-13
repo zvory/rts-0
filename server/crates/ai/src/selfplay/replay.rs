@@ -11,8 +11,8 @@ use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
 use crate::ai_core::profiles::{
-    profile_by_id, required_profiles, RIFLE_FLOOD_FULL_SATURATION_ID, STEEL_EXPANSION_TANKS_ID,
-    TECH_TO_TANKS_ID,
+    profile_by_id, required_profiles, AI_1_0_TECH_ID, RIFLE_FLOOD_FULL_SATURATION_ID,
+    STEEL_EXPANSION_TANKS_ID, TECH_TO_TANKS_ID,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
@@ -165,6 +165,7 @@ pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
         "saturation" | "full" | "macro" => Some(RIFLE_FLOOD_FULL_SATURATION_ID),
         "tech" | "tanks" => Some(TECH_TO_TANKS_ID),
         "expand" | "expansion" | "steel" | "steel_tanks" => Some(STEEL_EXPANSION_TANKS_ID),
+        "ai1" | "ai_1_0" | "ai_1_0_tech" => Some(AI_1_0_TECH_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
 }
@@ -790,7 +791,7 @@ mod tests {
         available_profile_ids, canonical_profile_id, run_profile_matchup_result,
         ProfileMatchupOptions, ScorecardCollector,
     };
-    use crate::ai_core::profiles::RIFLE_FLOOD_FULL_SATURATION_ID;
+    use crate::ai_core::profiles::{AI_1_0_TECH_ID, RIFLE_FLOOD_FULL_SATURATION_ID};
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
     use rts_sim::protocol::kinds;
@@ -807,6 +808,8 @@ mod tests {
             Some(RIFLE_FLOOD_FULL_SATURATION_ID)
         );
         assert!(available_profile_ids().contains(&RIFLE_FLOOD_FULL_SATURATION_ID));
+        assert_eq!(canonical_profile_id("ai1"), Some(AI_1_0_TECH_ID));
+        assert!(available_profile_ids().contains(&AI_1_0_TECH_ID));
     }
 
     #[test]

@@ -53,9 +53,9 @@ blocked reasons such as defensive panic, missing prerequisite building, missing 
 City Centre, no candidate resources, or no valid site. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
 The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
-`tech_to_tanks`, and `steel_expansion_tanks`; they parameterize worker targets, supply buffers,
-building/tech goals, production priorities, resource timing, expansion timing, and attack
-thresholds without providing their own `think()` functions.
+`tech_to_tanks`, `steel_expansion_tanks`, and `ai_1_0_tech`; they parameterize worker targets,
+supply buffers, building/tech goals, production priorities, resource timing, expansion timing, and
+attack thresholds without providing their own `think()` functions.
 `rifle_flood_fast` sends exactly one reserved worker toward a hidden edge-biased proxy point near
 the nearest public enemy start tile immediately, before it can afford the barracks. The transit
 target stays at least 18 tiles from the enemy start, prefers map-edge footprints, and avoids the
@@ -90,6 +90,13 @@ selection prefers oil coverage before extra steel output.
 for the Vehicle Works step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
+`ai_1_0_tech` is the selectable AI 1.0 tech spine and is not in the live random profile pool yet. It
+opens with Riflemen, expands off a completed Training Centre, builds Research Complex and Factory
+without adding Machine Gunners, Anti-Tank Guns, Artillery, or Command Cars, produces Scout Cars while
+Tank research is blocked or pending, then prioritizes Tanks once Tank research completes. In the
+Phase 4 bounded sample `ai_1_0_tech` vs `rifle_flood_full_saturation` at seed `1090519044` and
+14,000 ticks, it issued its first Rifleman attack at tick 1703, planned/completed expansion at
+7571/8432, completed its first Scout Car at 9179, and completed its first Tank at 10409.
 All profiles share a defensive panic mode. Visible enemy units near the AI's base, home resource
 line, or workers temporarily suspend expansion, worker training, and non-defensive tech spending
 only when their steel+oil value is at least 75% of the AI's own local unit value. While panicking,
