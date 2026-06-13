@@ -1,5 +1,5 @@
 {
-  "reason": "phase 4 team-safe combat coverage",
+  "reason": "Phase 5 team-aware victory helpers on Game API",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -115,7 +115,7 @@
     },
     {
       "path": "services/combat/projection.rs",
-      "lines": 80
+      "lines": 81
     },
     {
       "path": "services/combat/tests.rs",
@@ -263,7 +263,7 @@
     },
     {
       "path": "teams.rs",
-      "lines": 166
+      "lines": 231
     },
     {
       "path": "tests.rs",
@@ -1415,7 +1415,7 @@
     },
     {
       "path": "teams.rs",
-      "count": 13
+      "count": 16
     },
     {
       "path": "upgrade.rs",

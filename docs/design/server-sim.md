@@ -109,6 +109,15 @@ impl Game {
     /// Player ids still alive. Humans need at least one building; AI players also need a unit.
     pub fn alive_players(&self) -> Vec<u32>;
 
+    /// Team ids with at least one alive member, in stable start/lobby order.
+    pub fn alive_team_ids(&self) -> Vec<TeamId>;
+
+    /// First alive player on a team in stable start/lobby order.
+    pub fn first_alive_player_on_team(&self, team_id: TeamId) -> Option<u32>;
+
+    /// Whether this player's team still has at least one alive member.
+    pub fn team_has_alive_player(&self, player_id: u32) -> bool;
+
     /// Frozen score-screen rows for every match participant, in start/lobby order.
     pub fn scores(&self) -> Vec<PlayerScore>;
 
@@ -159,7 +168,9 @@ building target acquisition, direct-fire damage attribution, and overpenetration
 `owner == player` checks remain correct for strict authority and economy surfaces such as
 selected-unit ownership, production/research/cancel authority, build/gather ownership, rally
 control, supply, upgrades, and resource spending. Remaining raw owner comparisons in fog/event
-projection and victory are intentionally owner-only or reserved for later team phases.
+projection are intentionally owner-only. Victory resolution is team-aware: the room task ends 2+
+player matches only when at most one nonzero team still has an alive member, and a defeated player
+does not receive an individual loss screen while any teammate keeps that team alive.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).

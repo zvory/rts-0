@@ -164,8 +164,9 @@ frozen server snapshot taken when that recipient gets `gameOver`; it is not live
 3-4 player match continues. Unit/structure score is the configured steel+oil value of every
 unit/building entity created for that player, including starting entities.
 
-`winnerTeamId` is the winning team's id when a winner exists, otherwise `null`. During singleton-team
-FFA it matches `winnerId`; `winnerId` remains for FFA compatibility.
+`winnerTeamId` is the winning team's id when a winner exists, otherwise `null`. `winnerId` remains
+for FFA compatibility. During singleton-team FFA, `winnerTeamId` matches `winnerId`; during team
+wins, `winnerId` is the first living player on the winning team in stable start/lobby order.
 
 `ReplayBranchSeat`: `{ playerId: u32, teamId: u32, name: string, color: string, claimable: bool }`. Seats are
 listed in original replay player order. `claimable` is false only for unsupported original seats;

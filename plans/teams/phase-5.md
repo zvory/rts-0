@@ -1,6 +1,6 @@
 # Phase 5 - Team Victory and Game-Over Semantics
 
-Status: planned.
+Status: implemented.
 
 ## Goal
 
@@ -73,3 +73,14 @@ ambiguous.
 
 The phase handoff must describe winner-id compatibility decisions, team defeat tests, and any match
 history implications deferred to the replay/history phase.
+
+## Handoff
+
+- `winnerTeamId` is the authoritative winner field for team games. `winnerId` remains populated
+  for compatibility and is the first living player on the winning team in stable start/lobby order.
+- Team defeat coverage now includes a 2v2 live integration scenario where one teammate gives up
+  without receiving an early loss, then the match ends only after the opposing team is fully
+  defeated. Rust coverage exercises `Game` alive-team helpers directly.
+- Score rows remain per-player and already include `teamId`. Match-history schema is unchanged;
+  `winner_name` continues to derive from compatibility `winnerId`, so richer team-winner history
+  display remains deferred to the replay/history phase.
