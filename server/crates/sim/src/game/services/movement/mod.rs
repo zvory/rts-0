@@ -80,6 +80,11 @@ pub(crate) fn movement_system_with_events(
     smokes: &SmokeCloudStore,
 ) {
     for id in entities.ids() {
+        if let Some(e) = entities.get_mut(id) {
+            e.set_movement_delta(0.0, 0.0);
+        }
+    }
+    for id in entities.ids() {
         let has_meth = entities
             .get(id)
             .filter(|e| e.kind == EntityKind::Rifleman)

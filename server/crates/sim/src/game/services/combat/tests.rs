@@ -1686,21 +1686,151 @@ fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
 
 #[test]
 fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
+    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
+    let target_kinds = [
+        EntityKind::Worker,
+        EntityKind::Rifleman,
+        EntityKind::MachineGunner,
+        EntityKind::AtTeam,
+        EntityKind::MortarTeam,
+        EntityKind::Tank,
+        EntityKind::ScoutCar,
+        EntityKind::CommandCar,
+        EntityKind::Artillery,
+    ];
+
+    for target_kind in target_kinds {
+        let mut entities = EntityStore::new();
+        let target_id = entities
+            .spawn_unit(2, target_kind, 220.0, 100.0)
+            .expect("target should spawn");
+        let speed = config::unit_stats(target_kind)
+            .map(|stats| stats.speed)
+            .expect("target should have unit stats");
+        if let Some(target) = entities.get_mut(target_id) {
+            target.set_order(Order::attack_move_to(500.0, 100.0));
+            target.set_path(vec![(500.0, 100.0)]);
+            target.set_path_goal(Some((500.0, 100.0)));
+            target.mark_move_phase(MovePhase::Moving);
+            target.set_movement_delta(speed, 0.0);
+        }
+
+        let (aim_x, _aim_y) = mortar_aim_point(&entities, target_id, 10);
+        let expected_lead = speed * config::MORTAR_SHELL_DELAY_TICKS as f32;
+        assert!(
+            aim_x >= 220.0 + expected_lead - error_px - 0.001,
+            "{target_kind:?} moving target should be led by its current movement delta, got x={aim_x:.2}"
+        );
+    }
+}
+
+#[test]
+fn mortar_autocast_leads_current_direction_not_corner_destination() {
+    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Worker, 220.0, 100.0)
+        .expect("target should spawn");
+    if let Some(target) = entities.get_mut(target_id) {
+        target.set_order(Order::attack_move_to(500.0, 50.0));
+        target.set_path(vec![(500.0, 50.0), (220.0, 50.0)]);
+        target.set_path_goal(Some((500.0, 50.0)));
+        target.mark_move_phase(MovePhase::Moving);
+    }
+
+    let map = open_map(24);
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
+    assert!(
+        aim_x <= 220.0 + error_px + 0.001,
+        "target moving north around a corner should not be led east toward its final destination, got x={aim_x:.2}"
+    );
+    assert!(
+        aim_y < 0.0,
+        "target moving north around a corner should be led along actual last movement, got y={aim_y:.2}"
+    );
+}
+
+#[test]
+fn mortar_autocast_velocity_clears_when_path_clears() {
+    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("target should spawn");
+    if let Some(target) = entities.get_mut(target_id) {
+        target.set_movement_delta(2.0, 0.0);
+        target.clear_path();
+    }
+
+    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
+    let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
+    assert!(
+        offset <= error_px + 0.001,
+        "target with cleared path should not keep stale mortar lead, got offset {offset:.2}"
+    );
+}
+
+#[test]
+fn mortar_autocast_velocity_resets_for_stationary_units_each_movement_tick() {
+    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     let mut entities = EntityStore::new();
     let target_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
         .expect("target should spawn");
     if let Some(target) = entities.get_mut(target_id) {
         target.set_order(Order::attack_move_to(500.0, 100.0));
-        target.set_path(vec![(500.0, 100.0)]);
-        target.set_path_goal(Some((500.0, 100.0)));
+        target.set_path(Vec::new());
         target.mark_move_phase(MovePhase::Moving);
+        target.set_movement_delta(2.0, 0.0);
     }
 
-    let (aim_x, _aim_y) = mortar_aim_point(&entities, target_id, 10);
+    let map = open_map(24);
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
+    let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
     assert!(
-        aim_x > 270.0,
-        "actively moving attack-move target should still be led along its route, got x={aim_x:.2}"
+        offset <= error_px + 0.001,
+        "stationary target should not retain stale movement-tick mortar lead, got offset {offset:.2}"
+    );
+}
+
+#[test]
+fn mortar_autocast_velocity_clears_when_target_stops_to_fire() {
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("target should spawn");
+    let enemy_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 235.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(target) = entities.get_mut(target_id) {
+        target.set_order(Order::attack_move_to(500.0, 100.0));
+        target.set_path(vec![(500.0, 100.0)]);
+        target.mark_move_phase(MovePhase::Moving);
+        target.set_movement_delta(1.6, 0.0);
+    }
+    if let Some(enemy) = entities.get_mut(enemy_id) {
+        enemy.set_attack_cd(10);
+    }
+
+    run_combat_tick_with_players(&mut entities, &[player_state(1, false), player_state(2, false)]);
+
+    let target = entities.get(target_id).expect("target should exist");
+    assert!(
+        target.path_is_empty(),
+        "target should clear its path when stopping to fire"
+    );
+    assert_eq!(
+        target.movement_delta(),
+        (0.0, 0.0),
+        "target should not retain stale movement delta after combat clears its path"
     );
 }
 

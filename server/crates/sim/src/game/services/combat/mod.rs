@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
-    fires_while_moving, AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
+    fires_while_moving, AttackPhase, Entity, EntityKind, EntityStore, Order,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -347,18 +347,9 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
     };
     let mut x = t.pos_x;
     let mut y = t.pos_y;
-    if let Some((gx, gy)) = mortar_lead_goal(t) {
-        let dx = gx - t.pos_x;
-        let dy = gy - t.pos_y;
-        let dist = (dx * dx + dy * dy).sqrt();
-        if dist > f32::EPSILON && dist.is_finite() {
-            let speed = config::unit_stats(t.kind)
-                .map(|stats| stats.speed)
-                .unwrap_or(0.0);
-            let lead = (speed * config::MORTAR_SHELL_DELAY_TICKS as f32).min(dist);
-            x += dx / dist * lead;
-            y += dy / dist * lead;
-        }
+    if let Some((dx, dy)) = mortar_lead_delta(t) {
+        x += dx;
+        y += dy;
     }
     let error = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
     if error > 0.0 {
@@ -372,11 +363,30 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
     (x, y)
 }
 
-fn mortar_lead_goal(target: &Entity) -> Option<(f32, f32)> {
-    if target.path_is_empty() || target.move_phase() != Some(MovePhase::Moving) {
+fn mortar_lead_delta(target: &Entity) -> Option<(f32, f32)> {
+    let (vx, vy) = target.movement_delta();
+    if !vx.is_finite() || !vy.is_finite() {
         return None;
     }
-    target.move_intent()
+    let lead_ticks = config::MORTAR_SHELL_DELAY_TICKS as f32;
+    let mut dx = vx * lead_ticks;
+    let mut dy = vy * lead_ticks;
+    let lead_dist = (dx * dx + dy * dy).sqrt();
+    if lead_dist <= f32::EPSILON || !lead_dist.is_finite() {
+        return None;
+    }
+    let max_lead = config::unit_stats(target.kind)
+        .map(|stats| stats.speed * lead_ticks)
+        .unwrap_or(0.0);
+    if max_lead <= f32::EPSILON || !max_lead.is_finite() {
+        return None;
+    }
+    if lead_dist > max_lead {
+        let scale = max_lead / lead_dist;
+        dx *= scale;
+        dy *= scale;
+    }
+    Some((dx, dy))
 }
 
 fn mortar_autocast_would_hit_same_team_entity(

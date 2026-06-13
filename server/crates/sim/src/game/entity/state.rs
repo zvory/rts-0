@@ -53,6 +53,10 @@ pub struct MovementState {
     /// Position snapshot taken when `stuck_ticks` was last reset to 0. Used to measure
     /// progress each tick for tolerant arrival.
     pub last_progress_pos: (f32, f32),
+    /// Position delta from this tick's path-following movement phase. This is transient:
+    /// reset before movement, set after waypoint advancement, and intentionally excludes
+    /// later collision shoves.
+    pub last_move_delta: (f32, f32),
     /// Ticks remaining before this unit may sidestep again. Decremented each tick; reset to 0
     /// on new order.
     pub sidestep_cooldown: u16,
@@ -92,6 +96,7 @@ impl Default for MovementState {
             path_goal: None,
             stuck_ticks: 0,
             last_progress_pos: (0.0, 0.0),
+            last_move_delta: (0.0, 0.0),
             sidestep_cooldown: 0,
             scout_car_recovery_cooldown: 0,
             scout_car_reverse_waypoint: None,

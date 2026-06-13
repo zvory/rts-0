@@ -384,6 +384,7 @@ pub(super) fn advance_moving_units(
         if let Some(e) = entities.get_mut(id) {
             e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);
             e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);
+            e.set_movement_delta(e.pos_x - orig_x, e.pos_y - orig_y);
             if let Some(f) = new_facing {
                 e.set_facing(f);
             }
