@@ -1,5 +1,7 @@
 # Phase 3.5 - WASM Local Lane Backfill
 
+Status: Done.
+
 ## Objective
 
 Register the existing `rts-sim-wasm` predictor as the tri-state harness local lane and convert the

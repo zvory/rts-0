@@ -1,6 +1,7 @@
 # Phase 8.5 - Guarded Construction Progress Extrapolation
 
-Status: Considered; not implemented.
+Status: Done. Considered and left without broader construction prediction because guarded
+construction progress remained too state-dependent for safe default prediction.
 
 ## Objective
 

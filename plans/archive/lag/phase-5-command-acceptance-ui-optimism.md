@@ -1,6 +1,6 @@
 # Phase 5 - Command Acceptance, Rejection, and UI Optimism
 
-Status: Implemented for production queue and rally-plan optimism. Build placement, research,
+Status: Done. Implemented for production queue and rally-plan optimism. Build placement, research,
 setup/teardown, and ability targeting remain authoritative-only until their command-specific
 accept/reject scenarios exist.
 

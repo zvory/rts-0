@@ -166,28 +166,9 @@ too state-dependent to predict safely.
 
 ## Current Implementation Status
 
-- Phase 0: not implemented. The design exists, but the scenario DSL, three-lane runner, network
-  profile controller, artifact writer, and CI scenario suite need backfill.
-- Phase 1: implemented ahead of harness backfill. `clientSeq` command envelopes, sim-consumption
-  acknowledgement metadata, and compact snapshot transport support exist.
-- Phase 2: implemented ahead of harness backfill. `PredictionController` and focused JS state
-  transition coverage exist, but artifact-backed two-lane scenarios do not.
-- Phase 3: implemented ahead of harness backfill. `rts-sim-wasm`, native/WASM-facing parity
-  coverage, generated browser assets, and WASM smoke coverage exist, but the local lane is not
-  registered in a tri-state runner.
-- Phase 4: implemented ahead of harness backfill. Owned-unit movement prediction is wired through
-  the browser adapter and smoke-tested, but delayed/dropped/coalesced network scenarios are not
-  covered by a DSL harness.
-- Phase 5: implemented for production queue and rally-plan optimism. Build, research, setup,
-  teardown, and ability command acceptance remain authoritative-only.
-- Phase 6: implemented. Combat, fog reconstruction, hidden/enemy state, economy gathering,
-  production simulation, construction simulation, resource node state, and abilities remain
-  unsupported in the WASM predictor.
-- Phase 7: implemented. Prediction is default-enabled for compatible live active-player sessions
-  with compatibility and performance fallback gates.
-- Phases 8 and 8.5 are not implemented. They should add narrow, UI-only extrapolation for
-  already-authoritative progress before considering any broader economy, production, or
-  construction simulation.
+Archived. Every phase is marked done in its phase document. The final shipped scope keeps the
+server authoritative, enables compatible owned-unit prediction with compatibility/performance
+fallbacks, and leaves unsafe broader prediction surfaces authoritative-only.
 
 ## Non-Goals
 
