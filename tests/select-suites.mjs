@@ -16,6 +16,7 @@ const suiteOrder = [
   "node-server-integration",
   "node-regression",
   "node-ai-integration",
+  "node-team-integration",
   "node-minimap-input-contracts",
   "client-smoke",
   "full-ai",
@@ -64,6 +65,15 @@ function isRulesVisibleBalance(pathname) {
     pathname === "client/src/config.js" ||
     pathname === "docs/design/balance.md" ||
     pathname.startsWith("docs/context/balance")
+  );
+}
+
+function isTeamRelated(pathname) {
+  return (
+    pathname === "tests/team_integration.mjs" ||
+    pathname === "tests/team_harness.mjs" ||
+    pathname.startsWith("plans/teams/") ||
+    pathname.includes("team")
   );
 }
 
@@ -135,6 +145,10 @@ export function selectSuites(files) {
       }
     }
 
+    if (isTeamRelated(normalized)) {
+      suites.add("node-team-integration");
+    }
+
     if (normalized.startsWith("client/")) {
       addAll(suites, ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]);
       if (normalized.includes("net") || normalized.includes("protocol")) {
@@ -179,6 +193,8 @@ function verify() {
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
     [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
+    [["plans/teams/phase-1.md"], ["node-team-integration"]],
+    [["tests/team_harness.mjs"], ["node-server-integration", "node-regression", "node-ai-integration", "node-team-integration"]],
     [["docs/design/architecture.md"], ["docs-only"]],
   ];
 

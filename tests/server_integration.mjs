@@ -5,53 +5,27 @@
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/server_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
-import { COMPACT_SNAPSHOT_VERSION, decodeServerMessage } from "../client/src/protocol.js";
+import { COMPACT_SNAPSHOT_VERSION } from "../client/src/protocol.js";
+import {
+  assertCountdownProtocol,
+  assertDistinctStartTiles,
+  assertScoreProtocol,
+  assertStartProtocol,
+  closeClients,
+  connectClient,
+  createAssertions,
+  readyPlayers,
+  sleep,
+  startMatch,
+  uniqueRoom,
+} from "./team_harness.mjs";
 
-const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
-const ROOM = "itest-" + Math.floor(performance.now());
-
-let failures = 0;
-const VERBOSE = !!process.env.RTS_VERBOSE;
-const ok = (cond, msg) => { if (!cond) { console.log("  FAIL " + msg); failures++; } else if (VERBOSE) { console.log("  PASS " + msg); } };
-
-class Client {
-  constructor(tag) {
-    this.tag = tag;
-    this.ws = new WebSocket(URL);
-    this.playerId = null;
-    this.lastSnapshot = null;
-    this.msgs = [];
-    this.rawSnapshots = [];
-    this.waiters = [];
-    this.nextClientSeq = 1;
-    this.ws.onmessage = (e) => {
-      const raw = JSON.parse(e.data);
-      if (raw.t === "snapshot") this.rawSnapshots.push(raw);
-      const m = decodeServerMessage(raw);
-      this.msgs.push(m);
-      if (m.t === "welcome") this.playerId = m.playerId;
-      if (m.t === "snapshot") this.lastSnapshot = m;
-      this.waiters = this.waiters.filter((w) => !w.test(m) || (w.resolve(m), false));
-    };
-    this.ws.onerror = (e) => console.log(`[${tag}] ws error`, e.message || e.type || e);
-  }
-  open() { return new Promise((res, rej) => { this.ws.onopen = () => res(); this.ws.onclose = () => rej(new Error("closed before open")); }); }
-  send(o) { this.ws.send(JSON.stringify(o)); }
-  command(cmd) { this.send({ t: "command", clientSeq: this.nextClientSeq++, cmd }); }
-  waitFor(test, timeoutMs = 5000, label = "message") {
-    const hit = this.msgs.find(test);
-    if (hit) return Promise.resolve(hit);
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`[${this.tag}] timeout waiting for ${label}`)), timeoutMs);
-      this.waiters.push({ test, resolve: (m) => { clearTimeout(t); resolve(m); } });
-    });
-  }
-}
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ROOM = uniqueRoom("itest");
+const assertions = createAssertions();
+const { ok } = assertions;
 
 (async () => {
-  const A = new Client("A"); await A.open();
-  await A.waitFor((m) => m.t === "welcome", 3000, "A welcome");
+  const A = await connectClient("A");
   ok(A.playerId != null, `A got welcome playerId=${A.playerId}`);
   A.send({ t: "join", name: "Alpha", room: ROOM });
   const initialLobby = await A.waitFor((m) => m.t === "lobby", 3000, "A lobby");
@@ -60,12 +34,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(initialLobby.maps.some(m => m.name === initialLobby.map),
      `selected map is present in selectable maps (${initialLobby.map})`);
 
-  const B = new Client("B"); await B.open();
-  await B.waitFor((m) => m.t === "welcome", 3000, "B welcome");
+  const B = await connectClient("B");
   B.send({ t: "join", name: "Bravo", room: ROOM });
 
-  const C = new Client("C"); await C.open();
-  await C.waitFor((m) => m.t === "welcome", 3000, "C welcome");
+  const C = await connectClient("C");
   C.send({ t: "join", name: "Observer", room: ROOM, spectator: true });
 
   const lob = await A.waitFor((m) => m.t === "lobby" && m.players.length === 3, 3000, "A lobby(3)");
@@ -74,24 +46,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(lob.players.every((p) => /^#/.test(p.color)), `players have hex colors: ${lob.players.map((p) => p.color).join(",")}`);
   ok(lob.players.find((p) => p.id === C.playerId)?.isSpectator === true, "lobby marks C as spectator");
 
-  A.send({ t: "ready", ready: true });
-  B.send({ t: "ready", ready: true });
-  await A.waitFor((m) => m.t === "lobby" && m.canStart, 3000, "canStart");
+  await readyPlayers([A, B]);
   ok(true, "canStart after both ready");
-  A.send({ t: "start" });
 
-  const countdownA = await A.waitFor((m) => m.t === "matchCountdown", 3000, "A countdown");
-  const countdownB = await B.waitFor((m) => m.t === "matchCountdown", 3000, "B countdown");
-  const countdownC = await C.waitFor((m) => m.t === "matchCountdown", 3000, "C countdown");
-  ok(countdownA.durationMs === 3000 && countdownA.words.join(" ") === "Drei! Zwei! Eins!",
-     `countdown words/duration are correct (${countdownA.words?.join(" ")}, ${countdownA.durationMs}ms)`);
+  const { countdowns, starts } = await startMatch(A, [A, B, C]);
+  const [countdownA, countdownB, countdownC] = countdowns;
+  assertCountdownProtocol(ok, countdownA);
   ok(countdownB.durationMs === 3000 && countdownC.durationMs === 3000, "all lobby participants receive countdown");
 
-  const startA = await A.waitFor((m) => m.t === "start", 6000, "A start");
-  const startB = await B.waitFor((m) => m.t === "start", 6000, "B start");
-  const startC = await C.waitFor((m) => m.t === "start", 6000, "C start");
-  ok(startA.map.terrain.length === startA.map.width * startA.map.height,
-     `start map ${startA.map.width}x${startA.map.height}, terrain len=${startA.map.terrain.length}`);
+  const [startA, startB, startC] = starts;
+  assertStartProtocol(ok, startA, { playerId: A.playerId, expectedPlayers: 2, spectator: false });
+  assertStartProtocol(ok, startB, { playerId: B.playerId, expectedPlayers: 2, spectator: false });
+  assertStartProtocol(ok, startC, { playerId: C.playerId, expectedPlayers: 2, spectator: true });
+  assertDistinctStartTiles(ok, startA);
   ok(startA.players.length === 2, `start lists 2 players`);
   ok(startA.playerId === A.playerId && startB.playerId === B.playerId, `each start carries own playerId`);
   ok(startC.playerId === C.playerId && startC.spectator === true, `spectator start carries observer id and flag`);
@@ -168,6 +135,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const overC = await C.waitFor((m) => m.t === "gameOver", 4000, "C gameOver");
   ok(over.you === "won", `WIN: A wins after B gives up (you=${over.you})`);
   ok(overC.you === "draw" && overC.winnerId === A.playerId, `SPECTATOR: observer sees neutral result with winner (${overC.you}/${overC.winnerId})`);
+  assertScoreProtocol(ok, over, { expectedPlayers: 2 });
   ok(Array.isArray(over.scores) && over.scores.length === 2, `SCORE: gameOver lists both players (${over.scores?.length})`);
   const aScore = over.scores?.find((s) => s.id === A.playerId);
   const bScore = over.scores?.find((s) => s.id === B.playerId);
@@ -194,10 +162,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
      "REMATCH: returning from replay clears active players' ready flags");
   ok(lobbyAfterReplay.canStart === false, "REMATCH: lobby cannot immediately restart until players ready again");
 
-  A.ws.close();
-  B.ws.close();
-  C.ws.close();
+  closeClients(A, B, C);
   await sleep(200);
-  if (failures > 0) console.log(`\n${failures} FAILURE(S) ❌`);
-  process.exit(failures === 0 ? 0 : 1);
+  if (assertions.failures > 0) console.log(`\n${assertions.failures} FAILURE(S)`);
+  process.exit(assertions.failures === 0 ? 0 : 1);
 })().catch((e) => { console.log("TEST ERROR:", e.message); process.exit(2); });

@@ -7,7 +7,7 @@
 #   2. Rust formatting              (cargo fmt --check)
 #   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
-#   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration)
+#   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration, team_integration)
 #   6. Headless browser suites      (client_smoke + tri-state lag scenarios; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
@@ -448,6 +448,7 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   run_suite_bg "API: server_integration" node "$SCRIPT_DIR/server_integration.mjs"
   run_suite_bg "API: regression"         node "$SCRIPT_DIR/regression.mjs"
   run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
+  run_suite_bg "API: team_integration"   node "$SCRIPT_DIR/team_integration.mjs"
 
   # Browser suites are latency-sensitive and each may drive its own Chrome/WebSocket room. Keep
   # them off the already-parallel background batch so snapshot-lane comparisons are not distorted
