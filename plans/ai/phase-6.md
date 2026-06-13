@@ -4,7 +4,7 @@ Status: Not implemented.
 
 ## Objective
 
-Add Scout Car harassment routed toward the back of the enemy steel line. This should be the AI 1.0
+Add Scout Car harassment  that avoids pathing through the frontal approach and attempts to attack the enemy base and steel line from behind. This should be the AI 1.0
 second attack style while staying fog-respecting, deterministic, and simpler than full split-attack
 micro.
 
@@ -13,8 +13,7 @@ micro.
 - Add a harassment manager that reserves a small Scout Car group separately from frontal-wave units.
 - Choose harassment destinations from public enemy start/resource information and visible,
   fog-respecting observations.
-- Route toward the back of the enemy steel line rather than directly into the front of the enemy
-  base when enough map information is available.
+- Route toward the enemy steel/oil patches from behind the enemy base, using a circuitious route to avoid being spotted. 
 - React to visible combat units with ordinary attack or move intents, but do not require retreat,
   regroup, focused worker targeting, or hidden building ignore logic for AI 1.0.
 - Add smoke usage only if the current action layer and unit ability contracts make it small and
