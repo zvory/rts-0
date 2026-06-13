@@ -23,7 +23,9 @@ crate.
 | `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room. `room` defaults to `"main"`. If `spectator` is true, join as a lobby-time observer instead of a match participant. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). |
-| `addAi`    | — | Host adds a computer opponent to the room (lobby phase only, host-only). |
+| `setTeamPreset` | `preset: "solo"|"ffa"|"1v2"|"1v3"|"2v2"` | Host selects a scripted lobby team preset (lobby phase only, host-only). `ffa` is the default exposed to ordinary rooms; non-FFA presets are currently for tests/dev automation, not normal lobby UI. |
+| `setTeam` | `id: u32`, `teamId: u32` | Host assigns an active human or AI lobby seat to a nonzero team id (lobby phase only, host-only). Unknown ids, spectators, team id `0`, and overfull preset moves are ignored. |
+| `addAi`    | `teamId?: u32` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be nonzero and fit the current preset; otherwise the server assigns the next deterministic preset seat. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setQuickstart` | `enabled: bool` | Host toggles "Debug mode" for the next match in this room. |
 | `setSpectator` | `spectator: bool` | Switch between active player and spectator role while still in the lobby. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
@@ -131,7 +133,7 @@ authority.
 | `t`        | Fields |
 |------------|--------|
 | `welcome`  | `playerId: u32` — assigned on connect. |
-| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool` |
+| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool`, `teamPreset: string` |
 | `matchCountdown` | `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, rejects new joins, and sends `start` only after the countdown duration elapses. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
@@ -149,9 +151,12 @@ true for computer opponents (always shown ready; the client renders an "AI" tag 
 remove control instead of a ready toggle). `isSpectator` is true for human observers; they do not
 consume active map starts, block readiness, or count toward win/loss.
 
-`teamId` is nonzero for active match players and AI seats. Phase 1 keeps FFA semantics by assigning
-each seated player a unique singleton team by default. Spectator lobby rows may carry `teamId: 0`
-because they are not match players.
+`teamId` is nonzero for active match players and AI seats. `ffa` assigns each active player a
+unique singleton team by default. Scripted presets assign lobby seats deterministically with the
+host first when the host is active: `solo` is exactly one active player on Team 1 and does not add
+or require AI opponents; `1v2` is `[1,2,2]`; `1v3` is `[1,2,2,2]`; `2v2` is `[1,1,2,2]`.
+Spectator lobby rows carry `teamId: 0` because they are not match players. `canStart` is false
+until the active seat count and per-team sizes match the selected preset.
 
 `PlayerScore`: `{ id: u32, teamId: u32, name: string, color: string, unitScore: u32, structureScore: u32,
 unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a

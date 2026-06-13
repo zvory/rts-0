@@ -34,6 +34,7 @@ use crate::game::{Game, PlayerInit};
 use crate::protocol::{
     BranchStagingOccupant, BranchStagingSeat, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat,
     ReplayStartMetadata, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload,
+    TeamId,
 };
 use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
 
@@ -110,8 +111,19 @@ pub enum RoomEvent {
     Ready { player_id: u32, ready: bool },
     /// The host requested the match to begin (honored only from the host when `can_start`).
     StartRequest { player_id: u32 },
+    /// The host selected a team preset (lobby phase only; honored only from the host).
+    SetTeamPreset { player_id: u32, preset: String },
+    /// The host assigned one active lobby seat to a team (lobby phase only; honored only from host).
+    SetTeam {
+        player_id: u32,
+        target: u32,
+        team_id: TeamId,
+    },
     /// The host asked to add a computer opponent (lobby phase only; honored only from the host).
-    AddAi { player_id: u32 },
+    AddAi {
+        player_id: u32,
+        team_id: Option<TeamId>,
+    },
     /// The host asked to remove an AI opponent by id (lobby phase only; honored only from host).
     RemoveAi { player_id: u32, target: u32 },
     /// The host toggled the lobby's start-with-more-money mode.

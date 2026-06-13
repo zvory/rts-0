@@ -1,6 +1,6 @@
 # Phase 2 - Scriptable Lobby Team Setup
 
-Status: planned.
+Status: implemented.
 
 ## Goal
 
@@ -88,3 +88,16 @@ None expected beyond confirming any temporary test/dev gate is not visible in or
 
 The phase handoff must describe how to script each preset in tests, list the new lobby commands,
 document solo semantics, and call out that user-facing lobby controls are intentionally deferred.
+
+## Handoff
+
+- Script presets with host-only WebSocket messages:
+  - `setTeamPreset { preset: "solo"|"ffa"|"1v2"|"1v3"|"2v2" }`
+  - `setTeam { id, teamId }`
+  - `addAi { teamId? }`
+- `solo` starts with exactly one active non-spectator player on Team 1, does not add or require an
+  AI opponent, and keeps the existing never-ending sandbox behavior.
+- `ffa` remains the default ordinary-room preset. `1v2`, `1v3`, and `2v2` are scriptable for tests
+  and dev automation but intentionally have no normal lobby UI controls yet.
+- Preset templates are deterministic with the active host first when possible: `1v2` is
+  `[1,2,2]`, `1v3` is `[1,2,2,2]`, and `2v2` is `[1,1,2,2]`.

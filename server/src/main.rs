@@ -1370,8 +1370,36 @@ async fn handle_client_message(
             )
             .await;
         }
-        ClientMessage::AddAi => {
-            send_room_event(player_id, current_room, RoomEvent::AddAi { player_id }).await;
+        ClientMessage::SetTeamPreset { preset } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetTeamPreset { player_id, preset },
+            )
+            .await;
+        }
+        ClientMessage::SetTeam {
+            id: target,
+            team_id,
+        } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetTeam {
+                    player_id,
+                    target,
+                    team_id,
+                },
+            )
+            .await;
+        }
+        ClientMessage::AddAi { team_id } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::AddAi { player_id, team_id },
+            )
+            .await;
         }
         ClientMessage::RemoveAi { id } => {
             send_room_event(

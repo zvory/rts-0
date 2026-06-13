@@ -108,8 +108,20 @@ pub enum ClientMessage {
     Ready { ready: bool },
     /// Host requests the match to begin.
     Start,
+    /// Host selects a lobby team preset (lobby phase only).
+    SetTeamPreset { preset: String },
+    /// Host assigns one active lobby seat to a nonzero team id (lobby phase only).
+    SetTeam {
+        id: u32,
+        #[serde(rename = "teamId")]
+        team_id: TeamId,
+    },
     /// Host adds a computer-controlled opponent to the room (lobby phase only).
-    AddAi,
+    AddAi {
+        #[serde(rename = "teamId")]
+        #[serde(default)]
+        team_id: Option<TeamId>,
+    },
     /// Host removes a previously-added AI opponent by its player id (lobby phase only).
     RemoveAi { id: u32 },
     /// Host toggles the lobby's debug mode.
@@ -365,6 +377,7 @@ pub enum ServerMessage {
         players: Vec<LobbyPlayer>,
         can_start: bool,
         quickstart: bool,
+        team_preset: String,
         /// Currently selected map name.
         map: String,
         /// All available maps (populated from disk at broadcast time).

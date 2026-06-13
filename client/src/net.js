@@ -128,9 +128,19 @@ export class Net {
     this._send(msg.start());
   }
 
+  /** Select a scripted lobby team preset (host-only; ignored by the server otherwise). */
+  setTeamPreset(preset) {
+    this._send(msg.setTeamPreset(preset));
+  }
+
+  /** Assign one lobby seat to a nonzero team id (host-only; ignored by the server otherwise). */
+  setTeam(id, teamId) {
+    this._send(msg.setTeam(id, teamId));
+  }
+
   /** Add a computer opponent to the room (host-only; ignored by the server otherwise). */
-  addAi() {
-    this._send(msg.addAi());
+  addAi(teamId = undefined) {
+    this._send(msg.addAi(teamId));
   }
 
   /**

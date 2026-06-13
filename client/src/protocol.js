@@ -23,6 +23,8 @@ export const C = Object.freeze({
   JOIN: "join",
   READY: "ready",
   START: "start",
+  SET_TEAM_PRESET: "setTeamPreset",
+  SET_TEAM: "setTeam",
   ADD_AI: "addAi",
   REMOVE_AI: "removeAi",
   SET_QUICKSTART: "setQuickstart",
@@ -802,7 +804,13 @@ export const msg = Object.freeze({
   },
   ready: (ready) => ({ t: C.READY, ready: !!ready }),
   start: () => ({ t: C.START }),
-  addAi: () => ({ t: C.ADD_AI }),
+  setTeamPreset: (preset) => ({ t: C.SET_TEAM_PRESET, preset }),
+  setTeam: (id, teamId) => ({ t: C.SET_TEAM, id, teamId }),
+  addAi: (teamId = undefined) => {
+    const payload = { t: C.ADD_AI };
+    if (teamId != null) payload.teamId = teamId;
+    return payload;
+  },
   removeAi: (id) => ({ t: C.REMOVE_AI, id }),
   setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
   setSpectator: (spectator) => ({ t: C.SET_SPECTATOR, spectator: !!spectator }),

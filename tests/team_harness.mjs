@@ -127,6 +127,35 @@ export async function addAi(host, count = 1, { timeoutMs = 3000 } = {}) {
   return added;
 }
 
+export async function addAiToTeam(host, teamId, { timeoutMs = 3000 } = {}) {
+  const beforeIds = new Set(lastLobby(host)?.players.map((player) => player.id) || []);
+  host.send({ t: "addAi", teamId });
+  const lobby = await host.waitNext(
+    (msg) => msg.t === "lobby" && msg.players.some((player) => player.isAi && !beforeIds.has(player.id)),
+    timeoutMs,
+    `lobby with added AI on team ${teamId}`,
+  );
+  return lobby.players.find((player) => player.isAi && !beforeIds.has(player.id));
+}
+
+export async function setTeamPreset(host, preset, { timeoutMs = 3000 } = {}) {
+  host.send({ t: "setTeamPreset", preset });
+  return host.waitNext(
+    (msg) => msg.t === "lobby" && msg.teamPreset === preset,
+    timeoutMs,
+    `lobby with ${preset} preset`,
+  );
+}
+
+export async function setTeam(host, id, teamId, { timeoutMs = 3000 } = {}) {
+  host.send({ t: "setTeam", id, teamId });
+  return host.waitNext(
+    (msg) => msg.t === "lobby" && msg.players.some((player) => player.id === id && player.teamId === teamId),
+    timeoutMs,
+    `lobby with ${id} on team ${teamId}`,
+  );
+}
+
 export async function removeAi(host, id, { timeoutMs = 3000 } = {}) {
   host.send({ t: "removeAi", id });
   return host.waitNext(
@@ -152,6 +181,13 @@ export async function startMatch(host, participants, { timeoutMs = 6000 } = {}) 
   return { countdowns, starts };
 }
 
+export async function startMatchDirect(host, participants, { timeoutMs = 3000 } = {}) {
+  host.send({ t: "start" });
+  return Promise.all(participants.map((client) =>
+    client.waitFor((msg) => msg.t === "start", timeoutMs, `${client.tag} start`)
+  ));
+}
+
 export async function waitForGameOver(clients, { timeoutMs = 4000 } = {}) {
   return Promise.all(clients.map((client) =>
     client.waitFor((msg) => msg.t === "gameOver", timeoutMs, `${client.tag} gameOver`)
@@ -171,6 +207,8 @@ export function assertLobbyProtocol(ok, lobby, { expectedPlayers, hostId } = {})
   ok(typeof lobby.hostId === "number", `LOBBY: hostId is numeric (${lobby.hostId})`);
   if (hostId != null) ok(lobby.hostId === hostId, `LOBBY: host is expected player (${lobby.hostId})`);
   ok(typeof lobby.canStart === "boolean", `LOBBY: canStart is boolean (${lobby.canStart})`);
+  ok(typeof lobby.teamPreset === "string" && lobby.teamPreset.length > 0,
+    `LOBBY: teamPreset is present (${lobby.teamPreset})`);
   ok(Array.isArray(lobby.players), `LOBBY: players is an array (${lobby.players?.length})`);
   if (expectedPlayers != null) ok(lobby.players.length === expectedPlayers, `LOBBY: lists ${expectedPlayers} participants`);
   ok(Array.isArray(lobby.maps) && lobby.maps.length >= 1, `LOBBY: exposes selectable maps (${lobby.maps?.length})`);
