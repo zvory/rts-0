@@ -21,3 +21,13 @@ clearer.
 Each phase document should describe its scope, expected code or documentation touch points,
 verification, manual testing focus, and handoff expectations. When a phase is complete, mark that
 phase document as done in the implementation commit for that phase.
+
+## Executor runner
+
+For unattended executor passes, use `scripts/phase-runner.sh` from a clean checkout. The runner
+creates one `/tmp/rts-worktrees` worktree and one `zvorygin/` branch per phase, invokes Codex with
+the repo-local `$phase-runner` skill, saves a compact JSON handoff under the plan directory, and
+commits completed phase work.
+
+The runner is only for implementation phases that already have approved phase files. It does not
+create plans, perform final review, merge to `main`, push, or open PRs.

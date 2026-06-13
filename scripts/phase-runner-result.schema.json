@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["completed", "blocked"]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "files_changed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "verification": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "gameplay_impact": {
+      "type": "string"
+    },
+    "next_executor_notes": {
+      "type": "string"
+    },
+    "manual_test_notes": {
+      "type": "string"
+    },
+    "blocked_reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "summary",
+    "files_changed",
+    "verification",
+    "gameplay_impact",
+    "next_executor_notes",
+    "manual_test_notes",
+    "blocked_reason"
+  ]
+}
