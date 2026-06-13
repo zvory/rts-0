@@ -311,6 +311,7 @@ mod tests {
         );
         let names: Vec<&str> = available.iter().map(|e| e.name.as_str()).collect();
         assert!(names.contains(&"Default"), "got: {names:?}");
+        assert!(names.contains(&"Low Econ"), "got: {names:?}");
         assert!(names.contains(&"No Terrain"), "got: {names:?}");
         // Every entry must have a non-empty description.
         for entry in &available {
@@ -355,7 +356,16 @@ mod tests {
     #[test]
     fn shuffled_starts_get_expansions_from_authored_pool() {
         // All authored expansions from default-handcrafted.json.
-        let authored_expansions: &[(u32, u32)] = &[(63, 38), (63, 88), (88, 62), (38, 62)];
+        let authored_expansions: &[(u32, u32)] = &[
+            (40, 11),
+            (85, 114),
+            (114, 40),
+            (11, 85),
+            (63, 38),
+            (63, 87),
+            (87, 63),
+            (38, 63),
+        ];
         for seed in 0..16u32 {
             let map = Map::generate(4, seed);
             // Every assigned expansion must come from the authored pool.
@@ -372,6 +382,7 @@ mod tests {
                 map.expansion_sites.len(),
                 "duplicate expansion assigned (seed {seed})"
             );
+            assert_eq!(map.expansion_sites.len(), map.starts.len() * 2);
         }
     }
 
@@ -385,8 +396,8 @@ mod tests {
                 .starts
                 .iter()
                 .copied()
-                .zip(map.expansion_sites.iter().copied())
-                .map(|(start, expansion)| (start, vec![expansion]))
+                .zip(map.expansion_sites.chunks_exact(2))
+                .map(|(start, expansions)| (start, expansions.to_vec()))
             {
                 assert!(
                     authored_slots.contains(&slot),
@@ -398,9 +409,9 @@ mod tests {
 
     #[test]
     fn adjacent_two_player_layout_assigns_naturals_away_from_opponent() {
-        // For two-player Default, seed % 6 selects the authored 2p layout. Seed 2 is the
+        // For two-player Low Econ, seed % 6 selects the authored 2p layout. Seed 2 is the
         // top-adjacent NW-vs-NE layout; its naturals are left/right, not the shared top natural.
-        let map = Map::generate(2, 2);
+        let map = Map::load("Low Econ", 2, 2).expect("low econ map should load");
         let pairs: HashSet<_> = map
             .starts
             .iter()
@@ -415,10 +426,10 @@ mod tests {
     }
 
     #[test]
-    fn safer_expansions_grants_two_naturals_per_player() {
+    fn default_grants_two_naturals_per_player() {
         for player_count in 1..=4 {
-            let map = Map::load("Safer Expansions", player_count, 0x1234_5678)
-                .expect("safer expansions should load from bundled assets");
+            let map = Map::load("Default", player_count, 0x1234_5678)
+                .expect("default map should load from bundled assets");
 
             assert_eq!(map.starts.len(), player_count);
             assert_eq!(map.expansion_sites.len(), player_count * 2);
@@ -525,10 +536,10 @@ mod tests {
 
     fn default_authored_slots() -> [BaseSlot; 4] {
         [
-            ((25, 25), vec![(63, 38)]),
-            ((100, 100), vec![(63, 88)]),
-            ((100, 25), vec![(88, 62)]),
-            ((25, 100), vec![(38, 62)]),
+            ((13, 12), vec![(40, 11), (63, 38)]),
+            ((112, 113), vec![(85, 114), (63, 87)]),
+            ((112, 12), vec![(114, 40), (87, 63)]),
+            ((13, 113), vec![(11, 85), (38, 63)]),
         ]
     }
 }
