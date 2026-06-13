@@ -19,7 +19,7 @@ export default scenario("queued_order_visibility", {
     selectOwn("worker", 0),
     issue("move", { x: 3392, y: 3216 }),
     issue("attackMove", { x: 3488, y: 3280, queued: true }),
-    waitForSnapshot({ minTickDelta: 3 }),
+    waitForSnapshot({ minTickDelta: 360 }),
     capture("after-queued-orders"),
     assertOrderPlansMatch({ unit: "worker" }),
   ],
