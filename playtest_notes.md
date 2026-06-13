@@ -1,3 +1,6 @@
+make it so tanks take up more selection slots
+
+
 attempting to join a replay in progress doesn't give you vision, it's all fog, but when reclaiming position from this all fog mode, the top bar actualy works
 
 when host leaves the replay, it seems to kill the repolay?
