@@ -14,6 +14,9 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
 
 ## Core Constraints
 
+- This is a pre-alpha refactor with **zero backwards compatibility guarantees**. Old replay
+  artifacts, persisted match-history replays, old protocol payloads, old compact snapshot versions,
+  and old clients may break. Preserve current live gameplay behavior, not old saved data formats.
 - Preserve the current faction's gameplay unless a phase explicitly changes it.
 - Keep the server authoritative for economy, production, fog, combat, abilities, match outcome, and
   faction validation.
@@ -32,8 +35,41 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
   faction architecture itself.
 - Prefer small registries and typed helpers over stringly scattered checks. If a phase adds an
   exception, add a follow-up or ratchet so the exception does not become the new pattern.
-- AI support for new factions is not required for the first human-playable faction unless a phase
-  explicitly opts into it.
+- AI support for new factions is explicitly out of scope until a phase opts into it. AI slots must
+  stay current-faction-only and server/lobby validation must enforce that.
+- Prediction/WASM may be disabled for non-default factions until the WASM simulation and adapter
+  intentionally support the new faction contracts.
+- Faction definitions start as authoritative Rust catalog data. The client should consume a
+  mechanically generated or mechanically checked JS mirror; do not hand-maintain divergent faction
+  data.
+- Runtime and wire entity identity stays global for now. Faction catalogs control which global
+  units, buildings, upgrades, abilities, labels, stats, and commands are legal for a player.
+- Factions may have completely different economies. The architecture must not assume steel/oil are
+  permanent global fields.
+- Avoid faction-specific map resource objects for the first new faction unless the approved faction
+  brief requires them. Prefer universal map resources that some factions ignore, or non-map
+  resource generation through buildings/abilities/timers.
+
+## Approved Design Decisions
+
+- **Compatibility:** no backwards compatibility requirement for replay artifacts, match-history
+  replay payloads, compact snapshot versions, old clients, or old protocol payloads.
+- **Economy:** factions can have completely different resource sets, so generic resource payloads
+  are part of the architecture rather than an optional later migration.
+- **Data ownership:** faction catalogs are Rust-authoritative. Client data is generated or
+  mechanically checked from the Rust catalog.
+- **Entity identity:** keep one global `EntityKind`/wire-kind namespace for now; faction catalogs
+  decide availability and rules.
+- **Command legality:** the server rejects out-of-faction build/train/research/economy/ability
+  commands even if the referenced global kind exists.
+- **Starts:** faction starting loadouts define starting entities, resources, supply model, and
+  optional opening upgrades/flags.
+- **AI:** AI remains current-faction-only until an explicit AI phase implements another faction.
+- **Prediction:** non-default factions can disable prediction/WASM until prediction is updated.
+- **Client catalog:** keep local client descriptors, but generate or mechanically verify them from
+  authoritative Rust data. Do not switch to server-sent command-card descriptors in this plan.
+- **Abilities:** build the smallest registry/effect surface needed for known abilities and the
+  approved second faction; do not build a generic scripting engine.
 
 ## Phase Summaries
 
@@ -50,44 +86,73 @@ creates the contract all later faction data hangs from.
 Phase 2 moves unit, building, upgrade, and tech-tree queries behind faction-aware catalog APIs. It
 keeps the existing faction's rules unchanged, but stops production/build/research code from
 assuming one global tech tree. This phase is where architectural cleanliness matters most: old
-hardcoded checks should either move into catalog data or remain behind named compatibility helpers.
+hardcoded checks should either move into catalog data or remain behind named compatibility helpers,
+and client catalog data must become generated or mechanically parity-checked from Rust.
 
-Phase 3 refactors economy and starting loadouts so a faction can opt into different starting
-entities and resource usage. It must keep the current steel/oil/supply behavior exactly compatible
-while adding a test fixture faction that can start without mining steel or oil. This phase should
-not yet build the real new faction; it proves the engine can support one.
+Phase 3 replaces fixed steel/oil economy payload assumptions with a generic resource contract. It
+may break old snapshots and replays because this project does not require pre-alpha backwards
+compatibility. The current faction should still display and spend Steel, Oil, and Supply exactly as
+players expect, but the protocol and HUD should be capable of representing different spendable
+resource sets.
 
-Phase 4 expands the ability system into a faction-ready ability registry and reusable effect
-surface. It keeps Smoke, Mortar Fire, Artillery Point Fire, and Breakthrough behavior intact while
-making discovery, cooldown projection, charges, costs, command-card affordances, and protocol ids
-work for additional abilities. This is the main prerequisite for an ability-heavy faction.
+Phase 4 moves starting entities, starting resources, supply rules, opening upgrades, and fixture
+economy choices into faction loadout definitions. It keeps the current faction's start behavior
+unchanged while proving a test fixture can start with a different economy and no steel/oil mining
+dependency. This phase should avoid faction-specific map resources unless a brief has already
+approved them.
 
-Phase 5 updates the client faction surface: command cards, HUD resources, placement menus,
+Phase 5 turns existing abilities into registry-backed discovery and projection without changing
+their effects. It preserves Smoke, Mortar Fire, Artillery Point Fire, Breakthrough, and legacy
+Charge compatibility while routing ids, carriers, target modes, cooldowns, charges, costs, and
+command-card affordances through faction-aware definitions. This phase should mostly be parity
+tests and command validation, not a new effect engine.
+
+Phase 6 adds the reusable ability effect hooks needed by the approved second faction. It should
+generalize only concrete patterns that are actually needed, such as self buffs, targeted world
+effects, delayed impacts, area effects, toggles/autocast, or limited charges. Any remaining one-off
+effect code is acceptable if the registry clearly documents how Phase 10 should add signature
+abilities.
+
+Phase 7 updates the client faction surface: command cards, HUD resources, placement menus,
 rendering fallbacks, tooltips, hotkeys, and compact protocol decoding. It should preserve the
 current faction's UI while adding fixture-faction coverage for alternate build menus, resources,
 and ability buttons. This phase is player-facing, so DOM contract tests and smoke coverage are
 required.
 
-Phase 6 implements the approved second faction incrementally using the new contracts. It should
-start with the faction brief and rules/balance spec, then add the minimal playable vertical slice
-before expanding the roster. Each unit, building, upgrade, and ability must land with targeted
-server/client tests and factual patch-note bullets.
+Phase 8 is the approval gate for the real second faction. It creates or references the faction
+brief plus rules/balance spec, including economy, loadout, production, roster slices, abilities,
+art readability, and explicit AI/prediction policy. No implementation code for the real faction
+should land until this phase is approved.
 
-Phase 7 handles integration hardening, AI decisions, performance, documentation, and rollout. It
-decides whether AI can play the new faction now or should be restricted to the current faction, then
-tests mixed-faction matches, replay compatibility, fog/security boundaries, and balance docs. This
-phase is where the feature becomes safe to make generally selectable.
+Phase 9 implements the second faction's start, economy, and first production path. It should be a
+playable but narrow slice: the faction can enter a match, see the right resources, create its basic
+production loop, and reject all illegal cross-faction commands. It should keep AI and prediction
+disabled for the new faction unless the approved brief says otherwise.
+
+Phase 10 adds the second faction's first combat and signature ability slice. It should include one
+baseline combat unit, one signature ability-heavy unit, readable client art, fog-safe events, and
+targeted server/client tests. The goal is a short playable match that demonstrates the faction's
+mechanical identity without trying to finish the whole roster.
+
+Phase 11 expands the roster as approved, hardens integration, updates docs, and decides rollout.
+It verifies mixed-faction match shapes, replay/branch/dev scenario flows under the new non-backcompat
+schema, match history, spectators, quickstart, AI restrictions, prediction restrictions, performance,
+and balance documentation. This phase is where faction choice becomes ready for regular playtesting.
 
 ## Phase Index
 
 0. [Phase 0 - Architecture Inventory and Harness](phase-0.md)
 1. [Phase 1 - Faction Identity Contract](phase-1.md)
 2. [Phase 2 - Faction-Aware Rules Catalog](phase-2.md)
-3. [Phase 3 - Economy and Starting Loadouts](phase-3.md)
-4. [Phase 4 - Ability Registry and Effect Hooks](phase-4.md)
-5. [Phase 5 - Client Faction Surface](phase-5.md)
-6. [Phase 6 - Second Faction Vertical Slice](phase-6.md)
-7. [Phase 7 - Integration, AI, Rollout, and Documentation](phase-7.md)
+3. [Phase 3 - Generic Resource Contract](phase-3.md)
+4. [Phase 4 - Faction Starting Loadouts](phase-4.md)
+5. [Phase 5 - Ability Registry Parity](phase-5.md)
+6. [Phase 6 - Ability Effect Hooks](phase-6.md)
+7. [Phase 7 - Client Faction Surface](phase-7.md)
+8. [Phase 8 - Second Faction Brief and Rules Spec](phase-8.md)
+9. [Phase 9 - Second Faction Start and Economy Slice](phase-9.md)
+10. [Phase 10 - Second Faction Combat and Signature Ability Slice](phase-10.md)
+11. [Phase 11 - Roster Expansion, Integration, and Rollout](phase-11.md)
 
 ## Testing Strategy
 
@@ -105,6 +170,10 @@ are:
 - Fog/security tests for new ability events and alternate resource visibility.
 - Architecture checks or reports that flag new direct `EntityKind::Worker`, `steel`, `oil`, or
   current-tech-tree special cases outside approved compatibility modules.
+- Prediction/WASM compatibility checks proving non-default factions either disable prediction with
+  a clear reason or are intentionally supported by the WASM adapter.
+- Generated-client-catalog or catalog-parity tests proving JS descriptors match Rust-authoritative
+  faction data.
 
 Broad test bundles should still be avoided during development. Each phase document names focused
 verification, and the final merge-ready commit should rely on the normal hook for full-suite
@@ -126,6 +195,7 @@ phase. Do not mark later phases complete early.
 - Do not rewrite the renderer or client framework.
 - Do not make generic ECS or data-driven scripting a prerequisite for the first new faction.
 - Do not make the browser authoritative for faction mechanics.
-- Do not require the new faction to have AI support before human play unless Phase 7 decides that
+- Do not implement server-sent command-card descriptors in this plan.
+- Do not preserve old replay/protocol compatibility during this pre-alpha refactor.
+- Do not require the new faction to have AI support before human play unless Phase 11 decides that
   product scope requires it.
-

@@ -1,68 +1,69 @@
-# Phase 6 - Second Faction Vertical Slice
+# Phase 6 - Ability Effect Hooks
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Implement the approved second faction as a playable vertical slice using the new faction, economy,
-catalog, ability, and client surfaces. This phase begins only after the faction brief and rules/
-balance spec are approved.
+Add only the reusable ability effect hooks needed by known current abilities and the approved second
+faction mechanics. Avoid building a generic scripting engine before the faction brief proves the
+needed shapes.
 
 ## Scope
 
-- Complete or reference the faction brief and rules/balance spec before implementation.
-- Add the faction id, catalog data, starting loadout, resource model, and first production path.
-- Implement the minimum playable roster first:
-  - one core/base structure or equivalent anchor
-  - one builder/producer path or equivalent mechanic
-  - one baseline combat unit
-  - one signature ability-heavy unit
-  - enough economy/progression to sustain a short match
-- Add units/buildings/upgrades/abilities incrementally after the vertical slice works.
-- Add art/rendering that is readable enough for playtesting; avoid blank placeholders in normal
-  gameplay.
-- Collect patch-note bullets as stats, economy, combat behavior, and UI affordances are added.
-- Keep AI disabled or restricted for the new faction unless explicitly implemented.
+- Identify from the approved brief or fixture needs which reusable effect classes are required.
+- Add focused hooks for concrete patterns such as:
+  - self buff
+  - targeted world effect
+  - delayed projectile or delayed impact
+  - area effect
+  - toggle/autocast
+  - limited charges
+  - resource-consuming activation
+- Keep complex one-off implementations acceptable when they remain clearer than generic hooks.
+- Ensure hooks receive faction/player context so wrong-faction effects cannot trigger.
+- Ensure every effect event remains fog-safe and does not reveal hidden enemy entities or positions.
+- Keep `Game::tick()` panic-free when ability definitions are missing, stale caster ids are used, or
+  target positions are invalid.
+- Update ability docs with the split between registry metadata and effect implementation.
 
 ## Expected Touch Points
 
-- `server/crates/rules/src/`
-- `server/crates/sim/src/game/`
+- `server/crates/sim/src/game/ability.rs`
+- `server/crates/sim/src/game/services/ability_orders.rs`
+- `server/crates/sim/src/game/services/commands.rs`
+- `server/crates/sim/src/game/services/combat/`
+- `server/crates/sim/src/game/smoke.rs`
+- `server/crates/sim/src/game/mortar.rs`
+- `server/crates/sim/src/game/artillery.rs`
+- `server/crates/sim/src/game/snapshot.rs`
 - `server/crates/protocol/src/lib.rs`
-- `server/src/protocol.rs`
 - `client/src/protocol.js`
 - `client/src/config.js`
 - `client/src/hud_command_card.js`
-- `client/src/renderer/`
-- `docs/design/balance.md`
 - `docs/design/protocol.md`
-- `docs/design/client-ui.md`
 - `docs/design/server-sim.md`
+- `docs/design/balance.md`
 
 ## Verification
 
-- Focused Rust tests for every new unit/building/ability rule.
-- Protocol parity tests for every new kind, ability, upgrade, event, or resource id.
-- Client command-card descriptor tests for the new faction.
-- Server integration test for a mixed-faction match start and basic production/ability use.
-- Fog/security regression tests for signature abilities.
-- Targeted client smoke test for rendering and command issuance.
-- Balance docs updated in the same change as player-facing stats.
+- Rust tests for each reusable hook that is added.
+- Rust regression tests proving existing ability effects remain behaviorally unchanged.
+- Fog/security tests for every event or reveal produced by the hooks.
+- Command tests for stale ids, invalid target positions, wrong-faction effects, and missing
+  definitions.
+- Client descriptor tests if any hook changes projection, charges, cooldowns, or event rendering.
 
 ## Manual Testing Focus
 
-Play a short local match or dev scenario as the new faction and verify start, resource/progression,
-building/production path, signature ability use, combat readability, and defeat/win behavior.
-Also play a current-faction match to confirm it was not regressed.
+Use debug mode to execute every current ability and inspect that visuals, cooldowns, resource costs,
+autocast state, and fog behavior are unchanged.
 
 ## Handoff Expectations
 
-The handoff must include patch-note bullets, the implemented roster/progression list, tests run,
-known balance risks, and what remains for the next implementation slice. It should also state
-whether AI can select the new faction or remains blocked.
+The handoff must list the hooks that exist, the effect code intentionally left one-off, and the
+specific path Phase 10 should follow to add the second faction's signature ability.
 
 ## Player-Facing Outcome
 
-Players can try the new faction's first playable slice. The faction should feel mechanically
-distinct enough to validate the architecture, even if final balance and roster depth are deferred.
-
+No intended current-faction balance change. The ability system has practical extension points for
+the second faction without becoming a general scripting system.

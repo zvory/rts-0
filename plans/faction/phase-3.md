@@ -1,67 +1,78 @@
-# Phase 3 - Economy and Starting Loadouts
+# Phase 3 - Generic Resource Contract
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Make faction-specific starts and economy models possible while preserving the current steel/oil/
-supply faction. Add a fixture faction for tests that can start without steel/oil mining, but do
-not implement the real new faction's roster yet.
+Replace fixed steel/oil economy payload assumptions with a generic resource contract that can
+represent completely different faction economies. Current-faction gameplay should remain the same,
+but old replay artifacts, compact snapshot versions, and old clients may break.
 
 ## Scope
 
-- Move starting entities and starting resources into faction loadout definitions.
-- Let a faction define whether it uses steel, oil, supply, current resource nodes, alternate
-  resources, or no mined resources.
-- Decide the minimal protocol shape for alternate resources:
-  - either keep fixed `steel/oil/supply` for Phase 3 and allow the fixture to ignore them, or
-  - introduce a generic resource bag if the approved architecture requires it now.
-- Keep current faction snapshot fields compatible unless a deliberate protocol migration is made.
-- Make resource node spawning map/faction aware enough that factions can ignore map resources
-  without breaking opponents who still need them.
-- Add server validation for illegal cross-faction economy commands.
-- Keep score calculations and match history sensible for zero-cost or alternate-cost fixture
-  entities.
+- Introduce typed resource ids and definitions in the Rust-authoritative rules/faction catalog.
+- Represent current Steel, Oil, and Supply through the new resource contract.
+- Decide the exact semantic split between spendable resources and capacity resources such as
+  supply. Supply may remain a specialized resource type, but it should still be faction-defined.
+- Replace or wrap fixed `steel`, `oil`, `supplyUsed`, and `supplyCap` snapshot/player-resource
+  assumptions with generic resource payloads.
+- Bump compact snapshot and prediction protocol versions as needed without migration shims.
+- Update replay artifacts, replay start metadata, match-history replay serialization, branch
+  keyframes, and dev session starts to use the new schema.
+- Update HUD/resource rendering for the current faction through the generic payload while keeping
+  player-visible Steel/Oil/Supply presentation unchanged.
+- Add server-side affordability/spend/refund helpers that operate on resource ids instead of
+  steel/oil pairs.
+- Add architecture-check pressure against new direct `steel`/`oil` economy fields outside approved
+  compatibility shims during migration.
+- Disable prediction for non-default or generic-resource fixture factions until the WASM adapter is
+  intentionally updated.
 
 ## Expected Touch Points
 
-- `server/crates/sim/src/game/setup.rs`
+- `server/crates/rules/src/`
 - `server/crates/sim/src/game/player_state.rs`
 - `server/crates/sim/src/game/services/economy.rs`
 - `server/crates/sim/src/game/services/construction.rs`
 - `server/crates/sim/src/game/services/production.rs`
 - `server/crates/sim/src/game/snapshot.rs`
+- `server/crates/sim/src/game/replay.rs`
 - `server/crates/contract/src/lib.rs`
 - `server/crates/protocol/src/lib.rs`
+- `server/src/lobby/`
+- `client/src/protocol.js`
 - `client/src/state.js`
 - `client/src/hud.js`
 - `client/src/config.js`
+- `tests/protocol_parity.mjs`
+- `tests/sim_wasm_smoke.mjs`
 - `docs/design/protocol.md`
 - `docs/design/balance.md`
 
 ## Verification
 
-- Rust tests for default current-faction start parity.
-- Rust tests for fixture-faction starts with no steel/oil mining requirement.
-- Server integration test for mixed current-faction plus fixture-faction match start.
-- Protocol parity tests if resource or start payload shapes change.
-- Client contract tests for HUD resource rendering if generic resources are introduced.
-- Fog tests proving resource node visibility does not leak faction-specific hidden state.
+- Rust tests proving current-faction Steel/Oil/Supply values match the old start and spend behavior.
+- Rust tests for generic affordability, spending, refunding, capacity checks, and spectator
+  per-player resource projection.
+- Protocol parity tests for resource ids, generic resource payloads, and compact snapshot version.
+- Client HUD/resource tests proving current-faction resource display is unchanged.
+- Replay/branch serialization tests proving the new schema round-trips; no old replay compatibility
+  test is required.
+- Prediction/WASM test or client contract proving unsupported faction/resource payloads disable
+  prediction with a clear reason.
 
 ## Manual Testing Focus
 
-Verify current faction gathering and spending still work. If a fixture faction is exposed in a dev
-path, verify it starts with its fixture loadout, does not need steel/oil mining, and cannot issue
-current-faction build/train commands.
+Start a normal current-faction match and verify Steel, Oil, Supply, gathering, spending, training,
+researching, spectator resource rows, and post-match replay display still look correct.
 
 ## Handoff Expectations
 
-The handoff must state the chosen resource protocol strategy, list what remains fixed to
-steel/oil/supply, and identify any UI limitations left for Phase 5. It should also include the
-mixed-faction test command and result.
+The handoff must document the resource payload shape, compact snapshot version change, replay schema
+change, which fixed steel/oil helpers remain temporarily, and how Phase 4 should define faction
+starting resources and supply rules.
 
 ## Player-Facing Outcome
 
-The current faction should play unchanged. Dev/test fixtures prove a different economy and start
-model can exist without destabilizing normal matches.
-
+The current faction should look and play unchanged, but the underlying economy contract can now
+represent factions that do not use Steel/Oil.

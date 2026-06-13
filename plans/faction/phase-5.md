@@ -1,65 +1,64 @@
-# Phase 5 - Client Faction Surface
+# Phase 5 - Ability Registry Parity
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Make the browser client render and command different faction catalogs without breaking the current
-HUD. This phase should turn server-side faction/economy/ability contracts into clear command cards,
-resource displays, placement options, hotkeys, and visual fallbacks.
+Route existing ability discovery, validation, cooldown projection, remaining uses, costs, and
+command-card affordances through faction-aware registry definitions while preserving current
+behavior. This phase is a parity refactor, not a new ability-effect framework.
 
 ## Scope
 
-- Make client config/catalog access faction-aware.
-- Support faction-specific build menus instead of one global `WORKER_BUILDABLE` list.
-- Support faction-specific train/research/ability buttons.
-- Update HUD resource rendering for the chosen Phase 3 resource strategy.
-- Add visual fallbacks for unknown or fixture units/buildings so protocol additions do not render
-  blank.
-- Update hotkey profile behavior so new faction command ids are stable and do not collide
-  accidentally.
-- Keep no-framework/no-build-step client conventions.
-- Preserve current faction command card DOM/classes/hotkeys unless a documented migration is
-  required.
+- Add a faction-aware ability registry with stable ids, labels, carriers, target mode, range,
+  cooldown, charges, resource cost, queue behavior, tech requirement, and autocast metadata.
+- Represent existing Smoke, Mortar Fire, Artillery Point Fire, Breakthrough, and legacy Charge in
+  the registry.
+- Keep current one-off effect implementations intact where practical.
+- Route command validation, carrier eligibility, target-mode validation, resource cost checks,
+  cooldown projection, remaining uses, autocast availability, and command-card discovery through
+  the registry.
+- Reject wrong-faction ability use on the server.
+- Update generated or mechanically checked client ability descriptors so the command card mirrors
+  Rust registry data.
+- Keep protocol ids and compact ability projection synchronized with the registry.
 
 ## Expected Touch Points
 
-- `client/src/config.js`
+- `server/crates/rules/src/`
+- `server/crates/sim/src/game/ability.rs`
+- `server/crates/sim/src/game/services/ability_orders.rs`
+- `server/crates/sim/src/game/services/commands.rs`
+- `server/crates/sim/src/game/snapshot.rs`
+- `server/crates/protocol/src/lib.rs`
 - `client/src/protocol.js`
-- `client/src/state.js`
-- `client/src/hud.js`
+- `client/src/config.js`
 - `client/src/hud_command_card.js`
-- `client/src/input/`
-- `client/src/renderer/units.js`
-- `client/src/renderer/buildings.js`
-- `client/src/hotkey_profiles.js`
-- `tests/client_contracts.mjs`
 - `tests/hud_command_card.mjs`
-- `docs/design/client-ui.md`
+- `docs/design/protocol.md`
+- `docs/design/server-sim.md`
+- `docs/design/balance.md`
 
 ## Verification
 
-- Command-card descriptor tests for current faction parity.
-- Command-card descriptor tests for fixture faction build/train/research/ability cards.
-- Client protocol parity tests for new faction/resource/ability fields.
-- Hotkey profile tests for new command ids.
-- Client architecture checker if imports or module boundaries change.
-- Client smoke test when visible HUD/rendering behavior changes.
+- Rust ability registry tests for all existing abilities.
+- Rust command tests for carrier eligibility, wrong-faction carriers, target modes, resource costs,
+  cooldowns, charges, queueing, autocast gating, and invalid ids.
+- Client descriptor tests proving existing ability buttons, hotkeys, labels, costs, and cooldown
+  clocks are unchanged.
+- Protocol parity tests for ability ids and compact ability projection.
+- Focused debug-mode sim/client test for existing ability availability.
 
 ## Manual Testing Focus
 
-Start current-faction debug mode and verify the command card, build placement, training,
-researching, and ability buttons. If fixture faction is exposed in a dev path, verify its resource
-display and command card show only fixture-legal actions.
+In debug mode, verify Scout Car Smoke, Mortar Fire, Artillery Point Fire, and Command Car
+Breakthrough still appear on the correct units and execute as before.
 
 ## Handoff Expectations
 
-The handoff must identify the client catalog entry points, added descriptor tests, and any visual
-fallbacks that are intentionally temporary. It should tell Phase 6 how to add real faction UI data
-without editing command-card logic.
+The handoff must list the ability registry fields, remaining one-off effect code, generated/client
+mirror status, and the recipe for adding a registry-backed ability in Phase 6 or Phase 10.
 
 ## Player-Facing Outcome
 
-The current UI should look and behave unchanged. The client becomes capable of presenting a
-different faction's tech tree and ability set through data-backed descriptors.
-
+No intended current-faction balance change. Existing abilities are now cataloged and faction-aware.
