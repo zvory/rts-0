@@ -99,13 +99,19 @@ export class BranchStaging {
 export const REPLAY_ANALYSIS_TABS
 createReplayAnalysisOverlayPreferences(storage?)
 export class ReplayAnalysisOverlay {
-  constructor({ root, preferences })      // mounts replay-only analysis shell under root
+  constructor({ root, preferences, getEntities, getCameraBounds, getPlayers, stats })
+  applyReplayAnalysis(payload)            // renders server-backed production, unit, and losses tabs
+  update()                                // refreshes viewport army value from camera/snapshot state
   destroy()
 }
 ```
 `App` owns one replay analysis preference object and passes it through replay `Match` rebuilds so
 selected tab, visible state, and collapsed state survive replay seek-triggered `start` messages.
-The overlay owns its generated DOM and is read-only until later phases populate real metrics.
+The overlay owns its generated DOM and is read-only. The Army Value tab is client-side and
+viewport-specific; Production, Units, Units Lost, and Resources Lost render the latest
+server-authored `replayAnalysis` payload. Resources Lost follows the protocol's narrow definition:
+spent steel/oil value of units that died, excluding buildings, stockpile changes, harvesting,
+refunds, and cancelled queues.
 
 `settings_container.js`
 ```js

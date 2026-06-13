@@ -1,6 +1,6 @@
 # Phase 5 - Losses, Resources Lost, and Hardening
 
-Status: Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -70,8 +70,40 @@ short player-facing patch-note summary of the new replay analysis affordances. I
 are desired, the handoff should describe how to add a new tab descriptor and whether it needs
 client-only viewport data or server-backed replay analysis data.
 
+## Implementation Handoff
+
+- Units Lost renders per-player loss groups from `replayAnalysis.players[].unitsLost`, sorted by
+  mirrored unit label. Each player gets a `Total lost` row with count, steel value, and oil value,
+  followed by per-kind rows.
+- Resources Lost renders the Phase 3 definition exactly: spent steel/oil value of units that died.
+  The tab labels this as `Dead unit value` and explicitly excludes buildings, cancelled queues,
+  refunds, harvesting, and stockpile changes.
+- Server/protocol counters were not changed; the existing `replayAnalysis` contract already matched
+  the Phase 3 resource-loss definition.
+- Tab buttons use roving `tabIndex` with Arrow, Home, and End keyboard navigation. The overlay still
+  stores selected tab, visible state, and collapsed state in `createReplayAnalysisOverlayPreferences`
+  so seek-triggered `Match` rebuilds preserve user state.
+- Additional DOM coverage lives in `tests/client_contracts.mjs` for loss rendering, resource-loss
+  labeling/totals, seek-style payload replacement, and keyboard tab navigation.
+
+## Automated Verification
+
+```bash
+node tests/client_contracts.mjs
+node scripts/check-client-architecture.mjs
+```
+
+Browser smoke coverage for opening a real replay, toggling every tab, seeking, and asserting values
+after rebuild remains a gap; no existing smoke harness path was extended in this phase.
+
+## Patch Notes
+
+- Replay analysis now includes completed Units Lost and Resources Lost tabs.
+- Resources Lost reports killed unit value only, making it a fight-loss metric rather than a broad
+  economy or spending tracker.
+- Replay analysis tabs are easier to operate from the keyboard with arrow/Home/End navigation.
+
 ## Player-Facing Outcome
 
 Replay viewers have a coherent analysis suite for current fight value, production, unit
 composition, units lost, and resource value lost, with reliable behavior across replay seeking.
-
