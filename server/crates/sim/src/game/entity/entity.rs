@@ -248,6 +248,23 @@ impl Entity {
         }
     }
 
+    pub(crate) fn set_movement_delta(&mut self, dx: f32, dy: f32) {
+        if let Some(m) = self.movement.as_mut() {
+            m.last_move_delta = if dx.is_finite() && dy.is_finite() {
+                (dx, dy)
+            } else {
+                (0.0, 0.0)
+            };
+        }
+    }
+
+    pub(crate) fn movement_delta(&self) -> (f32, f32) {
+        self.movement
+            .as_ref()
+            .map(|m| m.last_move_delta)
+            .unwrap_or((0.0, 0.0))
+    }
+
     pub fn set_last_repath_tick(&mut self, tick: u32) {
         if let Some(m) = self.movement.as_mut() {
             m.last_repath_tick = tick;
@@ -376,6 +393,9 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.path = path;
             m.scout_car_reverse_waypoint = None;
+            if m.path.is_empty() {
+                m.last_move_delta = (0.0, 0.0);
+            }
         }
     }
 
@@ -383,6 +403,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.path.clear();
             m.scout_car_reverse_waypoint = None;
+            m.last_move_delta = (0.0, 0.0);
         }
     }
 
@@ -1013,6 +1034,7 @@ impl Entity {
             m.order = Order::Idle;
             m.queued_orders.clear();
             m.path.clear();
+            m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
         self.reset_artillery_accuracy();
@@ -1026,6 +1048,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
             m.path.clear();
+            m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
     }
