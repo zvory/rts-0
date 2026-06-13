@@ -72,7 +72,40 @@ function isTeamRelated(pathname) {
   return (
     pathname === "tests/team_integration.mjs" ||
     pathname === "tests/team_harness.mjs" ||
+    pathname === "server/crates/sim/src/game/teams.rs" ||
+    pathname === "server/crates/sim/src/game/snapshot.rs" ||
+    pathname === "server/crates/sim/src/game/fog.rs" ||
+    pathname === "server/crates/sim/src/game/building_memory.rs" ||
+    pathname === "server/crates/sim/src/game/map/authored/assignment.rs" ||
+    pathname === "server/crates/sim/src/game/map/team_assignment_tests.rs" ||
+    pathname === "server/src/lobby/room_task.rs" ||
+    pathname === "server/src/lobby/team_setup.rs" ||
+    pathname === "client/src/state.js" ||
+    pathname === "client/src/lobby.js" ||
+    pathname === "client/src/scoreboard.js" ||
+    pathname === "client/src/replay_viewer.js" ||
+    pathname === "client/src/replay_controls.js" ||
+    pathname.startsWith("client/src/input/") ||
+    pathname.startsWith("server/crates/ai/src/") ||
+    pathname.startsWith("server/crates/sim/src/game/services/combat/") ||
+    pathname.startsWith("server/crates/sim/src/game/services/commands") ||
+    pathname.startsWith("server/crates/sim/src/game/services/world_query") ||
+    pathname.startsWith("server/crates/sim/src/rules/projection") ||
+    isProtocolShape(pathname) ||
     pathname.startsWith("plans/teams/") ||
+    [
+      "docs/context/client-ui.md",
+      "docs/context/match-history.md",
+      "docs/context/protocol.md",
+      "docs/context/server-sim.md",
+      "docs/context/testing.md",
+      "docs/design/ai.md",
+      "docs/design/client-ui.md",
+      "docs/design/match-history.md",
+      "docs/design/protocol.md",
+      "docs/design/server-sim.md",
+      "docs/design/testing.md",
+    ].includes(pathname) ||
     pathname.includes("team")
   );
 }
@@ -185,12 +218,15 @@ export function selectSuites(files) {
 
 function verify() {
   const cases = [
-    [["server/crates/protocol/src/lib.rs"], ["cargo-test-contract-protocol", "js-protocol-contracts", "node-server-integration"]],
+    [["server/crates/protocol/src/lib.rs"], ["cargo-test-contract-protocol", "js-protocol-contracts", "node-server-integration", "node-team-integration"]],
     [["server/crates/rules/src/balance.rs"], ["cargo-test-rules", "cargo-test-sim", "js-protocol-contracts"]],
     [["server/crates/sim/src/game/systems.rs"], ["cargo-test-sim", "node-server-integration"]],
-    [["server/crates/ai/src/ai_core/profiles.rs"], ["cargo-test-ai", "node-ai-integration", "full-ai"]],
-    [["server/src/lobby/room_task.rs"], ["cargo-test-server", "node-server-integration", "node-regression", "node-ai-integration", "client-smoke"]],
+    [["server/crates/sim/src/game/teams.rs"], ["cargo-test-sim", "node-server-integration", "node-team-integration"]],
+    [["server/crates/sim/src/game/map/authored/assignment.rs"], ["cargo-test-sim", "node-server-integration", "node-team-integration"]],
+    [["server/crates/ai/src/ai_core/profiles.rs"], ["cargo-test-ai", "node-ai-integration", "node-team-integration", "full-ai"]],
+    [["server/src/lobby/room_task.rs"], ["cargo-test-server", "node-server-integration", "node-regression", "node-ai-integration", "node-team-integration", "client-smoke"]],
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    [["client/src/state.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "node-team-integration", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
     [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
     [["plans/teams/phase-1.md"], ["node-team-integration"]],

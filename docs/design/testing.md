@@ -91,6 +91,11 @@ suites.
   FFA compatibility, current authored map proximity, 1v2/1v3 team layouts, synthetic larger layouts,
   start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
   live lobby/start contract.
+- `tests/team_integration.mjs` is the canonical live multi-client team suite. It requires a running
+  server and covers default singleton FFA, solo sandbox starts, scripted `1v2`/`1v3`/`2v2` setup,
+  host-only/invalid team mutation rejection, shared team snapshot vision, allied command-authority
+  no-ops, allied attack rejection, and team victory/game-over semantics. `tests/run-all.sh --no-rust`
+  includes this suite in the live Node API pass, so a final local gate already exercises it.
 - `rts-ai`: run AI package tests and `node tests/ai_integration.mjs`. Run
   `RTS_FULL_AI_TESTS=1 cargo test` or `tests/run-all.sh --full-ai` when strategy profiles,
   profile-backed self-play, replay determinism, or long-match balance behavior changed.

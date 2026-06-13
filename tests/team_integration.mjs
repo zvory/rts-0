@@ -29,6 +29,19 @@ function startDistanceSq(a, b) {
   return (a.startTileX - b.startTileX) ** 2 + (a.startTileY - b.startTileY) ** 2;
 }
 
+function tileVisible(snapshot, start, tileX, tileY) {
+  const index = tileY * start.map.width + tileX;
+  return snapshot.visibleTiles?.[index] === 1;
+}
+
+function entityTile(start, entity) {
+  const tileSize = start.map.tileSize;
+  return {
+    x: Math.floor(entity.x / tileSize),
+    y: Math.floor(entity.y / tileSize),
+  };
+}
+
 async function joinNamed(tag, room, name = tag, opts = {}) {
   const client = await connectClient(tag);
   client.send({ t: "join", name, room, ...opts });
@@ -103,6 +116,46 @@ async function twoVsTwoStartsWithHumanAndAis() {
   const oppositeCornerBaseline = 10000;
   ok(teamOneDistance < oppositeCornerBaseline && teamTwoDistance < oppositeCornerBaseline,
     `2v2 teammates spawn near each other (${teamOneDistance}, ${teamTwoDistance})`);
+  closeClients(A, B);
+}
+
+async function alliedSnapshotUsesSharedVisionWithoutSharedControl() {
+  const room = uniqueRoom("team-shared-vision");
+  const A = await joinNamed("vision-A", room, "Alpha");
+  const B = await joinNamed("vision-B", room, "Bravo");
+  await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "vision human lobby");
+  await setTeamPreset(A, "2v2");
+  await addAiToTeam(A, 2);
+  await addAiToTeam(A, 2);
+  await readyPlayers([A, B]);
+  const { starts } = await startMatch(A, [A, B]);
+  const startA = starts[0];
+  const allyMeta = startA.players.find((player) => player.id === B.playerId);
+  ok(allyMeta?.teamId === 1, `shared vision setup has B on Team 1 (${allyMeta?.teamId})`);
+
+  const [snapA, snapB] = await Promise.all([
+    A.waitFor((msg) => msg.t === "snapshot" && msg.entities.some((e) => e.owner === B.playerId), 8000, "A sees allied entities"),
+    B.waitFor((msg) => msg.t === "snapshot" && msg.entities.some((e) => e.owner === B.playerId), 8000, "B sees own entities"),
+  ]);
+  const allyInA = snapA.entities.filter((e) => e.owner === B.playerId && e.kind !== "steel" && e.kind !== "oil");
+  const ownInB = snapB.entities.filter((e) => e.owner === B.playerId && e.kind !== "steel" && e.kind !== "oil");
+  ok(allyInA.length > 0 && ownInB.length > 0,
+    `team snapshot carries allied read-only entities (${allyInA.length}/${ownInB.length})`);
+
+  const alliedWorker = allyInA.find((e) => e.kind === "worker");
+  const alliedWorkerHp = alliedWorker?.hp;
+  if (alliedWorker) {
+    const tile = entityTile(startA, alliedWorker);
+    ok(tileVisible(snapA, startA, tile.x, tile.y),
+      `A's visibleTiles include an allied worker tile (${tile.x},${tile.y})`);
+    A.command({ c: "stop", units: [alliedWorker.id] });
+    const laterB = await B.waitFor((msg) => msg.t === "snapshot" && msg.tick > snapB.tick + 8, 3000, "post allied stop snapshots");
+    const workerAfter = laterB.entities.find((e) => e.id === alliedWorker.id);
+    ok(workerAfter?.hp === alliedWorkerHp,
+      "malicious command against allied visible entity stays a no-op on the ally's unit");
+  } else {
+    ok(false, "shared vision setup exposed no allied worker for command-authority probe");
+  }
   closeClients(A, B);
 }
 
@@ -222,6 +275,7 @@ async function main() {
   await assertPresetStarts({ preset: "1v2", aiTeams: [2, 2], expectedTeams: [1, 2, 2] });
   await assertPresetStarts({ preset: "1v3", aiTeams: [2, 2, 2], expectedTeams: [1, 2, 2, 2] });
   await twoVsTwoStartsWithHumanAndAis();
+  await alliedSnapshotUsesSharedVisionWithoutSharedControl();
   await alliedAttackTargetCommandIsIgnored();
   await twoVsTwoResolvesByTeam();
   await hostOnlyAndInvalidMutationsAreIgnored();
