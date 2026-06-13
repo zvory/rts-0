@@ -14,7 +14,8 @@ use crate::ai_core::observation::{
     AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
+    AI_1_0_TECH, RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS,
+    TECH_TO_TANKS,
 };
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
@@ -1192,6 +1193,166 @@ fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_tech() {
                 assignments
             } if *assignments > 0
         )
+    }));
+}
+
+#[test]
+fn ai_1_0_opens_with_riflemen_before_vehicle_tech() {
+    let observation = observation(
+        AiEconomy {
+            steel: 250,
+            oil: 0,
+            supply_used: 10,
+            supply_cap: 20,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Tank
+    }));
+}
+
+#[test]
+fn ai_1_0_saves_for_tank_tech_and_uses_scout_cars_while_blocked() {
+    let mut observation = observation(
+        AiEconomy {
+            steel: 450,
+            oil: 250,
+            supply_used: 30,
+            supply_cap: 60,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            building(13, EntityKind::ResearchComplex, Some(0)),
+            building(14, EntityKind::Factory, Some(0)),
+        ],
+    );
+
+    let mut memory = AiDecisionMemory::for_profile(&AI_1_0_TECH);
+    let decision = decide(&observation, &AI_1_0_TECH, &mut memory);
+
+    assert!(decision.intents.contains(&AiIntent::Research {
+        upgrade: UpgradeKind::TankUnlock
+    }));
+    assert!(decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Tank
+    }));
+
+    observation.upgrades.push(UpgradeKind::TankUnlock);
+    let unlocked = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    assert!(unlocked.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Tank
+    }));
+    assert!(!unlocked.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar
+    }));
+}
+
+#[test]
+fn ai_1_0_tech_path_omits_support_weapon_buildings() {
+    let observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 30,
+            supply_cap: 70,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            worker(20, AiEntityState::Idle),
+            worker(21, AiEntityState::Idle),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResearchComplex
+    }));
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Steelworks
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::MachineGunner
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::AntiTankGun
+    }));
+}
+
+#[test]
+fn ai_1_0_can_expand_while_transitioning_to_vehicles() {
+    let mut owned = vec![
+        building(10, EntityKind::CityCentre, Some(0)),
+        building(11, EntityKind::Barracks, Some(0)),
+        building(12, EntityKind::TrainingCentre, None),
+    ];
+    owned.extend((0..4).map(|i| combat(30 + i, EntityKind::Rifleman)));
+    owned.push(worker(80, AiEntityState::Idle));
+    owned.push(worker(81, AiEntityState::Idle));
+    owned.push(worker(82, AiEntityState::Idle));
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 30,
+            supply_cap: 70,
+        },
+        owned,
+    ));
+
+    let decision = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::CityCentre
+    }));
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResearchComplex
+    }));
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
     }));
 }
 
