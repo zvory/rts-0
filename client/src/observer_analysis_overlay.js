@@ -1,5 +1,6 @@
 import { STATS, UPGRADES } from "./config.js";
 import { isUnit } from "./protocol.js";
+import { resourceValueElement } from "./resource_icons.js";
 
 const STORAGE_KEY = "rts.observerAnalysisOverlay";
 const LEGACY_STORAGE_KEY = "rts.replayAnalysisOverlay";
@@ -322,15 +323,8 @@ export class ObserverAnalysisOverlay {
       name.className = "replay-army-value-name";
       name.textContent = row.name;
 
-      const steel = document.createElement("span");
-      steel.className = "replay-army-value-steel";
-      steel.textContent = formatValue(row.steel);
-      steel.title = "Steel value";
-
-      const oil = document.createElement("span");
-      oil.className = "replay-army-value-oil";
-      oil.textContent = formatValue(row.oil);
-      oil.title = "Oil value";
+      const steel = resourceValueElement("steel", row.steel, "replay-army-value-steel");
+      const oil = resourceValueElement("oil", row.oil, "replay-army-value-oil");
 
       item.append(swatch, name, steel, oil);
       wrap.appendChild(item);
@@ -670,13 +664,8 @@ function renderUnitRow({ className, icon, label, count, steel, oil }) {
   countEl.className = "replay-units-count";
   countEl.textContent = formatValue(count);
 
-  const steelEl = document.createElement("span");
-  steelEl.className = "replay-units-steel";
-  steelEl.textContent = formatValue(steel);
-
-  const oilEl = document.createElement("span");
-  oilEl.className = "replay-units-oil";
-  oilEl.textContent = formatValue(oil);
+  const steelEl = resourceValueElement("steel", steel, "replay-units-steel");
+  const oilEl = resourceValueElement("oil", oil, "replay-units-oil");
 
   row.append(iconEl, labelEl, countEl, steelEl, oilEl);
   return row;
@@ -695,13 +684,8 @@ function renderResourceLostRow({ className, name, color, steel, oil }) {
   nameEl.className = "replay-resources-lost-name";
   nameEl.textContent = name;
 
-  const steelEl = document.createElement("span");
-  steelEl.className = "replay-resources-lost-steel";
-  steelEl.textContent = formatValue(steel);
-
-  const oilEl = document.createElement("span");
-  oilEl.className = "replay-resources-lost-oil";
-  oilEl.textContent = formatValue(oil);
+  const steelEl = resourceValueElement("steel", steel, "replay-resources-lost-steel");
+  const oilEl = resourceValueElement("oil", oil, "replay-resources-lost-oil");
 
   row.append(swatch, nameEl, steelEl, oilEl);
   return row;

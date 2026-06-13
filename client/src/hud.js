@@ -18,11 +18,7 @@ import {
   UPGRADES,
 } from "./config.js";
 import { buildCommandCardDescriptors } from "./hud_command_card.js";
-const RESOURCE_ICON_FALLBACKS = Object.freeze({
-  steel: "▰",
-  oil: "⬤",
-  supply: "▲",
-});
+import { resourceIconHtml } from "./resource_icons.js";
 const BREAKTHROUGH_VOICE_IDS = Object.freeze([
   "unit_breakthrough_todes_rit_01",
   "unit_breakthrough_koste_es_01",
@@ -117,10 +113,9 @@ export class HUD {
     this.elSteel = rootEl.querySelector("#res-steel");
     this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
-    // Cache the initial top-bar resource icon markup so command-card hovers and
-    // replay rows stay in sync with the shared HUD icons.
-    this._resourceIcons = this._readResourceIconHtml();
-    if (this.elHud && (!this.elSteel || !this.elOil || !this.elSupply)) {
+    // Rebuild the static shell once so the top bar, replay rows, and command-card
+    // hovers all use the shared resource icon definitions.
+    if (this.elHud) {
       this._restoreSinglePlayerResourceShell();
     }
 
@@ -940,20 +935,8 @@ export class HUD {
     return btn;
   }
 
-  _readResourceIconHtml() {
-    const icons = {};
-    for (const kind of Object.keys(RESOURCE_ICON_FALLBACKS)) {
-      const el = this.elHud?.querySelector(`.res-icon.${kind}`);
-      icons[kind] = el
-        ? el.outerHTML
-        : `<span class="res-icon ${kind}">${RESOURCE_ICON_FALLBACKS[kind]}</span>`;
-    }
-    return icons;
-  }
-
   _resourceIcon(kind) {
-    return this._resourceIcons?.[kind] ||
-      `<span class="res-icon ${kind}">${RESOURCE_ICON_FALLBACKS[kind] || ""}</span>`;
+    return resourceIconHtml(kind);
   }
 }
 

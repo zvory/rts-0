@@ -1842,6 +1842,23 @@ input[type="text"]:focus {
 .cmd-btn .cmd-tooltip .res-icon.supply {
   color: var(--supply);
 }
+.replay-analysis-overlay .res-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+.replay-analysis-overlay .res-icon.steel {
+  color: var(--steel);
+  text-shadow: 1px 1px 0 #191710;
+}
+.replay-analysis-overlay .res-icon.oil {
+  color: var(--oil);
+  text-shadow: 1px 1px 0 #5f6848;
+}
+.replay-analysis-overlay .resource-value-number {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+}
 .cmd-btn .cmd-tooltip-row {
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);
@@ -2080,9 +2097,13 @@ input[type="text"]:focus {
 .replay-units-oil,
 .replay-resources-lost-steel,
 .replay-resources-lost-oil {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   justify-self: end;
-  color: var(--ink-faint);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
+  font-weight: 850;
 }
 .replay-units-row {
   grid-template-columns: 25px minmax(0, 1fr) minmax(24px, auto) minmax(40px, auto) minmax(34px, auto);
@@ -2105,22 +2126,13 @@ input[type="text"]:focus {
   color: var(--accent);
   font-weight: 800;
 }
+.replay-units-row.is-total .resource-value-number,
+.replay-resources-lost-row.is-total .resource-value-number {
+  color: var(--accent);
+}
 .replay-units-count::before {
   content: "x";
   color: var(--ink-dim);
-}
-.replay-units-steel::before {
-  content: "S ";
-  color: #b8b8b8;
-}
-.replay-units-oil::before,
-.replay-resources-lost-oil::before {
-  content: "O ";
-  color: #8f8a7b;
-}
-.replay-resources-lost-steel::before {
-  content: "S ";
-  color: #b8b8b8;
 }
 .replay-army-value-empty {
   color: var(--ink-dim);
@@ -2147,17 +2159,13 @@ input[type="text"]:focus {
 }
 .replay-army-value-steel,
 .replay-army-value-oil {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   justify-self: end;
-  color: var(--ink-faint);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
-}
-.replay-army-value-steel::before {
-  content: "S ";
-  color: #b8b8b8;
-}
-.replay-army-value-oil::before {
-  content: "O ";
-  color: #8f8a7b;
+  font-weight: 850;
 }
 .replay-analysis-show {
   pointer-events: auto;
