@@ -1,6 +1,6 @@
 # Phase 13 - End-to-End Hardening and Release Audit
 
-Status: planned.
+Status: implemented.
 
 ## Goal
 
@@ -88,3 +88,20 @@ Use scripted setup, not hand-built multi-tab rooms, to check:
 
 The final handoff must summarize the automated coverage, list any manual checks performed, name any
 known follow-up work, and explain the player-facing gameplay impact.
+
+## Implementation Notes
+
+- `tests/team_integration.mjs` is the canonical live multi-client team suite. It now covers default
+  singleton FFA, solo, scripted `1v2`, `1v3`, and `2v2`, 2v2 teammate start grouping, shared team
+  snapshot vision, allied command-authority no-ops, malicious allied attack rejection, team victory,
+  and host-only/invalid lobby mutation rejection.
+- `tests/run-all.sh --no-rust` already includes `team_integration`, so the normal live Node gate
+  exercises the team suite without a separate manual room setup.
+- `tests/select-suites.mjs` now maps team-sensitive protocol, server simulation, lobby, AI, map,
+  replay/client-state, and team docs changes to `node-team-integration`.
+- Raw owner comparison audit result: hostile relationship behavior is centralized through
+  `Game`/`TeamRelations` helpers and documented in `docs/design/server-sim.md`. Remaining raw
+  `owner == player`/`owner != player` checks are intentional exact-owner control, economy,
+  production, prediction, local UI affordance, or test fixture checks.
+- Protocol/docs audit result: live lobby presets are documented as normal UI, not tests/dev-only,
+  and the testing design/context capsules point future work to the canonical team suite.
