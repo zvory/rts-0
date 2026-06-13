@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ai_core::decision::{decide_profile, AiDecisionMemory};
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
-    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
+    profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID,
 };
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -22,13 +22,12 @@ use rts_sim::protocol::{Snapshot, StartPayload};
 
 const DECISION_INTERVAL: u32 = 9;
 
-/// Default live-lobby profile. This preserves the current macro-focused AI behavior better than
-/// the faster pressure profile, while still selecting from the canonical shared profile ids.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = RIFLE_FLOOD_FULL_SATURATION_ID;
+/// Default live-lobby profile. Live lobby AI uses the promoted AI 1.0 tech behavior.
+pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_0_TECH_ID;
 
-/// Profiles available to ordinary lobby AI opponents. The names map to player-facing behaviors:
-/// tank rush, proxy rush, and the previous rifle saturation strategy.
-const LIVE_PROFILE_IDS: [&str; 1] = [RIFLE_FLOOD_FULL_SATURATION_ID];
+/// Profiles available to ordinary lobby AI opponents. The live pool is intentionally singular
+/// until profile selection is exposed through a real lobby contract.
+const LIVE_PROFILE_IDS: [&str; 1] = [AI_1_0_TECH_ID];
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
     LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
@@ -57,7 +56,7 @@ impl AiController {
     }
 
     pub fn with_profile_id(player: u32, profile_id: &'static str) -> Self {
-        let profile = profile_by_id(profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION);
+        let profile = profile_by_id(profile_id).unwrap_or(&AI_1_0_TECH);
         Self {
             player,
             profile_id: profile.id,
@@ -77,7 +76,7 @@ impl AiController {
     }
 
     fn profile(&self) -> &'static AiProfile {
-        profile_by_id(self.profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION)
+        profile_by_id(self.profile_id).unwrap_or(&AI_1_0_TECH)
     }
 
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
@@ -230,12 +229,12 @@ mod tests {
         let ai = AiController::new(2);
 
         assert_eq!(ai.player_id(), 2);
-        assert_eq!(ai.profile_id(), RIFLE_FLOOD_FULL_SATURATION_ID);
+        assert_eq!(ai.profile_id(), AI_1_0_TECH_ID);
     }
 
     #[test]
-    fn live_profile_pool_has_only_rifle_flood_full_saturation() {
-        assert_eq!(LIVE_PROFILE_IDS, [RIFLE_FLOOD_FULL_SATURATION_ID]);
+    fn live_profile_pool_has_only_ai_1_0_tech() {
+        assert_eq!(LIVE_PROFILE_IDS, [AI_1_0_TECH_ID]);
     }
 
     #[test]
@@ -251,6 +250,6 @@ mod tests {
     fn unknown_profile_id_falls_back_to_default_profile() {
         let ai = AiController::with_profile_id(2, "missing_profile");
 
-        assert_eq!(ai.profile_id(), RIFLE_FLOOD_FULL_SATURATION_ID);
+        assert_eq!(ai.profile_id(), AI_1_0_TECH_ID);
     }
 }

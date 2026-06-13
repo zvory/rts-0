@@ -10,10 +10,7 @@ use serde::Serialize;
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
-use crate::ai_core::profiles::{
-    profile_by_id, required_profiles, AI_1_0_TECH_ID, RIFLE_FLOOD_FULL_SATURATION_ID,
-    STEEL_EXPANSION_TANKS_ID, TECH_TO_TANKS_ID,
-};
+use crate::ai_core::profiles::{profile_by_id, required_profiles, AI_1_0_TECH_ID};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayArtifactV1,
@@ -161,11 +158,7 @@ pub fn available_profile_ids() -> Vec<&'static str> {
 
 pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
-        "rush" | "fast" => Some("rifle_flood_fast"),
-        "saturation" | "full" | "macro" => Some(RIFLE_FLOOD_FULL_SATURATION_ID),
-        "tech" | "tanks" => Some(TECH_TO_TANKS_ID),
-        "expand" | "expansion" | "steel" | "steel_tanks" => Some(STEEL_EXPANSION_TANKS_ID),
-        "ai1" | "ai_1_0" | "ai_1_0_tech" => Some(AI_1_0_TECH_ID),
+        "ai" | "ai1" | "ai_1_0" | "ai_1_0_tech" | "default" => Some(AI_1_0_TECH_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
 }
@@ -791,25 +784,20 @@ mod tests {
         available_profile_ids, canonical_profile_id, run_profile_matchup_result,
         ProfileMatchupOptions, ScorecardCollector,
     };
-    use crate::ai_core::profiles::{AI_1_0_TECH_ID, RIFLE_FLOOD_FULL_SATURATION_ID};
+    use crate::ai_core::profiles::AI_1_0_TECH_ID;
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
     use rts_sim::protocol::kinds;
     use rts_sim::protocol::{EntityView, Event, Snapshot, SnapshotNetStatus};
 
     #[test]
-    fn full_saturation_baseline_is_selectable() {
-        assert_eq!(
-            canonical_profile_id("rifle_flood_full_saturation"),
-            Some(RIFLE_FLOOD_FULL_SATURATION_ID)
-        );
-        assert_eq!(
-            canonical_profile_id("saturation"),
-            Some(RIFLE_FLOOD_FULL_SATURATION_ID)
-        );
-        assert!(available_profile_ids().contains(&RIFLE_FLOOD_FULL_SATURATION_ID));
+    fn only_ai_1_0_profile_is_selectable() {
+        assert_eq!(canonical_profile_id("ai"), Some(AI_1_0_TECH_ID));
         assert_eq!(canonical_profile_id("ai1"), Some(AI_1_0_TECH_ID));
-        assert!(available_profile_ids().contains(&AI_1_0_TECH_ID));
+        assert_eq!(canonical_profile_id("default"), Some(AI_1_0_TECH_ID));
+        assert_eq!(available_profile_ids(), vec![AI_1_0_TECH_ID]);
+        assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
+        assert_eq!(canonical_profile_id("saturation"), None);
     }
 
     #[test]
@@ -902,8 +890,8 @@ mod tests {
     #[test]
     fn profile_matchup_result_includes_ai_trace_tail() {
         let result = run_profile_matchup_result(ProfileMatchupOptions {
-            profile_a: RIFLE_FLOOD_FULL_SATURATION_ID.to_string(),
-            profile_b: RIFLE_FLOOD_FULL_SATURATION_ID.to_string(),
+            profile_a: AI_1_0_TECH_ID.to_string(),
+            profile_b: AI_1_0_TECH_ID.to_string(),
             seed: 7,
             max_ticks: 12,
             verify_replay: false,

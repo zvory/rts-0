@@ -29,11 +29,11 @@ not import the server shell, lobby internals, Axum/Tokio transport, or private s
 path tricks. If AI needs more observations, add a public, fog-respecting `Game`/snapshot surface
 instead of reaching into entity stores from the server layer.
 
-**Strategy (deliberately "very basic").** Each controller, on a staggered cadence
+**Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
-decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs randomly choose from the
-server-side live profile pool at match start without a lobby protocol or UI change. Each controller
-keeps its chosen profile for the whole match. Team relationships are observation-only safety
+decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
+`ai_1_0_tech` profile by default and keep that profile for the whole match. There is no lobby
+protocol or UI for selecting AI profiles. Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
 current living player set so attack waves keep choosing living enemies. AI teammates still do not
@@ -55,46 +55,10 @@ plan owns ready combat groups, required-unit readiness, attack reissue cadence, 
 combat target selection, and blockers such as waiting for units, waiting for a required Tank,
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
-The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
-`tech_to_tanks`, `steel_expansion_tanks`, and `ai_1_0_tech`; they parameterize worker targets,
-supply buffers, building/tech goals, production priorities, resource timing, expansion timing, and
-attack thresholds without providing their own `think()` functions.
-`rifle_flood_fast` sends exactly one reserved worker toward a hidden edge-biased proxy point near
-the nearest public enemy start tile immediately, before it can afford the barracks. The transit
-target stays at least 18 tiles from the enemy start, prefers map-edge footprints, and avoids the
-direct own-base-to-enemy-base scouting line. If the worker was already committed when the barracks
-becomes affordable, the AI places the barracks near that worker's current position rather than
-waiting for the ideal edge point; if it can afford the barracks immediately, it uses the hidden
-edge target as the build site. It trains only one extra home worker and sends riflemen as
-individual pressure units instead of waiting for escalating waves. Pure rifle attack profiles use
-AI-only raid movement: launched riflemen receive plain `Move` orders to a point deeper than the
-public enemy start tile, so they ignore buildings encountered on the way, while the AI reissues
-direct `Attack` commands against visible enemy units with workers first. Local home-defense
-responses reserve only the defenders assigned to that threat; unrelated moving raiders keep
-reacting to visible units on their own route, including scout cars, instead of continuing past
-them. After a direct raid fight is cleared, raiders already away from home immediately resume the
-deeper raid move instead of waiting for the next outbound wave cadence. If no enemy units are
-visible and raiders have reached within 4 tiles of the center of the
-enemy main-base steel line, they fall back to attacking visible buildings so a unitless opponent
-can still be finished. Once the first completed Barracks has had enough time to produce seven
-Riflemen, using the current Rifleman training time from shared unit stats, the profile stops
-treating the rush as a pure all-in: it resumes worker production toward main steel saturation,
-starts oil workers after a steel floor, adds a home
-Barracks, builds a Training Centre, and switches production toward Machine Gunners / Anti-Tank Guns with
-Riflemen as the fallback until support tech is ready. Machine Gunners come online with the Training
-Centre; Anti-Tank Guns train from the follow-up Gun Works (`steelworks` kind) after Anti-Tank Gun Crews
-research.
-`rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
-workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
-number. At 50 supply it independently pivots into the tank tech path and becomes eligible to expand
-off a completed Training Centre instead of waiting for a finished Vehicle Works; expansion site
-selection prefers oil coverage before extra steel output.
-`tech_to_tanks` is a steel-first fast-tech profile: it keeps worker production active while saving
-for the Vehicle Works step, delays oil workers until at least eight workers are already mining steel,
-uses ready combat units to clear visible threats in its home resource line before attacking out,
-and treats a single completed tank as a valid minimum attack wave.
-`ai_1_0_tech` is the selectable AI 1.0 tech spine and is not in the live random profile pool yet. It
-opens with four-Rifleman frontal waves, expands off a completed Training Centre, builds Research
+The only selectable code-defined profile is `ai_1_0_tech`; it parameterizes worker targets, supply
+buffers, building/tech goals, production priorities, resource timing, expansion timing, harassment,
+and attack thresholds without providing its own `think()` function. It opens with four-Rifleman
+frontal waves, expands off a completed Training Centre, builds Research
 Complex and Factory without adding Machine Gunners, Anti-Tank Guns, Artillery, or Command Cars,
 produces Scout Cars while Tank research or Methamphetamines is blocked or pending, then prioritizes
 Tanks once both Tank research and Methamphetamines complete. It reserves up to two completed Scout
@@ -109,17 +73,8 @@ buildings, regroup, or use Scout Car smoke in AI 1.0. Tank frontal waves require
 the ready group and Methamphetamines before launch; while waiting, ready Tank groups stage toward
 the enemy instead of dribbling into attack orders. Methamphetamines is enforced before first Tank
 production, not only before Tank attack launch, so Tank production and Tank-wave readiness cannot
-race ahead of the upgrade. In the Phase 4 bounded sample `ai_1_0_tech` vs
-`rifle_flood_full_saturation` at seed `1090519044` and 14,000 ticks, before this Methamphetamine
-gate was added, it issued its first Rifleman attack at tick 1703, planned/completed expansion at
-7571/8432, completed its first Scout Car at 9179, and completed its first Tank at 10409. With the
-Phase 5 gate in the same bounded sample, first Rifleman attack stayed at tick 1703,
-planned/completed expansion stayed at 7571/8432, first Scout Car moved to 9227, and first Tank
-moved to 10457. With Phase 6 Scout Car harassment enabled in the same bounded sample, first Rifleman
-attack stayed at tick 1703, expansion stayed at 7571/8432, first Scout Car stayed at 9227, first
-Scout Car harassment command was issued at 9227, and first Tank stayed at 10457. The replay
-verified at the 14,000 tick cap with no elimination.
-All profiles share a defensive panic mode. Visible enemy units near the AI's base, home resource
+race ahead of the upgrade.
+The profile includes a defensive panic mode. Visible enemy units near the AI's base, home resource
 line, or workers temporarily suspend expansion, worker training, and non-defensive tech spending
 only when their steel+oil value is at least 75% of the AI's own local unit value. While panicking,
 the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+ of visible
@@ -131,21 +86,10 @@ the relevant support tech is absent, production falls back to Riflemen and panic
 create tech buildings.
 If the pressure persists through the panic window, the AI asks for an additional Barracks before
 resuming its normal profile once the threat has cleared.
-`steel_expansion_tanks` is a defensive economic support profile: it saves for a second City
-Centre near a neutral steel expansion before building any non-Depot tech structure. Valid
-expansion sites must cover the full local resource line, then are ranked by own distance divided
-by nearest living enemy-start distance so similarly close naturals prefer the base farther from
-enemies. Once that expansion City Centre is planned, it builds Barracks and Training Centre tech, staffs
-oil, produces Machine Gunners before Gun Works and then Anti-Tank Guns from Gun Works toward a one-for-one support mix, and keeps those
-support units staged in a short line on the enemy-facing side of its main-base steel cluster
-instead of launching outbound attack waves.
-After 50 supply used, it switches to a Vehicle Works tech path, stops Machine Gunner / Anti-Tank Gun
-production, trains tanks, and launches outbound tank groups only once at least three tanks are
-ready. After the expansion City Centre is complete, its worker resource assignment is locally bounded so
-main-base workers do not walk to expansion patches, and expansion workers do not walk back to
-main-base patches.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
-profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
+profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
+promoted `ai_1_0_tech` default. Profiles are still not client-selectable, and older experimental
+profile ids are no longer listed or accepted by developer tooling.
 
 **Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player
@@ -156,7 +100,7 @@ expansion City Centre planned/completed, and first Tank completion. Match-level 
 winner or tick-cap status, first damage, attack events, death events, replay verification status,
 and optional replay artifact path. Compact baseline scenario metadata for opening pressure,
 mid-game expansion, tank tech, and blocked-goal pressure lives in
-`server/crates/ai/src/selfplay/scenarios.rs` so later profile phases can compare the same authored
+`server/crates/ai/src/selfplay/scenarios.rs` so later AI changes can compare the same authored
 fixtures without rewriting the harness.
 Profile matchup JSON also includes a bounded `aiTraceTail` of compact trace entries for recent
 profile-backed thinks. The tail is diagnostic output only; deterministic replay artifacts continue

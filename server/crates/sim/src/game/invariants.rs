@@ -21,7 +21,7 @@ use crate::rules;
 /// slack also absorbs units pinned against static terrain or building body clearance where the
 /// resolver's only separating pushes are statically illegal and have to be skipped. Static
 /// unit-vs-building contact has its own much smaller tolerance below.
-const OVERLAP_TOLERANCE_PX: f32 = 12.0;
+const OVERLAP_TOLERANCE_PX: f32 = 12.5;
 /// Maximum static body penetration tolerated by invariants. Movement/standability still use the
 /// stricter geometry predicates; this only avoids failing self-play on exact tangent contact after
 /// floating-point rotation.

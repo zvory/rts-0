@@ -701,14 +701,8 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 5] {
-    [
-        &RIFLE_FLOOD_FAST,
-        &RIFLE_FLOOD_FULL_SATURATION,
-        &TECH_TO_TANKS,
-        &STEEL_EXPANSION_TANKS,
-        &AI_1_0_TECH,
-    ]
+pub(crate) fn required_profiles() -> [&'static AiProfile; 1] {
+    [&AI_1_0_TECH]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
@@ -727,18 +721,9 @@ mod tests {
 
         assert_eq!(
             profiles.map(|profile| profile.id),
-            [
-                RIFLE_FLOOD_FAST_ID,
-                RIFLE_FLOOD_FULL_SATURATION_ID,
-                TECH_TO_TANKS_ID,
-                STEEL_EXPANSION_TANKS_ID,
-                AI_1_0_TECH_ID
-            ]
+            [AI_1_0_TECH_ID]
         );
-        assert_eq!(
-            profile_by_id(TECH_TO_TANKS_ID).unwrap().id,
-            TECH_TO_TANKS_ID
-        );
+        assert_eq!(profile_by_id(AI_1_0_TECH_ID).unwrap().id, AI_1_0_TECH_ID);
         assert!(profile_by_id("tech_tree").is_none());
     }
 

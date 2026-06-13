@@ -316,10 +316,6 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     if profiles.is_empty() {
         return Err("--profiles must include at least one profile".to_string());
     }
-    if profiles.len() < 2 {
-        return Err("--profiles must include at least two distinct profiles".to_string());
-    }
-
     Ok(Some(CliConfig {
         seeds,
         seed_start,
@@ -487,7 +483,7 @@ mod tests {
 
     #[test]
     fn default_profile_selection_uses_all_available_profiles() {
-        let config = parse_args(Vec::<String>::new())
+    let config = parse_args(Vec::<String>::new())
             .expect("default args should parse")
             .expect("default args should return config");
 
@@ -497,8 +493,8 @@ mod tests {
     #[test]
     fn duplicate_profile_selection_is_rejected() {
         let err = ensure_distinct_profiles(vec![
-            "rifle_flood_fast".to_string(),
-            "rifle_flood_fast".to_string(),
+            "ai_1_0_tech".to_string(),
+            "ai_1_0_tech".to_string(),
         ])
         .expect_err("duplicate profiles should fail");
 
@@ -506,13 +502,14 @@ mod tests {
     }
 
     #[test]
-    fn single_profile_selection_is_rejected() {
-        let err = parse_args(vec![
+    fn single_profile_selection_is_allowed() {
+        let config = parse_args(vec![
             "--profiles".to_string(),
-            "rifle_flood_fast".to_string(),
+            "ai_1_0_tech".to_string(),
         ])
-        .expect_err("single profile should fail");
+        .expect("single profile should parse")
+        .expect("single profile should return config");
 
-        assert!(err.contains("at least two distinct profiles"));
+        assert_eq!(config.profiles, vec!["ai_1_0_tech".to_string()]);
     }
 }
