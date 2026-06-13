@@ -19,6 +19,7 @@ const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 pub struct EntityProjectionContext<'a> {
     pub fog: &'a Fog,
     pub actionable_fog: Option<&'a Fog>,
+    pub private_detail_fog: Option<&'a Fog>,
     pub smokes: Option<&'a SmokeCloudStore>,
     pub fogged: bool,
     pub entities: &'a EntityStore,
@@ -129,6 +130,7 @@ pub fn project_entity(
         entity.state_str(),
     );
     let actionable_fog = context.actionable_fog.unwrap_or(context.fog);
+    let private_detail_fog = context.private_detail_fog.unwrap_or(actionable_fog);
     let vision_only = context.fogged
         && entity.owner != viewer
         && !entity.is_node()
@@ -155,7 +157,7 @@ pub fn project_entity(
                 entity.owner == viewer
                     || !context.fogged
                     || (!vision_only
-                        && actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+                        && private_detail_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
                         && !context
                             .smokes
                             .map(|smokes| smokes.point_inside(target.pos_x, target.pos_y))
@@ -236,7 +238,7 @@ pub fn project_entity(
             entity,
             context.entities,
             viewer,
-            actionable_fog,
+            private_detail_fog,
             context.smokes,
         );
         if context.include_debug_path {
@@ -497,6 +499,7 @@ mod tests {
             EntityProjectionContext {
                 fog,
                 actionable_fog: Some(fog),
+                private_detail_fog: Some(fog),
                 smokes: None,
                 fogged,
                 entities,

@@ -1,6 +1,6 @@
 # Phase 6 - Shared Current Vision
 
-Status: planned.
+Status: implemented.
 
 ## Goal
 
@@ -69,3 +69,15 @@ scenario URL over manual multi-tab setup.
 
 The phase handoff must explain the team-fog implementation choice, define defeated/disconnected
 vision behavior, and list any projection or event surfaces intentionally deferred.
+
+## Handoff
+
+- Implementation choice: raw authoritative fog is still recomputed per player after each tick.
+  `snapshot_for` builds a temporary team-current fog by unioning raw grids from living teammates
+  only, then uses that fog for entity projection and `visibleTiles`.
+- Defeated/disconnected behavior: eliminated players have their entities and lingering sources
+  removed and stop contributing current sight. If their team still has a living member, their
+  connection receives the surviving team's current visibility.
+- Deferred surfaces: command validation/combat targeting still use raw owner-local fog; resources,
+  supply, upgrades, owner-only queues/rallies/abilities, remembered-building refreshes, target
+  tracer private details, and transient event fanout remain local-player-only.

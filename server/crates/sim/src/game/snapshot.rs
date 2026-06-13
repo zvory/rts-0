@@ -6,11 +6,13 @@ impl Game {
     /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
+        let live_fog = self.team_current_fog_for(player, &self.fog);
         if self.lingering_sight.is_empty() {
-            return self.snapshot_for_mode(player, &self.fog, Some(&self.fog), true, false);
+            return self.snapshot_for_mode(player, &live_fog, Some(&live_fog), true, false);
         }
         let snapshot_fog = self.snapshot_fog();
-        self.snapshot_for_mode(player, &snapshot_fog, Some(&self.fog), true, false)
+        let team_snapshot_fog = self.team_current_fog_for(player, &snapshot_fog);
+        self.snapshot_for_mode(player, &team_snapshot_fog, Some(&live_fog), true, false)
     }
 
     /// Build a full-world snapshot for a viewer. Used only by dev watch flows where fog is
@@ -91,6 +93,7 @@ impl Game {
                 projection::EntityProjectionContext {
                     fog,
                     actionable_fog,
+                    private_detail_fog: Some(&self.fog),
                     smokes: Some(&self.smokes),
                     fogged,
                     entities: &self.entities,
@@ -199,6 +202,7 @@ impl Game {
                         projection::EntityProjectionContext {
                             fog,
                             actionable_fog: Some(fog),
+                            private_detail_fog: Some(&self.fog),
                             smokes: Some(&self.smokes),
                             fogged: true,
                             entities: &self.entities,
@@ -221,5 +225,13 @@ impl Game {
             .collect::<Vec<_>>();
         views.sort_by_key(|view| view.id);
         views
+    }
+
+    pub(crate) fn team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
+        let mut visible_players = self.living_team_player_ids_for_vision(player);
+        if visible_players.is_empty() {
+            visible_players.push(player);
+        }
+        fog.union_for(player, &visible_players)
     }
 }

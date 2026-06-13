@@ -127,6 +127,23 @@ impl Game {
             .map(|player| player.id)
             .collect()
     }
+
+    pub(crate) fn living_team_player_ids_for_vision(&self, player_id: u32) -> Vec<u32> {
+        let Some(team_id) = self.team_of_player(player_id) else {
+            return Vec::new();
+        };
+        if team_id == 0 {
+            return Vec::new();
+        }
+        let alive_players = self.alive_players();
+        self.players
+            .iter()
+            .filter(|player| {
+                player.team_id == team_id && alive_players.contains(&player.id)
+            })
+            .map(|player| player.id)
+            .collect()
+    }
 }
 
 #[cfg(test)]

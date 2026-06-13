@@ -629,6 +629,220 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     (game, observer, friendly, enemy, smoke_pos)
 }
 
+fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 1,
+            name: "Two".into(),
+            color: "#bbb".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            name: "Three".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let p1_base = game.map.tile_center(2, 2);
+    let p2_base = game.map.tile_center(5, 2);
+    let p3_base = game.map.tile_center(55, 55);
+    game.entities
+        .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
+        .expect("p1 city centre should spawn");
+    game.entities
+        .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
+        .expect("p2 city centre should spawn");
+    game.entities
+        .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
+        .expect("p3 city centre should spawn");
+
+    let spotter_pos = game.map.tile_center(28, 30);
+    let enemy_pos = game.map.tile_center(30, 30);
+    let hidden_enemy_pos = game.map.tile_center(55, 50);
+    let spotter = game
+        .entities
+        .spawn_unit(2, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("ally spotter should spawn");
+    let visible_enemy = game
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("visible enemy should spawn");
+    let hidden_enemy = game
+        .entities
+        .spawn_unit(
+            3,
+            EntityKind::Rifleman,
+            hidden_enemy_pos.0,
+            hidden_enemy_pos.1,
+        )
+        .expect("hidden enemy should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    (game, spotter, visible_enemy, hidden_enemy, enemy_pos)
+}
+
+#[test]
+fn snapshot_shares_living_teammate_current_vision() {
+    let (game, _spotter, visible_enemy, hidden_enemy, enemy_pos) = team_fog_fixture();
+    assert!(
+        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        "fixture should keep the enemy outside player 1's own raw fog"
+    );
+    assert!(
+        game.fog.is_visible_world(2, enemy_pos.0, enemy_pos.1),
+        "fixture should put the enemy inside player 2's raw fog"
+    );
+
+    let snapshot = game.snapshot_for(1);
+
+    assert!(
+        snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.id == visible_enemy),
+        "ally current sight should reveal the enemy in player 1's snapshot"
+    );
+    assert!(
+        snapshot
+            .entities
+            .iter()
+            .all(|entity| entity.id != hidden_enemy),
+        "enemies outside every living teammate's current sight should stay hidden"
+    );
+    let visible_index = ((enemy_pos.1 / config::TILE_SIZE as f32).floor() as u32 * game.map.size
+        + (enemy_pos.0 / config::TILE_SIZE as f32).floor() as u32) as usize;
+    assert_eq!(
+        snapshot.visible_tiles[visible_index], 1,
+        "visibleTiles should include the living teammate's current sight"
+    );
+    assert_eq!(snapshot.player_resources.len(), 0);
+    assert!(
+        snapshot.steel
+            == game
+                .players
+                .iter()
+                .find(|player| player.id == 1)
+                .expect("player 1 should exist")
+                .steel,
+        "recipient economy remains local-player-only"
+    );
+}
+
+#[test]
+fn defeated_teammate_no_longer_contributes_current_vision() {
+    let (mut game, _spotter, visible_enemy, _hidden_enemy, _enemy_pos) = team_fog_fixture();
+
+    assert!(
+        game.snapshot_for(1)
+            .entities
+            .iter()
+            .any(|entity| entity.id == visible_enemy),
+        "precondition: teammate sight reveals the enemy"
+    );
+
+    game.eliminate(2);
+
+    assert!(
+        game.snapshot_for(1)
+            .entities
+            .iter()
+            .all(|entity| entity.id != visible_enemy),
+        "eliminated teammate sight should stop contributing to team current vision"
+    );
+    assert!(
+        game.snapshot_for(2)
+            .entities
+            .iter()
+            .all(|entity| entity.id != visible_enemy),
+        "defeated player should receive surviving teammate vision but not their own stale vision"
+    );
+}
+
+#[test]
+fn team_current_vision_keeps_smoke_blocking() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 1,
+            name: "Two".into(),
+            color: "#bbb".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            name: "Three".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let p1_base = game.map.tile_center(2, 2);
+    let p2_base = game.map.tile_center(4, 2);
+    let p3_base = game.map.tile_center(50, 50);
+    game.entities
+        .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
+        .expect("p1 city centre should spawn");
+    game.entities
+        .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
+        .expect("p2 city centre should spawn");
+    game.entities
+        .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
+        .expect("p3 city centre should spawn");
+    let spotter_pos = game.map.tile_center(4, 4);
+    let smoke_pos = game.map.tile_center(7, 4);
+    let enemy_pos = game.map.tile_center(7, 4);
+    game.entities
+        .spawn_unit(2, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("ally spotter should spawn");
+    let enemy = game
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    game.smokes
+        .spawn(
+            smoke_pos.0,
+            smoke_pos.1,
+            config::SMOKE_CLOUD_RADIUS_TILES,
+            config::SMOKE_CLOUD_DURATION_TICKS,
+            game.tick,
+        )
+        .expect("smoke should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+
+    let snapshot = game.snapshot_for(1);
+
+    assert!(
+        snapshot.entities.iter().all(|entity| entity.id != enemy),
+        "team current vision must not reveal enemies hidden inside smoke"
+    );
+}
+
 #[test]
 fn manual_mortar_fire_impacts_without_toast_notice() {
     let players = [
