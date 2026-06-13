@@ -20,6 +20,7 @@ use crate::game::services::movement::angle_delta;
 use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
@@ -102,9 +103,10 @@ pub(crate) fn promote_ready_orders(
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let ready: Vec<u32> = entities
         .iter()
-        .filter(|e| ready_for_next_order(map, entities, fog, e))
+        .filter(|e| ready_for_next_order(map, entities, &teams, fog, e))
         .map(|e| e.id)
         .collect();
     if ready.is_empty() {
@@ -153,7 +155,8 @@ pub(crate) fn promote_ready_orders(
             clear_completed_active_order(entities, id);
         }
 
-        let Some(promoted) = pop_next_valid_intent(map, entities, players, fog, events, id) else {
+        let Some(promoted) = pop_next_valid_intent(map, entities, players, &teams, fog, events, id)
+        else {
             continue;
         };
         match promoted {
@@ -233,7 +236,13 @@ fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, ids: &[u32]
     }
 }
 
-fn ready_for_next_order(map: &Map, entities: &EntityStore, fog: &Fog, e: &Entity) -> bool {
+fn ready_for_next_order(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    e: &Entity,
+) -> bool {
     if !e.is_unit() {
         return false;
     }
@@ -249,7 +258,7 @@ fn ready_for_next_order(map: &Map, entities: &EntityStore, fog: &Fog, e: &Entity
         }
         Order::Attack(order) => {
             !e.queued_orders().is_empty()
-                && attack_order_complete(map, entities, fog, e, order.intent.target)
+                && attack_order_complete(map, entities, teams, fog, e, order.intent.target)
         }
         Order::Gather(_) | Order::Build(_) | Order::ArtilleryPointFire(_) => false,
         Order::Ability(_) => matches!(
@@ -269,6 +278,7 @@ fn pop_next_valid_intent(
     map: &Map,
     entities: &mut EntityStore,
     players: &[PlayerState],
+    teams: &TeamRelations,
     fog: &Fog,
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     id: u32,
@@ -320,7 +330,7 @@ fn pop_next_valid_intent(
                 }
             }
             OrderIntent::Attack(attack) => {
-                if attack_intent_valid(entities, fog, owner, id, attack.target) {
+                if attack_intent_valid(entities, teams, fog, owner, id, attack.target) {
                     return Some(PromotedIntent::Attack {
                         target: attack.target,
                     });
@@ -537,6 +547,7 @@ fn setup_ticks_for(kind: EntityKind) -> u16 {
 
 fn attack_intent_valid(
     entities: &EntityStore,
+    teams: &TeamRelations,
     fog: &Fog,
     owner: u32,
     attacker: u32,
@@ -552,18 +563,19 @@ fn attack_intent_valid(
         return false;
     }
     matches!(entities.get(target),
-        Some(t) if world_query::is_enemy_targetable(t, owner, attacker)
+        Some(t) if world_query::is_enemy_targetable(t, teams, owner, attacker)
             && fog.is_visible_world(owner, t.pos_x, t.pos_y))
 }
 
 fn attack_order_complete(
     map: &Map,
     entities: &EntityStore,
+    teams: &TeamRelations,
     fog: &Fog,
     attacker: &Entity,
     target: u32,
 ) -> bool {
-    if !attack_intent_valid(entities, fog, attacker.owner, attacker.id, target) {
+    if !attack_intent_valid(entities, teams, fog, attacker.owner, attacker.id, target) {
         return true;
     }
     attacker.attack_unreachable_checks() >= ATTACK_UNREACHABLE_PROMOTION_CHECKS
@@ -1283,7 +1295,10 @@ mod tests {
         let pos = (320.0, 320.0);
         let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
         let distance = config::TILE_SIZE as f32 * 22.0;
-        let target = (pos.0 + angle.cos() * distance, pos.1 + angle.sin() * distance);
+        let target = (
+            pos.0 + angle.cos() * distance,
+            pos.1 + angle.sin() * distance,
+        );
         let artillery = entities
             .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
             .expect("artillery should spawn");

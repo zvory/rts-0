@@ -18,6 +18,7 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
 
@@ -59,6 +60,7 @@ pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 pub(crate) fn combat_system(
     map: &Map,
     entities: &mut EntityStore,
+    teams: &TeamRelations,
     mortar_autocast_researched: &dyn Fn(u32) -> bool,
     _occ: &Occupancy,
     spatial: &SpatialIndex,
@@ -145,7 +147,7 @@ pub(crate) fn combat_system(
 
         // Resolve / acquire a target id based on the current order semantics.
         let target = resolve_target(
-            map, entities, spatial, &los, fog, smokes, id, owner, px, py, acquire_px, mode,
+            map, entities, teams, spatial, &los, fog, smokes, id, owner, px, py, acquire_px, mode,
         );
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.
@@ -191,8 +193,8 @@ pub(crate) fn combat_system(
             Some(t) => (t.pos_x, t.pos_y, t.owner),
             None => continue,
         };
-        if t_owner == owner {
-            continue; // never friendly fire
+        if !teams.is_enemy_owner(owner, t_owner) {
+            continue; // never intentionally fire on non-hostile players
         }
         let dist = dist2(px, py, tx, ty).sqrt();
         let target_angle = (ty - py).atan2(tx - px);

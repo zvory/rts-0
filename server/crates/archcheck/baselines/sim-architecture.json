@@ -262,6 +262,10 @@
       "lines": 387
     },
     {
+      "path": "teams.rs",
+      "lines": 164
+    },
+    {
       "path": "tests.rs",
       "lines": 3283
     },
@@ -1408,6 +1412,10 @@
     {
       "path": "systems.rs",
       "count": 1
+    },
+    {
+      "path": "teams.rs",
+      "count": 11
     },
     {
       "path": "upgrade.rs",

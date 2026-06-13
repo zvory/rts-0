@@ -149,6 +149,17 @@ on `Game` are available for future team-aware systems: `team_of_player`, `same_t
 `same_team_owner`, `is_enemy_player`, `is_enemy_owner`, and `allied_player_ids`. Neutral owner `0`
 is never allied with a player.
 
+Command validation, queued attack promotion, and combat target acquisition use the same
+`TeamRelations` snapshot derived from `PlayerState` at the start of the tick phase. Hostile target
+checks must call `is_enemy_owner` through that relationship surface rather than relying on raw
+`owner != player`; this covers explicit attack commands, ordered attack retention, attack-move and
+idle auto-acquisition, shoot-while-moving target retention, AT-team tank preference, and hostile
+building target acquisition. Raw `owner == player` checks remain correct for strict authority and
+economy surfaces such as selected-unit ownership, production/research/cancel authority, build/gather
+ownership, rally control, supply, upgrades, and resource spending. Raw owner comparisons in damage,
+shot blocking/overpenetration, mortar/artillery splash, kill credit, worker retreat, fog/event
+projection, under-attack notices, and victory remain intentionally classified as later team phases.
+
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.

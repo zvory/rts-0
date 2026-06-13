@@ -29,6 +29,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
@@ -193,6 +194,7 @@ pub(crate) fn run_tick(
     });
 
     crate::perf::timed(perf.as_deref_mut(), "combat", || {
+        let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         let mortar_autocast_researched = |owner| {
             players
                 .iter()
@@ -201,6 +203,7 @@ pub(crate) fn run_tick(
         services::combat::combat_system(
             map,
             entities,
+            &teams,
             &mortar_autocast_researched,
             &post_movement.occupancy,
             &post_movement.spatial,

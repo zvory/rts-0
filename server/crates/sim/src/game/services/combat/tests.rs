@@ -8,6 +8,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::{PlayerState, ScoreState};
 use crate::protocol::{terrain, NoticeSeverity};
@@ -61,6 +62,14 @@ fn player_state(id: u32, is_ai: bool) -> PlayerState {
         score: ScoreState::default(),
         upgrades: Default::default(),
     }
+}
+
+fn default_team_relations() -> TeamRelations {
+    TeamRelations::from_player_teams([(1, 1), (2, 2)])
+}
+
+fn team_relations(assignments: &[(u32, u32)]) -> TeamRelations {
+    TeamRelations::from_player_teams(assignments.iter().copied())
 }
 
 fn run_combat_tick(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
@@ -120,6 +129,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     combat_system(
         map,
         entities,
+        &TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id))),
         &mortar_autocast_researched,
         &occ,
         &spatial,
@@ -193,6 +203,7 @@ fn idle_army_units_auto_acquire_targets() {
     let target = resolve_target(
         &map,
         &entities,
+        &default_team_relations(),
         &spatial,
         &los,
         &fog,
@@ -209,6 +220,36 @@ fn idle_army_units_auto_acquire_targets() {
 }
 
 #[test]
+fn allied_riflemen_do_not_auto_acquire_each_other() {
+    let (entities, self_id, ally_id) = rifleman_with_enemy();
+    let map = open_map(8);
+    let los = LineOfSight::new(&map);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
+    let attacker = entities.get(self_id).expect("attacker should exist");
+
+    let target = resolve_target(
+        &map,
+        &entities,
+        &team_relations(&[(1, 7), (2, 7)]),
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        self_id,
+        attacker.owner,
+        attacker.pos_x,
+        attacker.pos_y,
+        128.0,
+        combat_mode(attacker),
+    );
+
+    assert_eq!(target, None);
+    assert_ne!(target, Some(ally_id));
+}
+
+#[test]
 fn move_orders_ignore_nearby_enemies() {
     let (mut entities, self_id, _) = rifleman_with_enemy();
     let map = open_map(8);
@@ -222,6 +263,7 @@ fn move_orders_ignore_nearby_enemies() {
     let target = resolve_target(
         &map,
         &entities,
+        &default_team_relations(),
         &spatial,
         &los,
         &fog,
@@ -251,6 +293,7 @@ fn attack_move_keeps_auto_acquisition() {
     let target = resolve_target(
         &map,
         &entities,
+        &default_team_relations(),
         &spatial,
         &los,
         &fog,
@@ -264,6 +307,170 @@ fn attack_move_keeps_auto_acquisition() {
     );
 
     assert_eq!(target, Some(enemy_id));
+}
+
+#[test]
+fn attack_move_ignores_allies_and_acquires_enemies() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let ally = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("ally should spawn");
+    let enemy = entities
+        .spawn_unit(3, EntityKind::Rifleman, 150.0, 100.0)
+        .expect("enemy should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(300.0, 100.0));
+    let map = open_map(8);
+    let los = LineOfSight::new(&map);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+
+    let target = resolve_target(
+        &map,
+        &entities,
+        &team_relations(&[(1, 7), (2, 7), (3, 3)]),
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        attacker,
+        attacker_entity.owner,
+        attacker_entity.pos_x,
+        attacker_entity.pos_y,
+        128.0,
+        combat_mode(attacker_entity),
+    );
+
+    assert_eq!(target, Some(enemy));
+    assert_ne!(target, Some(ally));
+}
+
+#[test]
+fn ordered_attackers_do_not_retain_allied_targets() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let ally = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("ally should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(ally));
+    let map = open_map(8);
+    let los = LineOfSight::new(&map);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+
+    let target = resolve_target(
+        &map,
+        &entities,
+        &team_relations(&[(1, 7), (2, 7)]),
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        attacker,
+        attacker_entity.owner,
+        attacker_entity.pos_x,
+        attacker_entity.pos_y,
+        128.0,
+        combat_mode(attacker_entity),
+    );
+
+    assert_eq!(target, None);
+}
+
+#[test]
+fn acquisition_against_buildings_ignores_allied_buildings() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let allied_building = entities
+        .spawn_building(2, EntityKind::Barracks, 120.0, 100.0, true)
+        .expect("allied building should spawn");
+    let enemy_building = entities
+        .spawn_building(3, EntityKind::Barracks, 150.0, 100.0, true)
+        .expect("enemy building should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(300.0, 100.0));
+    let map = open_map(8);
+    let los = LineOfSight::new(&map);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+
+    let target = resolve_target(
+        &map,
+        &entities,
+        &team_relations(&[(1, 7), (2, 7), (3, 3)]),
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        attacker,
+        attacker_entity.owner,
+        attacker_entity.pos_x,
+        attacker_entity.pos_y,
+        192.0,
+        combat_mode(attacker_entity),
+    );
+
+    assert_eq!(target, Some(enemy_building));
+    assert_ne!(target, Some(allied_building));
+}
+
+#[test]
+fn at_team_tank_preference_ignores_allied_tanks() {
+    let mut entities = EntityStore::new();
+    let at_team = entities
+        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+        .expect("at team should spawn");
+    let allied_tank = entities
+        .spawn_unit(2, EntityKind::Tank, 120.0, 100.0)
+        .expect("allied tank should spawn");
+    let enemy_tank = entities
+        .spawn_unit(3, EntityKind::Tank, 150.0, 100.0)
+        .expect("enemy tank should spawn");
+    let map = open_map(8);
+    let los = LineOfSight::new(&map);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
+    let attacker = entities.get(at_team).expect("at team should exist");
+
+    let target = resolve_target(
+        &map,
+        &entities,
+        &team_relations(&[(1, 7), (2, 7), (3, 3)]),
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        at_team,
+        attacker.owner,
+        attacker.pos_x,
+        attacker.pos_y,
+        192.0,
+        combat_mode(attacker),
+    );
+
+    assert_eq!(target, Some(enemy_tank));
+    assert_ne!(target, Some(allied_tank));
 }
 
 #[test]
@@ -291,6 +498,7 @@ fn stone_blocks_attack_move_auto_acquisition() {
     let target = resolve_target(
         &map,
         &entities,
+        &default_team_relations(),
         &spatial,
         &los,
         &fog,
@@ -373,6 +581,7 @@ fn smoke_blocks_attack_move_auto_acquisition() {
     let target = resolve_target(
         &map,
         &entities,
+        &default_team_relations(),
         &spatial,
         &los,
         &fog,
@@ -538,6 +747,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     combat_system(
         &map,
         &mut entities,
+        &TeamRelations::from_player_teams([(1, 1)]),
         &mortar_autocast_researched,
         &occ,
         &spatial,
@@ -696,6 +906,7 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
         let target = resolve_target(
             &map,
             &entities,
+            &default_team_relations(),
             &spatial,
             &los,
             &fog,
@@ -749,6 +960,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
         let target = resolve_target(
             &map,
             &entities,
+            &default_team_relations(),
             &spatial,
             &los,
             &fog,
@@ -938,6 +1150,7 @@ fn idle_workers_do_not_auto_acquire_targets() {
     let target = resolve_target(
         &map,
         &entities,
+        &default_team_relations(),
         &spatial,
         &los,
         &fog,
@@ -2423,6 +2636,7 @@ fn attack_move_prefers_clear_target_over_target_behind_friendly_tank() {
     let target = resolve_target(
         &map,
         &entities,
+        &default_team_relations(),
         &spatial,
         &los,
         &fog,

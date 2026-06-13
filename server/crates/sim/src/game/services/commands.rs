@@ -24,6 +24,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::teams::TeamRelations;
 use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
@@ -50,6 +51,7 @@ pub(crate) fn apply_commands(
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     for (player, cmd) in pending {
         match cmd {
             SimCommand::Move {
@@ -71,6 +73,7 @@ pub(crate) fn apply_commands(
                     players,
                     spatial,
                     coordinator,
+                    &teams,
                     fog,
                     smokes,
                     mortar_shells,
@@ -101,6 +104,7 @@ pub(crate) fn apply_commands(
                     players,
                     spatial,
                     coordinator,
+                    &teams,
                     fog,
                     smokes,
                     mortar_shells,
@@ -118,7 +122,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let target_valid =
-                    attack_target_valid(entities, fog, smokes, player, &units, target);
+                    attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -133,6 +137,7 @@ pub(crate) fn apply_commands(
                     players,
                     spatial,
                     coordinator,
+                    &teams,
                     fog,
                     smokes,
                     mortar_shells,
@@ -164,6 +169,7 @@ pub(crate) fn apply_commands(
                     players,
                     spatial,
                     coordinator,
+                    &teams,
                     fog,
                     smokes,
                     mortar_shells,
@@ -267,6 +273,7 @@ pub(crate) fn apply_commands(
                     players,
                     spatial,
                     coordinator,
+                    &teams,
                     fog,
                     smokes,
                     mortar_shells,
@@ -303,6 +310,7 @@ pub(crate) fn apply_commands(
                     players,
                     spatial,
                     coordinator,
+                    &teams,
                     fog,
                     smokes,
                     mortar_shells,
@@ -553,6 +561,7 @@ fn apply_planned_unit_order(
     players: &mut [PlayerState],
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
+    teams: &TeamRelations,
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
@@ -586,7 +595,9 @@ fn apply_planned_unit_order(
                 }
                 planner::OrderIntent::AttackTarget(target) => {
                     if immediate_unit_can_replace(entities, player, unit)
-                        && attack_unit_can_target(entities, fog, smokes, player, unit, target)
+                        && attack_unit_can_target(
+                            entities, teams, fog, smokes, player, unit, target,
+                        )
                         && !deployed_at_gun_target_outside_arc(entities, unit, target)
                     {
                         if let Some(e) = entities.get_mut(unit) {
@@ -703,6 +714,7 @@ fn apply_planned_unit_order(
                             OrderIntent::Attack(attack)
                                 if attack_unit_can_target(
                                     entities,
+                                    teams,
                                     fog,
                                     smokes,
                                     player,
@@ -798,6 +810,7 @@ fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) ->
 
 fn attack_target_valid(
     entities: &EntityStore,
+    teams: &TeamRelations,
     fog: &Fog,
     smokes: &SmokeCloudStore,
     player: u32,
@@ -806,11 +819,12 @@ fn attack_target_valid(
 ) -> bool {
     dedupe_cap_units(units.to_vec())
         .into_iter()
-        .any(|unit| attack_unit_can_target(entities, fog, smokes, player, unit, target))
+        .any(|unit| attack_unit_can_target(entities, teams, fog, smokes, player, unit, target))
 }
 
 fn attack_unit_can_target(
     entities: &EntityStore,
+    teams: &TeamRelations,
     fog: &Fog,
     smokes: &SmokeCloudStore,
     player: u32,
@@ -818,7 +832,7 @@ fn attack_unit_can_target(
     target: u32,
 ) -> bool {
     matches!(entities.get(target),
-        Some(t) if world_query::is_enemy_targetable(t, player, unit)
+        Some(t) if world_query::is_enemy_targetable(t, teams, player, unit)
             && fog.is_visible_world(player, t.pos_x, t.pos_y)
             && !smokes.point_inside(t.pos_x, t.pos_y))
 }
@@ -1023,12 +1037,14 @@ fn use_ability(
             target,
         },
     };
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     apply_planned_unit_order(
         map,
         entities,
         players,
         spatial,
         coordinator,
+        &teams,
         fog,
         smokes,
         mortar_shells,
@@ -2190,7 +2206,12 @@ mod tests {
         };
         let mut players = vec![player_state(1), player_state(2)];
 
-        apply_with_players(&map, &mut entities, &mut players, vec![(1, command.clone())]);
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(1, command.clone())],
+        );
         assert_eq!(
             entities
                 .get(mortar)
@@ -4192,6 +4213,43 @@ mod tests {
         assert!(
             !matches!(rifle.order(), Order::Attack(_)),
             "hidden target ids should not become attack orders"
+        );
+        assert_eq!(rifle.target_id(), None);
+        assert_eq!(rifle.path_goal(), None);
+    }
+
+    #[test]
+    fn attack_command_rejects_allied_targets() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let ally = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("ally should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].team_id = 7;
+        players[1].team_id = 7;
+
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::Attack {
+                    units: vec![rifle],
+                    target: ally,
+                    queued: false,
+                },
+            )],
+        );
+
+        let rifle = entities.get(rifle).expect("rifleman should exist");
+        assert!(
+            !matches!(rifle.order(), Order::Attack(_)),
+            "allied target ids should not become attack orders"
         );
         assert_eq!(rifle.target_id(), None);
         assert_eq!(rifle.path_goal(), None);
