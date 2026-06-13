@@ -5,6 +5,7 @@ use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
+use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
 use crate::rules::combat;
 use crate::rules::projection;
@@ -118,6 +119,7 @@ impl MortarShellStore {
         &mut self,
         map: &Map,
         entities: &mut EntityStore,
+        teams: &TeamRelations,
         fog: &Fog,
         events: &mut HashMap<u32, Vec<Event>>,
         tick: u32,
@@ -126,7 +128,7 @@ impl MortarShellStore {
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
-                resolve_shell(map, entities, fog, events, &shell, tick);
+                resolve_shell(map, entities, teams, fog, events, &shell, tick);
             } else {
                 pending.push(shell);
             }
@@ -149,8 +151,7 @@ fn emit_launch(
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        if pid != owner
-            && (!reveal_launch_to_enemies || !fog.is_visible_world(pid, from_x, from_y))
+        if pid != owner && (!reveal_launch_to_enemies || !fog.is_visible_world(pid, from_x, from_y))
         {
             continue;
         }
@@ -169,6 +170,7 @@ fn emit_launch(
 fn resolve_shell(
     _map: &Map,
     entities: &mut EntityStore,
+    teams: &TeamRelations,
     fog: &Fog,
     events: &mut HashMap<u32, Vec<Event>>,
     shell: &MortarShell,
@@ -216,13 +218,18 @@ fn resolve_shell(
             continue;
         }
         let damaged = entities.get_mut(id).is_some_and(|target| {
-            target.apply_damage(effective, Some((shell.owner, (shell.x, shell.y), tick)))
+            let attribution = teams.is_enemy_owner(shell.owner, target.owner).then_some((
+                shell.owner,
+                (shell.x, shell.y),
+                tick,
+            ));
+            target.apply_damage(effective, attribution)
         });
         if damaged {
-            if victim_owner != 0 && victim_owner != shell.owner && reveal.is_some() {
+            if teams.is_enemy_owner(shell.owner, victim_owner) && reveal.is_some() {
                 reveal_recipients.push(victim_owner);
             }
-            push_under_attack_notice(events, fog, shell.owner, victim_owner, tx, ty);
+            push_under_attack_notice(events, teams, fog, shell.owner, victim_owner, tx, ty);
         }
     }
     reveal_recipients.sort_unstable();
@@ -293,22 +300,28 @@ fn emit_impact(
 
 fn push_under_attack_notice(
     events: &mut HashMap<u32, Vec<Event>>,
+    teams: &TeamRelations,
     fog: &Fog,
     attacker_owner: u32,
     victim_owner: u32,
     x: f32,
     y: f32,
 ) {
-    if victim_owner == 0 || victim_owner == attacker_owner {
+    if victim_owner == 0 || !teams.is_enemy_owner(attacker_owner, victim_owner) {
         return;
     }
-    if !projection::event_visible_to(victim_owner, x, y, attacker_owner, fog) {
-        return;
+    let player_ids: Vec<u32> = events.keys().copied().collect();
+    for pid in player_ids {
+        if !teams.same_team_or_same_owner(pid, victim_owner)
+            || !projection::event_visible_to(pid, x, y, attacker_owner, fog)
+        {
+            continue;
+        }
+        events.entry(pid).or_default().push(Event::Notice {
+            msg: "alert:under_attack".to_string(),
+            x: Some(x),
+            y: Some(y),
+            severity: crate::protocol::NoticeSeverity::Alert,
+        });
     }
-    events.entry(victim_owner).or_default().push(Event::Notice {
-        msg: "alert:under_attack".to_string(),
-        x: Some(x),
-        y: Some(y),
-        severity: crate::protocol::NoticeSeverity::Alert,
-    });
 }

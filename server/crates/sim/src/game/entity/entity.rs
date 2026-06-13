@@ -648,6 +648,10 @@ impl Entity {
             self.last_damage_owner = Some(owner);
             self.last_damage_tick = Some(tick);
             self.last_damage_pos = Some(pos);
+        } else if self.hp == 0 {
+            self.last_damage_owner = None;
+            self.last_damage_tick = None;
+            self.last_damage_pos = None;
         }
         true
     }

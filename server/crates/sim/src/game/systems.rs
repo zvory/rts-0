@@ -243,10 +243,12 @@ pub(crate) fn run_tick(
         services::construction::construction_system(map, entities, players, events);
     });
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
-        mortar_shells.resolve_due(map, entities, fog, events, tick);
+        let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
+        mortar_shells.resolve_due(map, entities, &teams, fog, events, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "artillery_impacts", || {
-        artillery_shells.resolve_due(entities, events, tick);
+        let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
+        artillery_shells.resolve_due(entities, &teams, events, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         services::death::death_system(

@@ -116,8 +116,12 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     let mut pathing = PathingService::new(256, 64);
     let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 10);
     let mut fog = Fog::new(map.size);
-    fog.recompute_with_smoke(&[1, 2], entities, map, smokes);
-    let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+    let player_ids: Vec<u32> = players.iter().map(|player| player.id).collect();
+    fog.recompute_with_smoke(&player_ids, entities, map, smokes);
+    let mut events: HashMap<u32, Vec<Event>> = player_ids
+        .iter()
+        .map(|player_id| (*player_id, Vec::new()))
+        .collect();
 
     let mut rng = SmallRng::seed_from_u64(rng_seed);
     let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
@@ -165,6 +169,37 @@ fn apply_test_damage(
     vy: f32,
     range_px: f32,
 ) {
+    apply_test_damage_with_teams(
+        entities,
+        &default_team_relations(),
+        events,
+        attacker,
+        victim,
+        dmg,
+        attacker_owner,
+        ax,
+        ay,
+        vx,
+        vy,
+        range_px,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_test_damage_with_teams(
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    events: &mut HashMap<u32, Vec<Event>>,
+    attacker: u32,
+    victim: u32,
+    dmg: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+    range_px: f32,
+) {
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.size);
     let smokes = SmokeCloudStore::new();
@@ -172,6 +207,7 @@ fn apply_test_damage(
     apply_damage(
         &map,
         entities,
+        teams,
         events,
         &fog,
         &smokes,
@@ -686,7 +722,7 @@ fn visible_damage_emits_positioned_under_attack_alert_to_victim_owner() {
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("attacker should spawn");
     let victim_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .spawn_unit(2, EntityKind::Worker, 120.0, 100.0)
         .expect("victim should spawn");
     entities
         .get_mut(attacker_id)
@@ -716,6 +752,59 @@ fn visible_damage_emits_positioned_under_attack_alert_to_victim_owner() {
             )),
             "victim owner should receive a positioned under-attack alert"
         );
+}
+
+#[test]
+fn visible_enemy_damage_alerts_victim_team_only() {
+    let mut entities = EntityStore::new();
+    let attacker_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let victim_id = entities
+        .spawn_unit(2, EntityKind::Worker, 120.0, 100.0)
+        .expect("victim should spawn");
+    entities
+        .spawn_unit(3, EntityKind::Worker, 120.0, 132.0)
+        .expect("victim ally should spawn");
+    entities
+        .get_mut(attacker_id)
+        .expect("attacker should exist")
+        .set_order(Order::attack(victim_id));
+    let mut p1 = player_state(1, false);
+    let mut p2 = player_state(2, false);
+    let mut p3 = player_state(3, false);
+    p1.team_id = 1;
+    p2.team_id = 7;
+    p3.team_id = 7;
+
+    let events = run_combat_tick_with_players(&mut entities, &[p1, p2, p3]);
+
+    assert!(
+        events
+            .get(&2)
+            .expect("victim owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")),
+        "victim owner should receive the under-attack notice"
+    );
+    assert!(
+        events
+            .get(&3)
+            .expect("victim ally events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")),
+        "victim ally should receive the team under-attack notice"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("attacker events should exist")
+            .iter()
+            .all(
+                |event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")
+            ),
+        "attacker team should not receive the victim alert"
+    );
 }
 
 #[test]
@@ -1582,6 +1671,42 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
 }
 
 #[test]
+fn mortar_autocast_skips_shot_that_would_hit_allied_unit() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    let enemy_id = entities
+        .spawn_unit(3, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("enemy should spawn");
+    let (impact_x, impact_y) = mortar_aim_point(&entities, enemy_id, 10);
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, impact_x, impact_y + 24.0)
+        .expect("allied unit should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
+    }
+    let mut p1 = player_state(1, false);
+    let mut p2 = player_state(2, false);
+    let mut p3 = player_state(3, false);
+    p1.team_id = 7;
+    p2.team_id = 7;
+    p3.team_id = 3;
+
+    run_combat_tick_with_players(&mut entities, &[p1, p2, p3]);
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "autocast mortar should hold fire when the predicted impact would hit an allied unit"
+    );
+}
+
+#[test]
 fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
@@ -2196,6 +2321,90 @@ fn shots_overpenetrate_past_non_blocking_primary_target() {
         matches!(secondary.order(), Order::Idle),
         "overpenetration damage must not mutate worker orders"
     );
+}
+
+#[test]
+fn overpenetration_does_not_damage_allied_entity_behind_enemy() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let primary = entities
+        .spawn_unit(3, EntityKind::Rifleman, 140.0, 100.0)
+        .expect("enemy primary target should spawn");
+    let ally_behind = entities
+        .spawn_unit(2, EntityKind::Worker, 165.0, 100.0)
+        .expect("allied unit should spawn");
+    let ally_hp_before = entities.get(ally_behind).expect("ally should exist").hp;
+    let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+    events.insert(1, Vec::new());
+    events.insert(2, Vec::new());
+    events.insert(3, Vec::new());
+    let teams = team_relations(&[(1, 7), (2, 7), (3, 3)]);
+
+    apply_test_damage_with_teams(
+        &mut entities,
+        &teams,
+        &mut events,
+        attacker,
+        primary,
+        20,
+        1,
+        100.0,
+        100.0,
+        140.0,
+        100.0,
+        128.0,
+    );
+
+    assert!(
+        entities.get(primary).expect("primary should exist").hp < 40,
+        "enemy primary should take the direct hit"
+    );
+    assert_eq!(
+        entities.get(ally_behind).expect("ally should exist").hp,
+        ally_hp_before,
+        "overpenetration must not damage allied entities behind an enemy"
+    );
+}
+
+#[test]
+fn allied_damage_does_not_update_last_damage_signal() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let ally = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("ally should spawn");
+    let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+    events.insert(1, Vec::new());
+    events.insert(2, Vec::new());
+    let teams = team_relations(&[(1, 7), (2, 7)]);
+
+    apply_test_damage_with_teams(
+        &mut entities,
+        &teams,
+        &mut events,
+        attacker,
+        ally,
+        10,
+        1,
+        100.0,
+        100.0,
+        120.0,
+        100.0,
+        128.0,
+    );
+
+    let ally = entities.get(ally).expect("ally should exist");
+    assert!(
+        ally.hp < ally.max_hp,
+        "test applies raw damage to prove attribution is independent of health loss"
+    );
+    assert_eq!(ally.last_damage_owner(), None);
+    assert_eq!(ally.last_damage_pos(), None);
+    assert_eq!(ally.last_damage_tick(), None);
 }
 
 #[test]

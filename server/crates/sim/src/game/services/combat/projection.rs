@@ -4,10 +4,13 @@ use crate::game::services::geometry::{
     building_rect_for_entity, segment_intersects_rect, segment_intersects_unit_body,
     unit_body_for_entity,
 };
+use crate::game::teams::TeamRelations;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn resolve_shot_victim(
     map: &Map,
     entities: &EntityStore,
+    teams: &TeamRelations,
     attacker: u32,
     intended_victim: u32,
     attacker_owner: u32,
@@ -24,7 +27,7 @@ pub(super) fn resolve_shot_victim(
     for candidate in entities.iter() {
         if candidate.id == attacker
             || candidate.is_node()
-            || candidate.owner == attacker_owner
+            || !teams.is_enemy_owner(attacker_owner, candidate.owner)
             || candidate.hp == 0
         {
             continue;

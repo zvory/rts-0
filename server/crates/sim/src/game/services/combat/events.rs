@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::game::entity::{Entity, EntityKind};
 use crate::game::fog::Fog;
+use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules::projection;
 
@@ -57,6 +58,7 @@ pub(super) fn emit_attack_event(
 pub(super) fn push_under_attack_notices_for_visible_attack(
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    teams: &TeamRelations,
     victim_owner: u32,
     attacker_owner: u32,
     ax: f32,
@@ -69,19 +71,23 @@ pub(super) fn push_under_attack_notices_for_visible_attack(
         if !projection::attack_event_visible_to(pid, ax, ay, vx, vy, attacker_owner, fog) {
             continue;
         }
-        push_under_attack_notice(events, pid, victim_owner, attacker_owner, vx, vy);
+        push_under_attack_notice(events, teams, pid, victim_owner, attacker_owner, vx, vy);
     }
 }
 
 pub(super) fn push_under_attack_notice(
     events: &mut HashMap<u32, Vec<Event>>,
+    teams: &TeamRelations,
     recipient: u32,
     victim_owner: u32,
     attacker_owner: u32,
     x: f32,
     y: f32,
 ) {
-    if victim_owner == 0 || victim_owner == attacker_owner || recipient != victim_owner {
+    if victim_owner == 0
+        || !teams.is_enemy_owner(attacker_owner, victim_owner)
+        || !teams.same_team_or_same_owner(recipient, victim_owner)
+    {
         return;
     }
     events.entry(recipient).or_default().push(Event::Notice {
