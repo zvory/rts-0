@@ -170,7 +170,7 @@ shot interception, overpenetration, support-weapon splash attribution, worker-re
 under-attack notice routing use `TeamRelations` snapshots derived from `PlayerState`. Hostile target
 checks must call `is_enemy_owner` through that relationship surface rather than relying on raw
 `owner != player`; this covers explicit attack commands, ordered attack retention, attack-move and
-idle auto-acquisition, shoot-while-moving target retention, AT-team tank preference, hostile
+idle auto-acquisition, shoot-while-moving target retention, Anti-Tank Gun tank preference, hostile
 building target acquisition, direct-fire damage attribution, and overpenetration victims. Raw
 `owner == player` checks remain correct for strict authority and economy surfaces such as
 selected-unit ownership, production/research/cancel authority, build/gather ownership, rally
@@ -363,9 +363,9 @@ Allocation rules:
   chosen idle caster's active order with an ability movement order. Abilities may also explicitly
   allow interrupting a moving caster; manual Mortar Fire uses that path so a non-queued fire order
   stops the mortar's current movement and clears future queued intents.
-- AT-gun setup is a queueable facing intent for selected AT teams only. The stored point means
+- Anti-Tank Gun setup is a queueable facing intent for selected Anti-Tank Guns only. The stored point means
   "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
-  selections ignore non-AT units for setup but keep them for later compatible orders.
+  selections ignore non-setup-capable units for setup but keep them for later compatible orders.
 
 Examples:
 
@@ -377,7 +377,7 @@ Examples:
   receive the attack-move stages.
 - **Legacy Charge in queues.** Old command logs may contain queued Charge stages. Because Charge no
   longer has eligible carriers, those stages are skipped and later queued orders still promote.
-- **Packed AT guns.** The player orders packed AT guns to move, then Shift-arms setup and clicks a
+- **Packed anti-tank guns.** The player orders packed anti-tank guns to move, then Shift-arms setup and clicks a
   facing point. The setup stage promotes after movement and computes facing from the gun's actual
   arrived position toward the stored world point.
 - **Reactive moving smoke.** A scout car already moving past cover receives an immediate Smoke
@@ -443,7 +443,7 @@ building sites. Production spawn exits, construction/build intent, movement land
 candidates, collision push targets, and formation goal selection all use this shared standability
 layer for static/body legality. Swept segment checks sample the same body shape along a straight
 segment, and broad-phase queries use each body's conservative bounding radius. Movement separates
-oriented vehicle body legality from drive behavior: tanks and AT guns use pivot-drive locomotion
+oriented vehicle body legality from drive behavior: tanks and anti-tank guns use pivot-drive locomotion
 that can rotate in place before advancing, while scout cars use car-drive path following where hull
 facing changes through translation/curvature. These helpers are pure and do not change the wire
 protocol or client contract.

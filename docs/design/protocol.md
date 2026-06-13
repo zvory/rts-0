@@ -58,15 +58,15 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `move`       | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move selected units to a world point. Infantry ignore enemies until they arrive or receive another order; tanks and scout cars keep driving and fire at in-range enemies without chasing. When `queued` is true, store future movement intent instead of replacing the active order. |
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move while attacking enemies encountered; this is the aggressive movement order. When `queued` is true, store future attack-move intent instead of replacing the active order. |
 | `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Attack a specific entity. When `queued` is true, store future attack intent instead of replacing the active order. |
-| `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned AT guns and artillery toward a world point. When `queued` is true, append a future setup-facing intent for owned completed AT teams and artillery only; the stored point is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
-| `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
+| `setupAntiTankGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned anti-tank guns and artillery toward a world point. When `queued` is true, append a future setup-facing intent for owned completed Anti-Tank Guns and artillery only; the stored point is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
+| `tearDownAntiTankGuns` | `units: u32[]` | Pack up owned anti-tank guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but no longer has eligible carriers. |
 | `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"|"breakthrough"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is legacy/no-op; `smoke`, `mortarFire`, and deployed Artillery `pointFire` target a world point. Command Car `breakthrough` is self-targeted and ignores `x`/`y`. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Artillery point fire requires a deployed gun and is terminal in the unit order queue: once accepted, later queued unit orders are not appended after it. |
 | `setAutocast` | `ability: "mortarFire"`, `units: u32[]`, `enabled: bool` | Toggle server-authoritative autocast for owned Mortar Teams. Other unit/ability combinations are ignored. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Upgrade ids: `methamphetamines` at the Training Centre; `at_gun_unlock`, `artillery_unlock`, `tank_unlock`, `command_car_unlock`, and `mortar_autocast` at the R&D Complex (`research_complex`). `artillery_unlock` requires completed `at_gun_unlock`; `command_car_unlock` requires completed `tank_unlock`. |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Upgrade ids: `methamphetamines` at the Training Centre; `anti_tank_gun_unlock`, `artillery_unlock`, `tank_unlock`, `command_car_unlock`, and `mortar_autocast` at the R&D Complex (`research_complex`). `artillery_unlock` requires completed `anti_tank_gun_unlock`; `command_car_unlock` requires completed `tank_unlock`. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
 | `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre, research_complex), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
@@ -331,10 +331,10 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `upgrade` | 1 `methamphetamines`, 2 `at_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock` |
+| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch |
 
@@ -344,7 +344,7 @@ trailing missing optional fields are omitted; interior missing optional fields a
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
 stage first, followed by queued unit stages in execution order. Each compact stage is
 `[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`,
-6 `smoke`, 7 `setupAtGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, or
+6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, or
 11 `breakthrough`.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
@@ -401,7 +401,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","mortar_team","artillery","scout_car","tank","command_car","city_centre","depot","barracks","training_centre","research_complex","factory","steelworks"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","tank","command_car","city_centre","depot","barracks","training_centre","research_complex","factory","steelworks"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -418,7 +418,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
-  setupState?: string,           // machine_gunner/at_team/mortar_team/artillery only:
+  setupState?: string,           // machine_gunner/anti_tank_gun/mortar_team/artillery only:
                                   // "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:
   rally?: [f32, f32],            // first rally point (world px); ONLY ever sent to the owner
@@ -427,9 +427,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
-  setupFacing?: f32,             // at_team/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
+  setupFacing?: f32,             // anti_tank_gun/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
   orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
-    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"smoke"|"mortarFire"|"pointFire"|"setupAtGuns", x: f32, y: f32 }
+    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"smoke"|"mortarFire"|"pointFire"|"setupAntiTankGuns", x: f32, y: f32 }
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
   abilities?: [                  // owner-only ability affordance/cooldown data

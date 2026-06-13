@@ -2,7 +2,7 @@
 
 ## Objective
 
-Add the Superior Firepower late-game capstone after the Scout Car, Mortar, AT Gun, and Tank timing
+Add the Superior Firepower late-game capstone after the Scout Car, Mortar, Anti-Tank Gun, and Tank timing
 foundation is playable.
 
 ## Artillery
@@ -12,10 +12,10 @@ Working checklist: [artillery-checklist.md](artillery-checklist.md).
 - Built at Gun Works.
 - Requires a late Gun Works upgrade.
 - Costs 300 steel / 100 oil.
-- Like AT Guns, must set up before firing and tear down before moving.
-- Movement and setup behavior matches AT Guns, but Artillery is slower and uses a tank-sized
+- Like Anti-Tank Guns, must set up before firing and tear down before moving.
+- Movement and setup behavior matches Anti-Tank Guns, but Artillery is slower and uses a tank-sized
   footprint.
-- When setting up, shows a cone indicating where it can shoot, like the AT Gun setup cone.
+- When setting up, shows a cone indicating where it can shoot, like the Anti-Tank Gun setup cone.
 - Field of fire is 20 degrees total after setup.
 - Minimum range is 10 tiles.
 - Maximum range is 50 tiles.
@@ -35,7 +35,7 @@ Working checklist: [artillery-checklist.md](artillery-checklist.md).
 
 - Add the Artillery unit definition, Gun Works upgrade, training option, cost, footprint, movement,
   setup, and teardown behavior.
-- Reuse the AT Gun-style setup command flow and setup cone affordance where possible, adjusted for
+- Reuse the Anti-Tank Gun-style setup command flow and setup cone affordance where possible, adjusted for
   Artillery's 20-degree field of fire.
 - Add point-fire command handling and UI affordances for Artillery.
 - Track per-setup firing accuracy so the CEP starts at 5 tiles and reaches 2 tiles on the fifth

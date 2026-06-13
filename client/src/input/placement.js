@@ -42,7 +42,7 @@ export function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
     halfH = ((stat.footH ? stat.footH : 1) * tileSize) / 2;
     return e.x + halfW > minX && e.x - halfW < maxX && e.y + halfH > minY && e.y - halfH < maxY;
   } else {
-    if (e.kind === KIND.AT_TEAM) return bodyCircleIntersectsRect(e, minX, minY, maxX, maxY, 0);
+    if (e.kind === KIND.ANTI_TANK_GUN) return bodyCircleIntersectsRect(e, minX, minY, maxX, maxY, 0);
     if (isVehicleBodyKind(e.kind)) return orientedVehicleIntersectsRect(e, minX, minY, maxX, maxY, 0);
     const radius = stat.size ? stat.size : 0;
     const nearestX = Math.min(Math.max(e.x, minX), maxX);

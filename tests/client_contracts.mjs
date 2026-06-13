@@ -14,8 +14,8 @@ import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
 import { MatchHealth } from "../client/src/match_health.js";
 import {
-  AT_GUN_DEPLOYED_RANGE_TILES,
-  AT_GUN_FIELD_OF_FIRE_RAD,
+  ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
+  ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
@@ -850,10 +850,10 @@ function hotkeyService() {
     ],
     resources: { steel: 125, oil: 125 },
   }));
-  const atGun = buttonByLabel(upgradeCard, "AT Gun");
-  assert(atGun && !atGun.enabled, "upgrade-gated unit should be disabled before research");
-  assert(atGun.title === "Requires research in R&D Complex", "upgrade-gated unit tooltip should name R&D research");
-  assert(!buttonByLabel(upgradeCard, "AT Gun Crews"), "Gun Works should not expose R&D research");
+  const antiTankGun = buttonByLabel(upgradeCard, "Anti-Tank Gun");
+  assert(antiTankGun && !antiTankGun.enabled, "upgrade-gated unit should be disabled before research");
+  assert(antiTankGun.title === "Requires research in R&D Complex", "upgrade-gated unit tooltip should name R&D research");
+  assert(!buttonByLabel(upgradeCard, "Anti-Tank Gun Crews"), "Gun Works should not expose R&D research");
 
   const researchComplex = { id: 53, owner: 1, kind: KIND.RESEARCH_COMPLEX, buildProgress: null };
   const researchCard = buildCommandCardDescriptors(commandCardCtx({
@@ -865,13 +865,13 @@ function hotkeyService() {
     ],
     resources: { steel: 200, oil: 200 },
   }));
-  const atUnlock = buttonByLabel(researchCard, "AT Gun Crews");
+  const antiTankGunUnlock = buttonByLabel(researchCard, "Anti-Tank Gun Crews");
   const artilleryUnlock = buttonByLabel(researchCard, "Unlock Artillery");
-  assert(atUnlock && atUnlock.enabled, "available affordable upgrade should be enabled");
-  assert(atUnlock.commandId === `research.${UPGRADE.AT_GUN_UNLOCK}`, "research button should expose stable research identity");
-  assert(atUnlock.intent.type === "research", "upgrade button should carry research intent");
-  assert(artilleryUnlock && !artilleryUnlock.enabled, "Artillery research should show disabled before AT Gun research");
-  assert(artilleryUnlock.title === "Requires AT Gun Research", "Artillery research should name missing AT prerequisite");
+  assert(antiTankGunUnlock && antiTankGunUnlock.enabled, "available affordable upgrade should be enabled");
+  assert(antiTankGunUnlock.commandId === `research.${UPGRADE.ANTI_TANK_GUN_UNLOCK}`, "research button should expose stable research identity");
+  assert(antiTankGunUnlock.intent.type === "research", "upgrade button should carry research intent");
+  assert(artilleryUnlock && !artilleryUnlock.enabled, "Artillery research should show disabled before Anti-Tank Gun research");
+  assert(artilleryUnlock.title === "Requires Anti-Tank Gun Research", "Artillery research should name missing anti-tank prerequisite");
 
   const catalog = buildCommandCardContextCatalog();
   assert(catalog.some((entry) => entry.id === "worker-build"), "command-card context catalog includes worker build context");
@@ -2127,7 +2127,7 @@ function fakeAudioContext() {
         null,
         [
           [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112],
-          [ORDER_STAGE_CODE[ORDER_STAGE.SETUP_AT_GUNS], 128, 160],
+          [ORDER_STAGE_CODE[ORDER_STAGE.SETUP_ANTI_TANK_GUNS], 128, 160],
           [ORDER_STAGE_CODE[ORDER_STAGE.CHARGE], 176, 208],
           [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224],
           [ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE], 320, 352],
@@ -2229,17 +2229,17 @@ function fakeAudioContext() {
     "entity debug path decodes",
   );
   assert(
-      decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_AT_GUNS &&
+      decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
       decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.CHARGE &&
       decoded.entities[0].orderPlan[3].kind === ORDER_STAGE.SMOKE &&
       decoded.entities[0].orderPlan[4].kind === ORDER_STAGE.POINT_FIRE,
     "order plan stage flavor decodes",
   );
   assert(
-    decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_AT_GUNS &&
+    decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
       decoded.entities[0].orderPlan[1].x === 128 &&
       decoded.entities[0].orderPlan[1].y === 160,
-    "queued AT gun setup order stage decodes",
+    "queued anti-tank gun setup order stage decodes",
   );
   assert(
     decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.CHARGE &&
@@ -2390,26 +2390,26 @@ function fakeAudioContext() {
 
 {
   assert(
-    JSON.stringify(cmd.setupAtGuns([1, 2], 100, 200)) ===
-      JSON.stringify({ c: "setupAtGuns", units: [1, 2], x: 100, y: 200 }),
-    "setupAtGuns command builder emits the wire shape",
+    JSON.stringify(cmd.setupAntiTankGuns([1, 2], 100, 200)) ===
+      JSON.stringify({ c: "setupAntiTankGuns", units: [1, 2], x: 100, y: 200 }),
+    "setupAntiTankGuns command builder emits the wire shape",
   );
   assert(
-    JSON.stringify(cmd.tearDownAtGuns([3, 4])) ===
-      JSON.stringify({ c: "tearDownAtGuns", units: [3, 4] }),
-    "tearDownAtGuns command builder emits the wire shape",
+    JSON.stringify(cmd.tearDownAntiTankGuns([3, 4])) ===
+      JSON.stringify({ c: "tearDownAntiTankGuns", units: [3, 4] }),
+    "tearDownAntiTankGuns command builder emits the wire shape",
   );
   assert(
     JSON.stringify(cmd.move([1], 100, 200, true)) ===
       JSON.stringify({ c: "move", units: [1], x: 100, y: 200, queued: true }),
     "queued move command builder emits the queued flag only when requested",
   );
-  assert(AT_GUN_DEPLOYED_RANGE_TILES === 12, "client mirrors deployed AT gun range");
+  assert(ANTI_TANK_GUN_DEPLOYED_RANGE_TILES === 12, "client mirrors deployed anti-tank gun range");
   assertApprox(
-    AT_GUN_FIELD_OF_FIRE_RAD,
+    ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
     Math.PI / 4,
     0.000001,
-    "client mirrors AT gun field of fire",
+    "client mirrors anti-tank gun field of fire",
   );
 }
 
@@ -2834,16 +2834,16 @@ function fakeAudioContext() {
   );
   assert(STATS[KIND.STEELWORKS].buildTicks === 620, "Gun Works build time mirrors server");
   assert(
-    STATS[KIND.STEELWORKS].trains.includes(KIND.AT_TEAM),
-    "Gun Works should train AT Guns after the unlock",
+    STATS[KIND.STEELWORKS].trains.includes(KIND.ANTI_TANK_GUN),
+    "Gun Works should train Anti-Tank Guns after the unlock",
   );
   assert(
     !STATS[KIND.STEELWORKS].researches,
     "Gun Works should no longer expose advanced unlock research",
   );
   assert(
-    !STATS[KIND.BARRACKS].trains.includes(KIND.AT_TEAM),
-    "Barracks should no longer train AT Guns",
+    !STATS[KIND.BARRACKS].trains.includes(KIND.ANTI_TANK_GUN),
+    "Barracks should no longer train Anti-Tank Guns",
   );
   assert(
     STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
@@ -2862,12 +2862,12 @@ function fakeAudioContext() {
     "R&D Complex cost and build time mirror server",
   );
   assert(
-    STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.AT_GUN_UNLOCK) &&
+    STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ANTI_TANK_GUN_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ARTILLERY_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.TANK_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.COMMAND_CAR_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.MORTAR_AUTOCAST),
-    "R&D Complex should expose AT Gun, Artillery, Tank, Command Car, and Mortar Autocast research",
+    "R&D Complex should expose Anti-Tank Gun, Artillery, Tank, Command Car, and Mortar Autocast research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -2887,8 +2887,8 @@ function fakeAudioContext() {
     "Mortar Autocast research cost and time mirror server",
   );
   assert(
-    STATS[KIND.AT_TEAM].upgradeRequiresText === "Requires research in R&D Complex",
-    "AT Gun training should explain the R&D Complex research requirement",
+    STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in R&D Complex",
+    "Anti-Tank Gun training should explain the R&D Complex research requirement",
   );
   assert(
     STATS[KIND.TANK].upgradeRequiresText === "Requires research in R&D Complex",
@@ -3318,14 +3318,14 @@ function fakeAudioContext() {
     gunWorksHud._resourceIcons = {};
     renderCommandCard(gunWorksHud);
     const mortarButton = renderedButtons.find((button) => button.innerHTML.includes("Mortar Team"));
-    const atGunButton = renderedButtons.find((button) => button.innerHTML.includes("AT Gun"));
+    const antiTankGunButton = renderedButtons.find((button) => button.innerHTML.includes("Anti-Tank Gun"));
     const artilleryButton = renderedButtons.find((button) => button.innerHTML.includes("Artillery"));
-    const atResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
+    const antiTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG+"));
     const artilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
-    assert(atGunButton?.dataset.hotkey === "W", "AT Gun training should occupy the top-middle W slot");
+    assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
     assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
-    assert(!atResearchButton, "AT Gun Crews research should move out of Gun Works");
+    assert(!antiTankResearchButton, "Anti-Tank Gun Crews research should move out of Gun Works");
     assert(!artilleryResearchButton, "Unlock Artillery research should move out of Gun Works");
 
     renderedButtons.length = 0;
@@ -3349,27 +3349,27 @@ function fakeAudioContext() {
     rdHud._cancelRoundRobin = new Map();
     rdHud._resourceIcons = {};
     renderCommandCard(rdHud);
-    const rdAtResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
+    const rdAntiTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const rdCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
-    assert(rdAtResearchButton?.dataset.hotkey === "Q", "AT Gun Crews research should appear in R&D Complex");
+    assert(rdAntiTankResearchButton?.dataset.hotkey === "Q", "Anti-Tank Gun Crews research should appear in R&D Complex");
     assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
     assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.dataset.hotkey === "S", "Command Car research should appear in R&D Complex");
     assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
     assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
     assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Unlock Artillery research should appear in R&D Complex");
-    assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before AT Gun research");
-    assert(rdArtilleryResearchButton?.title === "Requires AT Gun Research", "Artillery research should name AT Gun prerequisite");
+    assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before Anti-Tank Gun research");
+    assert(rdArtilleryResearchButton?.title === "Requires Anti-Tank Gun Research", "Artillery research should name Anti-Tank Gun prerequisite");
 
     renderedButtons.length = 0;
-    rdHud.state.upgrades = [UPGRADE.AT_GUN_UNLOCK];
+    rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
     rdHud._cardSig = null;
     renderCommandCard(rdHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
-    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after AT Gun research");
+    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after Anti-Tank Gun research");
 
     renderedButtons.length = 0;
     rdHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
@@ -3441,15 +3441,15 @@ function fakeAudioContext() {
 
     renderedButtons.length = 0;
     sent.length = 0;
-    const selectedAtGun = { id: 88, owner: playerId, kind: KIND.AT_TEAM, setupState: SETUP.DEPLOYED };
+    const selectedAntiTankGun = { id: 88, owner: playerId, kind: KIND.ANTI_TANK_GUN, setupState: SETUP.DEPLOYED };
     const selectedArtillery = { id: 89, owner: playerId, kind: KIND.ARTILLERY, setupState: SETUP.PACKED };
-    const atGunHud = Object.create(HUD.prototype);
-    atGunHud.state = {
+    const antiTankGunHud = Object.create(HUD.prototype);
+    antiTankGunHud.state = {
       playerId,
       resources: { steel: 0, oil: 0 },
       commandTarget: null,
-      selectedEntities: () => [selectedAtGun, selectedArtillery],
-      entitiesInterpolated: () => [selectedAtGun, selectedArtillery],
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
+      entitiesInterpolated: () => [selectedAntiTankGun, selectedArtillery],
       beginCommandTarget(kind) {
         this.commandTarget = kind;
       },
@@ -3457,33 +3457,33 @@ function fakeAudioContext() {
         this.commandTarget = null;
       },
     };
-    atGunHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
-    atGunHud._cardSig = null;
+    antiTankGunHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    antiTankGunHud._cardSig = null;
 
-    renderCommandCard(atGunHud);
+    renderCommandCard(antiTankGunHud);
     const setupButton = renderedButtons.find((button) => button.innerHTML.includes("Set Up"));
     const tearDownButton = renderedButtons.find((button) => button.innerHTML.includes("Tear Down"));
-    assert(setupButton?.dataset.hotkey, "AT gun Set Up button should keep its command-card hotkey");
-    assert(!tearDownButton, "AT gun Tear Down should not occupy a command-card slot");
+    assert(setupButton?.dataset.hotkey, "anti-tank gun Set Up button should keep its command-card hotkey");
+    assert(!tearDownButton, "anti-tank gun Tear Down should not occupy a command-card slot");
 
     const setupCommands = [];
     const setupInput = Object.create(Input.prototype);
     setupInput.state = {
       playerId,
-      commandTarget: "setupAtGuns",
-      selectedEntities: () => [selectedAtGun, selectedArtillery],
+      commandTarget: "setupAntiTankGuns",
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
       addCommandFeedback() {},
     };
     setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
     setupInput._worldAt = (x, y) => ({ x, y });
-    setupInput._selectedOwnUnitIds = () => [selectedAtGun.id, selectedArtillery.id];
+    setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id];
     setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
     assert(
-      setupCommands[0]?.c === "setupAtGuns" &&
-        setupCommands[0].units.includes(selectedAtGun.id) &&
+      setupCommands[0]?.c === "setupAntiTankGuns" &&
+        setupCommands[0].units.includes(selectedAntiTankGun.id) &&
         setupCommands[0].units.includes(selectedArtillery.id) &&
         setupCommands[0].queued === true,
-      "setupAtGuns targeting includes selected artillery as setup-capable support weapons",
+      "setupAntiTankGuns targeting includes selected artillery as setup-capable support weapons",
     );
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
@@ -3555,7 +3555,7 @@ function fakeAudioContext() {
   assert(state.resources !== undefined, "GameState.resources");
   assert(Array.isArray(state.events), "GameState.events");
   assert(state.resourceMiningPreview === null, "GameState.resourceMiningPreview initially null");
-  assert(state.atGunSetupPreview === null, "GameState.atGunSetupPreview initially null");
+  assert(state.antiTankGunSetupPreview === null, "GameState.antiTankGunSetupPreview initially null");
   assertHasMethod(state, "updateResourceMiningPreview", "GameState");
   assert(state.selection instanceof Set, "GameState.selection");
   assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
@@ -3626,10 +3626,10 @@ function fakeAudioContext() {
   assert(state.resourceMiningPreview?.resourceId === 200, "resource mining preview stores hover link");
   state.updateResourceMiningPreview(null);
   assert(state.resourceMiningPreview === null, "resource mining preview can be cleared");
-  state.updateAtGunSetupPreview({ mouseX: 1, mouseY: 2, guns: [{ id: 9 }] });
-  assert(state.atGunSetupPreview?.guns?.[0]?.id === 9, "AT setup preview stores selected guns");
+  state.updateAntiTankGunSetupPreview({ mouseX: 1, mouseY: 2, guns: [{ id: 9 }] });
+  assert(state.antiTankGunSetupPreview?.guns?.[0]?.id === 9, "Anti-Tank Gun setup preview stores selected guns");
   state.endCommandTarget();
-  assert(state.atGunSetupPreview === null, "ending command target clears AT setup preview");
+  assert(state.antiTankGunSetupPreview === null, "ending command target clears Anti-Tank Gun setup preview");
 
   const artilleryState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   artilleryState.applySnapshot({
@@ -3969,8 +3969,8 @@ function fakeAudioContext() {
   );
   assert(STATS[KIND.TANK].body.length === 50.4, "tank client body length mirrors server");
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
-  assert(STATS[KIND.AT_TEAM].body.length === 42.0, "AT gun client body length mirrors server");
-  assert(STATS[KIND.AT_TEAM].body.width === 24.0, "AT gun client body width mirrors server");
+  assert(STATS[KIND.ANTI_TANK_GUN].body.length === 42.0, "anti-tank gun client body length mirrors server");
+  assert(STATS[KIND.ANTI_TANK_GUN].body.width === 24.0, "anti-tank gun client body width mirrors server");
   assert(STATS[KIND.ARTILLERY].size === STATS[KIND.TANK].size, "Artillery selection size should match tank size");
   assert(
     STATS[KIND.ARTILLERY].body.length === STATS[KIND.TANK].body.length &&
@@ -4002,14 +4002,14 @@ function fakeAudioContext() {
     input._worldPointHitsEntity(clickableTank, 0, 20, 32) === false,
     "tank hit testing should not use a stale circular side radius",
   );
-  const clickableAtGun = { id: 11, owner: 1, kind: KIND.AT_TEAM, x: 0, y: 0, facing: 0 };
+  const clickableAntiTankGun = { id: 11, owner: 1, kind: KIND.ANTI_TANK_GUN, x: 0, y: 0, facing: 0 };
   assert(
-    input._worldPointHitsEntity(clickableAtGun, 22, 0, 32) === true,
-    "AT gun hit testing should reach the wheeled body axis",
+    input._worldPointHitsEntity(clickableAntiTankGun, 22, 0, 32) === true,
+    "anti-tank gun hit testing should reach the wheeled body axis",
   );
   assert(
-    input._worldPointHitsEntity(clickableAtGun, 0, 18, 32) === false,
-    "AT gun hit testing should not use the old circular radius",
+    input._worldPointHitsEntity(clickableAntiTankGun, 0, 18, 32) === false,
+    "anti-tank gun hit testing should not use the old circular radius",
   );
 
   const overlappingWorker = { id: 30, owner: 1, kind: KIND.WORKER, x: 100, y: 100 };
@@ -4062,55 +4062,55 @@ function fakeAudioContext() {
 
   input.dom = { clientWidth: 800, clientHeight: 600 };
   input.camera = { screenToWorld: (x, y) => ({ x, y }) };
-  const deployedAtGun = {
+  const deployedAntiTankGun = {
     id: 21,
     owner: 1,
-    kind: KIND.AT_TEAM,
+    kind: KIND.ANTI_TANK_GUN,
     x: 100,
     y: 100,
     setupState: SETUP.DEPLOYED,
   };
-  const otherDeployedAtGun = {
+  const otherDeployedAntiTankGun = {
     id: 22,
     owner: 1,
-    kind: KIND.AT_TEAM,
+    kind: KIND.ANTI_TANK_GUN,
     x: 120,
     y: 100,
     setupState: SETUP.DEPLOYED,
   };
-  const packedAtGun = {
+  const packedAntiTankGun = {
     id: 23,
     owner: 1,
-    kind: KIND.AT_TEAM,
+    kind: KIND.ANTI_TANK_GUN,
     x: 110,
     y: 100,
     setupState: SETUP.PACKED,
   };
   input.state = {
     playerId: 1,
-    entitiesInterpolated: () => [deployedAtGun, otherDeployedAtGun, packedAtGun],
+    entitiesInterpolated: () => [deployedAntiTankGun, otherDeployedAntiTankGun, packedAntiTankGun],
   };
   assert(
     input
       ._closestOwnUnitKindInViewport(
-        KIND.AT_TEAM,
-        deployedAtGun.x,
-        deployedAtGun.y,
-        deployedAtGun,
+        KIND.ANTI_TANK_GUN,
+        deployedAntiTankGun.x,
+        deployedAntiTankGun.y,
+        deployedAntiTankGun,
       )
       .join(",") === "21,22",
-    "selecting set-up AT guns should not include packed AT guns",
+    "selecting set-up anti-tank guns should not include packed anti-tank guns",
   );
   assert(
     input
-      ._closestOwnUnitKindInViewport(KIND.AT_TEAM, packedAtGun.x, packedAtGun.y, packedAtGun)
+      ._closestOwnUnitKindInViewport(KIND.ANTI_TANK_GUN, packedAntiTankGun.x, packedAntiTankGun.y, packedAntiTankGun)
       .join(",") === "23",
-    "selecting packed AT guns should not include set-up AT guns",
+    "selecting packed anti-tank guns should not include set-up anti-tank guns",
   );
   assert(
-    input._closestOwnUnitKindInViewport(KIND.AT_TEAM, deployedAtGun.x, deployedAtGun.y).join(",") ===
+    input._closestOwnUnitKindInViewport(KIND.ANTI_TANK_GUN, deployedAntiTankGun.x, deployedAntiTankGun.y).join(",") ===
       "21,23,22",
-    "kind-only AT selection helper calls should keep legacy all-AT behavior",
+    "kind-only Anti-Tank Gun selection helper calls should keep legacy all Anti-Tank Gun behavior",
   );
 
   assert(input._controlGroupSlotFromKey({ code: "Digit1" }) === 0, "Digit1 maps to control group slot 0");

@@ -896,8 +896,9 @@ mod tests {
             html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=scout_car&count=15")
         );
         assert!(html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=tank&count=15"));
-        assert!(html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=at_team&count=15"));
-        assert!(html.contains("/dev/scenarios?id=vehicle_corner_wall&unit=at_team&count=5"));
+        assert!(html
+            .contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=anti_tank_gun&count=15"));
+        assert!(html.contains("/dev/scenarios?id=vehicle_corner_wall&unit=anti_tank_gun&count=5"));
         assert!(html.contains("/dev/scenarios?id=vehicle_corner_wall&unit=scout_car&count=5"));
         assert!(html.contains("/dev/scenarios?id=vehicle_corner_wall&unit=tank&count=5"));
         assert!(
@@ -910,7 +911,7 @@ mod tests {
             "/dev/scenarios?id=vehicle_small_block_baseline&unit=scout_car&count=5&blocker=machine_gunner"
         ));
         assert!(html.contains(
-            "/dev/scenarios?id=vehicle_small_block_baseline&unit=tank&count=5&blocker=at_team"
+            "/dev/scenarios?id=vehicle_small_block_baseline&unit=tank&count=5&blocker=anti_tank_gun"
         ));
         assert!(html.contains("/dev/scenarios?id=factory_zero_gap_perpendicular&unit=tank&count=1"));
     }

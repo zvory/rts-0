@@ -348,7 +348,7 @@ pub(super) fn spawn_factory_zero_gap_perpendicular_units(
 
 pub(super) fn wall_chokepoint_spawn_spacing(unit: EntityKind) -> f32 {
     match unit {
-        EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
+        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_BODY_WIDTH_PX + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX * 4.0,
         EntityKind::ScoutCar => {
             config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0
         }
@@ -359,9 +359,9 @@ pub(super) fn wall_chokepoint_spawn_spacing(unit: EntityKind) -> f32 {
 
 pub(super) fn vehicle_corner_wall_spawn_spacing(unit: EntityKind) -> (f32, f32) {
     match unit {
-        EntityKind::AtTeam => (
-            config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
-            config::AT_GUN_BODY_LENGTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
+        EntityKind::AntiTankGun => (
+            config::ANTI_TANK_GUN_BODY_WIDTH_PX + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX * 4.0,
+            config::ANTI_TANK_GUN_BODY_LENGTH_PX + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX * 4.0,
         ),
         EntityKind::ScoutCar => (
             config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0,
@@ -385,7 +385,7 @@ pub(super) fn vehicle_small_block_baseline_vehicle_spacing(vehicle: EntityKind) 
 
 pub(super) fn vehicle_zero_gap_side_radius(unit: EntityKind) -> f32 {
     match unit {
-        EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX,
+        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_BODY_WIDTH_PX * 0.5 + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX,
         EntityKind::ScoutCar => {
             config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
         }
@@ -396,9 +396,9 @@ pub(super) fn vehicle_zero_gap_side_radius(unit: EntityKind) -> f32 {
 
 pub(super) fn snaking_corridor_spawn_spacing(unit: EntityKind) -> Result<(f32, f32), String> {
     match unit {
-        EntityKind::AtTeam => Ok((
-            config::AT_GUN_BODY_WIDTH_PX * 1.5,
-            config::AT_GUN_BODY_LENGTH_PX * 1.5,
+        EntityKind::AntiTankGun => Ok((
+            config::ANTI_TANK_GUN_BODY_WIDTH_PX * 1.5,
+            config::ANTI_TANK_GUN_BODY_LENGTH_PX * 1.5,
         )),
         EntityKind::ScoutCar => Ok((
             config::SCOUT_CAR_BODY_WIDTH_PX * 1.5,

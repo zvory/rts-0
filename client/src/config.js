@@ -47,7 +47,7 @@ export const TANK_BODY = Object.freeze({
   width: 28.8,
   clearance: 1.5,
 });
-export const AT_GUN_BODY = Object.freeze({
+export const ANTI_TANK_GUN_BODY = Object.freeze({
   length: 42.0,
   width: 24.0,
   clearance: 1.0,
@@ -70,8 +70,8 @@ export const COMMAND_CAR_BODY = Object.freeze({
 
 // Workers can mine a resource only when a completed City Centre is within this many tiles.
 export const MINING_CC_RANGE_TILES = 9.0;
-export const AT_GUN_DEPLOYED_RANGE_TILES = 12;
-export const AT_GUN_FIELD_OF_FIRE_RAD = Math.PI / 4;
+export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 12;
+export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = Math.PI / 4;
 export const ARTILLERY_MIN_RANGE_TILES = 10;
 export const ARTILLERY_MAX_RANGE_TILES = 50;
 export const ARTILLERY_FIELD_OF_FIRE_RAD = 20 * Math.PI / 180;
@@ -92,7 +92,7 @@ export const MORTAR_OUTER_RADIUS_TILES = 1.5;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
-export const AT_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
+export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const COMMAND_CAR_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
@@ -117,9 +117,9 @@ export const STATS = Object.freeze({
     rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
     rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
-  [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 6, body: AT_GUN_BODY,
-    rangeTiles: AT_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
-    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.AT_GUN_UNLOCK,
+  [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 6, body: ANTI_TANK_GUN_BODY,
+    rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
+    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 7,
     rangeTiles: 9, cost: { steel: 100, oil: 50 }, supply: 3, buildTicks: 460,
@@ -153,7 +153,7 @@ export const STATS = Object.freeze({
   [KIND.RESEARCH_COMPLEX]: { label: "R&D Complex", icon: "RD", footW: 3, footH: 3, sight: 6,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
     researches: [
-      UPGRADE.AT_GUN_UNLOCK,
+      UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
@@ -166,7 +166,7 @@ export const STATS = Object.freeze({
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Gun Works", icon: "GW", footW: 3, footH: 3, sight: 6,
     cost: { steel: 125, oil: 125 }, buildTicks: 620,
-    trains: [KIND.MORTAR_TEAM, KIND.AT_TEAM, KIND.ARTILLERY],
+    trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
@@ -246,13 +246,13 @@ export const UPGRADES = Object.freeze({
     description: "Increase Rifleman Attack and Speed, Shoot While Moving",
     researchedAt: KIND.TRAINING_CENTRE,
   }),
-  [UPGRADE.AT_GUN_UNLOCK]: Object.freeze({
-    upgrade: UPGRADE.AT_GUN_UNLOCK,
-    label: "AT Gun Crews",
-    icon: "AT+",
+  [UPGRADE.ANTI_TANK_GUN_UNLOCK]: Object.freeze({
+    upgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    label: "Anti-Tank Gun Crews",
+    icon: "ATG+",
     cost: Object.freeze({ steel: 200, oil: 75 }),
-    researchTicks: AT_GUN_UNLOCK_RESEARCH_TICKS,
-    description: "Unlock AT Gun training",
+    researchTicks: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
+    description: "Unlock Anti-Tank Gun training",
     researchedAt: KIND.RESEARCH_COMPLEX,
   }),
   [UPGRADE.ARTILLERY_UNLOCK]: Object.freeze({
@@ -263,8 +263,8 @@ export const UPGRADES = Object.freeze({
     researchTicks: ARTILLERY_UNLOCK_RESEARCH_TICKS,
     description: "Unlocks production of Artillery",
     researchedAt: KIND.RESEARCH_COMPLEX,
-    requiresUpgrade: UPGRADE.AT_GUN_UNLOCK,
-    requiresText: "Requires AT Gun Research",
+    requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
+    requiresText: "Requires Anti-Tank Gun Research",
   }),
   [UPGRADE.TANK_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.TANK_UNLOCK,

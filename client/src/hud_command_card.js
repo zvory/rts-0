@@ -115,7 +115,7 @@ export function buildCommandCardContextCatalog() {
     resources: { steel: 1000, oil: 1000 },
     upgrades: [
       UPGRADE.METHAMPHETAMINES,
-      UPGRADE.AT_GUN_UNLOCK,
+      UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.COMMAND_CAR_UNLOCK,
@@ -209,7 +209,7 @@ export function buildUnitCard(ctx, selection) {
   const ownUnits = selectedOwnUnits(ctx, selection);
   const unitIds = ownUnits.map((e) => e.id);
   const setupGunIds = ownUnits
-    .filter((e) => e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY)
+    .filter((e) => e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY)
     .map((e) => e.id);
   const abilityAffordances = selectedAbilityAffordances(ctx, selection);
   const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
@@ -316,13 +316,13 @@ export function buildUnitCard(ctx, selection) {
         id: "unit:setup",
         commandId: "unit.setupSupportWeapon",
         kind: "button",
-        action: "setupAtGuns",
-        intent: { type: "beginCommandTarget", target: "setupAtGuns" },
+        action: "setupAntiTankGuns",
+        intent: { type: "beginCommandTarget", target: "setupAntiTankGuns" },
         icon: "SET",
         label: "Set Up",
         title: "Set up selected support weapons toward a target point",
         enabled: true,
-        cls: ctx.commandTarget === "setupAtGuns" ? "active" : "",
+        cls: ctx.commandTarget === "setupAntiTankGuns" ? "active" : "",
       };
     }
   }
@@ -436,7 +436,7 @@ function attackDescriptor(ctx, unitIds, slot) {
     kind: "button",
     action: "attack",
     intent: { type: "beginCommandTarget", target: "attack" },
-    icon: "AT",
+    icon: "ATG",
     label: "Attack",
     title: "Attack a target or attack-move to a point",
     enabled: unitIds.length > 0,

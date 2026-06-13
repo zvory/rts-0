@@ -1280,7 +1280,7 @@ fn steel_expansion_tanks_builds_expansion_cc_before_any_barracks() {
         kind: EntityKind::MachineGunner
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
     let non_depot_builds: Vec<_> = decision
         .commands
@@ -1786,12 +1786,12 @@ fn steel_expansion_tanks_builds_training_centre_before_training_support_units() 
         kind: EntityKind::MachineGunner
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
 }
 
 #[test]
-fn steel_expansion_tanks_builds_steelworks_before_training_at_teams() {
+fn steel_expansion_tanks_builds_steelworks_before_training_anti_tank_guns() {
     let observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
@@ -1822,12 +1822,12 @@ fn steel_expansion_tanks_builds_steelworks_before_training_at_teams() {
         kind: EntityKind::MachineGunner
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
 }
 
 #[test]
-fn steel_expansion_tanks_researches_at_gun_crews_before_training_at_teams() {
+fn steel_expansion_tanks_researches_anti_tank_gun_crews_before_training_anti_tank_guns() {
     let observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
@@ -1854,15 +1854,15 @@ fn steel_expansion_tanks_researches_at_gun_crews_before_training_at_teams() {
     );
 
     assert!(decision.intents.contains(&AiIntent::Research {
-        upgrade: UpgradeKind::AtGunUnlock
+        upgrade: UpgradeKind::AntiTankGunUnlock
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
 }
 
 #[test]
-fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
+fn steel_expansion_tanks_balances_machine_gunner_and_anti_tank_gun_training() {
     let mut observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
@@ -1880,7 +1880,7 @@ fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
             worker(60, AiEntityState::Idle),
         ],
     ));
-    observation.upgrades.push(UpgradeKind::AtGunUnlock);
+    observation.upgrades.push(UpgradeKind::AntiTankGunUnlock);
 
     let decision = decide(
         &observation,
@@ -1891,7 +1891,7 @@ fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
         kind: EntityKind::MachineGunner
     }));
     assert!(decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
 }
 
@@ -1913,7 +1913,7 @@ fn steel_expansion_tanks_counts_queued_machine_gunners_when_balancing_support() 
             building(16, EntityKind::Steelworks, Some(0)),
         ],
     ));
-    observation.upgrades.push(UpgradeKind::AtGunUnlock);
+    observation.upgrades.push(UpgradeKind::AntiTankGunUnlock);
 
     let decision = decide(
         &observation,
@@ -1922,7 +1922,7 @@ fn steel_expansion_tanks_counts_queued_machine_gunners_when_balancing_support() 
     );
 
     assert!(decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
 }
 
@@ -2071,7 +2071,7 @@ fn steel_expansion_tanks_stages_support_weapons_on_enemy_facing_main_steel_line(
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::TrainingCentre, None),
             combat_at(30, EntityKind::MachineGunner, 8.5 * ts, 8.5 * ts),
-            combat_at(31, EntityKind::AtTeam, 9.5 * ts, 8.5 * ts),
+            combat_at(31, EntityKind::AntiTankGun, 9.5 * ts, 8.5 * ts),
             combat_at(32, EntityKind::MachineGunner, 10.5 * ts, 8.5 * ts),
         ],
     ));
@@ -2159,7 +2159,7 @@ fn steel_expansion_tanks_switches_to_factory_at_fifty_supply() {
         kind: EntityKind::MachineGunner
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
 }
 
@@ -2196,7 +2196,7 @@ fn steel_expansion_tanks_trains_only_tanks_after_fifty_supply() {
         kind: EntityKind::MachineGunner
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
 }
 
@@ -2250,7 +2250,7 @@ fn steel_expansion_tanks_attacks_with_three_or_more_tanks_after_transition() {
             combat(31, EntityKind::Tank),
             combat(32, EntityKind::Tank),
             combat(40, EntityKind::MachineGunner),
-            combat(41, EntityKind::AtTeam),
+            combat(41, EntityKind::AntiTankGun),
         ],
     ));
     let three_tank_decision = decide(
@@ -2441,7 +2441,7 @@ fn infantry_heavy_home_threat_prefers_machine_gunners_before_tanks() {
             worker(23, AiEntityState::Gather),
         ],
     );
-    observation.upgrades.push(UpgradeKind::AtGunUnlock);
+    observation.upgrades.push(UpgradeKind::AntiTankGunUnlock);
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
@@ -2486,7 +2486,7 @@ fn lone_rifle_near_base_does_not_trigger_defensive_panic() {
             worker(21, AiEntityState::Gather),
         ],
     );
-    observation.upgrades.push(UpgradeKind::AtGunUnlock);
+    observation.upgrades.push(UpgradeKind::AntiTankGunUnlock);
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
@@ -2503,7 +2503,7 @@ fn lone_rifle_near_base_does_not_trigger_defensive_panic() {
 }
 
 #[test]
-fn armor_heavy_home_threat_prefers_at_teams_before_tanks() {
+fn armor_heavy_home_threat_prefers_anti_tank_guns_before_tanks() {
     let ts = config::TILE_SIZE as f32;
     let mut observation = observation(
         AiEconomy {
@@ -2524,7 +2524,7 @@ fn armor_heavy_home_threat_prefers_at_teams_before_tanks() {
             worker(23, AiEntityState::Gather),
         ],
     );
-    observation.upgrades.push(UpgradeKind::AtGunUnlock);
+    observation.upgrades.push(UpgradeKind::AntiTankGunUnlock);
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Tank, 10.5 * ts, 10.5 * ts));
@@ -2536,7 +2536,7 @@ fn armor_heavy_home_threat_prefers_at_teams_before_tanks() {
     );
 
     assert!(decision.intents.contains(&AiIntent::Train {
-        kind: EntityKind::AtTeam
+        kind: EntityKind::AntiTankGun
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::Tank

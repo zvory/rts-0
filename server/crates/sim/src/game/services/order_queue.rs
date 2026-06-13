@@ -77,7 +77,7 @@ enum PromotedIntent {
     SelfAbility {
         ability: crate::game::ability::AbilityKind,
     },
-    SetupAtGuns {
+    SetupAntiTankGuns {
         x: f32,
         y: f32,
     },
@@ -206,8 +206,8 @@ pub(crate) fn promote_ready_orders(
                 };
                 launch_self_ability(entities, owner, id, ability);
             }
-            PromotedIntent::SetupAtGuns { x, y } => {
-                execute_at_gun_setup(entities, id, x, y);
+            PromotedIntent::SetupAntiTankGuns { x, y } => {
+                execute_anti_tank_gun_setup(entities, id, x, y);
             }
             PromotedIntent::PointFire { x, y } => {
                 execute_artillery_point_fire(entities, id, x, y);
@@ -370,9 +370,9 @@ fn pop_next_valid_intent(
                     });
                 }
             }
-            OrderIntent::SetupAtGuns(point) => {
-                if setup_at_gun_intent_valid(entities, id, point.x, point.y) {
-                    return Some(PromotedIntent::SetupAtGuns {
+            OrderIntent::SetupAntiTankGuns(point) => {
+                if setup_anti_tank_gun_intent_valid(entities, id, point.x, point.y) {
+                    return Some(PromotedIntent::SetupAntiTankGuns {
                         x: point.x,
                         y: point.y,
                     });
@@ -496,11 +496,11 @@ fn self_ability_intent_valid(
             == crate::game::ability::AbilityTargetMode::SelfTarget
 }
 
-fn setup_at_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: f32) -> bool {
+fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: f32) -> bool {
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+    if !matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery)
         || e.under_construction()
         || !x.is_finite()
         || !y.is_finite()
@@ -511,8 +511,8 @@ fn setup_at_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: f32) ->
     facing.is_finite()
 }
 
-fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
-    if !setup_at_gun_intent_valid(entities, id, x, y) {
+fn execute_anti_tank_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
+    if !setup_anti_tank_gun_intent_valid(entities, id, x, y) {
         return false;
     }
     let Some(e) = entities.get(id) else {
@@ -543,7 +543,7 @@ fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> 
 fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
-        _ => config::AT_TEAM_SETUP_TICKS,
+        _ => config::ANTI_TANK_GUN_SETUP_TICKS,
     }
 }
 
@@ -561,7 +561,7 @@ fn attack_intent_valid(
     if unit.owner != owner || !unit.is_unit() || !unit.can_attack() {
         return false;
     }
-    if deployed_at_gun_target_outside_arc(entities, attacker, target) {
+    if deployed_anti_tank_gun_target_outside_arc(entities, attacker, target) {
         return false;
     }
     matches!(entities.get(target),
@@ -606,11 +606,11 @@ fn attack_can_fire_now(map: &Map, entities: &EntityStore, attacker: &Entity, tar
     )
 }
 
-fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
+fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
     let Some(attacker) = entities.get(id) else {
         return false;
     };
-    if attacker.kind != EntityKind::AtTeam
+    if attacker.kind != EntityKind::AntiTankGun
         || !matches!(
             attacker.weapon_setup(),
             crate::game::entity::WeaponSetup::Deployed
@@ -632,7 +632,7 @@ fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u
     if !target_angle.is_finite() {
         return true;
     }
-    angle_delta(center, target_angle).abs() > config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5
+    angle_delta(center, target_angle).abs() > config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u32) -> bool {
@@ -1260,7 +1260,7 @@ mod tests {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let at = entities
-            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
             .expect("at gun should spawn");
         {
             let unit = entities.get_mut(at).expect("at gun should exist");
@@ -1268,7 +1268,7 @@ mod tests {
             unit.mark_move_phase(MovePhase::Arrived);
             unit.pos_x = 150.0;
             unit.pos_y = 100.0;
-            unit.append_queued_order(OrderIntent::setup_at_guns(150.0, 140.0));
+            unit.append_queued_order(OrderIntent::setup_anti_tank_guns(150.0, 140.0));
             unit.append_queued_order(OrderIntent::attack_move_to(240.0, 100.0));
         }
 

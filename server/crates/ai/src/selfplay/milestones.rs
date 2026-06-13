@@ -478,8 +478,8 @@ impl PlayerMilestones {
             }
             Command::Move { units, .. } if self.rifleman_trained => Some(units.len() as u32),
             Command::Move { .. }
-            | Command::SetupAtGuns { .. }
-            | Command::TearDownAtGuns { .. }
+            | Command::SetupAntiTankGuns { .. }
+            | Command::TearDownAntiTankGuns { .. }
             | Command::UseAbility { .. }
             | Command::SetAutocast { .. }
             | Command::Gather { .. }

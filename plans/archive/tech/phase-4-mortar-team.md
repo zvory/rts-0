@@ -3,7 +3,7 @@
 ## Objective
 
 Implement the Superior Firepower path-entry unit. Mortar Teams should let SF players pressure
-static defenses, deter attacks and harassment, and punish clumped units before they reach AT Guns or Artillery.
+static defenses, deter attacks and harassment, and punish clumped units before they reach Anti-Tank Guns or Artillery.
 
 ## Unit Behavior
 
@@ -36,7 +36,7 @@ static defenses, deter attacks and harassment, and punish clumped units before t
 - Add manual fire command or ability if the current command model does not support point-targeted
   unit fire.
 - Add autocast state and UI affordance for toggling it.
-- Add renderer treatment that reads clearly as a crew weapon distinct from MGs and AT Guns.
+- Add renderer treatment that reads clearly as a crew weapon distinct from MGs and Anti-Tank Guns.
 - Update `docs/design/protocol.md`, `docs/design/balance.md`, and relevant context capsules.
 
 ## Verification
@@ -51,6 +51,6 @@ static defenses, deter attacks and harassment, and punish clumped units before t
 
 ## Player-Facing Outcome
 
-Superior Firepower gets an early active tool for positional grinding before AT Guns and Artillery.
+Superior Firepower gets an early active tool for positional grinding before Anti-Tank Guns and Artillery.
 Mobile Warfare can still punish poorly protected Mortars with Scout Cars.
 

@@ -16,7 +16,7 @@ default.
   milestone transitions.
 - Add a production manager that chooses Riflemen first, then Scout Cars for harassment availability,
   then Tanks once the economy and tech path can support them.
-- Keep Machine Gunners, AT Teams, Artillery, and Command Cars out of the first implementation unless
+- Keep Machine Gunners, Anti-Tank Guns, Artillery, and Command Cars out of the first implementation unless
   a focused defensive support case is explicitly required.
 - Add authored scenarios for early production, tech-blocked production, Scout Car unlock, and Tank
   unlock without requiring 10,000 setup ticks.

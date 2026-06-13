@@ -93,7 +93,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
     if e.kind == EntityKind::MachineGunner {
         v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
     }
-    if e.kind == EntityKind::AtTeam {
+    if e.kind == EntityKind::AntiTankGun {
         v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
         if e.owner == viewer {
             v.setup_facing = e.emplacement_facing();
@@ -385,7 +385,7 @@ fn manually_deployed_artillery_can_point_fire() {
 
     game.enqueue(
         1,
-        Command::SetupAtGuns {
+        Command::SetupAntiTankGuns {
             units: vec![artillery],
             x: setup_target.0,
             y: setup_target.1,
@@ -2118,7 +2118,7 @@ struct PhaseSixIntentFixture {
     scout_a: u32,
     scout_b: u32,
     rifleman: u32,
-    at_gun: u32,
+    anti_tank_gun: u32,
     first_move: (f32, f32),
     second_move: (f32, f32),
     smoke_targets: [(f32, f32); 4],
@@ -2179,10 +2179,10 @@ fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
         .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
         .expect("rifleman should spawn");
     let at_pos = game.map.tile_center(10, 14);
-    let at_gun = game
+    let anti_tank_gun = game
         .entities
-        .spawn_unit(1, EntityKind::AtTeam, at_pos.0, at_pos.1)
-        .expect("AT team should spawn");
+        .spawn_unit(1, EntityKind::AntiTankGun, at_pos.0, at_pos.1)
+        .expect("Anti-Tank Gun should spawn");
     let enemy_pos = game.map.tile_center(18, 14);
     game.entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
@@ -2212,7 +2212,7 @@ fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
         scout_a,
         scout_b,
         rifleman,
-        at_gun,
+        anti_tank_gun,
         first_move,
         second_move,
         smoke_targets,
@@ -2605,7 +2605,7 @@ fn phase_six_mixed_intent_command_log_replays_deterministically() {
         scout_a,
         scout_b,
         rifleman,
-        at_gun,
+        anti_tank_gun,
         first_move,
         second_move,
         smoke_targets,
@@ -2675,7 +2675,7 @@ fn phase_six_mixed_intent_command_log_replays_deterministically() {
     game.enqueue(
         1,
         Command::Move {
-            units: vec![at_gun],
+            units: vec![anti_tank_gun],
             x: charge_goal.0,
             y: charge_goal.1,
             queued: true,
@@ -2683,8 +2683,8 @@ fn phase_six_mixed_intent_command_log_replays_deterministically() {
     );
     game.enqueue(
         1,
-        Command::SetupAtGuns {
-            units: vec![at_gun],
+        Command::SetupAntiTankGuns {
+            units: vec![anti_tank_gun],
             x: setup_facing.0,
             y: setup_facing.1,
             queued: true,
@@ -2730,7 +2730,7 @@ fn phase_six_mixed_intent_command_log_replays_deterministically() {
     )));
     assert!(command_log.iter().any(|entry| matches!(
         entry.command,
-        crate::protocol::Command::SetupAtGuns { queued: true, .. }
+        crate::protocol::Command::SetupAntiTankGuns { queued: true, .. }
     )));
 
     let mut replay = phase_six_intent_fixture().game;
@@ -2941,7 +2941,7 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
 
 #[test]
 fn wall_chokepoint_dev_scenario_supports_all_vehicles() {
-    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
         let setup = Game::new_scout_car_wall_chokepoint_scenario(unit, 5, 0x5150_0004)
             .expect("scenario setup should succeed");
 

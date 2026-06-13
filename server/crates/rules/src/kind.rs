@@ -6,7 +6,7 @@ pub enum EntityKind {
     Worker,
     Rifleman,
     MachineGunner,
-    AtTeam,
+    AntiTankGun,
     MortarTeam,
     Artillery,
     ScoutCar,
@@ -28,7 +28,7 @@ impl EntityKind {
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
-        EntityKind::AtTeam,
+        EntityKind::AntiTankGun,
         EntityKind::MortarTeam,
         EntityKind::Artillery,
         EntityKind::ScoutCar,
@@ -62,7 +62,7 @@ impl EntityKind {
             EntityKind::Worker => "worker",
             EntityKind::Rifleman => "rifleman",
             EntityKind::MachineGunner => "machine_gunner",
-            EntityKind::AtTeam => "at_team",
+            EntityKind::AntiTankGun => "anti_tank_gun",
             EntityKind::MortarTeam => "mortar_team",
             EntityKind::Artillery => "artillery",
             EntityKind::ScoutCar => "scout_car",
@@ -89,7 +89,7 @@ impl FromStr for EntityKind {
             "worker" => Ok(EntityKind::Worker),
             "rifleman" => Ok(EntityKind::Rifleman),
             "machine_gunner" => Ok(EntityKind::MachineGunner),
-            "at_team" => Ok(EntityKind::AtTeam),
+            "anti_tank_gun" => Ok(EntityKind::AntiTankGun),
             "mortar_team" => Ok(EntityKind::MortarTeam),
             "artillery" => Ok(EntityKind::Artillery),
             "scout_car" => Ok(EntityKind::ScoutCar),
@@ -118,7 +118,7 @@ impl fmt::Display for EntityKind {
 pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::AtTeam
+        EntityKind::AntiTankGun
             | EntityKind::MortarTeam
             | EntityKind::Artillery
             | EntityKind::ScoutCar
@@ -130,7 +130,7 @@ pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
 pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::Artillery | EntityKind::Tank
+        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery | EntityKind::Tank
     )
 }
 

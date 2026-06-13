@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::game::entity::EntityKind;
 
 const METHAMPHETAMINES: &str = "methamphetamines";
-const AT_GUN_UNLOCK: &str = "at_gun_unlock";
+const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
 const ARTILLERY_UNLOCK: &str = "artillery_unlock";
 const TANK_UNLOCK: &str = "tank_unlock";
 const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
@@ -12,7 +12,7 @@ const MORTAR_AUTOCAST: &str = "mortar_autocast";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UpgradeKind {
     Methamphetamines,
-    AtGunUnlock,
+    AntiTankGunUnlock,
     ArtilleryUnlock,
     TankUnlock,
     CommandCarUnlock,
@@ -23,7 +23,7 @@ impl UpgradeKind {
     pub fn to_protocol_str(self) -> &'static str {
         match self {
             UpgradeKind::Methamphetamines => METHAMPHETAMINES,
-            UpgradeKind::AtGunUnlock => AT_GUN_UNLOCK,
+            UpgradeKind::AntiTankGunUnlock => ANTI_TANK_GUN_UNLOCK,
             UpgradeKind::ArtilleryUnlock => ARTILLERY_UNLOCK,
             UpgradeKind::TankUnlock => TANK_UNLOCK,
             UpgradeKind::CommandCarUnlock => COMMAND_CAR_UNLOCK,
@@ -38,7 +38,7 @@ impl FromStr for UpgradeKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             METHAMPHETAMINES => Ok(UpgradeKind::Methamphetamines),
-            AT_GUN_UNLOCK => Ok(UpgradeKind::AtGunUnlock),
+            ANTI_TANK_GUN_UNLOCK => Ok(UpgradeKind::AntiTankGunUnlock),
             ARTILLERY_UNLOCK => Ok(UpgradeKind::ArtilleryUnlock),
             TANK_UNLOCK => Ok(UpgradeKind::TankUnlock),
             COMMAND_CAR_UNLOCK => Ok(UpgradeKind::CommandCarUnlock),
@@ -60,7 +60,7 @@ pub struct UpgradeDefinition {
 
 pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::Methamphetamines,
-    UpgradeKind::AtGunUnlock,
+    UpgradeKind::AntiTankGunUnlock,
     UpgradeKind::ArtilleryUnlock,
     UpgradeKind::TankUnlock,
     UpgradeKind::CommandCarUnlock,
@@ -84,18 +84,18 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::METHAMPHETAMINES_COST_OIL,
             research_ticks: crate::config::METHAMPHETAMINES_RESEARCH_TICKS,
         },
-        UpgradeKind::AtGunUnlock => UpgradeDefinition {
+        UpgradeKind::AntiTankGunUnlock => UpgradeDefinition {
             kind,
             researched_at: EntityKind::ResearchComplex,
             requires_upgrade: None,
-            cost_steel: crate::config::AT_GUN_UNLOCK_COST_STEEL,
-            cost_oil: crate::config::AT_GUN_UNLOCK_COST_OIL,
-            research_ticks: crate::config::AT_GUN_UNLOCK_RESEARCH_TICKS,
+            cost_steel: crate::config::ANTI_TANK_GUN_UNLOCK_COST_STEEL,
+            cost_oil: crate::config::ANTI_TANK_GUN_UNLOCK_COST_OIL,
+            research_ticks: crate::config::ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
         },
         UpgradeKind::ArtilleryUnlock => UpgradeDefinition {
             kind,
             researched_at: EntityKind::ResearchComplex,
-            requires_upgrade: Some(UpgradeKind::AtGunUnlock),
+            requires_upgrade: Some(UpgradeKind::AntiTankGunUnlock),
             cost_steel: crate::config::ARTILLERY_UNLOCK_COST_STEEL,
             cost_oil: crate::config::ARTILLERY_UNLOCK_COST_OIL,
             research_ticks: crate::config::ARTILLERY_UNLOCK_RESEARCH_TICKS,
@@ -129,7 +129,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
 
 pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
     match unit {
-        EntityKind::AtTeam => Some(UpgradeKind::AtGunUnlock),
+        EntityKind::AntiTankGun => Some(UpgradeKind::AntiTankGunUnlock),
         EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
         EntityKind::CommandCar => Some(UpgradeKind::CommandCarUnlock),

@@ -5,8 +5,8 @@ import {
   STATS,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
-  AT_GUN_DEPLOYED_RANGE_TILES,
-  AT_GUN_FIELD_OF_FIRE_RAD,
+  ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
+  ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
@@ -26,7 +26,7 @@ import {
   angleDelta,
   clamp01,
   dashedLine,
-  drawAtGun,
+  drawAntiTankGun,
   drawFacingWedge,
   drawImpassableEdge,
   drawInfantryBase,
@@ -261,7 +261,7 @@ export function _drawDebugPathOverlay(state, entities = null) {
   }
 }
 
-export function _drawAtGunSetupPreview(state) {
+export function _drawAntiTankGunSetupPreview(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
@@ -270,7 +270,7 @@ export function _drawAtGunSetupPreview(state) {
     : null;
 
   for (const e of state.selectedEntities()) {
-    if (e.owner !== state.playerId || (e.kind !== KIND.AT_TEAM && e.kind !== KIND.ARTILLERY)) continue;
+    if (e.owner !== state.playerId || (e.kind !== KIND.ANTI_TANK_GUN && e.kind !== KIND.ARTILLERY)) continue;
     if (e.setupState !== SETUP.DEPLOYED) continue;
     const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
     if (facing == null) continue;
@@ -297,7 +297,7 @@ export function _drawAtGunSetupPreview(state) {
     );
   }
 
-  const preview = state.atGunSetupPreview;
+  const preview = state.antiTankGunSetupPreview;
   if (!preview || !Array.isArray(preview.guns)) return;
   for (const e of preview.guns) {
     if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
@@ -397,11 +397,11 @@ function fieldOfFireProfile(kind, tileSize) {
       arc: ARTILLERY_FIELD_OF_FIRE_RAD,
     };
   }
-  if (kind === KIND.AT_TEAM) {
+  if (kind === KIND.ANTI_TANK_GUN) {
     return {
       minRadius: 0,
-      maxRadius: AT_GUN_DEPLOYED_RANGE_TILES * tileSize,
-      arc: AT_GUN_FIELD_OF_FIRE_RAD,
+      maxRadius: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES * tileSize,
+      arc: ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
     };
   }
   return null;
@@ -1081,7 +1081,7 @@ export function _drawMuzzleFlashes(state) {
     const stat = STATS[attacker.kind] || {};
     const reach = isBuilding(attacker.kind)
       ? Math.max(stat.footW || 2, stat.footH || 2) * ((this._map && this._map.tileSize) || 32) * 0.5
-      : attacker.kind === KIND.AT_TEAM
+      : attacker.kind === KIND.ANTI_TANK_GUN
         ? (stat.size || 9) * 1.9
       : (stat.size || 9) * 1.1;
     const mx = attacker.x + Math.cos(facing) * reach;
@@ -1092,11 +1092,11 @@ export function _drawMuzzleFlashes(state) {
       const dy = targetPos.y - my;
       const shotLen = Math.hypot(dx, dy);
       // Mirror the server overpenetration band: a round that hits a tank stops dead (no tail),
-      // and AT teams punch twice as deep as everyone else.
+      // and Anti-Tank Guns punch twice as deep as everyone else.
       const tileSize = (this._map && this._map.tileSize) || 32;
-      const penFactor = target?.kind === KIND.TANK ? 0 : attacker.kind === KIND.AT_TEAM ? 0.5 : 0.25;
+      const penFactor = target?.kind === KIND.TANK ? 0 : attacker.kind === KIND.ANTI_TANK_GUN ? 0.5 : 0.25;
       const tailLen = (stat.rangeTiles || 0) * tileSize * penFactor;
-      const tracerWidth = attacker.kind === KIND.AT_TEAM ? 2.5 : 1.5;
+      const tracerWidth = attacker.kind === KIND.ANTI_TANK_GUN ? 2.5 : 1.5;
 
       g.lineStyle(tracerWidth, 0xffe066, 0.92 * fade);
       g.moveTo(mx, my);
@@ -1107,7 +1107,7 @@ export function _drawMuzzleFlashes(state) {
         const uy = dy / shotLen;
         const ex = targetPos.x + ux * tailLen;
         const ey = targetPos.y + uy * tailLen;
-        g.lineStyle(attacker.kind === KIND.AT_TEAM ? 1.4 : 1.0, 0xffd84a, 0.46 * fade);
+        g.lineStyle(attacker.kind === KIND.ANTI_TANK_GUN ? 1.4 : 1.0, 0xffd84a, 0.46 * fade);
         g.moveTo(targetPos.x, targetPos.y);
         g.lineTo(ex, ey);
       }

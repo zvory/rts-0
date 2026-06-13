@@ -108,7 +108,7 @@ pub(super) fn rifle_raid_unit_target(
 pub(super) fn rifle_raid_unit_priority(kind: EntityKind) -> u8 {
     match kind {
         EntityKind::Worker => 0,
-        EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::AtTeam => 1,
+        EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::AntiTankGun => 1,
         EntityKind::Tank => 2,
         _ => 3,
     }

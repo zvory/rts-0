@@ -283,22 +283,22 @@ fn command_trace_label(command: &Command) -> String {
                 building, x, y, kind, queued
             )
         }
-        Command::SetupAtGuns {
+        Command::SetupAntiTankGuns {
             units,
             x,
             y,
             queued,
         } => {
             format!(
-                "setup_at_guns units={} x={:.1} y={:.1} queued={}",
+                "setup_anti_tank_guns units={} x={:.1} y={:.1} queued={}",
                 id_list(units),
                 x,
                 y,
                 queued
             )
         }
-        Command::TearDownAtGuns { units } => {
-            format!("tear_down_at_guns units={}", id_list(units))
+        Command::TearDownAntiTankGuns { units } => {
+            format!("tear_down_anti_tank_guns units={}", id_list(units))
         }
         Command::UseAbility {
             units,
@@ -1085,7 +1085,7 @@ mod tests {
             &mut ctx,
             TrainUnitsRequest {
                 buildings: facts.production_buildings(EntityKind::Barracks),
-                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AntiTankGun],
                 completed_building_kinds: facts.complete_building_kinds(),
                 completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
@@ -1121,7 +1121,7 @@ mod tests {
             &mut ctx,
             TrainUnitsRequest {
                 buildings: facts.production_buildings(EntityKind::Barracks),
-                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AntiTankGun],
                 completed_building_kinds: facts.complete_building_kinds(),
                 completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
@@ -1153,7 +1153,7 @@ mod tests {
             ],
             Vec::new(),
         );
-        with_steelworks.upgrades.push(UpgradeKind::AtGunUnlock);
+        with_steelworks.upgrades.push(UpgradeKind::AntiTankGunUnlock);
         let facts = AiFacts::from_observation(&with_steelworks);
         let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_steelworks));
 
@@ -1161,7 +1161,7 @@ mod tests {
             &mut ctx,
             TrainUnitsRequest {
                 buildings: facts.production_buildings(EntityKind::Barracks),
-                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AntiTankGun],
                 completed_building_kinds: facts.complete_building_kinds(),
                 completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
@@ -1181,7 +1181,7 @@ mod tests {
             &mut ctx,
             TrainUnitsRequest {
                 buildings: facts.production_buildings(EntityKind::Steelworks),
-                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AntiTankGun],
                 completed_building_kinds: facts.complete_building_kinds(),
                 completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
@@ -1194,7 +1194,7 @@ mod tests {
 
         assert_eq!(
             trained.iter().map(|action| action.unit).collect::<Vec<_>>(),
-            vec![EntityKind::AtTeam]
+            vec![EntityKind::AntiTankGun]
         );
     }
 

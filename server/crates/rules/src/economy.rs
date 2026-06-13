@@ -116,7 +116,7 @@ mod tests {
             trainable_units(EntityKind::Steelworks),
             &[
                 EntityKind::MortarTeam,
-                EntityKind::AtTeam,
+                EntityKind::AntiTankGun,
                 EntityKind::Artillery
             ]
         );
@@ -124,7 +124,7 @@ mod tests {
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
         assert!(!train_requirement_met(EntityKind::MortarTeam, &[]));
-        assert!(!train_requirement_met(EntityKind::AtTeam, &[]));
+        assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
         assert!(!train_requirement_met(EntityKind::Artillery, &[]));
         assert!(train_requirement_met(
@@ -136,11 +136,11 @@ mod tests {
             &[EntityKind::Steelworks]
         ));
         assert!(!train_requirement_met(
-            EntityKind::AtTeam,
+            EntityKind::AntiTankGun,
             &[EntityKind::TrainingCentre]
         ));
         assert!(train_requirement_met(
-            EntityKind::AtTeam,
+            EntityKind::AntiTankGun,
             &[EntityKind::Steelworks]
         ));
         assert!(train_requirement_met(
@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(cost(EntityKind::Factory), (125, 125));
         assert_eq!(cost(EntityKind::CityCentre), (200, 0));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
-        assert_eq!(supply_cost(EntityKind::AtTeam), 3);
+        assert_eq!(supply_cost(EntityKind::AntiTankGun), 3);
         assert_eq!(cost(EntityKind::Artillery), (300, 100));
         assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 5);

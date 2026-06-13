@@ -79,15 +79,15 @@ Files that failed any of these were deleted immediately.
 
 **combat/examples/combat_tank_round_hit_05.mp3** — Rejected. Wrong character for armored vehicle impact. Deleted.
 
-**combat/examples/combat_at_round_hit_tank_01.mp3** — Deferred/deleted. Not bad in isolation, but skip AT hit variants until mortar and tank hit sounds have acceptable coverage.
+**combat/examples/combat_at_round_hit_tank_01.mp3** — Deferred/deleted. Not bad in isolation, but skip anti-tank hit variants until mortar and tank hit sounds have acceptable coverage.
 
-**combat/examples/combat_at_round_hit_tank_02.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
+**combat/examples/combat_at_round_hit_tank_02.mp3** — Deferred/deleted. Same category-level deferral as the rest of the anti-tank hit batch.
 
-**combat/examples/combat_at_round_hit_tank_03.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
+**combat/examples/combat_at_round_hit_tank_03.mp3** — Deferred/deleted. Same category-level deferral as the rest of the anti-tank hit batch.
 
-**combat/examples/combat_at_round_hit_tank_04.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
+**combat/examples/combat_at_round_hit_tank_04.mp3** — Deferred/deleted. Same category-level deferral as the rest of the anti-tank hit batch.
 
-**combat/examples/combat_at_round_hit_tank_05.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
+**combat/examples/combat_at_round_hit_tank_05.mp3** — Deferred/deleted. Same category-level deferral as the rest of the anti-tank hit batch.
 
 **units_tank_engine_loop_01.mp3** — Rejected.
 
@@ -170,7 +170,7 @@ Samples reviewed:
 - Realistic mortar explosion recordings: avoid retro/game-style, synthetic, 8-bit, or MIDI-like explosion packs
 - Realistic artillery explosion recordings: this batch produced no keepers; fetch a new round later
 - Armored vehicle hit impacts: avoid ambiguous "tank" searches that return water-tank/generic metal hits; search for armor impact, vehicle shell hit, anti-tank hit, or ricochet/penetration source material
-- AT round hit variants: defer until mortar and tank hit sounds have acceptable matching coverage
+- anti-tank round hit variants: defer until mortar and tank hit sounds have acceptable matching coverage
 - Sources unknown for most new keepers — track down before ship
 
 ## Out of scope — first pass

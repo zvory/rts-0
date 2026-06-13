@@ -58,7 +58,7 @@ const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
 const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
-    EntityKind::AtTeam,
+    EntityKind::AntiTankGun,
     EntityKind::Artillery,
 ];
 const FACTORY_UNITS: &[EntityKind] = &[
@@ -141,7 +141,7 @@ pub const UNITS: &[UnitDef] = &[
         train_requires: TRAINING_CENTRE_REQUIRED,
     },
     UnitDef {
-        kind: EntityKind::AtTeam,
+        kind: EntityKind::AntiTankGun,
         stats: balance::UnitStats {
             hp: 45,
             dmg: 60,

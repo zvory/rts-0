@@ -43,7 +43,7 @@ fn debug_starting_loadout_applies_to_humans_only() {
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
         EntityKind::MortarTeam,
-        EntityKind::AtTeam,
+        EntityKind::AntiTankGun,
         EntityKind::Artillery,
         EntityKind::ScoutCar,
         EntityKind::Tank,

@@ -74,7 +74,7 @@ Methamphetamines are permanently charging, keep advancing while firing with norm
 move at tank speed; other mobile combat units
 still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
-armored damage reduction, but AT guns do not roll their infantry miss chance against them.
+armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
 Plain `Move` tanks and scout cars only fire at enemies already in
 weapon range, while `AttackMove` tanks and scout cars can chase acquired targets. When they chase an acquired
 target from outside weapon range, they path to a standoff point inside firing range instead of the
@@ -93,9 +93,9 @@ authoritative `rules::defs` records.
   apply the same damage to friendly and enemy units/buildings; autocast skips predicted impact
   points that would hit any owned unit or building at its current position, while manual fire remains
   unrestricted.
-- AT guns use `AT_GUN_PACKED_RANGE_TILES = 5`, `AT_GUN_DEPLOYED_RANGE_TILES = 12`,
-  `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
-  `AT_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
+- anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 12`,
+  `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
+  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 50`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
@@ -117,10 +117,10 @@ authoritative `rules::defs` records.
   (~20s). Once complete, all current and future riflemen for that player are permanently charging:
   1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
   miss chance, and 25% faster attacks (16 tick cooldown becomes 12).
-- **AT Gun Crews** (R&D Complex research, protocol id `at_gun_unlock`): costs 200 steel / 75 oil
-  and takes 600 ticks (~20s). Once complete, that player can train AT Guns from Gun Works.
+- **Anti-Tank Gun Crews** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 200 steel / 75 oil
+  and takes 600 ticks (~20s). Once complete, that player can train Anti-Tank Guns from Gun Works.
 - **Unlock Artillery** (R&D Complex research, protocol id `artillery_unlock`): costs 300 steel /
-  200 oil and takes 900 ticks (~30s). It requires completed AT Gun Crews research. Once complete,
+  200 oil and takes 900 ticks (~30s). It requires completed Anti-Tank Gun Crews research. Once complete,
   that player can train Artillery from Gun Works.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
@@ -138,7 +138,7 @@ authoritative `rules::defs` records.
   from the caster. Launch delay: up to 100 ms at max range, scaling down for closer targets. Cloud
   radius: 2 tiles. Cloud duration: 5 seconds. Cooldown: 20 seconds per caster.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
-  place smoke between the advance and the AT gun / machine-gun nest, then move mobile units through
+  place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through
   the resulting dead zone. Active smoke is neutral world state: it blocks authoritative fog and
   combat LOS, prevents units inside smoke from contributing vision, hides enemies inside smoke, and
   does not participate in pathing, collision, scoring, supply, or targeting as an entity. Units
@@ -197,8 +197,8 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 50  | 30 outer / 60 inner AOE | 9 | 60 | 1.12 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| at_team         | 45  | 60 deployed / 45 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Gun Crews (`at_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 10-50 point fire | 90 | 0.922 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), AT Gun Crews (`at_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
+| anti_tank_gun         | 45  | 60 deployed / 45 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
+| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 10-50 point fire | 90 | 0.922 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
@@ -211,9 +211,9 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 620       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and trains AT Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

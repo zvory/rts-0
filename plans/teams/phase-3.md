@@ -13,7 +13,7 @@ unchanged.
 - Replace hostile target checks in command validation and target acquisition with the central
   relationship API.
 - Raw `Attack` commands against allies must be ignored or rejected safely.
-- Auto-acquisition, attack-move acquisition, ordered attack retention, AT-team tank preference,
+- Auto-acquisition, attack-move acquisition, ordered attack retention, Anti-Tank Gun tank preference,
   moving-fire retention, and building attacks must ignore allies.
 - Keep strict owner checks for command authority, production, gather/build/train/research/cancel,
   control surfaces, and economy.
@@ -50,7 +50,7 @@ Required Rust scenarios:
 - Raw attack command against an ally is ignored.
 - Ordered attackers drop or refuse an allied target.
 - Attack-move and building attack acquisition ignore allied entities.
-- AT-team tank preference chooses enemy tanks and not allied tanks.
+- Anti-Tank Gun tank preference chooses enemy tanks and not allied tanks.
 
 Required Node scenarios:
 

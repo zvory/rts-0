@@ -17,7 +17,7 @@ Working checklist for `plans/archive/tech/phase-7-command-car.md`, following
     positions after Artillery comes online.
   - It is intentionally overpowered in the tech-path matchup rather than having a clean tactical
     counter. The main answers are destroying the Mobile Warfare economy with Artillery, surviving
-    the attacks with AT killing fields, and punishing failed assaults during the cooldown window.
+    the attacks with anti-tank killing fields, and punishing failed assaults during the cooldown window.
 - [x] List expected unusual interactions with existing units, buildings, terrain, fog, commands, or
       AI behavior.
   - Command Car has no weapon.

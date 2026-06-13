@@ -462,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn no_rally_at_gun_spawn_uses_rotation_safe_circular_body() {
+    fn no_rally_anti_tank_gun_spawn_uses_rotation_safe_circular_body() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let gun_works = spawn_building_training(
@@ -471,7 +471,7 @@ mod tests {
             10,
             10,
             EntityKind::Steelworks,
-            EntityKind::AtTeam,
+            EntityKind::AntiTankGun,
         );
         let mut players = vec![player(1)];
 
@@ -483,17 +483,17 @@ mod tests {
                 .expect("gun works")
                 .prod_queue()
                 .is_empty(),
-            "AT gun should spawn when a no-rally Gun Works exit is available"
+            "anti-tank gun should spawn when a no-rally Gun Works exit is available"
         );
-        let at_gun = entities
+        let anti_tank_gun = entities
             .iter()
-            .find(|e| e.owner == 1 && e.kind == EntityKind::AtTeam && e.hp > 0)
-            .expect("AT gun should spawn");
+            .find(|e| e.owner == 1 && e.kind == EntityKind::AntiTankGun && e.hp > 0)
+            .expect("anti-tank gun should spawn");
         assert!(
-            matches!(at_gun.order(), Order::Idle),
-            "without a rally point the AT gun should stay idle at its spawn exit"
+            matches!(anti_tank_gun.order(), Order::Idle),
+            "without a rally point the anti-tank gun should stay idle at its spawn exit"
         );
-        let occ = Occupancy::build(&map, &entities_without(&entities, at_gun.id));
+        let occ = Occupancy::build(&map, &entities_without(&entities, anti_tank_gun.id));
         for facing in [
             0.0,
             std::f32::consts::FRAC_PI_2,
@@ -504,12 +504,12 @@ mod tests {
                 standability::unit_static_standable_with_facing(
                     &map,
                     &occ,
-                    EntityKind::AtTeam,
-                    at_gun.pos_x,
-                    at_gun.pos_y,
+                    EntityKind::AntiTankGun,
+                    anti_tank_gun.pos_x,
+                    anti_tank_gun.pos_y,
                     facing,
                 ),
-                "AT gun spawn should remain legal at facing {facing:.3}"
+                "anti-tank gun spawn should remain legal at facing {facing:.3}"
             );
         }
     }

@@ -1316,7 +1316,7 @@ mod tests {
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
 
-        for kind in [EntityKind::Tank, EntityKind::AtTeam] {
+        for kind in [EntityKind::Tank, EntityKind::AntiTankGun] {
             let (tile_path, world_path) = request_fixture_path(&map, kind, start, goal);
             let diagonal_steps = diagonal_tile_steps(start, &tile_path);
             assert!(
@@ -1443,7 +1443,7 @@ mod tests {
         let start = (1, 4);
         let goal = (14, 4);
 
-        for kind in [EntityKind::ScoutCar, EntityKind::Tank, EntityKind::AtTeam] {
+        for kind in [EntityKind::ScoutCar, EntityKind::Tank, EntityKind::AntiTankGun] {
             let normal = service.request_tile_path(
                 &map,
                 &occ,

@@ -37,7 +37,7 @@ pub mod kinds {
     pub const WORKER: &str = "worker";
     pub const RIFLEMAN: &str = "rifleman";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
-    pub const AT_TEAM: &str = "at_team";
+    pub const ANTI_TANK_GUN: &str = "anti_tank_gun";
     pub const MORTAR_TEAM: &str = "mortar_team";
     pub const ARTILLERY: &str = "artillery";
     pub const SCOUT_CAR: &str = "scout_car";
@@ -78,7 +78,7 @@ pub mod abilities {
 /// Permanent upgrade ids used by production/research and snapshot projection.
 pub mod upgrades {
     pub const METHAMPHETAMINES: &str = "methamphetamines";
-    pub const AT_GUN_UNLOCK: &str = "at_gun_unlock";
+    pub const ANTI_TANK_GUN_UNLOCK: &str = "anti_tank_gun_unlock";
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
     pub const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
@@ -239,14 +239,14 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
-    SetupAtGuns {
+    SetupAntiTankGuns {
         units: Vec<u32>,
         x: f32,
         y: f32,
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
-    TearDownAtGuns {
+    TearDownAntiTankGuns {
         units: Vec<u32>,
     },
     Charge {
@@ -1147,7 +1147,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::WORKER => 1,
         kinds::RIFLEMAN => 2,
         kinds::MACHINE_GUNNER => 3,
-        kinds::AT_TEAM => 4,
+        kinds::ANTI_TANK_GUN => 4,
         kinds::MORTAR_TEAM => 15,
         kinds::ARTILLERY => 16,
         kinds::TANK => 5,
@@ -1201,7 +1201,7 @@ fn order_stage_code(kind: &str) -> u8 {
         abilities::MORTAR_FIRE => 9,
         abilities::POINT_FIRE => 10,
         abilities::BREAKTHROUGH => 11,
-        "setupAtGuns" => 7,
+        "setupAntiTankGuns" => 7,
         abilities::CHARGE => 8,
         _ => 255,
     }
@@ -1221,7 +1221,7 @@ fn ability_code(ability: &str) -> u8 {
 fn upgrade_code(upgrade: &str) -> u8 {
     match upgrade {
         upgrades::METHAMPHETAMINES => 1,
-        upgrades::AT_GUN_UNLOCK => 2,
+        upgrades::ANTI_TANK_GUN_UNLOCK => 2,
         upgrades::TANK_UNLOCK => 3,
         upgrades::ARTILLERY_UNLOCK => 4,
         upgrades::MORTAR_AUTOCAST => 5,
@@ -1435,7 +1435,7 @@ mod tests {
                 y: 112.0,
             },
             OrderPlanMarker {
-                kind: "setupAtGuns".to_string(),
+                kind: "setupAntiTankGuns".to_string(),
                 x: 128.0,
                 y: 160.0,
             },
@@ -1539,7 +1539,7 @@ mod tests {
                     to: 7,
                     reveal: Some(AttackReveal {
                         owner: 1,
-                        kind: kinds::AT_TEAM.to_string(),
+                        kind: kinds::ANTI_TANK_GUN.to_string(),
                         x: 12.0,
                         y: 24.0,
                         facing: Some(0.5),

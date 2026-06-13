@@ -17,7 +17,7 @@ const PREDICTION_SMOOTH_MAX_PX = 96;
 const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.RIFLEMAN]: 420,
   [KIND.MACHINE_GUNNER]: 160,
-  [KIND.AT_TEAM]: 820,
+  [KIND.ANTI_TANK_GUN]: 820,
   [KIND.MORTAR_TEAM]: 520,
   [KIND.ARTILLERY]: 980,
   [KIND.SCOUT_CAR]: 160,
@@ -107,7 +107,7 @@ export class GameState {
     this.commandCardMode = null;
 
     // --- command targeting / feedback (client-only) ---
-    /** @type {null | "move" | "attack" | "setupAtGuns"} */
+    /** @type {null | "move" | "attack" | "setupAntiTankGuns"} */
     this.commandTarget = null;
     this.commandComposer = new CommandComposer();
     /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
@@ -117,7 +117,7 @@ export class GameState {
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
     /** @type {null | {mouseX:number, mouseY:number, guns:Array<object>}} */
-    this.atGunSetupPreview = null;
+    this.antiTankGunSetupPreview = null;
     /** @type {null | {ability:string, mouseX:number, mouseY:number, carriers:Array<object>, rangePx:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
     this.abilityTargetPreview = null;
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
@@ -1010,7 +1010,7 @@ export class GameState {
     this.placement = null;
     this.commandTarget = null;
     this.lastCommandTargetArm = null;
-    this.atGunSetupPreview = null;
+    this.antiTankGunSetupPreview = null;
     this.commandCardMode = "workerBuild";
   }
 
@@ -1059,7 +1059,7 @@ export class GameState {
 
   /**
    * Arm a one-click command target mode from the HUD.
-   * @param {"move"|"attack"|"setupAtGuns"|{kind:"ability",ability:string}} kind
+   * @param {"move"|"attack"|"setupAntiTankGuns"|{kind:"ability",ability:string}} kind
    */
   beginCommandTarget(kind, options = {}) {
     this.placement = null;
@@ -1108,7 +1108,7 @@ export class GameState {
 
   _syncCommandTargetFromComposer() {
     this.commandTarget = this.commandComposer.target;
-    this.atGunSetupPreview = null;
+    this.antiTankGunSetupPreview = null;
     this.abilityTargetPreview = null;
   }
 
@@ -1159,11 +1159,11 @@ export class GameState {
   }
 
   /**
-   * Set or clear the AT gun manual setup cone preview.
+   * Set or clear the anti-tank gun manual setup cone preview.
    * @param {null | {mouseX:number, mouseY:number, guns:Array<object>}} preview
    */
-  updateAtGunSetupPreview(preview) {
-    this.atGunSetupPreview = preview;
+  updateAntiTankGunSetupPreview(preview) {
+    this.antiTankGunSetupPreview = preview;
   }
 
   /**
