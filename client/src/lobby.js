@@ -14,6 +14,28 @@ const NAME_STORAGE_KEY = "rts.playerName";
 /** Max players in a match (humans + AI). Mirrors the server's `MAX_PLAYERS`. */
 const MAX_PLAYERS = 4;
 
+export const TEAM_PRESETS = Object.freeze([
+  { id: "ffa", label: "FFA", teams: [] },
+  { id: "solo", label: "Solo", teams: [{ id: 1, cap: 1 }] },
+  { id: "1v2", label: "1v2", teams: [{ id: 1, cap: 1 }, { id: 2, cap: 2 }] },
+  { id: "1v3", label: "1v3", teams: [{ id: 1, cap: 1 }, { id: 2, cap: 3 }] },
+  { id: "2v2", label: "2v2", teams: [{ id: 1, cap: 2 }, { id: 2, cap: 2 }] },
+]);
+
+export function presetById(id) {
+  return TEAM_PRESETS.find((preset) => preset.id === id) || TEAM_PRESETS[0];
+}
+
+export function teamSlotsForPreset(presetId, players = []) {
+  const preset = presetById(presetId);
+  if (preset.id === "ffa") {
+    return players
+      .filter((player) => !player.isSpectator)
+      .map((player) => ({ id: Number(player.teamId) || Number(player.id), cap: 1 }));
+  }
+  return preset.teams.map((team) => ({ ...team }));
+}
+
 /**
  * The lobby screen controller.
  */
@@ -42,6 +64,8 @@ export class Lobby {
     this.elStatus = rootEl.querySelector("#lobby-status");
     this.selMap = rootEl.querySelector("#lobby-map");
     this.elMapDisplay = rootEl.querySelector("#lobby-map-display");
+    this.selTeamPreset = rootEl.querySelector("#lobby-team-preset");
+    this.elTeamPresetDisplay = rootEl.querySelector("#lobby-team-preset-display");
 
     // Local lobby state.
     this._joined = false;
@@ -50,6 +74,7 @@ export class Lobby {
     this._hostId = null;
     this._canStart = false;
     this._quickstart = false;
+    this._teamPreset = "ffa";
     this._selectedMap = "";
     this._availableMaps = [];
     /** Total seated players (humans + AI) from the latest lobby message. */
@@ -169,6 +194,15 @@ export class Lobby {
         this.net.selectMap(this.selMap.value);
       });
     }
+
+    if (this.selTeamPreset) {
+      this._populateTeamPresetOptions();
+      this.selTeamPreset.addEventListener("change", () => {
+        const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+        if (!isHost || this.selTeamPreset.disabled) return;
+        this.net.setTeamPreset(this.selTeamPreset.value);
+      });
+    }
   }
 
   _join() {
@@ -222,6 +256,7 @@ export class Lobby {
     this._hostId = m.hostId;
     this._canStart = !!m.canStart;
     this._quickstart = !!m.quickstart;
+    this._teamPreset = m.teamPreset || "ffa";
     this._selectedMap = m.map || "";
     this._availableMaps = Array.isArray(m.maps) ? m.maps : [];
 
@@ -236,6 +271,7 @@ export class Lobby {
     this._reflectAddAiButton();
     this._reflectQuickstart();
     this._reflectMap();
+    this._reflectTeamPreset();
 
     const participantCount = this._playerCount;
     const spectatorCount = players.filter((p) => p.isSpectator).length;
@@ -254,86 +290,181 @@ export class Lobby {
     ul.innerHTML = "";
 
     const myId = this.net.playerId;
-    for (const p of players) {
-      const li = document.createElement("li");
-      li.className = "player-row";
-      if (p.id === myId) li.classList.add("is-you");
-
-      const swatch = document.createElement("span");
-      swatch.className = "player-color";
-      swatch.style.background = p.color || "#888";
-
-      const name = document.createElement("span");
-      name.className = "player-name";
-      name.textContent = p.name || `Player ${p.id}`;
-
-      const tags = document.createElement("span");
-      tags.className = "player-tags";
-      if (p.id === this._hostId) {
-        const host = document.createElement("span");
-        host.className = "tag host";
-        host.textContent = "(host)";
-        tags.appendChild(host);
-      }
-      if (p.isAi) {
-        li.classList.add("is-ai");
-        const bot = document.createElement("span");
-        bot.className = "tag ai";
-        bot.textContent = "AI";
-        tags.appendChild(bot);
-      }
-      if (p.isSpectator) {
-        li.classList.add("is-spectator");
-        const spec = document.createElement("span");
-        spec.className = "tag spectator";
-        spec.textContent = "Spectator";
-        tags.appendChild(spec);
-      }
-
-      li.appendChild(swatch);
-      li.appendChild(name);
-      li.appendChild(tags);
-
-      if (p.isAi) {
-        // AI players are always "ready"; the host gets a remove control instead of a check.
-        const iAmHost = this.net.playerId != null && this.net.playerId === this._hostId;
-        if (iAmHost) {
-          const remove = document.createElement("button");
-          remove.className = "player-remove btn";
-          remove.type = "button";
-          remove.textContent = "✕";
-          remove.title = "Remove AI";
-          remove.setAttribute("aria-label", `Remove ${p.name || "AI"}`);
-          remove.addEventListener("click", () => this.net.removeAi(p.id));
-          li.appendChild(remove);
-        } else {
-          const ready = document.createElement("span");
-          ready.className = "player-ready ready";
-          ready.textContent = "✓ Ready";
-          li.appendChild(ready);
-        }
-      } else if (p.isSpectator) {
-        const ready = document.createElement("span");
-        ready.className = "player-ready spectator";
-        ready.textContent = "Observing";
-        li.appendChild(ready);
-      } else {
-        const ready = document.createElement("span");
-        ready.className = "player-ready" + (p.ready ? " ready" : "");
-        ready.textContent = p.ready ? "✓ Ready" : "…";
-        li.appendChild(ready);
-      }
-
-      ul.appendChild(li);
-
-      // Keep our own ready toggle in sync with the authoritative server state.
-      if (p.id === myId) {
-        this._ready = !!p.ready;
-        this._spectator = !!p.isSpectator;
-        if (this.chkSpectatorInput) this.chkSpectatorInput.checked = this._spectator;
-        this._reflectReadyButton();
+    const seatedPlayers = players.filter((player) => !player.isSpectator);
+    const spectatorPlayers = players.filter((player) => player.isSpectator);
+    const slots = teamSlotsForPreset(this._teamPreset, seatedPlayers);
+    const renderedIds = new Set();
+    for (const slot of slots) {
+      const teamPlayers = seatedPlayers.filter((player) => Number(player.teamId) === Number(slot.id));
+      this._appendTeamHeader(ul, slot, teamPlayers.length);
+      for (const p of teamPlayers) {
+        renderedIds.add(p.id);
+        ul.appendChild(this._buildPlayerRow(p, slots, myId));
       }
     }
+
+    for (const p of seatedPlayers.filter((player) => !renderedIds.has(player.id))) {
+      const slot = { id: Number(p.teamId) || Number(p.id), cap: 1 };
+      this._appendTeamHeader(ul, slot, 1);
+      ul.appendChild(this._buildPlayerRow(p, [slot], myId));
+    }
+
+    if (spectatorPlayers.length > 0) {
+      this._appendSpectatorHeader(ul, spectatorPlayers.length);
+      for (const p of spectatorPlayers) {
+        ul.appendChild(this._buildPlayerRow(p, slots, myId));
+      }
+    }
+  }
+
+  _appendTeamHeader(ul, slot, count) {
+    const li = document.createElement("li");
+    li.className = "team-row";
+    const label = document.createElement("span");
+    label.className = "team-row-label";
+    label.textContent = `Team ${slot.id}`;
+    const countEl = document.createElement("span");
+    countEl.className = "team-row-count";
+    countEl.textContent = `${count}/${slot.cap}`;
+    li.append(label, countEl);
+
+    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+    if (isHost) {
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "team-add-ai btn";
+      add.textContent = "+ AI";
+      add.title = `Add AI to Team ${slot.id}`;
+      add.disabled = this._countdownActive || this._playerCount >= MAX_PLAYERS || count >= slot.cap;
+      add.addEventListener("click", () => {
+        if (!add.disabled) this.net.addAi(slot.id);
+      });
+      li.appendChild(add);
+    }
+
+    ul.appendChild(li);
+  }
+
+  _appendSpectatorHeader(ul, count) {
+    const li = document.createElement("li");
+    li.className = "team-row spectator-row";
+    const label = document.createElement("span");
+    label.className = "team-row-label";
+    label.textContent = "Spectators";
+    const countEl = document.createElement("span");
+    countEl.className = "team-row-count";
+    countEl.textContent = String(count);
+    li.append(label, countEl);
+    ul.appendChild(li);
+  }
+
+  _buildPlayerRow(p, slots, myId) {
+    const li = document.createElement("li");
+    li.className = "player-row";
+    if (p.id === myId) li.classList.add("is-you");
+
+    const swatch = document.createElement("span");
+    swatch.className = "player-color";
+    swatch.style.background = p.color || "#888";
+
+    const name = document.createElement("span");
+    name.className = "player-name";
+    name.textContent = p.name || `Player ${p.id}`;
+
+    const tags = document.createElement("span");
+    tags.className = "player-tags";
+    if (p.id === this._hostId) {
+      const host = document.createElement("span");
+      host.className = "tag host";
+      host.textContent = "(host)";
+      tags.appendChild(host);
+    }
+    if (p.isAi) {
+      li.classList.add("is-ai");
+      const bot = document.createElement("span");
+      bot.className = "tag ai";
+      bot.textContent = "AI";
+      tags.appendChild(bot);
+    }
+    if (p.isSpectator) {
+      li.classList.add("is-spectator");
+      const spec = document.createElement("span");
+      spec.className = "tag spectator";
+      spec.textContent = "Spectator";
+      tags.appendChild(spec);
+    }
+
+    li.appendChild(swatch);
+    li.appendChild(name);
+    li.appendChild(tags);
+    this._appendTeamAssignment(li, p, slots);
+
+    if (p.isAi) {
+      // AI players are always "ready"; the host gets a remove control instead of a check.
+      const iAmHost = this.net.playerId != null && this.net.playerId === this._hostId;
+      if (iAmHost) {
+        const remove = document.createElement("button");
+        remove.className = "player-remove btn";
+        remove.type = "button";
+        remove.textContent = "✕";
+        remove.title = "Remove AI";
+        remove.setAttribute("aria-label", `Remove ${p.name || "AI"}`);
+        remove.addEventListener("click", () => this.net.removeAi(p.id));
+        li.appendChild(remove);
+      } else {
+        const ready = document.createElement("span");
+        ready.className = "player-ready ready";
+        ready.textContent = "✓ Ready";
+        li.appendChild(ready);
+      }
+    } else if (p.isSpectator) {
+      const ready = document.createElement("span");
+      ready.className = "player-ready spectator";
+      ready.textContent = "Observing";
+      li.appendChild(ready);
+    } else {
+      const ready = document.createElement("span");
+      ready.className = "player-ready" + (p.ready ? " ready" : "");
+      ready.textContent = p.ready ? "✓ Ready" : "...";
+      li.appendChild(ready);
+    }
+
+    // Keep our own ready toggle in sync with the authoritative server state.
+    if (p.id === myId) {
+      this._ready = !!p.ready;
+      this._spectator = !!p.isSpectator;
+      if (this.chkSpectatorInput) this.chkSpectatorInput.checked = this._spectator;
+      this._reflectReadyButton();
+    }
+    return li;
+  }
+
+  _appendTeamAssignment(li, player, slots) {
+    if (player.isSpectator) return;
+    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+    if (!isHost || slots.length <= 1) {
+      const label = document.createElement("span");
+      label.className = "player-team-label";
+      label.textContent = `Team ${player.teamId}`;
+      li.appendChild(label);
+      return;
+    }
+
+    const select = document.createElement("select");
+    select.className = "player-team-select";
+    select.setAttribute("aria-label", `Team for ${player.name || `Player ${player.id}`}`);
+    select.disabled = this._countdownActive;
+    for (const slot of slots) {
+      const opt = document.createElement("option");
+      opt.value = String(slot.id);
+      opt.textContent = `Team ${slot.id}`;
+      select.appendChild(opt);
+    }
+    select.value = String(player.teamId);
+    select.addEventListener("change", () => {
+      if (!select.disabled) this.net.setTeam(player.id, Number(select.value));
+    });
+    li.appendChild(select);
   }
 
   /**
@@ -447,6 +578,7 @@ export class Lobby {
     this._reflectAddAiButton();
     this._reflectQuickstart();
     this._reflectMap();
+    this._reflectTeamPreset();
     this.setStatus("Match starting...");
 
     const overlay = document.createElement("div");
@@ -489,6 +621,33 @@ export class Lobby {
     this._reflectAddAiButton();
     this._reflectQuickstart();
     this._reflectMap();
+    this._reflectTeamPreset();
+  }
+
+  _populateTeamPresetOptions() {
+    if (!this.selTeamPreset || this.selTeamPreset.options.length) return;
+    for (const preset of TEAM_PRESETS) {
+      const opt = document.createElement("option");
+      opt.value = preset.id;
+      opt.textContent = preset.label;
+      this.selTeamPreset.appendChild(opt);
+    }
+  }
+
+  /** Render the team preset selector (host) or preset label (non-host). */
+  _reflectTeamPreset() {
+    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+    const preset = presetById(this._teamPreset);
+    if (this.selTeamPreset) {
+      this._populateTeamPresetOptions();
+      this.selTeamPreset.value = preset.id;
+      this.selTeamPreset.disabled = this._countdownActive || !isHost;
+      this.selTeamPreset.hidden = !isHost;
+    }
+    if (this.elTeamPresetDisplay) {
+      this.elTeamPresetDisplay.textContent = `Preset: ${preset.label}`;
+      this.elTeamPresetDisplay.hidden = isHost;
+    }
   }
 
   _handleJoinReplayPrompt(m) {

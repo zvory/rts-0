@@ -6,7 +6,9 @@
 // (Renderer, Input, HUD, Minimap, Lobby) are not instantiated here.
 
 import { Net } from "../client/src/net.js";
+import { TEAM_PRESETS, presetById, teamSlotsForPreset } from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
+import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
@@ -2490,6 +2492,42 @@ function fakeAudioContext() {
     0.000001,
     "client mirrors AT gun field of fire",
   );
+}
+
+// ---------------------------------------------------------------------------
+// Lobby team UI helpers
+// ---------------------------------------------------------------------------
+{
+  assert(TEAM_PRESETS[0]?.id === "ffa", "lobby team UI defaults to FFA first");
+  assert(
+    TEAM_PRESETS.map((preset) => preset.id).join(",") === "ffa,solo,1v2,1v3,2v2",
+    "lobby exposes every supported team preset",
+  );
+  assert(presetById("unknown").id === "ffa", "unknown lobby preset falls back to FFA");
+  const ffaSlots = teamSlotsForPreset("ffa", [
+    { id: 3, teamId: 3 },
+    { id: 4, teamId: 4 },
+    { id: 9, teamId: 0, isSpectator: true },
+  ]);
+  assert(ffaSlots.length === 2 && ffaSlots[0].id === 3 && ffaSlots[1].id === 4,
+    "FFA lobby rows render singleton active-player teams");
+  const twoVsTwoSlots = teamSlotsForPreset("2v2", []);
+  assert(
+    twoVsTwoSlots.length === 2 && twoVsTwoSlots[0].cap === 2 && twoVsTwoSlots[1].cap === 2,
+    "2v2 lobby rows expose two capped teams",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scoreboard team helpers
+// ---------------------------------------------------------------------------
+{
+  assert(formatTeamLabel(2) === "Team 2", "scoreboard formats numeric team labels");
+  assert(formatTeamLabel(null) === "-", "scoreboard formats missing team labels");
+  assert(scoreRowIsWinner({ id: 7, teamId: 2 }, 7, null), "scoreboard keeps winnerId fallback");
+  assert(scoreRowIsWinner({ id: 8, teamId: 2 }, 7, 2), "scoreboard highlights all winning-team rows");
+  assert(!scoreRowIsWinner({ id: 7, teamId: 1 }, 7, 2),
+    "winnerTeamId takes precedence over singleton winnerId highlighting");
 }
 
 // ---------------------------------------------------------------------------

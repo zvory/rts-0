@@ -26,8 +26,8 @@
     <!--
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
         Lobby:  #lobby-screen, #lobby-name, #lobby-room, #lobby-join, #lobby-players,
-                #lobby-spectator, #lobby-ready, #lobby-add-ai, #lobby-quickstart,
-                #lobby-start, #lobby-status
+                #lobby-spectator, #lobby-team-preset, #lobby-team-preset-display,
+                #lobby-ready, #lobby-add-ai, #lobby-quickstart, #lobby-start, #lobby-status
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selection-area, #control-group-tabs,
@@ -77,6 +77,11 @@
 
           <div class="lobby-room" hidden>
             <h2>Players</h2>
+            <div class="lobby-team-row">
+              <label id="lobby-team-preset-label" for="lobby-team-preset">Teams</label>
+              <select id="lobby-team-preset" disabled></select>
+              <span id="lobby-team-preset-display" hidden></span>
+            </div>
             <ul id="lobby-players" class="player-list"></ul>
             <div class="lobby-map-row">
               <label id="lobby-map-label" for="lobby-map">Map</label>

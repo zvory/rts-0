@@ -1,6 +1,6 @@
 # Phase 9 - Lobby and Score UI Exposure
 
-Status: planned.
+Status: done.
 
 ## Goal
 
@@ -66,3 +66,17 @@ team display. Do not require manual multi-tab validation.
 
 The phase handoff must describe UI behavior, list any deliberately deferred polish, and confirm the
 temporary gating state.
+
+## Implementation Notes
+
+- Lobby team setup is now exposed in the normal lobby: hosts see a preset selector for `ffa`,
+  `solo`, `1v2`, `1v3`, and `2v2`; player rows are grouped by team; supported team presets show
+  per-seat team selectors and per-team AI add buttons. Non-hosts see preset/team labels without
+  mutation controls.
+- `ffa` remains the default visible preset and renders each active player as a singleton team row.
+- The score screen now includes a Team column and highlights every score row whose `teamId` matches
+  `winnerTeamId`; singleton FFA `winnerId` highlighting remains as a compatibility fallback.
+- Temporary normal-lobby gating for non-FFA team presets is retired. Team games are reachable from
+  the ordinary lobby UI.
+- Deferred polish: entity body colors remain owner-colored, and the lobby keeps compact native
+  selects/buttons rather than adding bespoke formation previews or multi-tab setup flows.
