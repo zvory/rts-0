@@ -152,6 +152,9 @@ for raw_phase in "${PHASES[@]}"; do
   worktree_path="$WORKTREE_ROOT/$PLAN_NAME-$phase_id"
   handoff_dir="$worktree_path/plans/$PLAN_NAME/handoffs"
   handoff_file="$handoff_dir/$phase_id.json"
+  log_dir="$WORKTREE_ROOT/phase-runner-logs/$PLAN_NAME"
+  codex_log="$log_dir/$phase_id.codex.log"
+  timing_file="$log_dir/$phase_id.timing.json"
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
     echo "error: branch already exists: $branch" >&2
@@ -180,16 +183,25 @@ This is an executor pass only:
 - Implement only this phase.
 - Mark plans/$PLAN_NAME/$phase_id.md done if and only if the phase is completed.
 - Run the smallest targeted verification appropriate for the changed files.
+- Let the final git commit hook run the full local test gate; do not duplicate broad full-suite
+  verification inside the executor pass.
+- Avoid broad formatting commands such as workspace-wide cargo fmt unless they are required for the
+  phase diff. If formatting is needed, keep any formatter drift outside the phase scope out of the
+  final diff.
+- Prefer plain filesystem renames/moves over git mv inside this sandboxed executor session; the
+  outer runner owns staging and committing.
 - If the phase is ambiguous, too broad, blocked by failing verification, or needs human design/product input, stop and report status "blocked".
 
 Return a compact JSON handoff matching the requested schema.
 EOF
   )"
 
+  phase_start=$SECONDS
   echo "phase-runner: creating $worktree_path from $previous_ref on $branch"
   if [ "$DRY_RUN" = "0" ]; then
     git worktree add "$worktree_path" -b "$branch" "$previous_ref"
     mkdir -p "$handoff_dir"
+    mkdir -p "$log_dir"
   fi
 
   if [ "$DRY_RUN" = "1" ]; then
@@ -211,27 +223,69 @@ EOF
   fi
   codex_args+=("$prompt")
 
-  echo "phase-runner: running Codex executor for $phase_id"
-  if ! codex "${codex_args[@]}"; then
+  echo "phase-runner: running Codex executor for $phase_id (log: $codex_log)"
+  executor_start=$SECONDS
+  if ! codex "${codex_args[@]}" >"$codex_log" 2>&1; then
     echo "phase-runner: Codex failed for $phase_id; leaving worktree at $worktree_path" >&2
+    echo "phase-runner: last 80 log lines from $codex_log" >&2
+    tail -80 "$codex_log" >&2 || true
     exit 1
   fi
+  executor_seconds=$((SECONDS - executor_start))
 
   status="$(json_get_status "$handoff_file")"
   if [ "$status" != "completed" ]; then
     echo "phase-runner: $phase_id reported status '$status'; leaving worktree for inspection: $worktree_path" >&2
+    echo "phase-runner: last 80 log lines from $codex_log" >&2
+    tail -80 "$codex_log" >&2 || true
     exit 1
   fi
 
+  commit_seconds=0
   if [ -z "$(git -C "$worktree_path" status --porcelain=v1)" ]; then
     echo "phase-runner: $phase_id completed but produced no file changes; leaving branch uncommitted" >&2
   else
     git -C "$worktree_path" add -A
-    git -C "$worktree_path" commit -m "Execute $PLAN_NAME $phase_id" \
-      -m "Executor pass for plans/$PLAN_NAME/$phase_id.md." \
+    commit_args=(
+      commit
+      -m "Execute $PLAN_NAME $phase_id"
+      -m "Executor pass for plans/$PLAN_NAME/$phase_id.md."
       -m "Handoff saved to plans/$PLAN_NAME/handoffs/$phase_id.json."
+    )
+    commit_start=$SECONDS
+    git -C "$worktree_path" "${commit_args[@]}"
+    commit_seconds=$((SECONDS - commit_start))
     echo "phase-runner: committed $branch"
   fi
+  total_seconds=$((SECONDS - phase_start))
+  PLAN_NAME="$PLAN_NAME" \
+  PHASE_ID="$phase_id" \
+  BRANCH="$branch" \
+  BASE_REF="$previous_ref" \
+  WORKTREE="$worktree_path" \
+  CODEX_LOG="$codex_log" \
+  EXECUTOR_SECONDS="$executor_seconds" \
+  COMMIT_SECONDS="$commit_seconds" \
+  TOTAL_SECONDS="$total_seconds" \
+  TIMING_FILE="$timing_file" \
+  node -e '
+    const fs = require("fs");
+    const payload = {
+      plan: process.env.PLAN_NAME,
+      phase: process.env.PHASE_ID,
+      branch: process.env.BRANCH,
+      baseRef: process.env.BASE_REF,
+      worktree: process.env.WORKTREE,
+      codexLog: process.env.CODEX_LOG,
+      timingsSeconds: {
+        executor: Number(process.env.EXECUTOR_SECONDS),
+        commit: Number(process.env.COMMIT_SECONDS),
+        total: Number(process.env.TOTAL_SECONDS),
+      },
+    };
+    fs.writeFileSync(process.env.TIMING_FILE, `${JSON.stringify(payload, null, 2)}\n`);
+  '
+  echo "phase-runner: timing saved to $timing_file (${total_seconds}s total)"
 
   previous_ref="$branch"
 done
