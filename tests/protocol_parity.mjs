@@ -23,6 +23,7 @@ import {
   decodeServerMessage,
   msg,
 } from "../client/src/protocol.js";
+import { PLAYER_PALETTE } from "../client/src/config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -30,6 +31,8 @@ const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs"
 const rust = fs.readFileSync(rustProtocolPath, "utf8");
 const rustContractPath = path.join(repoRoot, "server/crates/contract/src/lib.rs");
 const rustContract = fs.readFileSync(rustContractPath, "utf8");
+const rustLobbyPath = path.join(repoRoot, "server/src/lobby/mod.rs");
+const rustLobby = fs.readFileSync(rustLobbyPath, "utf8");
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -74,6 +77,12 @@ function extractTerrainCodes() {
     codes[match[1]] = Number(match[2]);
   }
   return codes;
+}
+
+function extractRustPlayerPalette() {
+  const match = rustLobby.match(/const\s+PLAYER_PALETTE\s*:\s*\[&str;\s*\d+\]\s*=\s*\[([\s\S]*?)\];/);
+  assert(match, "missing Rust player palette");
+  return Array.from(match[1].matchAll(/"([^"]+)"/g), (entry) => entry[1]);
 }
 
 const rustConstants = new Map([
@@ -142,6 +151,11 @@ assertSameCodes("order stage", extractCodeFunction("order_stage_code"), ORDER_ST
 assertSameCodes("ability", extractCodeFunction("ability_code"), ABILITY_CODE);
 assertSameCodes("upgrade", extractCodeFunction("upgrade_code"), UPGRADE_CODE);
 assertSameCodes("notice severity", extractCodeFunction("notice_severity_code"), NOTICE_SEVERITY_CODE);
+
+assert(
+  JSON.stringify(extractRustPlayerPalette()) === JSON.stringify(PLAYER_PALETTE),
+  "client PLAYER_PALETTE must match server lobby PLAYER_PALETTE",
+);
 
 assert(
   rust.includes("client_seq") && JSON.stringify(msg.command({ c: "stop", units: [1] }, 9)) === JSON.stringify({ t: "command", clientSeq: 9, cmd: { c: "stop", units: [1] } }),

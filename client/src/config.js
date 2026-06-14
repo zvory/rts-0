@@ -103,8 +103,8 @@ export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
-  "#cc1111", "#1133bb", "#33aaee", "#dd1188",
-  "#117733", "#eeeeee", "#222222", "#8822cc",
+  "#0072b2", "#d55e00", "#009e73", "#cc79a7",
+  "#56b4e9", "#e69f00", "#f0e442", "#7e57c2",
 ]);
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
