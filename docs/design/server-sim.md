@@ -252,18 +252,21 @@ policy is centralized instead of scattered through services.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
-`game/ability.rs` defines `AbilityKind` (legacy `Charge` plus active `Smoke`), `AbilityDefinition`,
-`AbilityTargetMode` (`SelfTarget` or `WorldPoint`), `ResourceCost`, and the compile-time
-definition table accessed via `ability::definition(kind)`. Ability definitions include the carrier
-entity kinds, target mode, optional tile range, cooldown in ticks, resource cost, tech requirement,
-and whether the ability may be queued. Adding a new ability means adding an `AbilityKind` variant
-and a `definition` match arm; no other files need to change for the definition itself.
+`rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the
+stable id, label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
+finite charges, Steel/Oil cost, tech requirement, queue behavior, autocast support, command-card
+visibility, and compact protocol/order-stage codes. `game/ability.rs` keeps the typed
+`AbilityKind` and converts those registry rows into the sim-facing `AbilityDefinition`; it is not a
+second source of metadata. Adding a registry-backed ability means adding a global `AbilityKind` and
+protocol id, adding the faction catalog entry, updating the client mirror/parity check, and then
+adding only the effect-specific code that the registry cannot express.
 
 `services::ability_orders` owns the tick-path execution helpers:
 - `order_or_launch_world_ability` — for `WorldPoint` abilities: if the caster is in range, launch
   immediately; otherwise compute a staging point inside range and issue an `Order::Ability`
   movement order via `MoveCoordinator`.
-- `launch_world_ability` — deducts resources, sets the caster's cooldown, clears the active order,
+- `launch_world_ability` — reads range/cost/cooldown from the registry, deducts resources, sets
+  the caster's cooldown, clears the active order,
   and executes the effect (currently: schedules a smoke cloud or delayed mortar shell). Guards:
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
@@ -282,6 +285,10 @@ Rules functions have no imports from `services/`; classification and formula rul
 kind-specific data from `rules::defs`. `config.rs` holds scalar constants and compatibility
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
+
+Snapshot ability affordances are projected from the owning player's faction catalog, so fixture or
+future factions do not inherit Kriegsia command-card buttons merely because they reuse a global
+entity kind.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource

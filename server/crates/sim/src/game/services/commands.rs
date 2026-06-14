@@ -245,6 +245,10 @@ pub(crate) fn apply_commands(
                 units,
                 enabled,
             } => {
+                let definition = ability::definition(ability);
+                if !definition.autocast {
+                    continue;
+                }
                 if ability == AbilityKind::MortarFire
                     && !players.iter().any(|p| {
                         p.id == player && p.upgrades.contains(&UpgradeKind::MortarAutocast)
@@ -253,7 +257,14 @@ pub(crate) fn apply_commands(
                     continue;
                 }
                 for id in dedupe_cap_units(units) {
-                    if owns_unit(entities, player, id) {
+                    if owns_unit(entities, player, id)
+                        && ability_orders::caster_allowed_by_faction(
+                            entities,
+                            &faction_id,
+                            id,
+                            ability,
+                        )
+                    {
                         if let Some(e) = entities.get_mut(id) {
                             e.set_autocast_enabled(ability, enabled);
                         }
@@ -1006,8 +1017,15 @@ fn use_ability(
         let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
             return;
         };
+        let faction_id = faction_id_for(
+            players.iter().map(|p| (p.id, p.faction_id.as_str())),
+            player,
+        );
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         for unit in dedupe_cap_units(request.units) {
+            if !ability_orders::caster_allowed_by_faction(entities, &faction_id, unit, ability) {
+                continue;
+            }
             if request.queued {
                 if artillery_point_fire_command_target(map, entities, player, unit, x, y).is_some()
                 {
@@ -1309,7 +1327,7 @@ fn try_fire_artillery(
     ) {
         return false;
     }
-    let ammo_cost = rules::economy::ResourceCost::new(config::ARTILLERY_AMMO_COST_STEEL, 0);
+    let ammo_cost = ability::definition(AbilityKind::PointFire).cost;
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return false;
     };
@@ -2487,6 +2505,41 @@ mod tests {
                 .autocast_enabled(AbilityKind::MortarFire),
             Some(true),
             "researched autocast command should be accepted"
+        );
+    }
+
+    #[test]
+    fn set_mortar_autocast_rejects_wrong_faction_carriers() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let mortar = entities
+            .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+            .expect("mortar should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].faction_id = rules::faction::EMPTY_FIXTURE_FACTION_ID.to_string();
+        players[0].upgrades.insert(UpgradeKind::MortarAutocast);
+
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::SetAutocast {
+                    ability: AbilityKind::MortarFire,
+                    units: vec![mortar],
+                    enabled: true,
+                },
+            )],
+        );
+
+        assert_eq!(
+            entities
+                .get(mortar)
+                .expect("mortar should exist")
+                .autocast_enabled(AbilityKind::MortarFire),
+            Some(false),
+            "out-of-faction autocast commands should not toggle carrier state"
         );
     }
 

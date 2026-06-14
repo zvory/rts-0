@@ -187,7 +187,7 @@ export const ABILITIES = Object.freeze({
     cost: SMOKE_ABILITY_COST,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
-    queued: false,
+    queued: true,
   }),
   [ABILITY.MORTAR_FIRE]: Object.freeze({
     ability: ABILITY.MORTAR_FIRE,
@@ -202,6 +202,7 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: MORTAR_OUTER_RADIUS_TILES,
     queued: false,
+    autocast: true,
   }),
   [ABILITY.POINT_FIRE]: Object.freeze({
     ability: ABILITY.POINT_FIRE,

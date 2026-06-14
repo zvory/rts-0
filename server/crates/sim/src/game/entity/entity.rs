@@ -1056,8 +1056,18 @@ impl Entity {
 
 fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {
     let mut uses = BTreeMap::new();
-    if kind == EntityKind::ScoutCar {
-        uses.insert(AbilityKind::Smoke, config::SCOUT_CAR_SMOKE_USES);
+    for entry in rules::faction::CATALOGS
+        .iter()
+        .flat_map(|catalog| catalog.abilities.iter())
+        .filter(|entry| entry.carriers.contains(&kind))
+    {
+        let Some(charges) = entry.charges else {
+            continue;
+        };
+        let Ok(ability) = entry.id.parse::<AbilityKind>() else {
+            continue;
+        };
+        uses.insert(ability, charges);
     }
     uses
 }

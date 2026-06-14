@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use crate::config;
 use crate::game::entity::EntityKind;
 use crate::protocol;
+use crate::rules;
 use crate::rules::economy::ResourceCost;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -53,73 +53,35 @@ pub struct AbilityDefinition {
     pub carriers: &'static [EntityKind],
     pub target_mode: AbilityTargetMode,
     pub range_tiles: Option<u32>,
+    pub min_range_tiles: Option<u32>,
     pub cooldown_ticks: u16,
+    pub charges: Option<u16>,
     pub cost: ResourceCost,
     pub tech_requirement: Option<EntityKind>,
     pub may_queue: bool,
+    pub autocast: bool,
+    pub command_card: bool,
 }
 
-const CHARGE_CARRIERS: &[EntityKind] = &[];
-const SMOKE_CARRIERS: &[EntityKind] = &[EntityKind::ScoutCar];
-const MORTAR_FIRE_CARRIERS: &[EntityKind] = &[EntityKind::MortarTeam];
-const POINT_FIRE_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
-const BREAKTHROUGH_CARRIERS: &[EntityKind] = &[EntityKind::CommandCar];
-
 pub fn definition(kind: AbilityKind) -> AbilityDefinition {
-    match kind {
-        AbilityKind::Charge => AbilityDefinition {
-            kind,
-            carriers: CHARGE_CARRIERS,
-            target_mode: AbilityTargetMode::SelfTarget,
-            range_tiles: None,
-            cooldown_ticks: config::RIFLEMAN_CHARGE_COOLDOWN_TICKS,
-            cost: ResourceCost::new(0, 0),
-            tech_requirement: None,
-            may_queue: false,
+    let entry = rules::faction::ability_definition(kind.to_protocol_str())
+        .unwrap_or_else(|| unreachable!("missing registry entry for {:?}", kind));
+    AbilityDefinition {
+        kind,
+        carriers: entry.carriers,
+        target_mode: match entry.target_mode {
+            rules::faction::AbilityTargetMode::SelfTarget => AbilityTargetMode::SelfTarget,
+            rules::faction::AbilityTargetMode::WorldPoint => AbilityTargetMode::WorldPoint,
         },
-        AbilityKind::Smoke => AbilityDefinition {
-            kind,
-            carriers: SMOKE_CARRIERS,
-            target_mode: AbilityTargetMode::WorldPoint,
-            range_tiles: Some(config::SMOKE_ABILITY_RANGE_TILES),
-            cooldown_ticks: config::SMOKE_ABILITY_COOLDOWN_TICKS,
-            cost: ResourceCost {
-                steel: config::SMOKE_ABILITY_COST_STEEL,
-                oil: config::SMOKE_ABILITY_COST_OIL,
-            },
-            tech_requirement: None,
-            may_queue: true,
-        },
-        AbilityKind::MortarFire => AbilityDefinition {
-            kind,
-            carriers: MORTAR_FIRE_CARRIERS,
-            target_mode: AbilityTargetMode::WorldPoint,
-            range_tiles: Some(9),
-            cooldown_ticks: 60,
-            cost: ResourceCost::new(0, 0),
-            tech_requirement: None,
-            may_queue: false,
-        },
-        AbilityKind::PointFire => AbilityDefinition {
-            kind,
-            carriers: POINT_FIRE_CARRIERS,
-            target_mode: AbilityTargetMode::WorldPoint,
-            range_tiles: Some(config::ARTILLERY_MAX_RANGE_TILES),
-            cooldown_ticks: 0,
-            cost: ResourceCost::new(0, 0),
-            tech_requirement: None,
-            may_queue: true,
-        },
-        AbilityKind::Breakthrough => AbilityDefinition {
-            kind,
-            carriers: BREAKTHROUGH_CARRIERS,
-            target_mode: AbilityTargetMode::SelfTarget,
-            range_tiles: None,
-            cooldown_ticks: config::BREAKTHROUGH_COOLDOWN_TICKS,
-            cost: ResourceCost::new(0, 0),
-            tech_requirement: None,
-            may_queue: true,
-        },
+        range_tiles: entry.range_tiles,
+        min_range_tiles: entry.min_range_tiles,
+        cooldown_ticks: entry.cooldown_ticks,
+        charges: entry.charges,
+        cost: entry.cost,
+        tech_requirement: entry.tech_requirement,
+        may_queue: entry.may_queue,
+        autocast: entry.autocast,
+        command_card: entry.command_card,
     }
 }
 

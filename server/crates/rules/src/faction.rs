@@ -5,7 +5,7 @@
 //! id across factions only when its gameplay semantics are identical for every faction that can
 //! use it; divergent behavior needs a distinct global id gated by catalog availability.
 
-use crate::{defs, EntityKind};
+use crate::{balance, defs, economy::ResourceCost, EntityKind};
 
 pub const DEFAULT_FACTION_ID: &str = "kriegsia";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
@@ -21,6 +21,7 @@ pub const SMOKE_ABILITY: &str = "smoke";
 pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
 pub const POINT_FIRE_ABILITY: &str = "pointFire";
 pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
+pub const CHARGE_ABILITY: &str = "charge";
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
@@ -133,20 +134,107 @@ const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
 
 const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
     AbilityCatalogEntry {
+        id: CHARGE_ABILITY,
+        label: "Charge",
+        icon: "CHG",
+        hotkey: None,
+        title: "Legacy Rifleman Charge",
+        carriers: &[],
+        target_mode: AbilityTargetMode::SelfTarget,
+        range_tiles: None,
+        min_range_tiles: None,
+        cooldown_ticks: balance::RIFLEMAN_CHARGE_COOLDOWN_TICKS,
+        charges: None,
+        cost: ResourceCost::new(0, 0),
+        tech_requirement: None,
+        may_queue: false,
+        autocast: false,
+        command_card: false,
+        protocol_code: 1,
+        order_stage_code: 8,
+    },
+    AbilityCatalogEntry {
         id: SMOKE_ABILITY,
+        label: "Smoke",
+        icon: "SMK",
+        hotkey: Some("D"),
+        title: "Target a smoke grenade location",
         carriers: &[EntityKind::ScoutCar],
+        target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(balance::SMOKE_ABILITY_RANGE_TILES),
+        min_range_tiles: None,
+        cooldown_ticks: balance::SMOKE_ABILITY_COOLDOWN_TICKS,
+        charges: Some(balance::SCOUT_CAR_SMOKE_USES),
+        cost: ResourceCost::new(
+            balance::SMOKE_ABILITY_COST_STEEL,
+            balance::SMOKE_ABILITY_COST_OIL,
+        ),
+        tech_requirement: None,
+        may_queue: true,
+        autocast: false,
+        command_card: true,
+        protocol_code: 2,
+        order_stage_code: 6,
     },
     AbilityCatalogEntry {
         id: MORTAR_FIRE_ABILITY,
+        label: "Fire",
+        icon: "FIR",
+        hotkey: Some("X"),
+        title: "Target mortar fire",
         carriers: &[EntityKind::MortarTeam],
+        target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(9),
+        min_range_tiles: None,
+        cooldown_ticks: (balance::TICK_HZ as u16) * 2,
+        charges: None,
+        cost: ResourceCost::new(0, 0),
+        tech_requirement: None,
+        may_queue: false,
+        autocast: true,
+        command_card: true,
+        protocol_code: 3,
+        order_stage_code: 9,
     },
     AbilityCatalogEntry {
         id: POINT_FIRE_ABILITY,
+        label: "Point Fire",
+        icon: "PF",
+        hotkey: Some("X"),
+        title: "Target artillery fire",
         carriers: &[EntityKind::Artillery],
+        target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES),
+        min_range_tiles: Some(balance::ARTILLERY_MIN_RANGE_TILES),
+        cooldown_ticks: balance::ARTILLERY_RELOAD_TICKS as u16,
+        charges: None,
+        cost: ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0),
+        tech_requirement: None,
+        may_queue: true,
+        autocast: false,
+        command_card: true,
+        protocol_code: 4,
+        order_stage_code: 10,
     },
     AbilityCatalogEntry {
         id: BREAKTHROUGH_ABILITY,
+        label: "Breakthrough!",
+        icon: "BRK",
+        hotkey: Some("E"),
+        title: "Speed up nearby owned units; stronger in smoke",
         carriers: &[EntityKind::CommandCar],
+        target_mode: AbilityTargetMode::SelfTarget,
+        range_tiles: None,
+        min_range_tiles: None,
+        cooldown_ticks: balance::BREAKTHROUGH_COOLDOWN_TICKS,
+        charges: None,
+        cost: ResourceCost::new(0, 0),
+        tech_requirement: None,
+        may_queue: true,
+        autocast: false,
+        command_card: true,
+        protocol_code: 5,
+        order_stage_code: 11,
     },
 ];
 
@@ -190,9 +278,40 @@ pub struct UpgradeCatalogEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbilityTargetMode {
+    SelfTarget,
+    WorldPoint,
+}
+
+impl AbilityTargetMode {
+    pub fn stable_id(self) -> &'static str {
+        match self {
+            AbilityTargetMode::SelfTarget => "self",
+            AbilityTargetMode::WorldPoint => "worldPoint",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AbilityCatalogEntry {
     pub id: &'static str,
+    pub label: &'static str,
+    pub icon: &'static str,
+    pub hotkey: Option<&'static str>,
+    pub title: &'static str,
     pub carriers: &'static [EntityKind],
+    pub target_mode: AbilityTargetMode,
+    pub range_tiles: Option<u32>,
+    pub min_range_tiles: Option<u32>,
+    pub cooldown_ticks: u16,
+    pub charges: Option<u16>,
+    pub cost: ResourceCost,
+    pub tech_requirement: Option<EntityKind>,
+    pub may_queue: bool,
+    pub autocast: bool,
+    pub command_card: bool,
+    pub protocol_code: u8,
+    pub order_stage_code: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -285,6 +404,23 @@ impl FactionCatalog {
             .iter()
             .any(|entry| entry.id == ability_id && entry.carriers.contains(&carrier))
     }
+
+    pub fn ability(self, ability_id: &str) -> Option<AbilityCatalogEntry> {
+        self.abilities
+            .iter()
+            .copied()
+            .find(|entry| entry.id == ability_id)
+    }
+
+    pub fn abilities_for_carrier(
+        self,
+        carrier: EntityKind,
+    ) -> impl Iterator<Item = AbilityCatalogEntry> {
+        self.abilities
+            .iter()
+            .copied()
+            .filter(move |entry| entry.carriers.contains(&carrier))
+    }
 }
 
 pub fn catalog_for(faction_id: &str) -> Option<FactionCatalog> {
@@ -305,6 +441,13 @@ pub fn catalog_for_or_default_empty(faction_id: &str) -> Option<FactionCatalog> 
 pub fn catalog_loadout_for(faction_id: &str, loadout_id: &str) -> Option<FactionLoadout> {
     let catalog = catalog_for(faction_id)?;
     (catalog.loadout.id == loadout_id).then_some(catalog.loadout)
+}
+
+pub fn ability_definition(ability_id: &str) -> Option<AbilityCatalogEntry> {
+    CATALOGS
+        .iter()
+        .flat_map(|catalog| catalog.abilities.iter().copied())
+        .find(|entry| entry.id == ability_id)
 }
 
 #[cfg(test)]
@@ -353,7 +496,56 @@ mod tests {
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
         assert!(catalog.allows_ability(POINT_FIRE_ABILITY, EntityKind::Artillery));
+        assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));
         assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::Worker));
+    }
+
+    #[test]
+    fn default_ability_registry_preserves_current_metadata() {
+        let smoke = CURRENT_CATALOG.ability(SMOKE_ABILITY).unwrap();
+        assert_eq!(smoke.label, "Smoke");
+        assert_eq!(smoke.carriers, &[EntityKind::ScoutCar]);
+        assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
+        assert_eq!(smoke.range_tiles, Some(balance::SMOKE_ABILITY_RANGE_TILES));
+        assert_eq!(smoke.charges, Some(balance::SCOUT_CAR_SMOKE_USES));
+        assert_eq!(
+            smoke.cost,
+            ResourceCost::new(
+                balance::SMOKE_ABILITY_COST_STEEL,
+                balance::SMOKE_ABILITY_COST_OIL,
+            )
+        );
+        assert!(smoke.command_card);
+
+        let point_fire = CURRENT_CATALOG.ability(POINT_FIRE_ABILITY).unwrap();
+        assert_eq!(point_fire.carriers, &[EntityKind::Artillery]);
+        assert_eq!(
+            point_fire.min_range_tiles,
+            Some(balance::ARTILLERY_MIN_RANGE_TILES)
+        );
+        assert_eq!(
+            point_fire.range_tiles,
+            Some(balance::ARTILLERY_MAX_RANGE_TILES)
+        );
+        assert_eq!(
+            point_fire.cost,
+            ResourceCost::new(balance::ARTILLERY_AMMO_COST_STEEL, 0)
+        );
+        assert_eq!(
+            point_fire.cooldown_ticks,
+            balance::ARTILLERY_RELOAD_TICKS as u16
+        );
+
+        let breakthrough = CURRENT_CATALOG.ability(BREAKTHROUGH_ABILITY).unwrap();
+        assert_eq!(breakthrough.target_mode, AbilityTargetMode::SelfTarget);
+        assert_eq!(
+            breakthrough.cooldown_ticks,
+            balance::BREAKTHROUGH_COOLDOWN_TICKS
+        );
+
+        let charge = ability_definition(CHARGE_ABILITY).unwrap();
+        assert!(!charge.command_card);
+        assert!(charge.carriers.is_empty());
     }
 
     #[test]

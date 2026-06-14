@@ -168,6 +168,10 @@ authoritative `rules::defs` records.
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
   can still turn autocast off per selected Mortar Team.
+- Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
+  catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, queueability,
+  autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
+  against that registry for client-visible ability descriptors.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles

@@ -27,6 +27,7 @@ pub struct EntityProjectionContext<'a> {
     pub target: Option<&'a Entity>,
     pub include_debug_path: bool,
     pub teams: Option<&'a TeamRelations>,
+    pub owner_faction_id: Option<&'a str>,
 }
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
@@ -303,10 +304,22 @@ pub fn project_entity(
         if context.include_debug_path {
             view.debug_path = debug_path_view(entity);
         }
+        let catalog = context
+            .owner_faction_id
+            .and_then(crate::rules::faction::catalog_for);
         view.abilities = entity
             .ability_cooldowns
             .iter()
             .filter(|(_, cooldown_left)| **cooldown_left > 0)
+            .filter(|(kind, _)| {
+                catalog.is_some_and(|catalog| {
+                    catalog
+                        .ability(kind.to_protocol_str())
+                        .is_some_and(|entry| {
+                            entry.command_card && entry.carriers.contains(&entity.kind)
+                        })
+                })
+            })
             .map(|(kind, cooldown_left)| AbilityCooldownView {
                 ability: kind.to_protocol_str().to_string(),
                 cooldown_left: *cooldown_left,
@@ -314,12 +327,14 @@ pub fn project_entity(
                 autocast_enabled: entity.autocast_enabled(*kind),
             })
             .collect();
-        for kind in [
-            ability::AbilityKind::Smoke,
-            ability::AbilityKind::MortarFire,
-            ability::AbilityKind::PointFire,
-            ability::AbilityKind::Breakthrough,
-        ] {
+        for entry in catalog
+            .into_iter()
+            .flat_map(|catalog| catalog.abilities_for_carrier(entity.kind))
+            .filter(|entry| entry.command_card)
+        {
+            let Ok(kind) = entry.id.parse::<ability::AbilityKind>() else {
+                continue;
+            };
             if ability::carried_by(kind, entity.kind)
                 && !view
                     .abilities
@@ -458,7 +473,9 @@ fn intent_plan_marker(
             self_position.0,
             self_position.1,
         ),
-        OrderIntent::SetupAntiTankGuns(point) => point_marker("setupAntiTankGuns", point.x, point.y),
+        OrderIntent::SetupAntiTankGuns(point) => {
+            point_marker("setupAntiTankGuns", point.x, point.y)
+        }
     }
 }
 
@@ -565,6 +582,7 @@ mod tests {
                 target,
                 include_debug_path,
                 teams: None,
+                owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
             },
         )
     }

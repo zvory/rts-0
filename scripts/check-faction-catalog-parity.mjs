@@ -10,7 +10,14 @@ import {
   UPGRADES,
   WORKER_BUILDABLE,
 } from "../client/src/config.js";
-import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "../client/src/protocol.js";
+import {
+  ABILITY,
+  ABILITY_CODE,
+  DEFAULT_FACTION_ID,
+  KIND,
+  ORDER_STAGE_CODE,
+  UPGRADE,
+} from "../client/src/protocol.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -111,11 +118,38 @@ for (const entry of rustCatalog.research) {
 for (const entry of rustCatalog.abilities) {
   assert(abilityByStableId.has(entry.id), `client ABILITY is missing ${entry.id}`);
   const ability = abilityByStableId.get(entry.id);
+  assert.equal(ABILITY_CODE[ability], entry.protocolCode, `${entry.id} compact ability code mirrors Rust registry`);
+  assert.equal(
+    ORDER_STAGE_CODE[ability],
+    entry.orderStageCode,
+    `${entry.id} order stage code mirrors Rust registry`,
+  );
+  if (!entry.commandCard) {
+    assert.equal(
+      ABILITIES[ability],
+      undefined,
+      `${entry.id} is registry-only and should not render a command-card descriptor`,
+    );
+    continue;
+  }
+  const descriptor = ABILITIES[ability];
+  assert(descriptor, `client ABILITIES is missing command-card descriptor for ${entry.id}`);
+  assert.equal(descriptor.label, entry.label, `${entry.id} label mirrors Rust registry`);
+  assert.equal(descriptor.icon, entry.icon, `${entry.id} icon mirrors Rust registry`);
+  assert.equal(descriptor.hotkey ?? null, entry.hotkey, `${entry.id} hotkey mirrors Rust registry`);
+  assert.equal(descriptor.title, entry.title, `${entry.id} title mirrors Rust registry`);
   assert.deepEqual(
-    ABILITIES[ability]?.carriers ?? [],
+    descriptor.carriers,
     asClientKinds(entry.carriers),
     `${entry.id} carriers mirror Rust catalog`,
   );
+  assert.equal(descriptor.targetMode, entry.targetMode, `${entry.id} target mode mirrors Rust registry`);
+  assert.equal(descriptor.rangeTiles ?? null, entry.rangeTiles, `${entry.id} range mirrors Rust registry`);
+  assert.equal(descriptor.minRangeTiles ?? null, entry.minRangeTiles, `${entry.id} min range mirrors Rust registry`);
+  assert.equal(descriptor.cooldownTicks, entry.cooldownTicks, `${entry.id} cooldown mirrors Rust registry`);
+  assert.deepEqual(descriptor.cost, entry.cost, `${entry.id} cost mirrors Rust registry`);
+  assert.equal(descriptor.queued, entry.mayQueue, `${entry.id} queue behavior mirrors Rust registry`);
+  assert.equal(!!descriptor.autocast, entry.autocast, `${entry.id} autocast flag mirrors Rust registry`);
 }
 
 for (const [kind, cost] of Object.entries(rustCatalog.costs)) {

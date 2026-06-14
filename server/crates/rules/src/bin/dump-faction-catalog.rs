@@ -99,8 +99,31 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         } else {
             ","
         };
-        print!("{indent}    {{\"id\":\"{}\",\"carriers\":", ability.id);
+        print!(
+            "{indent}    {{\"id\":\"{}\",\"label\":\"{}\",\"icon\":\"{}\",\"hotkey\":{},\"title\":\"{}\",\"carriers\":",
+            ability.id,
+            ability.label,
+            ability.icon,
+            json_string_or_null(ability.hotkey),
+            ability.title,
+        );
         print_kind_array_inline(ability.carriers);
+        print!(
+            ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"mayQueue\":{},\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
+            ability.target_mode.stable_id(),
+            json_u32_or_null(ability.range_tiles),
+            json_u32_or_null(ability.min_range_tiles),
+            ability.cooldown_ticks,
+            json_u16_or_null(ability.charges),
+            ability.cost.steel,
+            ability.cost.oil,
+            json_kind_or_null(ability.tech_requirement),
+            ability.may_queue,
+            ability.autocast,
+            ability.command_card,
+            ability.protocol_code,
+            ability.order_stage_code,
+        );
         println!("}}{comma}");
     }
     println!("{indent}  ],");
@@ -144,4 +167,28 @@ fn print_kind_array_inline(kinds: &[EntityKind]) {
 
 fn print_kind_vec_inline(kinds: &[EntityKind]) {
     print_kind_array_inline(kinds);
+}
+
+fn json_string_or_null(value: Option<&str>) -> String {
+    value
+        .map(|value| format!("\"{value}\""))
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn json_u32_or_null(value: Option<u32>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn json_u16_or_null(value: Option<u16>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn json_kind_or_null(value: Option<EntityKind>) -> String {
+    value
+        .map(|kind| format!("\"{}\"", kind.stable_id()))
+        .unwrap_or_else(|| "null".to_string())
 }

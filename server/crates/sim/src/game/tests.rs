@@ -211,6 +211,38 @@ fn empty_flat_game(players: &[PlayerInit]) -> Game {
 }
 
 #[test]
+fn snapshot_projects_abilities_from_owner_faction_catalog() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: crate::rules::faction::EMPTY_FIXTURE_FACTION_ID.to_string(),
+        name: "Fixture".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let scout = game
+        .entities
+        .spawn_unit(1, EntityKind::ScoutCar, pos.0, pos.1)
+        .expect("scout should spawn");
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.fog.recompute(&[1], &game.entities, &game.map);
+
+    let snapshot = game.snapshot_for(1);
+    let scout_view = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == scout)
+        .expect("scout should project");
+
+    assert!(
+        scout_view.abilities.is_empty(),
+        "fixture faction scout cars should not inherit Kriegsia Smoke affordances"
+    );
+}
+
+#[test]
 fn artillery_point_fire_queue_is_terminal() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
