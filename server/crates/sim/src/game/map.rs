@@ -11,6 +11,7 @@
 
 use std::path::PathBuf;
 
+mod atlas;
 mod authored;
 #[cfg(test)]
 mod team_assignment_tests;
@@ -234,7 +235,9 @@ impl Map {
         json: &str,
         seed: u32,
     ) -> Result<Map, String> {
-        authored::load(player_count, json, seed)
+        let map = authored::load(player_count, json, seed)?;
+        map.validate_static_atlas();
+        Ok(map)
     }
 
     fn from_authored_json_with_name_for_players(
@@ -250,7 +253,9 @@ impl Map {
                 team_id: *team_id,
             })
             .collect();
-        authored::load_for_players(&players, json, seed)
+        let map = authored::load_for_players(&players, json, seed)?;
+        map.validate_static_atlas();
+        Ok(map)
     }
 
     #[inline]
@@ -303,6 +308,21 @@ impl Map {
     /// World size in pixels (square).
     pub fn world_size_px(&self) -> f32 {
         self.size as f32 * config::TILE_SIZE as f32
+    }
+
+    /// Deterministic static topology derived from public map facts.
+    fn atlas(&self) -> atlas::MapAtlas {
+        atlas::MapAtlas::generate(self)
+    }
+
+    /// Serializable static atlas facts for dev/editor diagnostics. This is derived from public
+    /// authored map data only and intentionally excludes live entities, fog, or AI state.
+    pub fn atlas_diagnostics(&self) -> serde_json::Value {
+        atlas::atlas_diagnostics_json(self)
+    }
+
+    fn validate_static_atlas(&self) {
+        self.atlas().validate();
     }
 }
 

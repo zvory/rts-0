@@ -1,6 +1,6 @@
 # Phase 1 - Map Atlas Foundation
 
-Status: Planned.
+Status: Done.
 
 ## Objective
 

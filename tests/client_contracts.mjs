@@ -5,6 +5,7 @@
 // This does NOT spin up a browser or a server. Modules that require DOM / Pixi
 // (Renderer, Input, HUD, Minimap, Lobby) are not instantiated here.
 
+import fs from "node:fs";
 import { Net } from "../client/src/net.js";
 import { TEAM_PRESETS, presetById, teamSlotsForPreset } from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
@@ -5392,6 +5393,25 @@ function fakeAudioContext() {
     overlay.destroy();
     assert(root.children.length === 0, "observer analysis overlay removes generated DOM on destroy");
   });
+}
+
+{
+  const editorHtml = fs.readFileSync(new URL("../client/map-editor.html", import.meta.url), "utf8");
+  assert(editorHtml.includes('data-view="atlas"'), "map editor exposes an Atlas tab");
+  assert(editorHtml.includes('const MAP_ATLAS_URL = "/maps/atlas"'), "map editor requests server atlas diagnostics");
+  for (const id of [
+    "atlas-movement",
+    "atlas-passability",
+    "atlas-components",
+    "atlas-clearance",
+    "atlas-regions",
+    "atlas-portals",
+    "atlas-anchors",
+    "atlas-readout",
+  ]) {
+    assert(editorHtml.includes(`id="${id}"`), `map editor includes ${id} control`);
+  }
+  assert(editorHtml.includes('activeView !== "edit"'), "map editor gates mutation while the Atlas tab is active");
 }
 
 function textWithin(node) {

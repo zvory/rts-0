@@ -167,6 +167,95 @@
         gap: 8px;
       }
 
+      .view-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .atlas-controls {
+        display: grid;
+        gap: 8px;
+      }
+
+      .atlas-controls label,
+      .atlas-check {
+        display: grid;
+        gap: 4px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .atlas-check {
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        text-transform: none;
+        font-weight: 600;
+      }
+
+      .atlas-check input {
+        margin: 0;
+      }
+
+      .atlas-readout {
+        min-height: 92px;
+        border: 1px solid var(--edge);
+        border-radius: 3px;
+        background: #171a14;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 11px;
+        line-height: 1.45;
+        padding: 8px;
+      }
+
+      .atlas-legend {
+        display: grid;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .atlas-legend-row {
+        display: grid;
+        grid-template-columns: 18px 1fr;
+        gap: 7px;
+        align-items: center;
+      }
+
+      .legend-swatch {
+        width: 18px;
+        height: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+
+      .legend-swatch.passable {
+        background: rgba(109, 184, 104, 0.42);
+      }
+
+      .legend-swatch.component {
+        background: #68a2d9;
+      }
+
+      .legend-swatch.clearance {
+        background: linear-gradient(90deg, rgba(180, 65, 65, 0.75), rgba(233, 219, 117, 0.75), rgba(94, 178, 112, 0.75));
+      }
+
+      .legend-swatch.region {
+        background: rgba(180, 141, 214, 0.45);
+      }
+
+      .legend-swatch.portal {
+        background: #f0d36a;
+      }
+
+      .legend-swatch.anchor {
+        background: #f6f0d0;
+      }
+
       .tool {
         display: grid;
         grid-template-columns: 22px 1fr;
@@ -348,6 +437,37 @@
         <button id="resize-map" type="button">Resize</button>
       </div>
 
+      <h2>View</h2>
+      <div class="view-tabs" id="view-tabs">
+        <button class="active" type="button" data-view="edit">Edit</button>
+        <button type="button" data-view="atlas">Atlas</button>
+      </div>
+
+      <div id="atlas-panel" hidden>
+        <h2>Atlas</h2>
+        <div class="atlas-controls">
+          <label>
+            Movement
+            <select id="atlas-movement"></select>
+          </label>
+          <label class="atlas-check"><input id="atlas-passability" type="checkbox" checked /> Passability</label>
+          <label class="atlas-check"><input id="atlas-components" type="checkbox" /> Components</label>
+          <label class="atlas-check"><input id="atlas-clearance" type="checkbox" checked /> Clearance</label>
+          <label class="atlas-check"><input id="atlas-regions" type="checkbox" /> Regions</label>
+          <label class="atlas-check"><input id="atlas-portals" type="checkbox" checked /> Portals</label>
+          <label class="atlas-check"><input id="atlas-anchors" type="checkbox" checked /> Anchors</label>
+          <div id="atlas-readout" class="atlas-readout">Atlas data has not loaded.</div>
+          <div class="atlas-legend" aria-label="Atlas legend">
+            <div class="atlas-legend-row"><span class="legend-swatch passable"></span><span>Passable terrain for selected movement</span></div>
+            <div class="atlas-legend-row"><span class="legend-swatch component"></span><span>Component id color bands</span></div>
+            <div class="atlas-legend-row"><span class="legend-swatch clearance"></span><span>Clearance heat: low to high</span></div>
+            <div class="atlas-legend-row"><span class="legend-swatch region"></span><span>Region bucket overlays</span></div>
+            <div class="atlas-legend-row"><span class="legend-swatch portal"></span><span>Portal center and width label</span></div>
+            <div class="atlas-legend-row"><span class="legend-swatch anchor"></span><span>Semantic anchor id label</span></div>
+          </div>
+        </div>
+      </div>
+
       <h2>Palette</h2>
       <div class="tool-grid" id="tools">
         <button class="tool active" type="button" data-tool="grass">
@@ -421,6 +541,7 @@
       const MAX_SIZE = 160;
       const DEFAULT_MAP_URL = "/maps/default-handcrafted.json";
       const MAP_CATALOG_URL = "/maps/catalog";
+      const MAP_ATLAS_URL = "/maps/atlas";
       const FALLBACK_BUILT_IN_MAPS = Object.freeze([
         { file: "default-handcrafted.json", name: "Default", description: "4-player three-base map with safer in-base naturals plus a standardized contested natural for each spawn." },
         { file: "low-econ.json", name: "Low Econ", description: "Original lower-economy 4-player map with one natural expansion per spawn." },
@@ -437,8 +558,23 @@
       const builtInMapSelect = document.getElementById("built-in-map");
       const pairListEl = document.getElementById("pair-list");
       const naturalListEl = document.getElementById("natural-list");
+      const atlasPanelEl = document.getElementById("atlas-panel");
+      const atlasMovementEl = document.getElementById("atlas-movement");
+      const atlasReadoutEl = document.getElementById("atlas-readout");
+      const atlasLayerInputs = {
+        passability: document.getElementById("atlas-passability"),
+        components: document.getElementById("atlas-components"),
+        clearance: document.getElementById("atlas-clearance"),
+        regions: document.getElementById("atlas-regions"),
+        portals: document.getElementById("atlas-portals"),
+        anchors: document.getElementById("atlas-anchors"),
+      };
 
       let map = fallbackMap();
+      let activeView = "edit";
+      let atlasData = null;
+      let atlasLoadingFor = "";
+      let atlasHoverTile = null;
       let selectedTool = "grass";
       let selectedMode = "paint";
       let selectedSiteId = map.sites[0].id;
@@ -652,9 +788,12 @@
         map = normalizeMap(await response.json());
         selectedSiteId = map.sites[0].id;
         selectedLayoutId = map.layouts[0].id;
+        atlasData = null;
+        atlasHoverTile = null;
         map.sites.forEach(clearProtectedArea);
         refresh();
         setStatus("loaded " + label);
+        if (activeView === "atlas") loadAtlasDiagnostics();
       }
 
       async function loadBuiltInMap(file) {
@@ -681,6 +820,58 @@
           setStatus("map catalog unavailable; using fallback list", true);
         }
         renderBuiltInMapSelect();
+      }
+
+      async function loadAtlasDiagnostics() {
+        const key = map.name + "|4|0";
+        atlasLoadingFor = key;
+        atlasReadoutEl.textContent = "Loading atlas for " + map.name + "...";
+        try {
+          const url = MAP_ATLAS_URL + "?map=" + encodeURIComponent(map.name) + "&playerCount=4&seed=0";
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) throw new Error("HTTP " + response.status + " " + await response.text());
+          const data = await response.json();
+          if (atlasLoadingFor !== key) return;
+          atlasData = data && data.atlas ? data.atlas : null;
+          syncAtlasMovementOptions();
+          refresh();
+          setStatus("atlas loaded for " + map.name);
+        } catch (err) {
+          if (atlasLoadingFor !== key) return;
+          atlasData = null;
+          atlasReadoutEl.textContent = "Atlas unavailable: " + err.message;
+          draw();
+          setStatus("atlas unavailable: " + err.message, true);
+        }
+      }
+
+      function syncAtlasMovementOptions() {
+        const classes = atlasData && Array.isArray(atlasData.movementClasses) ? atlasData.movementClasses : [];
+        const previous = atlasMovementEl.value;
+        atlasMovementEl.replaceChildren();
+        for (const movementClass of classes) {
+          const opt = document.createElement("option");
+          opt.value = movementClass;
+          opt.textContent = movementClass;
+          atlasMovementEl.appendChild(opt);
+        }
+        if (classes.includes(previous)) atlasMovementEl.value = previous;
+      }
+
+      function selectedAtlasLayer() {
+        if (!atlasData || !Array.isArray(atlasData.layers)) return null;
+        const movementClass = atlasMovementEl.value || (atlasData.movementClasses && atlasData.movementClasses[0]);
+        return atlasData.layers.find(function (layer) { return layer.movementClass === movementClass; }) || atlasData.layers[0] || null;
+      }
+
+      function atlasTileIndex(x, y) {
+        return y * map.terrain.length + x;
+      }
+
+      function tileFromAtlas(value) {
+        if (!value) return null;
+        if (Array.isArray(value)) return { x: Number(value[0]), y: Number(value[1]) };
+        return { x: Number(value.x), y: Number(value.y) };
       }
 
       function terrainAt(x, y) {
@@ -754,6 +945,166 @@
       function updateStatus() {
         const errors = validationErrors();
         setStatus(errors.length ? errors[0] : map.terrain.length + "x" + map.terrain.length + " valid", errors.length > 0);
+      }
+
+      function atlasColor(id, alpha) {
+        const hue = (Number(id || 0) * 47) % 360;
+        return "hsla(" + hue + ", 62%, 56%, " + alpha + ")";
+      }
+
+      function drawAtlasTileLayer(layer, values, colorForValue) {
+        const size = map.terrain.length;
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const idx = atlasTileIndex(x, y);
+            const value = values[idx];
+            const color = colorForValue(value, idx);
+            if (!color) continue;
+            ctx.fillStyle = color;
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+
+      function drawAtlasRegions(layer) {
+        if (!Array.isArray(layer.regions)) return;
+        for (const region of layer.regions) {
+          const min = tileFromAtlas(region.minTile);
+          const max = tileFromAtlas(region.maxTile);
+          if (!min || !max) continue;
+          ctx.strokeStyle = atlasColor(region.id, 0.9);
+          ctx.lineWidth = 2;
+          ctx.strokeRect(
+            min.x * cellSize + 1,
+            min.y * cellSize + 1,
+            (max.x - min.x + 1) * cellSize - 2,
+            (max.y - min.y + 1) * cellSize - 2,
+          );
+          ctx.fillStyle = atlasColor(region.id, 0.12);
+          ctx.fillRect(
+            min.x * cellSize,
+            min.y * cellSize,
+            (max.x - min.x + 1) * cellSize,
+            (max.y - min.y + 1) * cellSize,
+          );
+        }
+      }
+
+      function drawAtlasPortals(layer) {
+        if (!Array.isArray(layer.portals)) return;
+        ctx.font = "700 " + Math.max(9, Math.floor(cellSize * 0.8)) + "px " + getComputedStyle(document.body).fontFamily;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        for (const portal of layer.portals) {
+          const tile = tileFromAtlas(portal.centerTile);
+          if (!tile) continue;
+          const cx = tile.x * cellSize + cellSize / 2;
+          const cy = tile.y * cellSize + cellSize / 2;
+          const radius = Math.max(4, Math.min(14, portal.widthTiles * cellSize * 0.18));
+          ctx.fillStyle = "rgba(240, 211, 106, 0.85)";
+          ctx.strokeStyle = "#171a14";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#f6f0d0";
+          ctx.fillText("P" + portal.id + "/" + portal.widthTiles, cx, cy - radius - 2);
+        }
+      }
+
+      function drawAtlasAnchors() {
+        if (!atlasData || !Array.isArray(atlasData.anchors)) return;
+        const movementClass = atlasMovementEl.value;
+        ctx.font = "700 " + Math.max(9, Math.floor(cellSize * 0.75)) + "px " + getComputedStyle(document.body).fontFamily;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        for (const anchor of atlasData.anchors) {
+          if (anchor.movementClass !== movementClass) continue;
+          const tile = tileFromAtlas(anchor.tile);
+          if (!tile) continue;
+          const cx = tile.x * cellSize + cellSize / 2;
+          const cy = tile.y * cellSize + cellSize / 2;
+          ctx.fillStyle = anchor.kind === "resourceLineApproach" ? "#f0d36a" : "#f6f0d0";
+          ctx.strokeStyle = "#171a14";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.rect(cx - 4, cy - 4, 8, 8);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#f6f0d0";
+          ctx.fillText(anchor.id, cx + 6, cy);
+        }
+      }
+
+      function drawAtlasOverlay() {
+        const layer = selectedAtlasLayer();
+        if (!layer) {
+          if (activeView === "atlas") atlasReadoutEl.textContent = "Atlas data has not loaded.";
+          return;
+        }
+        if (atlasLayerInputs.passability.checked) {
+          drawAtlasTileLayer(layer, layer.passableTiles || [], function (passable) {
+            return passable ? "rgba(109, 184, 104, 0.24)" : "rgba(25, 25, 25, 0.38)";
+          });
+        }
+        if (atlasLayerInputs.components.checked) {
+          drawAtlasTileLayer(layer, layer.componentByTile || [], function (componentId) {
+            return componentId == null ? null : atlasColor(componentId, 0.28);
+          });
+        }
+        if (atlasLayerInputs.clearance.checked) {
+          const clearances = layer.clearanceTiles || [];
+          const maxClearance = Math.max(1, clearances.reduce(function (max, value) { return Math.max(max, Number(value) || 0); }, 0));
+          drawAtlasTileLayer(layer, clearances, function (clearance, idx) {
+            if (!(layer.passableTiles || [])[idx]) return null;
+            const t = Math.min(1, (Number(clearance) || 0) / maxClearance);
+            const red = Math.round(190 - t * 95);
+            const green = Math.round(70 + t * 120);
+            return "rgba(" + red + "," + green + ",82,0.34)";
+          });
+        }
+        if (atlasLayerInputs.regions.checked) drawAtlasRegions(layer);
+        if (atlasLayerInputs.portals.checked) drawAtlasPortals(layer);
+        if (atlasLayerInputs.anchors.checked) drawAtlasAnchors();
+        updateAtlasReadout();
+      }
+
+      function updateAtlasReadout() {
+        if (activeView !== "atlas") return;
+        const layer = selectedAtlasLayer();
+        if (!layer) {
+          atlasReadoutEl.textContent = "Atlas data has not loaded.";
+          return;
+        }
+        if (!atlasHoverTile) {
+          atlasReadoutEl.textContent =
+            "Map: " + map.name + "\n" +
+            "Movement: " + layer.movementClass + "\n" +
+            "Components: " + layer.components.length + "\n" +
+            "Regions: " + layer.regions.length + "\n" +
+            "Portals: " + layer.portals.length + "\n" +
+            "Anchors: " + atlasData.anchors.filter(function (anchor) { return anchor.movementClass === layer.movementClass; }).length;
+          return;
+        }
+        const idx = atlasTileIndex(atlasHoverTile.x, atlasHoverTile.y);
+        const anchors = atlasData.anchors.filter(function (anchor) {
+          const tile = tileFromAtlas(anchor.tile);
+          return anchor.movementClass === layer.movementClass && tile && tile.x === atlasHoverTile.x && tile.y === atlasHoverTile.y;
+        });
+        const portals = layer.portals.filter(function (portal) {
+          const tile = tileFromAtlas(portal.centerTile);
+          return tile && tile.x === atlasHoverTile.x && tile.y === atlasHoverTile.y;
+        });
+        atlasReadoutEl.textContent =
+          "Tile: " + atlasHoverTile.x + "," + atlasHoverTile.y + "\n" +
+          "Movement: " + layer.movementClass + "\n" +
+          "Passable: " + String(!!(layer.passableTiles || [])[idx]) + "\n" +
+          "Clearance: " + ((layer.clearanceTiles || [])[idx] ?? 0) + "\n" +
+          "Component: " + ((layer.componentByTile || [])[idx] ?? "none") + "\n" +
+          "Region: " + ((layer.regionByTile || [])[idx] ?? "none") + "\n" +
+          "Portals: " + (portals.map(function (portal) { return "P" + portal.id + " w" + portal.widthTiles + " r" + portal.fromRegion + "->" + portal.toRegion; }).join(", ") || "none") + "\n" +
+          "Anchors: " + (anchors.map(function (anchor) { return anchor.id + " c" + anchor.componentId + " r" + anchor.regionId; }).join(", ") || "none");
       }
 
       function draw() {
@@ -842,6 +1193,8 @@
           ctx.lineWidth = 2;
           ctx.strokeRect(rect.x0 * cellSize + 1, rect.y0 * cellSize + 1, rect.w * cellSize - 2, rect.h * cellSize - 2);
         }
+
+        if (activeView === "atlas") drawAtlasOverlay();
       }
 
       function renderBaseList() {
@@ -914,8 +1267,17 @@
         if (!siteById(selectedSiteId) && map.sites[0]) selectedSiteId = map.sites[0].id;
         if (!currentLayout() && map.layouts[0]) selectedLayoutId = map.layouts[0].id;
         renderBaseList();
+        syncViewTabs();
         draw();
         updateStatus();
+      }
+
+      function syncViewTabs() {
+        document.querySelectorAll("[data-view]").forEach(function (button) {
+          button.classList.toggle("active", button.dataset.view === activeView);
+        });
+        atlasPanelEl.hidden = activeView !== "atlas";
+        canvas.style.cursor = activeView === "atlas" ? "help" : "crosshair";
       }
 
       function syncToolButtons() {
@@ -948,7 +1310,7 @@
       }
 
       function applyTool(tile) {
-        if (!tile) return;
+        if (!tile || activeView !== "edit") return;
         if (selectedTool === "base") {
           setSelectedSite(tile);
           const site = siteById(selectedSiteId);
@@ -968,7 +1330,7 @@
       }
 
       function applyBox(a, b) {
-        if (!a || !b || selectedTool === "base") return;
+        if (!a || !b || selectedTool === "base" || activeView !== "edit") return;
         const ch = TERRAIN[selectedTool];
         if (!ch) return;
         const rect = tileRect(a, b);
@@ -984,6 +1346,7 @@
       }
 
       function resizeMap(nextSize) {
+        if (activeView !== "edit") return;
         const size = Math.max(MIN_SIZE, Math.min(MAX_SIZE, nextSize));
         const oldSize = map.terrain.length;
         const rows = [];
@@ -993,6 +1356,8 @@
           rows.push(row);
         }
         map.terrain = rows;
+        atlasData = null;
+        atlasHoverTile = null;
         map.sites.forEach(function (site) {
           const r = siteRadius(site);
           site.x = Math.max(r, Math.min(size - r - 1, site.x));
@@ -1011,6 +1376,8 @@
           map = fallbackMap();
           selectedSiteId = map.sites[0].id;
           selectedLayoutId = map.layouts[0].id;
+          atlasData = null;
+          atlasHoverTile = null;
           refresh();
           setStatus("default fetch failed: " + err.message, true);
         }
@@ -1080,9 +1447,23 @@
         selectedMode = button.dataset.mode;
         syncModeButtons();
       });
+      document.getElementById("view-tabs").addEventListener("click", function (event) {
+        const button = event.target.closest("[data-view]");
+        if (!button) return;
+        activeView = button.dataset.view;
+        pointerDown = false;
+        syncViewTabs();
+        if (activeView === "atlas" && !atlasData) loadAtlasDiagnostics();
+        else draw();
+      });
       canvas.addEventListener("pointerdown", function (event) {
         const tile = canvasTile(event);
         if (!tile) return;
+        if (activeView === "atlas") {
+          atlasHoverTile = tile;
+          updateAtlasReadout();
+          return;
+        }
         pointerDown = true;
         dragStartTile = tile;
         dragPreviewTile = tile;
@@ -1090,6 +1471,11 @@
         if (selectedTool === "base" || selectedMode === "paint") applyTool(tile); else draw();
       });
       canvas.addEventListener("pointermove", function (event) {
+        if (activeView === "atlas") {
+          atlasHoverTile = canvasTile(event);
+          updateAtlasReadout();
+          return;
+        }
         if (!pointerDown || selectedTool === "base") return;
         const tile = canvasTile(event);
         if (!tile) return;
@@ -1116,6 +1502,8 @@
           map = normalizeMap(JSON.parse(await file.text()));
           selectedSiteId = map.sites[0].id;
           selectedLayoutId = map.layouts[0].id;
+          atlasData = null;
+          atlasHoverTile = null;
           map.sites.forEach(clearProtectedArea);
           refresh();
         } catch (err) {
@@ -1125,6 +1513,10 @@
         }
       });
       builtInMapSelect.addEventListener("change", function (event) { loadBuiltInMap(event.target.value); });
+      atlasMovementEl.addEventListener("change", function () { draw(); });
+      Object.values(atlasLayerInputs).forEach(function (input) {
+        input.addEventListener("change", function () { draw(); });
+      });
       document.getElementById("save-file").addEventListener("click", saveMap);
       document.getElementById("save-as-file").addEventListener("click", saveMapAs);
       document.getElementById("reset-map").addEventListener("click", loadDefault);

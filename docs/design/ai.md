@@ -40,6 +40,9 @@ current living player set so attack waves keep choosing living enemies. AI teamm
 share economy, production, command authority, build orders, attack plans, or a team controller.
 It does not micro, scout, or choose hidden enemy unit positions. A local per-think budget in the
 shared action layer prevents it from over-committing resources/supply it does not have.
+Static map-atlas facts are generated in `rts-sim::game::map` from public terrain, starts, and
+resource-site data; later AI routing may consume those public facts through map-owned route query
+APIs without importing private simulation internals or reading live hidden state.
 
 **Shared AI core.** `rts_ai::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.

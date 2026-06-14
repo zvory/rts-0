@@ -18,6 +18,7 @@ crates/
     mod.rs       # Game struct + public API (the seam below)
     command.rs   # SimCommand domain commands + protocol translation helpers
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
+    map/atlas.rs # Static map atlas: movement passability, clearance, regions, portals, anchors
     entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player live visibility grids; snapshots union living teammate grids
@@ -44,6 +45,27 @@ for server-only imports. `server/src/protocol.rs`, `server/src/config.rs`,
 `server/crates/sim/src/protocol.rs`, `server/crates/sim/src/config.rs`, and
 `server/crates/sim/src/rules/mod.rs` remain intentional adapters while call sites are migrated;
 new code should prefer the owning crate directly when that does not make local code less clear.
+
+### 3.0.1 Static map atlas
+
+`game::map::atlas` owns deterministic topology derived from public authored map data. `Map::atlas()`
+builds movement-class layers for current ground infantry and vehicle representatives, including
+terrain passability, connected components, static clearance from terrain and map edges, coarse
+regions, and portals between adjacent regions. It also attaches semantic anchors for selected
+mains, naturals, generated resource clusters, and resource-line approach tiles to component and
+region ids.
+
+The atlas is static and fog-safe: it uses terrain, selected starts, and selected expansion sites
+already available through normal map loading, not live entities or hidden enemy observations. It is
+not an authored lane schema, route-summary cache, dynamic influence map, or visualization artifact;
+AI routing queries should derive those later through a public map-owned API instead of importing
+private simulation state.
+
+`GET /maps/atlas?map=<name>&playerCount=4&seed=0` is a dev/editor diagnostic path for the
+standalone map editor. The server loads the named authored map through `Map::load`, generates the
+same static atlas, and serializes movement-class passability, component ids, clearance, regions,
+portals, and semantic anchors for read-only inspection. This endpoint is not live match UI and does
+not expose dynamic entities, hidden fog state, route scores, or AI decisions.
 
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
