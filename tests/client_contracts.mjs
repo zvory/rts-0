@@ -7,7 +7,7 @@
 
 import fs from "node:fs";
 import { Net } from "../client/src/net.js";
-import { TEAM_PRESETS, presetById, teamSlotsForPreset } from "../client/src/lobby.js";
+import { MAX_LOBBY_TEAMS, teamSlotsForLobby } from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
 import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
 import { GameState } from "../client/src/state.js";
@@ -2655,24 +2655,24 @@ function fakeAudioContext() {
 // Lobby team UI helpers
 // ---------------------------------------------------------------------------
 {
-  assert(TEAM_PRESETS[0]?.id === "ffa", "lobby team UI defaults to FFA first");
-  assert(
-    TEAM_PRESETS.map((preset) => preset.id).join(",") === "ffa,solo,1v2,1v3,2v2",
-    "lobby exposes every supported team preset",
-  );
-  assert(presetById("unknown").id === "ffa", "unknown lobby preset falls back to FFA");
-  const ffaSlots = teamSlotsForPreset("ffa", [
-    { id: 3, teamId: 3 },
-    { id: 4, teamId: 4 },
+  assert(MAX_LOBBY_TEAMS === 4, "lobby exposes four host-managed team slots");
+  const slots = teamSlotsForLobby([
+    { id: 3, teamId: 1 },
+    { id: 4, teamId: 2 },
     { id: 9, teamId: 0, isSpectator: true },
   ]);
-  assert(ffaSlots.length === 2 && ffaSlots[0].id === 3 && ffaSlots[1].id === 4,
-    "FFA lobby rows render singleton active-player teams");
-  const twoVsTwoSlots = teamSlotsForPreset("2v2", []);
   assert(
-    twoVsTwoSlots.length === 2 && twoVsTwoSlots[0].cap === 2 && twoVsTwoSlots[1].cap === 2,
-    "2v2 lobby rows expose two capped teams",
+    slots.length === 3 && slots[0].id === 1 && slots[1].id === 2 && slots[2].id === 3 && slots[2].isNew,
+    "lobby renders occupied teams plus the first empty new-team slot",
   );
+  const fullSlots = teamSlotsForLobby([
+    { id: 1, teamId: 1 },
+    { id: 2, teamId: 2 },
+    { id: 3, teamId: 3 },
+    { id: 4, teamId: 4 },
+  ]);
+  assert(fullSlots.length === 4 && fullSlots.every((slot) => !slot.isNew),
+    "lobby omits the new-team slot when all four teams are occupied");
 }
 
 // ---------------------------------------------------------------------------

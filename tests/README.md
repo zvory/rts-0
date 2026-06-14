@@ -79,10 +79,9 @@ node tests/server_integration.mjs
 
 ## Team integration harness baseline (no dependencies)
 
-Drives a live room through multi-client setup, AI seating/removal, readiness, match start,
-snapshot waits, and game-over waits using shared helpers in `tests/team_harness.mjs`. Phase 0 keeps
-the assertions FFA-compatible and documents where later team phases should add `teamId` checks and
-1v2, 1v3, and 2v2 scenarios. The suite does not start its own server; start one first or use
+Drives a live room through multi-client setup, custom team-slot assignment, AI seating/removal,
+readiness, match start, snapshot waits, and game-over waits using shared helpers in
+`tests/team_harness.mjs`. The suite does not start its own server; start one first or use
 `tests/run-all.sh`, which boots a private server and sets `RTS_WS`.
 
 ```bash

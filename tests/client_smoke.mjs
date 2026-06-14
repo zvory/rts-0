@@ -56,26 +56,16 @@ try {
   await page.waitForFunction(() => document.querySelector("#lobby-players")?.children.length >= 1, { timeout: 5000 });
   ok(true, "joined room; lobby player list populated");
   const teamUi = await page.evaluate(() => {
-    const preset = document.querySelector("#lobby-team-preset");
     const rows = Array.from(document.querySelectorAll("#lobby-players .team-row"));
     return {
-      presetVisible: !!preset && !preset.hidden,
-      presetValue: preset?.value,
-      options: Array.from(preset?.options || []).map((option) => option.value),
       teamRows: rows.map((row) => row.textContent || ""),
-      singletonLabels: Array.from(document.querySelectorAll("#lobby-players .player-team-label"))
-        .map((node) => node.textContent || ""),
+      newTeamRows: rows.filter((row) => row.classList.contains("is-new-team")).length,
+      draggableSeats: Array.from(document.querySelectorAll("#lobby-players .lobby-seat[draggable='true']")).length,
     };
   });
-  ok(teamUi.presetVisible && teamUi.presetValue === "ffa",
-    `team preset control visible with default FFA (${teamUi.presetValue})`);
-  ok(teamUi.options.join(",") === "ffa,solo,1v2,1v3,2v2",
-    `team preset control lists supported presets (${teamUi.options.join(",")})`);
-  ok(teamUi.teamRows.some((text) => /Team \d+/.test(text)) && teamUi.singletonLabels.length >= 1,
-    `lobby renders singleton team rows (${teamUi.teamRows.join(" | ")})`);
-  await page.select("#lobby-team-preset", "solo");
-  await page.waitForFunction(() => document.querySelector("#lobby-team-preset")?.value === "solo", { timeout: 5000 });
-  ok(true, "host changed team preset through lobby UI");
+  ok(teamUi.teamRows.some((text) => /Team 1/.test(text)) && teamUi.newTeamRows === 1,
+    `lobby renders occupied teams plus one new-team row (${teamUi.teamRows.join(" | ")})`);
+  ok(teamUi.draggableSeats >= 1, `host lobby seats are draggable (${teamUi.draggableSeats})`);
 
   await page.click("#lobby-ready");
   await page.waitForFunction(() => { const b = document.querySelector("#lobby-start"); return b && !b.disabled; }, { timeout: 5000 });
