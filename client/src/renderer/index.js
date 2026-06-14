@@ -37,6 +37,8 @@ import {
   _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
   _drawDebugPathOverlay,
+  _drawMarkTargetImpacts,
+  _drawMarkTargets,
   _drawMuzzleFlashes,
   _drawMortarImpacts,
   _drawMortarLaunches,
@@ -232,6 +234,8 @@ export class Renderer {
     this._drawArtilleryLaunches(state);
     this._drawArtilleryTargets(state);
     this._drawArtilleryImpacts(state);
+    this._drawMarkTargets(state);
+    this._drawMarkTargetImpacts(state);
     this._drawSelectedMortarRanges(state);
     this._drawAbilityTargetPreview(state);
     this._drawAntiTankGunSetupPreview(state);
@@ -464,6 +468,8 @@ Object.assign(Renderer.prototype, {
   _drawArtilleryLaunches,
   _drawArtilleryTargets,
   _drawArtilleryImpacts,
+  _drawMarkTargets,
+  _drawMarkTargetImpacts,
   _drawAbilityTargetPreview,
   _drawSelectedMortarRanges,
   _drawSmokes,

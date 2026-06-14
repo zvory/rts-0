@@ -281,4 +281,27 @@ function buttonSlots(card) {
   });
   assert.equal(workshopCard.slots[0].commandId, ekaterinaCommandId("train", KIND.EKATERINA_CONSCRIPT));
   assert.equal(workshopCard.slots[0].hotkey, "Q");
+  assert.equal(workshopCard.slots[1].commandId, ekaterinaCommandId("train", KIND.EKATERINA_SIGNAL_TEAM));
+  assert.equal(workshopCard.slots[1].hotkey, "W");
+
+  const signalTeam = {
+    id: 53,
+    owner: 1,
+    kind: KIND.EKATERINA_SIGNAL_TEAM,
+    abilities: [{ ability: ABILITY.MARK_TARGET, cooldownLeft: 0, remainingUses: null }],
+  };
+  const signalCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: EKATERINA_FACTION_ID,
+    selection: [signalTeam],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const markTarget = signalCard.slots.find((slot) =>
+    slot?.commandId === ekaterinaCommandId("ability", ABILITY.MARK_TARGET)
+  );
+  assert.equal(markTarget?.hotkey, "D");
+  assert.equal(markTarget?.intent.targetMode, "worldPoint");
 }

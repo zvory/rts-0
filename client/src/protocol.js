@@ -83,6 +83,7 @@ export const KIND = Object.freeze({
   COMMAND_CAR: "command_car",
   EKATERINA_ENGINEER: "ekaterina_engineer",
   EKATERINA_CONSCRIPT: "ekaterina_conscript",
+  EKATERINA_SIGNAL_TEAM: "ekaterina_signal_team",
   CITY_CENTRE: "city_centre",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -108,6 +109,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.COMMAND_CAR,
   KIND.EKATERINA_ENGINEER,
   KIND.EKATERINA_CONSCRIPT,
+  KIND.EKATERINA_SIGNAL_TEAM,
 ]);
 export const BUILDING_KINDS = Object.freeze([
   KIND.CITY_CENTRE,
@@ -157,6 +159,8 @@ export const EVENT = Object.freeze({
   MORTAR_IMPACT: "mortarImpact",
   ARTILLERY_TARGET: "artilleryTarget",
   ARTILLERY_IMPACT: "artilleryImpact",
+  MARK_TARGET: "markTarget",
+  MARK_TARGET_IMPACT: "markTargetImpact",
 });
 
 export const NOTICE_SEVERITY = Object.freeze({
@@ -171,6 +175,7 @@ export const ABILITY = Object.freeze({
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
   BREAKTHROUGH: "breakthrough",
+  MARK_TARGET: "markTarget",
 });
 
 export const REPLAY_VISION = Object.freeze({
@@ -182,7 +187,7 @@ export const REPLAY_VISION = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 19;
+export const COMPACT_SNAPSHOT_VERSION = 20;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -195,6 +200,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.SCOUT_CAR]: 14,
   [KIND.EKATERINA_ENGINEER]: 19,
   [KIND.EKATERINA_CONSCRIPT]: 20,
+  [KIND.EKATERINA_SIGNAL_TEAM]: 24,
   [KIND.CITY_CENTRE]: 6,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
@@ -256,6 +262,8 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.ARTILLERY_TARGET]: 7,
   [EVENT.ARTILLERY_IMPACT]: 8,
   [EVENT.MORTAR_LAUNCH]: 9,
+  [EVENT.MARK_TARGET]: 10,
+  [EVENT.MARK_TARGET_IMPACT]: 11,
 });
 
 export const ORDER_STAGE = Object.freeze({
@@ -269,6 +277,7 @@ export const ORDER_STAGE = Object.freeze({
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
   BREAKTHROUGH: "breakthrough",
+  MARK_TARGET: "markTarget",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
 
@@ -284,6 +293,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.MORTAR_FIRE]: 9,
   [ORDER_STAGE.POINT_FIRE]: 10,
   [ORDER_STAGE.BREAKTHROUGH]: 11,
+  [ORDER_STAGE.MARK_TARGET]: 12,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -292,6 +302,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.MORTAR_FIRE]: 3,
   [ABILITY.POINT_FIRE]: 4,
   [ABILITY.BREAKTHROUGH]: 5,
+  [ABILITY.MARK_TARGET]: 6,
 });
 
 export const NOTICE_SEVERITY_CODE = Object.freeze({
@@ -705,6 +716,31 @@ function decodeCompactEvent(record, index) {
         x: readNumber(fields[1], "event.artilleryImpact.x"),
         y: readNumber(fields[2], "event.artilleryImpact.y"),
         radiusTiles: readNumber(fields[3], "event.artilleryImpact.radiusTiles"),
+      };
+    case EVENT.MARK_TARGET: {
+      if (fields.length !== 4 && fields.length !== 5) {
+        throw new Error(`mark target event ${index} field count mismatch`);
+      }
+      const target = decodeCompactPoint(fields[1], "event.markTarget.target");
+      const ev = {
+        e: EVENT.MARK_TARGET,
+        x: target[0],
+        y: target[1],
+        radiusTiles: readNumber(fields[2], "event.markTarget.radiusTiles"),
+        delayTicks: readU32(fields[3], "event.markTarget.delayTicks"),
+      };
+      if (fields.length > 4 && fields[4] != null) {
+        ev.from = readU32(fields[4], "event.markTarget.from");
+      }
+      return ev;
+    }
+    case EVENT.MARK_TARGET_IMPACT:
+      requireLength(fields, 4, `mark target impact event ${index}`);
+      return {
+        e: EVENT.MARK_TARGET_IMPACT,
+        x: readNumber(fields[1], "event.markTargetImpact.x"),
+        y: readNumber(fields[2], "event.markTargetImpact.y"),
+        radiusTiles: readNumber(fields[3], "event.markTargetImpact.radiusTiles"),
       };
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);

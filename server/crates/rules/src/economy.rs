@@ -385,7 +385,10 @@ mod tests {
         );
         assert_eq!(
             trainable_units_for_faction(EKATERINA_FACTION_ID, EntityKind::EkaterinaWorkshop),
-            vec![EntityKind::EkaterinaConscript]
+            vec![
+                EntityKind::EkaterinaConscript,
+                EntityKind::EkaterinaSignalTeam
+            ]
         );
         assert!(build_requirement_met_for_faction(
             EKATERINA_FACTION_ID,
@@ -409,11 +412,13 @@ mod tests {
         ));
         assert_eq!(cost(EntityKind::EkaterinaEngineer), (50, 0));
         assert_eq!(cost(EntityKind::EkaterinaConscript), (45, 0));
+        assert_eq!(cost(EntityKind::EkaterinaSignalTeam), (90, 25));
         assert_eq!(cost(EntityKind::EkaterinaSupplyCache), (80, 0));
         assert_eq!(cost(EntityKind::EkaterinaWorkshop), (140, 35));
         assert_eq!(supply_provided(EntityKind::EkaterinaCommandPost), 8);
         assert_eq!(supply_provided(EntityKind::EkaterinaSupplyCache), 8);
         assert_eq!(supply_cost(EntityKind::EkaterinaConscript), 1);
+        assert_eq!(supply_cost(EntityKind::EkaterinaSignalTeam), 2);
     }
 
     #[test]

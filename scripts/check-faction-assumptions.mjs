@@ -80,7 +80,7 @@ for (const pathName of [
 assert(!matrix.includes("| TBD |"), "lifecycle matrix should name owning checks instead of TBD");
 
 const rulesKind = read("server/crates/rules/src/kind.rs");
-assert(rulesKind.includes("pub const ALL: [EntityKind; 23]"), "EntityKind::ALL count changed");
+assert(rulesKind.includes("pub const ALL: [EntityKind; 24]"), "EntityKind::ALL count changed");
 
 const protocol = read("server/crates/protocol/src/lib.rs");
 const clientProtocol = read("client/src/protocol.js");
@@ -89,8 +89,8 @@ for (const token of ["WORKER", "CITY_CENTRE", "STEEL", "OIL"]) {
   assert(clientProtocol.includes(`${token}:`), `client protocol missing ${token}`);
 }
 assert(
-  protocol.includes("COMPACT_SNAPSHOT_VERSION: u8 = 19") &&
-    clientProtocol.includes("COMPACT_SNAPSHOT_VERSION = 19"),
+  protocol.includes("COMPACT_SNAPSHOT_VERSION: u8 = 20") &&
+    clientProtocol.includes("COMPACT_SNAPSHOT_VERSION = 20"),
   "compact snapshot version changed; update protocol parity and inventory deliberately",
 );
 

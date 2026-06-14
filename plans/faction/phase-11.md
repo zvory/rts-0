@@ -1,6 +1,6 @@
 # Phase 11 - Second Faction Combat and Signature Ability Slice
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 
@@ -66,3 +66,19 @@ items proposed for Phase 12.
 ## Player-Facing Outcome
 
 The new faction has a small but playable combat identity suitable for focused playtesting.
+
+## Executor Notes
+
+Patch-note bullets to carry into the handoff:
+
+- Ekaterina Workshop now trains Signal Teams: 90 steel / 25 oil, 2 supply, 420 ticks (~14s), 42 HP,
+  2 damage, 4-tile attack range, 24-tick attack cooldown, 1.45 px/tick movement, and 9 sight.
+- Signal Team Mark Target is a queued world-point ability on hotkey `D`: 15 steel, 8-tile range,
+  750-tick (~25s) cooldown, immediate marker, 60-tick (~2s) delayed pulse, 1.25-tile radius, and 20
+  normal damage to units only.
+- Mark Target intentionally includes friendly fire, does not damage buildings, and uses fog-filtered
+  marker events with optional caster ids so visible target pings do not reveal hidden Signal Teams.
+- The client command card, targeted ability cursor, compact protocol, state storage, renderer
+  feedback, and parity checks now include `ekaterina_signal_team` / `markTarget`.
+- Ekaterina remains dev-scenario-only; normal lobby selection, AI, prediction, self-play, replay
+  branch launch, and match-history replay are still Kriegsia-only until later phases opt in.

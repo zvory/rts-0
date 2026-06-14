@@ -14,6 +14,7 @@ pub enum EntityKind {
     CommandCar,
     EkaterinaEngineer,
     EkaterinaConscript,
+    EkaterinaSignalTeam,
     CityCentre,
     Depot,
     Barracks,
@@ -29,7 +30,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 23] = [
+    pub const ALL: [EntityKind; 24] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
@@ -41,6 +42,7 @@ impl EntityKind {
         EntityKind::CommandCar,
         EntityKind::EkaterinaEngineer,
         EntityKind::EkaterinaConscript,
+        EntityKind::EkaterinaSignalTeam,
         EntityKind::CityCentre,
         EntityKind::Depot,
         EntityKind::Barracks,
@@ -84,6 +86,7 @@ impl EntityKind {
             EntityKind::CommandCar => "command_car",
             EntityKind::EkaterinaEngineer => "ekaterina_engineer",
             EntityKind::EkaterinaConscript => "ekaterina_conscript",
+            EntityKind::EkaterinaSignalTeam => "ekaterina_signal_team",
             EntityKind::CityCentre => "city_centre",
             EntityKind::Depot => "depot",
             EntityKind::Barracks => "barracks",
@@ -116,6 +119,7 @@ impl FromStr for EntityKind {
             "command_car" => Ok(EntityKind::CommandCar),
             "ekaterina_engineer" => Ok(EntityKind::EkaterinaEngineer),
             "ekaterina_conscript" => Ok(EntityKind::EkaterinaConscript),
+            "ekaterina_signal_team" => Ok(EntityKind::EkaterinaSignalTeam),
             "city_centre" => Ok(EntityKind::CityCentre),
             "depot" => Ok(EntityKind::Depot),
             "barracks" => Ok(EntityKind::Barracks),

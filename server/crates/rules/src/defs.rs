@@ -57,7 +57,10 @@ pub struct NodeDef {
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
 const EKATERINA_ENGINEER_ONLY: &[EntityKind] = &[EntityKind::EkaterinaEngineer];
 const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
-const EKATERINA_WORKSHOP_UNITS: &[EntityKind] = &[EntityKind::EkaterinaConscript];
+const EKATERINA_WORKSHOP_UNITS: &[EntityKind] = &[
+    EntityKind::EkaterinaConscript,
+    EntityKind::EkaterinaSignalTeam,
+];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
@@ -303,6 +306,27 @@ pub const UNITS: &[UnitDef] = &[
             cost_oil: 0,
             supply: 1,
             build_ticks: 300,
+            radius: 9.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
+        trained_at: Some(EntityKind::EkaterinaWorkshop),
+        train_requires: &[],
+    },
+    UnitDef {
+        kind: EntityKind::EkaterinaSignalTeam,
+        stats: balance::UnitStats {
+            hp: 42,
+            dmg: 2,
+            range_tiles: 4,
+            cooldown: 24,
+            speed: 1.45,
+            sight_tiles: 9,
+            cost_steel: 90,
+            cost_oil: 25,
+            supply: 2,
+            build_ticks: 420,
             radius: 9.0,
         },
         armor_class: ArmorClass::Small,
@@ -594,7 +618,9 @@ mod tests {
             .filter(|kind| {
                 !matches!(
                     kind,
-                    EntityKind::EkaterinaEngineer | EntityKind::EkaterinaConscript
+                    EntityKind::EkaterinaEngineer
+                        | EntityKind::EkaterinaConscript
+                        | EntityKind::EkaterinaSignalTeam
                 )
             })
             .collect();
@@ -734,6 +760,15 @@ mod tests {
         assert_eq!(conscript.cooldown, 18);
         assert_eq!((conscript.cost_steel, conscript.cost_oil), (45, 0));
         assert_eq!(conscript.supply, 1);
+
+        let signal_team = unit_def(EntityKind::EkaterinaSignalTeam).unwrap().stats;
+        assert_eq!(signal_team.hp, 42);
+        assert_eq!(signal_team.dmg, 2);
+        assert_eq!(signal_team.range_tiles, 4);
+        assert_eq!(signal_team.cooldown, 24);
+        assert_eq!((signal_team.cost_steel, signal_team.cost_oil), (90, 25));
+        assert_eq!(signal_team.supply, 2);
+        assert_eq!(signal_team.build_ticks, 420);
 
         let command_post = building_def(EntityKind::EkaterinaCommandPost)
             .unwrap()

@@ -100,6 +100,11 @@ export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 7;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
 export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
+export const MARK_TARGET_RANGE_TILES = 8;
+export const MARK_TARGET_COOLDOWN_TICKS = TICK_HZ * 25;
+export const MARK_TARGET_DELAY_TICKS = TICK_HZ * 2;
+export const MARK_TARGET_RADIUS_TILES = 1.25;
+export const MARK_TARGET_ABILITY_COST = Object.freeze({ steel: 15, oil: 0 });
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -143,6 +148,8 @@ export const STATS = Object.freeze({
     rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 360 },
   [KIND.EKATERINA_CONSCRIPT]: { label: "Conscript", icon: "CON", size: 9, sight: 8,
     rangeTiles: 4, cost: { steel: 45, oil: 0 }, supply: 1, buildTicks: 300 },
+  [KIND.EKATERINA_SIGNAL_TEAM]: { label: "Signal Team", icon: "SIG", size: 9, sight: 9,
+    rangeTiles: 4, cost: { steel: 90, oil: 25 }, supply: 2, buildTicks: 420 },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
@@ -178,7 +185,7 @@ export const STATS = Object.freeze({
     cost: { steel: 80, oil: 0 }, buildTicks: 260, trains: [], requires: KIND.EKATERINA_COMMAND_POST },
   [KIND.EKATERINA_WORKSHOP]: { label: "Workshop", icon: "WS", footW: 3, footH: 2, sight: 6,
     cost: { steel: 140, oil: 35 }, buildTicks: 520,
-    trains: [KIND.EKATERINA_CONSCRIPT], requires: KIND.EKATERINA_COMMAND_POST },
+    trains: [KIND.EKATERINA_CONSCRIPT, KIND.EKATERINA_SIGNAL_TEAM], requires: KIND.EKATERINA_COMMAND_POST },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -244,6 +251,21 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: BREAKTHROUGH_RADIUS_TILES,
     durationTicks: BREAKTHROUGH_DURATION_TICKS,
+    queued: true,
+  }),
+  [ABILITY.MARK_TARGET]: Object.freeze({
+    ability: ABILITY.MARK_TARGET,
+    label: "Mark Target",
+    icon: "MRK",
+    hotkey: "D",
+    title: "Mark a location for a delayed area damage pulse",
+    carriers: Object.freeze([KIND.EKATERINA_SIGNAL_TEAM]),
+    targetMode: "worldPoint",
+    rangeTiles: MARK_TARGET_RANGE_TILES,
+    cooldownTicks: MARK_TARGET_COOLDOWN_TICKS,
+    cost: MARK_TARGET_ABILITY_COST,
+    radiusTiles: MARK_TARGET_RADIUS_TILES,
+    delayTicks: MARK_TARGET_DELAY_TICKS,
     queued: true,
   }),
 });
@@ -408,7 +430,7 @@ export const FACTION_CATALOGS = Object.freeze({
   [EKATERINA_FACTION_ID]: freezeCatalog({
     id: EKATERINA_FACTION_ID,
     loadoutId: "ekaterina.standard",
-    units: [KIND.EKATERINA_ENGINEER, KIND.EKATERINA_CONSCRIPT],
+    units: [KIND.EKATERINA_ENGINEER, KIND.EKATERINA_CONSCRIPT, KIND.EKATERINA_SIGNAL_TEAM],
     buildings: [
       KIND.EKATERINA_COMMAND_POST,
       KIND.EKATERINA_SUPPLY_CACHE,
@@ -417,10 +439,10 @@ export const FACTION_CATALOGS = Object.freeze({
     buildables: [KIND.EKATERINA_SUPPLY_CACHE, KIND.EKATERINA_WORKSHOP],
     trainables: {
       [KIND.EKATERINA_COMMAND_POST]: [KIND.EKATERINA_ENGINEER],
-      [KIND.EKATERINA_WORKSHOP]: [KIND.EKATERINA_CONSCRIPT],
+      [KIND.EKATERINA_WORKSHOP]: [KIND.EKATERINA_CONSCRIPT, KIND.EKATERINA_SIGNAL_TEAM],
     },
     research: {},
-    abilities: [],
+    abilities: [ABILITY.MARK_TARGET],
   }),
 });
 

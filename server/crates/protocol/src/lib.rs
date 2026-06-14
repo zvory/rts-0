@@ -45,6 +45,7 @@ pub mod kinds {
     pub const COMMAND_CAR: &str = "command_car";
     pub const EKATERINA_ENGINEER: &str = "ekaterina_engineer";
     pub const EKATERINA_CONSCRIPT: &str = "ekaterina_conscript";
+    pub const EKATERINA_SIGNAL_TEAM: &str = "ekaterina_signal_team";
     pub const CITY_CENTRE: &str = "city_centre";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -78,6 +79,7 @@ pub mod abilities {
     pub const MORTAR_FIRE: &str = "mortarFire";
     pub const POINT_FIRE: &str = "pointFire";
     pub const BREAKTHROUGH: &str = "breakthrough";
+    pub const MARK_TARGET: &str = "markTarget";
 }
 
 /// Permanent upgrade ids used by production/research and snapshot projection.
@@ -519,7 +521,7 @@ pub struct LobbyPlayer {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 19;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 20;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -1082,6 +1084,32 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(radius_tiles)?;
                 seq.end()
             }
+            Event::MarkTarget {
+                from,
+                x,
+                y,
+                radius_tiles,
+                delay_ticks,
+            } => {
+                let len = if from.is_some() { 5 } else { 4 };
+                let mut seq = serializer.serialize_seq(Some(len))?;
+                seq.serialize_element(&10u8)?;
+                seq.serialize_element(&[x, y])?;
+                seq.serialize_element(radius_tiles)?;
+                seq.serialize_element(delay_ticks)?;
+                if len > 5 {
+                    seq.serialize_element(from)?;
+                }
+                seq.end()
+            }
+            Event::MarkTargetImpact { x, y, radius_tiles } => {
+                let mut seq = serializer.serialize_seq(Some(4))?;
+                seq.serialize_element(&11u8)?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.serialize_element(radius_tiles)?;
+                seq.end()
+            }
             Event::Notice {
                 msg,
                 x,
@@ -1163,6 +1191,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::SCOUT_CAR => 14,
         kinds::EKATERINA_ENGINEER => 19,
         kinds::EKATERINA_CONSCRIPT => 20,
+        kinds::EKATERINA_SIGNAL_TEAM => 24,
         kinds::CITY_CENTRE => 6,
         kinds::DEPOT => 7,
         kinds::BARRACKS => 8,
@@ -1215,6 +1244,7 @@ fn order_stage_code(kind: &str) -> u8 {
         abilities::MORTAR_FIRE => 9,
         abilities::POINT_FIRE => 10,
         abilities::BREAKTHROUGH => 11,
+        abilities::MARK_TARGET => 12,
         "setupAntiTankGuns" => 7,
         abilities::CHARGE => 8,
         _ => 255,
@@ -1228,6 +1258,7 @@ fn ability_code(ability: &str) -> u8 {
         abilities::MORTAR_FIRE => 3,
         abilities::POINT_FIRE => 4,
         abilities::BREAKTHROUGH => 5,
+        abilities::MARK_TARGET => 6,
         _ => 255,
     }
 }

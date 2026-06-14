@@ -18,6 +18,7 @@ pub mod entity;
 pub(crate) mod fog;
 mod invariants;
 pub mod map;
+mod mark_target;
 mod mortar;
 mod pathfinding;
 mod player_state;
@@ -47,6 +48,7 @@ use entity::{BuildPhase, EntityKind, EntityStore};
 use fog::{Fog, LingeringSightSource};
 use map::Map;
 pub use map::MapMetadata;
+use mark_target::MarkTargetStore;
 use mortar::MortarShellStore;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -143,6 +145,8 @@ pub struct Game {
     smokes: SmokeCloudStore,
     /// Delayed mortar shell impacts waiting to resolve area damage.
     mortar_shells: MortarShellStore,
+    /// Delayed Ekaterina Mark Target pulses waiting to resolve area damage.
+    mark_targets: MarkTargetStore,
     /// Delayed artillery shell impacts waiting to resolve area damage.
     artillery_shells: ArtilleryShellStore,
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
@@ -218,6 +222,7 @@ impl Game {
             &mut self.lingering_sight,
             &mut self.smokes,
             &mut self.mortar_shells,
+            &mut self.mark_targets,
             &mut self.artillery_shells,
             pending,
             &mut events,

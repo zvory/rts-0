@@ -85,6 +85,7 @@ fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
             | EntityKind::MachineGunner
             | EntityKind::EkaterinaEngineer
             | EntityKind::EkaterinaConscript
+            | EntityKind::EkaterinaSignalTeam
     )
 }
 
@@ -254,6 +255,7 @@ mod tests {
             (EntityKind::MachineGunner, false, false, false),
             (EntityKind::EkaterinaEngineer, false, false, false),
             (EntityKind::EkaterinaConscript, false, false, false),
+            (EntityKind::EkaterinaSignalTeam, false, false, false),
             (EntityKind::AntiTankGun, false, true, true),
             (EntityKind::MortarTeam, false, false, false),
             (EntityKind::ScoutCar, false, false, false),

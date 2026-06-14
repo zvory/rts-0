@@ -377,9 +377,10 @@ faction catalog use the local player's faction id as the command-id prefix.
 `commandCardAbilitiesForFaction`. `scripts/check-faction-catalog-parity.mjs` compares those
 descriptors with the Rust catalog dump for every client-exposed faction. Unknown valid faction ids
 fail closed in command-card data, so future factions do not inherit Kriegsia build, train, research,
-or ability buttons before their catalog is intentionally exposed. The Phase 10 Ekaterina mirror
-exposes only Supply Cache/Workshop build buttons, Engineer training, and Conscript training, all
-with `ekaterina.*` command ids and checked against the Rust dump.
+or ability buttons before their catalog is intentionally exposed. The Phase 10/11 Ekaterina mirror
+exposes Supply Cache/Workshop build buttons, Engineer training, Conscript and Signal Team training,
+and the Signal Team Mark Target command-card ability, all with `ekaterina.*` command ids and
+checked against the Rust dump.
 
 `minimap.js`
 ```js
@@ -417,7 +418,7 @@ For spectator starts, `match.js` hides the command card and give-up action, comp
 the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
 with `playerResources`.
 
-### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
+### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire, Mark Target)
 
 `input/commands.js` exposes `_onAbilityTarget` and `_refreshAbilityTargetPreview` for world-point
 abilities. When the HUD command card calls `state.commandTarget = { kind: "ability", ability }`,
@@ -437,6 +438,9 @@ Selected owned Mortar Teams also draw dotted firing-range circles even when the 
 armed. The Mortar Team Fire command-card button shows an autocast swirl while any selected mortar's
 owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that button sends
 `setAutocast(mortarFire, enabled=false)` and does not arm manual targeting.
+Signal Team Mark Target uses the same world-point targeting flow and command issuer path. The
+renderer shows blue signal markers for accepted target pings and blue pulse feedback when the
+delayed impact resolves.
 
 `state.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
 (null or `{ ability, x, y, rangeCenters, inRange }`). `commandTarget` is a transient UI state;
@@ -446,8 +450,8 @@ selection.
 Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
 - While in targeted ability mode, draws a dotted range ring (radius = `rangeTiles × tileSize`) around
   each eligible carrier.
-- At the cursor position, draws the cloud radius preview (2-tile circle) colored green when in
-  range of at least one carrier, grey when out of range.
+- At the cursor position, draws the configured ability radius preview colored green when in range of
+  at least one carrier, grey when out of range.
 
 Smoke rendering (`renderer/feedback.js`, `_drawSmokes`; layer `smokes` between `selectionRings`
 and unit layer):

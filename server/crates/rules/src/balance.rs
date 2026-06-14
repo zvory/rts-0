@@ -99,6 +99,13 @@ pub const SMOKE_ABILITY_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 20;
 pub const SCOUT_CAR_SMOKE_USES: u16 = 2;
 pub const SMOKE_ABILITY_COST_STEEL: u32 = 0;
 pub const SMOKE_ABILITY_COST_OIL: u32 = 0;
+pub const MARK_TARGET_RANGE_TILES: u32 = 8;
+pub const MARK_TARGET_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 25;
+pub const MARK_TARGET_COST_STEEL: u32 = 15;
+pub const MARK_TARGET_COST_OIL: u32 = 0;
+pub const MARK_TARGET_DELAY_TICKS: u32 = TICK_HZ * 2;
+pub const MARK_TARGET_RADIUS_TILES: f32 = 1.25;
+pub const MARK_TARGET_DAMAGE: u32 = 20;
 
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;

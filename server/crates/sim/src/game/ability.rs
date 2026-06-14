@@ -12,6 +12,7 @@ pub enum AbilityKind {
     MortarFire,
     PointFire,
     Breakthrough,
+    MarkTarget,
 }
 
 impl AbilityKind {
@@ -22,6 +23,7 @@ impl AbilityKind {
             AbilityKind::MortarFire => protocol::abilities::MORTAR_FIRE,
             AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
             AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
+            AbilityKind::MarkTarget => protocol::abilities::MARK_TARGET,
         }
     }
 }
@@ -36,6 +38,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::MORTAR_FIRE => Ok(AbilityKind::MortarFire),
             protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
             protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
+            protocol::abilities::MARK_TARGET => Ok(AbilityKind::MarkTarget),
             _ => Err(()),
         }
     }
@@ -103,6 +106,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
         AbilityKind::Charge => AbilityEffectHook::SelfStatus,
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
+        AbilityKind::MarkTarget => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
     }

@@ -23,6 +23,7 @@ pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
 pub const POINT_FIRE_ABILITY: &str = "pointFire";
 pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
 pub const CHARGE_ABILITY: &str = "charge";
+pub const MARK_TARGET_ABILITY: &str = "markTarget";
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
@@ -134,6 +135,7 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 const EKATERINA_UNITS: &[EntityKind] = &[
     EntityKind::EkaterinaEngineer,
     EntityKind::EkaterinaConscript,
+    EntityKind::EkaterinaSignalTeam,
 ];
 
 const EKATERINA_BUILDINGS: &[EntityKind] = &[
@@ -280,6 +282,30 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
     },
 ];
 
+const EKATERINA_ABILITIES: &[AbilityCatalogEntry] = &[AbilityCatalogEntry {
+    id: MARK_TARGET_ABILITY,
+    label: "Mark Target",
+    icon: "MRK",
+    hotkey: Some("D"),
+    title: "Mark a location for a delayed area damage pulse",
+    carriers: &[EntityKind::EkaterinaSignalTeam],
+    target_mode: AbilityTargetMode::WorldPoint,
+    range_tiles: Some(balance::MARK_TARGET_RANGE_TILES),
+    min_range_tiles: None,
+    cooldown_ticks: balance::MARK_TARGET_COOLDOWN_TICKS,
+    charges: None,
+    cost: ResourceCost::new(
+        balance::MARK_TARGET_COST_STEEL,
+        balance::MARK_TARGET_COST_OIL,
+    ),
+    tech_requirement: None,
+    may_queue: true,
+    autocast: false,
+    command_card: true,
+    protocol_code: 6,
+    order_stage_code: 12,
+}];
+
 pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
     id: DEFAULT_FACTION_ID,
     loadout: CURRENT_STANDARD_LOADOUT,
@@ -318,7 +344,7 @@ pub const EKATERINA_CATALOG: FactionCatalog = FactionCatalog {
     buildings: EKATERINA_BUILDINGS,
     buildables: EKATERINA_ENGINEER_BUILDABLES,
     upgrades: &[],
-    abilities: &[],
+    abilities: EKATERINA_ABILITIES,
     builders: &[EntityKind::EkaterinaEngineer],
     gatherers: &[EntityKind::EkaterinaEngineer],
     production_anchors: &[
@@ -521,7 +547,9 @@ mod tests {
             .filter(|kind| {
                 !matches!(
                     kind,
-                    EntityKind::EkaterinaEngineer | EntityKind::EkaterinaConscript
+                    EntityKind::EkaterinaEngineer
+                        | EntityKind::EkaterinaConscript
+                        | EntityKind::EkaterinaSignalTeam
                 )
             })
             .collect();
@@ -658,8 +686,24 @@ mod tests {
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::EkaterinaWorkshop),
-            vec![EntityKind::EkaterinaConscript]
+            vec![
+                EntityKind::EkaterinaConscript,
+                EntityKind::EkaterinaSignalTeam
+            ]
         );
+        assert!(catalog.allows_ability(MARK_TARGET_ABILITY, EntityKind::EkaterinaSignalTeam));
+        let mark = catalog.ability(MARK_TARGET_ABILITY).unwrap();
+        assert_eq!(mark.target_mode, AbilityTargetMode::WorldPoint);
+        assert_eq!(mark.range_tiles, Some(balance::MARK_TARGET_RANGE_TILES));
+        assert_eq!(mark.cooldown_ticks, balance::MARK_TARGET_COOLDOWN_TICKS);
+        assert_eq!(
+            mark.cost,
+            ResourceCost::new(
+                balance::MARK_TARGET_COST_STEEL,
+                balance::MARK_TARGET_COST_OIL
+            )
+        );
+        assert!(mark.command_card);
         assert!(catalog.can_build(
             EntityKind::EkaterinaEngineer,
             EntityKind::EkaterinaSupplyCache

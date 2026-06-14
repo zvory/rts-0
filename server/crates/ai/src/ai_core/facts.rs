@@ -312,7 +312,8 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::MortarTeam
         | EntityKind::ScoutCar
         | EntityKind::Tank
-        | EntityKind::EkaterinaConscript => true,
+        | EntityKind::EkaterinaConscript
+        | EntityKind::EkaterinaSignalTeam => true,
         EntityKind::Worker
         | EntityKind::EkaterinaEngineer
         | EntityKind::CityCentre
