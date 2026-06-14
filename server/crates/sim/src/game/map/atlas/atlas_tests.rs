@@ -153,6 +153,28 @@ fn atlas_regions_use_twelve_tile_buckets() {
     }
 }
 
+#[test]
+fn atlas_splits_bucket_when_terrain_divides_local_region() {
+    let mut map = all_grass_map(24, (1, 1));
+    set_rock_rect(&mut map, 5, 0, 5, REGION_SIZE_TILES - 1);
+
+    let atlas = map.atlas();
+    let layer = atlas
+        .layer(MovementClass::Infantry)
+        .expect("infantry layer");
+    let left_idx = map.index(1, 1);
+    let right_idx = map.index(8, 1);
+
+    assert_eq!(layer.component_by_tile[left_idx], layer.component_by_tile[right_idx]);
+    assert_ne!(layer.region_by_tile[left_idx], layer.region_by_tile[right_idx]);
+    assert_region_connected(&map, layer, layer.region_by_tile[left_idx].expect("left region"));
+    assert_region_connected(
+        &map,
+        layer,
+        layer.region_by_tile[right_idx].expect("right region"),
+    );
+}
+
 fn assert_layer_consistent(map: &Map, layer: &MovementLayerAtlas) {
     let len = (map.size * map.size) as usize;
     assert_eq!(layer.passable_tiles.len(), len);
@@ -168,6 +190,7 @@ fn assert_layer_consistent(map: &Map, layer: &MovementLayerAtlas) {
         assert!(region.tile_count > 0);
         assert!(region.min_tile.0 <= region.max_tile.0);
         assert!(region.min_tile.1 <= region.max_tile.1);
+        assert_region_connected(map, layer, region.id);
     }
 
     for portal in &layer.portals {
@@ -198,14 +221,46 @@ fn assert_layer_consistent(map: &Map, layer: &MovementLayerAtlas) {
     }
 }
 
-fn map_with_rock_rect(size: u32, min_x: u32, min_y: u32, max_x: u32, max_y: u32) -> Map {
-    let mut map = all_grass_map(size, (1, 1));
-    for y in min_y..=max_y {
-        for x in min_x..=max_x {
-            let idx = map.index(x, y);
-            map.terrain[idx] = map_terrain::ROCK;
+fn assert_region_connected(map: &Map, layer: &MovementLayerAtlas, region_id: usize) {
+    let Some(start) = first_region_tile(map, layer, region_id) else {
+        panic!("region {region_id} has no tiles");
+    };
+    let mut visited = vec![false; (map.size * map.size) as usize];
+    let mut queue = VecDeque::from([start]);
+    visited[map.index(start.0, start.1)] = true;
+    let mut visited_count = 0u32;
+
+    while let Some((x, y)) = queue.pop_front() {
+        visited_count += 1;
+        for (nx, ny) in cardinal_neighbors(map, x, y) {
+            let nidx = map.index(nx, ny);
+            if !visited[nidx] && layer.region_by_tile[nidx] == Some(region_id) {
+                visited[nidx] = true;
+                queue.push_back((nx, ny));
+            }
         }
     }
+
+    assert_eq!(
+        visited_count, layer.regions[region_id].tile_count,
+        "region {region_id} is split"
+    );
+}
+
+fn first_region_tile(map: &Map, layer: &MovementLayerAtlas, region_id: usize) -> Option<Tile> {
+    for y in 0..map.size {
+        for x in 0..map.size {
+            if layer.region_by_tile[map.index(x, y)] == Some(region_id) {
+                return Some((x, y));
+            }
+        }
+    }
+    None
+}
+
+fn map_with_rock_rect(size: u32, min_x: u32, min_y: u32, max_x: u32, max_y: u32) -> Map {
+    let mut map = all_grass_map(size, (1, 1));
+    set_rock_rect(&mut map, min_x, min_y, max_x, max_y);
     map
 }
 
@@ -232,6 +287,15 @@ fn set_grass_rect(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u32)
         for x in min_x..=max_x {
             let idx = map.index(x, y);
             map.terrain[idx] = map_terrain::GRASS;
+        }
+    }
+}
+
+fn set_rock_rect(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u32) {
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let idx = map.index(x, y);
+            map.terrain[idx] = map_terrain::ROCK;
         }
     }
 }
