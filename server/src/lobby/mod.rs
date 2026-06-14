@@ -50,10 +50,10 @@ use dev_replay::room_mode_for;
 use room_task::{RoomMode, RoomTask};
 pub use snapshots::compact_snapshot_for_wire;
 
-/// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
+/// Player colors, assigned in colorblind-safer order. MUST match `client/src/config.js`
 /// `PLAYER_PALETTE`.
 const PLAYER_PALETTE: [&str; 8] = [
-    "#4878c8", "#c84848", "#30a090", "#8040c8", "#c83880", "#c87830", "#409840", "#c8b030",
+    "#0072b2", "#d55e00", "#009e73", "#cc79a7", "#56b4e9", "#e69f00", "#f0e442", "#7e57c2",
 ];
 
 /// Hard cap on players in a single match (humans + AI). The hardcoded map has four authored

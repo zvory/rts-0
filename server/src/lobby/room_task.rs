@@ -1744,12 +1744,22 @@ impl RoomTask {
             .to_string()
     }
 
-    /// Color for the `seat`-th AI opponent. AI colors are drawn from the *tail* of the palette so
-    /// they never collide with human colors (assigned from the first available head colors),
-    /// given the [`MAX_PLAYERS`] cap.
-    fn ai_color(seat: usize) -> String {
-        let idx = (PLAYER_PALETTE.len() - 1 - (seat % PLAYER_PALETTE.len())) % PLAYER_PALETTE.len();
-        PLAYER_PALETTE[idx].to_string()
+    /// Color for the `seat`-th AI opponent. AIs use the same accessible order as humans while
+    /// skipping colors already held by active humans, so mixed human/AI rooms stay distinct
+    /// without bunching every AI into the palette tail.
+    fn ai_color(&self, seat: usize) -> String {
+        PLAYER_PALETTE
+            .iter()
+            .copied()
+            .filter(|color| {
+                !self
+                    .players
+                    .values()
+                    .any(|player| !player.spectator && player.color == *color)
+            })
+            .nth(seat)
+            .unwrap_or(PLAYER_PALETTE[(self.active_human_count() + seat) % PLAYER_PALETTE.len()])
+            .to_string()
     }
 
     fn on_command(&mut self, player_id: u32, client_seq: u32, cmd: SimCommand) {
@@ -2089,7 +2099,7 @@ impl RoomTask {
                 faction_id: ai_faction_id.clone(),
                 name: ai.name.clone(),
                 ready: true,
-                color: Self::ai_color(seat),
+                color: self.ai_color(seat),
                 is_ai: true,
                 is_spectator: false,
             });
@@ -2183,7 +2193,7 @@ impl RoomTask {
                 team_id: ai.team_id,
                 faction_id: ai_faction_id.clone(),
                 name: ai.name.clone(),
-                color: Self::ai_color(seat),
+                color: self.ai_color(seat),
                 is_ai: true,
             });
         }
@@ -3935,6 +3945,52 @@ mod tests {
             },
         );
         writer
+    }
+
+    #[test]
+    fn ai_colors_start_at_accessibility_palette_head_without_humans() {
+        let task = RoomTask::new(
+            "ai-colors".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+
+        let colors: Vec<String> = (0..4).map(|seat| task.ai_color(seat)).collect();
+
+        assert_eq!(
+            colors,
+            vec![
+                PLAYER_PALETTE[0].to_string(),
+                PLAYER_PALETTE[1].to_string(),
+                PLAYER_PALETTE[2].to_string(),
+                PLAYER_PALETTE[3].to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn ai_colors_skip_active_human_colors_in_palette_order() {
+        let mut task = RoomTask::new(
+            "mixed-colors".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 1, false);
+
+        let colors: Vec<String> = (0..3).map(|seat| task.ai_color(seat)).collect();
+
+        assert_eq!(
+            colors,
+            vec![
+                PLAYER_PALETTE[1].to_string(),
+                PLAYER_PALETTE[2].to_string(),
+                PLAYER_PALETTE[3].to_string(),
+            ]
+        );
     }
 
     fn add_branch_occupant(task: &mut RoomTask, id: u32) -> ConnectionWriter {
