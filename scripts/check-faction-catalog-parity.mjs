@@ -81,8 +81,8 @@ assert.equal(
 );
 assert.equal(
   allRustCatalogs.catalogs.some((catalog) => catalog.id === "ekaterina"),
-  true,
-  "Ekaterina catalog is exposed once the Phase 10 slice exists",
+  false,
+  "reserved future factions are not client-exposed until their catalog exists",
 );
 assert.deepEqual(
   WORKER_BUILDABLE,

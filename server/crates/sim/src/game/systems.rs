@@ -23,7 +23,6 @@ use crate::game::command::SimCommand;
 use crate::game::entity::EntityStore;
 use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::map::Map;
-use crate::game::mark_target::MarkTargetStore;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services;
 use crate::game::services::occupancy::Occupancy;
@@ -115,7 +114,6 @@ pub(crate) fn run_tick(
     lingering_sight: &mut Vec<LingeringSightSource>,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
-    mark_targets: &mut MarkTargetStore,
     artillery_shells: &mut ArtilleryShellStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -139,7 +137,6 @@ pub(crate) fn run_tick(
             fog,
             smokes,
             mortar_shells,
-            mark_targets,
             artillery_shells,
             pending,
             events,
@@ -177,7 +174,6 @@ pub(crate) fn run_tick(
             &mut coordinator,
             smokes,
             mortar_shells,
-            mark_targets,
             events,
             tick,
         );
@@ -250,10 +246,6 @@ pub(crate) fn run_tick(
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         mortar_shells.resolve_due(map, entities, &teams, fog, events, tick);
-    });
-    crate::perf::timed(perf.as_deref_mut(), "mark_target_impacts", || {
-        let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-        mark_targets.resolve_due(entities, &teams, fog, events, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "artillery_impacts", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
@@ -345,7 +337,6 @@ mod tests {
         let mut lingering_sight = Vec::new();
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
-        let mut mark_targets = MarkTargetStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
 
         let worker = entities
@@ -374,7 +365,6 @@ mod tests {
             &mut lingering_sight,
             &mut smokes,
             &mut mortar_shells,
-            &mut mark_targets,
             &mut artillery_shells,
             Vec::new(),
             &mut events,

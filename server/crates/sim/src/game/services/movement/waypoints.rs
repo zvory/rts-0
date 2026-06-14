@@ -88,9 +88,7 @@ pub(super) fn advance_moving_units(
         let is_car = uses_car_movement_semantics(kind);
         let vehicle_oil_cost_per_px = match kind {
             EntityKind::Tank => Some(config::TANK_OIL_COST_PER_PX),
-            EntityKind::ScoutCar | EntityKind::CommandCar => {
-                Some(config::SCOUT_CAR_OIL_COST_PER_PX)
-            }
+            EntityKind::ScoutCar | EntityKind::CommandCar => Some(config::SCOUT_CAR_OIL_COST_PER_PX),
             _ => None,
         };
         // Experimental vehicle fuel rule: an oil-starved vehicle pauses before retrying so sparse
@@ -188,7 +186,7 @@ pub(super) fn advance_moving_units(
                     // swept body can reach the next segment. Vehicles also keep their
                     // facing-specific guard so reverse/recovery waypoints are physically reached.
                     let route_accepts = entities.get(id).is_some_and(|e| {
-                        !e.kind.is_worker()
+                        e.kind != EntityKind::Worker
                             && route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
                     });
                     let legacy_infantry_accepts = if !uses_vehicle_movement && !route_accepts {

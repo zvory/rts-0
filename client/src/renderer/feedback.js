@@ -804,55 +804,6 @@ export function _drawArtilleryTargets(state) {
   }
 }
 
-export function _drawMarkTargets(state) {
-  const g = this._feedbackGfx;
-  if (!state || typeof state.liveMarkTargets !== "function") return;
-  const now = performance.now();
-  const targets = state.liveMarkTargets(now);
-  if (!targets.length) return;
-  const ts = (this._map && this._map.tileSize) || 32;
-
-  for (const target of targets) {
-    const ttlMs = Math.max(700, ((target.delayTicks || 0) / 30) * 1000 + 250);
-    const t = clamp01((now - target.createdAt) / ttlMs);
-    const fade = 1 - smoothstep01(Math.max(0, t - 0.72) / 0.28);
-    const radius = Math.max(18, (target.radiusTiles || 1.25) * ts);
-    const pulse = 0.75 + 0.25 * Math.sin(t * Math.PI * 6);
-    g.lineStyle(2.5, 0x8fd5ff, 0.88 * fade);
-    drawDashedCircle(g, target.x, target.y, radius * pulse, 16);
-    g.lineStyle(2, 0xf2d16b, 0.76 * fade);
-    g.moveTo(target.x - 14, target.y);
-    g.lineTo(target.x + 14, target.y);
-    g.moveTo(target.x, target.y - 14);
-    g.lineTo(target.x, target.y + 14);
-    g.lineStyle(1.6, 0x8fd5ff, 0.58 * fade);
-    drawDashedCircle(g, target.x, target.y, radius * 0.42, 8);
-  }
-}
-
-export function _drawMarkTargetImpacts(state) {
-  const g = this._feedbackGfx;
-  if (!state || typeof state.liveMarkTargetImpacts !== "function") return;
-  const now = performance.now();
-  const impacts = state.liveMarkTargetImpacts(now);
-  if (!impacts.length) return;
-  const ts = (this._map && this._map.tileSize) || 32;
-
-  for (const impact of impacts) {
-    const age = now - impact.createdAt;
-    const t = clamp01(age / 760);
-    const fade = 1 - smoothstep01(Math.max(0, t - 0.42) / 0.58);
-    const radius = Math.max(18, (impact.radiusTiles || 1.25) * ts);
-    g.lineStyle(3, 0x8fd5ff, 0.88 * fade);
-    g.drawCircle(impact.x, impact.y, radius * (0.45 + t * 0.55));
-    g.lineStyle(2, 0xffffff, 0.78 * fade);
-    drawDashedCircle(g, impact.x, impact.y, radius, 12);
-    g.beginFill(0x8fd5ff, 0.16 * fade);
-    drawJaggedBlob(g, impact.x, impact.y, radius * 0.9, 14, impact.seed + 17, 0.76, 1.0);
-    g.endFill();
-  }
-}
-
 export function _drawArtilleryLaunches(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveArtilleryLaunches !== "function") return;

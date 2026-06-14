@@ -1,22 +1,20 @@
 # Phase 11 - Second Faction Combat and Signature Ability Slice
 
-Status: Done.
+Status: Blocked until Phase 10 lands an approved hero-centric Ekaterina slice.
 
 ## Objective
 
-Add the second faction's first combat loop: one baseline combat unit plus one signature
-ability-heavy unit. This phase should make the faction mechanically legible in a short match without
-trying to complete the whole roster.
+Extend the approved Ekaterina hero combat loop. This phase must build on the new hero-centric spec,
+not the purged RTS-style baseline-unit plus specialist-unit design.
 
 ## Scope
 
-- Add the approved baseline combat unit with stats, cost, supply/capacity use, production path,
-  renderer data, command-card affordances, and tests.
-- Add the approved signature ability-heavy unit and its ability or abilities.
+- Add only the approved hero combat, progression, ability, or objective interactions.
+- Do not add the purged Conscript, Signal Team, Workshop, or Mark Target content.
 - Use existing ability registry and effect hooks where possible; add only tightly scoped hooks if
   the approved ability cannot be implemented cleanly.
-- Add fog-safe events, notices, cooldown/charge projection, Steel/Oil costs, and client visuals for
-  the signature ability.
+- Add fog-safe events, notices, cooldown/charge projection, approved resource/progression costs, and
+  client visuals for hero abilities.
 - Keep AI blocked for the new faction unless explicitly approved.
 - Keep prediction disabled for the new faction unless WASM support is intentionally implemented.
 - Update the lifecycle matrix if the new combat or ability slice changes replay, branch, spectator,
@@ -42,43 +40,27 @@ trying to complete the whole roster.
 
 ## Verification
 
-- Focused Rust tests for new unit stats, production, costs, supply/capacity, and command legality.
+- Focused Rust tests for approved hero stats, progression/economy, commands, and legality.
 - Rust ability tests for carrier eligibility, target mode, costs, cooldowns, charges, events, and
   wrong-faction rejection.
 - Fog/security regression tests for every new event or reveal.
 - Protocol parity tests for every new kind, ability, event, or upgrade id.
-- Client command-card descriptor tests for the new combat and ability units.
+- Client command-card/control descriptor tests for the hero combat and ability surface.
 - Targeted client smoke or dev scenario test for rendering and command issuance.
-- Balance docs updated with player-facing stats and ability behavior.
+- Balance/design docs updated with player-facing hero stats and ability behavior.
 
 ## Manual Testing Focus
 
-Play a short local/dev match as the new faction and verify production, combat readability, ability
-targeting, cooldown/charges, Steel/Oil cost, fog behavior, defeat/win behavior, and current-faction
-regression.
+Play a short local/dev match as Ekaterina and verify hero combat readability, ability targeting,
+cooldown/charges, approved resource/progression costs, fog behavior, defeat/win behavior, and
+Kriegsia regression.
 
 ## Handoff Expectations
 
-The handoff must include patch-note bullets, implemented unit/ability details, verification
-commands/results, lifecycle matrix updates, known balance risks, and the next roster/progression
-items proposed for Phase 12.
+The handoff must include patch-note bullets, implemented hero/ability details, verification
+commands/results, lifecycle matrix updates, known balance risks, and the next approved items
+proposed for Phase 12.
 
 ## Player-Facing Outcome
 
-The new faction has a small but playable combat identity suitable for focused playtesting.
-
-## Executor Notes
-
-Patch-note bullets to carry into the handoff:
-
-- Ekaterina Workshop now trains Signal Teams: 90 steel / 25 oil, 2 supply, 420 ticks (~14s), 42 HP,
-  2 damage, 4-tile attack range, 24-tick attack cooldown, 1.45 px/tick movement, and 9 sight.
-- Signal Team Mark Target is a queued world-point ability on hotkey `D`: 15 steel, 8-tile range,
-  750-tick (~25s) cooldown, immediate marker, 60-tick (~2s) delayed pulse, 1.25-tile radius, and 20
-  normal damage to units only.
-- Mark Target intentionally includes friendly fire, does not damage buildings, and uses fog-filtered
-  marker events with optional caster ids so visible target pings do not reveal hidden Signal Teams.
-- The client command card, targeted ability cursor, compact protocol, state storage, renderer
-  feedback, and parity checks now include `ekaterina_signal_team` / `markTarget`.
-- Ekaterina remains dev-scenario-only; normal lobby selection, AI, prediction, self-play, replay
-  branch launch, and match-history replay are still Kriegsia-only until later phases opt in.
+Ekaterina has a small but playable hero-combat identity suitable for focused playtesting.

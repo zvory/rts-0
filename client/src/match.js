@@ -769,11 +769,7 @@ export class Match {
         this.handleNotice(ev);
       } else if (ev && ev.e === EVENT.ATTACK) {
         this.playAttackSound(ev);
-      } else if (ev && (
-        ev.e === EVENT.MORTAR_LAUNCH ||
-        ev.e === EVENT.ARTILLERY_TARGET ||
-        ev.e === EVENT.MARK_TARGET
-      )) {
+      } else if (ev && (ev.e === EVENT.MORTAR_LAUNCH || ev.e === EVENT.ARTILLERY_TARGET)) {
         this.playPointFireSound(ev);
       }
     }

@@ -1,37 +1,36 @@
 # Phase 9 - Second Faction Brief and Rules Spec
 
-Status: Done.
+Status: Reset. Ekaterina is reserved only; no rules/balance spec is approved.
 
 ## Objective
 
-Create the approved second-faction brief and rules/balance spec before implementing real faction
-content. This is the gate where major design decisions about how the faction works must be run by
-the user.
+Create a new approved Ekaterina brief and rules/balance spec before implementing any real faction
+content. The prior RTS-style Ekaterina concept was purged; this phase must restart from the
+hero-centric direction.
 
 ## Scope
 
 - Write or reference the faction brief, including theme, intended strategic identity, how the
-  faction uses Steel/Oil/Supply, production model, strengths, weaknesses, and expected match pacing.
-- Define the starting loadout, starting Steel/Oil/Supply values, supply/capacity model, and how the
-  faction uses or ignores the existing universal Steel/Oil map resources.
-- Define the minimum playable implementation slices:
-  - start, economy, and first production path
-  - baseline combat unit
-  - signature ability-heavy unit
-  - later roster/progression expansions
-- Define the initial unit/building/upgrade/ability roster with factual stat targets or placeholder
-  ranges that can be tested.
-- Define required client art/readability expectations for each initial unit/building.
+  mostly-one-hero control model works, strengths, weaknesses, and expected match pacing.
+- Define whether Ekaterina uses Kriegsia's Steel/Oil/Supply model, a stripped-down variant, hero
+  progression, cooldowns, objectives, or some other economy. Do not assume workers, bases, or
+  production buildings.
+- Define the minimum playable implementation slices for a MOBA-like hero faction.
+- Define the initial hero, controls, progression, abilities, respawn/death behavior, objective
+  interaction, and any supporting non-hero entities with factual stat targets or placeholder ranges
+  that can be tested.
+- Define required client art/readability expectations for the hero, ability targeting, and any
+  approved supporting entities.
 - Decide whether prediction remains disabled for the new faction, which should be the default.
 - Confirm AI remains blocked for the new faction unless the user explicitly approves AI work.
-- Identify the exact existing assignment path Phase 10 may use to start as the new faction before
-  normal lobby selection is exposed.
+- Identify the exact existing assignment path Phase 10 may use to start as Ekaterina before normal
+  lobby selection is exposed, if any.
 - Define command-id namespace expectations for the faction's build/train/research/ability actions
   so hotkey profiles remain stable.
-- Identify every mechanic that needs a new ability hook, Steel/Oil/Supply behavior, fog event, or
-  protocol field before Phase 10 starts.
-- Explicitly record that arbitrary new resources and faction-specific map resource objects are out
-  of scope for this faction rollout unless the user starts a separate generic-resource plan.
+- Identify every mechanic that needs a new ability hook, resource/progression behavior, fog event,
+  or protocol field before Phase 10 starts.
+- Explicitly record which resource/progression ideas are approved and which are out of scope.
+- Explicitly reject the purged RTS-style content unless the user re-approves it by name.
 - Do not implement Rust, JS, protocol, balance, art, tests, or other implementation files for the
   real faction in this phase.
 
@@ -47,8 +46,8 @@ the user.
 ## Verification
 
 - Documentation review only.
-- Confirm the brief/spec answers economy, loadout, production, first combat, signature ability, AI,
-  prediction, and art-readability questions.
+- Confirm the brief/spec answers hero control, progression/economy, starting state, first combat,
+  signature abilities, AI, prediction, and art-readability questions.
 - No broad test run is required for a docs-only phase.
 
 ## Manual Testing Focus
@@ -61,19 +60,8 @@ small enough for Phase 10 and Phase 11 to implement independently.
 The handoff must name the approved brief/spec files, list explicit user-approved decisions, identify
 any open questions, name the exact assignment path Phase 10 should use, and state exactly what
 Phase 10 may implement. If any major faction mechanic is not approved, Phase 10 must not implement
-it.
+it. A generic "start/economy/production" slice is not approved for Ekaterina.
 
 ## Player-Facing Outcome
 
-No gameplay change. The second faction is designed and scoped before implementation starts.
-
-## Implementation Notes
-
-Phase 9 added the approved Ekaterina brief and rules/balance spec:
-
-- [Ekaterina Faction Brief](ekaterina-brief.md)
-- [Ekaterina Rules and Balance Spec](ekaterina-rules-spec.md)
-
-Phase 10 may implement only the start, economy, and first production path described in the spec,
-using the dev-only `dev:ekaterina_opening` assignment path. AI, prediction, normal lobby faction
-selection, generic resources, and the signature ability effect remain out of scope for Phase 10.
+No gameplay change. Ekaterina remains reserved until the new hero-centric design is approved.
