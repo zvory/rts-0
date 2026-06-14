@@ -5,8 +5,9 @@ Status: Not started.
 ## Goal
 
 Finish the rollout by removing stale 12-unit cap assumptions, documenting the command-budget rule,
-and adding focused regression coverage for the server/client contract. This phase should leave the
-feature ready for playtesting and later tuning.
+and consolidating focused regression coverage added during Phases 1-4. This phase should leave the
+feature ready for playtesting and later tuning, but it should not be the first phase that protects a
+behavior changed earlier in the rollout.
 
 ## Scope
 
@@ -16,14 +17,18 @@ feature ready for playtesting and later tuning.
   - `docs/design/client-ui.md` for the selection grid and control-group behavior
   - `docs/design/balance.md` if command budget becomes a balance-tuning surface
   - `docs/context/` capsules if section lists or contract pointers shift
-- Add or consolidate focused tests for:
+- Confirm the focused tests added in Phases 1-4 cover:
   - server command-budget rejection
   - client selection budget helper
   - drag/double-click/shift selection admission
   - control-group save/add/recall
+  - subset-command send guards that validate submitted ids rather than broader selection context
   - outgoing command send guard
-  - HUD budget grid rendering
+  - HUD budget grid rendering, including stacked Command Cars with narrower cells and no collapsed
+    entries
   - mirrored constants or generated config parity
+- Add only missing regression tests found by that sweep; do not defer known Phase 1-4 behavioral
+  coverage into this cleanup phase.
 - Collect factual patch-note bullets for the final merge:
   - selection/command bandwidth is supply-based
   - base command budget is 24 supply
@@ -34,12 +39,14 @@ feature ready for playtesting and later tuning.
 
 - No active code path still enforces the old 12 selected-unit cap.
 - Docs describe the new command-budget rule and server rejection behavior.
-- Focused regression coverage protects the budget rule, Command Car stacking, and UI display.
+- Focused regression coverage from the full rollout protects the budget rule, Command Car stacking,
+  submitted-id command guards, control-group normalization, and UI display.
 - Tuning constants are named and easy to change later.
 
 ## Verification
 
-- Run the focused tests added or changed across this rollout.
+- Run the focused tests added or changed across this rollout, prioritizing any gaps found in the
+  final sweep.
 - Run protocol/balance parity checks if Phase 1 introduced mirrored constants or generated config.
 - Let the normal commit hook run the broad gate when committing the merge-ready phase unless the
   change is docs-only or the hook failure is confirmed unrelated.
