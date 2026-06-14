@@ -130,6 +130,12 @@ and fixture start choices into faction loadout definitions. It keeps the current
 behavior unchanged while proving a test fixture can use a different loadout and command set within
 the existing economy. This phase should not add faction-specific map resources.
 
+Phase 5.5 tightens the architectural seams discovered after the first implemented faction phases.
+It makes lower-level catalog access fail closed for unknown factions, narrows old global start
+resource compatibility APIs, strengthens catalog/checker guardrails, and prepares Phase 6 to
+consolidate ability metadata instead of adding another source of truth. This phase should not add
+Ekaterina gameplay or change Kriegsia behavior.
+
 Phase 6 turns existing abilities into registry-backed discovery and projection without changing
 their effects. It preserves Smoke, Mortar Fire, Artillery Point Fire, Breakthrough, and legacy
 Charge compatibility while routing ids, carriers, target modes, cooldowns, charges, costs, and
@@ -181,6 +187,7 @@ and balance documentation. This phase is where faction choice becomes ready for 
    - [Phase 3D - Replay, Branch, and Dev Lifecycle Tests](phase-3d.md)
 4. [Phase 4 - Steel/Oil Resource Policy Hardening](phase-4.md)
 5. [Phase 5 - Faction Starting Loadouts](phase-5.md)
+5.5. [Phase 5.5 - Architecture Course Correction Guardrails](phase-5.5.md)
 6. [Phase 6 - Ability Registry Parity](phase-6.md)
 7. [Phase 7 - Ability Effect Hooks](phase-7.md)
 8. [Phase 8 - Client Faction Surface](phase-8.md)
