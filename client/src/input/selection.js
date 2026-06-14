@@ -88,7 +88,6 @@ export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY, anchor = n
       const db = Math.hypot(b.x - anchorX, b.y - anchorY);
       return da - db || a.id - b.id;
     })
-    .slice(0, 12)
     .map((e) => e.id);
 }
 
@@ -135,7 +134,6 @@ export function _closestIdsToPoint(ids, screenX, screenY) {
       const db = Math.hypot(b.x - anchor.x, b.y - anchor.y);
       return da - db || a.id - b.id;
     })
-    .slice(0, 12)
     .map((e) => e.id);
 }
 

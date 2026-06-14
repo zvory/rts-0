@@ -107,6 +107,8 @@ export const EKATERINA_LINE_SHOT_RANGE_TILES = 6;
 export const EKATERINA_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKATERINA_LINE_SHOT_DAMAGE = 40;
 export const EKATERINA_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
+export const BASE_COMMAND_SUPPLY_CAP = 24;
+export const COMMAND_CAR_SUPPLY_CAP_BONUS = 12;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([

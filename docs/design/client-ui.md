@@ -13,6 +13,7 @@ src/
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   state.js        # GameState: holds prev+current snapshot, selection, camera, placement
+  command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # resources, fog overlay, feedback, and renderer-local palette helpers
@@ -200,12 +201,13 @@ export class GameState {
   resources                             // {steel,oil,supplyUsed,supplyCap} (latest)
   events                                 // latest snapshot's events
   // selection (client-only):
-  selection                              // Set<entityId>
+  selection                              // Set<entityId>; playable own selections are admitted by command supply
+  selectionBudgetOverflow               // null | {used, cap, seq}; short-lived HUD feedback after ignored overflow
   setSelection(ids), addToSelection(ids), clearSelection()
   selectedEntities()                     // resolved entity objects from current snapshot
   entityById(id)
   // control groups (client-only):
-  controlGroups                          // ten Array<entityId> slots; slot 9 maps to key 0
+  controlGroups                          // ten budget-admitted Array<entityId> slots; slot 9 maps to key 0
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
   selectControlGroup(slot), controlGroupEntities(slot)
   // build placement (client-only):
@@ -258,6 +260,14 @@ export class Fog {
 `fog.update`; those views are rendered as intel, not as local fog sources. Normal match snapshots
 provide `visibleTiles`, so the overlay follows server-authoritative fog including smoke blockers;
 local stamping remains a fallback for older/dev object snapshots.
+
+Playable own selections and human multi-unit commands use the mirrored command-supply budget from
+`command_budget.js`: 24 base command supply plus 12 per admitted Command Car, with unit supply as
+weight and a fallback weight of 1. Drag selection, shift-add, double-click same-kind selection, and
+control-group save/add/recall preserve their normal candidate ordering, except Command Cars in the
+candidate set are admitted first so their budget bonus is reliable. Overflow candidates are ignored
+client-side and surface `selectionBudgetOverflow` for the HUD; outgoing commands that still exceed
+the budget are blocked before `Net.command`.
 
 `input/index.js`
 ```js

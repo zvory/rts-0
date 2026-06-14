@@ -1547,26 +1547,106 @@ input[type="text"]:focus {
 #selected-panel .bar.low > span {
   background: var(--bad);
 }
-/* Multi-select roster: little icon chips. */
-#selected-panel .sel-grid,
-#selected-panel .sel-roster {
+/* Multi-select command budget grid. */
+#selected-panel .sel-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-#selected-panel .sel-chip {
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  gap: 4px;
-  place-items: center;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
   font-size: 12px;
-  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+#selected-panel .sel-count-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+#selected-panel .sel-budget-counter {
+  color: var(--supply);
+  font-weight: 800;
+  white-space: nowrap;
+}
+#selected-panel .sel-budget-counter.overflow {
+  color: var(--bad);
+}
+#selected-panel .sel-budget-grid {
+  --sel-budget-cell: 18px;
+  display: grid;
+  grid-template-columns: repeat(var(--sel-budget-cols), var(--sel-budget-cell));
+  grid-template-rows: repeat(2, var(--sel-budget-cell));
+  grid-auto-flow: column;
+  gap: 3px;
+  align-items: stretch;
+  justify-content: start;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px;
   border: 1px solid var(--panel-edge);
-  background: var(--void);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent calc(var(--sel-budget-cell) + 3px)
+    ),
+    rgba(0, 0, 0, 0.18);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+#selected-panel .sel-budget-block {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(126, 231, 255, 0.28), rgba(44, 86, 96, 0.72));
+  color: #f3fbff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  overflow: hidden;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+#selected-panel .sel-budget-block.weight-1,
+#selected-panel .sel-budget-block.weight-2 {
+  font-size: 10px;
+}
+#selected-panel .sel-budget-block.weight-4,
+#selected-panel .sel-budget-block.weight-5,
+#selected-panel .sel-budget-block.weight-6 {
+  font-size: 13px;
+}
+#selected-panel .sel-budget-block.has-reserved-cell::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(33.333% - 1px);
+  height: calc(50% - 1px);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.13) 0,
+      rgba(255, 255, 255, 0.13) 2px,
+      rgba(0, 0, 0, 0.16) 2px,
+      rgba(0, 0, 0, 0.16) 4px
+    );
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+#selected-panel .sel-budget-block.unplaced {
+  opacity: 0.45;
+}
+#selected-panel .sel-budget-overflow {
+  color: var(--bad);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* Production progress inside #selected-panel (buildings training units). */

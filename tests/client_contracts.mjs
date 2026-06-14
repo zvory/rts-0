@@ -25,14 +25,19 @@ import {
   RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
   ABILITIES,
+  BASE_COMMAND_SUPPLY_CAP,
+  COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
   UPGRADES,
 } from "../client/src/config.js";
+import { commandWithinBudget } from "../client/src/command_budget.js";
 import {
   HUD,
   formatTankOilUsed,
   groupCooldownClocks,
   playerHasCompletedKind,
+  selectionBudgetBlockShape,
+  selectionBudgetGridModel,
 } from "../client/src/hud.js";
 import {
   buildCommandCardContextCatalog,
@@ -261,6 +266,66 @@ function fakeHudRootWithoutResourceSpans() {
       },
     },
   };
+}
+
+function withFakeHudDocument(fn) {
+  const priorDocument = globalThis.document;
+  class FakeElement {
+    constructor(tagName) {
+      this.tagName = String(tagName).toUpperCase();
+      this.className = "";
+      this.textContent = "";
+      this.innerHTML = "";
+      this.title = "";
+      this.children = [];
+      this.attributes = new Map();
+      this.style = {
+        values: new Map(),
+        setProperty: (name, value) => {
+          this.style.values.set(name, String(value));
+        },
+      };
+    }
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name, String(value));
+    }
+    getAttribute(name) {
+      return this.attributes.get(name) || null;
+    }
+    querySelectorAll(selector) {
+      const results = [];
+      const matches = (node) => selector.startsWith(".")
+        ? node.className.split(/\s+/).includes(selector.slice(1))
+        : false;
+      const visit = (node) => {
+        if (matches(node)) results.push(node);
+        for (const child of node.children || []) visit(child);
+      };
+      visit(this);
+      return results;
+    }
+    querySelector(selector) {
+      return this.querySelectorAll(selector)[0] || null;
+    }
+  }
+  globalThis.document = {
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+    createDocumentFragment() {
+      return new FakeElement("fragment");
+    },
+  };
+  try {
+    return fn({ FakeElement });
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
 }
 
 function withFakeSettingsDocument(fn) {
@@ -553,6 +618,70 @@ function hotkeyService() {
   assert(ids.get("res-steel").textContent === "325", "restored HUD steel span updates from live resources");
   assert(ids.get("res-oil").textContent === "80", "restored HUD oil span updates from live resources");
   assert(ids.get("res-supply").textContent === "7 / 14", "restored HUD supply span updates from live supply");
+}
+
+// ---------------------------------------------------------------------------
+// HUD selection budget grid
+// ---------------------------------------------------------------------------
+{
+  const riflemen = Array.from({ length: 24 }, (_, index) => ({
+    id: 1000 + index,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+  }));
+  const tanks = Array.from({ length: 4 }, (_, index) => ({
+    id: 1100 + index,
+    owner: 1,
+    kind: KIND.TANK,
+  }));
+  const commandCar = { id: 1200, owner: 1, kind: KIND.COMMAND_CAR };
+  const artillery = { id: 1300, owner: 1, kind: KIND.ARTILLERY };
+
+  const infantryModel = selectionBudgetGridModel(riflemen);
+  assert(infantryModel.used === 24 && infantryModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports 24/24 infantry supply");
+  assert(infantryModel.cols === 12, "HUD base budget grid uses two rows of twelve cells");
+  assert(infantryModel.blocks.every((block) => block.weight === 1 && block.cols === 1 && block.rows === 1 && block.placed),
+    "HUD infantry blocks occupy one fixed cell each");
+
+  const tankModel = selectionBudgetGridModel(tanks);
+  assert(tankModel.used === 24 && tankModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports four Tanks as 24/24");
+  assert(tankModel.blocks.every((block) => block.weight === 6 && block.cols === 3 && block.rows === 2 && block.placed),
+    "HUD Tank blocks occupy a two-row by three-column shape");
+
+  const commandCarModel = selectionBudgetGridModel(tanks.concat(commandCar));
+  assert(commandCarModel.used === 28 && commandCarModel.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
+    "HUD budget grid includes Command Car cap expansion");
+  assert(commandCarModel.cols === 18, "HUD budget grid grows visible columns for Command Car cap");
+
+  const artilleryShape = selectionBudgetBlockShape(STATS[KIND.ARTILLERY].supply);
+  assert(artilleryShape.cols === 3 && artilleryShape.rows === 2 && artilleryShape.reservedCells === 1,
+    "HUD five-supply shape uses a deterministic near-rectangle with one reserved cell");
+  const artilleryModel = selectionBudgetGridModel([artillery]);
+  assert(artilleryModel.blocks[0].reservedCells === 1, "HUD five-supply blocks expose their reserved visual cell");
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const state = {
+      selectionBudgetOverflow: { used: 24, cap: BASE_COMMAND_SUPPLY_CAP, seq: 1 },
+      selectedEntities() {
+        return tanks;
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    const grid = panel.querySelector(".sel-budget-grid");
+    const blocks = panel.querySelectorAll(".sel-budget-block");
+    const overflow = panel.querySelector(".sel-budget-overflow");
+    assert(grid && grid.style.values.get("--sel-budget-cols") === "12", "HUD renders grid columns into selected panel DOM");
+    assert(blocks.length === 4 && blocks.every((block) => block.className.includes("weight-6")),
+      "HUD renders four Tank budget blocks into selected panel DOM");
+    assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2627,6 +2756,62 @@ function fakeAudioContext() {
 }
 
 // ---------------------------------------------------------------------------
+// Command Budget
+// ---------------------------------------------------------------------------
+{
+  function budgetState(entities) {
+    const byId = new Map(entities.map((entity) => [entity.id, entity]));
+    return {
+      entityById(id) {
+        return byId.get(id);
+      },
+      isOwnOwner(owner) {
+        return owner === 1;
+      },
+    };
+  }
+
+  const tanks = Array.from({ length: 5 }, (_, index) => ({
+    id: index + 1,
+    owner: 1,
+    kind: KIND.TANK,
+    state: STATE.IDLE,
+  }));
+  const overBudget = commandWithinBudget(
+    budgetState(tanks),
+    cmd.move(tanks.map((tank) => tank.id), 100, 100),
+  );
+  assert(!overBudget.ok, "client command guard rejects five tanks without a Command Car");
+  assert(overBudget.used === 30 && overBudget.cap === BASE_COMMAND_SUPPLY_CAP, "client reports base command budget usage");
+
+  const commandCar = { id: 99, owner: 1, kind: KIND.COMMAND_CAR, state: STATE.IDLE };
+  const legalWithCar = commandWithinBudget(
+    budgetState(tanks.concat(commandCar)),
+    cmd.attackMove(tanks.map((tank) => tank.id).concat(commandCar.id), 100, 100),
+  );
+  assert(legalWithCar.ok, "client command guard allows five tanks with one Command Car");
+  assert(
+    legalWithCar.used === 34 &&
+      legalWithCar.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
+    "client command guard counts Command Car supply and bonus",
+  );
+
+  const legalInfantry = Array.from({ length: 24 }, (_, index) => ({
+    id: index + 200,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    state: STATE.IDLE,
+  }));
+  assert(
+    commandWithinBudget(
+      budgetState(legalInfantry),
+      cmd.stop(legalInfantry.map((entity) => entity.id)),
+    ).ok,
+    "client command guard allows 24 one-supply units",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // PredictionController
 // ---------------------------------------------------------------------------
 {
@@ -3886,6 +4071,162 @@ function fakeAudioContext() {
   const sel = state.selectedEntities();
   assert(sel.length === 1 && sel[0].id === 1, "selectedEntities drops stale ids");
 
+  const budgetSelectionState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  const budgetRiflemen = Array.from({ length: 30 }, (_, index) => ({
+    id: 300 + index,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: index * 4,
+    y: 0,
+    hp: 40,
+    maxHp: 40,
+    state: STATE.IDLE,
+  }));
+  const budgetTanks = Array.from({ length: 5 }, (_, index) => ({
+    id: 400 + index,
+    owner: 1,
+    kind: KIND.TANK,
+    x: index * 12,
+    y: 20,
+    hp: 100,
+    maxHp: 100,
+    state: STATE.IDLE,
+  }));
+  const budgetCommandCar = {
+    id: 450,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 80,
+    y: 20,
+    hp: 80,
+    maxHp: 80,
+    state: STATE.IDLE,
+  };
+  budgetSelectionState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 80,
+    entities: budgetRiflemen.concat(budgetTanks, budgetCommandCar),
+    events: [],
+  });
+  budgetSelectionState.setSelection(budgetRiflemen.map((entity) => entity.id));
+  assert(
+    budgetSelectionState.selection.size === BASE_COMMAND_SUPPLY_CAP,
+    "selection budget admits 24 one-supply units by command supply",
+  );
+  assert(
+    budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
+    "selection overflow records budget state for the HUD",
+  );
+  budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id));
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
+    "selection budget admits four six-supply tanks without a Command Car",
+  );
+  budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id));
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "450,400,401,402,403,404",
+    "selection budget pre-admits Command Cars before filling normal candidates",
+  );
+  budgetSelectionState.setSelection(budgetTanks.slice(0, 4).map((entity) => entity.id));
+  budgetSelectionState.addToSelection([budgetRiflemen[0].id]);
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
+    "shift-add ignores overflow without replacing the existing selection",
+  );
+  budgetSelectionState.addToSelection([budgetCommandCar.id, budgetTanks[4].id]);
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,450,404",
+    "shift-add can admit a Command Car bonus and then later candidates",
+  );
+  budgetSelectionState.setControlGroup(0, budgetRiflemen.map((entity) => entity.id));
+  assert(
+    budgetSelectionState.controlGroups[0].length === BASE_COMMAND_SUPPLY_CAP,
+    "control-group save admits 24 one-supply units",
+  );
+  assert(
+    budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
+    "control-group save records overflow for ignored one-supply units",
+  );
+  budgetSelectionState.setControlGroup(1, budgetTanks.map((entity) => entity.id));
+  assert(
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    "control-group save ignores over-budget Tanks",
+  );
+  budgetSelectionState.addToControlGroup(1, [budgetRiflemen[0].id]);
+  assert(
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    "control-group add ignores overflow without trimming existing legal members",
+  );
+  budgetSelectionState.addToControlGroup(1, [budgetCommandCar.id, budgetTanks[4].id]);
+  assert(
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403,450,404",
+    "control-group add can admit one Command Car bonus and then later candidates",
+  );
+  const secondBudgetCommandCar = {
+    id: 451,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 96,
+    y: 20,
+    hp: 80,
+    maxHp: 80,
+    state: STATE.IDLE,
+  };
+  budgetSelectionState.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 80,
+    entities: budgetRiflemen.concat(budgetTanks, budgetCommandCar, secondBudgetCommandCar),
+    events: [],
+  });
+  budgetSelectionState.setControlGroup(2, budgetTanks.map((entity) => entity.id).concat([budgetCommandCar.id, secondBudgetCommandCar.id]));
+  assert(
+    budgetSelectionState.controlGroups[2].join(",") === "450,451,400,401,402,403,404",
+    "control-group save stacks multiple Command Car bonuses",
+  );
+  budgetSelectionState.controlGroups[3] = budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id);
+  const recalledLateCar = budgetSelectionState.selectControlGroup(3);
+  assert(
+    recalledLateCar.join(",") === "450,400,401,402,403,404",
+    "control-group recall pre-admits a Command Car stored late in old runtime order",
+  );
+  assert(
+    budgetSelectionState.controlGroups[3].join(",") === "450,400,401,402,403,404",
+    "control-group recall rewrites old over-budget runtime groups to legal admitted order",
+  );
+  budgetSelectionState.controlGroups[4] = budgetTanks.map((entity) => entity.id);
+  const recalledOverBudgetTanks = budgetSelectionState.selectControlGroup(4);
+  assert(
+    recalledOverBudgetTanks.join(",") === "400,401,402,403",
+    "control-group recall filters old over-budget Tank groups before selection",
+  );
+  assert(
+    budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
+    "control-group recall records overflow feedback for old over-budget groups",
+  );
+  const controlGroupCommands = [];
+  const controlGroupToasts = [];
+  const guardedControlGroupIssuer = {
+    issueCommand(command) {
+      const budget = commandWithinBudget(budgetSelectionState, command);
+      if (!budget.ok) {
+        controlGroupToasts.push(budget);
+        return { sent: false, blocked: "commandBudget", budget };
+      }
+      controlGroupCommands.push(command);
+      return { sent: true };
+    },
+  };
+  guardedControlGroupIssuer.issueCommand(cmd.move(Array.from(budgetSelectionState.selection), 10, 20));
+  guardedControlGroupIssuer.issueCommand(cmd.move(budgetTanks.map((entity) => entity.id), 10, 20));
+  assert(controlGroupCommands.length === 1, "legal recalled control-group command is sent through the budget guard");
+  assert(controlGroupToasts.length === 1, "over-budget command restored from stale group data is blocked before send");
+
   // Command-card submenu is local-only and is closed by mode-changing actions.
   state.openWorkerBuildMenu();
   assert(state.commandCardMode === "workerBuild", "worker build submenu opens");
@@ -3906,7 +4247,7 @@ function fakeAudioContext() {
   state.setSelection([1]);
   assert(state.commandCardMode === null, "selection replacement closes the worker build submenu");
 
-  // Control groups are local-only, own controllable entities only, and capped like selection.
+  // Control groups are local-only, own controllable entities only, and budgeted like selection.
   const cgState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   const ownControllables = Array.from({ length: 14 }, (_, i) => ({
     id: 100 + i,
@@ -3938,11 +4279,11 @@ function fakeAudioContext() {
   assertHasMethod(cgState, "controlGroupEntities", "GameState");
   cgState.setControlGroup(0, [100, 160, 101, 161, 112, 113, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111]);
   assert(
-    cgState.controlGroups[0].join(",") === "100,101,112,113,102,103,104,105,106,107,108,109",
-    "control groups store own units/buildings only in selection order up to 12",
+    cgState.controlGroups[0].join(",") === "100,101,112,113,102,103,104,105,106,107,108,109,110,111",
+    "control groups store own units/buildings only in selection order within budget",
   );
   cgState.addToControlGroup(0, [110, 111, 112, 113]);
-  assert(cgState.controlGroups[0].length === 12, "adding to a full control group ignores overflow");
+  assert(cgState.controlGroups[0].length === 14, "adding duplicates to a budgeted control group is stable");
   cgState.setControlGroup(1, [100, 101]);
   cgState.addToControlGroup(1, [101, 102, 103]);
   assert(cgState.controlGroups[1].join(",") === "100,101,102,103", "adding to a control group dedupes existing ids");
@@ -4028,6 +4369,89 @@ function fakeAudioContext() {
   assert(
     stopIntent?.unitIds?.join(",") === String(ownWorker.id),
     "mixed own/allied command card emits commands only for own entity ids",
+  );
+
+  const budgetInputState = new GameState({
+    ...start,
+    map: { ...start.map, width: 12, height: 12, resources: [] },
+  });
+  const boxRiflemen = Array.from({ length: 30 }, (_, index) => ({
+    id: 5100 + index,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 8 + index * 4,
+    y: 140,
+    hp: 45,
+    maxHp: 45,
+    state: STATE.IDLE,
+  }));
+  const doubleClickRiflemen = Array.from({ length: 30 }, (_, index) => ({
+    id: 5200 + index,
+    owner: 1,
+    kind: KIND.MACHINE_GUNNER,
+    x: 8 + index * 4,
+    y: 180,
+    hp: 55,
+    maxHp: 55,
+    state: STATE.IDLE,
+  }));
+  const budgetInputTanks = Array.from({ length: 5 }, (_, index) => ({
+    id: 5300 + index,
+    owner: 1,
+    kind: KIND.TANK,
+    x: 8 + index * 16,
+    y: 220,
+    hp: 292,
+    maxHp: 292,
+    state: STATE.IDLE,
+  }));
+  const lateBoxCommandCar = {
+    id: 5400,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 96,
+    y: 220,
+    hp: 225,
+    maxHp: 225,
+    state: STATE.IDLE,
+  };
+  budgetInputState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 80,
+    entities: boxRiflemen.concat(doubleClickRiflemen, budgetInputTanks, lateBoxCommandCar),
+    events: [],
+  });
+  const budgetSelectionInput = Object.create(Input.prototype);
+  budgetSelectionInput.state = budgetInputState;
+  budgetSelectionInput.camera = selectionInput.camera;
+  budgetSelectionInput.dom = selectionInput.dom;
+  budgetSelectionInput._worldAt = Input.prototype._worldAt;
+  budgetSelectionInput._entityAtWorld = Input.prototype._entityAtWorld;
+  budgetSelectionInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
+  budgetSelectionInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
+  budgetSelectionInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
+  budgetSelectionInput._commitClickSelection = Input.prototype._commitClickSelection;
+  budgetSelectionInput._commitBoxSelection = Input.prototype._commitBoxSelection;
+  budgetSelectionInput._ownBuildingsOfKindInViewport = Input.prototype._ownBuildingsOfKindInViewport;
+  budgetSelectionInput._closestOwnUnitKindInViewport = Input.prototype._closestOwnUnitKindInViewport;
+  budgetSelectionInput._commitBoxSelection({ x0: 0, y0: 124, x1: 140, y1: 156 }, false);
+  assert(
+    Array.from(budgetInputState.selection).length === BASE_COMMAND_SUPPLY_CAP,
+    "drag selection admits the base budget of one-supply units",
+  );
+  budgetSelectionInput._commitClickSelection({ x: doubleClickRiflemen[0].x, y: doubleClickRiflemen[0].y }, false, true);
+  assert(
+    Array.from(budgetInputState.selection).length === BASE_COMMAND_SUPPLY_CAP / STATS[KIND.MACHINE_GUNNER].supply &&
+      Array.from(budgetInputState.selection).every((id) => id >= 5200 && id < 5300),
+    "double-click same-kind selection is filtered by command supply",
+  );
+  budgetSelectionInput._commitBoxSelection({ x0: 0, y0: 204, x1: 120, y1: 236 }, false);
+  assert(
+    Array.from(budgetInputState.selection).join(",") === "5400,5300,5301,5302,5303,5304",
+    "drag selection pre-admits a late Command Car before budget-filling Tanks",
   );
   const alliedRightClickCommands = [];
   const rightClickInput = Object.create(Input.prototype);

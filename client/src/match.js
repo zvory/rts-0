@@ -29,6 +29,7 @@ import {
 } from "./alerts.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { buildGiveUpAction, buildSettingsTabs } from "./settings_panels.js";
+import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 
 const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
@@ -123,6 +124,11 @@ export class Match {
     }
     this.commandIssuer = {
       issueCommand: (command, options = {}) => {
+        const budget = commandWithinBudget(this.state, command);
+        if (!budget.ok) {
+          this.toast?.(COMMAND_BUDGET_OVERFLOW_NOTICE);
+          return { clientSeq: null, sent: false, predicted: false, blocked: "commandBudget", budget };
+        }
         const issued = this.prediction.issueCommand(command, options);
         this.state?.setOptimisticCommandState(this.prediction.optimisticUiState());
         return issued;

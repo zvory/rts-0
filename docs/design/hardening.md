@@ -2,8 +2,14 @@
 The server treats every client as potentially hostile. Limits live next to the code:
 - **WebSocket frame cap** (`main.rs`): `max_message_size`/`max_frame_size` = 256 KiB. Oversized
   frames are rejected and the connection closed before they reach serde.
-- **Command unit cap** (`services/commands.rs` `MAX_UNITS_PER_COMMAND = 256`): unit-list commands are
-  deduped and capped before per-unit work, so a repeated/huge id list can't trigger an A* storm.
+- **Command unit cap and budget** (`services/commands.rs`): unit-list commands inspect at most
+  `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject over-budget
+  human commands before planning. The human command budget is 24 supply plus 12 for each submitted
+  owned Command Car, with mirrored unit supply as command weight and a fallback weight of 1.
+  AI-owned players are exempt from the command-budget gameplay limit because live AI still enqueues
+  ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Rejection drops the whole
+  malformed human command and emits a private "Command supply exceeded" notice; the server does not
+  silently trim the unit list.
 - **Queued order caps** (`entity/order.rs` `MAX_QUEUED_ORDERS = 8`): each mobile unit stores at most
   eight future intents. Queued command application still runs the unit-list dedupe/cap first, and
   queued promotion drains invalid stale intents instead of retrying them forever.

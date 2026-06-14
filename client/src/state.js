@@ -8,6 +8,7 @@
 
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { CommandComposer } from "./command_composer.js";
+import { admitSelectionIds } from "./command_budget.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import {
   DEFAULT_FACTION_ID,
@@ -98,6 +99,9 @@ export class GameState {
     // --- selection (client-only) ---
     /** @type {Set<number>} */
     this.selection = new Set();
+    /** @type {null | {used:number, cap:number, seq:number}} latest playable selection budget overflow. */
+    this.selectionBudgetOverflow = null;
+    this._selectionBudgetOverflowSeq = 0;
     /** @type {boolean} true when the server says movement path diagnostics are available. */
     this.debugPathOverlaysAvailable = !!startInfo.debugMode;
     /** @type {boolean} local gear-menu preference for drawing movement path diagnostics. */
@@ -167,11 +171,6 @@ export class GameState {
     this.optimisticProductionByBuilding = new Map();
     this.optimisticRallyByBuilding = new Map();
     this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
-  }
-
-  /** Maximum number of entities the local selection may contain. */
-  static get MAX_SELECTION_SIZE() {
-    return 12;
   }
 
   /** World pixels per tile. */
@@ -865,11 +864,9 @@ export class GameState {
    * @param {Iterable<number>} ids
    */
   setSelection(ids) {
-    this.selection = new Set();
-    for (const id of ids) {
-      this.selection.add(id);
-      if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
-    }
+    const admitted = admitSelectionIds(this, ids);
+    this.selection = new Set(admitted.ids);
+    this._recordSelectionBudgetOverflow(admitted);
     this.closeCommandCardMenu();
   }
 
@@ -879,10 +876,9 @@ export class GameState {
    */
   addToSelection(ids) {
     this._pruneSelection();
-    for (const id of ids) {
-      if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
-      this.selection.add(id);
-    }
+    const admitted = admitSelectionIds(this, ids, { baseIds: this.selection });
+    this.selection = new Set(admitted.ids);
+    this._recordSelectionBudgetOverflow(admitted);
     this.closeCommandCardMenu();
   }
 
@@ -895,12 +891,14 @@ export class GameState {
     for (const id of ids) {
       this.selection.delete(id);
     }
+    this.selectionBudgetOverflow = null;
     this.closeCommandCardMenu();
   }
 
   /** Clear the selection. */
   clearSelection() {
     this.selection.clear();
+    this.selectionBudgetOverflow = null;
     this.closeCommandCardMenu();
   }
 
@@ -920,6 +918,12 @@ export class GameState {
     if (changed) this.selection = live;
   }
 
+  _recordSelectionBudgetOverflow(admitted) {
+    this.selectionBudgetOverflow = admitted?.overflow
+      ? { used: admitted.used, cap: admitted.cap, seq: ++this._selectionBudgetOverflowSeq }
+      : null;
+  }
+
   /**
    * Replace a control group with currently-live own units/buildings.
    * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
@@ -928,9 +932,10 @@ export class GameState {
    */
   setControlGroup(slot, ids) {
     if (!this._validControlGroupSlot(slot)) return [];
-    const next = this._ownControllableIds(ids, GameState.MAX_SELECTION_SIZE);
-    this.controlGroups[slot] = next;
-    return next.slice();
+    const admitted = this._admitControlGroupIds(ids);
+    this.controlGroups[slot] = admitted.ids;
+    this._recordSelectionBudgetOverflow(admitted);
+    return admitted.ids.slice();
   }
 
   /**
@@ -941,17 +946,11 @@ export class GameState {
    */
   addToControlGroup(slot, ids) {
     if (!this._validControlGroupSlot(slot)) return [];
-    const merged = this.controlGroups[slot] ? this.controlGroups[slot].slice() : [];
-    const seen = new Set(merged);
-    const additions = this._ownControllableIds(ids, GameState.MAX_SELECTION_SIZE);
-    for (const id of additions) {
-      if (merged.length >= GameState.MAX_SELECTION_SIZE) break;
-      if (seen.has(id)) continue;
-      merged.push(id);
-      seen.add(id);
-    }
-    this.controlGroups[slot] = merged;
-    return merged.slice();
+    this._pruneControlGroup(slot);
+    const admitted = this._admitControlGroupIds(ids, { baseIds: this.controlGroups[slot] || [] });
+    this.controlGroups[slot] = admitted.ids;
+    this._recordSelectionBudgetOverflow(admitted);
+    return admitted.ids.slice();
   }
 
   /**
@@ -977,21 +976,22 @@ export class GameState {
    */
   selectControlGroup(slot) {
     if (!this._validControlGroupSlot(slot)) return [];
-    this._pruneControlGroup(slot);
+    const pruned = this._pruneControlGroup(slot);
     const ids = this.controlGroups[slot] || [];
-    if (ids.length > 0) this.setSelection(ids);
-    return ids.slice();
+    if (ids.length === 0) return [];
+    this.setSelection(ids);
+    if (pruned?.overflow) this._recordSelectionBudgetOverflow(pruned);
+    return Array.from(this.selection);
   }
 
   _validControlGroupSlot(slot) {
     return Number.isInteger(slot) && slot >= 0 && slot < this.controlGroups.length;
   }
 
-  _ownControllableIds(ids, limit) {
+  _ownControllableIds(ids) {
     const out = [];
     const seen = new Set();
     for (const id of ids || []) {
-      if (out.length >= limit) break;
       if (seen.has(id)) continue;
       const e = this._curById.get(id);
       if (!e || e.owner !== this.playerId) continue;
@@ -1002,32 +1002,24 @@ export class GameState {
     return out;
   }
 
+  _admitControlGroupIds(ids, { baseIds = [] } = {}) {
+    const base = this._ownControllableIds(baseIds);
+    const candidates = this._ownControllableIds(ids);
+    return admitSelectionIds(this, candidates, { baseIds: base });
+  }
+
   _pruneControlGroups() {
     for (let i = 0; i < this.controlGroups.length; i++) this._pruneControlGroup(i);
   }
 
   _pruneControlGroup(slot) {
     const group = this.controlGroups[slot];
-    if (!group || group.length === 0) return;
-    const live = [];
-    let changed = false;
-    const seen = new Set();
-    for (const id of group) {
-      const e = this._curById.get(id);
-      if (
-        e &&
-        e.owner === this.playerId &&
-        (isUnit(e.kind) || isBuilding(e.kind)) &&
-        !seen.has(id) &&
-        live.length < GameState.MAX_SELECTION_SIZE
-      ) {
-        live.push(id);
-        seen.add(id);
-      } else {
-        changed = true;
-      }
+    if (!group || group.length === 0) return null;
+    const admitted = this._admitControlGroupIds(group);
+    if (admitted.ids.length !== group.length || admitted.ids.some((id, index) => id !== group[index])) {
+      this.controlGroups[slot] = admitted.ids;
     }
-    if (changed) this.controlGroups[slot] = live;
+    return admitted;
   }
 
   // --- build placement (client-only) -------------------------------------

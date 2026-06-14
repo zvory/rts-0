@@ -1,6 +1,6 @@
 # Phase 1 - Server Command Budget Validation
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

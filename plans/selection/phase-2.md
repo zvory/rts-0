@@ -1,6 +1,6 @@
 # Phase 2 - Client Selection Budget
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 
