@@ -155,6 +155,12 @@ preserve the current faction's UI while adding fixture-faction coverage for alte
 and ability buttons within the existing resource model. This phase is player-facing, so DOM
 contract tests and smoke coverage are required.
 
+Phase 8.5 cleans up architecture drift found after the guardrail, ability, and client-surface
+phases before the real second-faction brief starts. It restores the faction-assumption ratchet,
+centralizes replay faction/loadout validation, documents the Point Fire ability extension policy,
+and decides whether the checked client catalog mirror is sufficient for Phase 10. This phase should
+not add Ekaterina gameplay or change Kriegsia behavior.
+
 Phase 9 is the approval gate for the real second faction. It creates or references the faction
 brief plus rules/balance spec, including Steel/Oil/Supply usage, loadout, production, roster slices,
 abilities, art readability, and explicit AI/prediction policy. No implementation code for the real
@@ -191,6 +197,7 @@ and balance documentation. This phase is where faction choice becomes ready for 
 6. [Phase 6 - Ability Registry Parity](phase-6.md)
 7. [Phase 7 - Ability Effect Hooks](phase-7.md)
 8. [Phase 8 - Client Faction Surface](phase-8.md)
+8.5. [Phase 8.5 - Architecture Cleanup Before Second-Faction Spec](phase-8.5.md)
 9. [Phase 9 - Second Faction Brief and Rules Spec](phase-9.md)
 10. [Phase 10 - Second Faction Start and Economy Slice](phase-10.md)
 11. [Phase 11 - Second Faction Combat and Signature Ability Slice](phase-11.md)
