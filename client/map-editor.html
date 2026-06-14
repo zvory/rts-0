@@ -450,20 +450,20 @@
             Movement
             <select id="atlas-movement"></select>
           </label>
-          <label class="atlas-check"><input id="atlas-passability" type="checkbox" checked /> Passability</label>
-          <label class="atlas-check"><input id="atlas-components" type="checkbox" /> Components</label>
-          <label class="atlas-check"><input id="atlas-clearance" type="checkbox" checked /> Clearance</label>
-          <label class="atlas-check"><input id="atlas-regions" type="checkbox" /> Regions</label>
-          <label class="atlas-check"><input id="atlas-portals" type="checkbox" checked /> Portals</label>
-          <label class="atlas-check"><input id="atlas-anchors" type="checkbox" checked /> Anchors</label>
+          <label class="atlas-check" data-atlas-help="passability"><input id="atlas-passability" type="checkbox" checked /> Passability</label>
+          <label class="atlas-check" data-atlas-help="components"><input id="atlas-components" type="checkbox" /> Components</label>
+          <label class="atlas-check" data-atlas-help="clearance"><input id="atlas-clearance" type="checkbox" checked /> Clearance</label>
+          <label class="atlas-check" data-atlas-help="regions"><input id="atlas-regions" type="checkbox" /> Regions</label>
+          <label class="atlas-check" data-atlas-help="portals"><input id="atlas-portals" type="checkbox" checked /> Portals</label>
+          <label class="atlas-check" data-atlas-help="anchors"><input id="atlas-anchors" type="checkbox" checked /> Anchors</label>
           <div id="atlas-readout" class="atlas-readout">Atlas data has not loaded.</div>
           <div class="atlas-legend" aria-label="Atlas legend">
-            <div class="atlas-legend-row"><span class="legend-swatch passable"></span><span>Passable terrain for selected movement</span></div>
-            <div class="atlas-legend-row"><span class="legend-swatch component"></span><span>Component id color bands</span></div>
-            <div class="atlas-legend-row"><span class="legend-swatch clearance"></span><span>Clearance heat: low to high</span></div>
-            <div class="atlas-legend-row"><span class="legend-swatch region"></span><span>Region bucket overlays</span></div>
-            <div class="atlas-legend-row"><span class="legend-swatch portal"></span><span>Portal center and width label</span></div>
-            <div class="atlas-legend-row"><span class="legend-swatch anchor"></span><span>Semantic anchor id label</span></div>
+            <div class="atlas-legend-row" data-atlas-help="passability"><span class="legend-swatch passable"></span><span>Passable terrain for selected movement</span></div>
+            <div class="atlas-legend-row" data-atlas-help="components"><span class="legend-swatch component"></span><span>Component id color bands</span></div>
+            <div class="atlas-legend-row" data-atlas-help="clearance"><span class="legend-swatch clearance"></span><span>Clearance heat: low to high</span></div>
+            <div class="atlas-legend-row" data-atlas-help="regions"><span class="legend-swatch region"></span><span>Region bucket overlays</span></div>
+            <div class="atlas-legend-row" data-atlas-help="portals"><span class="legend-swatch portal"></span><span>Portal center and width label</span></div>
+            <div class="atlas-legend-row" data-atlas-help="anchors"><span class="legend-swatch anchor"></span><span>Semantic anchor id label</span></div>
           </div>
         </div>
       </div>
@@ -569,12 +569,21 @@
         portals: document.getElementById("atlas-portals"),
         anchors: document.getElementById("atlas-anchors"),
       };
+      const atlasHelpText = {
+        passability: "Passability\nWhether each terrain tile can be crossed by the selected movement class.",
+        components: "Components\nConnected passable areas. Tiles in different components cannot reach each other without changing movement rules.",
+        clearance: "Clearance\nDistance from blocked terrain or the map edge. Higher values mean wider, safer-feeling space for routes.",
+        regions: "Regions\nCoarse buckets of nearby passable tiles inside a component. They compress raw terrain into named areas the AI can reason about.",
+        portals: "Portals\nConnections between adjacent regions. A portal records the crossing center, the two region ids, movement class, and approximate width.",
+        anchors: "Anchors\nStrategic map points attached to topology: starts, mains, naturals, resource clusters, and resource-line approaches.",
+      };
 
       let map = fallbackMap();
       let activeView = "edit";
       let atlasData = null;
       let atlasLoadingFor = "";
       let atlasHoverTile = null;
+      let atlasHelpKey = "";
       let selectedTool = "grass";
       let selectedMode = "paint";
       let selectedSiteId = map.sites[0].id;
@@ -1070,11 +1079,24 @@
         updateAtlasReadout();
       }
 
+      function atlasHelpStats(layer) {
+        if (!layer || !atlasData) return "";
+        return "\n\nCurrent " + layer.movementClass + " layer: " +
+          layer.components.length + " components, " +
+          layer.regions.length + " regions, " +
+          layer.portals.length + " portals, " +
+          atlasData.anchors.filter(function (anchor) { return anchor.movementClass === layer.movementClass; }).length + " anchors.";
+      }
+
       function updateAtlasReadout() {
         if (activeView !== "atlas") return;
         const layer = selectedAtlasLayer();
         if (!layer) {
           atlasReadoutEl.textContent = "Atlas data has not loaded.";
+          return;
+        }
+        if (atlasHelpKey && atlasHelpText[atlasHelpKey]) {
+          atlasReadoutEl.textContent = atlasHelpText[atlasHelpKey] + atlasHelpStats(layer);
           return;
         }
         if (!atlasHoverTile) {
@@ -1102,9 +1124,9 @@
           "Passable: " + String(!!(layer.passableTiles || [])[idx]) + "\n" +
           "Clearance: " + ((layer.clearanceTiles || [])[idx] ?? 0) + "\n" +
           "Component: " + ((layer.componentByTile || [])[idx] ?? "none") + "\n" +
-          "Region: " + ((layer.regionByTile || [])[idx] ?? "none") + "\n" +
-          "Portals: " + (portals.map(function (portal) { return "P" + portal.id + " w" + portal.widthTiles + " r" + portal.fromRegion + "->" + portal.toRegion; }).join(", ") || "none") + "\n" +
-          "Anchors: " + (anchors.map(function (anchor) { return anchor.id + " c" + anchor.componentId + " r" + anchor.regionId; }).join(", ") || "none");
+          "Region: " + ((layer.regionByTile || [])[idx] ?? "none") + " - coarse topology area\n" +
+          "Portals: " + (portals.map(function (portal) { return "P" + portal.id + " w" + portal.widthTiles + " r" + portal.fromRegion + "->" + portal.toRegion; }).join(", ") || "none") + " - region crossings\n" +
+          "Anchors: " + (anchors.map(function (anchor) { return anchor.id + " c" + anchor.componentId + " r" + anchor.regionId; }).join(", ") || "none") + " - strategic points";
       }
 
       function draw() {
@@ -1516,6 +1538,29 @@
       atlasMovementEl.addEventListener("change", function () { draw(); });
       Object.values(atlasLayerInputs).forEach(function (input) {
         input.addEventListener("change", function () { draw(); });
+      });
+      atlasPanelEl.addEventListener("pointerover", function (event) {
+        const helpTarget = event.target.closest("[data-atlas-help]");
+        if (!helpTarget || !atlasPanelEl.contains(helpTarget)) return;
+        atlasHelpKey = helpTarget.dataset.atlasHelp || "";
+        updateAtlasReadout();
+      });
+      atlasPanelEl.addEventListener("pointerout", function (event) {
+        const helpTarget = event.target.closest("[data-atlas-help]");
+        if (!helpTarget || !atlasPanelEl.contains(helpTarget)) return;
+        if (event.relatedTarget && helpTarget.contains(event.relatedTarget)) return;
+        atlasHelpKey = "";
+        updateAtlasReadout();
+      });
+      atlasPanelEl.addEventListener("focusin", function (event) {
+        const helpTarget = event.target.closest("[data-atlas-help]");
+        if (!helpTarget || !atlasPanelEl.contains(helpTarget)) return;
+        atlasHelpKey = helpTarget.dataset.atlasHelp || "";
+        updateAtlasReadout();
+      });
+      atlasPanelEl.addEventListener("focusout", function () {
+        atlasHelpKey = "";
+        updateAtlasReadout();
       });
       document.getElementById("save-file").addEventListener("click", saveMap);
       document.getElementById("save-as-file").addEventListener("click", saveMapAs);
