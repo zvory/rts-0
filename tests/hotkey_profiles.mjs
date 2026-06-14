@@ -17,7 +17,7 @@ import {
 import { KIND } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
-const ekaterinaCommandId = (family, subject) => factionCommandId("ekaterina", family, subject);
+const ekatCommandId = (family, subject) => factionCommandId("ekat", family, subject);
 
 function memoryStorage(seed = {}) {
   const data = new Map(Object.entries(seed));
@@ -278,20 +278,20 @@ function workerBuildCard(factionId = "kriegsia") {
   }, { activate: true });
   assert.equal(imported.ok, true, "Kriegsia faction bindings import successfully");
   assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "B", "Kriegsia custom build binding applies to Kriegsia");
-  assert.equal(workerBuildCard("ekaterina").slots[0], null, "unknown future factions do not inherit Kriegsia build commands");
+  assert.equal(workerBuildCard("ekat").slots[0], null, "unknown future factions do not inherit Kriegsia build commands");
 }
 
 {
   const hotkeys = service();
-  const futureCommandId = ekaterinaCommandId("build", KIND.CITY_CENTRE);
+  const futureCommandId = ekatCommandId("build", KIND.CITY_CENTRE);
   const imported = hotkeys.importProfile({
     schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
-    id: "custom.future-ekaterina",
+    id: "custom.future-ekat",
     type: "custom",
     mode: "direct",
-    name: "Future Ekaterina",
+    name: "Future Ekat",
     factionBindings: {
-      ekaterina: {
+      ekat: {
         [futureCommandId]: "E",
       },
     },
@@ -304,9 +304,9 @@ function workerBuildCard(factionId = "kriegsia") {
   }, { activate: true });
   assert.equal(imported.ok, true, "unavailable faction commands are preserved on import");
   assert(imported.warnings.some((warning) => warning.code === "unavailableFactionCommand"), "unavailable faction command preservation is diagnosed");
-  assert.equal(imported.profile.factionBindings.ekaterina[futureCommandId], "E", "future Ekaterina command binding is stored");
-  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "Q", "future Ekaterina bindings are inactive for current Kriegsia cards");
-  assert.equal(hotkeys.exportProfile(imported.profile.id).factionBindings.ekaterina[futureCommandId], "E", "future Ekaterina bindings round-trip through export");
+  assert.equal(imported.profile.factionBindings.ekat[futureCommandId], "E", "future Ekat command binding is stored");
+  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "Q", "future Ekat bindings are inactive for current Kriegsia cards");
+  assert.equal(hotkeys.exportProfile(imported.profile.id).factionBindings.ekat[futureCommandId], "E", "future Ekat bindings round-trip through export");
 }
 
 {

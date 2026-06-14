@@ -224,8 +224,8 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        (AbilityEffectHook::Teleport, AbilityKind::EkaterinaTeleport) => {
-            let Some((blink_x, blink_y)) = hero_abilities::ekaterina_teleport_destination(
+        (AbilityEffectHook::Teleport, AbilityKind::EkatTeleport) => {
+            let Some((blink_x, blink_y)) = hero_abilities::ekat_teleport_destination(
                 map,
                 entities,
                 caster,
@@ -242,7 +242,7 @@ pub(crate) fn launch_world_ability(
                 return false;
             };
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
-            if !hero_abilities::move_ekaterina_to(entities, caster, blink_x, blink_y) {
+            if !hero_abilities::move_ekat_to(entities, caster, blink_x, blink_y) {
                 return false;
             }
             notice_positioned(
@@ -255,11 +255,11 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        (AbilityEffectHook::LineDamage, AbilityKind::EkaterinaLineShot) => {
+        (AbilityEffectHook::LineDamage, AbilityKind::EkatLineShot) => {
             if !ps.spend_cost(definition.cost) {
                 return false;
             }
-            let Some((target_x, target_y)) = hero_abilities::apply_ekaterina_line_shot(
+            let Some((target_x, target_y)) = hero_abilities::apply_ekat_line_shot(
                 entities,
                 teams,
                 player,

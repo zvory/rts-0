@@ -3,7 +3,7 @@
 ## Purpose
 
 Add support for multiple factions without turning every new faction identity into a cross-codebase
-rewrite. The immediate playable faction remains Kriegsia, the many-unit RTS faction. Ekaterina is
+rewrite. The immediate playable faction remains Kriegsia, the many-unit RTS faction. Ekat is
 reserved as the first future second faction, but its previous RTS-style roster/economy/ability spec
 has been purged. Its design restarts from a clean slate as a MOBA-like, hero-centric faction where
 the player mostly controls one hero unit.
@@ -65,11 +65,11 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
 - **Compatibility:** no backwards compatibility requirement for replay artifacts, match-history
   replay payloads, compact snapshot versions, old clients, or old protocol payloads.
 - **Faction names:** the existing faction is **Kriegsia** and its canonical id is `kriegsia`.
-  The first real new faction is **Ekaterina** and its reserved id is `ekaterina`. Earlier Phase 1/2
+  The first real new faction is **Ekat** and its reserved id is `ekat`. Earlier Phase 1/2
   work introduced `steel_vanguard` as a temporary current-faction id; Phase 3A must rename that id
   before later phases build durable replay, command, hotkey, or prediction contracts on it.
 - **Economy:** Kriegsia and architecture fixtures use the existing Steel, Oil, and Supply resource
-  contract. Ekaterina has no approved economy, production, building, or resource contract yet; do
+  contract. Ekat has no approved economy, production, building, or resource contract yet; do
   not infer one from Kriegsia.
 - **Data ownership:** faction catalogs are Rust-authoritative. Client data is generated or
   mechanically checked from the Rust catalog.
@@ -78,7 +78,7 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
 - **Command legality:** the server rejects out-of-faction build/train/research/economy/ability
   commands even if the referenced global kind exists.
 - **Starts:** faction starting loadouts define starting entities, resources, supply model, and
-  optional opening upgrades/flags only after a faction rules spec is approved. Ekaterina has no
+  optional opening upgrades/flags only after a faction rules spec is approved. Ekat has no
   approved loadout.
 - **AI:** AI remains current-faction-only until an explicit AI phase implements another faction.
 - **Prediction:** prediction stays enabled for supported local-player factions only. It must be
@@ -115,7 +115,7 @@ and client catalog data must become generated or mechanically parity-checked fro
 
 Phase 3 is split into four executor-sized guardrail phases before faction-specific starts or UI
 become visible. Phase 3A corrects the canonical current-faction id to `kriegsia`, reserves
-`ekaterina`, adds the server validation contract, and updates the lifecycle matrix. Phase 3B makes
+`ekat`, adds the server validation contract, and updates the lifecycle matrix. Phase 3B makes
 AI and prediction fail closed; Phase 3C defines command ids and per-faction hotkeys; Phase 3D
 hardens replay, branch, and dev lifecycle tests.
 
@@ -134,7 +134,7 @@ Phase 5.5 tightens the architectural seams discovered after the first implemente
 It makes lower-level catalog access fail closed for unknown factions, narrows old global start
 resource compatibility APIs, strengthens catalog/checker guardrails, and prepares Phase 6 to
 consolidate ability metadata instead of adding another source of truth. This phase should not add
-Ekaterina gameplay or change Kriegsia behavior.
+Ekat gameplay or change Kriegsia behavior.
 
 Phase 6 turns existing abilities into registry-backed discovery and projection without changing
 their effects. It preserves Smoke, Mortar Fire, Artillery Point Fire, Breakthrough, and legacy
@@ -159,13 +159,13 @@ Phase 8.5 cleans up architecture drift found after the guardrail, ability, and c
 phases before the real second-faction brief starts. It restores the faction-assumption ratchet,
 centralizes replay faction/loadout validation, documents the Point Fire ability extension policy,
 and decides whether the checked client catalog mirror is sufficient for Phase 10. This phase should
-not add Ekaterina gameplay or change Kriegsia behavior.
+not add Ekat gameplay or change Kriegsia behavior.
 
-Phase 9 is reset to a design gate for Ekaterina's clean-slate hero faction direction. It may only
+Phase 9 is reset to a design gate for Ekat's clean-slate hero faction direction. It may only
 produce a user-approved brief and rules/balance spec. No Rust, JS, protocol, balance, art, tests, or
-other implementation files for Ekaterina should land until that spec exists.
+other implementation files for Ekat should land until that spec exists.
 
-Phase 10 is blocked until Phase 9 approves a hero-centric Ekaterina rules spec. It must not recreate
+Phase 10 is blocked until Phase 9 approves a hero-centric Ekat rules spec. It must not recreate
 the purged RTS-style worker/building/production slice.
 
 Phase 11 is blocked until Phase 10 has an approved hero-centric implementation slice. It must not
@@ -199,7 +199,7 @@ Phase 12 remains undefined until the hero-faction design and implementation sequ
 
 - [Faction Lifecycle Matrix](lifecycle-matrix.md) — assignment, AI, prediction, replay, branch,
   spectator, dev-tool, and match-history source-of-truth tracker.
-- [Ekaterina Clean-Slate Brief](ekaterina-brief.md) — reserved-id product direction and explicit
+- [Ekat Clean-Slate Brief](ekat-brief.md) — reserved-id product direction and explicit
   non-approval of the purged RTS-style content.
 
 ## Testing Strategy

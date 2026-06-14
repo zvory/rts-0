@@ -1,16 +1,16 @@
 # Phase 10 - Second Faction Start and Economy Slice
 
-Status: Blocked until Phase 9 approves a hero-centric Ekaterina rules spec.
+Status: Blocked until Phase 9 approves a hero-centric Ekat rules spec.
 
 ## Objective
 
-Implement only the first Phase 9-approved hero-centric Ekaterina slice. The old RTS-style
+Implement only the first Phase 9-approved hero-centric Ekat slice. The old RTS-style
 start/economy/production path was purged and must not be recreated without explicit approval.
 
 ## Scope
 
-- Use the existing reserved `ekaterina` id only if the approved spec says the slice is ready to run.
-- Expose Ekaterina only through the Phase 9-approved assignment path unless this phase explicitly
+- Use the existing reserved `ekat` id only if the approved spec says the slice is ready to run.
+- Expose Ekat only through the Phase 9-approved assignment path unless this phase explicitly
   implements normal lobby selection.
 - Add only the approved hero start state, controls, progression/economy, abilities, and supporting
   entities.
@@ -51,14 +51,14 @@ start/economy/production path was purged and must not be recreated without expli
 - Rust command tests for illegal cross-faction commands in both directions.
 - Protocol parity tests for any new faction/kind/ability/event ids touched by this slice.
 - Client command-card/control descriptor tests for the approved hero actions.
-- Server integration test for the approved Ekaterina start path.
-- Prediction-disable test for Ekaterina starts if WASM is not updated.
-- Replay/branch schema test for the Ekaterina start slice if replay or branch start is exposed.
+- Server integration test for the approved Ekat start path.
+- Prediction-disable test for Ekat starts if WASM is not updated.
+- Replay/branch schema test for the Ekat start slice if replay or branch start is exposed.
 - Balance/design docs updated with player-facing hero stats and progression/economy behavior.
 
 ## Manual Testing Focus
 
-Start a local match as Ekaterina and verify the approved hero controls, start state,
+Start a local match as Ekat and verify the approved hero controls, start state,
 progression/economy, command legality, AI restriction, and prediction-disabled state. Also start a
 Kriegsia match and verify the original RTS start and economy were not regressed.
 
@@ -69,4 +69,4 @@ used, lifecycle matrix updates, tests run, known limitations, and exactly what P
 
 ## Player-Facing Outcome
 
-Players can enter the approved dev/local Ekaterina path and exercise the first hero-centric slice.
+Players can enter the approved dev/local Ekat path and exercise the first hero-centric slice.

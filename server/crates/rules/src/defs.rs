@@ -267,7 +267,7 @@ pub const UNITS: &[UnitDef] = &[
         train_requires: FACTORY_BUILDING_REQUIRED,
     },
     UnitDef {
-        kind: EntityKind::Ekaterina,
+        kind: EntityKind::Ekat,
         stats: balance::UnitStats {
             hp: 300,
             dmg: 10,
@@ -537,7 +537,7 @@ mod tests {
                 EntityKind::Tank,
                 EntityKind::ScoutCar,
                 EntityKind::CommandCar,
-                EntityKind::Ekaterina,
+                EntityKind::Ekat,
             ]
         );
 

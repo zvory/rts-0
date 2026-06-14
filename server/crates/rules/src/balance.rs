@@ -99,14 +99,14 @@ pub const SMOKE_ABILITY_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 20;
 pub const SCOUT_CAR_SMOKE_USES: u16 = 2;
 pub const SMOKE_ABILITY_COST_STEEL: u32 = 0;
 pub const SMOKE_ABILITY_COST_OIL: u32 = 0;
-pub const EKATERINA_REGEN_TICKS: u32 = TICK_HZ;
-pub const EKATERINA_REGEN_HP: u32 = 1;
-pub const EKATERINA_TELEPORT_RANGE_TILES: u32 = 5;
-pub const EKATERINA_TELEPORT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 8;
-pub const EKATERINA_LINE_SHOT_RANGE_TILES: u32 = 6;
-pub const EKATERINA_LINE_SHOT_WIDTH_TILES: f32 = 0.6;
-pub const EKATERINA_LINE_SHOT_DAMAGE: u32 = 40;
-pub const EKATERINA_LINE_SHOT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 10;
+pub const EKAT_REGEN_TICKS: u32 = TICK_HZ;
+pub const EKAT_REGEN_HP: u32 = 1;
+pub const EKAT_TELEPORT_RANGE_TILES: u32 = 5;
+pub const EKAT_TELEPORT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 8;
+pub const EKAT_LINE_SHOT_RANGE_TILES: u32 = 6;
+pub const EKAT_LINE_SHOT_WIDTH_TILES: f32 = 0.6;
+pub const EKAT_LINE_SHOT_DAMAGE: u32 = 40;
+pub const EKAT_LINE_SHOT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 10;
 
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;

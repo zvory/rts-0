@@ -43,7 +43,7 @@ pub mod kinds {
     pub const SCOUT_CAR: &str = "scout_car";
     pub const TANK: &str = "tank";
     pub const COMMAND_CAR: &str = "command_car";
-    pub const EKATERINA: &str = "ekaterina";
+    pub const EKAT: &str = "ekat";
     pub const CITY_CENTRE: &str = "city_centre";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
@@ -75,8 +75,8 @@ pub mod abilities {
     pub const MORTAR_FIRE: &str = "mortarFire";
     pub const POINT_FIRE: &str = "pointFire";
     pub const BREAKTHROUGH: &str = "breakthrough";
-    pub const EKATERINA_TELEPORT: &str = "ekaterinaTeleport";
-    pub const EKATERINA_LINE_SHOT: &str = "ekaterinaLineShot";
+    pub const EKAT_TELEPORT: &str = "ekatTeleport";
+    pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
 }
 
 /// Permanent upgrade ids used by production/research and snapshot projection.
@@ -1170,7 +1170,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::STEELWORKS => 13,
         kinds::RESEARCH_COMPLEX => 17,
         kinds::COMMAND_CAR => 18,
-        kinds::EKATERINA => 19,
+        kinds::EKAT => 19,
         kinds::ZAMOK => 20,
         _ => 255,
     }
@@ -1211,8 +1211,8 @@ fn order_stage_code(kind: &str) -> u8 {
         abilities::MORTAR_FIRE => 9,
         abilities::POINT_FIRE => 10,
         abilities::BREAKTHROUGH => 11,
-        abilities::EKATERINA_TELEPORT => 12,
-        abilities::EKATERINA_LINE_SHOT => 13,
+        abilities::EKAT_TELEPORT => 12,
+        abilities::EKAT_LINE_SHOT => 13,
         "setupAntiTankGuns" => 7,
         abilities::CHARGE => 8,
         _ => 255,
@@ -1226,8 +1226,8 @@ fn ability_code(ability: &str) -> u8 {
         abilities::MORTAR_FIRE => 3,
         abilities::POINT_FIRE => 4,
         abilities::BREAKTHROUGH => 5,
-        abilities::EKATERINA_TELEPORT => 6,
-        abilities::EKATERINA_LINE_SHOT => 7,
+        abilities::EKAT_TELEPORT => 6,
+        abilities::EKAT_LINE_SHOT => 7,
         _ => 255,
     }
 }

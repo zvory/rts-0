@@ -7,7 +7,7 @@ Status: Done.
 Clean up the architectural drift found after Phases 5.5 through 8 before Phase 9 starts the real
 second-faction brief. This phase is a cleanup and guardrail repair pass, not a gameplay-content
 phase. It should keep Kriegsia behavior unchanged while making the faction architecture ready for
-approved Ekaterina design work.
+approved Ekat design work.
 
 ## Review Findings To Address
 
@@ -60,7 +60,7 @@ approved Ekaterina design work.
 
 ## Non-Goals
 
-- Do not add Ekaterina catalog entries, lobby selection, units, buildings, abilities, art, AI
+- Do not add Ekat catalog entries, lobby selection, units, buildings, abilities, art, AI
   behavior, or prediction support.
 - Do not implement the Phase 9 faction brief or rules/balance spec.
 - Do not redesign the ability system into a generic scripting engine.

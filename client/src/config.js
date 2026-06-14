@@ -100,13 +100,13 @@ export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 7;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
 export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
-export const EKATERINA_REGEN_TICKS = TICK_HZ;
-export const EKATERINA_TELEPORT_RANGE_TILES = 5;
-export const EKATERINA_TELEPORT_COOLDOWN_TICKS = TICK_HZ * 8;
-export const EKATERINA_LINE_SHOT_RANGE_TILES = 6;
-export const EKATERINA_LINE_SHOT_WIDTH_TILES = 0.6;
-export const EKATERINA_LINE_SHOT_DAMAGE = 40;
-export const EKATERINA_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
+export const EKAT_REGEN_TICKS = TICK_HZ;
+export const EKAT_TELEPORT_RANGE_TILES = 5;
+export const EKAT_TELEPORT_COOLDOWN_TICKS = TICK_HZ * 8;
+export const EKAT_LINE_SHOT_RANGE_TILES = 6;
+export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
+export const EKAT_LINE_SHOT_DAMAGE = 40;
+export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 12;
 
@@ -148,7 +148,7 @@ export const STATS = Object.freeze({
     rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.COMMAND_CAR_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
-  [KIND.EKATERINA]: { label: "Ekaterina", icon: "EK", size: 10, sight: 9,
+  [KIND.EKAT]: { label: "Ekat", icon: "EK", size: 10, sight: 9,
     rangeTiles: 4, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
@@ -248,32 +248,32 @@ export const ABILITIES = Object.freeze({
     durationTicks: BREAKTHROUGH_DURATION_TICKS,
     queued: true,
   }),
-  [ABILITY.EKATERINA_TELEPORT]: Object.freeze({
-    ability: ABILITY.EKATERINA_TELEPORT,
+  [ABILITY.EKAT_TELEPORT]: Object.freeze({
+    ability: ABILITY.EKAT_TELEPORT,
     label: "Teleport",
     icon: "TP",
     hotkey: "D",
     title: "Teleport up to 5 tiles",
-    carriers: Object.freeze([KIND.EKATERINA]),
+    carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
-    rangeTiles: EKATERINA_TELEPORT_RANGE_TILES,
-    cooldownTicks: EKATERINA_TELEPORT_COOLDOWN_TICKS,
+    rangeTiles: EKAT_TELEPORT_RANGE_TILES,
+    cooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: false,
   }),
-  [ABILITY.EKATERINA_LINE_SHOT]: Object.freeze({
-    ability: ABILITY.EKATERINA_LINE_SHOT,
+  [ABILITY.EKAT_LINE_SHOT]: Object.freeze({
+    ability: ABILITY.EKAT_LINE_SHOT,
     label: "Line Shot",
     icon: "LS",
     hotkey: "X",
     title: "Damage enemies in a line",
-    carriers: Object.freeze([KIND.EKATERINA]),
+    carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
-    rangeTiles: EKATERINA_LINE_SHOT_RANGE_TILES,
-    cooldownTicks: EKATERINA_LINE_SHOT_COOLDOWN_TICKS,
+    rangeTiles: EKAT_LINE_SHOT_RANGE_TILES,
+    cooldownTicks: EKAT_LINE_SHOT_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
-    radiusTiles: EKATERINA_LINE_SHOT_WIDTH_TILES * 0.5,
-    damage: EKATERINA_LINE_SHOT_DAMAGE,
+    radiusTiles: EKAT_LINE_SHOT_WIDTH_TILES * 0.5,
+    damage: EKAT_LINE_SHOT_DAMAGE,
     queued: false,
   }),
 });
@@ -360,7 +360,7 @@ export const WORKER_BUILDABLE = Object.freeze([
 ]);
 
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
-export const EKATERINA_FACTION_ID = "ekaterina";
+export const EKAT_FACTION_ID = "ekat";
 
 function freezeCatalog(catalog) {
   const trainables = {};
@@ -435,15 +435,15 @@ export const FACTION_CATALOGS = Object.freeze({
     research: {},
     abilities: [],
   }),
-  [EKATERINA_FACTION_ID]: freezeCatalog({
-    id: EKATERINA_FACTION_ID,
-    loadoutId: "ekaterina.standard",
-    units: [KIND.EKATERINA],
+  [EKAT_FACTION_ID]: freezeCatalog({
+    id: EKAT_FACTION_ID,
+    loadoutId: "ekat.standard",
+    units: [KIND.EKAT],
     buildings: [KIND.ZAMOK],
     buildables: [],
     trainables: {},
     research: {},
-    abilities: [ABILITY.EKATERINA_TELEPORT, ABILITY.EKATERINA_LINE_SHOT],
+    abilities: [ABILITY.EKAT_TELEPORT, ABILITY.EKAT_LINE_SHOT],
   }),
 });
 
