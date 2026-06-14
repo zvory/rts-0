@@ -93,8 +93,8 @@
 
           <aside class="lobby-setup-panel" aria-label="Lobby setup">
             <header class="lobby-setup-header">
-              <span>Host controls</span>
-              <h2>Match setup</h2>
+              <span id="lobby-setup-kicker">Join lobby</span>
+              <h2 id="lobby-setup-title">Choose room</h2>
             </header>
 
             <div class="lobby-form">
@@ -113,17 +113,17 @@
               </label>
               <button id="lobby-join" class="btn primary">Join room</button>
 
-              <div class="lobby-control-field lobby-team-row">
+              <div class="lobby-control-field lobby-team-row lobby-joined-only">
                 <label id="lobby-team-preset-label" for="lobby-team-preset">Teams</label>
                 <select id="lobby-team-preset" disabled></select>
                 <span id="lobby-team-preset-display" hidden></span>
               </div>
-              <div class="lobby-control-field lobby-map-row">
+              <div class="lobby-control-field lobby-map-row lobby-joined-only">
                 <label id="lobby-map-label" for="lobby-map">Map</label>
                 <select id="lobby-map" disabled></select>
                 <span id="lobby-map-display" hidden></span>
               </div>
-              <div class="lobby-host-tools">
+              <div class="lobby-host-tools lobby-joined-only">
                 <button id="lobby-add-ai" class="btn host-only" hidden>Add AI</button>
                 <label id="lobby-quickstart" class="toggle host-only" hidden>
                   <input type="checkbox" />
@@ -133,9 +133,9 @@
             </div>
 
             <footer class="lobby-launch-panel">
-              <span>Launch</span>
-              <h2>Ready check</h2>
-              <div class="lobby-actions">
+              <span class="lobby-joined-only">Launch</span>
+              <h2 class="lobby-joined-only">Ready check</h2>
+              <div class="lobby-actions lobby-joined-only">
                 <button id="lobby-ready" class="btn">Ready</button>
                 <button id="lobby-start" class="btn primary" disabled>Start match</button>
               </div>
