@@ -250,12 +250,16 @@ the same `ReplayArtifactV1` contract as post-match and match-history replays; pr
 artifact payloads are rejected instead of falling back to a separate loader.
 
 Replay artifact schema version 2 stores ordered `players[]` with each original `team_id` and
-required `faction_id`, the compatibility `winnerId`, optional `winnerTeamId`, and `finalScores[]`
-with each row's `teamId`. Missing `players[].faction_id` or artifact schema version 1 payloads are
-rejected. Missing `players[].team_id`, `finalScores[].teamId`, or `winnerTeamId` in older
-singleton-FFA-compatible schema-2 fixtures defaults through the documented singleton team behavior;
-new captures always include explicit nonzero player and score team ids, required player faction
-ids, and `winnerTeamId` when there is a winning team.
+required `faction_id`, plus `playerLoadouts[]` with one `{ playerId, factionId, loadoutId,
+startingSteel, startingOil }` record per player. Replay reconstruction uses those per-player
+loadout records instead of one global `startingSteel`/`startingOil`/`startingLoadoutMode` shim.
+The compatibility `winnerId`, optional `winnerTeamId`, and `finalScores[]` with each row's
+`teamId` remain part of the artifact. Missing `players[].faction_id`, missing/mismatched
+`playerLoadouts[]`, or artifact schema version 1 payloads are rejected. Missing
+`players[].team_id`, `finalScores[].teamId`, or `winnerTeamId` in older singleton-FFA-compatible
+schema-2 fixtures defaults through the documented singleton team behavior; new captures always
+include explicit nonzero player and score team ids, required player faction ids, required player
+loadout records, and `winnerTeamId` when there is a winning team.
 
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload

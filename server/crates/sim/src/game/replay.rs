@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Game, MapMetadata, PlayerInit, StartingLoadout};
+use super::{Game, MapMetadata, PlayerInit, PlayerStartingLoadout};
 use crate::game::command::SimCommand;
 use crate::protocol::{Command, Event, PlayerScore, ReplayStartMetadata, Snapshot};
 
@@ -21,22 +21,6 @@ pub struct CommandLogEntry {
     pub command: Command,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum ReplayStartingLoadoutMode {
-    Standard,
-    DebugHuman,
-}
-
-impl From<StartingLoadout> for ReplayStartingLoadoutMode {
-    fn from(value: StartingLoadout) -> Self {
-        match value {
-            StartingLoadout::Standard => ReplayStartingLoadoutMode::Standard,
-            StartingLoadout::DebugHuman => ReplayStartingLoadoutMode::DebugHuman,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplayArtifactV1 {
@@ -46,9 +30,7 @@ pub struct ReplayArtifactV1 {
     pub map_schema_version: u32,
     pub map_content_hash: String,
     pub seed: u32,
-    pub starting_steel: u32,
-    pub starting_oil: u32,
-    pub starting_loadout_mode: ReplayStartingLoadoutMode,
+    pub player_loadouts: Vec<PlayerStartingLoadout>,
     pub players: Vec<PlayerInit>,
     pub duration_ticks: u32,
     pub command_log: Vec<CommandLogEntry>,
@@ -73,9 +55,7 @@ impl ReplayArtifactV1 {
             map_schema_version: map.schema_version,
             map_content_hash: map.content_hash.clone(),
             seed: game.seed(),
-            starting_steel: game.starting_steel(),
-            starting_oil: game.starting_oil(),
-            starting_loadout_mode: game.starting_loadout().into(),
+            player_loadouts: game.starting_loadouts().to_vec(),
             players: game.player_inits(),
             duration_ticks: game.tick_count(),
             command_log: game.command_log().to_vec(),
@@ -231,11 +211,9 @@ pub fn replay_commands(
     commands: &[CommandLogEntry],
     ticks: u32,
     seed: u32,
-    starting_steel: u32,
-    starting_oil: u32,
+    starting_loadouts: &[PlayerStartingLoadout],
 ) -> Result<ReplayOutcome, ReplayError> {
-    let mut replay =
-        Game::new_for_replay_with_starting_resources(players, starting_steel, starting_oil, seed);
+    let mut replay = Game::new_for_replay_with_starting_loadouts(players, starting_loadouts, seed);
     let mut next_command = 0usize;
     let mut events = Vec::new();
 
@@ -349,9 +327,16 @@ mod tests {
     }
 
     #[test]
-    fn replay_commands_preserves_explicit_starting_resources() {
+    fn replay_commands_preserves_explicit_player_loadout_resources() {
         let players = players();
-        let outcome = replay_commands(&players, &[], 0, 0x1234_5678, 99_999, 88_888)
+        let starting_loadouts = [PlayerStartingLoadout {
+            player_id: 1,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            loadout_id: "kriegsia.standard".to_string(),
+            starting_steel: 99_999,
+            starting_oil: 88_888,
+        }];
+        let outcome = replay_commands(&players, &[], 0, 0x1234_5678, &starting_loadouts)
             .expect("replay should succeed");
         let snapshot = &outcome.final_snapshots[0].snapshot;
 
@@ -375,12 +360,10 @@ mod tests {
         assert_eq!(artifact.server_build_sha, "test-sha");
         assert_eq!(artifact.map_name, "Default");
         assert_eq!(artifact.seed, 0x1234_5678);
-        assert_eq!(artifact.starting_steel, 777);
-        assert_eq!(artifact.starting_oil, 333);
-        assert_eq!(
-            artifact.starting_loadout_mode,
-            ReplayStartingLoadoutMode::Standard
-        );
+        assert_eq!(artifact.player_loadouts.len(), 1);
+        assert_eq!(artifact.player_loadouts[0].starting_steel, 777);
+        assert_eq!(artifact.player_loadouts[0].starting_oil, 333);
+        assert_eq!(artifact.player_loadouts[0].loadout_id, "kriegsia.standard");
         assert_eq!(artifact.players, players);
         assert_eq!(artifact.players[0].faction_id, DEFAULT_FACTION_ID);
         assert_eq!(artifact.duration_ticks, 1);
@@ -399,9 +382,13 @@ mod tests {
             "mapSchemaVersion": 1,
             "mapContentHash": "hash",
             "seed": 1,
-            "startingSteel": 75,
-            "startingOil": 0,
-            "startingLoadoutMode": "standard",
+            "playerLoadouts": [{
+                "playerId": 1,
+                "factionId": DEFAULT_FACTION_ID,
+                "loadoutId": "kriegsia.standard",
+                "startingSteel": 75,
+                "startingOil": 0
+            }],
             "players": [{
                 "id": 1,
                 "team_id": 1,
@@ -430,9 +417,6 @@ mod tests {
             "mapSchemaVersion": 1,
             "mapContentHash": "hash",
             "seed": 1,
-            "startingSteel": 75,
-            "startingOil": 0,
-            "startingLoadoutMode": "standard",
             "players": [{
                 "id": 1,
                 "team_id": 1,

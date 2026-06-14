@@ -642,8 +642,7 @@ fn replay_outcome_for(
         game.command_log(),
         game.tick_count(),
         game.seed(),
-        game.starting_steel(),
-        game.starting_oil(),
+        game.starting_loadouts(),
     )
     .map_err(|e| SelfPlayFailure::new(format!("replay failed: {e}")))
 }
@@ -904,12 +903,10 @@ mod tests {
 
         assert!(!result.ai_trace_tail.is_empty());
         assert!(result.ai_trace_tail.len() <= super::PROFILE_MATCHUP_TRACE_TAIL);
-        assert!(
-            result.ai_trace_tail.iter().any(|entry| entry
-                .lines
-                .iter()
-                .any(|line| line.contains("goal=Economy")))
-        );
+        assert!(result
+            .ai_trace_tail
+            .iter()
+            .any(|entry| entry.lines.iter().any(|line| line.contains("goal=Economy"))));
     }
 
     fn snapshot(entities: Vec<EntityView>) -> Snapshot {

@@ -308,8 +308,13 @@ fn build_dev_scenario_game(
     game.pathing = pathing;
     game.lingering_sight.clear();
     game.smokes = SmokeCloudStore::new();
-    game.starting_steel = 0;
-    game.starting_oil = 0;
+    game.starting_loadouts = vec![PlayerStartingLoadout {
+        player_id,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        loadout_id: "dev_scenario".to_string(),
+        starting_steel: 0,
+        starting_oil: 0,
+    }];
     game.map_metadata = super::dev_map_metadata(metadata_name);
     game.debug_path_overlays = true;
     game.starting_loadout = StartingLoadout::DebugHuman;

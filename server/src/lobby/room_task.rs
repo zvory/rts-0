@@ -463,6 +463,45 @@ impl ReplaySession {
                 ));
             }
         }
+        let mut seen_loadouts = HashSet::new();
+        for loadout in &artifact.player_loadouts {
+            if !seen_loadouts.insert(loadout.player_id) {
+                return Err(format!(
+                    "replay artifact has duplicate loadout for player {}",
+                    loadout.player_id
+                ));
+            }
+            let Some(player) = artifact
+                .players
+                .iter()
+                .find(|player| player.id == loadout.player_id)
+            else {
+                return Err(format!(
+                    "replay loadout references unknown player {}",
+                    loadout.player_id
+                ));
+            };
+            if loadout.faction_id != player.faction_id {
+                return Err(format!(
+                    "replay loadout for player {} has faction {:?}; expected {:?}",
+                    loadout.player_id, loadout.faction_id, player.faction_id
+                ));
+            }
+            if loadout.loadout_id.trim().is_empty() {
+                return Err(format!(
+                    "replay loadout for player {} is missing a loadout id",
+                    loadout.player_id
+                ));
+            }
+        }
+        for player in &artifact.players {
+            if !seen_loadouts.contains(&player.id) {
+                return Err(format!(
+                    "replay artifact is missing loadout for player {}",
+                    player.id
+                ));
+            }
+        }
         if artifact.duration_ticks > Self::MAX_DURATION_TICKS {
             return Err(format!(
                 "replay duration {} exceeds maximum {}",
@@ -536,10 +575,8 @@ impl ReplaySession {
             .map_err(|err| format!("cannot load replay map: {err}"))?;
         Ok(Game::new_for_replay_with_map_metadata(
             &artifact.players,
-            artifact.starting_steel,
-            artifact.starting_oil,
             artifact.seed,
-            artifact.starting_loadout_mode.clone(),
+            &artifact.player_loadouts,
             map,
             metadata,
         ))
@@ -4265,6 +4302,36 @@ mod tests {
         };
         assert!(
             err.contains("duplicate player id"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_require_matching_player_loadouts() {
+        let players = replay_test_players(2);
+        let (_live, mut missing_artifact) = replay_test_artifact(&players, 0);
+        missing_artifact
+            .player_loadouts
+            .retain(|loadout| loadout.player_id != players[0].id);
+
+        let err = match ReplaySession::new(missing_artifact) {
+            Ok(_) => panic!("missing replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("missing loadout"),
+            "unexpected artifact reject: {err}"
+        );
+
+        let (_live, mut mismatched_artifact) = replay_test_artifact(&players, 0);
+        mismatched_artifact.player_loadouts[0].faction_id = "ekaterina".to_string();
+
+        let err = match ReplaySession::new(mismatched_artifact) {
+            Ok(_) => panic!("mismatched replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("loadout for player"),
             "unexpected artifact reject: {err}"
         );
     }
