@@ -37,6 +37,7 @@ import {
   buildCommandCardContextCatalog,
   buildCommandCardDescriptors,
   duplicateCommandIdsForCard,
+  factionCommandId,
 } from "../client/src/hud_command_card.js";
 import { Audio, noticeSoundId } from "../client/src/audio.js";
 import {
@@ -45,6 +46,7 @@ import {
 } from "../client/src/combat_audio.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
+  DEFAULT_FACTION_ID,
   PREDICTION_PROTOCOL_VERSION,
   ABILITY,
   ABILITY_CODE,
@@ -146,10 +148,12 @@ function commandCardCtx({
   commandCardMode = null,
   commandTarget = null,
   spectator = false,
+  factionId = DEFAULT_FACTION_ID,
 } = {}) {
   return {
     spectator,
     playerId,
+    factionId,
     selection,
     resources,
     upgrades,
@@ -158,6 +162,10 @@ function commandCardCtx({
     groupCooldownClocks,
     playerHasCompleteKind: (kind) => playerHasCompletedKind(entities, playerId, kind),
   };
+}
+
+function defaultFactionCommandId(family, subject) {
+  return factionCommandId(DEFAULT_FACTION_ID, family, subject);
 }
 
 function commandButtons(card) {
@@ -735,7 +743,7 @@ function hotkeyService() {
   assert(buildCard.kind === "workerBuild", "worker build menu should use build descriptor card");
   assert(buildCard.slots.length === 9, "worker build card keeps a 3x3 grid");
   assert(buildCard.slots[0].intent.type === "beginPlacement", "worker build button should start placement");
-  assert(buildCard.slots[0].commandId === `build.${KIND.CITY_CENTRE}`, "worker build button should expose stable command identity");
+  assert(buildCard.slots[0].commandId === defaultFactionCommandId("build", KIND.CITY_CENTRE), "worker build button should expose stable command identity");
   assert(buildCard.slots[0].slotIndex === 0, "worker build button should expose rendered slot index");
   assert(buildCard.slots[0].label === "City Centre", "worker build first slot should stay City Centre");
   assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
@@ -762,7 +770,7 @@ function hotkeyService() {
   }));
   assert(trainCard.kind === "train", "production building should use train descriptor card");
   assert(trainCard.slots[0].label === "Rifleman", "Barracks first train slot should be Rifleman");
-  assert(trainCard.slots[0].commandId === `train.${KIND.RIFLEMAN}`, "train button should expose stable train identity");
+  assert(trainCard.slots[0].commandId === defaultFactionCommandId("train", KIND.RIFLEMAN), "train button should expose stable train identity");
   assert(trainCard.slots[0].slotIndex === 0, "train button should expose rendered slot index");
   assert(trainCard.slots[0].repeatable, "train hotkeys should remain repeatable");
   assert(trainCard.slots[0].intent.type === "train", "train button should carry train intent");
@@ -786,7 +794,7 @@ function hotkeyService() {
   }));
   const smoke = buttonByAction(abilityCard, "ability");
   assert(smoke.label === "Smoke", "ability button should expose ability label");
-  assert(smoke.commandId === `ability.${ABILITY.SMOKE}`, "ability button should expose stable ability identity");
+  assert(smoke.commandId === defaultFactionCommandId("ability", ABILITY.SMOKE), "ability button should expose stable ability identity");
   assert(smoke.slotIndex === 5, "ability button should expose rendered slot index");
   assert(smoke.hotkey === "D", "ability preferred hotkey should be preserved");
   assert(smoke.intent.targetMode === "worldPoint", "world-point ability should carry targeting intent");
@@ -870,7 +878,7 @@ function hotkeyService() {
   const antiTankGunUnlock = buttonByLabel(researchCard, "Anti-Tank Gun Crews");
   const artilleryUnlock = buttonByLabel(researchCard, "Unlock Artillery");
   assert(antiTankGunUnlock && antiTankGunUnlock.enabled, "available affordable upgrade should be enabled");
-  assert(antiTankGunUnlock.commandId === `research.${UPGRADE.ANTI_TANK_GUN_UNLOCK}`, "research button should expose stable research identity");
+  assert(antiTankGunUnlock.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
   assert(antiTankGunUnlock.intent.type === "research", "upgrade button should carry research intent");
   assert(artilleryUnlock && !artilleryUnlock.enabled, "Artillery research should show disabled before Anti-Tank Gun research");
   assert(artilleryUnlock.title === "Requires Anti-Tank Gun Research", "Artillery research should name missing anti-tank prerequisite");

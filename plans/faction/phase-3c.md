@@ -1,6 +1,6 @@
 # Phase 3C - Command Identity and Per-Faction Hotkeys
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

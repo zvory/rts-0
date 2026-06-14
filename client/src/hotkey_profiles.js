@@ -1,4 +1,10 @@
-import { GRID_HOTKEYS, gridHotkeyForSlot } from "./hud_command_card.js";
+import {
+  GRID_HOTKEYS,
+  factionCommandId,
+  gridHotkeyForSlot,
+  parsedFactionCommandId,
+} from "./hud_command_card.js";
+import { DEFAULT_FACTION_ID } from "./protocol.js";
 
 export const HOTKEY_PROFILE_SCHEMA_VERSION = 1;
 export const HOTKEY_STORAGE_PROFILES_KEY = "rts.hotkeyProfiles.v1";
@@ -64,6 +70,7 @@ export function createGridPreset() {
     name: "Grid",
     description: "Command-card hotkeys follow the rendered QWE/ASD/ZXC grid.",
     bindings: {},
+    factionBindings: {},
   });
 }
 
@@ -75,7 +82,7 @@ export function createClassicPreset(catalog) {
     mode: "direct",
     name: "Classic RTS",
     description: "Stable command hotkeys that do not move when command-card slots move.",
-    bindings: buildClassicBindings(catalog),
+    ...buildClassicBindingMaps(catalog),
   });
 }
 
@@ -108,7 +115,7 @@ export class HotkeyProfileService {
   }
 
   allProfiles() {
-    return [...this.presets, ...this.customProfiles.map((profile) => ({ ...profile, bindings: { ...profile.bindings } }))];
+    return [...this.presets, ...this.customProfiles.map((profile) => cloneProfile(profile))];
   }
 
   getActiveProfile() {
@@ -149,6 +156,7 @@ export class HotkeyProfileService {
       description: metadata.description || "",
       basePresetId: preset.id,
       bindings: { ...preset.bindings },
+      factionBindings: cloneFactionBindings(preset.factionBindings),
     };
     const result = this.saveCustomProfile(profile);
     return result.ok ? { ...result, profile: this.profileById(id) } : result;
@@ -177,7 +185,7 @@ export class HotkeyProfileService {
     const warnings = [...parsed.warnings];
     if (parsed.profile.mode === "direct") {
       for (const command of this.catalog.commands || []) {
-        if (!parsed.profile.bindings[command.commandId]) {
+        if (!profileBindingForCommand(parsed.profile, command.commandId)) {
           errors.push({ code: "unresolvedCommand", commandId: command.commandId });
         }
       }
@@ -208,6 +216,7 @@ export class HotkeyProfileService {
       type: "custom",
       name,
       bindings: { ...parsed.profile.bindings },
+      factionBindings: cloneFactionBindings(parsed.profile.factionBindings),
     };
     this._replaceCustomProfile(profile);
     this._writeCustomProfiles();
@@ -229,6 +238,7 @@ export class HotkeyProfileService {
       createdWithBuild: createdWithBuild(),
       basePreset,
       bindings: { ...profile.bindings },
+      factionBindings: cloneFactionBindings(profile.factionBindings),
     };
   }
 
@@ -260,6 +270,7 @@ export class HotkeyProfileService {
       description: profile.description || "",
       basePresetId: profile.basePresetId || null,
       bindings: { ...profile.bindings },
+      factionBindings: cloneFactionBindings(profile.factionBindings),
     };
   }
 
@@ -282,39 +293,63 @@ export class HotkeyProfileService {
     if (!id) errors.push({ code: "missingId" });
     const type = raw.type === "preset" ? "preset" : "custom";
     const sourceBindings = raw.bindings && typeof raw.bindings === "object" ? raw.bindings : {};
-    const bindings = {};
+    const sourceFactionBindings = raw.factionBindings && typeof raw.factionBindings === "object"
+      ? raw.factionBindings
+      : {};
+    const bindingMaps = { bindings: {}, factionBindings: {} };
 
     for (const [commandId, value] of Object.entries(sourceBindings)) {
-      if (!this._knownCommandIds().has(commandId)) {
-        warnings.push({ code: "unknownCommand", commandId });
-        continue;
-      }
       const key = normalizeHotkey(value);
       if (!key) {
         errors.push({ code: "invalidKey", commandId, key: value });
         continue;
       }
-      bindings[commandId] = key;
+      const migrated = this._canonicalImportedCommandId(commandId, warnings);
+      if (!migrated) continue;
+      setBindingForCommand(bindingMaps, migrated, key);
+    }
+
+    for (const [factionId, entries] of Object.entries(sourceFactionBindings)) {
+      if (!validFactionId(factionId) || !entries || typeof entries !== "object" || Array.isArray(entries)) {
+        warnings.push({ code: "invalidFactionBindings", factionId });
+        continue;
+      }
+      for (const [commandId, value] of Object.entries(entries)) {
+        const key = normalizeHotkey(value);
+        if (!key) {
+          errors.push({ code: "invalidKey", commandId, key: value });
+          continue;
+        }
+        const parsed = parsedFactionCommandId(commandId);
+        if (!parsed || parsed.factionId !== factionId) {
+          warnings.push({ code: "unknownCommand", commandId });
+          continue;
+        }
+        if (!this._knownCommandIds().has(commandId)) {
+          warnings.push({ code: "unavailableFactionCommand", commandId });
+        }
+        setBindingForCommand(bindingMaps, commandId, key);
+      }
     }
 
     if (mode === "direct") {
       for (const command of this.catalog.commands || []) {
-        if (bindings[command.commandId]) continue;
+        if (bindingForCommand(bindingMaps, command.commandId)) continue;
         if (!fillMissing) {
           warnings.push({ code: "missingCommandUnresolved", commandId: command.commandId });
           if (!allowUnresolved) errors.push({ code: "unresolvedCommand", commandId: command.commandId });
           continue;
         }
-        const fallback = this._fallbackKeyForCommand(command);
+        const fallback = this._fallbackKeyForMissingCommand(command, bindingMaps);
         if (fallback) {
-          bindings[command.commandId] = fallback;
+          setBindingForCommand(bindingMaps, command.commandId, fallback);
           warnings.push({ code: "missingCommandFallback", commandId: command.commandId, key: fallback });
         } else {
           warnings.push({ code: "missingCommandUnresolved", commandId: command.commandId });
           if (!allowUnresolved) errors.push({ code: "unresolvedCommand", commandId: command.commandId });
         }
       }
-      this._appendConflictErrors(bindings, errors);
+      this._appendConflictErrors(bindingMaps, errors);
     }
 
     const profile = {
@@ -329,7 +364,8 @@ export class HotkeyProfileService {
         : typeof raw.basePreset === "string"
           ? raw.basePreset
           : null,
-      bindings,
+      bindings: bindingMaps.bindings,
+      factionBindings: bindingMaps.factionBindings,
     };
     return { ok: errors.length === 0, profile, errors, warnings };
   }
@@ -345,7 +381,7 @@ export class HotkeyProfileService {
 
   resolveSlot(slot, profile = this.getActiveProfile()) {
     const hotkey = profile?.mode === "direct"
-      ? normalizeHotkey(profile.bindings?.[slot.commandId]) || this._fallbackKeyForCommand(slot)
+      ? normalizeHotkey(profileBindingForCommand(profile, slot.commandId)) || this._fallbackKeyForCommand(slot)
       : gridHotkeyForSlot(slot.slotIndex);
     return { ...slot, hotkey };
   }
@@ -395,17 +431,47 @@ export class HotkeyProfileService {
     return this._knownIds;
   }
 
+  _canonicalImportedCommandId(commandId, warnings) {
+    if (this._knownCommandIds().has(commandId)) return commandId;
+    const legacy = parsedLegacyFactionCommandId(commandId);
+    if (legacy) {
+      warnings.push({ code: "legacyCommandMigrated", commandId, migratedCommandId: legacy.commandId });
+      return legacy.commandId;
+    }
+    if (parsedFactionCommandId(commandId)) {
+      warnings.push({ code: "unavailableFactionCommand", commandId });
+      return commandId;
+    }
+    warnings.push({ code: "unknownCommand", commandId });
+    return "";
+  }
+
   _fallbackKeyForCommand(command) {
     const slotKey = Number.isInteger(command.slotIndex) ? gridHotkeyForSlot(command.slotIndex) : "";
     if (slotKey) return slotKey;
     return normalizeHotkey((command.label || "").trim().charAt(0));
   }
 
-  _appendConflictErrors(bindings, errors) {
+  _fallbackKeyForMissingCommand(command, bindingMaps) {
+    const preferred = this._fallbackKeyForCommand(command);
+    const used = new Set();
+    for (const context of this.catalog.contexts || []) {
+      if (!context.commandIds.includes(command.commandId)) continue;
+      for (const contextCommandId of context.commandIds) {
+        if (contextCommandId === command.commandId) continue;
+        const key = bindingForCommand(bindingMaps, contextCommandId);
+        if (key) used.add(key);
+      }
+    }
+    if (preferred && !used.has(preferred)) return preferred;
+    return firstFreeKey(used);
+  }
+
+  _appendConflictErrors(bindingMaps, errors) {
     for (const context of this.catalog.contexts || []) {
       const byKey = new Map();
       for (const commandId of context.commandIds) {
-        const key = bindings[commandId];
+        const key = bindingForCommand(bindingMaps, commandId);
         if (!key) continue;
         const prior = byKey.get(key);
         if (prior) {
@@ -465,34 +531,34 @@ function createdWithBuild() {
   return String(globalThis.__RTS_BUILD__ || globalThis.__RTS_VERSION__ || DEFAULT_EXPORT_BUILD);
 }
 
-function buildClassicBindings(catalog) {
-  const bindings = {};
+function buildClassicBindingMaps(catalog) {
+  const bindingMaps = { bindings: {}, factionBindings: {} };
   for (const command of catalog?.commands || []) {
-    bindings[command.commandId] =
+    setBindingForCommand(bindingMaps, command.commandId,
       CORE_CLASSIC_BINDINGS[command.commandId] ||
       normalizeHotkey((command.label || "").trim().charAt(0)) ||
-      (Number.isInteger(command.slotIndex) ? GRID_HOTKEYS[command.slotIndex] : "");
+      (Number.isInteger(command.slotIndex) ? GRID_HOTKEYS[command.slotIndex] : ""));
   }
-  return resolveContextConflicts(bindings, catalog);
+  return resolveContextConflicts(bindingMaps, catalog);
 }
 
-function resolveContextConflicts(bindings, catalog) {
+function resolveContextConflicts(bindingMaps, catalog) {
   for (const context of catalog?.contexts || []) {
     const used = new Set();
     for (const commandId of context.commandIds) {
-      const current = bindings[commandId];
+      const current = bindingForCommand(bindingMaps, commandId);
       if (current && !used.has(current)) {
         used.add(current);
         continue;
       }
       const next = firstFreeKey(used);
       if (next) {
-        bindings[commandId] = next;
+        setBindingForCommand(bindingMaps, commandId, next);
         used.add(next);
       }
     }
   }
-  return bindings;
+  return bindingMaps;
 }
 
 function firstFreeKey(used) {
@@ -503,7 +569,11 @@ function firstFreeKey(used) {
 }
 
 function freezeProfile(profile) {
-  return Object.freeze({ ...profile, bindings: Object.freeze({ ...profile.bindings }) });
+  return Object.freeze({
+    ...profile,
+    bindings: Object.freeze({ ...profile.bindings }),
+    factionBindings: freezeFactionBindings(profile.factionBindings),
+  });
 }
 
 function labelFromContextId(id) {
@@ -512,4 +582,77 @@ function labelFromContextId(id) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ") || "Command Card";
+}
+
+export function profileBindingForCommand(profile, commandId) {
+  return bindingForCommand(profile || {}, commandId);
+}
+
+export function setProfileBindingForCommand(profile, commandId, key) {
+  if (!profile || typeof profile !== "object") return;
+  setBindingForCommand(profile, commandId, key);
+}
+
+function bindingForCommand(bindingMaps, commandId) {
+  const parsed = parsedFactionCommandId(commandId);
+  if (parsed) return bindingMaps.factionBindings?.[parsed.factionId]?.[commandId] || "";
+  return bindingMaps.bindings?.[commandId] || "";
+}
+
+function setBindingForCommand(bindingMaps, commandId, key) {
+  const parsed = parsedFactionCommandId(commandId);
+  if (parsed) {
+    if (!bindingMaps.factionBindings || typeof bindingMaps.factionBindings !== "object") {
+      bindingMaps.factionBindings = {};
+    }
+    bindingMaps.factionBindings[parsed.factionId] = {
+      ...(bindingMaps.factionBindings[parsed.factionId] || {}),
+      [commandId]: key,
+    };
+    return;
+  }
+  if (!bindingMaps.bindings || typeof bindingMaps.bindings !== "object") {
+    bindingMaps.bindings = {};
+  }
+  bindingMaps.bindings[commandId] = key;
+}
+
+function parsedLegacyFactionCommandId(commandId) {
+  const match = /^(build|train|research|ability)\.([A-Za-z0-9_]+)$/.exec(String(commandId || ""));
+  return match
+    ? {
+        family: match[1],
+        subject: match[2],
+        commandId: factionCommandId(DEFAULT_FACTION_ID, match[1], match[2]),
+      }
+    : null;
+}
+
+function validFactionId(factionId) {
+  return /^[a-z0-9_]+$/.test(String(factionId || ""));
+}
+
+function cloneProfile(profile) {
+  return {
+    ...profile,
+    bindings: { ...profile.bindings },
+    factionBindings: cloneFactionBindings(profile.factionBindings),
+  };
+}
+
+function cloneFactionBindings(factionBindings = {}) {
+  const clone = {};
+  for (const [factionId, bindings] of Object.entries(factionBindings || {})) {
+    if (!bindings || typeof bindings !== "object") continue;
+    clone[factionId] = { ...bindings };
+  }
+  return clone;
+}
+
+function freezeFactionBindings(factionBindings = {}) {
+  const clone = {};
+  for (const [factionId, bindings] of Object.entries(factionBindings || {})) {
+    clone[factionId] = Object.freeze({ ...bindings });
+  }
+  return Object.freeze(clone);
 }
