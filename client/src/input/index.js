@@ -895,13 +895,13 @@ export class Input {
    * but shift-clicking an already-selected entity removes it from the selection.
    * Ctrl+click selects all own units of the same kind visible in the viewport.
    */
-  /** All own buildings of `kind` whose center lies in the viewport. Cap mirrors unit ctrl-click. */
-  /** Up to 12 own units of `kind` in the viewport, closest to `anchor`. */
+  /** All own buildings of `kind` whose center lies in the viewport. */
+  /** Own units of `kind` in the viewport, closest to `anchor`. */
   /**
    * Box release: select all OWN units fully/partly inside the box. If the box
    * captured no units, fall back to OWN buildings inside it. Shift adds.
    */
-  /** Return up to 12 ids from `ids`, ordered by distance to the screen anchor. */
+  /** Return ids from `ids`, ordered by distance to the screen anchor. */
   // --- Right-button logic (context-sensitive orders) ----------------------
 
   // --- Selection queries --------------------------------------------------

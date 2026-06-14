@@ -3939,6 +3939,77 @@ function fakeAudioContext() {
   const sel = state.selectedEntities();
   assert(sel.length === 1 && sel[0].id === 1, "selectedEntities drops stale ids");
 
+  const budgetSelectionState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  const budgetRiflemen = Array.from({ length: 30 }, (_, index) => ({
+    id: 300 + index,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: index * 4,
+    y: 0,
+    hp: 40,
+    maxHp: 40,
+    state: STATE.IDLE,
+  }));
+  const budgetTanks = Array.from({ length: 5 }, (_, index) => ({
+    id: 400 + index,
+    owner: 1,
+    kind: KIND.TANK,
+    x: index * 12,
+    y: 20,
+    hp: 100,
+    maxHp: 100,
+    state: STATE.IDLE,
+  }));
+  const budgetCommandCar = {
+    id: 450,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 80,
+    y: 20,
+    hp: 80,
+    maxHp: 80,
+    state: STATE.IDLE,
+  };
+  budgetSelectionState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 80,
+    entities: budgetRiflemen.concat(budgetTanks, budgetCommandCar),
+    events: [],
+  });
+  budgetSelectionState.setSelection(budgetRiflemen.map((entity) => entity.id));
+  assert(
+    budgetSelectionState.selection.size === BASE_COMMAND_SUPPLY_CAP,
+    "selection budget admits 24 one-supply units instead of the old 12-count cap",
+  );
+  assert(
+    budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
+    "selection overflow records budget state for the HUD",
+  );
+  budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id));
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
+    "selection budget admits four six-supply tanks without a Command Car",
+  );
+  budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id));
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "450,400,401,402,403,404",
+    "selection budget pre-admits Command Cars before filling normal candidates",
+  );
+  budgetSelectionState.setSelection(budgetTanks.slice(0, 4).map((entity) => entity.id));
+  budgetSelectionState.addToSelection([budgetRiflemen[0].id]);
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
+    "shift-add ignores overflow without replacing the existing selection",
+  );
+  budgetSelectionState.addToSelection([budgetCommandCar.id, budgetTanks[4].id]);
+  assert(
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,450,404",
+    "shift-add can admit a Command Car bonus and then later candidates",
+  );
+
   // Command-card submenu is local-only and is closed by mode-changing actions.
   state.openWorkerBuildMenu();
   assert(state.commandCardMode === "workerBuild", "worker build submenu opens");

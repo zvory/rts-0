@@ -3,7 +3,7 @@ import {
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
 } from "./config.js";
-import { KIND, STATE, isUnit } from "./protocol.js";
+import { KIND, STATE, isBuilding, isUnit } from "./protocol.js";
 
 export const COMMAND_BUDGET_OVERFLOW_NOTICE = "Command supply exceeded";
 
@@ -11,11 +11,48 @@ export function commandBudgetForEntities(entities) {
   let used = 0;
   let cap = BASE_COMMAND_SUPPLY_CAP;
   for (const entity of entities || []) {
-    if (!entity || !isUnit(entity.kind)) continue;
+    if (!selectableCountsForCommandBudget(entity)) continue;
     used += commandWeight(entity.kind);
     if (entity.kind === KIND.COMMAND_CAR) cap += COMMAND_CAR_SUPPLY_CAP_BONUS;
   }
   return { used, cap, over: used > cap };
+}
+
+export function admitSelectionIds(state, ids, { baseIds = [] } = {}) {
+  const base = uniqueLiveSelectionEntities(state, baseIds);
+  const candidates = uniqueLiveSelectionEntities(state, ids, new Set(base.map((entity) => entity.id)));
+
+  if (!shouldBudgetSelection(state, base, candidates)) {
+    return {
+      ids: base.concat(candidates).map((entity) => entity.id),
+      overflow: false,
+      ...commandBudgetForEntities(base.concat(candidates)),
+    };
+  }
+
+  const admitted = base.slice();
+  const admittedIds = new Set(admitted.map((entity) => entity.id));
+  const commandCars = candidates.filter((entity) => entity.kind === KIND.COMMAND_CAR);
+  const orderedCandidates = commandCars.concat(
+    candidates.filter((entity) => entity.kind !== KIND.COMMAND_CAR),
+  );
+  let budget = commandBudgetForEntities(admitted);
+  let overflow = false;
+
+  for (const entity of orderedCandidates) {
+    if (admittedIds.has(entity.id)) continue;
+    const nextCap = budget.cap + (entity.kind === KIND.COMMAND_CAR ? COMMAND_CAR_SUPPLY_CAP_BONUS : 0);
+    const nextUsed = budget.used + commandWeight(entity.kind);
+    if (nextUsed <= nextCap) {
+      admitted.push(entity);
+      admittedIds.add(entity.id);
+      budget = { used: nextUsed, cap: nextCap, over: false };
+    } else {
+      overflow = true;
+    }
+  }
+
+  return { ids: admitted.map((entity) => entity.id), overflow, ...budget };
 }
 
 export function commandWithinBudget(state, command) {
@@ -38,7 +75,35 @@ export function commandWithinBudget(state, command) {
   return { ok: !budget.over, ...budget };
 }
 
-function commandWeight(kind) {
+export function commandWeight(kind) {
   const supply = STATS[kind]?.supply;
   return Number.isFinite(supply) && supply > 0 ? supply : 1;
+}
+
+function selectableCountsForCommandBudget(entity) {
+  return !!entity && (isUnit(entity.kind) || isBuilding(entity.kind));
+}
+
+function uniqueLiveSelectionEntities(state, ids, seen = new Set()) {
+  const out = [];
+  for (const id of ids || []) {
+    if (!Number.isInteger(id) || seen.has(id)) continue;
+    const entity = typeof state?.entityById === "function" ? state.entityById(id) : null;
+    if (!entity || entity.shotReveal || entity.visionOnly) continue;
+    seen.add(id);
+    out.push(entity);
+  }
+  return out;
+}
+
+function shouldBudgetSelection(state, base, candidates) {
+  if (!state || state.spectator) return false;
+  const all = base.concat(candidates);
+  if (all.length === 0) return true;
+  return all.every(
+    (entity) =>
+      selectableCountsForCommandBudget(entity) &&
+      typeof state.isOwnOwner === "function" &&
+      state.isOwnOwner(entity.owner),
+  );
 }

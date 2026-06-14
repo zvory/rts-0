@@ -8,6 +8,7 @@
 
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { CommandComposer } from "./command_composer.js";
+import { admitSelectionIds } from "./command_budget.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import {
   DEFAULT_FACTION_ID,
@@ -98,6 +99,8 @@ export class GameState {
     // --- selection (client-only) ---
     /** @type {Set<number>} */
     this.selection = new Set();
+    /** @type {null | {used:number, cap:number}} latest playable selection budget overflow. */
+    this.selectionBudgetOverflow = null;
     /** @type {boolean} true when the server says movement path diagnostics are available. */
     this.debugPathOverlaysAvailable = !!startInfo.debugMode;
     /** @type {boolean} local gear-menu preference for drawing movement path diagnostics. */
@@ -169,7 +172,7 @@ export class GameState {
     this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
   }
 
-  /** Maximum number of entities the local selection may contain. */
+  /** Temporary count cap for control-group storage until selection Phase 3. */
   static get MAX_SELECTION_SIZE() {
     return 12;
   }
@@ -865,11 +868,9 @@ export class GameState {
    * @param {Iterable<number>} ids
    */
   setSelection(ids) {
-    this.selection = new Set();
-    for (const id of ids) {
-      this.selection.add(id);
-      if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
-    }
+    const admitted = admitSelectionIds(this, ids);
+    this.selection = new Set(admitted.ids);
+    this._recordSelectionBudgetOverflow(admitted);
     this.closeCommandCardMenu();
   }
 
@@ -879,10 +880,9 @@ export class GameState {
    */
   addToSelection(ids) {
     this._pruneSelection();
-    for (const id of ids) {
-      if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
-      this.selection.add(id);
-    }
+    const admitted = admitSelectionIds(this, ids, { baseIds: this.selection });
+    this.selection = new Set(admitted.ids);
+    this._recordSelectionBudgetOverflow(admitted);
     this.closeCommandCardMenu();
   }
 
@@ -895,12 +895,14 @@ export class GameState {
     for (const id of ids) {
       this.selection.delete(id);
     }
+    this.selectionBudgetOverflow = null;
     this.closeCommandCardMenu();
   }
 
   /** Clear the selection. */
   clearSelection() {
     this.selection.clear();
+    this.selectionBudgetOverflow = null;
     this.closeCommandCardMenu();
   }
 
@@ -918,6 +920,12 @@ export class GameState {
       }
     }
     if (changed) this.selection = live;
+  }
+
+  _recordSelectionBudgetOverflow(admitted) {
+    this.selectionBudgetOverflow = admitted?.overflow
+      ? { used: admitted.used, cap: admitted.cap }
+      : null;
   }
 
   /**
