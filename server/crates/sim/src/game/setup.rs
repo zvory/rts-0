@@ -1,31 +1,21 @@
 use super::*;
 use crate::game::entity::WeaponSetup;
+use crate::rules::faction::{FactionLoadout, StartingFormation};
+use std::str::FromStr;
 
 mod dev_scenarios;
 
 impl Game {
     #[allow(dead_code)]
     pub fn new(players: &[PlayerInit], seed: u32) -> Game {
-        Self::new_inner(
-            players,
-            config::STARTING_STEEL,
-            config::STARTING_OIL,
-            seed,
-            StartingLoadout::Standard,
-        )
+        Self::new_inner(players, None, seed, StartingLoadout::Standard, None)
     }
 
     /// Compatibility constructor retained for callers that still name live AI profile setup.
     /// AI controllers are owned by the caller, not by `Game`.
     #[allow(dead_code)]
     pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game {
-        Self::new_inner(
-            players,
-            config::STARTING_STEEL,
-            config::STARTING_OIL,
-            seed,
-            StartingLoadout::Standard,
-        )
+        Self::new_inner(players, None, seed, StartingLoadout::Standard, None)
     }
 
     /// Create a match with explicit starting resources for every player.
@@ -36,7 +26,13 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, steel, oil, seed, StartingLoadout::Standard)
+        Self::new_inner(
+            players,
+            Some((steel, oil)),
+            seed,
+            StartingLoadout::Standard,
+            None,
+        )
     }
 
     /// Compatibility constructor retained for callers that still name live AI profile setup.
@@ -48,7 +44,13 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, steel, oil, seed, StartingLoadout::Standard)
+        Self::new_inner(
+            players,
+            Some((steel, oil)),
+            seed,
+            StartingLoadout::Standard,
+            None,
+        )
     }
 
     /// Create a debug lobby match with boosted resources and a prebuilt human-only loadout.
@@ -59,7 +61,13 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, steel, oil, seed, StartingLoadout::DebugHuman)
+        Self::new_inner(
+            players,
+            Some((steel, oil)),
+            seed,
+            StartingLoadout::DebugHuman,
+            None,
+        )
     }
 
     /// Compatibility constructor retained for callers that still name live AI profile setup.
@@ -85,10 +93,10 @@ impl Game {
     ) -> Game {
         Self::new_inner_with_map(
             players,
-            config::STARTING_STEEL,
-            config::STARTING_OIL,
+            None,
             seed,
             StartingLoadout::Standard,
+            None,
             Some(map),
             map_metadata,
         )
@@ -123,10 +131,10 @@ impl Game {
     ) -> Game {
         Self::new_inner_with_map(
             players,
-            steel,
-            oil,
+            Some((steel, oil)),
             seed,
             StartingLoadout::DebugHuman,
+            None,
             Some(map),
             map_metadata,
         )
@@ -137,41 +145,51 @@ impl Game {
         Self::new_without_ai_controllers(players, seed)
     }
 
-    /// Like [`Game::new_for_replay`] but with explicit starting resources. Used when replaying a
-    /// match that was originally created in debug mode so the initial player economy matches the
-    /// live recording.
+    /// Like [`Game::new_for_replay`] but with explicit starting resources for all players.
     pub fn new_for_replay_with_starting_resources(
         players: &[PlayerInit],
         steel: u32,
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, steel, oil, seed, StartingLoadout::Standard)
+        Self::new_inner(
+            players,
+            Some((steel, oil)),
+            seed,
+            StartingLoadout::Standard,
+            None,
+        )
+    }
+
+    pub fn new_for_replay_with_starting_loadouts(
+        players: &[PlayerInit],
+        starting_loadouts: &[PlayerStartingLoadout],
+        seed: u32,
+    ) -> Game {
+        Self::new_inner(
+            players,
+            None,
+            seed,
+            StartingLoadout::Standard,
+            Some(starting_loadouts),
+        )
     }
 
     /// Rebuild a replay from an explicit map and starting loadout. Replay playback owns command
     /// injection externally, so no live AI controllers are attached.
     pub fn new_for_replay_with_map_metadata(
         players: &[PlayerInit],
-        steel: u32,
-        oil: u32,
         seed: u32,
-        starting_loadout: crate::game::replay::ReplayStartingLoadoutMode,
+        starting_loadouts: &[PlayerStartingLoadout],
         map: Map,
         map_metadata: MapMetadata,
     ) -> Game {
-        let starting_loadout = match starting_loadout {
-            crate::game::replay::ReplayStartingLoadoutMode::Standard => StartingLoadout::Standard,
-            crate::game::replay::ReplayStartingLoadoutMode::DebugHuman => {
-                StartingLoadout::DebugHuman
-            }
-        };
         Self::new_inner_with_map(
             players,
-            steel,
-            oil,
+            None,
             seed,
-            starting_loadout,
+            StartingLoadout::Standard,
+            Some(starting_loadouts),
             Some(map),
             map_metadata,
         )
@@ -181,13 +199,7 @@ impl Game {
     /// controllers. Used by command-log replay and scripted self-play, where commands come from
     /// an external driver.
     pub fn new_without_ai_controllers(players: &[PlayerInit], seed: u32) -> Game {
-        Self::new_inner(
-            players,
-            config::STARTING_STEEL,
-            config::STARTING_OIL,
-            seed,
-            StartingLoadout::Standard,
-        )
+        Self::new_inner(players, None, seed, StartingLoadout::Standard, None)
     }
 
     pub fn seed(&self) -> u32 {
@@ -195,15 +207,21 @@ impl Game {
     }
 
     pub fn starting_steel(&self) -> u32 {
-        self.starting_steel
+        self.starting_loadouts
+            .first()
+            .map(|loadout| loadout.starting_steel)
+            .unwrap_or(config::STARTING_STEEL)
     }
 
     pub fn starting_oil(&self) -> u32 {
-        self.starting_oil
+        self.starting_loadouts
+            .first()
+            .map(|loadout| loadout.starting_oil)
+            .unwrap_or(config::STARTING_OIL)
     }
 
-    pub(crate) fn starting_loadout(&self) -> StartingLoadout {
-        self.starting_loadout
+    pub fn starting_loadouts(&self) -> &[PlayerStartingLoadout] {
+        &self.starting_loadouts
     }
 
     pub fn map_metadata(&self) -> &MapMetadata {
@@ -212,17 +230,17 @@ impl Game {
 
     fn new_inner(
         players: &[PlayerInit],
-        steel: u32,
-        oil: u32,
+        resource_override: Option<(u32, u32)>,
         seed: u32,
         starting_loadout: StartingLoadout,
+        starting_loadout_overrides: Option<&[PlayerStartingLoadout]>,
     ) -> Game {
         Self::new_inner_with_map(
             players,
-            steel,
-            oil,
+            resource_override,
             seed,
             starting_loadout,
+            starting_loadout_overrides,
             None,
             default_map_metadata(),
         )
@@ -231,10 +249,10 @@ impl Game {
     #[allow(clippy::too_many_arguments)]
     fn new_inner_with_map(
         players: &[PlayerInit],
-        steel: u32,
-        oil: u32,
+        resource_override: Option<(u32, u32)>,
         seed: u32,
         starting_loadout: StartingLoadout,
+        starting_loadout_overrides: Option<&[PlayerStartingLoadout]>,
         map_override: Option<Map>,
         map_metadata: MapMetadata,
     ) -> Game {
@@ -252,33 +270,60 @@ impl Game {
         let mut entities = EntityStore::new();
 
         let mut player_states = Vec::with_capacity(players.len() + 1);
+        let mut resolved_starting_loadouts = Vec::with_capacity(players.len());
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
+            let faction_id = if p.faction_id.is_empty() {
+                DEFAULT_FACTION_ID.to_string()
+            } else {
+                p.faction_id.clone()
+            };
+            let catalog = crate::rules::faction::catalog_for_or_default(&faction_id);
+            let loadout = catalog.loadout;
+            let override_record = starting_loadout_overrides
+                .and_then(|records| records.iter().find(|record| record.player_id == p.id));
+            let (initial_steel, initial_oil) = override_record
+                .map(|record| (record.starting_steel, record.starting_oil))
+                .or(resource_override)
+                .unwrap_or((loadout.initial_steel, loadout.initial_oil));
             let mut ps = PlayerState {
                 id: p.id,
                 team_id: super::teams::normalize_team_id(p.id, p.team_id),
-                faction_id: if p.faction_id.is_empty() {
-                    DEFAULT_FACTION_ID.to_string()
-                } else {
-                    p.faction_id.clone()
-                },
+                faction_id: faction_id.clone(),
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile: start,
-                steel,
-                oil,
+                steel: initial_steel,
+                oil: initial_oil,
                 supply_used: 0,
                 supply_cap: 0,
                 is_ai: p.is_ai,
                 score: ScoreState::default(),
                 upgrades: Default::default(),
             };
-            spawn_player_start(&mut entities, &map, &mut ps, start);
+            spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
             if starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
                 spawn_debug_human_start(&mut entities, &map, &mut ps, start);
             }
-            // The starting City Centre contributes supply immediately.
-            ps.set_supply_counts(0, config::CITY_CENTRE_SUPPLY);
+            for &upgrade in loadout.opening_upgrades {
+                if let Ok(kind) = upgrade::UpgradeKind::from_str(upgrade) {
+                    ps.upgrades.insert(kind);
+                }
+            }
+            let loadout_id = if starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
+                format!("{}.debug_human", catalog.id)
+            } else {
+                override_record
+                    .map(|record| record.loadout_id.clone())
+                    .unwrap_or_else(|| loadout.id.to_string())
+            };
+            resolved_starting_loadouts.push(PlayerStartingLoadout {
+                player_id: p.id,
+                faction_id,
+                loadout_id,
+                starting_steel: initial_steel,
+                starting_oil: initial_oil,
+            });
             player_states.push(ps);
         }
 
@@ -314,8 +359,7 @@ impl Game {
             mortar_shells: crate::game::mortar::MortarShellStore::default(),
             artillery_shells: crate::game::artillery::ArtilleryShellStore::default(),
             seed,
-            starting_steel: steel,
-            starting_oil: oil,
+            starting_loadouts: resolved_starting_loadouts,
             map_metadata,
             debug_path_overlays: starting_loadout == StartingLoadout::DebugHuman,
             starting_loadout,
@@ -460,29 +504,32 @@ fn spawn_player_start(
     map: &Map,
     player: &mut PlayerState,
     start: (u32, u32),
+    loadout: FactionLoadout,
 ) {
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
-
-    if entities
-        .spawn_building(player.id, EntityKind::CityCentre, hx, hy, true)
-        .is_some()
-    {
-        player.record_entity_created(EntityKind::CityCentre);
-    }
-
     let ts = config::TILE_SIZE as f32;
-    let ring_r = ts * 2.5;
-    let count = config::STARTING_WORKERS;
-    for i in 0..count {
-        let ang = std::f32::consts::TAU * (i as f32) / (count.max(1) as f32);
-        let wx = hx + ring_r * ang.cos();
-        let wy = hy + ring_r * ang.sin();
-        if entities
-            .spawn_unit(player.id, EntityKind::Worker, wx, wy)
-            .is_some()
-        {
-            player.record_entity_created(EntityKind::Worker);
+
+    for group in loadout.starting_entities {
+        for i in 0..group.count {
+            let (x, y) = match group.formation {
+                StartingFormation::Center => (hx, hy),
+                StartingFormation::Ring { radius_tiles_x10 } => {
+                    let ring_r = ts * (radius_tiles_x10 as f32 / 10.0);
+                    let ang = std::f32::consts::TAU * (i as f32) / (group.count.max(1) as f32);
+                    (hx + ring_r * ang.cos(), hy + ring_r * ang.sin())
+                }
+            };
+            let spawned = if group.kind.is_building() {
+                entities.spawn_building(player.id, group.kind, x, y, group.completed)
+            } else if group.kind.is_unit() {
+                entities.spawn_unit(player.id, group.kind, x, y)
+            } else {
+                None
+            };
+            if spawned.is_some() {
+                player.record_entity_created(group.kind);
+            }
         }
     }
 

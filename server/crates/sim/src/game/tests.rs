@@ -3785,8 +3785,7 @@ fn no_commands_one_player_is_deterministic() {
         game.command_log(),
         game.tick_count(),
         game.seed(),
-        game.starting_steel(),
-        game.starting_oil(),
+        game.starting_loadouts(),
     )
     .expect("one-player no-commands replay should succeed");
     assert_eq!(replay.events, event_log);

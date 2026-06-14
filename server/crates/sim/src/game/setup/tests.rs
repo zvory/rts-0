@@ -1,10 +1,65 @@
 use super::*;
+use crate::rules::faction::EMPTY_FIXTURE_FACTION_ID;
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
     game.entities
         .iter()
         .filter(|e| e.owner == owner && e.kind == kind)
         .count()
+}
+
+#[test]
+fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "Kriegsia".to_string(),
+            color: "#cc1111".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: EMPTY_FIXTURE_FACTION_ID.to_string(),
+            name: "Fixture".to_string(),
+            color: "#1133bb".to_string(),
+            is_ai: false,
+        },
+    ];
+    let game = Game::new(&players, 9);
+    game.assert_invariants();
+
+    let fixture = game.players.iter().find(|p| p.id == 2).unwrap();
+    assert_eq!(fixture.faction_id, EMPTY_FIXTURE_FACTION_ID);
+    assert_eq!(fixture.steel, 125);
+    assert_eq!(fixture.oil, 25);
+    assert_eq!(fixture.supply_cap, config::DEPOT_SUPPLY);
+    assert_eq!(
+        fixture.supply_used,
+        crate::rules::economy::supply_cost(EntityKind::ScoutCar)
+    );
+    assert_eq!(owned_kind_count(&game, 2, EntityKind::Depot), 1);
+    assert_eq!(owned_kind_count(&game, 2, EntityKind::ScoutCar), 1);
+    assert_eq!(owned_kind_count(&game, 2, EntityKind::CityCentre), 0);
+    assert_eq!(owned_kind_count(&game, 2, EntityKind::Worker), 0);
+
+    let loadout = game
+        .starting_loadouts()
+        .iter()
+        .find(|loadout| loadout.player_id == 2)
+        .unwrap();
+    assert_eq!(loadout.faction_id, EMPTY_FIXTURE_FACTION_ID);
+    assert_eq!(loadout.loadout_id, "phase2_empty_fixture.scout_depot");
+    assert_eq!(loadout.starting_steel, 125);
+    assert_eq!(loadout.starting_oil, 25);
+
+    let resource_nodes = game.entities.iter().filter(|e| e.kind.is_node()).count();
+    assert!(
+        resource_nodes > 0,
+        "fixture starts still use universal Steel/Oil nodes"
+    );
 }
 
 #[test]
@@ -31,7 +86,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
 
     assert_eq!(game.starting_steel(), config::STARTING_STEEL);
     assert_eq!(game.starting_oil(), config::STARTING_OIL);
-    assert_eq!(game.starting_loadout(), StartingLoadout::Standard);
+    assert_eq!(game.starting_loadouts()[0].loadout_id, "kriegsia.standard");
 
     for player in &game.players {
         assert_eq!(player.faction_id, DEFAULT_FACTION_ID);

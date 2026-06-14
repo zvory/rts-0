@@ -73,6 +73,16 @@ pub struct PlayerInit {
     pub is_ai: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerStartingLoadout {
+    pub player_id: u32,
+    pub faction_id: String,
+    pub loadout_id: String,
+    pub starting_steel: u32,
+    pub starting_oil: u32,
+}
+
 /// Per-player economy and bookkeeping carried for the whole match. Visible to `systems` (the
 /// only other module that mutates economy), but not part of the public API.
 #[derive(Clone)]
@@ -138,11 +148,9 @@ pub struct Game {
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
-    /// Starting steel granted to each player at match start. Retained so replay artifacts can
-    /// faithfully recreate debug-mode economy.
-    starting_steel: u32,
-    /// Starting oil granted to each player at match start. See [`Game::starting_steel`].
-    starting_oil: u32,
+    /// Per-player faction loadouts used to build the initial match state. Replays persist this
+    /// alongside player faction ids so mixed starts do not collapse into one global resource pair.
+    starting_loadouts: Vec<PlayerStartingLoadout>,
     /// Stable authored map identity used by replay artifacts.
     map_metadata: MapMetadata,
     /// True for lobby "Debug mode" matches; enables owner-only movement path diagnostics in

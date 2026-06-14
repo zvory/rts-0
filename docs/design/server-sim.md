@@ -76,14 +76,12 @@ impl Game {
     /// Create a live lobby match with explicit starting steel/oil and random AI strategies.
     pub fn new_with_starting_resources_and_random_ai_profiles(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
-    /// Rebuild replay playback with explicit resources, loadout, map, and map metadata.
+    /// Rebuild replay playback with recorded per-player faction loadouts, map, and map metadata.
     /// Commands are injected by the replay runtime rather than live AI controllers.
     pub fn new_for_replay_with_map_metadata(
         players: &[PlayerInit],
-        steel: u32,
-        oil: u32,
         seed: u32,
-        starting_loadout: ReplayStartingLoadoutMode,
+        starting_loadouts: &[PlayerStartingLoadout],
         map: Map,
         map_metadata: MapMetadata,
     ) -> Game;

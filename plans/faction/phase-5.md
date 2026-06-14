@@ -1,6 +1,6 @@
 # Phase 5 - Faction Starting Loadouts
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

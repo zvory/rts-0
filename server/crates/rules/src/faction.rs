@@ -22,6 +22,56 @@ pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
 pub const POINT_FIRE_ABILITY: &str = "pointFire";
 pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
 
+const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
+    StartingEntityGroup {
+        kind: EntityKind::CityCentre,
+        count: 1,
+        formation: StartingFormation::Center,
+        completed: true,
+    },
+    StartingEntityGroup {
+        kind: EntityKind::Worker,
+        count: crate::balance::STARTING_WORKERS,
+        formation: StartingFormation::Ring {
+            radius_tiles_x10: 25,
+        },
+        completed: true,
+    },
+];
+
+const EMPTY_FIXTURE_START_ENTITIES: &[StartingEntityGroup] = &[
+    StartingEntityGroup {
+        kind: EntityKind::Depot,
+        count: 1,
+        formation: StartingFormation::Center,
+        completed: true,
+    },
+    StartingEntityGroup {
+        kind: EntityKind::ScoutCar,
+        count: 1,
+        formation: StartingFormation::Ring {
+            radius_tiles_x10: 20,
+        },
+        completed: true,
+    },
+];
+
+pub const CURRENT_STANDARD_LOADOUT: FactionLoadout = FactionLoadout {
+    id: "kriegsia.standard",
+    initial_steel: crate::balance::STARTING_STEEL,
+    initial_oil: crate::balance::STARTING_OIL,
+    starting_entities: CURRENT_STANDARD_START_ENTITIES,
+    opening_upgrades: &[],
+};
+
+pub const EMPTY_FIXTURE_LOADOUT: FactionLoadout = FactionLoadout {
+    id: "phase2_empty_fixture.scout_depot",
+    initial_steel: 125,
+    initial_oil: 25,
+    starting_entities: EMPTY_FIXTURE_START_ENTITIES,
+    opening_upgrades: &[],
+};
+
 const DEFAULT_UNITS: &[EntityKind] = &[
     EntityKind::Worker,
     EntityKind::Rifleman,
@@ -102,6 +152,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
 
 pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
     id: DEFAULT_FACTION_ID,
+    loadout: CURRENT_STANDARD_LOADOUT,
     units: DEFAULT_UNITS,
     buildings: DEFAULT_BUILDINGS,
     buildables: DEFAULT_WORKER_BUILDABLES,
@@ -119,8 +170,9 @@ pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
 
 pub const EMPTY_FIXTURE_CATALOG: FactionCatalog = FactionCatalog {
     id: EMPTY_FIXTURE_FACTION_ID,
-    units: &[],
-    buildings: &[],
+    loadout: EMPTY_FIXTURE_LOADOUT,
+    units: &[EntityKind::ScoutCar],
+    buildings: &[EntityKind::Depot],
     buildables: &[],
     upgrades: &[],
     abilities: &[],
@@ -144,8 +196,32 @@ pub struct AbilityCatalogEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartingFormation {
+    Center,
+    Ring { radius_tiles_x10: u32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StartingEntityGroup {
+    pub kind: EntityKind,
+    pub count: u32,
+    pub formation: StartingFormation,
+    pub completed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FactionLoadout {
+    pub id: &'static str,
+    pub initial_steel: u32,
+    pub initial_oil: u32,
+    pub starting_entities: &'static [StartingEntityGroup],
+    pub opening_upgrades: &'static [&'static str],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FactionCatalog {
     pub id: &'static str,
+    pub loadout: FactionLoadout,
     pub units: &'static [EntityKind],
     pub buildings: &'static [EntityKind],
     pub buildables: &'static [EntityKind],
@@ -276,10 +352,36 @@ mod tests {
         let catalog = EMPTY_FIXTURE_CATALOG;
 
         assert!(!catalog.allows_unit(EntityKind::Worker));
-        assert!(!catalog.allows_building(EntityKind::Depot));
+        assert!(!catalog.allows_building(EntityKind::CityCentre));
         assert!(!catalog.can_build(EntityKind::Worker, EntityKind::Depot));
+        assert!(catalog.allows_unit(EntityKind::ScoutCar));
+        assert!(catalog.allows_building(EntityKind::Depot));
         assert!(catalog.trainable_units(EntityKind::CityCentre).is_empty());
         assert!(!catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
         assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
+    }
+
+    #[test]
+    fn faction_catalogs_define_starting_loadouts() {
+        assert_eq!(CURRENT_CATALOG.loadout.id, "kriegsia.standard");
+        assert_eq!(
+            CURRENT_CATALOG.loadout.initial_steel,
+            crate::balance::STARTING_STEEL
+        );
+        assert_eq!(
+            CURRENT_CATALOG.loadout.initial_oil,
+            crate::balance::STARTING_OIL
+        );
+        assert_eq!(
+            CURRENT_CATALOG.loadout.starting_entities,
+            CURRENT_STANDARD_START_ENTITIES
+        );
+
+        assert_eq!(EMPTY_FIXTURE_CATALOG.loadout.initial_steel, 125);
+        assert_eq!(EMPTY_FIXTURE_CATALOG.loadout.initial_oil, 25);
+        assert_eq!(
+            EMPTY_FIXTURE_CATALOG.loadout.starting_entities,
+            EMPTY_FIXTURE_START_ENTITIES
+        );
     }
 }

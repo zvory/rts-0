@@ -14,11 +14,11 @@ default faction catalog to the client descriptors.
 ### 5.0 Faction economy contract
 
 The faction rollout keeps Steel, Oil, and Supply as the global economy contract. Faction catalogs
-may decide which global units, buildings, upgrades, and abilities are legal for a player and may
-later define different starting Steel/Oil/Supply loadouts or costs, but they still use fixed
-`steel`, `oil`, `supplyUsed`, and `supplyCap` fields. Start-map resource nodes remain Steel and Oil
-nodes. Score values, replay analysis values, command-card costs, affordability checks, refunds, and
-supply reservation are intentionally Steel/Oil/Supply-shaped.
+decide which global units, buildings, upgrades, and abilities are legal for a player and define
+starting Steel/Oil values plus starting entity loadouts, but they still use fixed `steel`, `oil`,
+`supplyUsed`, and `supplyCap` fields. Start-map resource nodes remain Steel and Oil nodes. Score
+values, replay analysis values, command-card costs, affordability checks, refunds, and supply
+reservation are intentionally Steel/Oil/Supply-shaped.
 
 Approved direct Steel/Oil/Supply modules for this plan are:
 

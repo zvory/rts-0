@@ -429,6 +429,15 @@ fn replay_incompatibility_reason(artifact: &ReplayArtifactV1, build_sha: &str) -
 }
 
 fn replay_faction_incompatibility_reason(artifact: &ReplayArtifactV1) -> Option<String> {
+    let mut loadout_player_ids = std::collections::HashSet::new();
+    for loadout in &artifact.player_loadouts {
+        if !loadout_player_ids.insert(loadout.player_id) {
+            return Some(format!(
+                "Replay has duplicate loadout records for player {}.",
+                loadout.player_id
+            ));
+        }
+    }
     for player in &artifact.players {
         let faction_id = player.faction_id.trim();
         if faction_id.is_empty() {
@@ -453,6 +462,25 @@ fn replay_faction_incompatibility_reason(artifact: &ReplayArtifactV1) -> Option<
             return Some(format!(
                 "Replay player {} uses unsupported faction {:?}.",
                 player.id, faction_id
+            ));
+        }
+        let Some(loadout) = artifact
+            .player_loadouts
+            .iter()
+            .find(|loadout| loadout.player_id == player.id)
+        else {
+            return Some(format!("Replay player {} is missing a loadout.", player.id));
+        };
+        if loadout.faction_id != player.faction_id {
+            return Some(format!(
+                "Replay player {} loadout faction {:?} does not match player faction {:?}.",
+                player.id, loadout.faction_id, player.faction_id
+            ));
+        }
+        if loadout.loadout_id.trim().is_empty() {
+            return Some(format!(
+                "Replay player {} is missing a loadout id.",
+                player.id
             ));
         }
     }
