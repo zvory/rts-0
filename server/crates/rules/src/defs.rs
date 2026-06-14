@@ -266,6 +266,27 @@ pub const UNITS: &[UnitDef] = &[
         trained_at: Some(EntityKind::Factory),
         train_requires: FACTORY_BUILDING_REQUIRED,
     },
+    UnitDef {
+        kind: EntityKind::Ekaterina,
+        stats: balance::UnitStats {
+            hp: 300,
+            dmg: 10,
+            range_tiles: 4,
+            cooldown: 24,
+            speed: 2.0,
+            sight_tiles: 9,
+            cost_steel: 0,
+            cost_oil: 0,
+            supply: 0,
+            build_ticks: 0,
+            radius: 10.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
+        trained_at: None,
+        train_requires: &[],
+    },
 ];
 
 pub const BUILDINGS: &[BuildingDef] = &[
@@ -287,6 +308,26 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: WORKER_ONLY,
+        build_requires: &[],
+    },
+    BuildingDef {
+        kind: EntityKind::Zamok,
+        stats: balance::BuildingStats {
+            hp: 600,
+            sight_tiles: 9,
+            cost_steel: 0,
+            cost_oil: 0,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: 0,
+            provides_supply: balance::CITY_CENTRE_SUPPLY,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
         build_requires: &[],
     },
     BuildingDef {
@@ -496,6 +537,7 @@ mod tests {
                 EntityKind::Tank,
                 EntityKind::ScoutCar,
                 EntityKind::CommandCar,
+                EntityKind::Ekaterina,
             ]
         );
 
@@ -504,6 +546,7 @@ mod tests {
             buildings,
             vec![
                 EntityKind::CityCentre,
+                EntityKind::Zamok,
                 EntityKind::Depot,
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,

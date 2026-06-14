@@ -100,6 +100,13 @@ export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 7;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
 export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
+export const EKATERINA_REGEN_TICKS = TICK_HZ;
+export const EKATERINA_TELEPORT_RANGE_TILES = 5;
+export const EKATERINA_TELEPORT_COOLDOWN_TICKS = TICK_HZ * 8;
+export const EKATERINA_LINE_SHOT_RANGE_TILES = 6;
+export const EKATERINA_LINE_SHOT_WIDTH_TILES = 0.6;
+export const EKATERINA_LINE_SHOT_DAMAGE = 40;
+export const EKATERINA_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -139,9 +146,13 @@ export const STATS = Object.freeze({
     rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.COMMAND_CAR_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
+  [KIND.EKATERINA]: { label: "Ekaterina", icon: "EK", size: 10, sight: 9,
+    rangeTiles: 4, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
+  [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 9,
+    cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 4,
     cost: { steel: 100, oil: 0 }, buildTicks: 300, trains: [] },
   [KIND.BARRACKS]: { label: "Barracks", icon: "BK", footW: 3, footH: 2, sight: 6,
@@ -235,6 +246,34 @@ export const ABILITIES = Object.freeze({
     durationTicks: BREAKTHROUGH_DURATION_TICKS,
     queued: true,
   }),
+  [ABILITY.EKATERINA_TELEPORT]: Object.freeze({
+    ability: ABILITY.EKATERINA_TELEPORT,
+    label: "Teleport",
+    icon: "TP",
+    hotkey: "D",
+    title: "Teleport up to 5 tiles",
+    carriers: Object.freeze([KIND.EKATERINA]),
+    targetMode: "worldPoint",
+    rangeTiles: EKATERINA_TELEPORT_RANGE_TILES,
+    cooldownTicks: EKATERINA_TELEPORT_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    queued: false,
+  }),
+  [ABILITY.EKATERINA_LINE_SHOT]: Object.freeze({
+    ability: ABILITY.EKATERINA_LINE_SHOT,
+    label: "Line Shot",
+    icon: "LS",
+    hotkey: "X",
+    title: "Damage enemies in a line",
+    carriers: Object.freeze([KIND.EKATERINA]),
+    targetMode: "worldPoint",
+    rangeTiles: EKATERINA_LINE_SHOT_RANGE_TILES,
+    cooldownTicks: EKATERINA_LINE_SHOT_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    radiusTiles: EKATERINA_LINE_SHOT_WIDTH_TILES * 0.5,
+    damage: EKATERINA_LINE_SHOT_DAMAGE,
+    queued: false,
+  }),
 });
 
 export const UPGRADES = Object.freeze({
@@ -319,6 +358,7 @@ export const WORKER_BUILDABLE = Object.freeze([
 ]);
 
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
+export const EKATERINA_FACTION_ID = "ekaterina";
 
 function freezeCatalog(catalog) {
   const trainables = {};
@@ -392,6 +432,16 @@ export const FACTION_CATALOGS = Object.freeze({
     trainables: {},
     research: {},
     abilities: [],
+  }),
+  [EKATERINA_FACTION_ID]: freezeCatalog({
+    id: EKATERINA_FACTION_ID,
+    loadoutId: "ekaterina.standard",
+    units: [KIND.EKATERINA],
+    buildings: [KIND.ZAMOK],
+    buildables: [],
+    trainables: {},
+    research: {},
+    abilities: [ABILITY.EKATERINA_TELEPORT, ABILITY.EKATERINA_LINE_SHOT],
   }),
 });
 

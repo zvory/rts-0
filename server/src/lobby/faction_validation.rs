@@ -1,4 +1,6 @@
-use rts_rules::faction::{catalog_for, DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
+use rts_rules::faction::{
+    catalog_for, DEFAULT_FACTION_ID, EKATERINA_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum FactionRequestContext {
@@ -89,7 +91,7 @@ pub(super) fn validate_faction_request(
         };
     }
 
-    if faction_id == DEFAULT_FACTION_ID {
+    if matches!(faction_id, DEFAULT_FACTION_ID | EKATERINA_FACTION_ID) {
         return FactionValidation::AcceptedPlayable {
             faction_id: faction_id.to_string(),
         };
@@ -128,10 +130,23 @@ mod tests {
             }
         );
         assert_eq!(
-            validate_faction_request(FactionRequestContext::NormalLobby, Some("ekaterina")),
+            validate_faction_request(FactionRequestContext::NormalLobby, Some("unknown_faction")),
             FactionValidation::Rejected {
-                requested: Some("ekaterina".to_string()),
+                requested: Some("unknown_faction".to_string()),
                 reason: FactionRejectReason::UnknownCatalog,
+            }
+        );
+    }
+
+    #[test]
+    fn ekaterina_is_a_playable_faction() {
+        assert_eq!(
+            validate_faction_request(
+                FactionRequestContext::NormalLobby,
+                Some(EKATERINA_FACTION_ID)
+            ),
+            FactionValidation::AcceptedPlayable {
+                faction_id: EKATERINA_FACTION_ID.to_string()
             }
         );
     }

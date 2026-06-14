@@ -559,6 +559,11 @@ impl Entity {
         });
     }
 
+    pub fn set_position(&mut self, x: f32, y: f32) {
+        self.pos_x = x;
+        self.pos_y = y;
+    }
+
     pub fn set_facing(&mut self, facing: f32) {
         if let Some(m) = self.movement.as_mut() {
             m.facing = facing;
@@ -674,6 +679,14 @@ impl Entity {
             self.last_damage_tick = None;
             self.last_damage_pos = None;
         }
+        true
+    }
+
+    pub fn restore_hp(&mut self, amount: u32) -> bool {
+        if self.hp == 0 || amount == 0 || self.hp >= self.max_hp {
+            return false;
+        }
+        self.hp = self.hp.saturating_add(amount).min(self.max_hp);
         true
     }
 

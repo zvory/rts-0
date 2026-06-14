@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
+use crate::game::hero_abilities;
 use crate::game::map::Map;
 use crate::game::mortar::{mortar_current_facing_ready, rotate_mortar_for_fire, MortarShellStore};
 use crate::game::services::commands::{notice, notice_positioned};
@@ -220,6 +221,69 @@ pub(crate) fn launch_world_ability(
                 crate::protocol::NoticeSeverity::Info,
                 x,
                 y,
+            );
+            true
+        }
+        (AbilityEffectHook::Teleport, AbilityKind::EkaterinaTeleport) => {
+            let Some((blink_x, blink_y)) = hero_abilities::ekaterina_teleport_destination(
+                map,
+                entities,
+                caster,
+                x,
+                y,
+                definition.range_tiles,
+            ) else {
+                return false;
+            };
+            if !ps.spend_cost(definition.cost) {
+                return false;
+            }
+            let Some(e) = entities.get_mut(caster) else {
+                return false;
+            };
+            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            if !hero_abilities::move_ekaterina_to(entities, caster, blink_x, blink_y) {
+                return false;
+            }
+            notice_positioned(
+                events,
+                player,
+                "Teleport",
+                crate::protocol::NoticeSeverity::Info,
+                blink_x,
+                blink_y,
+            );
+            true
+        }
+        (AbilityEffectHook::LineDamage, AbilityKind::EkaterinaLineShot) => {
+            if !ps.spend_cost(definition.cost) {
+                return false;
+            }
+            let Some((target_x, target_y)) = hero_abilities::apply_ekaterina_line_shot(
+                entities,
+                teams,
+                player,
+                caster,
+                x,
+                y,
+                definition.range_tiles,
+                tick,
+            ) else {
+                return false;
+            };
+            if let Some(e) = entities.get_mut(caster) {
+                e.start_ability_cooldown(ability, definition.cooldown_ticks);
+                if !preserve_active_order {
+                    e.clear_active_order();
+                }
+            }
+            notice_positioned(
+                events,
+                player,
+                "Line Shot",
+                crate::protocol::NoticeSeverity::Info,
+                target_x,
+                target_y,
             );
             true
         }

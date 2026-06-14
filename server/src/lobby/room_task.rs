@@ -4388,7 +4388,7 @@ mod tests {
     fn replay_session_rejects_unknown_or_fixture_faction_ids() {
         let players = replay_test_players(2);
         let (_live, mut unknown_artifact) = replay_test_artifact(&players, 0);
-        unknown_artifact.players[0].faction_id = "ekaterina".to_string();
+        unknown_artifact.players[0].faction_id = "unknown-faction".to_string();
 
         let err = match ReplaySession::new(unknown_artifact) {
             Ok(_) => panic!("unsupported replay faction should be rejected"),

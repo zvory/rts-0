@@ -29,6 +29,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("death", ServiceRole::TickSystem),
     ("economy", ServiceRole::TickSystem),
     ("geometry", ServiceRole::QueryIndex),
+    ("hero", ServiceRole::TickSystem),
     ("line_of_sight", ServiceRole::QueryIndex),
     ("move_coordinator", ServiceRole::MutationHelper),
     ("movement", ServiceRole::TickSystem),

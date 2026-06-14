@@ -13,6 +13,7 @@ pub mod construction;
 pub mod death;
 pub mod economy;
 pub mod geometry;
+pub mod hero;
 pub mod line_of_sight;
 pub mod move_coordinator;
 pub mod movement;

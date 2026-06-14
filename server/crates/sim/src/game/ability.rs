@@ -12,6 +12,8 @@ pub enum AbilityKind {
     MortarFire,
     PointFire,
     Breakthrough,
+    EkaterinaTeleport,
+    EkaterinaLineShot,
 }
 
 impl AbilityKind {
@@ -22,6 +24,8 @@ impl AbilityKind {
             AbilityKind::MortarFire => protocol::abilities::MORTAR_FIRE,
             AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
             AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
+            AbilityKind::EkaterinaTeleport => protocol::abilities::EKATERINA_TELEPORT,
+            AbilityKind::EkaterinaLineShot => protocol::abilities::EKATERINA_LINE_SHOT,
         }
     }
 }
@@ -36,6 +40,8 @@ impl FromStr for AbilityKind {
             protocol::abilities::MORTAR_FIRE => Ok(AbilityKind::MortarFire),
             protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
             protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
+            protocol::abilities::EKATERINA_TELEPORT => Ok(AbilityKind::EkaterinaTeleport),
+            protocol::abilities::EKATERINA_LINE_SHOT => Ok(AbilityKind::EkaterinaLineShot),
             _ => Err(()),
         }
     }
@@ -53,6 +59,8 @@ pub enum AbilityEffectHook {
     OwnedAreaStatus,
     DelayedWorld,
     ArtilleryPointFire,
+    Teleport,
+    LineDamage,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +113,8 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
+        AbilityKind::EkaterinaTeleport => AbilityEffectHook::Teleport,
+        AbilityKind::EkaterinaLineShot => AbilityEffectHook::LineDamage,
     }
 }
 
@@ -133,6 +143,14 @@ mod tests {
         assert_eq!(
             definition(AbilityKind::Breakthrough).effect_hook,
             AbilityEffectHook::OwnedAreaStatus
+        );
+        assert_eq!(
+            definition(AbilityKind::EkaterinaTeleport).effect_hook,
+            AbilityEffectHook::Teleport
+        );
+        assert_eq!(
+            definition(AbilityKind::EkaterinaLineShot).effect_hook,
+            AbilityEffectHook::LineDamage
         );
     }
 }

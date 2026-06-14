@@ -1053,7 +1053,7 @@ mod tests {
     #[test]
     fn match_history_replay_launch_rejects_unsupported_or_fixture_factions() {
         let mut unknown = replay_artifact_for_faction(DEFAULT_FACTION_ID);
-        unknown.players[0].faction_id = "ekaterina".to_string();
+        unknown.players[0].faction_id = "unknown-faction".to_string();
         let err = replay_incompatibility_reason(&unknown, "current-build")
             .expect("unsupported future faction should reject");
         assert!(err.contains("unknown faction"), "unexpected reject: {err}");
