@@ -297,6 +297,11 @@ transport decode:
 }
 ```
 
+Steel, Oil, and Supply are fixed protocol fields for this faction plan. Normal snapshots,
+spectator/replay `playerResources`, compact `"s"`, compact `"pr"`, start-map resources, score
+values, and observer analysis remain on the current Steel/Oil/Supply schema; faction-specific or
+arbitrary resource vectors are deferred to a separate generic-resource migration.
+
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
 team. A defeated/disconnected teammate stops contributing live sight; if that player's team still

@@ -1,6 +1,6 @@
 # Phase 4 - Steel/Oil Resource Policy Hardening
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

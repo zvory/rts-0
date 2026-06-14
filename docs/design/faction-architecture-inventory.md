@@ -42,6 +42,9 @@ Oil nodes. Current starting values are `STARTING_STEEL = 75`, `STARTING_OIL = 0`
 Compact snapshots encode resources as fixed scalar slots: tick, Steel, Oil, Supply used, and Supply
 cap. Spectator/replay `player_resources` use the same Steel/Oil/Supply fields. Later generic
 resource work must be a separate plan; this faction plan keeps the current resource payload shape.
+Approved direct-resource modules are listed in `docs/design/balance.md` under the faction economy
+contract. Future direct Steel/Oil/Supply references outside those owners should either route
+through catalog-aware cost/loadout helpers or update that approved inventory deliberately.
 
 ## Current Starting Loadout
 

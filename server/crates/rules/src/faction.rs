@@ -203,6 +203,12 @@ impl FactionCatalog {
             .iter()
             .any(|entry| entry.id == upgrade_id && entry.researched_at == building_kind)
     }
+
+    pub fn allows_ability(self, ability_id: &str, carrier: EntityKind) -> bool {
+        self.abilities
+            .iter()
+            .any(|entry| entry.id == ability_id && entry.carriers.contains(&carrier))
+    }
 }
 
 pub fn catalog_for(faction_id: &str) -> Option<FactionCatalog> {
@@ -260,6 +266,9 @@ mod tests {
         assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::ResearchComplex));
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
+        assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
+        assert!(catalog.allows_ability(POINT_FIRE_ABILITY, EntityKind::Artillery));
+        assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::Worker));
     }
 
     #[test]
@@ -271,5 +280,6 @@ mod tests {
         assert!(!catalog.can_build(EntityKind::Worker, EntityKind::Depot));
         assert!(catalog.trainable_units(EntityKind::CityCentre).is_empty());
         assert!(!catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
+        assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
     }
 }

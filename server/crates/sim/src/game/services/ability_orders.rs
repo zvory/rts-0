@@ -35,6 +35,7 @@ pub(crate) fn order_or_launch_world_ability(
     mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
+    faction_id: &str,
     caster: u32,
     ability: AbilityKind,
     x: f32,
@@ -45,6 +46,9 @@ pub(crate) fn order_or_launch_world_ability(
     let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
         return AbilityOrderResult::Skipped;
     };
+    if !caster_allowed_by_faction(entities, faction_id, caster, ability) {
+        return AbilityOrderResult::Skipped;
+    }
     if !caster_can_accept_order(entities, player, caster, ability) {
         return AbilityOrderResult::Skipped;
     }
@@ -77,6 +81,7 @@ pub(crate) fn order_or_launch_world_ability(
             mortar_shells,
             events,
             player,
+            faction_id,
             caster,
             ability,
             x,
@@ -108,6 +113,7 @@ pub(crate) fn launch_world_ability(
     mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
+    faction_id: &str,
     caster: u32,
     ability: AbilityKind,
     x: f32,
@@ -120,6 +126,7 @@ pub(crate) fn launch_world_ability(
         return false;
     };
     if !caster_can_attempt(entities, player, caster, ability)
+        || !caster_allowed_by_faction(entities, faction_id, caster, ability)
         || !tech_requirement_met(entities, player, ability)
         || !caster_in_range(map, entities, caster, ability, x, y)
         || !world_ability_facing_ready(entities, caster, ability, x, y)
@@ -133,16 +140,15 @@ pub(crate) fn launch_world_ability(
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return false;
     };
-    if ps.steel < definition.cost.steel || ps.oil < definition.cost.oil {
+    if !ps.can_afford(definition.cost.steel, definition.cost.oil) {
         if emit_resource_notice {
             notice(
                 events,
                 player,
-                rules::economy::resource_shortage_notice(
+                rules::economy::resource_shortage_notice_for_cost(
                     ps.steel,
                     ps.oil,
-                    definition.cost.steel,
-                    definition.cost.oil,
+                    definition.cost,
                 ),
             );
         }
@@ -158,7 +164,7 @@ pub(crate) fn launch_world_ability(
             let Some(e) = entities.get_mut(caster) else {
                 return false;
             };
-            if !ps.spend_resources(definition.cost.steel, definition.cost.oil) {
+            if !ps.spend_cost(definition.cost) {
                 return false;
             }
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
@@ -182,7 +188,7 @@ pub(crate) fn launch_world_ability(
             if !e.consume_ability_use(ability) {
                 return false;
             }
-            if !ps.spend_resources(definition.cost.steel, definition.cost.oil) {
+            if !ps.spend_cost(definition.cost) {
                 return false;
             }
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
@@ -223,11 +229,13 @@ pub(crate) fn launch_world_ability(
 
 pub(crate) fn launch_self_ability(
     entities: &mut EntityStore,
+    faction_id: &str,
     player: u32,
     caster: u32,
     ability: AbilityKind,
 ) -> bool {
     if !caster_can_attempt(entities, player, caster, ability)
+        || !caster_allowed_by_faction(entities, faction_id, caster, ability)
         || !tech_requirement_met(entities, player, ability)
     {
         return false;
@@ -325,6 +333,17 @@ pub(crate) fn caster_can_accept_order(
     matches!(entities.get(caster),
         Some(e) if caster_base_ready(e, player, ability)
             && ability_order_ready(e.kind, e.weapon_setup(), ability))
+}
+
+pub(crate) fn caster_allowed_by_faction(
+    entities: &EntityStore,
+    faction_id: &str,
+    caster: u32,
+    ability: AbilityKind,
+) -> bool {
+    matches!(entities.get(caster), Some(e)
+        if rules::faction::catalog_for_or_default(faction_id)
+            .allows_ability(ability.to_protocol_str(), e.kind))
 }
 
 fn caster_base_ready(e: &crate::game::entity::Entity, player: u32, ability: AbilityKind) -> bool {

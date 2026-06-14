@@ -1,7 +1,7 @@
 # Faction Lifecycle Matrix
 
-Status: Updated through Phase 3D replay, branch, dev, self-play, and match-history lifecycle tests
-policy. Every later phase that touches a match lifecycle path must keep this matrix updated.
+Status: Updated through Phase 4 resource-policy hardening. Every later phase that touches a match
+lifecycle path must keep this matrix updated.
 
 ## Purpose
 
@@ -40,5 +40,5 @@ Canonical faction ids:
 | Dev scenarios | Scenario definition plus Kriegsia default start unless scenario explicitly owns a test fixture | Kriegsia only in Phase 3D; fixture rejected outside explicit test fixture context | Not applicable unless scenario declares AI | Disabled only for unsupported local-player faction | Not replayed unless scenario recording exists | `server/crates/sim/src/game/setup/dev_scenarios/tests.rs`, `docs/context/testing.md` | No arbitrary client spawning. |
 | Self-play | Self-play `PlayerInit.faction_id`, validated by `lobby::faction_validation` | Kriegsia until AI support expands | Kriegsia-only | Not applicable | Artifact schema 2 records faction ids | `server/crates/ai/src/selfplay` tests | Separate AI plan needed for other factions. |
 | Match history replay | Stored schema-2 match artifact | Recorded Kriegsia in Phase 3D; unknown, fixture-only, and unsupported catalog ids reject at replay launch | From artifact only | Disabled for replay viewers | Load from persisted schema; schema 1 rejected by decode/compatibility and unsupported faction rows reject before room creation | `server/src/main.rs` replay compatibility tests, `docs/design/match-history.md` | Old persisted replays are incompatible. |
-| Spectator/no-fog view | Live match start payload or replay schema | Match factions from start/replay metadata | Not applicable | Disabled | Preserve recorded faction metadata | `tests/server_integration.mjs`, future observer faction metadata test | Resource rows stay Steel/Oil/Supply. |
-| Post-match replay | Captured schema-2 match artifact | Recorded replay factions | From artifact only | Disabled for replay viewers | Load from captured schema | `tests/server_integration.mjs` | Same schema as match history replay. |
+| Spectator/no-fog view | Live match start payload or replay schema | Match factions from start/replay metadata | Not applicable | Disabled | Preserve recorded faction metadata | `tests/server_integration.mjs`, future observer faction metadata test | Resource rows stay fixed Steel/Oil/Supply fields. |
+| Post-match replay | Captured schema-2 match artifact | Recorded replay factions | From artifact only | Disabled for replay viewers | Load from captured schema with Steel/Oil/Supply resource payloads | `tests/server_integration.mjs` | Same schema as match history replay; generic resources are deferred. |

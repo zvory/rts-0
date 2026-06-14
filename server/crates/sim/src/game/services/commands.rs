@@ -371,29 +371,21 @@ pub(crate) fn apply_commands(
                     notice(events, player, "Requirement not met");
                     continue;
                 }
-                if !ps.can_afford(definition.cost_steel, definition.cost_oil) {
+                let cost =
+                    rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
+                if !ps.can_afford(cost.steel, cost.oil) {
                     notice(
                         events,
                         player,
-                        rules::economy::resource_shortage_notice(
-                            ps.steel,
-                            ps.oil,
-                            definition.cost_steel,
-                            definition.cost_oil,
-                        ),
+                        rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
                     );
                     continue;
                 }
-                if !ps.spend_resources(definition.cost_steel, definition.cost_oil) {
+                if !ps.spend_cost(cost) {
                     notice(
                         events,
                         player,
-                        rules::economy::resource_shortage_notice(
-                            ps.steel,
-                            ps.oil,
-                            definition.cost_steel,
-                            definition.cost_oil,
-                        ),
+                        rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
                     );
                     continue;
                 }
@@ -406,7 +398,7 @@ pub(crate) fn apply_commands(
                     })
                 });
                 if !queued {
-                    ps.refund_resources(definition.cost_steel, definition.cost_oil);
+                    ps.refund_cost(cost);
                 }
             }
             SimCommand::Cancel { building } => {
@@ -435,14 +427,7 @@ pub(crate) fn apply_commands(
                 }
                 let max = (map.world_size_px() - 1.0).max(0.0);
                 let rally = RallyIntent::new(kind, x.clamp(0.0, max), y.clamp(0.0, max));
-                order_set_rally(
-                    entities,
-                    &faction_id,
-                    player,
-                    building,
-                    rally,
-                    queued,
-                );
+                order_set_rally(entities, &faction_id, player, building, rally, queued);
             }
             SimCommand::Rejected { reason } => {
                 notice(events, player, reason.notice_message());
@@ -540,6 +525,12 @@ fn planner_facts(
                 matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
             if let Some(ability) = ability {
                 if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
+                    && ability_orders::caster_allowed_by_faction(
+                        entities,
+                        faction_id,
+                        id,
+                        ability.kind,
+                    )
                     && ability.tech_ready
                 {
                     facts.abilities.push(planner::AbilityFacts {
@@ -707,6 +698,10 @@ fn apply_planned_unit_order(
                         e.clear_queued_orders();
                     }
                     clear_staged_anti_tank_gun_setup(entities, &[unit]);
+                    let faction_id = faction_id_for(
+                        players.iter().map(|p| (p.id, p.faction_id.as_str())),
+                        player,
+                    );
                     order_or_launch_world_ability(
                         map,
                         entities,
@@ -718,6 +713,7 @@ fn apply_planned_unit_order(
                         mortar_shells,
                         events,
                         player,
+                        &faction_id,
                         unit,
                         ability,
                         target.x,
@@ -728,7 +724,11 @@ fn apply_planned_unit_order(
                 }
                 planner::OrderIntent::SelfAbility { ability } => {
                     if let Some(ability) = ability_from_planner(ability) {
-                        launch_self_ability(entities, player, unit, ability);
+                        let faction_id = faction_id_for(
+                            players.iter().map(|p| (p.id, p.faction_id.as_str())),
+                            player,
+                        );
+                        launch_self_ability(entities, &faction_id, player, unit, ability);
                     }
                 }
             },
@@ -781,7 +781,11 @@ fn apply_planned_unit_order(
                 };
                 match target {
                     planner::AbilityTarget::SelfTarget => {
-                        launch_self_ability(entities, player, unit, ability);
+                        let faction_id = faction_id_for(
+                            players.iter().map(|p| (p.id, p.faction_id.as_str())),
+                            player,
+                        );
+                        launch_self_ability(entities, &faction_id, player, unit, ability);
                     }
                     planner::AbilityTarget::WorldPoint(point) => {
                         if ability == AbilityKind::PointFire {
@@ -811,6 +815,10 @@ fn apply_planned_unit_order(
                             mortar_shells,
                             events,
                             player,
+                            &faction_id_for(
+                                players.iter().map(|p| (p.id, p.faction_id.as_str())),
+                                player,
+                            ),
                             unit,
                             ability,
                             point.x,
@@ -1290,23 +1298,36 @@ fn try_fire_artillery(
     if !ready {
         return false;
     }
+    let faction_id = faction_id_for(
+        players.iter().map(|p| (p.id, p.faction_id.as_str())),
+        player,
+    );
+    if !ability_orders::caster_allowed_by_faction(
+        entities,
+        &faction_id,
+        unit,
+        AbilityKind::PointFire,
+    ) {
+        return false;
+    }
+    let ammo_cost = rules::economy::ResourceCost::new(config::ARTILLERY_AMMO_COST_STEEL, 0);
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return false;
     };
-    if ps.steel < config::ARTILLERY_AMMO_COST_STEEL {
+    if !ps.can_afford(ammo_cost.steel, ammo_cost.oil) {
         notice(events, player, "Not enough steel");
         if let Some(e) = entities.get_mut(unit) {
             e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
         }
         return false;
     }
-    if !ps.spend_resources(config::ARTILLERY_AMMO_COST_STEEL, 0) {
+    if !ps.spend_cost(ammo_cost) {
         notice(events, player, "Not enough steel");
         return false;
     }
     let (target_x, target_y) = {
         let Some(e) = entities.get_mut(unit) else {
-            ps.refund_resources(config::ARTILLERY_AMMO_COST_STEEL, 0);
+            ps.refund_cost(ammo_cost);
             return false;
         };
         let shot_number = e.increment_artillery_shots_fired();
@@ -1647,12 +1668,12 @@ fn order_build(
         Some(p) => p,
         None => return,
     };
-    let (cost_steel, cost_oil) = rules::economy::cost(building);
-    if !can_resume_existing && (ps.steel < cost_steel || ps.oil < cost_oil) {
+    let cost = rules::economy::resource_cost(building);
+    if !can_resume_existing && !ps.can_afford(cost.steel, cost.oil) {
         notice(
             events,
             player,
-            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil),
+            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
         );
         return;
     }
@@ -1706,13 +1727,13 @@ fn order_train(
         notice(events, player, "Upgrade required");
         return;
     }
-    let (cost_steel, cost_oil) = rules::economy::cost(unit);
+    let cost = rules::economy::resource_cost(unit);
     let supply = rules::economy::supply_cost(unit);
-    if ps.steel < cost_steel || ps.oil < cost_oil {
+    if !ps.can_afford(cost.steel, cost.oil) {
         notice(
             events,
             player,
-            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil),
+            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
         );
         return;
     }
@@ -1724,16 +1745,16 @@ fn order_train(
         notice(events, player, "Not enough supply");
         return;
     }
-    if !ps.spend_resources(cost_steel, cost_oil) {
+    if !ps.spend_cost(cost) {
         notice(
             events,
             player,
-            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil),
+            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
         );
         return;
     }
     if !ps.reserve_supply(supply) {
-        ps.refund_resources(cost_steel, cost_oil);
+        ps.refund_cost(cost);
         notice(events, player, "Not enough supply");
         return;
     }
@@ -1747,7 +1768,7 @@ fn order_train(
     });
     if !queued {
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-            ps.refund_resources(cost_steel, cost_oil);
+            ps.refund_cost(cost);
             ps.release_supply(supply);
         }
     }
@@ -1814,13 +1835,15 @@ fn order_cancel(
     if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
         match cancelled {
             Cancelled::Unit(unit) if config::unit_stats(unit).is_some() => {
-                let (cost_steel, cost_oil) = rules::economy::cost(unit);
-                ps.refund_resources(cost_steel, cost_oil);
+                ps.refund_cost(rules::economy::resource_cost(unit));
                 ps.release_supply(rules::economy::supply_cost(unit));
             }
             Cancelled::Upgrade(upgrade) => {
                 let definition = upgrade::definition(upgrade);
-                ps.refund_resources(definition.cost_steel, definition.cost_oil);
+                ps.refund_cost(rules::economy::ResourceCost::new(
+                    definition.cost_steel,
+                    definition.cost_oil,
+                ));
             }
             _ => {}
         }
@@ -2296,6 +2319,12 @@ mod tests {
         let research_complex = entities
             .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
             .expect("research complex should spawn");
+        let resources_before = (
+            players[0].steel,
+            players[0].oil,
+            players[0].supply_used,
+            players[0].supply_cap,
+        );
 
         let events = apply_with_players(
             &map,
@@ -2329,6 +2358,16 @@ mod tests {
             ],
         );
 
+        assert_eq!(
+            (
+                players[0].steel,
+                players[0].oil,
+                players[0].supply_used,
+                players[0].supply_cap,
+            ),
+            resources_before,
+            "fixture-faction illegal build/train/research commands must not spend Steel/Oil or reserve Supply"
+        );
         assert!(
             !matches!(
                 entities.get(worker).expect("worker").order(),
@@ -2363,6 +2402,52 @@ mod tests {
             .collect();
         assert!(notices.contains(&"Cannot train that here"));
         assert!(notices.contains(&"Cannot research that here"));
+    }
+
+    #[test]
+    fn fixture_faction_point_fire_does_not_spend_steel() {
+        let map = flat_map(64);
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].faction_id = rules::faction::EMPTY_FIXTURE_FACTION_ID.to_string();
+        let mut entities = EntityStore::new();
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, 320.0, 320.0)
+            .expect("artillery should spawn");
+        {
+            let gun = entities.get_mut(artillery).expect("artillery should exist");
+            gun.set_weapon_setup(WeaponSetup::Deployed);
+            gun.set_emplacement_facing(Some(0.0));
+        }
+        let steel_before = players[0].steel;
+
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::PointFire,
+                    units: vec![artillery],
+                    x: Some(960.0),
+                    y: Some(320.0),
+                    queued: false,
+                },
+            )],
+        );
+
+        assert_eq!(
+            players[0].steel, steel_before,
+            "out-of-faction artillery ability must not spend Steel"
+        );
+        assert_eq!(
+            entities
+                .get(artillery)
+                .expect("artillery should exist")
+                .attack_cd(),
+            0,
+            "out-of-faction artillery ability must not start the firing cooldown"
+        );
     }
 
     #[test]

@@ -82,14 +82,14 @@ pub(crate) fn construction_system(
             }
             continue;
         }
-        let (cost_steel, cost_oil) = rules::economy::cost(kind);
+        let cost = rules::economy::resource_cost(kind);
         let resource_notice = match players.iter().find(|p| p.id == owner) {
             Some(p) => {
-                if p.steel >= cost_steel && p.oil >= cost_oil {
+                if p.can_afford(cost.steel, cost.oil) {
                     None
                 } else {
-                    Some(rules::economy::resource_shortage_notice(
-                        p.steel, p.oil, cost_steel, cost_oil,
+                    Some(rules::economy::resource_shortage_notice_for_cost(
+                        p.steel, p.oil, cost,
                     ))
                 }
             }
@@ -125,7 +125,7 @@ pub(crate) fn construction_system(
             Some(p) => p,
             None => continue,
         };
-        if !ps.spend_resources(cost_steel, cost_oil) {
+        if !ps.spend_cost(cost) {
             continue;
         }
 

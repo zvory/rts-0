@@ -3,6 +3,7 @@ use std::str::FromStr;
 use crate::config;
 use crate::game::entity::EntityKind;
 use crate::protocol;
+use crate::rules::economy::ResourceCost;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AbilityKind {
@@ -47,12 +48,6 @@ pub enum AbilityTargetMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ResourceCost {
-    pub steel: u32,
-    pub oil: u32,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AbilityDefinition {
     pub kind: AbilityKind,
     pub carriers: &'static [EntityKind],
@@ -78,7 +73,7 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             target_mode: AbilityTargetMode::SelfTarget,
             range_tiles: None,
             cooldown_ticks: config::RIFLEMAN_CHARGE_COOLDOWN_TICKS,
-            cost: ResourceCost { steel: 0, oil: 0 },
+            cost: ResourceCost::new(0, 0),
             tech_requirement: None,
             may_queue: false,
         },
@@ -101,7 +96,7 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             target_mode: AbilityTargetMode::WorldPoint,
             range_tiles: Some(9),
             cooldown_ticks: 60,
-            cost: ResourceCost { steel: 0, oil: 0 },
+            cost: ResourceCost::new(0, 0),
             tech_requirement: None,
             may_queue: false,
         },
@@ -111,7 +106,7 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             target_mode: AbilityTargetMode::WorldPoint,
             range_tiles: Some(config::ARTILLERY_MAX_RANGE_TILES),
             cooldown_ticks: 0,
-            cost: ResourceCost { steel: 0, oil: 0 },
+            cost: ResourceCost::new(0, 0),
             tech_requirement: None,
             may_queue: true,
         },
@@ -121,7 +116,7 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             target_mode: AbilityTargetMode::SelfTarget,
             range_tiles: None,
             cooldown_ticks: config::BREAKTHROUGH_COOLDOWN_TICKS,
-            cost: ResourceCost { steel: 0, oil: 0 },
+            cost: ResourceCost::new(0, 0),
             tech_requirement: None,
             may_queue: true,
         },
