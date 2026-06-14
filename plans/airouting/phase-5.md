@@ -1,66 +1,66 @@
-# Phase 5 - Diagnostics and Validation
+# Phase 5 - Agent Legibility Design Gate
 
-Status: Planned.
+Status: Design blocked.
 
 ## Objective
 
-Harden the new terrain routing system with diagnostics, self-play validation, and documentation so it
-can support future AI movement work. This phase should make route decisions observable and
-regression-resistant without expanding into a full tactical planner.
+Do not implement agent-legibility tooling in this phase. The goal is to explicitly pause before
+building SVG, PNG, Markdown, JSON-report, or other agent-facing map inspection output because the
+right format and workflow are not yet known.
 
 ## Scope
 
-- Add compact route diagnostics to AI manager traces or self-play scorecards: selected corridor id,
-  route score, main blockers, hot-route status, and first Scout Car harassment route metadata.
-- Add focused self-play or scenario validation around the known Default map right-side spawn case.
-  Prefer a short deterministic harness that checks route commands and progress over a long
-  20,000-tick balance run.
-- Add a route snapshot or unit test fixture for the Default map candidate scores so map edits or
-  scoring changes make route behavior changes visible in review.
-- Verify that route traces stay diagnostic-only and do not affect deterministic replay command
-  logs.
-- Update `docs/design/ai.md` with the final terrain routing architecture, ownership boundaries,
-  limitations, and future extension points for army movement, scouting, or expansion path safety.
-- Refresh `docs/context/server-sim.md` only if routing files or design-section pointers changed
-  enough that the capsule would send future agents to stale locations.
-- Collect factual gameplay patch-note bullets for the final implementation summary.
+- Start with a user design discussion before writing implementation code.
+- Clarify what problem agent-legibility tooling should solve after the atlas-backed AI behavior
+  exists:
+  - helping agents avoid false map claims during planning
+  - helping humans review map topology changes
+  - helping AI developers debug route selection
+  - producing artifacts for tests or handoffs
+- Decide whether the output should be visual, textual, structured, interactive, or some combination
+  of those formats.
+- Decide who the primary consumer is: user, implementation agents, review agents, future live AI
+  diagnostics, or map authors.
+- Decide whether the tooling belongs in Rust, Node, browser UI, dev-only server routes, or an
+  external script.
+- Decide what generated artifacts, if any, may be committed. Avoid committing large generated
+  images or brittle snapshots without explicit approval.
+- After the design discussion, write a new implementation plan if the user approves tooling work.
+
+## Explicit Non-Goals
+
+- Do not generate SVG overlays.
+- Do not generate PNG overlays.
+- Do not add a Markdown map report.
+- Do not add a browser map-inspection UI.
+- Do not add agent-facing artifact generation to tests or handoffs.
+- Do not make any code changes for agent-legibility tooling without a follow-up user-approved plan.
 
 ## Expected Touch Points
 
-- `server/crates/ai/src/ai_core/decision/trace.rs`
-- `server/crates/ai/src/selfplay/replay.rs`
-- `server/crates/ai/src/selfplay/tests.rs` or a focused self-play scenario module
-- Route evaluator and harassment tests from earlier phases
+None for implementation. A design-only follow-up may update:
+
+- `plans/airouting/` or a new one-word plan directory
 - `docs/design/ai.md`
-- `docs/context/server-sim.md` only if section pointers need refresh
+- `docs/design/server-sim.md`
+- map authoring documentation, if such documentation exists by then
 
 ## Verification
 
-Run the focused checks added by this phase plus the route and harassment test filters:
-
-```bash
-cargo test --manifest-path server/Cargo.toml -p rts-ai routing
-cargo test --manifest-path server/Cargo.toml -p rts-ai harassment
-cargo test --manifest-path server/Cargo.toml -p rts-ai selfplay
-```
-
-If a live Node or browser check is added for the manual route case, keep it narrow and document the
-exact server port and seed needed to reproduce the top-right versus bottom-right configuration.
+No automated verification is expected because this is a design gate. If a follow-up design brief is
+created, verify only that it captures the user's decisions and does not sneak in implementation work.
 
 ## Manual Testing Focus
 
-Run the known right-side two-AI case and inspect Scout Car harassment in a spectator or self-play
-replay. Confirm the diagnostic trace explains the selected route, Scout Cars avoid the far-right
-one-tile choke as their first plan, and route memory is visible when a flank becomes occupied.
+None. This phase is intentionally blocked until the user leads a design discussion.
 
 ## Handoff Expectations
 
-The handoff must summarize the diagnostics added, the fastest regression command for route
-behavior, and any remaining limitations that future AI movement work should respect. It should also
-include factual patch-note bullets for player-facing AI harassment changes.
+The handoff must say whether the user approved any agent-legibility tooling direction. If no
+direction was approved, the handoff must explicitly state that tooling remains blocked and must not
+be implemented by executor automation.
 
 ## Player-Facing Outcome
 
-AI Scout Car harassment becomes easier to debug and less likely to regress. Players should see
-harassing Scout Cars use more credible flanks, avoid repeated choke loops, and react more naturally
-when a flank is occupied.
+No player-facing change. This phase prevents premature tooling work from distracting from the
+atlas-backed routing foundation.
