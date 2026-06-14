@@ -289,6 +289,7 @@ fn build_dev_scenario_game(
     let players = [PlayerInit {
         id: player_id,
         team_id: player_id,
+        faction_id: "kriegsia".to_string(),
         name: "Scenario".to_string(),
         color: "#4878c8".to_string(),
         is_ai: false,

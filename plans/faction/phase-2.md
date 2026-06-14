@@ -1,6 +1,6 @@
 # Phase 2 - Faction-Aware Rules Catalog
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

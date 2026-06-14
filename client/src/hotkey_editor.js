@@ -4,6 +4,8 @@ import {
   HOTKEY_PRESET_GRID,
   HOTKEY_PROFILE_SCHEMA_VERSION,
   normalizeHotkey,
+  profileBindingForCommand,
+  setProfileBindingForCommand,
 } from "./hotkey_profiles.js";
 
 const CONTEXT_LABELS = Object.freeze({
@@ -348,7 +350,7 @@ export class HotkeyEditor {
       this.render();
       return;
     }
-    this.draft.bindings[this.pendingCommandId] = key;
+    setProfileBindingForCommand(this.draft, this.pendingCommandId, key);
     this.pendingCommandId = "";
     this.invalidCapture = "";
     this.render();
@@ -417,7 +419,7 @@ export class HotkeyEditor {
       ...card,
       slots: card.slots.map((slot) => {
         if (!slot) return null;
-        const key = normalizeHotkey(this.draft.bindings?.[slot.commandId]);
+        const key = normalizeHotkey(profileBindingForCommand(this.draft, slot.commandId));
         return { ...slot, hotkey: key || "?" };
       }),
     };
@@ -477,16 +479,22 @@ export class HotkeyEditor {
       description: profile.description || "",
       basePresetId: profile.basePresetId || (profile.type === "preset" ? profile.id : null),
       bindings: { ...profile.bindings },
+      factionBindings: cloneFactionBindings(profile.factionBindings),
     };
   }
 
   _customDraftFrom(source, name, bindings = null) {
     const now = Date.now().toString(36);
-    const sourceBindings = source?.mode === "direct"
-      ? source.bindings
-      : source?.mode === "grid"
-        ? this._gridBindings()
-        : {};
+    const sourceBindingMaps = bindings
+      ? { bindings, factionBindings: {} }
+      : source?.mode === "direct"
+        ? {
+            bindings: { ...source.bindings },
+            factionBindings: cloneFactionBindings(source.factionBindings),
+          }
+        : source?.mode === "grid"
+          ? this._gridBindingMaps()
+          : { bindings: {}, factionBindings: {} };
     return {
       schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
       id: `custom.${now}`,
@@ -495,19 +503,20 @@ export class HotkeyEditor {
       name,
       description: source?.description || "",
       basePresetId: source?.id || null,
-      bindings: bindings || { ...sourceBindings },
+      bindings: { ...sourceBindingMaps.bindings },
+      factionBindings: cloneFactionBindings(sourceBindingMaps.factionBindings),
     };
   }
 
-  _gridBindings() {
-    const bindings = {};
+  _gridBindingMaps() {
+    const profile = { bindings: {}, factionBindings: {} };
     for (const command of this.hotkeyProfiles.catalog.commands || []) {
       if (Number.isInteger(command.slotIndex)) {
         const slotKey = ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"][command.slotIndex] || "";
-        if (slotKey) bindings[command.commandId] = slotKey;
+        if (slotKey) setProfileBindingForCommand(profile, command.commandId, slotKey);
       }
     }
-    return bindings;
+    return profile;
   }
 }
 
@@ -552,4 +561,13 @@ function safeFilename(value) {
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "") || "hotkeys";
+}
+
+function cloneFactionBindings(factionBindings = {}) {
+  const clone = {};
+  for (const [factionId, bindings] of Object.entries(factionBindings || {})) {
+    if (!bindings || typeof bindings !== "object") continue;
+    clone[factionId] = { ...bindings };
+  }
+  return clone;
 }

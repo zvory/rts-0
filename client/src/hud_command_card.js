@@ -1,4 +1,4 @@
-import { ABILITY, KIND, ORDER_STAGE, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, DEFAULT_FACTION_ID, KIND, ORDER_STAGE, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   STATS,
@@ -14,6 +14,15 @@ export const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X
 
 export function gridHotkeyForSlot(slotIndex) {
   return GRID_HOTKEYS[slotIndex] || "";
+}
+
+export function factionCommandId(factionId, family, subject) {
+  return `${normalizedFactionId(factionId)}.${family}.${subject}`;
+}
+
+export function parsedFactionCommandId(commandId) {
+  const match = /^([a-z0-9_]+)\.(build|train|research|ability)\.([A-Za-z0-9_]+)$/.exec(String(commandId || ""));
+  return match ? { factionId: match[1], family: match[2], subject: match[3] } : null;
 }
 
 function card(kind, signature, slots, extras = {}) {
@@ -111,6 +120,7 @@ export function buildCommandCardContextCatalog() {
   const allEntities = [...baseEntities, worker, rifleman, scoutCar, mortar, artillery, commandCar];
   const ctx = (selection, overrides = {}) => ({
     playerId,
+    factionId: DEFAULT_FACTION_ID,
     selection,
     resources: { steel: 1000, oil: 1000 },
     upgrades: [
@@ -165,6 +175,7 @@ export function commandSubject(ctx, selection) {
 
 export function buildWorkerBuildCard(ctx) {
   const resources = resourcesOf(ctx);
+  const factionId = commandFactionId(ctx);
   const slots = [];
   const sigParts = [];
   let idx = 0;
@@ -175,7 +186,7 @@ export function buildWorkerBuildCard(ctx) {
     sigParts.push(`${kind}:${availability}`);
     slots.push({
       id: `build:${kind}`,
-      commandId: `build.${kind}`,
+      commandId: factionCommandId(factionId, "build", kind),
       kind: "button",
       action: "build",
       intent: { type: "beginPlacement", building: kind },
@@ -206,6 +217,7 @@ export function buildWorkerBuildCard(ctx) {
 }
 
 export function buildUnitCard(ctx, selection) {
+  const factionId = commandFactionId(ctx);
   const ownUnits = selectedOwnUnits(ctx, selection);
   const unitIds = ownUnits.map((e) => e.id);
   const setupGunIds = ownUnits
@@ -275,7 +287,7 @@ export function buildUnitCard(ctx, selection) {
     if (slot < 0) continue;
     slots[slot] = {
       id: `ability:${definition.ability}`,
-      commandId: `ability.${definition.ability}`,
+      commandId: factionCommandId(factionId, "ability", definition.ability),
       kind: "button",
       action: "ability",
       intent: {
@@ -332,6 +344,7 @@ export function buildUnitCard(ctx, selection) {
 
 export function buildTrainCard(ctx, building) {
   const resources = resourcesOf(ctx);
+  const factionId = commandFactionId(ctx);
   const trains = trainsOf(building.kind);
   const researches = availableResearchesOf(ctx, building.kind);
   const producingBuildings = selectedProducingBuildingsForKind(ctx, building.kind);
@@ -355,7 +368,7 @@ export function buildTrainCard(ctx, building) {
     const availability = trainAvailability(ctx, unit, resources);
     slots[slot] = {
       id: `train:${unit}`,
-      commandId: `train.${unit}`,
+      commandId: factionCommandId(factionId, "train", unit),
       kind: "button",
       action: "train",
       intent: { type: "train", unit },
@@ -379,7 +392,7 @@ export function buildTrainCard(ctx, building) {
     const availability = researchAvailability(ctx, upgrade, resources);
     slots[slot] = {
       id: `research:${upgrade}`,
-      commandId: `research.${upgrade}`,
+      commandId: factionCommandId(factionId, "research", upgrade),
       kind: "button",
       action: "research",
       intent: { type: "research", upgrade },
@@ -563,6 +576,16 @@ function requirementsOf(definition) {
 
 function resourcesOf(ctx) {
   return ctx.resources || { steel: 0, oil: 0 };
+}
+
+function commandFactionId(ctx) {
+  return normalizedFactionId(ctx?.factionId);
+}
+
+function normalizedFactionId(factionId) {
+  return typeof factionId === "string" && /^[a-z0-9_]+$/.test(factionId)
+    ? factionId
+    : DEFAULT_FACTION_ID;
 }
 
 function playerHasCompleteKind(ctx, kind) {

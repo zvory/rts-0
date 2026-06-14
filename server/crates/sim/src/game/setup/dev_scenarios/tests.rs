@@ -1,11 +1,19 @@
 use super::*;
 use rayon::prelude::*;
+use rts_rules::faction::DEFAULT_FACTION_ID;
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
     game.entities
         .iter()
         .filter(|e| e.owner == owner && e.kind == kind)
         .count()
+}
+
+fn assert_dev_scenario_starts_as_kriegsia(setup: &DevScenarioSetup) {
+    let payload = setup.game.start_payload();
+    assert_eq!(payload.players.len(), 1);
+    assert_eq!(payload.players[0].id, setup.player_id);
+    assert_eq!(payload.players[0].faction_id, DEFAULT_FACTION_ID);
 }
 
 #[derive(Debug)]
@@ -258,7 +266,11 @@ fn measure_vehicle_small_block_clear_time(
 
 #[test]
 fn direct_reverse_order_scenario_faces_unit_east_and_orders_goal_behind() {
-    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [
+        EntityKind::AntiTankGun,
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+    ] {
         let setup = Game::new_direct_reverse_order_scenario(unit, 1, 0x5150_0003)
             .expect("scenario setup should succeed");
         let unit_id = *setup.units.first().expect("scenario should spawn one unit");
@@ -281,6 +293,27 @@ fn direct_reverse_order_scenario_faces_unit_east_and_orders_goal_behind() {
             "{unit} should begin facing east, facing {:.4}",
             entity.facing()
         );
+    }
+}
+
+#[test]
+fn dev_scenarios_default_to_kriegsia_start_faction() {
+    let scenarios = [
+        Game::new_snaking_corridor_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
+        Game::new_direct_reverse_order_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 3, 0x5150_030d),
+        Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_vehicle_small_block_baseline_scenario(
+            EntityKind::ScoutCar,
+            1,
+            Some(EntityKind::Worker),
+            0x5150_030d,
+        ),
+        Game::new_factory_zero_gap_perpendicular_scenario(EntityKind::Tank, 1, 0x5150_030d),
+    ];
+
+    for setup in scenarios {
+        assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
 }
 
@@ -361,7 +394,11 @@ fn vehicle_corner_wall_scenario_matches_authored_layout() {
 
 #[test]
 fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
-    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [
+        EntityKind::AntiTankGun,
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+    ] {
         for count in [1usize, 3, 5] {
             let setup = Game::new_vehicle_corner_wall_scenario(unit, count, 0x5150_0006)
                 .expect("scenario setup should succeed");
@@ -373,7 +410,11 @@ fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
 
 #[test]
 fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
-    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [
+        EntityKind::AntiTankGun,
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+    ] {
         let setup = Game::new_factory_zero_gap_perpendicular_scenario(unit, 1, 0x5150_0009)
             .expect("scenario setup should succeed");
         assert_eq!(setup.issue_after_ticks, config::TICK_HZ / 2);
@@ -424,7 +465,11 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
 #[test]
 fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
     let mut results = Vec::new();
-    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [
+        EntityKind::AntiTankGun,
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+    ] {
         let setup = Game::new_direct_reverse_order_scenario(unit, 1, 0x5150_0007)
             .expect("scenario setup should succeed");
         results.push(measure_dev_scenario_clear_time(
@@ -434,7 +479,11 @@ fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
             setup,
         ));
     }
-    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [
+        EntityKind::AntiTankGun,
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+    ] {
         for count in [1usize, 3, 5] {
             let setup = Game::new_vehicle_corner_wall_scenario(unit, count, 0x5150_0008)
                 .expect("scenario setup should succeed");
@@ -480,7 +529,11 @@ fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
 #[test]
 fn experimental_factory_zero_gap_perpendicular_clear_time_matrix() {
     let mut results = Vec::new();
-    for unit in [EntityKind::AntiTankGun, EntityKind::ScoutCar, EntityKind::Tank] {
+    for unit in [
+        EntityKind::AntiTankGun,
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+    ] {
         let setup = Game::new_factory_zero_gap_perpendicular_scenario(unit, 1, 0x5150_0010)
             .expect("scenario setup should succeed");
         results.push(measure_dev_scenario_clear_time(

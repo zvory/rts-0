@@ -1,7 +1,7 @@
 use super::room_task::{DevScenarioConfig, DevScenarioId, DevSelfPlayConfig, RoomMode};
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
-use crate::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V1;
+use crate::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
     if room == format!("{DEV_SELFPLAY_ROOM_PREFIX}live") {
@@ -75,10 +75,10 @@ pub(super) fn load_replay_artifact(name: &str) -> Result<ReplayArtifactV1, Strin
                         .to_string(),
                 );
             };
-            if schema.as_u64() != Some(REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as u64) {
+            if schema.as_u64() != Some(REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as u64) {
                 return Err(format!(
                     "unsupported replay artifact schema {}; expected {}",
-                    schema, REPLAY_ARTIFACT_SCHEMA_VERSION_V1
+                    schema, REPLAY_ARTIFACT_SCHEMA_VERSION_V2
                 ));
             }
             return serde_json::from_value(value)
@@ -111,6 +111,7 @@ mod tests {
         vec![PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Loader".to_string(),
             color: "#ffffff".to_string(),
             is_ai: false,
@@ -141,7 +142,7 @@ mod tests {
 
         assert_eq!(
             loaded.artifact_schema_version,
-            REPLAY_ARTIFACT_SCHEMA_VERSION_V1
+            REPLAY_ARTIFACT_SCHEMA_VERSION_V2
         );
         assert_eq!(loaded.command_log, artifact.command_log);
         let _ = std::fs::remove_dir_all(&dir);

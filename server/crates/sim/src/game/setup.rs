@@ -257,6 +257,11 @@ impl Game {
             let mut ps = PlayerState {
                 id: p.id,
                 team_id: super::teams::normalize_team_id(p.id, p.team_id),
+                faction_id: if p.faction_id.is_empty() {
+                    DEFAULT_FACTION_ID.to_string()
+                } else {
+                    p.faction_id.clone()
+                },
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile: start,
@@ -278,12 +283,7 @@ impl Game {
         }
 
         if starting_loadout == StartingLoadout::DebugHuman {
-            spawn_debug_inert_enemy_mortar_corner(
-                &mut entities,
-                &map,
-                &mut player_states,
-                players,
-            );
+            spawn_debug_inert_enemy_mortar_corner(&mut entities, &map, &mut player_states, players);
         }
 
         // Always spawn resources on the neutral expansion sites. Claimed sites get a full start;
@@ -357,6 +357,7 @@ impl Game {
             .map(|p| PlayerStart {
                 id: p.id,
                 team_id: p.team_id,
+                faction_id: p.faction_id.clone(),
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile_x: p.start_tile.0,
@@ -607,8 +608,13 @@ fn spawn_debug_inert_enemy_mortar_corner(
     }
 
     let ts = config::TILE_SIZE as f32;
-    const MORTAR_OFFSETS: [(f32, f32); DEBUG_INERT_MORTAR_COUNT] =
-        [(0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), (1.0, -1.0)];
+    const MORTAR_OFFSETS: [(f32, f32); DEBUG_INERT_MORTAR_COUNT] = [
+        (0.0, -1.0),
+        (1.0, 0.0),
+        (0.0, 1.0),
+        (-1.0, 0.0),
+        (1.0, -1.0),
+    ];
     for (dx, dy) in MORTAR_OFFSETS {
         let x = clump_center.0 + dx * DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES * ts;
         let y = clump_center.1 + dy * DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES * ts;
@@ -625,9 +631,12 @@ fn spawn_debug_inert_enemy_mortar_corner(
         }
     }
 
-    if let Some(id) =
-        entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::ScoutCar, clump_center.0, clump_center.1)
-    {
+    if let Some(id) = entities.spawn_unit(
+        DEBUG_INERT_ENEMY_ID,
+        EntityKind::ScoutCar,
+        clump_center.0,
+        clump_center.1,
+    ) {
         if let Some(e) = entities.get_mut(id) {
             e.set_facing(center_facing);
             e.set_weapon_facing(center_facing);
@@ -645,6 +654,7 @@ fn spawn_debug_inert_enemy_mortar_corner(
     players.push(PlayerState {
         id: DEBUG_INERT_ENEMY_ID,
         team_id: DEBUG_INERT_ENEMY_ID,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
         name: "Inert Mortar Corner".to_string(),
         color: "#8d2f2f".to_string(),
         start_tile: clump_tile,
@@ -698,7 +708,11 @@ fn debug_back_axis(map: &Map, coord: u32) -> f32 {
     if coord.saturating_add(EDGE_BUFFER_TILES) >= map.size {
         return -1.0;
     }
-    if coord < map.size / 2 { -1.0 } else { 1.0 }
+    if coord < map.size / 2 {
+        -1.0
+    } else {
+        1.0
+    }
 }
 
 fn clamp_debug_world(map: &Map, x: f32, y: f32) -> (f32, f32) {

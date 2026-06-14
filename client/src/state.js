@@ -9,7 +9,15 @@
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { CommandComposer } from "./command_composer.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
-import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
+import {
+  DEFAULT_FACTION_ID,
+  KIND,
+  PASSABLE,
+  STATE,
+  isBuilding,
+  isResource,
+  isUnit,
+} from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
 const SHOT_REVEAL_MS = 1500;
@@ -60,7 +68,7 @@ export class GameState {
     /** @type {Map<number, object>} id -> static resource node with last-known remaining. */
     this.resourceById = new Map();
     for (const node of this.map.resources) this.resourceById.set(node.id, node);
-    /** @type {Array<{id:number,teamId:number,name:string,color:string,startTileX:number,startTileY:number}>} */
+    /** @type {Array<{id:number,teamId:number,factionId:string,name:string,color:string,startTileX:number,startTileY:number}>} */
     this.players = (startInfo.players || []).map((player) => this._normalizePlayer(player));
 
     // --- snapshot buffering for interpolation ---
@@ -174,6 +182,14 @@ export class GameState {
   playerById(id) {
     const playerId = Number(id);
     return this.players.find((player) => player.id === playerId) || null;
+  }
+
+  get localPlayer() {
+    return this.playerById(this.playerId);
+  }
+
+  get localFactionId() {
+    return this.localPlayer?.factionId || null;
   }
 
   teamIdForPlayer(id) {
@@ -1235,6 +1251,10 @@ export class GameState {
       ...player,
       id,
       teamId: Number.isInteger(rawTeamId) && rawTeamId > 0 ? rawTeamId >>> 0 : id,
+      factionId:
+        typeof player?.factionId === "string" && player.factionId.length > 0
+          ? player.factionId
+          : DEFAULT_FACTION_ID,
     };
   }
 }

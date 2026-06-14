@@ -683,6 +683,7 @@ mod tests {
             PlayerInit {
                 id: 1,
                 team_id: 1,
+                faction_id: "kriegsia".to_string(),
                 name: "A".into(),
                 color: "#fff".into(),
                 is_ai: false,
@@ -690,6 +691,7 @@ mod tests {
             PlayerInit {
                 id: 2,
                 team_id: 2,
+                faction_id: "kriegsia".to_string(),
                 name: "B".into(),
                 color: "#000".into(),
                 is_ai: true,
@@ -706,6 +708,7 @@ mod tests {
             PlayerInit {
                 id: 1,
                 team_id: 1,
+                faction_id: "kriegsia".to_string(),
                 name: "A".into(),
                 color: "#fff".into(),
                 is_ai: false,
@@ -713,6 +716,7 @@ mod tests {
             PlayerInit {
                 id: 2,
                 team_id: 2,
+                faction_id: "kriegsia".to_string(),
                 name: "B".into(),
                 color: "#000".into(),
                 is_ai: true,
@@ -727,6 +731,7 @@ mod tests {
         let players = [PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Solo".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -802,6 +807,7 @@ mod tests {
         let players = [PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Solo".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -856,6 +862,7 @@ mod tests {
         let players = [PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Solo".into(),
             color: "#fff".into(),
             is_ai: false,

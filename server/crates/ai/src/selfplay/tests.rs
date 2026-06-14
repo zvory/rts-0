@@ -351,6 +351,7 @@ fn selfplay_failure_artifact_writes_unified_replay_schema() {
     let players = vec![PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "kriegsia".to_string(),
         name: "Failure Artifact".to_string(),
         color: "#ffffff".to_string(),
         is_ai: false,
@@ -367,10 +368,11 @@ fn selfplay_failure_artifact_writes_unified_replay_schema() {
 
     assert_eq!(
         artifact.artifact_schema_version,
-        rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V1
+        rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2
     );
     assert_eq!(artifact.seed, 0x1234_5678);
     assert_eq!(artifact.players[0].name, "Failure Artifact");
+    assert_eq!(artifact.players[0].faction_id, "kriegsia");
 
     let _ = fs::remove_dir_all(dir);
 }
@@ -535,6 +537,7 @@ fn run_profile_matchup(config: MatchupConfig) {
         .map(|player| PlayerInit {
             id: player.id,
             team_id: player.id,
+            faction_id: "kriegsia".to_string(),
             name: player.name.to_string(),
             color: player.color.to_string(),
             is_ai: true,
@@ -648,6 +651,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Worker Rush".into(),
             color: "#e71d36".into(),
             is_ai: false,
@@ -655,6 +659,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "kriegsia".to_string(),
             name: "Economy".into(),
             color: "#3a86ff".into(),
             is_ai: true,
@@ -714,6 +719,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Miner A".into(),
             color: "#4cc9f0".into(),
             is_ai: false,
@@ -721,6 +727,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "kriegsia".to_string(),
             name: "Miner B".into(),
             color: "#f72585".into(),
             is_ai: false,
@@ -886,6 +893,7 @@ fn pending_tracker_start_payload() -> StartPayload {
         players: vec![PlayerStart {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Alpha".into(),
             color: "#4cc9f0".into(),
             start_tile_x: 10,
@@ -999,6 +1007,7 @@ fn identical_scripted_runs_are_identical() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "A".into(),
             color: "#4cc9f0".into(),
             is_ai: false,
@@ -1006,6 +1015,7 @@ fn identical_scripted_runs_are_identical() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "kriegsia".to_string(),
             name: "B".into(),
             color: "#f72585".into(),
             is_ai: false,
@@ -1049,6 +1059,7 @@ fn live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "AI Alpha".into(),
             color: "#4cc9f0".into(),
             is_ai: true,
@@ -1056,6 +1067,7 @@ fn live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile() {
         PlayerInit {
             id: 2,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "AI Bravo".into(),
             color: "#4895ef".into(),
             is_ai: true,
@@ -1063,6 +1075,7 @@ fn live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile() {
         PlayerInit {
             id: 3,
             team_id: 2,
+            faction_id: "kriegsia".to_string(),
             name: "AI Charlie".into(),
             color: "#f72585".into(),
             is_ai: true,
@@ -1070,6 +1083,7 @@ fn live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile() {
         PlayerInit {
             id: 4,
             team_id: 2,
+            faction_id: "kriegsia".to_string(),
             name: "AI Delta".into(),
             color: "#b5179e".into(),
             is_ai: true,
@@ -1216,6 +1230,7 @@ fn real_ai_vs_real_ai() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "AI Alpha".into(),
             color: "#4cc9f0".into(),
             is_ai: true,
@@ -1223,6 +1238,7 @@ fn real_ai_vs_real_ai() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "kriegsia".to_string(),
             name: "AI Beta".into(),
             color: "#f72585".into(),
             is_ai: true,

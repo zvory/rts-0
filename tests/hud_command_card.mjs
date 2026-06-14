@@ -5,8 +5,12 @@ import {
   buildCommandCardDescriptors,
   commandCardActivationCandidates,
   duplicateCommandIdsForCard,
+  factionCommandId,
 } from "../client/src/hud_command_card.js";
+import { WORKER_BUILDABLE } from "../client/src/config.js";
 import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
+
+const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
 
 const researchComplex = {
   id: 10,
@@ -48,10 +52,10 @@ function buttonSlots(card) {
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
   assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 4), [
-    `research.${UPGRADE.ANTI_TANK_GUN_UNLOCK}`,
-    `research.${UPGRADE.ARTILLERY_UNLOCK}`,
-    `research.${UPGRADE.TANK_UNLOCK}`,
-    `research.${UPGRADE.MORTAR_AUTOCAST}`,
+    kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
+    kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
   ]);
 }
 
@@ -97,7 +101,7 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  assert.equal(buildCard.slots[0].commandId, `build.${KIND.CITY_CENTRE}`);
+  assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.CITY_CENTRE));
   assert.equal(buildCard.slots[0].slotIndex, 0);
   assert.equal(buildCard.slots[0].hotkey, "Q");
   assert.equal(buildCard.slots[8].commandId, "worker.return");
@@ -119,11 +123,12 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  const smoke = abilityCard.slots.find((slot) => slot?.commandId === `ability.${ABILITY.SMOKE}`);
+  const smokeCommandId = kriegsiaCommandId("ability", ABILITY.SMOKE);
+  const smoke = abilityCard.slots.find((slot) => slot?.commandId === smokeCommandId);
   assert.equal(smoke.slotIndex, 5);
   assert.equal(smoke.hotkey, "D");
-  assert.deepEqual(commandCardActivationCandidates(abilityCard, `ability.${ABILITY.SMOKE}`), [{
-    commandId: `ability.${ABILITY.SMOKE}`,
+  assert.deepEqual(commandCardActivationCandidates(abilityCard, smokeCommandId), [{
+    commandId: smokeCommandId,
     slotIndex: 5,
     hotkey: "D",
     label: "Smoke",
@@ -133,8 +138,25 @@ function buttonSlots(card) {
 
 {
   const catalog = buildCommandCardContextCatalog();
-  assert(catalog.length >= 8, "catalog should include representative command-card contexts");
-  assert(catalog.some((entry) => entry.id === "mixed-army-support"), "catalog includes mixed support/ability context");
+  assert.deepEqual(catalog.map((entry) => entry.id), [
+    "empty",
+    "worker-main",
+    "worker-build",
+    "mixed-army-support",
+    "city-centre-train",
+    "factory-train",
+    "gun-works-train",
+    "research-complex",
+  ]);
+  assert.deepEqual(WORKER_BUILDABLE, [
+    KIND.CITY_CENTRE,
+    KIND.DEPOT,
+    KIND.BARRACKS,
+    KIND.TRAINING_CENTRE,
+    KIND.RESEARCH_COMPLEX,
+    KIND.FACTORY,
+    KIND.STEELWORKS,
+  ]);
   for (const entry of catalog) {
     assert.equal(duplicateCommandIdsForCard(entry.card).length, 0, `${entry.id} has duplicate command ids`);
     for (const slot of entry.card.slots) {

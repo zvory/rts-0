@@ -141,7 +141,7 @@ impl Game {
 }
 
 pub type TeamId = u32;
-pub struct PlayerInit { pub id: u32, pub team_id: TeamId, pub name: String, pub color: String, pub is_ai: bool }
+pub struct PlayerInit { pub id: u32, pub team_id: TeamId, pub faction_id: String, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
 `SimCommand` is the internal command enum from `game::command`; live `ClientMessage::Command`
@@ -164,6 +164,13 @@ seated player a unique nonzero team by default; deserialized or hand-built fixtu
 on `Game` are available for future team-aware systems: `team_of_player`, `same_team_player`,
 `same_team_owner`, `is_enemy_player`, `is_enemy_owner`, and `allied_player_ids`. Neutral owner `0`
 is never allied with a player.
+
+`PlayerInit.faction_id` is canonical faction identity. The default current faction is
+`kriegsia`, and the server/lobby layer validates requested or recorded faction ids before match
+assembly. That policy is separate from `rules::faction` catalog existence: normal lobby,
+quickstart, AI, self-play, and dev starts default to or accept only Kriegsia in Phase 3A, replay
+paths require explicit recorded faction ids, and `phase2_empty_fixture` is accepted only by
+test-fixture contexts.
 
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and
@@ -218,12 +225,21 @@ policy is centralized instead of scattered through services.
 - `rules::defs` — immutable unit/building/node definition tables keyed by `EntityKind`. These
   records are the source of truth for kind-specific stats, armor class, weapon class, target
   priority, production chains, tech requirements, and resource-node amounts.
+- `rules::faction` — faction catalogs keyed by stable faction id. Catalogs reference global
+  `EntityKind`, upgrade id, ability id, and Steel/Oil/Supply costs; reuse a global id across
+  factions only when gameplay semantics are identical for every faction that can use it. Divergent
+  behavior, stats, production role, or ability meaning requires a distinct global id gated through
+  catalog availability. The default catalog is `kriegsia`; `phase2_empty_fixture` exists only
+  as a command-validation test fixture. Server-side lifecycle policy lives in
+  `server/src/lobby/faction_validation.rs`.
 - `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
   `attack_profile(kind) -> AttackProfile`, and
   `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.
-- `rules::economy` — tech/production predicates (`trainable_units`, `build_requirement_met`,
-  `train_requirement_met`), resource-node amounts, and cost/supply wrappers (`cost`,
-  `supply_cost`, `supply_provided`).
+- `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
+  `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,
+  `can_research_for_faction`), resource-node amounts, and cost/supply wrappers (`cost`,
+  `supply_cost`, `supply_provided`). Legacy non-faction helpers remain as default-faction
+  compatibility surfaces for older call sites and tests.
 - `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
   opacity modifiers. It is intentionally small today (`Open` returns current defaults; raw stone
   terrain blocks LOS) so the forest/road/hill feature has one rules file to grow in.

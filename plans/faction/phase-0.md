@@ -1,6 +1,6 @@
 # Phase 0 - Architecture Inventory and Harness
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

@@ -1,6 +1,6 @@
 # Phase 1 - Faction Identity Contract
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

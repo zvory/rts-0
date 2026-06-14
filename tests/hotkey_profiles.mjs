@@ -12,8 +12,12 @@ import {
 import {
   buildCommandCardContextCatalog,
   buildCommandCardDescriptors,
+  factionCommandId,
 } from "../client/src/hud_command_card.js";
 import { KIND } from "../client/src/protocol.js";
+
+const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
+const ekaterinaCommandId = (family, subject) => factionCommandId("ekaterina", family, subject);
 
 function memoryStorage(seed = {}) {
   const data = new Map(Object.entries(seed));
@@ -43,6 +47,20 @@ function workerCard() {
   return buildCommandCardDescriptors({
     playerId: 1,
     selection: [worker],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+}
+
+function workerBuildCard(factionId = "kriegsia") {
+  const worker = { id: 20, owner: 1, kind: KIND.WORKER };
+  return buildCommandCardDescriptors({
+    playerId: 1,
+    factionId,
+    selection: [worker],
+    commandCardMode: "workerBuild",
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
@@ -211,6 +229,84 @@ function workerCard() {
   assert.equal(parsed.ok, true, "missing known commands are filled during import parsing");
   assert.equal(parsed.profile.bindings["unit.attack"], "A", "missing command falls back to rendered grid slot");
   assert(parsed.warnings.some((warning) => warning.code === "missingCommandFallback"), "fallback is diagnosed");
+}
+
+{
+  const hotkeys = service();
+  const migrated = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.legacy-build",
+    type: "custom",
+    mode: "direct",
+    name: "Legacy Build",
+    bindings: {
+      "build.city_centre": "B",
+      "unit.move": "M",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "W",
+    },
+  }, { activate: true });
+  const cityCentreCommandId = kriegsiaCommandId("build", KIND.CITY_CENTRE);
+  assert.equal(migrated.ok, true, "legacy faction command ids import successfully");
+  assert(migrated.warnings.some((warning) => warning.code === "legacyCommandMigrated"), "legacy command migration is diagnosed");
+  assert.equal(migrated.profile.factionBindings.kriegsia[cityCentreCommandId], "B", "legacy build ids migrate into Kriegsia bindings");
+  assert.equal(migrated.profile.bindings["build.city_centre"], undefined, "legacy build ids are not kept in the global binding map");
+  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "B", "migrated Kriegsia build binding resolves in Kriegsia cards");
+}
+
+{
+  const hotkeys = service();
+  const cityCentreCommandId = kriegsiaCommandId("build", KIND.CITY_CENTRE);
+  const imported = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.kriegsia-only",
+    type: "custom",
+    mode: "direct",
+    name: "Kriegsia Only",
+    factionBindings: {
+      kriegsia: {
+        [cityCentreCommandId]: "B",
+      },
+    },
+    bindings: {
+      "unit.move": "M",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "W",
+    },
+  }, { activate: true });
+  assert.equal(imported.ok, true, "Kriegsia faction bindings import successfully");
+  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "B", "Kriegsia custom build binding applies to Kriegsia");
+  assert.equal(hotkeys.resolveCard(workerBuildCard("ekaterina")).slots[0].hotkey, "Q", "Kriegsia custom build binding does not apply to Ekaterina command ids");
+}
+
+{
+  const hotkeys = service();
+  const futureCommandId = ekaterinaCommandId("build", KIND.CITY_CENTRE);
+  const imported = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.future-ekaterina",
+    type: "custom",
+    mode: "direct",
+    name: "Future Ekaterina",
+    factionBindings: {
+      ekaterina: {
+        [futureCommandId]: "E",
+      },
+    },
+    bindings: {
+      "unit.move": "M",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "W",
+    },
+  }, { activate: true });
+  assert.equal(imported.ok, true, "unavailable faction commands are preserved on import");
+  assert(imported.warnings.some((warning) => warning.code === "unavailableFactionCommand"), "unavailable faction command preservation is diagnosed");
+  assert.equal(imported.profile.factionBindings.ekaterina[futureCommandId], "E", "future Ekaterina command binding is stored");
+  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "Q", "future Ekaterina bindings are inactive for current Kriegsia cards");
+  assert.equal(hotkeys.exportProfile(imported.profile.id).factionBindings.ekaterina[futureCommandId], "E", "future Ekaterina bindings round-trip through export");
 }
 
 {

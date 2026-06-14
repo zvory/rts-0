@@ -1,11 +1,15 @@
 ## 5. Balance definitions & constants
-Kind-specific server balance lives in `server/crates/rules/src/defs.rs`; terrain movement/cover/
-concealment hooks live in `server/crates/rules/src/terrain.rs` and currently return the all-open-ground
-defaults. `config.rs` is the thin constants module for timings, tile size, starting resources,
-supply caps, mining amounts, and other scalar simulation constants; its `unit_stats(kind)` and
+Kind-specific server balance lives in `server/crates/rules/src/defs.rs`; faction availability,
+buildables, trainables, upgrade ids, and ability carriers live in
+`server/crates/rules/src/faction.rs`; terrain movement/cover/concealment hooks live in
+`server/crates/rules/src/terrain.rs` and currently return the all-open-ground defaults.
+`config.rs` is the thin constants module for timings, tile size, starting resources, supply caps,
+mining amounts, and other scalar simulation constants; its `unit_stats(kind)` and
 `building_stats(kind)` helpers read the defs table.
 `client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight, sizes,
-colors). Keep both in sync; the comment in each file points at the other.
+colors, and command-card descriptors). Keep both in sync; run
+`node scripts/check-faction-catalog-parity.mjs` to mechanically compare the Rust-authoritative
+default faction catalog to the client descriptors.
 
 ### 5.1 Target theme and MVP combat loop
 

@@ -3,6 +3,7 @@
 //! `rules::defs` owns kind-specific data; this module answers allowed/cost/supply questions.
 
 use crate::defs;
+use crate::faction::catalog_for_or_default;
 use crate::EntityKind;
 
 /// Which units a given building can train.
@@ -19,6 +20,11 @@ pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
     units
 }
 
+/// Which units a given building can train for a specific faction.
+pub fn trainable_units_for_faction(faction_id: &str, building_kind: EntityKind) -> Vec<EntityKind> {
+    catalog_for_or_default(faction_id).trainable_units(building_kind)
+}
+
 /// Whether `building_kind` is allowed to be placed given the set of building kinds the
 /// player already owns (tech requirements).
 pub fn build_requirement_met(
@@ -30,6 +36,17 @@ pub fn build_requirement_met(
         .unwrap_or(true)
 }
 
+/// Whether `building_kind` is in this faction's catalog and its tech requirements are met.
+pub fn build_requirement_met_for_faction(
+    faction_id: &str,
+    building_kind: EntityKind,
+    owned_building_kinds: &[EntityKind],
+) -> bool {
+    let catalog = catalog_for_or_default(faction_id);
+    catalog.allows_building(building_kind)
+        && build_requirement_met(building_kind, owned_building_kinds)
+}
+
 /// Whether a unit's training tech has been unlocked by completed buildings.
 pub fn train_requirement_met(
     unit_kind: EntityKind,
@@ -38,6 +55,48 @@ pub fn train_requirement_met(
     defs::unit_def(unit_kind)
         .map(|d| requirements_met(d.train_requires, owned_complete_building_kinds))
         .unwrap_or(true)
+}
+
+/// Whether `unit_kind` is in this faction's catalog and its training tech has been unlocked.
+pub fn train_requirement_met_for_faction(
+    faction_id: &str,
+    unit_kind: EntityKind,
+    owned_complete_building_kinds: &[EntityKind],
+) -> bool {
+    let catalog = catalog_for_or_default(faction_id);
+    catalog.allows_unit(unit_kind)
+        && train_requirement_met(unit_kind, owned_complete_building_kinds)
+}
+
+/// Whether `builder_kind` can place `building_kind` for this faction.
+pub fn can_build_for_faction(
+    faction_id: &str,
+    builder_kind: EntityKind,
+    building_kind: EntityKind,
+) -> bool {
+    catalog_for_or_default(faction_id).can_build(builder_kind, building_kind)
+}
+
+/// Whether `unit_kind` can gather resources for this faction.
+pub fn can_gather_for_faction(faction_id: &str, unit_kind: EntityKind) -> bool {
+    catalog_for_or_default(faction_id).can_gather(unit_kind)
+}
+
+/// Whether a completed building accepts production/rally commands for this faction.
+pub fn can_act_as_production_anchor_for_faction(
+    faction_id: &str,
+    building_kind: EntityKind,
+) -> bool {
+    catalog_for_or_default(faction_id).can_act_as_production_anchor(building_kind)
+}
+
+/// Whether a building may research this upgrade for this faction.
+pub fn can_research_for_faction(
+    faction_id: &str,
+    upgrade_id: &str,
+    building_kind: EntityKind,
+) -> bool {
+    catalog_for_or_default(faction_id).allows_research(upgrade_id, building_kind)
 }
 
 /// Resource node starting amount for a node kind.
@@ -92,9 +151,11 @@ fn requirements_met(requirements: &[EntityKind], owned: &[EntityKind]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::faction::DEFAULT_FACTION_ID;
 
     #[test]
     fn ww2_production_chain_matches_design() {
+        assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::CityCentre),
             &[EntityKind::Worker]
@@ -233,6 +294,25 @@ mod tests {
             crate::balance::DEPOT_SUPPLY
         );
         assert_eq!(supply_provided(EntityKind::Tank), 0);
+
+        assert_eq!(
+            trainable_units_for_faction(DEFAULT_FACTION_ID, EntityKind::Factory),
+            vec![
+                EntityKind::ScoutCar,
+                EntityKind::Tank,
+                EntityKind::CommandCar
+            ]
+        );
+        assert!(build_requirement_met_for_faction(
+            DEFAULT_FACTION_ID,
+            EntityKind::Factory,
+            &[EntityKind::CityCentre, EntityKind::TrainingCentre]
+        ));
+        assert!(train_requirement_met_for_faction(
+            DEFAULT_FACTION_ID,
+            EntityKind::Tank,
+            &[EntityKind::Factory]
+        ));
     }
 
     #[test]

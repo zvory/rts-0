@@ -20,8 +20,8 @@ use rayon::prelude::*;
 
 use super::collision::COLLISION_EPS_PX;
 use super::pivot_drive::{
-    pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK, PIVOT_VEHICLE_LOOKAHEAD_PX,
-    VEHICLE_REVERSE_GOAL_DISTANCE_PX,
+    pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
+    PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
 };
 use super::scout_car::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
@@ -82,6 +82,7 @@ fn player_with_oil(id: u32, oil: u32) -> PlayerState {
     PlayerState {
         id,
         team_id: id,
+        faction_id: "kriegsia".to_string(),
         name: format!("p{id}"),
         color: "#ffffff".to_string(),
         start_tile: (0, 0),
@@ -1584,7 +1585,9 @@ fn scout_car_wall_chokepoint_map(
     let center_world_x = gap_right_x as f32 * ts;
     let start_y = (wall_y as f32 + 10.5) * ts;
     let spacing = match unit {
-        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_BODY_WIDTH_PX + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX * 4.0,
+        EntityKind::AntiTankGun => {
+            config::ANTI_TANK_GUN_BODY_WIDTH_PX + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX * 4.0
+        }
         EntityKind::ScoutCar => {
             config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0
         }
@@ -2062,7 +2065,10 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
 
 #[test]
 fn snaking_corridor_vehicle_slot_clear_times_regression() {
-    let scenarios = [(EntityKind::Tank, 4usize), (EntityKind::AntiTankGun, 4usize)];
+    let scenarios = [
+        (EntityKind::Tank, 4usize),
+        (EntityKind::AntiTankGun, 4usize),
+    ];
     let results: Vec<_> = scenarios
         .par_iter()
         .map(|&(unit, count)| measure_snaking_corridor_unit_clear_times(unit, count, &[0, 1, 2, 3]))
@@ -4455,7 +4461,9 @@ fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
     let spatial = SpatialIndex::build(&entities, map.size);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
-    let e = entities.get(anti_tank_gun).expect("anti-tank gun should exist");
+    let e = entities
+        .get(anti_tank_gun)
+        .expect("anti-tank gun should exist");
     assert!(
         e.facing() > 0.0 && e.facing() <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
         "anti-tank gun body should turn by at most the support-weapon turn-rate constant, got {:.4}",
@@ -4781,10 +4789,7 @@ fn mortar_team_facing_turns_gradually_along_path() {
     let spatial = SpatialIndex::build(&entities, map.size);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
-    let facing = entities
-        .get(mortar)
-        .expect("mortar should exist")
-        .facing();
+    let facing = entities.get(mortar).expect("mortar should exist").facing();
     assert!(
         facing > 0.0 && facing <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
         "mortar should turn by at most the support-weapon turn-rate constant, got {facing:.4}"

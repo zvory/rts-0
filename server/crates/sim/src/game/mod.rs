@@ -36,7 +36,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use crate::config;
 use crate::protocol::{
     Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
-    ResourceDelta, ResourceNode, Snapshot, StartPayload,
+    ResourceDelta, ResourceNode, Snapshot, StartPayload, DEFAULT_FACTION_ID,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,7 @@ pub struct PlayerInit {
     pub id: u32,
     #[serde(default)]
     pub team_id: TeamId,
+    pub faction_id: String,
     pub name: String,
     pub color: String,
     /// When true this player is a computer opponent: it has no socket and is driven by the
@@ -78,6 +79,7 @@ pub struct PlayerInit {
 pub(crate) struct PlayerState {
     pub(crate) id: u32,
     pub(crate) team_id: TeamId,
+    pub(crate) faction_id: String,
     pub(crate) name: String,
     pub(crate) color: String,
     pub(crate) start_tile: (u32, u32),
@@ -389,6 +391,7 @@ impl Game {
             .map(|p| PlayerInit {
                 id: p.id,
                 team_id: p.team_id,
+                faction_id: p.faction_id.clone(),
                 name: p.name.clone(),
                 color: p.color.clone(),
                 is_ai: p.is_ai,

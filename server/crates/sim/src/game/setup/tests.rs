@@ -8,11 +8,81 @@ fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
 }
 
 #[test]
+fn standard_starting_loadout_matches_phase0_inventory() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".to_string(),
+            color: "#cc1111".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".to_string(),
+            color: "#1133bb".to_string(),
+            is_ai: false,
+        },
+    ];
+    let game = Game::new(&players, 7);
+
+    assert_eq!(game.starting_steel(), config::STARTING_STEEL);
+    assert_eq!(game.starting_oil(), config::STARTING_OIL);
+    assert_eq!(game.starting_loadout(), StartingLoadout::Standard);
+
+    for player in &game.players {
+        assert_eq!(player.faction_id, DEFAULT_FACTION_ID);
+        assert_eq!(player.steel, config::STARTING_STEEL);
+        assert_eq!(player.oil, config::STARTING_OIL);
+        assert_eq!(player.supply_cap, config::CITY_CENTRE_SUPPLY);
+        assert_eq!(player.supply_used, config::STARTING_WORKERS);
+        assert_eq!(
+            owned_kind_count(&game, player.id, EntityKind::CityCentre),
+            1
+        );
+        assert_eq!(
+            owned_kind_count(&game, player.id, EntityKind::Worker),
+            config::STARTING_WORKERS as usize
+        );
+        assert_eq!(owned_kind_count(&game, player.id, EntityKind::Depot), 0);
+        assert_eq!(owned_kind_count(&game, player.id, EntityKind::Barracks), 0);
+        assert_eq!(owned_kind_count(&game, player.id, EntityKind::Factory), 0);
+        assert_eq!(
+            owned_kind_count(&game, player.id, EntityKind::Steelworks),
+            0
+        );
+    }
+
+    assert!(game
+        .entities
+        .iter()
+        .any(|e| e.owner == 0 && e.kind == EntityKind::Steel));
+    assert!(game
+        .entities
+        .iter()
+        .any(|e| e.owner == 0 && e.kind == EntityKind::Oil));
+
+    let start = game.start_payload();
+    assert!(start
+        .players
+        .iter()
+        .all(|player| player.faction_id == DEFAULT_FACTION_ID));
+    assert!(game
+        .player_inits()
+        .iter()
+        .all(|player| player.faction_id == DEFAULT_FACTION_ID));
+}
+
+#[test]
 fn debug_starting_loadout_applies_to_humans_only() {
     let players = [
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "kriegsia".to_string(),
             name: "Human".to_string(),
             color: "#cc1111".to_string(),
             is_ai: false,
@@ -20,6 +90,7 @@ fn debug_starting_loadout_applies_to_humans_only() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "kriegsia".to_string(),
             name: "AI".to_string(),
             color: "#1133bb".to_string(),
             is_ai: true,
@@ -64,6 +135,7 @@ fn debug_starting_loadout_adds_inert_enemy_mortar_corner_without_profile() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "kriegsia".to_string(),
         name: "Human".to_string(),
         color: "#cc1111".to_string(),
         is_ai: false,

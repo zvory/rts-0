@@ -13,12 +13,19 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 continue;
             }
             if e.is_building() && !e.under_construction() {
-                cap += rules::economy::supply_provided(e.kind);
+                if rules::faction::catalog_for_or_default(&ps.faction_id).allows_building(e.kind) {
+                    cap += rules::economy::supply_provided(e.kind);
+                }
                 // Units queued for production reserve supply too.
                 for item in e.prod_queue() {
-                    used += rules::economy::supply_cost(item.unit);
+                    if rules::faction::catalog_for_or_default(&ps.faction_id).allows_unit(item.unit)
+                    {
+                        used += rules::economy::supply_cost(item.unit);
+                    }
                 }
-            } else if e.is_unit() {
+            } else if e.is_unit()
+                && rules::faction::catalog_for_or_default(&ps.faction_id).allows_unit(e.kind)
+            {
                 used += rules::economy::supply_cost(e.kind);
             }
         }

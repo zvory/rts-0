@@ -160,11 +160,18 @@ normalizeHotkey(value)
 ```
 
 Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
-`description`, `createdWithBuild`, `basePreset`, and `bindings`. Imports validate known command ids
-against the current command-card catalog, ignore unknown commands with warnings, reject invalid keys
-and same-context duplicates, and store accepted payloads as custom profiles. Untargeted imports
-rewrite ids/names to avoid local collisions; targeted imports replace the whole target profile
-payload instead of merging individual bindings.
+`description`, `createdWithBuild`, `basePreset`, `bindings`, and `factionBindings`. Direct-mode
+`bindings` hold global commands such as `unit.move`, `unit.attack`, `unit.stop`,
+`worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Faction catalog
+actions are stored under `factionBindings[factionId]` with namespaced command ids shaped as
+`kriegsia.build.<kind>`, `kriegsia.train.<kind>`, `kriegsia.research.<upgrade>`, and
+`kriegsia.ability.<ability>`; Ekaterina reserves the same `ekaterina.*` namespace but has no
+command cards yet. Imports migrate old flat Kriegsia ids like `build.city_centre` into the
+Kriegsia binding set, preserve structurally valid unavailable faction commands with warnings,
+ignore unknown non-faction commands with warnings, reject invalid keys and same-context duplicates,
+and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to avoid local
+collisions; targeted imports replace the whole target profile payload instead of merging individual
+bindings.
 
 The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
@@ -361,6 +368,9 @@ hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydo
 only those repeatable command-card buttons. Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type.
+Command identities are stable and split by scope: global tactical/navigation/production-control
+buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
+faction catalog use the local player's faction id as the command-id prefix.
 
 `minimap.js`
 ```js

@@ -482,6 +482,64 @@ mod tests {
     }
 
     #[test]
+    fn current_faction_catalog_matches_phase0_inventory() {
+        let units: Vec<_> = UNITS.iter().map(|d| d.kind).collect();
+        assert_eq!(
+            units,
+            vec![
+                EntityKind::Worker,
+                EntityKind::Rifleman,
+                EntityKind::MachineGunner,
+                EntityKind::AntiTankGun,
+                EntityKind::MortarTeam,
+                EntityKind::Artillery,
+                EntityKind::Tank,
+                EntityKind::ScoutCar,
+                EntityKind::CommandCar,
+            ]
+        );
+
+        let buildings: Vec<_> = BUILDINGS.iter().map(|d| d.kind).collect();
+        assert_eq!(
+            buildings,
+            vec![
+                EntityKind::CityCentre,
+                EntityKind::Depot,
+                EntityKind::Barracks,
+                EntityKind::TrainingCentre,
+                EntityKind::Factory,
+                EntityKind::ResearchComplex,
+                EntityKind::Steelworks,
+            ]
+        );
+
+        assert_eq!(
+            building_def(EntityKind::CityCentre).unwrap().trains,
+            WORKER_ONLY
+        );
+        assert_eq!(
+            building_def(EntityKind::Barracks).unwrap().trains,
+            BARRACKS_UNITS
+        );
+        assert_eq!(
+            building_def(EntityKind::Factory).unwrap().trains,
+            FACTORY_UNITS
+        );
+        assert_eq!(
+            building_def(EntityKind::Steelworks).unwrap().trains,
+            STEELWORKS_UNITS
+        );
+        assert_eq!(
+            node_def(EntityKind::Steel).unwrap().amount,
+            balance::STEEL_PATCH_AMOUNT
+        );
+        assert_eq!(
+            node_def(EntityKind::Oil).unwrap().amount,
+            balance::OIL_GEYSER_AMOUNT
+        );
+    }
+
+    #[test]
     fn depot_and_barracks_hp_keep_requested_ratio() {
         let depot_hp = building_def(EntityKind::Depot).expect("depot def").stats.hp;
         let barracks_hp = building_def(EntityKind::Barracks)
@@ -495,7 +553,10 @@ mod tests {
 
     #[test]
     fn workers_move_at_tank_speed() {
-        let worker_speed = unit_def(EntityKind::Worker).expect("worker def").stats.speed;
+        let worker_speed = unit_def(EntityKind::Worker)
+            .expect("worker def")
+            .stats
+            .speed;
         let tank_speed = unit_def(EntityKind::Tank).expect("tank def").stats.speed;
 
         assert_eq!(worker_speed, tank_speed);

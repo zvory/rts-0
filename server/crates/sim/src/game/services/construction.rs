@@ -65,7 +65,18 @@ pub(crate) fn construction_system(
         // Re-validate placement against the live entity set.
         let placeable =
             standability::building_site_clear_for_build_intent(map, entities, kind, tx, ty, worker);
-        if config::building_stats(kind).is_none() {
+        let owner_faction = players
+            .iter()
+            .find(|p| p.id == owner)
+            .map(|p| p.faction_id.as_str())
+            .unwrap_or(rules::faction::DEFAULT_FACTION_ID);
+        if config::building_stats(kind).is_none()
+            || !rules::economy::build_requirement_met_for_faction(
+                owner_faction,
+                kind,
+                &crate::game::services::world_query::completed_building_kinds(entities, owner),
+            )
+        {
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_active_order();
             }
@@ -559,6 +570,7 @@ mod tests {
         PlayerState {
             id,
             team_id: id,
+            faction_id: "kriegsia".to_string(),
             name: format!("Player {id}"),
             color: "#fff".to_string(),
             start_tile: (0, 0),

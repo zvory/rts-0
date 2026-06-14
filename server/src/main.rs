@@ -28,6 +28,7 @@ use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
 
+use rts_rules::faction::{catalog_for, DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
 use rts_server::db::Db;
 use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
@@ -35,7 +36,7 @@ use rts_server::dev_scenarios::{
 };
 use rts_server::game::map::Map;
 use rts_server::game::replay::{
-    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
 };
 use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
@@ -360,7 +361,7 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
         row.replay_unavailable_reason = Some("Replay was not recorded for this match.".to_string());
         return;
     };
-    if meta.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32 {
+    if meta.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32 {
         row.replay_available = false;
         row.replay_unavailable_reason = Some(format!(
             "Replay schema {} is not supported by this server.",
@@ -414,13 +415,48 @@ fn replay_incompatibility_reason(artifact: &ReplayArtifactV1, build_sha: &str) -
             ));
         }
     };
-    artifact
+    if let Some(reason) = artifact
         .validate_against(build_sha, &running_map)
         .err()
         .and_then(|err| match err {
             ReplayValidationError::BuildShaMismatch { .. } => None,
             err => Some(err.to_string()),
         })
+    {
+        return Some(reason);
+    }
+    replay_faction_incompatibility_reason(artifact)
+}
+
+fn replay_faction_incompatibility_reason(artifact: &ReplayArtifactV1) -> Option<String> {
+    for player in &artifact.players {
+        let faction_id = player.faction_id.trim();
+        if faction_id.is_empty() {
+            return Some(format!(
+                "Replay player {} is missing a faction id.",
+                player.id
+            ));
+        }
+        if catalog_for(faction_id).is_none() {
+            return Some(format!(
+                "Replay player {} has unknown faction {:?}.",
+                player.id, faction_id
+            ));
+        }
+        if faction_id == EMPTY_FIXTURE_FACTION_ID {
+            return Some(format!(
+                "Replay player {} uses fixture-only faction {:?}.",
+                player.id, faction_id
+            ));
+        }
+        if faction_id != DEFAULT_FACTION_ID {
+            return Some(format!(
+                "Replay player {} uses unsupported faction {:?}.",
+                player.id, faction_id
+            ));
+        }
+    }
+    None
 }
 
 fn replay_build_warning(server_build_sha: &str, replay_build_sha: &str) -> String {
@@ -970,11 +1006,24 @@ mod tests {
         }
     }
 
+    fn replay_artifact_for_faction(faction_id: &str) -> ReplayArtifactV1 {
+        let players = vec![rts_server::game::PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: faction_id.to_string(),
+            name: "Replay".to_string(),
+            color: "#ffffff".to_string(),
+            is_ai: false,
+        }];
+        let game = rts_server::game::Game::new(&players, 0x5150_030d);
+        ReplayArtifactV1::capture_from_game(&game, "current-build", None, game.scores())
+    }
+
     #[test]
     fn replay_summary_marks_current_build_and_map_available() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32,
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
             build_sha: "current-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,
@@ -991,7 +1040,7 @@ mod tests {
     fn replay_summary_warns_but_allows_incompatible_build() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32,
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
             build_sha: "old-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,
@@ -1020,6 +1069,30 @@ mod tests {
             row.replay_unavailable_reason.as_deref(),
             Some("Replay was not recorded for this match.")
         );
+    }
+
+    #[test]
+    fn match_history_replay_launch_accepts_schema_two_kriegsia_factions() {
+        let artifact = replay_artifact_for_faction(DEFAULT_FACTION_ID);
+
+        assert_eq!(
+            replay_incompatibility_reason(&artifact, "current-build"),
+            None
+        );
+    }
+
+    #[test]
+    fn match_history_replay_launch_rejects_unsupported_or_fixture_factions() {
+        let mut unknown = replay_artifact_for_faction(DEFAULT_FACTION_ID);
+        unknown.players[0].faction_id = "ekaterina".to_string();
+        let err = replay_incompatibility_reason(&unknown, "current-build")
+            .expect("unsupported future faction should reject");
+        assert!(err.contains("unknown faction"), "unexpected reject: {err}");
+
+        let fixture = replay_artifact_for_faction(EMPTY_FIXTURE_FACTION_ID);
+        let err = replay_incompatibility_reason(&fixture, "current-build")
+            .expect("fixture faction should reject persisted replay launch");
+        assert!(err.contains("fixture-only"), "unexpected reject: {err}");
     }
 }
 

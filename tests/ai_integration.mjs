@@ -21,6 +21,7 @@ import {
   startMatch,
   uniqueRoom,
 } from "./team_harness.mjs";
+import { DEFAULT_FACTION_ID } from "../client/src/protocol.js";
 
 const ROOM = uniqueRoom("ai-itest");
 const assertions = createAssertions();
@@ -41,10 +42,25 @@ const { ok } = assertions;
   ok(ai && /^#/.test(ai.color) && ai.color !== human.color, `AI has a distinct hex color (${ai?.color} vs ${human?.color})`);
   ok(ai && ai.ready === true, "AI is always ready");
   ok(ai && ai.id !== A.playerId, "AI got its own player id");
+  ok(ai && ai.factionId === DEFAULT_FACTION_ID, `AI defaults to ${DEFAULT_FACTION_ID}`);
+
+  // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
+  // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.
+  const beforeHandBuiltIds = new Set(withAi.players.map((player) => player.id));
+  A.send({ t: "addAi", factionId: "ekaterina" });
+  await sleep(400);
+  let withTwo = A.msgs.filter((m) => m.t === "lobby").at(-1);
+  const handBuiltAi = withTwo.players.find((p) => p.isAi && !beforeHandBuiltIds.has(p.id));
+  ok(
+    !handBuiltAi || handBuiltAi.factionId === DEFAULT_FACTION_ID,
+    "hand-built addAi factionId cannot create unsupported AI",
+  );
 
   // Add a second AI, then remove the first — exercises both controls and the cap accounting.
-  await addAi(A);
-  const withTwo = A.msgs.filter((m) => m.t === "lobby").at(-1);
+  if (!handBuiltAi) {
+    await addAi(A);
+    withTwo = A.msgs.filter((m) => m.t === "lobby").at(-1);
+  }
   ok(withTwo.players.filter((p) => p.isAi).length === 2, "second addAi seated a third player");
   const removed = await removeAi(A, ai.id);
   ok(!removed.players.some((p) => p.id === ai.id), "removeAi unseated the targeted AI");
@@ -70,6 +86,7 @@ const { ok } = assertions;
   assertCountdownProtocol(ok, countdowns[0]);
   const [start] = starts;
   ok(start.players.length === 2, `start lists 2 players (human + AI) (${start.players.length})`);
+  ok(start.players.every((p) => p.factionId === DEFAULT_FACTION_ID), `start players carry ${DEFAULT_FACTION_ID}`);
   const sa = start.players.find((p) => p.id === A.playerId);
   const sai = start.players.find((p) => p.id !== A.playerId);
   ok(sa && sai && (sa.startTileX !== sai.startTileX || sa.startTileY !== sai.startTileY),

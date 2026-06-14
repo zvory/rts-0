@@ -479,6 +479,7 @@ export class HUD {
     return {
       spectator: this.state.spectator,
       playerId: this.state.playerId,
+      factionId: this.state.localFactionId,
       selection: this.state.selectedEntities() || [],
       resources: this.state.resources || { steel: 0, oil: 0 },
       upgrades: this.state.upgrades || [],

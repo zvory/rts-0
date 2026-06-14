@@ -147,7 +147,7 @@ authority.
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
 
-`LobbyPlayer`: `{ id: u32, teamId: u32, name: string, ready: bool, color: string, isAi: bool, isSpectator: bool }`. `isAi` is
+`LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag and a host-only
 remove control instead of a ready toggle). `isSpectator` is true for human observers; they do not
 consume active map starts, block readiness, or count toward win/loss.
@@ -169,12 +169,12 @@ unit/building entity created for that player, including starting entities.
 for FFA compatibility. During singleton-team FFA, `winnerTeamId` matches `winnerId`; during team
 wins, `winnerId` is the first living player on the winning team in stable start/lobby order.
 
-`ReplayBranchSeat`: `{ playerId: u32, teamId: u32, name: string, color: string, claimable: bool }`. Seats are
+`ReplayBranchSeat`: `{ playerId: u32, teamId: u32, factionId: string, name: string, color: string, claimable: bool }`. Seats are
 listed in original replay player order. `claimable` is false only for unsupported original seats;
 the first implementation rejects AI-seat replays before creating a branch, so successful branch
 creation currently reports all seats as claimable.
 
-`BranchStagingSeat`: `{ playerId: u32, teamId: u32, name: string, color: string, claimantId?: u32,
+`BranchStagingSeat`: `{ playerId: u32, teamId: u32, factionId: string, name: string, color: string, claimantId?: u32,
 claimantName?: string }`. Seats are listed in original replay player order. A missing claimant
 means that original seat is still available to claim.
 
@@ -210,7 +210,7 @@ Sent once when the match begins. Carries everything static for the whole match.
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ]
   },
-  players: [ { id, teamId, name, color, startTileX, startTileY } ], // active match players only
+  players: [ { id, teamId, factionId, name, color, startTileX, startTileY } ], // active match players only
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
@@ -230,6 +230,12 @@ list only active match players in `players`.
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
+The canonical current faction id is `kriegsia`. Start payloads emit `factionId` for every active
+start player, lobby seat, and replay branch seat, and replay artifacts store `faction_id` for every
+player. Normal lobby, AI, quickstart, self-play, and dev starts all default to `kriegsia` through
+server-side faction policy validation. Other ids are rejected unless a lifecycle path explicitly
+accepts recorded replay data or a test fixture; the reserved future `ekaterina` id has no protocol
+or catalog payload yet.
 
 Prediction start compatibility metadata is present only for live active players. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version
@@ -243,11 +249,13 @@ running server/map asset or the replay is rejected with a clear error. Saved sel
 the same `ReplayArtifactV1` contract as post-match and match-history replays; pre-unified dev-only
 artifact payloads are rejected instead of falling back to a separate loader.
 
-`ReplayArtifactV1` stores ordered `players[]` with each original `teamId`, the compatibility
-`winnerId`, optional `winnerTeamId`, and `finalScores[]` with each row's `teamId`. Missing
-`players[].teamId`, `finalScores[].teamId`, or `winnerTeamId` in older singleton-FFA artifacts
-defaults through the documented singleton team behavior; new captures always include explicit
-nonzero player and score team ids, and include `winnerTeamId` when there is a winning team.
+Replay artifact schema version 2 stores ordered `players[]` with each original `team_id` and
+required `faction_id`, the compatibility `winnerId`, optional `winnerTeamId`, and `finalScores[]`
+with each row's `teamId`. Missing `players[].faction_id` or artifact schema version 1 payloads are
+rejected. Missing `players[].team_id`, `finalScores[].teamId`, or `winnerTeamId` in older
+singleton-FFA-compatible schema-2 fixtures defaults through the documented singleton team behavior;
+new captures always include explicit nonzero player and score team ids, required player faction
+ids, and `winnerTeamId` when there is a winning team.
 
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
