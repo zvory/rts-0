@@ -267,8 +267,9 @@ status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), and the 
 one-off artillery point-fire path. The hook receives the owning player's faction id at execution
 time through the normal command/order helpers, so wrong-faction ability use fails before effects,
 resource spending, cooldowns, or events are applied. The hook is deliberately not a generic script
-engine; new faction signature mechanics should add a tightly scoped hook only when the approved
-ability cannot use one of these shapes.
+engine. Phase 11 signature abilities should first use one of the existing shapes; if they cannot,
+add either a narrow explicit hook or a named one-off path with faction validation, cost validation,
+and fog-safe event tests rather than widening the hook into generic scripting.
 
 `services::ability_orders` owns the tick-path execution helpers:
 - `order_or_launch_world_ability` — for `WorldPoint` abilities: if the caster is in range, launch

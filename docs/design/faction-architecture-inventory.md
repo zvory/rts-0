@@ -125,4 +125,6 @@ one of those lifecycle paths.
 - `tests/hud_command_card.mjs` locks representative current command-card descriptors.
 - `node scripts/check-faction-catalog-parity.mjs` compares the client-exposed default catalog with
   the Rust dump and verifies that all Rust catalogs are dumpable while fixture/future catalogs stay
-  explicitly unsupported on the client surface.
+  explicitly unsupported on the client surface. This checked mirror remains the Phase 10 client
+  catalog path: every real-faction descriptor exposed in `client/src/config.js` must be compared
+  against the Rust dump by this gate.

@@ -5,6 +5,7 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
+use super::replay_validation;
 use super::snapshots::{compact_snapshot_for_wire, union_events};
 use super::*;
 use crate::game::entity::EntityKind;
@@ -445,74 +446,8 @@ impl ReplaySession {
                 artifact.players.len()
             ));
         }
-        let mut seen_players = HashSet::new();
-        for player in &artifact.players {
-            if !seen_players.insert(player.id) {
-                return Err(format!(
-                    "replay artifact has duplicate player id {}",
-                    player.id
-                ));
-            }
-            if let FactionValidation::Rejected { requested, reason } = validate_faction_request(
-                FactionRequestContext::ReplayPlayback,
-                Some(&player.faction_id),
-            ) {
-                return Err(format!(
-                    "replay player {} has unsupported faction {:?}: {:?}",
-                    player.id, requested, reason
-                ));
-            }
-        }
-        let mut seen_loadouts = HashSet::new();
-        for loadout in &artifact.player_loadouts {
-            if !seen_loadouts.insert(loadout.player_id) {
-                return Err(format!(
-                    "replay artifact has duplicate loadout for player {}",
-                    loadout.player_id
-                ));
-            }
-            let Some(player) = artifact
-                .players
-                .iter()
-                .find(|player| player.id == loadout.player_id)
-            else {
-                return Err(format!(
-                    "replay loadout references unknown player {}",
-                    loadout.player_id
-                ));
-            };
-            if loadout.faction_id != player.faction_id {
-                return Err(format!(
-                    "replay loadout for player {} has faction {:?}; expected {:?}",
-                    loadout.player_id, loadout.faction_id, player.faction_id
-                ));
-            }
-            if loadout.loadout_id.trim().is_empty() {
-                return Err(format!(
-                    "replay loadout for player {} is missing a loadout id",
-                    loadout.player_id
-                ));
-            }
-            if rts_rules::faction::catalog_loadout_for(
-                &player.faction_id,
-                loadout.loadout_id.trim(),
-            )
-            .is_none()
-            {
-                return Err(format!(
-                    "replay loadout for player {} references unknown loadout {:?} for faction {:?}",
-                    loadout.player_id, loadout.loadout_id, player.faction_id
-                ));
-            }
-        }
-        for player in &artifact.players {
-            if !seen_loadouts.contains(&player.id) {
-                return Err(format!(
-                    "replay artifact is missing loadout for player {}",
-                    player.id
-                ));
-            }
-        }
+        replay_validation::validate_faction_loadouts(artifact)?;
+        let seen_players: HashSet<u32> = artifact.players.iter().map(|player| player.id).collect();
         if artifact.duration_ticks > Self::MAX_DURATION_TICKS {
             return Err(format!(
                 "replay duration {} exceeds maximum {}",
@@ -4386,7 +4321,7 @@ mod tests {
             Err(err) => err,
         };
         assert!(
-            err.contains("missing loadout"),
+            err.contains("missing a loadout"),
             "unexpected artifact reject: {err}"
         );
 
@@ -4398,7 +4333,7 @@ mod tests {
             Err(err) => err,
         };
         assert!(
-            err.contains("loadout for player"),
+            err.contains("loadout faction"),
             "unexpected artifact reject: {err}"
         );
 
@@ -4411,6 +4346,24 @@ mod tests {
         };
         assert!(
             err.contains("unknown loadout"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_unknown_player_loadout() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        let mut extra_loadout = artifact.player_loadouts[0].clone();
+        extra_loadout.player_id = 999;
+        artifact.player_loadouts.push(extra_loadout);
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("unknown-player replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unknown player 999"),
             "unexpected artifact reject: {err}"
         );
     }
@@ -4442,7 +4395,7 @@ mod tests {
             Err(err) => err,
         };
         assert!(
-            err.contains("unsupported faction"),
+            err.contains("unknown faction"),
             "unexpected artifact reject: {err}"
         );
 
@@ -4454,7 +4407,7 @@ mod tests {
             Err(err) => err,
         };
         assert!(
-            err.contains("unsupported faction"),
+            err.contains("fixture-only"),
             "unexpected artifact reject: {err}"
         );
     }

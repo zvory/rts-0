@@ -376,7 +376,10 @@ faction catalog use the local player's faction id as the command-id prefix.
 `commandCardAbilitiesForFaction`. `scripts/check-faction-catalog-parity.mjs` compares those
 descriptors with the Rust catalog dump for every client-exposed faction. Unknown valid faction ids
 fail closed in command-card data, so future factions do not inherit Kriegsia build, train, research,
-or ability buttons before their catalog is intentionally exposed.
+or ability buttons before their catalog is intentionally exposed. Phase 10 may keep this checked
+mirror for real faction descriptors as long as the parity check remains a required gate comparing
+every client-exposed descriptor against the Rust dump; generation is not required before adding the
+first real faction catalog slice.
 
 `minimap.js`
 ```js

@@ -1,6 +1,6 @@
 # Phase 8.5 - Architecture Cleanup Before Second-Faction Spec
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

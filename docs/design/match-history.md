@@ -69,9 +69,9 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   the running server.
 - **Replay launch**: `POST /api/matches/{id}/replay` — read-only launch request. The server loads
   the persisted artifact only if the match is visible to the request scope, validates it against
-  the running build and map metadata, creates a spectator replay room, and returns
-  `{ "room": "..." }`. Incompatible or missing replays return a clear JSON `{ "error": "..." }`
-  instead of trying partial playback.
+  the running build, map metadata, and the shared replay faction/loadout validator used by replay
+  rooms, creates a spectator replay room, and returns `{ "room": "..." }`. Incompatible or missing
+  replays return a clear JSON `{ "error": "..." }` instead of trying partial playback.
 - **Write**: none. Clients cannot write history. Period.
 
 ## Code seams
