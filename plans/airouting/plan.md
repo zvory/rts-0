@@ -12,8 +12,9 @@ not preserve the old plan's unverified narrow-choke claim about the Default map.
 
 The atlas should be generated for every authored map from public map data: terrain, map sites,
 starts, and resource anchors. It should be legible to AI code through typed route queries, not by
-asking decision managers to inspect raw terrain strings. Agent-facing visualization or report
-tooling is intentionally deferred and design-blocked at the end of this plan.
+asking decision managers to inspect raw terrain strings. The generated atlas should also be
+legible to humans through a diagnostic, non-editable map editor tab before AI route queries start
+depending on it.
 
 ## Phase Summaries
 
@@ -21,6 +22,11 @@ Phase 1 defines and generates the static map atlas. It computes the smallest def
 movement-class passability, connected components, clearance, regions, portals, and semantic anchors
 for authored starts, naturals, and resource clusters. The outcome is a deterministic atlas that can
 be validated without changing live AI decisions.
+
+Phase 1.5 adds a dev/editor-only static atlas inspection tab to the map editor. The server computes
+the atlas through the authoritative map-loading path and exposes diagnostic atlas data for the
+editor to render as legible overlays. The outcome is a designer-facing way to verify that Phase 1
+generated the right world model before Phase 2 builds AI route queries on top of it.
 
 Phase 2 exposes atlas-backed routing queries to AI code. It adds route options between semantic
 anchors and arbitrary points, returns route facts such as distance, component match, portal path,
@@ -42,18 +48,19 @@ fallback. The outcome is Scout Car harassment that can recover when a route beco
 without treating unseen areas as known safe or known dangerous.
 
 Phase 5 is a design-blocked agent-legibility planning gate, not an implementation phase. It records
-that we do not yet know the right format, workflow, or UX for agent-facing map inspection tooling,
-and that no SVG, PNG, Markdown, or other agent-legibility output should be implemented before a
-user-led design discussion. The outcome should be a follow-up design brief only if the user chooses
-to pursue that tooling after the atlas-backed AI behavior is working.
+that, beyond the approved Phase 1.5 static atlas editor tab, we do not yet know the right format,
+workflow, or UX for broader agent-facing reports, exports, route-debug artifacts, or committed
+visual outputs. The outcome should be a follow-up design brief only if the user chooses to pursue
+additional tooling after the atlas-backed AI behavior is working.
 
 ## Phase Index
 
 1. [Phase 1 - Map Atlas Foundation](phase-1.md)
-2. [Phase 2 - AI Route Query Layer](phase-2.md)
-3. [Phase 3 - Scout Car Harassment Rewrite](phase-3.md)
-4. [Phase 4 - Route Memory and Validation](phase-4.md)
-5. [Phase 5 - Agent Legibility Design Gate](phase-5.md)
+2. [Phase 1.5 - Static Atlas Editor View](phase-1.5.md)
+3. [Phase 2 - AI Route Query Layer](phase-2.md)
+4. [Phase 3 - Scout Car Harassment Rewrite](phase-3.md)
+5. [Phase 4 - Route Memory and Validation](phase-4.md)
+6. [Phase 5 - Broader Agent Legibility Design Gate](phase-5.md)
 
 ## Overall Constraints
 
@@ -90,8 +97,10 @@ to pursue that tooling after the atlas-backed AI behavior is working.
 - Balance/gameplay patch notes should describe player-facing harassment behavior changes: Scout
   Cars should pressure resource lines through credible reachable routes and stop looping on a
   repeatedly occupied route.
-- Agent-legibility tooling is explicitly out of scope for Phases 1-4. Phase 5 must not implement
-  tooling; it is a design gate that requires user discussion before any implementation plan exists.
+- Phase 1.5 is the approved human-legibility tooling scope: a static, non-editable map editor tab
+  that renders server-computed atlas facts for diagnosis. Generated images, committed visual
+  artifacts, dynamic influence maps, route-debug exports, and broader agent reports remain out of
+  scope unless a later user-approved plan adds them.
 
 ## Implementation and Handoff Rules
 

@@ -1,18 +1,20 @@
-# Phase 5 - Agent Legibility Design Gate
+# Phase 5 - Broader Agent Legibility Design Gate
 
 Status: Design blocked.
 
 ## Objective
 
-Do not implement agent-legibility tooling in this phase. The goal is to explicitly pause before
-building SVG, PNG, Markdown, JSON-report, or other agent-facing map inspection output because the
-right format and workflow are not yet known.
+Do not implement broader agent-legibility tooling in this phase. Phase 1.5 already covers the
+approved static, non-editable map editor atlas tab. The goal here is to explicitly pause before
+building any additional SVG, PNG, Markdown, JSON-report, export, route-debug, or agent-facing map
+inspection output because the right format and workflow for those tools are not yet known.
 
 ## Scope
 
-- Start with a user design discussion before writing implementation code.
-- Clarify what problem agent-legibility tooling should solve after the atlas-backed AI behavior
-  exists:
+- Start with a user design discussion before writing implementation code beyond the Phase 1.5
+  editor tab.
+- Clarify what problem additional agent-legibility tooling should solve after the atlas-backed AI
+  behavior exists:
   - helping agents avoid false map claims during planning
   - helping humans review map topology changes
   - helping AI developers debug route selection
@@ -29,12 +31,13 @@ right format and workflow are not yet known.
 
 ## Explicit Non-Goals
 
-- Do not generate SVG overlays.
-- Do not generate PNG overlays.
+- Do not generate SVG overlays or exports.
+- Do not generate PNG overlays or exports.
 - Do not add a Markdown map report.
-- Do not add a browser map-inspection UI.
+- Do not add another browser map-inspection UI beyond the Phase 1.5 static atlas editor tab.
 - Do not add agent-facing artifact generation to tests or handoffs.
-- Do not make any code changes for agent-legibility tooling without a follow-up user-approved plan.
+- Do not make any code changes for additional agent-legibility tooling without a follow-up
+  user-approved plan.
 
 ## Expected Touch Points
 
@@ -56,11 +59,11 @@ None. This phase is intentionally blocked until the user leads a design discussi
 
 ## Handoff Expectations
 
-The handoff must say whether the user approved any agent-legibility tooling direction. If no
-direction was approved, the handoff must explicitly state that tooling remains blocked and must not
-be implemented by executor automation.
+The handoff must say whether the user approved any additional agent-legibility tooling direction.
+If no direction was approved, the handoff must explicitly state that tooling beyond the Phase 1.5
+static atlas editor tab remains blocked and must not be implemented by executor automation.
 
 ## Player-Facing Outcome
 
-No player-facing change. This phase prevents premature tooling work from distracting from the
-atlas-backed routing foundation.
+No player-facing change. This phase prevents premature extra tooling work from distracting from
+the atlas-backed routing foundation.

@@ -24,9 +24,10 @@ decisions; it should only create and validate the map facts that later routing c
   resource clusters, and selected resource-line approach anchors should map to components and
   regions.
 
-Do not add authored lanes, route summaries, dynamic influence maps, or agent-facing visual reports
-in this phase. Lanes and summaries should be derived from atlas queries later; influence maps need
-live observations; agent-legibility tooling is design-blocked until Phase 5.
+Do not add authored lanes, route summaries, dynamic influence maps, or atlas visualization in this
+phase. Lanes and summaries should be derived from atlas queries later; influence maps need live
+observations; the human-readable static atlas view is handled separately in Phase 1.5 after the
+atlas data exists.
 
 ## Scope
 
@@ -76,7 +77,8 @@ succeeds.
 
 The handoff must list the atlas fields implemented, where atlas generation lives, and which bundled
 maps are covered by tests. It must explicitly call out any atlas facts that were deferred, such as
-derived lane labels, route summaries, dynamic influence, or agent-legibility reports.
+derived lane labels, route summaries, dynamic influence, or visualization-only diagnostics needed
+by Phase 1.5.
 
 ## Player-Facing Outcome
 
