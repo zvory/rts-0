@@ -65,6 +65,10 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
 
 - **Compatibility:** no backwards compatibility requirement for replay artifacts, match-history
   replay payloads, compact snapshot versions, old clients, or old protocol payloads.
+- **Faction names:** the existing faction is **Kriegsia** and its canonical id is `kriegsia`.
+  The first real new faction is **Ekaterina** and its reserved id is `ekaterina`. Earlier Phase 1/2
+  work introduced `steel_vanguard` as a temporary current-faction id; Phase 3A must rename that id
+  before later phases build durable replay, command, hotkey, or prediction contracts on it.
 - **Economy:** all factions use the existing Steel, Oil, and Supply resource contract for now.
   Different faction flavor can be represented through costs, starting stockpiles, production rules,
   labels, or later balance changes; truly generic resources are deferred to a separate future plan.
@@ -77,7 +81,9 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
 - **Starts:** faction starting loadouts define starting entities, resources, supply model, and
   optional opening upgrades/flags.
 - **AI:** AI remains current-faction-only until an explicit AI phase implements another faction.
-- **Prediction:** non-default factions can disable prediction/WASM until prediction is updated.
+- **Prediction:** prediction stays enabled for supported local-player factions only. It must be
+  disabled when the local player is on an unsupported faction, but remote opponents using an
+  unsupported faction do not by themselves disable the local player's prediction path.
 - **Client catalog:** keep local client descriptors, but generate or mechanically verify them from
   authoritative Rust data. Do not switch to server-sent command-card descriptors in this plan.
 - **Abilities:** Phase 7 must not depend on the real second-faction brief. It may only add hooks
@@ -85,8 +91,9 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
   scoped hooks for the approved second-faction signature ability if needed.
 - **Command identity:** command ids used by command cards and hotkey profiles must include enough
   namespace to avoid collisions across faction-specific build/train/research/ability actions.
-  Profiles may preserve unresolved commands for unavailable factions, but active gameplay must only
-  arm commands legal for the player's current faction.
+  Global tactical commands and global production commands remain un-namespaced for now. Custom
+  hotkey bindings are stored per faction; grid mode may stay global because it follows rendered
+  slot position rather than command identity.
 
 ## Phase Summaries
 
@@ -106,10 +113,11 @@ assuming one global tech tree. This phase is where architectural cleanliness mat
 hardcoded checks should either move into catalog data or remain behind named compatibility helpers,
 and client catalog data must become generated or mechanically parity-checked from Rust.
 
-Phase 3 makes faction assignment explicit across every lifecycle path before faction-specific
-starts or UI become visible. It adds a lifecycle matrix, server validation helper, command-id
-namespace rules, hotkey unresolved-command behavior, and AI/prediction fail-closed tests. This
-phase prevents later slices from depending on unnamed dev paths or accidental lobby state.
+Phase 3 is split into four executor-sized guardrail phases before faction-specific starts or UI
+become visible. Phase 3A corrects the canonical current-faction id to `kriegsia`, reserves
+`ekaterina`, adds the server validation contract, and updates the lifecycle matrix. Phase 3B makes
+AI and prediction fail closed; Phase 3C defines command ids and per-faction hotkeys; Phase 3D
+hardens replay, branch, and dev lifecycle tests.
 
 Phase 4 keeps Steel, Oil, and Supply as the global resource contract and hardens faction-aware
 resource policy around that existing shape. It removes generic-resource work from the critical path
@@ -167,6 +175,10 @@ and balance documentation. This phase is where faction choice becomes ready for 
 1. [Phase 1 - Faction Identity Contract](phase-1.md)
 2. [Phase 2 - Faction-Aware Rules Catalog](phase-2.md)
 3. [Phase 3 - Assignment, Lifecycle, and Command Identity Guardrails](phase-3.md)
+   - [Phase 3A - Canonical Faction Validation and Lifecycle Matrix](phase-3a.md)
+   - [Phase 3B - AI and Prediction Fail-Closed Policy](phase-3b.md)
+   - [Phase 3C - Command Identity and Per-Faction Hotkeys](phase-3c.md)
+   - [Phase 3D - Replay, Branch, and Dev Lifecycle Tests](phase-3d.md)
 4. [Phase 4 - Steel/Oil Resource Policy Hardening](phase-4.md)
 5. [Phase 5 - Faction Starting Loadouts](phase-5.md)
 6. [Phase 6 - Ability Registry Parity](phase-6.md)
@@ -201,12 +213,13 @@ are:
 - Architecture checks or reports that flag new direct `EntityKind::Worker` or current-tech-tree
   special cases outside approved compatibility modules. Direct Steel/Oil/Supply references remain
   allowed only in the documented global economy modules and mirrors.
-- Prediction/WASM compatibility checks proving non-default factions either disable prediction with
-  a clear reason or are intentionally supported by the WASM adapter.
+- Prediction/WASM compatibility checks proving unsupported local-player factions disable prediction
+  with a clear reason, while supported local-player factions may keep prediction enabled even if an
+  opponent uses an unsupported faction.
 - Generated-client-catalog or catalog-parity tests proving JS descriptors match Rust-authoritative
   faction data.
-- Hotkey profile tests proving faction-specific command ids do not collide and unresolved commands
-  for unavailable factions are preserved but inactive.
+- Hotkey profile tests proving faction-specific command ids do not collide and custom bindings are
+  isolated per faction.
 
 Broad test bundles should still be avoided during development. Each phase document names focused
 verification, and the final merge-ready commit should rely on the normal hook for full-suite
