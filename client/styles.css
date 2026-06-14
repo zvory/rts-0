@@ -47,6 +47,7 @@
   --shadow: 6px 6px 0 rgba(0, 0, 0, 0.45);
   --hud-z: 10;
   --overlay-z: 100;
+  --bottom-hud-height: 275px;
 
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
@@ -1389,6 +1390,7 @@ input[type="text"]:focus {
   bottom: 12px;
   transform: translateX(-50%);
   width: clamp(280px, 36vw, 520px);
+  height: var(--bottom-hud-height);
   max-width: calc(100vw - 24px);
   pointer-events: none;
   display: flex;
@@ -1467,7 +1469,8 @@ input[type="text"]:focus {
 #selected-panel {
   min-width: 280px;
   width: 100%;
-  min-height: 92px;
+  min-height: 0;
+  flex: 1 1 auto;
   padding: 10px 14px;
   border-radius: var(--radius);
   pointer-events: auto;
@@ -2583,6 +2586,9 @@ input[type="text"]:focus {
 /* Keep everything usable down to ~1280x720: shrink the command card grid and
    tighten gaps so the bottom row of HUD panels does not overlap. */
 @media (max-width: 1366px), (max-height: 768px) {
+  :root {
+    --bottom-hud-height: 232px;
+  }
   #command-card {
     grid-template-columns: repeat(3, 64px);
     grid-auto-rows: 64px;
@@ -2600,9 +2606,11 @@ input[type="text"]:focus {
   .cmd-btn .cmd-icon {
     font-size: 20px;
   }
+  #selection-area {
+    width: clamp(240px, 40vw, 520px);
+  }
   #selected-panel {
     min-width: 240px;
-    max-width: 40vw;
   }
   #minimap {
     width: 198px;
