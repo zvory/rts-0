@@ -82,6 +82,7 @@ function isTeamRelated(pathname) {
     pathname === "server/src/lobby/team_setup.rs" ||
     pathname === "client/src/state.js" ||
     pathname === "client/src/lobby.js" ||
+    pathname === "client/src/lobby_view.js" ||
     pathname === "client/src/scoreboard.js" ||
     pathname === "client/src/replay_viewer.js" ||
     pathname === "client/src/replay_controls.js" ||

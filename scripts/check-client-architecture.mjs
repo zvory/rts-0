@@ -35,6 +35,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "hotkey_editor.js": "ui",
   "hotkey_profiles.js": "ui",
   "lobby.js": "ui",
+  "lobby_view.js": "ui",
   "match_history.js": "ui",
   "resource_icons.js": "ui",
   "status_badge.js": "ui",

@@ -54,52 +54,94 @@
 
       <!-- ============================ LOBBY ============================ -->
       <section id="lobby-screen" class="screen">
-        <div class="lobby-box">
-          <h1 class="logo">Bewegungskrieg!</h1>
-          <p class="subtitle">War of Movement</p>
+        <div class="lobby-shell">
+          <div class="lobby-box">
+            <header class="lobby-masthead">
+              <div>
+                <h1 class="logo">Bewegungskrieg!</h1>
+                <p class="subtitle">War of Movement</p>
+              </div>
+              <div class="lobby-room-chip" aria-label="Current room">
+                <span>Room</span>
+                <strong id="lobby-room-display">main</strong>
+              </div>
+            </header>
 
+            <div class="lobby-room" hidden>
+              <section class="lobby-status-grid" aria-label="Lobby status">
+                <div>
+                  <span>Mode</span>
+                  <b id="lobby-mode-summary">FFA</b>
+                </div>
+                <div>
+                  <span>Map</span>
+                  <b id="lobby-map-summary">Default</b>
+                </div>
+                <div>
+                  <span>Seats</span>
+                  <b id="lobby-seats-summary">0 / 4</b>
+                </div>
+                <div>
+                  <span>Observers</span>
+                  <b id="lobby-observers-summary">0</b>
+                </div>
+              </section>
 
-          <div class="lobby-form">
-            <label>
-              Name
-              <input id="lobby-name" type="text" maxlength="16" placeholder="Commander" autocomplete="off" />
-            </label>
-            <label>
-              Room
-              <input id="lobby-room" type="text" maxlength="24" value="main" autocomplete="off" />
-            </label>
-            <label id="lobby-spectator" class="toggle">
-              <input type="checkbox" />
-              <span>Spectator</span>
-            </label>
-            <button id="lobby-join" class="btn primary">Join</button>
+              <div id="lobby-players" class="player-list lobby-battle-order" aria-label="Lobby teams"></div>
+            </div>
           </div>
 
-          <div class="lobby-room" hidden>
-            <h2>Players</h2>
-            <div class="lobby-team-row">
-              <label id="lobby-team-preset-label" for="lobby-team-preset">Teams</label>
-              <select id="lobby-team-preset" disabled></select>
-              <span id="lobby-team-preset-display" hidden></span>
-            </div>
-            <ul id="lobby-players" class="player-list"></ul>
-            <div class="lobby-map-row">
-              <label id="lobby-map-label" for="lobby-map">Map</label>
-              <select id="lobby-map" disabled></select>
-              <span id="lobby-map-display" hidden></span>
-            </div>
-            <div class="lobby-actions">
-              <button id="lobby-ready" class="btn">Ready</button>
-              <button id="lobby-add-ai" class="btn host-only" hidden>+ Add AI</button>
-              <label id="lobby-quickstart" class="toggle host-only" hidden>
-                <input type="checkbox" />
-                <span>Debug mode</span>
+          <aside class="lobby-setup-panel" aria-label="Lobby setup">
+            <header class="lobby-setup-header">
+              <span>Host controls</span>
+              <h2>Match setup</h2>
+            </header>
+
+            <div class="lobby-form">
+              <label>
+                Name
+                <input id="lobby-name" type="text" maxlength="16" placeholder="Commander" autocomplete="off" />
               </label>
-              <button id="lobby-start" class="btn primary" disabled>Start match</button>
-            </div>
-          </div>
+              <label>
+                Room
+                <input id="lobby-room" type="text" maxlength="24" value="main" autocomplete="off" />
+              </label>
+              <label id="lobby-spectator" class="toggle seat-toggle">
+                <input type="checkbox" />
+                <span class="seat-choice commander">Commander</span>
+                <span class="seat-choice spectator">Spectator</span>
+              </label>
+              <button id="lobby-join" class="btn primary">Join room</button>
 
-          <p id="lobby-status" class="status"></p>
+              <div class="lobby-control-field lobby-team-row">
+                <label id="lobby-team-preset-label" for="lobby-team-preset">Teams</label>
+                <select id="lobby-team-preset" disabled></select>
+                <span id="lobby-team-preset-display" hidden></span>
+              </div>
+              <div class="lobby-control-field lobby-map-row">
+                <label id="lobby-map-label" for="lobby-map">Map</label>
+                <select id="lobby-map" disabled></select>
+                <span id="lobby-map-display" hidden></span>
+              </div>
+              <div class="lobby-host-tools">
+                <button id="lobby-add-ai" class="btn host-only" hidden>Add AI</button>
+                <label id="lobby-quickstart" class="toggle host-only" hidden>
+                  <input type="checkbox" />
+                  <span>Debug mode</span>
+                </label>
+              </div>
+            </div>
+
+            <footer class="lobby-launch-panel">
+              <span>Launch</span>
+              <h2>Ready check</h2>
+              <div class="lobby-actions">
+                <button id="lobby-ready" class="btn">Ready</button>
+                <button id="lobby-start" class="btn primary" disabled>Start match</button>
+              </div>
+              <p id="lobby-status" class="status"></p>
+            </footer>
+          </aside>
         </div>
         <div id="match-history-host" class="match-history"></div>
       </section>

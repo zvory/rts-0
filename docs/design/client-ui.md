@@ -23,7 +23,8 @@ src/
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
-  lobby.js        # Lobby screen: name entry, player list, ready/start buttons
+  lobby.js        # Lobby screen controller: name/room, ready/start, host controls
+  lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
@@ -406,9 +407,9 @@ export class Minimap {
 export class Lobby {
   constructor(rootEl, net)
   show(), hide()
-  // renders player list + ready/start/spectator role; calls net.join/ready/start/setSpectator.
-  // Host lobby controls expose team presets (ffa, solo, 1v2, 1v3, 2v2), grouped team rows,
-  // per-seat team assignment, and per-team AI add buttons through Net setTeamPreset/setTeam/addAi.
+  // owns lobby state, joins, ready/start/spectator role, and delegates roster DOM to lobby_view.js.
+  // Host lobby controls expose team presets (ffa, solo, 1v2, 1v3, 2v2), grouped team cards,
+  // per-seat team assignment, and team/rail AI add buttons through Net setTeamPreset/setTeam/addAi.
   // Non-hosts see the selected preset and team labels without mutation controls.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }
@@ -542,7 +543,7 @@ Current areas:
 - `model`: `state.js`, `command_composer.js`.
 - `transport`: `net.js`, `protocol.js`.
 - `rules-mirror`: `config.js`.
-- `ui`: HUD, command card, lobby, match history, minimap, status badge, branch staging, settings.
+- `ui`: HUD, command card, lobby controller/view, match history, minimap, status badge, branch staging, settings.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
