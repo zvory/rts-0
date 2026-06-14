@@ -36,6 +36,8 @@ import {
   formatTankOilUsed,
   groupCooldownClocks,
   playerHasCompletedKind,
+  selectionBudgetBlockShape,
+  selectionBudgetGridModel,
 } from "../client/src/hud.js";
 import {
   buildCommandCardContextCatalog,
@@ -264,6 +266,66 @@ function fakeHudRootWithoutResourceSpans() {
       },
     },
   };
+}
+
+function withFakeHudDocument(fn) {
+  const priorDocument = globalThis.document;
+  class FakeElement {
+    constructor(tagName) {
+      this.tagName = String(tagName).toUpperCase();
+      this.className = "";
+      this.textContent = "";
+      this.innerHTML = "";
+      this.title = "";
+      this.children = [];
+      this.attributes = new Map();
+      this.style = {
+        values: new Map(),
+        setProperty: (name, value) => {
+          this.style.values.set(name, String(value));
+        },
+      };
+    }
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name, String(value));
+    }
+    getAttribute(name) {
+      return this.attributes.get(name) || null;
+    }
+    querySelectorAll(selector) {
+      const results = [];
+      const matches = (node) => selector.startsWith(".")
+        ? node.className.split(/\s+/).includes(selector.slice(1))
+        : false;
+      const visit = (node) => {
+        if (matches(node)) results.push(node);
+        for (const child of node.children || []) visit(child);
+      };
+      visit(this);
+      return results;
+    }
+    querySelector(selector) {
+      return this.querySelectorAll(selector)[0] || null;
+    }
+  }
+  globalThis.document = {
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+    createDocumentFragment() {
+      return new FakeElement("fragment");
+    },
+  };
+  try {
+    return fn({ FakeElement });
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
 }
 
 function withFakeSettingsDocument(fn) {
@@ -556,6 +618,70 @@ function hotkeyService() {
   assert(ids.get("res-steel").textContent === "325", "restored HUD steel span updates from live resources");
   assert(ids.get("res-oil").textContent === "80", "restored HUD oil span updates from live resources");
   assert(ids.get("res-supply").textContent === "7 / 14", "restored HUD supply span updates from live supply");
+}
+
+// ---------------------------------------------------------------------------
+// HUD selection budget grid
+// ---------------------------------------------------------------------------
+{
+  const riflemen = Array.from({ length: 24 }, (_, index) => ({
+    id: 1000 + index,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+  }));
+  const tanks = Array.from({ length: 4 }, (_, index) => ({
+    id: 1100 + index,
+    owner: 1,
+    kind: KIND.TANK,
+  }));
+  const commandCar = { id: 1200, owner: 1, kind: KIND.COMMAND_CAR };
+  const artillery = { id: 1300, owner: 1, kind: KIND.ARTILLERY };
+
+  const infantryModel = selectionBudgetGridModel(riflemen);
+  assert(infantryModel.used === 24 && infantryModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports 24/24 infantry supply");
+  assert(infantryModel.cols === 12, "HUD base budget grid uses two rows of twelve cells");
+  assert(infantryModel.blocks.every((block) => block.weight === 1 && block.cols === 1 && block.rows === 1 && block.placed),
+    "HUD infantry blocks occupy one fixed cell each");
+
+  const tankModel = selectionBudgetGridModel(tanks);
+  assert(tankModel.used === 24 && tankModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports four Tanks as 24/24");
+  assert(tankModel.blocks.every((block) => block.weight === 6 && block.cols === 3 && block.rows === 2 && block.placed),
+    "HUD Tank blocks occupy a two-row by three-column shape");
+
+  const commandCarModel = selectionBudgetGridModel(tanks.concat(commandCar));
+  assert(commandCarModel.used === 28 && commandCarModel.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
+    "HUD budget grid includes Command Car cap expansion");
+  assert(commandCarModel.cols === 18, "HUD budget grid grows visible columns for Command Car cap");
+
+  const artilleryShape = selectionBudgetBlockShape(STATS[KIND.ARTILLERY].supply);
+  assert(artilleryShape.cols === 3 && artilleryShape.rows === 2 && artilleryShape.reservedCells === 1,
+    "HUD five-supply shape uses a deterministic near-rectangle with one reserved cell");
+  const artilleryModel = selectionBudgetGridModel([artillery]);
+  assert(artilleryModel.blocks[0].reservedCells === 1, "HUD five-supply blocks expose their reserved visual cell");
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const state = {
+      selectionBudgetOverflow: { used: 24, cap: BASE_COMMAND_SUPPLY_CAP, seq: 1 },
+      selectedEntities() {
+        return tanks;
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    const grid = panel.querySelector(".sel-budget-grid");
+    const blocks = panel.querySelectorAll(".sel-budget-block");
+    const overflow = panel.querySelector(".sel-budget-overflow");
+    assert(grid && grid.style.values.get("--sel-budget-cols") === "12", "HUD renders grid columns into selected panel DOM");
+    assert(blocks.length === 4 && blocks.every((block) => block.className.includes("weight-6")),
+      "HUD renders four Tank budget blocks into selected panel DOM");
+    assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
+  });
 }
 
 // ---------------------------------------------------------------------------

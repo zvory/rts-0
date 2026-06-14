@@ -99,8 +99,9 @@ export class GameState {
     // --- selection (client-only) ---
     /** @type {Set<number>} */
     this.selection = new Set();
-    /** @type {null | {used:number, cap:number}} latest playable selection budget overflow. */
+    /** @type {null | {used:number, cap:number, seq:number}} latest playable selection budget overflow. */
     this.selectionBudgetOverflow = null;
+    this._selectionBudgetOverflowSeq = 0;
     /** @type {boolean} true when the server says movement path diagnostics are available. */
     this.debugPathOverlaysAvailable = !!startInfo.debugMode;
     /** @type {boolean} local gear-menu preference for drawing movement path diagnostics. */
@@ -919,7 +920,7 @@ export class GameState {
 
   _recordSelectionBudgetOverflow(admitted) {
     this.selectionBudgetOverflow = admitted?.overflow
-      ? { used: admitted.used, cap: admitted.cap }
+      ? { used: admitted.used, cap: admitted.cap, seq: ++this._selectionBudgetOverflowSeq }
       : null;
   }
 
