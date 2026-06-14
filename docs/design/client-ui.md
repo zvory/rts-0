@@ -371,6 +371,12 @@ buildings in reverse round-robin order for the displayed producer type.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.
+`config.js` exposes the client-side faction catalog mirror used by command-card descriptors:
+`workerBuildablesForFaction`, `trainableUnitsForFaction`, `researchableUpgradesForFaction`, and
+`commandCardAbilitiesForFaction`. `scripts/check-faction-catalog-parity.mjs` compares those
+descriptors with the Rust catalog dump for every client-exposed faction. Unknown valid faction ids
+fail closed in command-card data, so future factions do not inherit Kriegsia build, train, research,
+or ability buttons before their catalog is intentionally exposed.
 
 `minimap.js`
 ```js

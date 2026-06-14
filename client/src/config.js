@@ -2,7 +2,7 @@
 // Gameplay is authoritative on the server; these values drive UI labels, the command
 // card, fog sight radii, and rendering. Keep costs/supply/sight in sync with the server.
 
-import { ABILITY, KIND, UPGRADE } from "./protocol.js";
+import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "./protocol.js";
 
 // Timing (for snapshot interpolation). Must match server TICK_HZ / SNAPSHOT_EVERY_N_TICKS.
 export const TICK_HZ = 30;
@@ -317,6 +317,117 @@ export const WORKER_BUILDABLE = Object.freeze([
   KIND.FACTORY,
   KIND.STEELWORKS,
 ]);
+
+export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
+
+function freezeCatalog(catalog) {
+  const trainables = {};
+  for (const [building, units] of Object.entries(catalog.trainables || {})) {
+    trainables[building] = Object.freeze([...units]);
+  }
+  const research = {};
+  for (const [building, upgrades] of Object.entries(catalog.research || {})) {
+    research[building] = Object.freeze([...upgrades]);
+  }
+  return Object.freeze({
+    ...catalog,
+    units: Object.freeze([...(catalog.units || [])]),
+    buildings: Object.freeze([...(catalog.buildings || [])]),
+    buildables: Object.freeze([...(catalog.buildables || [])]),
+    trainables: Object.freeze(trainables),
+    research: Object.freeze(research),
+    abilities: Object.freeze([...(catalog.abilities || [])]),
+  });
+}
+
+export const FACTION_CATALOGS = Object.freeze({
+  [DEFAULT_FACTION_ID]: freezeCatalog({
+    id: DEFAULT_FACTION_ID,
+    loadoutId: "kriegsia.standard",
+    units: [
+      KIND.WORKER,
+      KIND.RIFLEMAN,
+      KIND.MACHINE_GUNNER,
+      KIND.ANTI_TANK_GUN,
+      KIND.MORTAR_TEAM,
+      KIND.ARTILLERY,
+      KIND.TANK,
+      KIND.SCOUT_CAR,
+      KIND.COMMAND_CAR,
+    ],
+    buildings: [
+      KIND.CITY_CENTRE,
+      KIND.DEPOT,
+      KIND.BARRACKS,
+      KIND.TRAINING_CENTRE,
+      KIND.FACTORY,
+      KIND.RESEARCH_COMPLEX,
+      KIND.STEELWORKS,
+    ],
+    buildables: WORKER_BUILDABLE,
+    trainables: {
+      [KIND.CITY_CENTRE]: [KIND.WORKER],
+      [KIND.BARRACKS]: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER],
+      [KIND.FACTORY]: [KIND.SCOUT_CAR, KIND.TANK, KIND.COMMAND_CAR],
+      [KIND.STEELWORKS]: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
+    },
+    research: {
+      [KIND.TRAINING_CENTRE]: [UPGRADE.METHAMPHETAMINES],
+      [KIND.RESEARCH_COMPLEX]: [
+        UPGRADE.ANTI_TANK_GUN_UNLOCK,
+        UPGRADE.ARTILLERY_UNLOCK,
+        UPGRADE.TANK_UNLOCK,
+        UPGRADE.COMMAND_CAR_UNLOCK,
+        UPGRADE.MORTAR_AUTOCAST,
+      ],
+    },
+    abilities: [ABILITY.SMOKE, ABILITY.MORTAR_FIRE, ABILITY.POINT_FIRE, ABILITY.BREAKTHROUGH],
+  }),
+  [FIXTURE_FACTION_ID]: freezeCatalog({
+    id: FIXTURE_FACTION_ID,
+    loadoutId: "phase2_empty_fixture.scout_depot",
+    units: [KIND.SCOUT_CAR],
+    buildings: [KIND.DEPOT],
+    buildables: [],
+    trainables: {},
+    research: {},
+    abilities: [],
+  }),
+});
+
+const EMPTY_CLIENT_CATALOG = freezeCatalog({
+  id: "unknown",
+  loadoutId: "",
+  units: [],
+  buildings: [],
+  buildables: [],
+  trainables: {},
+  research: {},
+  abilities: [],
+});
+
+export function factionCatalog(factionId = DEFAULT_FACTION_ID) {
+  return FACTION_CATALOGS[factionId] || EMPTY_CLIENT_CATALOG;
+}
+
+export function workerBuildablesForFaction(factionId) {
+  return factionCatalog(factionId).buildables;
+}
+
+export function trainableUnitsForFaction(factionId, buildingKind) {
+  return factionCatalog(factionId).trainables[buildingKind] || [];
+}
+
+export function researchableUpgradesForFaction(factionId, buildingKind) {
+  return factionCatalog(factionId).research[buildingKind] || [];
+}
+
+export function commandCardAbilitiesForFaction(factionId) {
+  return factionCatalog(factionId)
+    .abilities
+    .map((ability) => ABILITIES[ability])
+    .filter(Boolean);
+}
 
 // Camera defaults.
 export const CAMERA = Object.freeze({

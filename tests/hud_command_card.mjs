@@ -7,7 +7,12 @@ import {
   duplicateCommandIdsForCard,
   factionCommandId,
 } from "../client/src/hud_command_card.js";
-import { WORKER_BUILDABLE } from "../client/src/config.js";
+import {
+  FIXTURE_FACTION_ID,
+  WORKER_BUILDABLE,
+  commandCardAbilitiesForFaction,
+  workerBuildablesForFaction,
+} from "../client/src/config.js";
 import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
@@ -134,6 +139,54 @@ function buttonSlots(card) {
     label: "Smoke",
     enabled: true,
   }]);
+}
+
+{
+  const fixtureWorker = { id: 40, owner: 1, kind: KIND.WORKER };
+  const fixtureBuildCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: FIXTURE_FACTION_ID,
+    selection: [fixtureWorker],
+    commandCardMode: "workerBuild",
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.deepEqual(workerBuildablesForFaction(FIXTURE_FACTION_ID), [], "fixture faction has an alternate empty build menu");
+  assert.deepEqual(commandCardAbilitiesForFaction(FIXTURE_FACTION_ID), [], "fixture faction does not inherit Kriegsia ability buttons");
+  assert.equal(fixtureBuildCard.kind, "workerBuild");
+  assert.deepEqual(fixtureBuildCard.slots.slice(0, 8), new Array(8).fill(null));
+  assert.equal(fixtureBuildCard.slots[8].commandId, "worker.return");
+
+  const fixtureDepot = { id: 41, owner: 1, kind: KIND.DEPOT, buildProgress: null };
+  const fixtureDepotCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: FIXTURE_FACTION_ID,
+    selection: [fixtureDepot],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(fixtureDepotCard.kind, "empty", "fixture Depot does not inherit Kriegsia production");
+
+  const fixtureScout = {
+    id: 42,
+    owner: 1,
+    kind: KIND.SCOUT_CAR,
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 1 }],
+  };
+  const fixtureScoutCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: FIXTURE_FACTION_ID,
+    selection: [fixtureScout],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert(!fixtureScoutCard.slots.some((slot) => slot?.action === "ability"), "fixture Scout Car does not inherit Smoke");
 }
 
 {

@@ -1,9 +1,11 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, ORDER_STAGE, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
-  ABILITIES,
   STATS,
   UPGRADES,
-  WORKER_BUILDABLE,
+  commandCardAbilitiesForFaction,
+  researchableUpgradesForFaction,
+  trainableUnitsForFaction,
+  workerBuildablesForFaction,
 } from "./config.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
@@ -168,7 +170,7 @@ export function commandSubject(ctx, selection) {
   for (const e of selection || []) {
     if (!isOwn(ctx, e)) continue;
     if (isUnit(e.kind)) return e;
-    if (isBuilding(e.kind) && (trainsOf(e.kind).length > 0 || researchesOf(e.kind).length > 0)) return e;
+    if (isBuilding(e.kind) && (factionTrainsOf(ctx, e.kind).length > 0 || factionResearchesOf(ctx, e.kind).length > 0)) return e;
   }
   return null;
 }
@@ -178,8 +180,7 @@ export function buildWorkerBuildCard(ctx) {
   const factionId = commandFactionId(ctx);
   const slots = [];
   const sigParts = [];
-  let idx = 0;
-  for (const kind of WORKER_BUILDABLE) {
+  for (const kind of workerBuildablesForFaction(factionId)) {
     const st = STATS[kind];
     if (!st) continue;
     const availability = buildAvailability(ctx, kind, resources);
@@ -199,7 +200,6 @@ export function buildWorkerBuildCard(ctx) {
       tooltipKind: kind,
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost },
     });
-    idx++;
   }
   while (slots.length < 8) slots.push(null);
   slots.push({
@@ -345,7 +345,7 @@ export function buildUnitCard(ctx, selection) {
 export function buildTrainCard(ctx, building) {
   const resources = resourcesOf(ctx);
   const factionId = commandFactionId(ctx);
-  const trains = trainsOf(building.kind);
+  const trains = factionTrainsOf(ctx, building.kind);
   const researches = availableResearchesOf(ctx, building.kind);
   const producingBuildings = selectedProducingBuildingsForKind(ctx, building.kind);
   const cancelSlot = 8;
@@ -474,7 +474,7 @@ function holdDescriptor(unitIds, slot) {
 export function selectedAbilityAffordances(ctx, selection) {
   const ownUnits = selectedOwnUnits(ctx, selection);
   const resources = resourcesOf(ctx);
-  return Object.values(ABILITIES)
+  return commandCardAbilitiesForFaction(commandFactionId(ctx))
     .map((definition) => {
       const carriers = ownUnits.filter((e) => definition.carriers.includes(e.kind));
       if (carriers.length === 0) return null;
@@ -559,14 +559,17 @@ function workerOnlySelection(ctx, selection) {
   return ownUnits.length > 0 && ownUnits.every((e) => e.kind === KIND.WORKER);
 }
 
-function trainsOf(kind) {
-  const st = STATS[kind];
-  return (st && st.trains) || [];
-}
-
 function researchesOf(kind) {
   const st = STATS[kind];
   return (st && st.researches) || [];
+}
+
+function factionTrainsOf(ctx, kind) {
+  return trainableUnitsForFaction(commandFactionId(ctx), kind);
+}
+
+function factionResearchesOf(ctx, kind) {
+  return researchableUpgradesForFaction(commandFactionId(ctx), kind);
 }
 
 function requirementsOf(definition) {
@@ -696,7 +699,7 @@ function trainDisabledReason(ctx, unit, resources) {
 
 function availableResearchesOf(ctx, kind) {
   const completed = ctx.upgrades || [];
-  return researchesOf(kind).filter((upgrade) => !completed.includes(upgrade));
+  return factionResearchesOf(ctx, kind).filter((upgrade) => !completed.includes(upgrade));
 }
 
 function researchAvailability(ctx, upgrade, resources) {
@@ -743,7 +746,7 @@ function selectedProducerBuildingsForUnit(ctx, unit) {
       isOwn(ctx, e) &&
       isBuilding(e.kind) &&
       e.buildProgress == null &&
-      trainsOf(e.kind).includes(unit),
+      factionTrainsOf(ctx, e.kind).includes(unit),
   );
 }
 

@@ -1,6 +1,6 @@
 # Phase 8 - Client Faction Surface
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

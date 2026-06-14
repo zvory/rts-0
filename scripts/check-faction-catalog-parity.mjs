@@ -6,9 +6,14 @@ import path from "node:path";
 
 import {
   ABILITIES,
+  FACTION_CATALOGS,
   STATS,
   UPGRADES,
   WORKER_BUILDABLE,
+  commandCardAbilitiesForFaction,
+  researchableUpgradesForFaction,
+  trainableUnitsForFaction,
+  workerBuildablesForFaction,
 } from "../client/src/config.js";
 import {
   ABILITY,
@@ -84,6 +89,43 @@ assert.deepEqual(
   asClientKinds(rustCatalog.buildables.map((entry) => entry.kind)),
   "client worker build menu mirrors Rust faction catalog",
 );
+
+for (const rustFaction of allRustCatalogs.catalogs) {
+  const clientFaction = FACTION_CATALOGS[rustFaction.id];
+  assert(clientFaction, `client FACTION_CATALOGS is missing ${rustFaction.id}`);
+  assert.deepEqual(clientFaction.units, asClientKinds(rustFaction.units), `${rustFaction.id} units mirror Rust catalog`);
+  assert.deepEqual(clientFaction.buildings, asClientKinds(rustFaction.buildings), `${rustFaction.id} buildings mirror Rust catalog`);
+  assert.deepEqual(
+    workerBuildablesForFaction(rustFaction.id),
+    asClientKinds(rustFaction.buildables.map((entry) => entry.kind)),
+    `${rustFaction.id} worker buildables mirror Rust catalog`,
+  );
+  for (const entry of rustFaction.trainables) {
+    assert.deepEqual(
+      trainableUnitsForFaction(rustFaction.id, kindByStableId.get(entry.building)),
+      asClientKinds(entry.units),
+      `${rustFaction.id} ${entry.building} trainables mirror Rust catalog`,
+    );
+  }
+  for (const building of rustFaction.buildings) {
+    const clientBuilding = kindByStableId.get(building);
+    const expectedResearch = rustFaction.research
+      .filter((entry) => entry.researchedAt === building)
+      .map((entry) => upgradeByStableId.get(entry.id));
+    assert.deepEqual(
+      researchableUpgradesForFaction(rustFaction.id, clientBuilding),
+      expectedResearch,
+      `${rustFaction.id} ${building} research list mirrors Rust catalog`,
+    );
+  }
+  assert.deepEqual(
+    commandCardAbilitiesForFaction(rustFaction.id).map((entry) => entry.ability),
+    rustFaction.abilities
+      .filter((entry) => entry.commandCard)
+      .map((entry) => abilityByStableId.get(entry.id)),
+    `${rustFaction.id} command-card abilities mirror Rust catalog`,
+  );
+}
 
 for (const entry of rustCatalog.buildables) {
   const clientKind = kindByStableId.get(entry.kind);
