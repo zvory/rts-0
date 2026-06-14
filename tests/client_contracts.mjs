@@ -5412,6 +5412,12 @@ function fakeAudioContext() {
     assert(editorHtml.includes(`id="${id}"`), `map editor includes ${id} control`);
   }
   assert(editorHtml.includes('activeView !== "edit"'), "map editor gates mutation while the Atlas tab is active");
+  for (const helpKey of ["passability", "components", "clearance", "regions", "portals", "anchors"]) {
+    assert(editorHtml.includes(`data-atlas-help="${helpKey}"`), `map editor exposes ${helpKey} atlas help`);
+  }
+  assert(editorHtml.includes("Coarse buckets of nearby passable tiles"), "map editor explains atlas regions");
+  assert(editorHtml.includes("Connections between adjacent regions"), "map editor explains atlas portals");
+  assert(editorHtml.includes("Strategic map points attached to topology"), "map editor explains atlas anchors");
 }
 
 function textWithin(node) {
