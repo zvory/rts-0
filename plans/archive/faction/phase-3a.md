@@ -6,14 +6,14 @@ Status: Done.
 
 Fix the canonical current-faction identity before durable lifecycle, replay, command, hotkey, or
 prediction contracts depend on the temporary Phase 1/2 id. The existing faction is **Kriegsia**
-with canonical id `kriegsia`; the first real future faction is **Ekaterina** with reserved id
-`ekaterina`.
+with canonical id `kriegsia`; the first real future faction is **Ekat** with reserved id
+`ekat`.
 
 ## Scope
 
 - Rename the temporary current-faction id `steel_vanguard` to `kriegsia` across protocol mirrors,
   Rust catalog data, client catalog parity data, docs, and tests.
-- Reserve `ekaterina` in planning docs only. Do not add Ekaterina gameplay, catalog entries,
+- Reserve `ekat` in planning docs only. Do not add Ekat gameplay, catalog entries,
   loadouts, command cards, or UI in this phase.
 - Keep `phase2_empty_fixture` as an architecture fixture. It is allowed only in Rust tests and
   explicitly documented dev/test harnesses; it is not a product faction and must not be selectable
@@ -67,7 +67,7 @@ dev/test-only, and replay-allowed. Catalog data belongs in `rts-rules`.
   previously exposed `steel_vanguard`.
 - Catalog parity still passes after the id rename.
 - Lifecycle matrix updated with explicit Phase 3A ownership.
-- No normal lobby selection for `ekaterina` or `phase2_empty_fixture`.
+- No normal lobby selection for `ekat` or `phase2_empty_fixture`.
 
 ## Manual Testing Focus
 
@@ -77,5 +77,5 @@ not faction behavior.
 ## Handoff Expectations
 
 The handoff must name the validation helper, confirm all temporary `steel_vanguard` runtime ids
-were removed or intentionally limited to migration notes, and state that `ekaterina` is reserved
+were removed or intentionally limited to migration notes, and state that `ekat` is reserved
 for later phases only.

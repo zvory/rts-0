@@ -1,10 +1,10 @@
 # Phase 11 - Second Faction Combat and Signature Ability Slice
 
-Status: Blocked until Phase 10 lands an approved hero-centric Ekaterina slice.
+Status: Blocked until Phase 10 lands an approved hero-centric Ekat slice.
 
 ## Objective
 
-Extend the approved Ekaterina hero combat loop. This phase must build on the new hero-centric spec,
+Extend the approved Ekat hero combat loop. This phase must build on the new hero-centric spec,
 not the purged RTS-style baseline-unit plus specialist-unit design.
 
 ## Scope
@@ -51,7 +51,7 @@ not the purged RTS-style baseline-unit plus specialist-unit design.
 
 ## Manual Testing Focus
 
-Play a short local/dev match as Ekaterina and verify hero combat readability, ability targeting,
+Play a short local/dev match as Ekat and verify hero combat readability, ability targeting,
 cooldown/charges, approved resource/progression costs, fog behavior, defeat/win behavior, and
 Kriegsia regression.
 
@@ -63,4 +63,4 @@ proposed for Phase 12.
 
 ## Player-Facing Outcome
 
-Ekaterina has a small but playable hero-combat identity suitable for focused playtesting.
+Ekat has a small but playable hero-combat identity suitable for focused playtesting.

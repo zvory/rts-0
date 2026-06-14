@@ -10,7 +10,7 @@ server lifecycle policy, AI restrictions, prediction compatibility, command iden
 profile behavior, and replay/dev path validation.
 
 The existing faction is **Kriegsia** with canonical id `kriegsia`. The planned second faction is
-**Ekaterina** with reserved id `ekaterina`. Earlier Phase 1/2 work introduced `steel_vanguard` as a
+**Ekat** with reserved id `ekat`. Earlier Phase 1/2 work introduced `steel_vanguard` as a
 temporary current-faction id; Phase 3A must correct that before later phases build durable
 contracts.
 
@@ -19,7 +19,7 @@ contracts.
 Phase 3 is now an umbrella with four executor-sized subphases:
 
 - [Phase 3A - Canonical Faction Validation and Lifecycle Matrix](phase-3a.md): rename the
-  temporary current-faction id to `kriegsia`, reserve `ekaterina`, add server validation policy, and
+  temporary current-faction id to `kriegsia`, reserve `ekat`, add server validation policy, and
   update the lifecycle matrix.
 - [Phase 3B - AI and Prediction Fail-Closed Policy](phase-3b.md): keep AI Kriegsia-only and disable
   prediction only when the local player is on an unsupported faction.
@@ -29,7 +29,7 @@ Phase 3 is now an umbrella with four executor-sized subphases:
   self-play, match-history, and dev paths load recorded faction ids or reject unsupported inputs
   cleanly.
 
-Do not implement Ekaterina gameplay content in any Phase 3 subphase.
+Do not implement Ekat gameplay content in any Phase 3 subphase.
 
 ## Expected Touch Points
 

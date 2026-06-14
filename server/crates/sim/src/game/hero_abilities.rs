@@ -27,7 +27,7 @@ pub(crate) fn clamped_world_ability_vector(
     Some((from_x + dx * scale, from_y + dy * scale))
 }
 
-pub(crate) fn ekaterina_teleport_destination(
+pub(crate) fn ekat_teleport_destination(
     map: &Map,
     entities: &EntityStore,
     caster: u32,
@@ -42,14 +42,14 @@ pub(crate) fn ekaterina_teleport_destination(
     standability::unit_static_standable(
         map,
         &occ,
-        EntityKind::Ekaterina,
+        EntityKind::Ekat,
         destination.0,
         destination.1,
     )
     .then_some(destination)
 }
 
-pub(crate) fn move_ekaterina_to(entities: &mut EntityStore, caster: u32, x: f32, y: f32) -> bool {
+pub(crate) fn move_ekat_to(entities: &mut EntityStore, caster: u32, x: f32, y: f32) -> bool {
     let Some(e) = entities.get_mut(caster) else {
         return false;
     };
@@ -62,7 +62,7 @@ pub(crate) fn move_ekaterina_to(entities: &mut EntityStore, caster: u32, x: f32,
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn apply_ekaterina_line_shot(
+pub(crate) fn apply_ekat_line_shot(
     entities: &mut EntityStore,
     teams: &TeamRelations,
     player: u32,
@@ -102,7 +102,7 @@ fn apply_line_shot_damage(
     if !len2.is_finite() || len2 <= f32::EPSILON {
         return;
     }
-    let half_width_px = config::EKATERINA_LINE_SHOT_WIDTH_TILES * config::TILE_SIZE as f32 * 0.5;
+    let half_width_px = config::EKAT_LINE_SHOT_WIDTH_TILES * config::TILE_SIZE as f32 * 0.5;
     let mut hits = Vec::new();
     for id in entities.ids() {
         if id == caster {
@@ -127,7 +127,7 @@ fn apply_line_shot_damage(
     for id in hits {
         if let Some(target) = entities.get_mut(id) {
             target.apply_damage(
-                config::EKATERINA_LINE_SHOT_DAMAGE,
+                config::EKAT_LINE_SHOT_DAMAGE,
                 Some((player, from, tick)),
             );
         }

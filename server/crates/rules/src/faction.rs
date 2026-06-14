@@ -8,7 +8,7 @@
 use crate::{balance, defs, economy::ResourceCost, EntityKind};
 
 pub const DEFAULT_FACTION_ID: &str = "kriegsia";
-pub const EKATERINA_FACTION_ID: &str = "ekaterina";
+pub const EKAT_FACTION_ID: &str = "ekat";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 
 pub const METHAMPHETAMINES_UPGRADE: &str = "methamphetamines";
@@ -23,8 +23,8 @@ pub const MORTAR_FIRE_ABILITY: &str = "mortarFire";
 pub const POINT_FIRE_ABILITY: &str = "pointFire";
 pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
 pub const CHARGE_ABILITY: &str = "charge";
-pub const EKATERINA_TELEPORT_ABILITY: &str = "ekaterinaTeleport";
-pub const EKATERINA_LINE_SHOT_ABILITY: &str = "ekaterinaLineShot";
+pub const EKAT_TELEPORT_ABILITY: &str = "ekatTeleport";
+pub const EKAT_LINE_SHOT_ABILITY: &str = "ekatLineShot";
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
@@ -60,7 +60,7 @@ const EMPTY_FIXTURE_START_ENTITIES: &[StartingEntityGroup] = &[
     },
 ];
 
-const EKATERINA_START_ENTITIES: &[StartingEntityGroup] = &[
+const EKAT_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
         kind: EntityKind::Zamok,
         count: 1,
@@ -68,7 +68,7 @@ const EKATERINA_START_ENTITIES: &[StartingEntityGroup] = &[
         completed: true,
     },
     StartingEntityGroup {
-        kind: EntityKind::Ekaterina,
+        kind: EntityKind::Ekat,
         count: 1,
         formation: StartingFormation::Ring {
             radius_tiles_x10: 25,
@@ -93,11 +93,11 @@ pub const EMPTY_FIXTURE_LOADOUT: FactionLoadout = FactionLoadout {
     opening_upgrades: &[],
 };
 
-pub const EKATERINA_LOADOUT: FactionLoadout = FactionLoadout {
-    id: "ekaterina.standard",
+pub const EKAT_LOADOUT: FactionLoadout = FactionLoadout {
+    id: "ekat.standard",
     initial_steel: 0,
     initial_oil: 0,
-    starting_entities: EKATERINA_START_ENTITIES,
+    starting_entities: EKAT_START_ENTITIES,
     opening_upgrades: &[],
 };
 
@@ -266,21 +266,21 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
     },
 ];
 
-const EKATERINA_UNITS: &[EntityKind] = &[EntityKind::Ekaterina];
-const EKATERINA_BUILDINGS: &[EntityKind] = &[EntityKind::Zamok];
+const EKAT_UNITS: &[EntityKind] = &[EntityKind::Ekat];
+const EKAT_BUILDINGS: &[EntityKind] = &[EntityKind::Zamok];
 
-const EKATERINA_ABILITIES: &[AbilityCatalogEntry] = &[
+const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
     AbilityCatalogEntry {
-        id: EKATERINA_TELEPORT_ABILITY,
+        id: EKAT_TELEPORT_ABILITY,
         label: "Teleport",
         icon: "TP",
         hotkey: Some("D"),
         title: "Teleport up to 5 tiles",
-        carriers: &[EntityKind::Ekaterina],
+        carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKATERINA_TELEPORT_RANGE_TILES),
+        range_tiles: Some(balance::EKAT_TELEPORT_RANGE_TILES),
         min_range_tiles: None,
-        cooldown_ticks: balance::EKATERINA_TELEPORT_COOLDOWN_TICKS,
+        cooldown_ticks: balance::EKAT_TELEPORT_COOLDOWN_TICKS,
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
@@ -291,16 +291,16 @@ const EKATERINA_ABILITIES: &[AbilityCatalogEntry] = &[
         order_stage_code: 12,
     },
     AbilityCatalogEntry {
-        id: EKATERINA_LINE_SHOT_ABILITY,
+        id: EKAT_LINE_SHOT_ABILITY,
         label: "Line Shot",
         icon: "LS",
         hotkey: Some("X"),
         title: "Damage enemies in a line",
-        carriers: &[EntityKind::Ekaterina],
+        carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKATERINA_LINE_SHOT_RANGE_TILES),
+        range_tiles: Some(balance::EKAT_LINE_SHOT_RANGE_TILES),
         min_range_tiles: None,
-        cooldown_ticks: balance::EKATERINA_LINE_SHOT_COOLDOWN_TICKS,
+        cooldown_ticks: balance::EKAT_LINE_SHOT_COOLDOWN_TICKS,
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
@@ -343,21 +343,21 @@ pub const EMPTY_FIXTURE_CATALOG: FactionCatalog = FactionCatalog {
     production_anchors: &[],
 };
 
-pub const EKATERINA_CATALOG: FactionCatalog = FactionCatalog {
-    id: EKATERINA_FACTION_ID,
-    loadout: EKATERINA_LOADOUT,
-    units: EKATERINA_UNITS,
-    buildings: EKATERINA_BUILDINGS,
+pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
+    id: EKAT_FACTION_ID,
+    loadout: EKAT_LOADOUT,
+    units: EKAT_UNITS,
+    buildings: EKAT_BUILDINGS,
     buildables: &[],
     upgrades: &[],
-    abilities: EKATERINA_ABILITIES,
+    abilities: EKAT_ABILITIES,
     builders: &[],
     gatherers: &[],
     production_anchors: &[],
 };
 
 pub const CATALOGS: &[FactionCatalog] =
-    &[CURRENT_CATALOG, EKATERINA_CATALOG, EMPTY_FIXTURE_CATALOG];
+    &[CURRENT_CATALOG, EKAT_CATALOG, EMPTY_FIXTURE_CATALOG];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpgradeCatalogEntry {
@@ -587,15 +587,15 @@ mod tests {
     }
 
     #[test]
-    fn ekaterina_catalog_exposes_one_hero_and_zamok() {
-        let catalog = EKATERINA_CATALOG;
+    fn ekat_catalog_exposes_one_hero_and_zamok() {
+        let catalog = EKAT_CATALOG;
 
-        assert_eq!(catalog.units, &[EntityKind::Ekaterina]);
+        assert_eq!(catalog.units, &[EntityKind::Ekat]);
         assert_eq!(catalog.buildings, &[EntityKind::Zamok]);
-        assert_eq!(catalog.loadout.id, "ekaterina.standard");
-        assert_eq!(catalog.loadout.starting_entities, EKATERINA_START_ENTITIES);
-        assert!(catalog.allows_ability(EKATERINA_TELEPORT_ABILITY, EntityKind::Ekaterina));
-        assert!(catalog.allows_ability(EKATERINA_LINE_SHOT_ABILITY, EntityKind::Ekaterina));
+        assert_eq!(catalog.loadout.id, "ekat.standard");
+        assert_eq!(catalog.loadout.starting_entities, EKAT_START_ENTITIES);
+        assert!(catalog.allows_ability(EKAT_TELEPORT_ABILITY, EntityKind::Ekat));
+        assert!(catalog.allows_ability(EKAT_LINE_SHOT_ABILITY, EntityKind::Ekat));
         assert!(!catalog.allows_unit(EntityKind::Rifleman));
         assert!(!catalog.allows_building(EntityKind::CityCentre));
     }
@@ -647,22 +647,22 @@ mod tests {
         assert!(!charge.command_card);
         assert!(charge.carriers.is_empty());
 
-        let teleport = EKATERINA_CATALOG
-            .ability(EKATERINA_TELEPORT_ABILITY)
+        let teleport = EKAT_CATALOG
+            .ability(EKAT_TELEPORT_ABILITY)
             .unwrap();
-        assert_eq!(teleport.carriers, &[EntityKind::Ekaterina]);
+        assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             teleport.range_tiles,
-            Some(balance::EKATERINA_TELEPORT_RANGE_TILES)
+            Some(balance::EKAT_TELEPORT_RANGE_TILES)
         );
 
-        let line_shot = EKATERINA_CATALOG
-            .ability(EKATERINA_LINE_SHOT_ABILITY)
+        let line_shot = EKAT_CATALOG
+            .ability(EKAT_LINE_SHOT_ABILITY)
             .unwrap();
-        assert_eq!(line_shot.carriers, &[EntityKind::Ekaterina]);
+        assert_eq!(line_shot.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             line_shot.range_tiles,
-            Some(balance::EKATERINA_LINE_SHOT_RANGE_TILES)
+            Some(balance::EKAT_LINE_SHOT_RANGE_TILES)
         );
     }
 
@@ -691,7 +691,7 @@ mod tests {
         assert!(catalog_loadout_for("unknown_faction", "kriegsia.standard").is_none());
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "missing.loadout").is_none());
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "kriegsia.standard").is_some());
-        assert!(catalog_loadout_for(EKATERINA_FACTION_ID, "ekaterina.standard").is_some());
+        assert!(catalog_loadout_for(EKAT_FACTION_ID, "ekat.standard").is_some());
     }
 
     #[test]
@@ -717,11 +717,11 @@ mod tests {
             EMPTY_FIXTURE_START_ENTITIES
         );
 
-        assert_eq!(EKATERINA_CATALOG.loadout.initial_steel, 0);
-        assert_eq!(EKATERINA_CATALOG.loadout.initial_oil, 0);
+        assert_eq!(EKAT_CATALOG.loadout.initial_steel, 0);
+        assert_eq!(EKAT_CATALOG.loadout.initial_oil, 0);
         assert_eq!(
-            EKATERINA_CATALOG.loadout.starting_entities,
-            EKATERINA_START_ENTITIES
+            EKAT_CATALOG.loadout.starting_entities,
+            EKAT_START_ENTITIES
         );
     }
 }

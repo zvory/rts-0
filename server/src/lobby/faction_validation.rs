@@ -1,5 +1,5 @@
 use rts_rules::faction::{
-    catalog_for, DEFAULT_FACTION_ID, EKATERINA_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
+    catalog_for, DEFAULT_FACTION_ID, EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,7 +91,7 @@ pub(super) fn validate_faction_request(
         };
     }
 
-    if matches!(faction_id, DEFAULT_FACTION_ID | EKATERINA_FACTION_ID) {
+    if matches!(faction_id, DEFAULT_FACTION_ID | EKAT_FACTION_ID) {
         return FactionValidation::AcceptedPlayable {
             faction_id: faction_id.to_string(),
         };
@@ -139,14 +139,11 @@ mod tests {
     }
 
     #[test]
-    fn ekaterina_is_a_playable_faction() {
+    fn ekat_is_a_playable_faction() {
         assert_eq!(
-            validate_faction_request(
-                FactionRequestContext::NormalLobby,
-                Some(EKATERINA_FACTION_ID)
-            ),
+            validate_faction_request(FactionRequestContext::NormalLobby, Some(EKAT_FACTION_ID)),
             FactionValidation::AcceptedPlayable {
-                faction_id: EKATERINA_FACTION_ID.to_string()
+                faction_id: EKAT_FACTION_ID.to_string()
             }
         );
     }

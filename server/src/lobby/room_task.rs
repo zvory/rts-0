@@ -4196,7 +4196,7 @@ mod tests {
         );
 
         let (_live, mut mismatched_artifact) = replay_test_artifact(&players, 0);
-        mismatched_artifact.player_loadouts[0].faction_id = "ekaterina".to_string();
+        mismatched_artifact.player_loadouts[0].faction_id = "ekat".to_string();
 
         let err = match ReplaySession::new(mismatched_artifact) {
             Ok(_) => panic!("mismatched replay loadout should be rejected"),

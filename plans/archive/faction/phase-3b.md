@@ -9,7 +9,7 @@ non-Kriegsia gameplay is available.
 
 ## Scope
 
-- Keep AI seats Kriegsia-only. Clients must not be able to create an AI as `ekaterina`,
+- Keep AI seats Kriegsia-only. Clients must not be able to create an AI as `ekat`,
   `phase2_empty_fixture`, or any unknown faction.
 - Keep `addAi` team-only in the Phase 3 protocol. If a hand-built or future client sends extra
   faction fields, lobby validation must ignore or reject the unsupported request without creating a

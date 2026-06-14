@@ -81,7 +81,7 @@ export const KIND = Object.freeze({
   SCOUT_CAR: "scout_car",
   TANK: "tank",
   COMMAND_CAR: "command_car",
-  EKATERINA: "ekaterina",
+  EKAT: "ekat",
   CITY_CENTRE: "city_centre",
   ZAMOK: "zamok",
   DEPOT: "depot",
@@ -103,7 +103,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.SCOUT_CAR,
   KIND.TANK,
   KIND.COMMAND_CAR,
-  KIND.EKATERINA,
+  KIND.EKAT,
 ]);
 export const BUILDING_KINDS = Object.freeze([
   KIND.CITY_CENTRE,
@@ -165,8 +165,8 @@ export const ABILITY = Object.freeze({
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
   BREAKTHROUGH: "breakthrough",
-  EKATERINA_TELEPORT: "ekaterinaTeleport",
-  EKATERINA_LINE_SHOT: "ekaterinaLineShot",
+  EKAT_TELEPORT: "ekatTeleport",
+  EKAT_LINE_SHOT: "ekatLineShot",
 });
 
 export const REPLAY_VISION = Object.freeze({
@@ -195,7 +195,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.TRAINING_CENTRE]: 9,
   [KIND.RESEARCH_COMPLEX]: 17,
   [KIND.COMMAND_CAR]: 18,
-  [KIND.EKATERINA]: 19,
+  [KIND.EKAT]: 19,
   [KIND.ZAMOK]: 20,
   [KIND.FACTORY]: 10,
   [KIND.STEEL]: 11,
@@ -262,8 +262,8 @@ export const ORDER_STAGE = Object.freeze({
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
   BREAKTHROUGH: "breakthrough",
-  EKATERINA_TELEPORT: "ekaterinaTeleport",
-  EKATERINA_LINE_SHOT: "ekaterinaLineShot",
+  EKAT_TELEPORT: "ekatTeleport",
+  EKAT_LINE_SHOT: "ekatLineShot",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
 
@@ -279,8 +279,8 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.MORTAR_FIRE]: 9,
   [ORDER_STAGE.POINT_FIRE]: 10,
   [ORDER_STAGE.BREAKTHROUGH]: 11,
-  [ORDER_STAGE.EKATERINA_TELEPORT]: 12,
-  [ORDER_STAGE.EKATERINA_LINE_SHOT]: 13,
+  [ORDER_STAGE.EKAT_TELEPORT]: 12,
+  [ORDER_STAGE.EKAT_LINE_SHOT]: 13,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -289,8 +289,8 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.MORTAR_FIRE]: 3,
   [ABILITY.POINT_FIRE]: 4,
   [ABILITY.BREAKTHROUGH]: 5,
-  [ABILITY.EKATERINA_TELEPORT]: 6,
-  [ABILITY.EKATERINA_LINE_SHOT]: 7,
+  [ABILITY.EKAT_TELEPORT]: 6,
+  [ABILITY.EKAT_LINE_SHOT]: 7,
 });
 
 export const NOTICE_SEVERITY_CODE = Object.freeze({

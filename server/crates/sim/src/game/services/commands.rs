@@ -685,14 +685,14 @@ struct AbilityFactInput<'a> {
 fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::Smoke | AbilityKind::EkaterinaTeleport | AbilityKind::EkaterinaLineShot
+        AbilityKind::Smoke | AbilityKind::EkatTeleport | AbilityKind::EkatLineShot
     )
 }
 
 fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::MortarFire | AbilityKind::EkaterinaTeleport | AbilityKind::EkaterinaLineShot
+        AbilityKind::MortarFire | AbilityKind::EkatTeleport | AbilityKind::EkatLineShot
     )
 }
 
@@ -1068,8 +1068,8 @@ fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
         AbilityKind::MortarFire => planner::AbilityId(2),
         AbilityKind::PointFire => planner::AbilityId(3),
         AbilityKind::Breakthrough => planner::AbilityId(4),
-        AbilityKind::EkaterinaTeleport => planner::AbilityId(5),
-        AbilityKind::EkaterinaLineShot => planner::AbilityId(6),
+        AbilityKind::EkatTeleport => planner::AbilityId(5),
+        AbilityKind::EkatLineShot => planner::AbilityId(6),
     }
 }
 
@@ -1080,8 +1080,8 @@ fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
         2 => Some(AbilityKind::MortarFire),
         3 => Some(AbilityKind::PointFire),
         4 => Some(AbilityKind::Breakthrough),
-        5 => Some(AbilityKind::EkaterinaTeleport),
-        6 => Some(AbilityKind::EkaterinaLineShot),
+        5 => Some(AbilityKind::EkatTeleport),
+        6 => Some(AbilityKind::EkatLineShot),
         _ => None,
     }
 }

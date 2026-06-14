@@ -7,7 +7,7 @@ Status: Done.
 Course-correct the faction architecture before Phase 6 ability registry work. The first five
 phases created the right high-level seams, but the implementation still has a few compatibility
 paths that can make future factions behave like Kriegsia if a lifecycle path forgets to validate
-input. This phase should tighten those seams without adding Ekaterina gameplay, changing Kriegsia
+input. This phase should tighten those seams without adding Ekat gameplay, changing Kriegsia
 balance, or starting the Phase 6 ability registry refactor.
 
 ## Review Findings To Address
@@ -61,7 +61,7 @@ balance, or starting the Phase 6 ability registry refactor.
 
 ## Non-Goals
 
-- Do not add Ekaterina catalog entries, command cards, lobby selection, art, AI behavior, or
+- Do not add Ekat catalog entries, command cards, lobby selection, art, AI behavior, or
   prediction support.
 - Do not implement the Phase 6 ability registry or Phase 7 ability effect hooks.
 - Do not migrate to generic resources.

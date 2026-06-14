@@ -243,12 +243,12 @@ fn snapshot_projects_abilities_from_owner_faction_catalog() {
 }
 
 #[test]
-fn ekaterina_start_projects_hero_zamok_and_abilities() {
+fn ekat_start_projects_hero_zamok_and_abilities() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
-        faction_id: crate::rules::faction::EKATERINA_FACTION_ID.to_string(),
-        name: "Ekaterina".into(),
+        faction_id: crate::rules::faction::EKAT_FACTION_ID.to_string(),
+        name: "Ekat".into(),
         color: "#fff".into(),
         is_ai: false,
     }];
@@ -263,8 +263,8 @@ fn ekaterina_start_projects_hero_zamok_and_abilities() {
     let hero = game
         .entities
         .iter()
-        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekaterina)
-        .expect("Ekaterina should start with her hero");
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
+        .expect("Ekat should start with her hero");
     assert_eq!(hero.hp, 300);
 
     let snapshot = game.snapshot_for(1);
@@ -281,19 +281,19 @@ fn ekaterina_start_projects_hero_zamok_and_abilities() {
     assert_eq!(
         ability_ids,
         vec![
-            crate::protocol::abilities::EKATERINA_TELEPORT,
-            crate::protocol::abilities::EKATERINA_LINE_SHOT,
+            crate::protocol::abilities::EKAT_TELEPORT,
+            crate::protocol::abilities::EKAT_LINE_SHOT,
         ]
     );
 }
 
 #[test]
-fn ekaterina_regenerates_one_hp_per_second_while_alive() {
+fn ekat_regenerates_one_hp_per_second_while_alive() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
-        faction_id: crate::rules::faction::EKATERINA_FACTION_ID.to_string(),
-        name: "Ekaterina".into(),
+        faction_id: crate::rules::faction::EKAT_FACTION_ID.to_string(),
+        name: "Ekat".into(),
         color: "#fff".into(),
         is_ai: false,
     }];
@@ -301,7 +301,7 @@ fn ekaterina_regenerates_one_hp_per_second_while_alive() {
     let pos = game.map.tile_center(10, 10);
     let hero = game
         .entities
-        .spawn_unit(1, EntityKind::Ekaterina, pos.0, pos.1)
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
     game.entities
         .get_mut(hero)
@@ -316,12 +316,12 @@ fn ekaterina_regenerates_one_hp_per_second_while_alive() {
 }
 
 #[test]
-fn ekaterina_teleport_moves_up_to_five_tiles_and_starts_cooldown() {
+fn ekat_teleport_moves_up_to_five_tiles_and_starts_cooldown() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
-        faction_id: crate::rules::faction::EKATERINA_FACTION_ID.to_string(),
-        name: "Ekaterina".into(),
+        faction_id: crate::rules::faction::EKAT_FACTION_ID.to_string(),
+        name: "Ekat".into(),
         color: "#fff".into(),
         is_ai: false,
     }];
@@ -330,13 +330,13 @@ fn ekaterina_teleport_moves_up_to_five_tiles_and_starts_cooldown() {
     let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
     let hero = game
         .entities
-        .spawn_unit(1, EntityKind::Ekaterina, pos.0, pos.1)
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
     game.enqueue(
         1,
         Command::UseAbility {
-            ability: ability::AbilityKind::EkaterinaTeleport,
+            ability: ability::AbilityKind::EkatTeleport,
             units: vec![hero],
             x: Some(target.0),
             y: Some(target.1),
@@ -349,19 +349,19 @@ fn ekaterina_teleport_moves_up_to_five_tiles_and_starts_cooldown() {
     assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
     assert!((hero_entity.pos_y - target.1).abs() < f32::EPSILON);
     assert_eq!(
-        hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkaterinaTeleport),
-        config::EKATERINA_TELEPORT_COOLDOWN_TICKS.saturating_sub(1)
+        hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
+        config::EKAT_TELEPORT_COOLDOWN_TICKS.saturating_sub(1)
     );
 }
 
 #[test]
-fn ekaterina_line_shot_damages_enemies_in_line_only() {
+fn ekat_line_shot_damages_enemies_in_line_only() {
     let players = [
         PlayerInit {
             id: 1,
             team_id: 1,
-            faction_id: crate::rules::faction::EKATERINA_FACTION_ID.to_string(),
-            name: "Ekaterina".into(),
+            faction_id: crate::rules::faction::EKAT_FACTION_ID.to_string(),
+            name: "Ekat".into(),
             color: "#fff".into(),
             is_ai: false,
         },
@@ -379,7 +379,7 @@ fn ekaterina_line_shot_damages_enemies_in_line_only() {
     let target = (pos.0 + config::TILE_SIZE as f32 * 6.0, pos.1);
     let hero = game
         .entities
-        .spawn_unit(1, EntityKind::Ekaterina, pos.0, pos.1)
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
     let enemy = game
         .entities
@@ -403,7 +403,7 @@ fn ekaterina_line_shot_damages_enemies_in_line_only() {
     game.enqueue(
         1,
         Command::UseAbility {
-            ability: ability::AbilityKind::EkaterinaLineShot,
+            ability: ability::AbilityKind::EkatLineShot,
             units: vec![hero],
             x: Some(target.0),
             y: Some(target.1),

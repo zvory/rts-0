@@ -1,18 +1,18 @@
 # Phase 9 - Second Faction Brief and Rules Spec
 
-Status: Reset. Ekaterina is reserved only; no rules/balance spec is approved.
+Status: Reset. Ekat is reserved only; no rules/balance spec is approved.
 
 ## Objective
 
-Create a new approved Ekaterina brief and rules/balance spec before implementing any real faction
-content. The prior RTS-style Ekaterina concept was purged; this phase must restart from the
+Create a new approved Ekat brief and rules/balance spec before implementing any real faction
+content. The prior RTS-style Ekat concept was purged; this phase must restart from the
 hero-centric direction.
 
 ## Scope
 
 - Write or reference the faction brief, including theme, intended strategic identity, how the
   mostly-one-hero control model works, strengths, weaknesses, and expected match pacing.
-- Define whether Ekaterina uses Kriegsia's Steel/Oil/Supply model, a stripped-down variant, hero
+- Define whether Ekat uses Kriegsia's Steel/Oil/Supply model, a stripped-down variant, hero
   progression, cooldowns, objectives, or some other economy. Do not assume workers, bases, or
   production buildings.
 - Define the minimum playable implementation slices for a MOBA-like hero faction.
@@ -23,7 +23,7 @@ hero-centric direction.
   approved supporting entities.
 - Decide whether prediction remains disabled for the new faction, which should be the default.
 - Confirm AI remains blocked for the new faction unless the user explicitly approves AI work.
-- Identify the exact existing assignment path Phase 10 may use to start as Ekaterina before normal
+- Identify the exact existing assignment path Phase 10 may use to start as Ekat before normal
   lobby selection is exposed, if any.
 - Define command-id namespace expectations for the faction's build/train/research/ability actions
   so hotkey profiles remain stable.
@@ -60,8 +60,8 @@ small enough for Phase 10 and Phase 11 to implement independently.
 The handoff must name the approved brief/spec files, list explicit user-approved decisions, identify
 any open questions, name the exact assignment path Phase 10 should use, and state exactly what
 Phase 10 may implement. If any major faction mechanic is not approved, Phase 10 must not implement
-it. A generic "start/economy/production" slice is not approved for Ekaterina.
+it. A generic "start/economy/production" slice is not approved for Ekat.
 
 ## Player-Facing Outcome
 
-No gameplay change. Ekaterina remains reserved until the new hero-centric design is approved.
+No gameplay change. Ekat remains reserved until the new hero-centric design is approved.

@@ -5,7 +5,7 @@ Status: Done.
 ## Objective
 
 Define stable command identities and hotkey storage before faction-specific command cards expand.
-Kriegsia and Ekaterina must not collide even if they both use the same hotkey labels or command
+Kriegsia and Ekat must not collide even if they both use the same hotkey labels or command
 families.
 
 ## Scope
@@ -19,12 +19,12 @@ families.
   - `kriegsia.train.<kind>`
   - `kriegsia.research.<upgrade>`
   - `kriegsia.ability.<ability>`
-- Do not create Ekaterina command cards in this phase. Reserve the namespace so later Ekaterina
-  commands can use `ekaterina.*` ids without colliding with Kriegsia.
+- Do not create Ekat command cards in this phase. Reserve the namespace so later Ekat
+  commands can use `ekat.*` ids without colliding with Kriegsia.
 - Store custom/direct hotkey bindings per faction. Grid mode remains global because it follows
   rendered command-card slot position rather than command id.
 - Migrate existing custom profiles from old Kriegsia ids such as `build.city_centre` and
-  `train.rifleman` into the Kriegsia binding set. Do not apply those custom bindings to Ekaterina.
+  `train.rifleman` into the Kriegsia binding set. Do not apply those custom bindings to Ekat.
 
 ## Hotkey Behavior
 
@@ -48,7 +48,7 @@ Profiles should support:
 
 - Existing Kriegsia command-card tests pass with namespaced build/train/research/ability ids.
 - Hotkey tests prove old custom profile ids migrate into Kriegsia bindings.
-- Hotkey tests prove Kriegsia custom bindings do not apply to Ekaterina.
+- Hotkey tests prove Kriegsia custom bindings do not apply to Ekat.
 - Hotkey import/export tests prove unavailable faction commands can be preserved but not armed.
 
 ## Manual Testing Focus
