@@ -3800,6 +3800,7 @@ fn saturating_duration_ms_u16(duration: Duration) -> u16 {
 mod tests {
     use super::*;
     use crate::protocol::DEFAULT_FACTION_ID;
+    use rts_rules::faction::EMPTY_FIXTURE_FACTION_ID;
 
     fn replay_test_players(count: usize) -> Vec<PlayerInit> {
         (1..=count as u32)
@@ -4280,6 +4281,34 @@ mod tests {
         };
         assert!(
             err.contains("exceeds maximum"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_session_rejects_unknown_or_fixture_faction_ids() {
+        let players = replay_test_players(2);
+        let (_live, mut unknown_artifact) = replay_test_artifact(&players, 0);
+        unknown_artifact.players[0].faction_id = "ekaterina".to_string();
+
+        let err = match ReplaySession::new(unknown_artifact) {
+            Ok(_) => panic!("unsupported replay faction should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unsupported faction"),
+            "unexpected artifact reject: {err}"
+        );
+
+        let (_live, mut fixture_artifact) = replay_test_artifact(&players, 0);
+        fixture_artifact.players[0].faction_id = EMPTY_FIXTURE_FACTION_ID.to_string();
+
+        let err = match ReplaySession::new(fixture_artifact) {
+            Ok(_) => panic!("fixture replay faction should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unsupported faction"),
             "unexpected artifact reject: {err}"
         );
     }
@@ -4884,7 +4913,10 @@ mod tests {
             std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()).collect();
         assert!(starts_b.iter().any(|msg| {
             matches!(msg, ServerMessage::Start(payload)
-                if payload.player_id == players[1].id && !payload.spectator && payload.replay.is_none())
+                if payload.player_id == players[1].id
+                    && !payload.spectator
+                    && payload.replay.is_none()
+                    && payload.players.iter().all(|player| player.faction_id == DEFAULT_FACTION_ID))
         }));
         let starts_spectator: Vec<_> =
             std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
@@ -4892,6 +4924,39 @@ mod tests {
             matches!(msg, ServerMessage::Start(payload)
                 if payload.player_id == 102 && payload.spectator && payload.replay.is_none())
         }));
+    }
+
+    #[test]
+    fn branch_live_launch_rejects_unsupported_recorded_faction_ids() {
+        let players = replay_test_players(2);
+        let mut seed = replay_branch_test_seed(&players, 0);
+        seed.seats[0].faction_id = EMPTY_FIXTURE_FACTION_ID.to_string();
+        let mut task = RoomTask::new(
+            "branch-faction-reject-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_branch_occupant(&mut task, 100);
+        let mut writer_b = add_branch_occupant(&mut task, 101);
+        let mut staging = BranchStagingState::new(seed);
+        staging.claim(100, players[0].id).unwrap();
+        staging.claim(101, players[1].id).unwrap();
+        task.phase = Phase::BranchStaging(Box::new(staging));
+
+        task.start_branch_live();
+
+        assert!(matches!(task.phase, Phase::BranchStaging(_)));
+        assert!(task.branch_live_seat_by_connection.is_empty());
+        let a_messages: Vec<_> =
+            std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
+        let b_messages: Vec<_> =
+            std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()).collect();
+        assert!(!a_messages
+            .iter()
+            .chain(b_messages.iter())
+            .any(|msg| matches!(msg, ServerMessage::Start(_))));
     }
 
     #[test]

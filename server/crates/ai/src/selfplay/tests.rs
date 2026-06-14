@@ -372,6 +372,7 @@ fn selfplay_failure_artifact_writes_unified_replay_schema() {
     );
     assert_eq!(artifact.seed, 0x1234_5678);
     assert_eq!(artifact.players[0].name, "Failure Artifact");
+    assert_eq!(artifact.players[0].faction_id, "kriegsia");
 
     let _ = fs::remove_dir_all(dir);
 }

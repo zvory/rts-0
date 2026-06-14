@@ -1,11 +1,19 @@
 use super::*;
 use rayon::prelude::*;
+use rts_rules::faction::DEFAULT_FACTION_ID;
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
     game.entities
         .iter()
         .filter(|e| e.owner == owner && e.kind == kind)
         .count()
+}
+
+fn assert_dev_scenario_starts_as_kriegsia(setup: &DevScenarioSetup) {
+    let payload = setup.game.start_payload();
+    assert_eq!(payload.players.len(), 1);
+    assert_eq!(payload.players[0].id, setup.player_id);
+    assert_eq!(payload.players[0].faction_id, DEFAULT_FACTION_ID);
 }
 
 #[derive(Debug)]
@@ -285,6 +293,27 @@ fn direct_reverse_order_scenario_faces_unit_east_and_orders_goal_behind() {
             "{unit} should begin facing east, facing {:.4}",
             entity.facing()
         );
+    }
+}
+
+#[test]
+fn dev_scenarios_default_to_kriegsia_start_faction() {
+    let scenarios = [
+        Game::new_snaking_corridor_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
+        Game::new_direct_reverse_order_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 3, 0x5150_030d),
+        Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_vehicle_small_block_baseline_scenario(
+            EntityKind::ScoutCar,
+            1,
+            Some(EntityKind::Worker),
+            0x5150_030d,
+        ),
+        Game::new_factory_zero_gap_perpendicular_scenario(EntityKind::Tank, 1, 0x5150_030d),
+    ];
+
+    for setup in scenarios {
+        assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
 }
 
