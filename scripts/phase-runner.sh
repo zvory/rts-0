@@ -7,6 +7,8 @@ BASE_BRANCH="main"
 DRY_RUN=0
 MODEL=""
 PLAN_NAME=""
+FROM_PHASE=""
+TO_PHASE=""
 declare -a PHASES=()
 
 usage() {
@@ -16,12 +18,17 @@ Usage:
 
 Examples:
   scripts/phase-runner.sh --plan faction 4
+  scripts/phase-runner.sh --plan faction 5.5
   scripts/phase-runner.sh --plan faction phase-4 phase-5 --base main
+  scripts/phase-runner.sh --plan faction --from 5 --to 6
   scripts/phase-runner.sh --plan ai 2 --model gpt-5.4-mini
 
 Runs executor passes only. Each phase gets a separate worktree and branch under
 /tmp/rts-worktrees. When multiple phases are provided, each later phase starts
 from the previous phase branch so the final branch contains the accumulated work.
+Phase ids may be numeric, decimal interstitials such as 5.5, or suffixed ids
+such as 3a. Use --from/--to to discover all phase files in that interval; for
+example --from 5 --to 6 runs phase-5.5 before phase-6 if both files exist.
 
 The runner never merges, pushes, creates plans, or performs final review.
 Calling agents should treat the inner Codex executor as a long-running job:
@@ -33,6 +40,8 @@ Options:
   --plan NAME       Plan directory name under plans/. Required.
   --base BRANCH     Starting branch for the first phase. Defaults to main.
   --model MODEL     Optional Codex model override for executor passes.
+  --from PHASE      Discover phases after PHASE, up to --to. Example: --from 5.
+  --to PHASE        Discover phases through PHASE. Requires --from.
   --dry-run         Print worktrees, branches, and prompts without running Codex.
   -h, --help        Show this help.
 
@@ -55,6 +64,14 @@ while [ "$#" -gt 0 ]; do
       MODEL="${2:-}"
       shift 2
       ;;
+    --from)
+      FROM_PHASE="${2:-}"
+      shift 2
+      ;;
+    --to)
+      TO_PHASE="${2:-}"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -75,7 +92,19 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ -z "$PLAN_NAME" ] || [ "${#PHASES[@]}" -eq 0 ]; then
+if [ -z "$PLAN_NAME" ]; then
+  usage >&2
+  exit 2
+fi
+
+if { [ -n "$FROM_PHASE" ] && [ -z "$TO_PHASE" ]; } || { [ -z "$FROM_PHASE" ] && [ -n "$TO_PHASE" ]; }; then
+  echo "error: --from and --to must be used together" >&2
+  usage >&2
+  exit 2
+fi
+
+if [ -n "$FROM_PHASE" ] && [ "${#PHASES[@]}" -ne 0 ]; then
+  echo "error: pass either explicit phases or --from/--to discovery, not both" >&2
   usage >&2
   exit 2
 fi
@@ -123,14 +152,65 @@ mkdir -p "$WORKTREE_ROOT"
 
 normalize_phase() {
   local raw="$1"
+  local label
   case "$raw" in
-    phase-*) printf '%s\n' "$raw" ;;
-    [0-9]*) printf 'phase-%s\n' "$raw" ;;
-    *)
-      echo "error: invalid phase '$raw'; use N or phase-N" >&2
-      exit 2
-      ;;
+    phase-*) label="${raw#phase-}" ;;
+    *) label="$raw" ;;
   esac
+  if [[ ! "$label" =~ ^[0-9]+(\.[0-9]+)?[a-z]?$ ]]; then
+    echo "error: invalid phase '$raw'; use N, N.M, Na, phase-N, phase-N.M, or phase-Na" >&2
+    exit 2
+  fi
+  printf 'phase-%s\n' "$label"
+}
+
+discover_phases() {
+  node -e '
+    const fs = require("fs");
+    const path = require("path");
+    const planDir = process.argv[1];
+    const from = process.argv[2];
+    const to = process.argv[3];
+
+    function parse(raw) {
+      const label = String(raw || "").replace(/^phase-/, "");
+      const match = /^([0-9]+)(?:\.([0-9]+))?([a-z])?$/.exec(label);
+      if (!match) throw new Error(`invalid phase id: ${raw}`);
+      return {
+        id: `phase-${label}`,
+        major: Number(match[1]),
+        decimal: match[2] == null ? null : Number(`0.${match[2]}`),
+        suffix: match[3] || "",
+      };
+    }
+
+    function cmp(a, b) {
+      return (
+        a.major - b.major ||
+        ((a.decimal ?? 0) - (b.decimal ?? 0)) ||
+        Number(Boolean(a.suffix)) - Number(Boolean(b.suffix)) ||
+        a.suffix.localeCompare(b.suffix)
+      );
+    }
+
+    const fromKey = parse(from);
+    const toKey = parse(to);
+    if (cmp(fromKey, toKey) >= 0) {
+      throw new Error(`--from must be before --to: ${from} .. ${to}`);
+    }
+
+    const phases = fs.readdirSync(planDir)
+      .filter((name) => /^phase-[0-9]+(?:\.[0-9]+)?[a-z]?\.md$/.test(name))
+      .map((name) => parse(path.basename(name, ".md")))
+      .filter((phase) => cmp(phase, fromKey) > 0 && cmp(phase, toKey) <= 0)
+      .sort(cmp)
+      .map((phase) => phase.id);
+
+    if (phases.length === 0) {
+      throw new Error(`no phase files discovered after ${from} through ${to}`);
+    }
+    process.stdout.write(`${phases.join("\n")}\n`);
+  ' "$plan_dir" "$FROM_PHASE" "$TO_PHASE"
 }
 
 json_get_status() {
@@ -151,6 +231,18 @@ phase_marked_done() {
 }
 
 previous_ref="$BASE_BRANCH"
+
+if [ -n "$FROM_PHASE" ]; then
+  while IFS= read -r discovered_phase; do
+    [ -n "$discovered_phase" ] && PHASES+=("$discovered_phase")
+  done < <(discover_phases)
+  echo "phase-runner: discovered phases: ${PHASES[*]}"
+fi
+
+if [ "${#PHASES[@]}" -eq 0 ]; then
+  usage >&2
+  exit 2
+fi
 
 for raw_phase in "${PHASES[@]}"; do
   phase_id="$(normalize_phase "$raw_phase")"
