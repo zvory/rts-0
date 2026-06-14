@@ -493,6 +493,17 @@ impl ReplaySession {
                     loadout.player_id
                 ));
             }
+            if rts_rules::faction::catalog_loadout_for(
+                &player.faction_id,
+                loadout.loadout_id.trim(),
+            )
+            .is_none()
+            {
+                return Err(format!(
+                    "replay loadout for player {} references unknown loadout {:?} for faction {:?}",
+                    loadout.player_id, loadout.loadout_id, player.faction_id
+                ));
+            }
         }
         for player in &artifact.players {
             if !seen_loadouts.contains(&player.id) {
@@ -4332,6 +4343,18 @@ mod tests {
         };
         assert!(
             err.contains("loadout for player"),
+            "unexpected artifact reject: {err}"
+        );
+
+        let (_live, mut unknown_loadout_artifact) = replay_test_artifact(&players, 0);
+        unknown_loadout_artifact.player_loadouts[0].loadout_id = "kriegsia.missing".to_string();
+
+        let err = match ReplaySession::new(unknown_loadout_artifact) {
+            Ok(_) => panic!("unknown replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unknown loadout"),
             "unexpected artifact reject: {err}"
         );
     }

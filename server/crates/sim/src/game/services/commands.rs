@@ -517,9 +517,8 @@ fn planner_facts(
             };
             facts.can_attack = e.can_attack();
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
-            facts.can_build = rules::faction::catalog_for_or_default(faction_id)
-                .builders
-                .contains(&e.kind)
+            facts.can_build = rules::faction::catalog_for(faction_id)
+                .is_some_and(|catalog| catalog.builders.contains(&e.kind))
                 || build_notice_compat;
             facts.can_setup_anti_tank_gun =
                 matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);

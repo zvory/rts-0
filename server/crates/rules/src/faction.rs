@@ -294,8 +294,17 @@ pub fn catalog_for(faction_id: &str) -> Option<FactionCatalog> {
         .find(|catalog| catalog.id == faction_id)
 }
 
-pub fn catalog_for_or_default(faction_id: &str) -> FactionCatalog {
-    catalog_for(faction_id).unwrap_or(CURRENT_CATALOG)
+pub fn catalog_for_or_default_empty(faction_id: &str) -> Option<FactionCatalog> {
+    if faction_id.trim().is_empty() {
+        Some(CURRENT_CATALOG)
+    } else {
+        catalog_for(faction_id)
+    }
+}
+
+pub fn catalog_loadout_for(faction_id: &str, loadout_id: &str) -> Option<FactionLoadout> {
+    let catalog = catalog_for(faction_id)?;
+    (catalog.loadout.id == loadout_id).then_some(catalog.loadout)
 }
 
 #[cfg(test)]
@@ -359,6 +368,19 @@ mod tests {
         assert!(catalog.trainable_units(EntityKind::CityCentre).is_empty());
         assert!(!catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
         assert!(!catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
+    }
+
+    #[test]
+    fn unknown_non_empty_catalog_ids_fail_closed() {
+        assert!(catalog_for("unknown_faction").is_none());
+        assert!(catalog_for_or_default_empty("unknown_faction").is_none());
+        assert_eq!(
+            catalog_for_or_default_empty("").unwrap().id,
+            DEFAULT_FACTION_ID
+        );
+        assert!(catalog_loadout_for("unknown_faction", "kriegsia.standard").is_none());
+        assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "missing.loadout").is_none());
+        assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "kriegsia.standard").is_some());
     }
 
     #[test]

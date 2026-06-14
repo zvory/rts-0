@@ -29,8 +29,10 @@ The current production catalog is in `server/crates/rules/src/defs.rs`:
 Temporary compatibility shim policy: direct global kind checks are approved in the current rules
 catalog, protocol adapters, setup/loadout code, AI, dev scenarios, command execution, production,
 economy, combat, world-query helpers, and tests. New production files that introduce direct
-current-faction kind checks should either use the future faction catalog API or be added to
-`scripts/check-faction-assumptions.mjs` with a short reason.
+current-faction kind checks should either use the faction catalog API or be added to
+`scripts/check-faction-assumptions.mjs` with a short reason. High-risk approved files have a direct
+special-case count ratchet so newly added current-faction checks inside those large files are also
+visible during review.
 
 ## Current Economy Shape
 
@@ -48,14 +50,19 @@ through catalog-aware cost/loadout helpers or update that approved inventory del
 
 ## Current Starting Loadout
 
-The standard match start is hardcoded in `server/crates/sim/src/game/setup.rs`: each player gets one
-completed City Centre, four Workers in a ring, nearby Steel/Oil resource clusters, starting Steel
-and Oil, and supply from the City Centre. Debug quickstart adds human-only extra buildings, combat
+The standard Kriegsia match start is defined by the `kriegsia.standard` faction loadout in
+`server/crates/rules/src/faction.rs` and assembled by `server/crates/sim/src/game/setup.rs`: each
+player gets one completed City Centre, four Workers in a ring, nearby Steel/Oil resource clusters,
+starting Steel and Oil, and supply from the City Centre. Unknown non-empty faction ids receive no
+catalog loadout, starting entities, starting Steel/Oil, or Kriegsia supply credit; lifecycle owners
+must validate before building a `Game`. Debug quickstart adds human-only extra buildings, combat
 units, resources, debug path overlays, and an inert enemy mortar corner for inspection.
 
-Replay starts currently reconstruct from starting Steel/Oil plus a `ReplayStartingLoadoutMode`
-(`Standard` or `DebugHuman`). This is an approved temporary shim until faction loadouts replace
-global starting values.
+Replay starts reconstruct from recorded per-player `PlayerStartingLoadout` records. Replay
+validators reject missing loadouts, records for unknown players, faction mismatches, empty loadout
+ids, and loadout ids that do not exist in the player's faction catalog. Global starting Steel/Oil
+constructors remain compatibility helpers for tests and debug starts rather than replay/lifecycle
+reconstruction APIs.
 
 ## Current Tech Tree
 
@@ -73,8 +80,11 @@ Current ability ids are Charge, Smoke, Mortar Fire, Point Fire, and Breakthrough
 costs, cooldowns, target modes, projection, and execution are split across
 `server/crates/sim/src/game/ability.rs`, `server/crates/sim/src/rules/projection.rs`,
 `server/crates/sim/src/game/services/ability_orders.rs`, `server/crates/protocol/src/lib.rs`, and
-`client/src/config.js`. Phase 6 owns registry-backed parity; Phase 0 only records the current
-special cases and keeps protocol/client command-card coverage in place.
+`client/src/config.js`. Phase 6 should make the faction-aware Rust ability registry the
+authoritative source for ability id, carrier, target mode, cooldown/charge, cost, and command-card
+affordance metadata, then project that to command validation and client parity checks instead of
+adding another parallel table. Until then, the split metadata remains intentionally documented and
+guarded by catalog parity, protocol parity, and command tests.
 
 ## Current Client Command Cards
 
@@ -113,3 +123,6 @@ one of those lifecycle paths.
 - `tests/protocol_parity.mjs` locks protocol kind, ability, upgrade, compact snapshot, and resource
   code parity.
 - `tests/hud_command_card.mjs` locks representative current command-card descriptors.
+- `node scripts/check-faction-catalog-parity.mjs` compares the client-exposed default catalog with
+  the Rust dump and verifies that all Rust catalogs are dumpable while fixture/future catalogs stay
+  explicitly unsupported on the client surface.

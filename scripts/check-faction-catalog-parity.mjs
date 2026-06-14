@@ -29,6 +29,22 @@ const rustCatalog = JSON.parse(execFileSync("cargo", [
   encoding: "utf8",
 }));
 
+const allRustCatalogs = JSON.parse(execFileSync("cargo", [
+  "run",
+  "--manifest-path",
+  "server/Cargo.toml",
+  "-p",
+  "rts-rules",
+  "--bin",
+  "dump-faction-catalog",
+  "--quiet",
+  "--",
+  "--all",
+], {
+  cwd: repoRoot,
+  encoding: "utf8",
+}));
+
 const kindByStableId = new Map(Object.entries(KIND).map(([, value]) => [value, value]));
 const upgradeByStableId = new Map(Object.entries(UPGRADE).map(([, value]) => [value, value]));
 const abilityByStableId = new Map(Object.entries(ABILITY).map(([, value]) => [value, value]));
@@ -41,6 +57,21 @@ function asClientKinds(kinds) {
 }
 
 assert.equal(rustCatalog.id, DEFAULT_FACTION_ID, "default faction id mirrors client protocol");
+assert.equal(
+  allRustCatalogs.catalogs.some((catalog) => catalog.id === DEFAULT_FACTION_ID),
+  true,
+  "all-catalog dump includes the default faction",
+);
+assert.equal(
+  allRustCatalogs.catalogs.some((catalog) => catalog.id === "phase2_empty_fixture"),
+  true,
+  "all-catalog dump exposes fixture catalogs for explicit unsupported handling",
+);
+assert.equal(
+  allRustCatalogs.catalogs.some((catalog) => catalog.id === "ekaterina"),
+  false,
+  "reserved future factions are not client-exposed until their catalog exists",
+);
 assert.deepEqual(
   WORKER_BUILDABLE,
   asClientKinds(rustCatalog.buildables.map((entry) => entry.kind)),

@@ -3,7 +3,7 @@
 //! `rules::defs` owns kind-specific data; this module answers allowed/cost/supply questions.
 
 use crate::defs;
-use crate::faction::catalog_for_or_default;
+use crate::faction::catalog_for;
 use crate::EntityKind;
 
 /// The faction plan intentionally keeps resource costs shaped as fixed Steel/Oil fields.
@@ -35,7 +35,9 @@ pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
 
 /// Which units a given building can train for a specific faction.
 pub fn trainable_units_for_faction(faction_id: &str, building_kind: EntityKind) -> Vec<EntityKind> {
-    catalog_for_or_default(faction_id).trainable_units(building_kind)
+    catalog_for(faction_id)
+        .map(|catalog| catalog.trainable_units(building_kind))
+        .unwrap_or_default()
 }
 
 /// Whether `building_kind` is allowed to be placed given the set of building kinds the
@@ -55,9 +57,10 @@ pub fn build_requirement_met_for_faction(
     building_kind: EntityKind,
     owned_building_kinds: &[EntityKind],
 ) -> bool {
-    let catalog = catalog_for_or_default(faction_id);
-    catalog.allows_building(building_kind)
-        && build_requirement_met(building_kind, owned_building_kinds)
+    catalog_for(faction_id).is_some_and(|catalog| {
+        catalog.allows_building(building_kind)
+            && build_requirement_met(building_kind, owned_building_kinds)
+    })
 }
 
 /// Whether a unit's training tech has been unlocked by completed buildings.
@@ -76,9 +79,10 @@ pub fn train_requirement_met_for_faction(
     unit_kind: EntityKind,
     owned_complete_building_kinds: &[EntityKind],
 ) -> bool {
-    let catalog = catalog_for_or_default(faction_id);
-    catalog.allows_unit(unit_kind)
-        && train_requirement_met(unit_kind, owned_complete_building_kinds)
+    catalog_for(faction_id).is_some_and(|catalog| {
+        catalog.allows_unit(unit_kind)
+            && train_requirement_met(unit_kind, owned_complete_building_kinds)
+    })
 }
 
 /// Whether `builder_kind` can place `building_kind` for this faction.
@@ -87,12 +91,12 @@ pub fn can_build_for_faction(
     builder_kind: EntityKind,
     building_kind: EntityKind,
 ) -> bool {
-    catalog_for_or_default(faction_id).can_build(builder_kind, building_kind)
+    catalog_for(faction_id).is_some_and(|catalog| catalog.can_build(builder_kind, building_kind))
 }
 
 /// Whether `unit_kind` can gather resources for this faction.
 pub fn can_gather_for_faction(faction_id: &str, unit_kind: EntityKind) -> bool {
-    catalog_for_or_default(faction_id).can_gather(unit_kind)
+    catalog_for(faction_id).is_some_and(|catalog| catalog.can_gather(unit_kind))
 }
 
 /// Whether a completed building accepts production/rally commands for this faction.
@@ -100,7 +104,8 @@ pub fn can_act_as_production_anchor_for_faction(
     faction_id: &str,
     building_kind: EntityKind,
 ) -> bool {
-    catalog_for_or_default(faction_id).can_act_as_production_anchor(building_kind)
+    catalog_for(faction_id)
+        .is_some_and(|catalog| catalog.can_act_as_production_anchor(building_kind))
 }
 
 /// Whether a building may research this upgrade for this faction.
@@ -109,7 +114,8 @@ pub fn can_research_for_faction(
     upgrade_id: &str,
     building_kind: EntityKind,
 ) -> bool {
-    catalog_for_or_default(faction_id).allows_research(upgrade_id, building_kind)
+    catalog_for(faction_id)
+        .is_some_and(|catalog| catalog.allows_research(upgrade_id, building_kind))
 }
 
 /// Resource node starting amount for a node kind.
@@ -336,6 +342,38 @@ mod tests {
             DEFAULT_FACTION_ID,
             EntityKind::Tank,
             &[EntityKind::Factory]
+        ));
+    }
+
+    #[test]
+    fn unknown_faction_economy_queries_fail_closed() {
+        let faction_id = "unknown_faction";
+
+        assert!(trainable_units_for_faction(faction_id, EntityKind::CityCentre).is_empty());
+        assert!(!build_requirement_met_for_faction(
+            faction_id,
+            EntityKind::Depot,
+            &[EntityKind::CityCentre]
+        ));
+        assert!(!train_requirement_met_for_faction(
+            faction_id,
+            EntityKind::Worker,
+            &[EntityKind::CityCentre]
+        ));
+        assert!(!can_build_for_faction(
+            faction_id,
+            EntityKind::Worker,
+            EntityKind::Depot
+        ));
+        assert!(!can_gather_for_faction(faction_id, EntityKind::Worker));
+        assert!(!can_act_as_production_anchor_for_faction(
+            faction_id,
+            EntityKind::CityCentre
+        ));
+        assert!(!can_research_for_faction(
+            faction_id,
+            crate::faction::TANK_UNLOCK_UPGRADE,
+            EntityKind::ResearchComplex
         ));
     }
 

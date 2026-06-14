@@ -16,9 +16,11 @@ default faction catalog to the client descriptors.
 The faction rollout keeps Steel, Oil, and Supply as the global economy contract. Faction catalogs
 decide which global units, buildings, upgrades, and abilities are legal for a player and define
 starting Steel/Oil values plus starting entity loadouts, but they still use fixed `steel`, `oil`,
-`supplyUsed`, and `supplyCap` fields. Start-map resource nodes remain Steel and Oil nodes. Score
-values, replay analysis values, command-card costs, affordability checks, refunds, and supply
-reservation are intentionally Steel/Oil/Supply-shaped.
+`supplyUsed`, and `supplyCap` fields. Unknown non-empty faction ids do not fall back to the
+Kriegsia catalog in lower-level economy queries: catalog-gated build/train/research/gather,
+production-anchor, and supply checks return empty or false. Start-map resource nodes remain Steel
+and Oil nodes. Score values, replay analysis values, command-card costs, affordability checks,
+refunds, and supply reservation are intentionally Steel/Oil/Supply-shaped.
 
 Approved direct Steel/Oil/Supply modules for this plan are:
 
@@ -27,7 +29,8 @@ Approved direct Steel/Oil/Supply modules for this plan are:
 - `server/crates/sim/src/game/player_state.rs`, `services/commands.rs`,
   `services/construction.rs`, `services/economy.rs`, `services/supply.rs`, `scoring.rs`,
   `analysis.rs`, `snapshot.rs`, `replay.rs`, and `setup.rs` for fixed-field simulation,
-  score/replay analysis, and start/loadout shims.
+  score/replay analysis, and start/loadout compatibility shims. New lifecycle/replay starts should
+  prefer per-player `PlayerStartingLoadout` records over global starting Steel/Oil overrides.
 - `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`,
   `server/crates/sim/src/protocol.rs`, and `client/src/protocol.js` for the mirrored wire and
   compact transport fields.

@@ -70,10 +70,13 @@ impl Game {
     /// Create a live lobby match where each AI chooses one strategy from the live profile pool.
     pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game;
 
-    /// Create a match with explicit starting steel/oil for every player.
+    /// Compatibility helper for tests and debug starts that still need explicit starting
+    /// Steel/Oil. Production replay/lifecycle reconstruction should use per-player
+    /// `PlayerStartingLoadout` records instead.
     pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
-    /// Create a live lobby match with explicit starting steel/oil and random AI strategies.
+    /// Compatibility helper for callers that still name AI profile setup plus explicit starting
+    /// resources. AI controllers are owned by the caller, not by `Game`.
     pub fn new_with_starting_resources_and_random_ai_profiles(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
     /// Rebuild replay playback with recorded per-player faction loadouts, map, and map metadata.
@@ -168,7 +171,10 @@ is never allied with a player.
 assembly. That policy is separate from `rules::faction` catalog existence: normal lobby,
 quickstart, AI, self-play, and dev starts default to or accept only Kriegsia in Phase 3A, replay
 paths require explicit recorded faction ids, and `phase2_empty_fixture` is accepted only by
-test-fixture contexts.
+test-fixture contexts. The lower rules/sim layer also fails closed: empty faction ids may default
+only at the narrow compatibility boundary, while unknown non-empty ids get no faction catalog
+loadout, no starting entities/resources, no supply credit for Kriegsia units/buildings, and no
+legal build/train/research/gather/ability surface.
 
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and

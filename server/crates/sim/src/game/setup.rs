@@ -1,6 +1,6 @@
 use super::*;
 use crate::game::entity::WeaponSetup;
-use crate::rules::faction::{FactionLoadout, StartingFormation};
+use crate::rules::faction::{catalog_for_or_default_empty, FactionLoadout, StartingFormation};
 use std::str::FromStr;
 
 mod dev_scenarios;
@@ -18,7 +18,7 @@ impl Game {
         Self::new_inner(players, None, seed, StartingLoadout::Standard, None)
     }
 
-    /// Create a match with explicit starting resources for every player.
+    /// Compatibility helper for tests/debug starts with one global resource override.
     #[allow(dead_code)]
     pub fn new_with_starting_resources(
         players: &[PlayerInit],
@@ -35,8 +35,7 @@ impl Game {
         )
     }
 
-    /// Compatibility constructor retained for callers that still name live AI profile setup.
-    /// AI controllers are owned by the caller, not by `Game`.
+    /// Compatibility helper for tests/debug starts with one global resource override.
     #[allow(dead_code)]
     pub fn new_with_starting_resources_and_random_ai_profiles(
         players: &[PlayerInit],
@@ -145,7 +144,7 @@ impl Game {
         Self::new_without_ai_controllers(players, seed)
     }
 
-    /// Like [`Game::new_for_replay`] but with explicit starting resources for all players.
+    /// Compatibility helper for old tests with one global resource override.
     pub fn new_for_replay_with_starting_resources(
         players: &[PlayerInit],
         steel: u32,
@@ -278,14 +277,17 @@ impl Game {
             } else {
                 p.faction_id.clone()
             };
-            let catalog = crate::rules::faction::catalog_for_or_default(&faction_id);
-            let loadout = catalog.loadout;
+            let catalog = catalog_for_or_default_empty(&faction_id);
+            let loadout = catalog.map(|catalog| catalog.loadout);
             let override_record = starting_loadout_overrides
                 .and_then(|records| records.iter().find(|record| record.player_id == p.id));
             let (initial_steel, initial_oil) = override_record
+                .filter(|_| catalog.is_some())
                 .map(|record| (record.starting_steel, record.starting_oil))
                 .or(resource_override)
-                .unwrap_or((loadout.initial_steel, loadout.initial_oil));
+                .filter(|_| catalog.is_some())
+                .or_else(|| loadout.map(|loadout| (loadout.initial_steel, loadout.initial_oil)))
+                .unwrap_or((0, 0));
             let mut ps = PlayerState {
                 id: p.id,
                 team_id: super::teams::normalize_team_id(p.id, p.team_id),
@@ -301,21 +303,29 @@ impl Game {
                 score: ScoreState::default(),
                 upgrades: Default::default(),
             };
-            spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
-            if starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
+            if let Some(loadout) = loadout {
+                spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
+            }
+            if catalog.is_some() && starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
                 spawn_debug_human_start(&mut entities, &map, &mut ps, start);
             }
-            for &upgrade in loadout.opening_upgrades {
-                if let Ok(kind) = upgrade::UpgradeKind::from_str(upgrade) {
-                    ps.upgrades.insert(kind);
+            if let Some(loadout) = loadout {
+                for &upgrade in loadout.opening_upgrades {
+                    if let Ok(kind) = upgrade::UpgradeKind::from_str(upgrade) {
+                        ps.upgrades.insert(kind);
+                    }
                 }
             }
             let loadout_id = if starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
-                format!("{}.debug_human", catalog.id)
+                catalog
+                    .map(|catalog| format!("{}.debug_human", catalog.id))
+                    .unwrap_or_else(|| format!("{faction_id}.invalid"))
             } else {
                 override_record
+                    .filter(|_| catalog.is_some())
                     .map(|record| record.loadout_id.clone())
-                    .unwrap_or_else(|| loadout.id.to_string())
+                    .or_else(|| loadout.map(|loadout| loadout.id.to_string()))
+                    .unwrap_or_else(|| format!("{faction_id}.invalid"))
             };
             resolved_starting_loadouts.push(PlayerStartingLoadout {
                 player_id: p.id,

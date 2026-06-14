@@ -342,8 +342,8 @@ pub(crate) fn caster_allowed_by_faction(
     ability: AbilityKind,
 ) -> bool {
     matches!(entities.get(caster), Some(e)
-        if rules::faction::catalog_for_or_default(faction_id)
-            .allows_ability(ability.to_protocol_str(), e.kind))
+        if rules::faction::catalog_for(faction_id)
+            .is_some_and(|catalog| catalog.allows_ability(ability.to_protocol_str(), e.kind)))
 }
 
 fn caster_base_ready(e: &crate::game::entity::Entity, player: u32, ability: AbilityKind) -> bool {

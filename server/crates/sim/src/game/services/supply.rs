@@ -6,6 +6,7 @@ use crate::rules;
 /// units + units still in production queues). Cap is clamped to `SUPPLY_CAP_MAX`.
 pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {
     for ps in players.iter_mut() {
+        let catalog = rules::faction::catalog_for(&ps.faction_id);
         let mut cap = 0u32;
         let mut used = 0u32;
         for e in entities.iter() {
@@ -13,19 +14,16 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 continue;
             }
             if e.is_building() && !e.under_construction() {
-                if rules::faction::catalog_for_or_default(&ps.faction_id).allows_building(e.kind) {
+                if catalog.is_some_and(|catalog| catalog.allows_building(e.kind)) {
                     cap += rules::economy::supply_provided(e.kind);
                 }
                 // Units queued for production reserve supply too.
                 for item in e.prod_queue() {
-                    if rules::faction::catalog_for_or_default(&ps.faction_id).allows_unit(item.unit)
-                    {
+                    if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
                         used += rules::economy::supply_cost(item.unit);
                     }
                 }
-            } else if e.is_unit()
-                && rules::faction::catalog_for_or_default(&ps.faction_id).allows_unit(e.kind)
-            {
+            } else if e.is_unit() && catalog.is_some_and(|catalog| catalog.allows_unit(e.kind)) {
                 used += rules::economy::supply_cost(e.kind);
             }
         }

@@ -88,6 +88,7 @@ impl Game {
         // 3. Supply equals living plus queued units
         // ------------------------------------------------------------------
         for ps in &self.players {
+            let catalog = rules::faction::catalog_for(&ps.faction_id);
             let mut expected_cap = 0u32;
             let mut expected_used = 0u32;
             for e in self.entities.iter() {
@@ -95,11 +96,16 @@ impl Game {
                     continue;
                 }
                 if e.is_building() && !e.under_construction() {
-                    expected_cap += rules::economy::supply_provided(e.kind);
-                    for item in e.prod_queue() {
-                        expected_used += rules::economy::supply_cost(item.unit);
+                    if catalog.is_some_and(|catalog| catalog.allows_building(e.kind)) {
+                        expected_cap += rules::economy::supply_provided(e.kind);
                     }
-                } else if e.is_unit() {
+                    for item in e.prod_queue() {
+                        if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
+                            expected_used += rules::economy::supply_cost(item.unit);
+                        }
+                    }
+                } else if e.is_unit() && catalog.is_some_and(|catalog| catalog.allows_unit(e.kind))
+                {
                     expected_used += rules::economy::supply_cost(e.kind);
                 }
             }
