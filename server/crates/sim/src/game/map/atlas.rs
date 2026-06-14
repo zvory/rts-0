@@ -322,75 +322,57 @@ fn build_regions(
     passable_tiles: &[bool],
     component_by_tile: &[Option<usize>],
 ) -> (Vec<Option<usize>>, Vec<AtlasRegion>) {
-    let mut buckets: BTreeMap<(usize, u32, u32), AtlasRegion> = BTreeMap::new();
+    let len = (map.size * map.size) as usize;
+    let mut region_by_tile = vec![None; len];
+    let mut regions = Vec::new();
 
     for y in 0..map.size {
         for x in 0..map.size {
             let idx = map.index(x, y);
-            if !passable_tiles[idx] {
+            if !passable_tiles[idx] || region_by_tile[idx].is_some() {
                 continue;
             }
             let Some(component_id) = component_by_tile[idx] else {
                 continue;
             };
-            let key = (component_id, x / REGION_SIZE_TILES, y / REGION_SIZE_TILES);
-            buckets
-                .entry(key)
-                .and_modify(|region| {
-                    region.min_tile.0 = region.min_tile.0.min(x);
-                    region.min_tile.1 = region.min_tile.1.min(y);
-                    region.max_tile.0 = region.max_tile.0.max(x);
-                    region.max_tile.1 = region.max_tile.1.max(y);
-                    region.tile_count += 1;
-                })
-                .or_insert(AtlasRegion {
-                    id: 0,
-                    component_id,
-                    min_tile: (x, y),
-                    max_tile: (x, y),
-                    tile_count: 1,
-                });
-        }
-    }
-
-    let mut regions: Vec<_> = buckets
-        .into_values()
-        .enumerate()
-        .map(|(id, region)| AtlasRegion {
-            id,
-            component_id: region.component_id,
-            min_tile: region.min_tile,
-            max_tile: region.max_tile,
-            tile_count: region.tile_count,
-        })
-        .collect();
-
-    let mut region_by_bucket = BTreeMap::new();
-    for region in &regions {
-        region_by_bucket.insert(
-            (
-                region.component_id,
-                region.min_tile.0 / REGION_SIZE_TILES,
-                region.min_tile.1 / REGION_SIZE_TILES,
-            ),
-            region.id,
-        );
-    }
-
-    let len = (map.size * map.size) as usize;
-    let mut region_by_tile = vec![None; len];
-    for y in 0..map.size {
-        for x in 0..map.size {
-            let idx = map.index(x, y);
-            let Some(component_id) = component_by_tile[idx] else {
-                continue;
+            let bucket = (x / REGION_SIZE_TILES, y / REGION_SIZE_TILES);
+            let id = regions.len();
+            let mut region = AtlasRegion {
+                id,
+                component_id,
+                min_tile: (x, y),
+                max_tile: (x, y),
+                tile_count: 0,
             };
-            let key = (component_id, x / REGION_SIZE_TILES, y / REGION_SIZE_TILES);
-            region_by_tile[idx] = region_by_bucket.get(&key).copied();
+            let mut queue = VecDeque::from([(x, y)]);
+            region_by_tile[idx] = Some(id);
+
+            while let Some((tx, ty)) = queue.pop_front() {
+                region.min_tile.0 = region.min_tile.0.min(tx);
+                region.min_tile.1 = region.min_tile.1.min(ty);
+                region.max_tile.0 = region.max_tile.0.max(tx);
+                region.max_tile.1 = region.max_tile.1.max(ty);
+                region.tile_count += 1;
+
+                for (nx, ny) in cardinal_neighbors(map, tx, ty) {
+                    if (nx / REGION_SIZE_TILES, ny / REGION_SIZE_TILES) != bucket {
+                        continue;
+                    }
+                    let nidx = map.index(nx, ny);
+                    if passable_tiles[nidx]
+                        && component_by_tile[nidx] == Some(component_id)
+                        && region_by_tile[nidx].is_none()
+                    {
+                        region_by_tile[nidx] = Some(id);
+                        queue.push_back((nx, ny));
+                    }
+                }
+            }
+
+            regions.push(region);
         }
     }
 
-    regions.sort_by_key(|region| region.id);
     (region_by_tile, regions)
 }
 
