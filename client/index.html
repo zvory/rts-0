@@ -26,7 +26,6 @@
     <!--
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
         Lobby:  #lobby-screen, #lobby-name, #lobby-room, #lobby-join, #lobby-players,
-                #lobby-spectator, #lobby-team-preset, #lobby-team-preset-display,
                 #lobby-ready, #lobby-add-ai, #lobby-quickstart, #lobby-start, #lobby-status
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
@@ -71,7 +70,7 @@
               <section class="lobby-status-grid" aria-label="Lobby status">
                 <div>
                   <span>Mode</span>
-                  <b id="lobby-mode-summary">FFA</b>
+                  <b id="lobby-mode-summary">Teams</b>
                 </div>
                 <div>
                   <span>Map</span>
@@ -106,18 +105,8 @@
                 Room
                 <input id="lobby-room" type="text" maxlength="24" value="main" autocomplete="off" />
               </label>
-              <label id="lobby-spectator" class="toggle seat-toggle">
-                <input type="checkbox" />
-                <span class="seat-choice commander">Commander</span>
-                <span class="seat-choice spectator">Spectator</span>
-              </label>
               <button id="lobby-join" class="btn primary">Join room</button>
 
-              <div class="lobby-control-field lobby-team-row lobby-joined-only">
-                <label id="lobby-team-preset-label" for="lobby-team-preset">Teams</label>
-                <select id="lobby-team-preset" disabled></select>
-                <span id="lobby-team-preset-display" hidden></span>
-              </div>
               <div class="lobby-control-field lobby-map-row lobby-joined-only">
                 <label id="lobby-map-label" for="lobby-map">Map</label>
                 <select id="lobby-map" disabled></select>

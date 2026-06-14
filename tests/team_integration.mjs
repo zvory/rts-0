@@ -2,7 +2,6 @@
 // `tests/run-all.sh` or start one with `cd server && cargo run` and set RTS_WS if needed.
 import {
   addAiToTeam,
-  assertCountdownProtocol,
   assertLobbyProtocol,
   assertScoreProtocol,
   assertStartProtocol,
@@ -10,7 +9,7 @@ import {
   connectClient,
   createAssertions,
   readyPlayers,
-  setTeamPreset,
+  setTeam,
   sleep,
   startMatch,
   startMatchDirect,
@@ -49,45 +48,23 @@ async function joinNamed(tag, room, name = tag, opts = {}) {
   return client;
 }
 
-async function assertPresetStarts({ preset, aiTeams, expectedTeams }) {
-  const room = uniqueRoom(`team-${preset}`);
-  const A = await joinNamed(`${preset}-A`, room, "Alpha");
-  const lobby = await setTeamPreset(A, preset);
-  assertLobbyProtocol(ok, lobby, { expectedPlayers: 1, hostId: A.playerId });
-
-  for (const teamId of aiTeams) {
-    await addAiToTeam(A, teamId);
-  }
-  await readyPlayers([A]);
-  const { countdowns, starts } = await startMatch(A, [A]);
-  assertCountdownProtocol(ok, countdowns[0]);
-  const [start] = starts;
-  assertStartProtocol(ok, start, {
-    playerId: A.playerId,
-    expectedPlayers: expectedTeams.length,
-    spectator: false,
-  });
-  ok(JSON.stringify(teamsFor(start)) === JSON.stringify(expectedTeams),
-    `${preset}: start teams are ${expectedTeams.join(",")} (${teamsFor(start).join(",")})`);
-  closeClients(A);
-}
-
-async function defaultFfaReportsUniqueTeams() {
-  const room = uniqueRoom("team-ffa");
+async function defaultLobbyAssignsEmptyTeams() {
+  const room = uniqueRoom("team-empty");
   const A = await joinNamed("ffa-A", room, "Alpha");
   const B = await joinNamed("ffa-B", room, "Bravo");
-  const lobby = await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "FFA lobby");
+  const lobby = await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "empty-team lobby");
   assertLobbyProtocol(ok, lobby, { expectedPlayers: 2, hostId: A.playerId });
-  ok(lobby.teamPreset === "ffa", `default preset is ffa (${lobby.teamPreset})`);
-  ok(lobby.players.every((player) => player.teamId === player.id),
-    "default FFA assigns every active player a unique singleton team");
+  ok(lobby.teamPreset === "custom", `lobby reports custom team slots (${lobby.teamPreset})`);
+  ok(lobby.players.find((player) => player.id === A.playerId)?.teamId === 1,
+    "first active player is assigned Team 1");
+  ok(lobby.players.find((player) => player.id === B.playerId)?.teamId === 2,
+    "new player joins the first empty team");
   closeClients(A, B);
 }
 
 async function soloStartsWithoutForcedAi() {
   const room = uniqueRoom("team-solo");
   const A = await joinNamed("solo-A", room, "Alpha");
-  await setTeamPreset(A, "solo");
   await readyPlayers([A]);
   const [start] = await startMatchDirect(A, [A]);
   assertStartProtocol(ok, start, { playerId: A.playerId, expectedPlayers: 1, spectator: false });
@@ -102,7 +79,7 @@ async function twoVsTwoStartsWithHumanAndAis() {
   const A = await joinNamed("2v2-A", room, "Alpha");
   const B = await joinNamed("2v2-B", room, "Bravo");
   await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "2v2 human lobby");
-  await setTeamPreset(A, "2v2");
+  await setTeam(A, B.playerId, 1);
   await addAiToTeam(A, 2);
   await addAiToTeam(A, 2);
   await readyPlayers([A, B]);
@@ -124,7 +101,7 @@ async function alliedSnapshotUsesSharedVisionWithoutSharedControl() {
   const A = await joinNamed("vision-A", room, "Alpha");
   const B = await joinNamed("vision-B", room, "Bravo");
   await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "vision human lobby");
-  await setTeamPreset(A, "2v2");
+  await setTeam(A, B.playerId, 1);
   await addAiToTeam(A, 2);
   await addAiToTeam(A, 2);
   await readyPlayers([A, B]);
@@ -164,7 +141,7 @@ async function alliedAttackTargetCommandIsIgnored() {
   const A = await joinNamed("target-A", room, "Alpha");
   const B = await joinNamed("target-B", room, "Bravo");
   await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "target human lobby");
-  await setTeamPreset(A, "2v2");
+  await setTeam(A, B.playerId, 1);
   await addAiToTeam(A, 2);
   await addAiToTeam(A, 2);
   await readyPlayers([A, B]);
@@ -197,7 +174,9 @@ async function twoVsTwoResolvesByTeam() {
   const C = await joinNamed("victory-C", room, "Charlie");
   const D = await joinNamed("victory-D", room, "Delta");
   await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 4, 3000, "team victory lobby");
-  await setTeamPreset(A, "2v2");
+  await setTeam(A, B.playerId, 1);
+  await setTeam(A, C.playerId, 2);
+  await setTeam(A, D.playerId, 2);
   await readyPlayers([A, B, C, D]);
   await startMatch(A, [A, B, C, D]);
 
@@ -231,22 +210,17 @@ async function hostOnlyAndInvalidMutationsAreIgnored() {
   const lobby = await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 3, 3000, "invalid lobby");
   assertLobbyProtocol(ok, lobby, { expectedPlayers: 3, hostId: A.playerId });
 
-  B.send({ t: "setTeamPreset", preset: "1v2" });
   B.send({ t: "setTeam", id: A.playerId, teamId: 2 });
   B.send({ t: "addAi", teamId: 2 });
   await sleep(400);
   let last = A.msgs.filter((msg) => msg.t === "lobby").at(-1);
-  ok(last.teamPreset === "ffa" && last.players.length === 3,
-    "non-host team preset, team assignment, and addAi(teamId) are ignored");
-  ok(last.players.find((player) => player.id === A.playerId)?.teamId === A.playerId,
+  ok(last.teamPreset === "custom" && last.players.length === 3,
+    "non-host team assignment and addAi(teamId) are ignored");
+  ok(last.players.find((player) => player.id === A.playerId)?.teamId === 1,
     "non-host setTeam did not move the host");
 
-  await setTeamPreset(A, "solo");
-  await readyPlayers([A, B], { timeoutMs: 3000 }).catch(() => null);
-  last = A.msgs.filter((msg) => msg.t === "lobby").at(-1);
-  ok(last.canStart === false, "invalid solo composition with two active players leaves canStart false");
-
   A.send({ t: "setTeam", id: B.playerId, teamId: 0 });
+  A.send({ t: "setTeam", id: B.playerId, teamId: 5 });
   A.send({ t: "setTeam", id: 999999, teamId: 1 });
   A.send({ t: "setTeam", id: C.playerId, teamId: 1 });
   await sleep(400);
@@ -256,24 +230,21 @@ async function hostOnlyAndInvalidMutationsAreIgnored() {
   ok(last.players.find((player) => player.id === C.playerId)?.teamId === 0,
     "spectator assignment is ignored and spectator remains team 0");
 
-  await setTeamPreset(A, "1v2");
-  A.send({ t: "setTeam", id: B.playerId, teamId: 1 });
+  await setTeam(A, B.playerId, 1);
   A.send({ t: "addAi", teamId: 0 });
-  A.send({ t: "addAi", teamId: 1 });
+  A.send({ t: "addAi", teamId: 5 });
   await sleep(400);
   last = A.msgs.filter((msg) => msg.t === "lobby").at(-1);
-  ok(last.players.find((player) => player.id === B.playerId)?.teamId === 2,
-    "overfull preset move to Team 1 is ignored in 1v2");
+  ok(last.players.find((player) => player.id === B.playerId)?.teamId === 1,
+    "host can move active players onto the same team");
   ok(last.players.length === 3 && !last.players.some((player) => player.isAi),
-    "invalid and overfull addAi(teamId) requests are ignored");
+    "invalid addAi(teamId) requests are ignored");
   closeClients(A, B, C);
 }
 
 async function main() {
-  await defaultFfaReportsUniqueTeams();
+  await defaultLobbyAssignsEmptyTeams();
   await soloStartsWithoutForcedAi();
-  await assertPresetStarts({ preset: "1v2", aiTeams: [2, 2], expectedTeams: [1, 2, 2] });
-  await assertPresetStarts({ preset: "1v3", aiTeams: [2, 2, 2], expectedTeams: [1, 2, 2, 2] });
   await twoVsTwoStartsWithHumanAndAis();
   await alliedSnapshotUsesSharedVisionWithoutSharedControl();
   await alliedAttackTargetCommandIsIgnored();

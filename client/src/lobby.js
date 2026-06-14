@@ -9,18 +9,17 @@
 
 import { S } from "./protocol.js";
 import {
+  MAX_LOBBY_TEAMS,
   LobbyRosterView,
-  TEAM_PRESETS,
-  presetById,
   splitLobbyPlayers,
-  teamSlotsForPreset,
+  teamSlotsForLobby,
 } from "./lobby_view.js";
 
 const NAME_STORAGE_KEY = "rts.playerName";
 
 const MAX_PLAYERS = 4;
 
-export { TEAM_PRESETS, presetById, teamSlotsForPreset };
+export { MAX_LOBBY_TEAMS, teamSlotsForLobby };
 
 /**
  * The lobby screen controller.
@@ -40,8 +39,6 @@ export class Lobby {
     this.btnJoin = rootEl.querySelector("#lobby-join");
     this.elSetupKicker = rootEl.querySelector("#lobby-setup-kicker");
     this.elSetupTitle = rootEl.querySelector("#lobby-setup-title");
-    this.chkSpectator = rootEl.querySelector("#lobby-spectator");
-    this.chkSpectatorInput = this.chkSpectator?.querySelector("input[type='checkbox']") || null;
     this.roomBlock = rootEl.querySelector(".lobby-room");
     this.elPlayers = rootEl.querySelector("#lobby-players");
     this.elRoomDisplay = rootEl.querySelector("#lobby-room-display");
@@ -57,8 +54,6 @@ export class Lobby {
     this.elStatus = rootEl.querySelector("#lobby-status");
     this.selMap = rootEl.querySelector("#lobby-map");
     this.elMapDisplay = rootEl.querySelector("#lobby-map-display");
-    this.selTeamPreset = rootEl.querySelector("#lobby-team-preset");
-    this.elTeamPresetDisplay = rootEl.querySelector("#lobby-team-preset-display");
     this.rosterView = new LobbyRosterView(this.elPlayers);
 
     // Local lobby state.
@@ -68,7 +63,7 @@ export class Lobby {
     this._hostId = null;
     this._canStart = false;
     this._quickstart = false;
-    this._teamPreset = "ffa";
+    this._teamPreset = "custom";
     this._selectedMap = "";
     this._availableMaps = [];
     /** Total seated players (humans + AI) from the latest lobby message. */
@@ -152,15 +147,6 @@ export class Lobby {
       this._reflectReadyButton();
     });
 
-    if (this.chkSpectatorInput) {
-      this.chkSpectatorInput.addEventListener("change", () => {
-        this._spectator = !!this.chkSpectatorInput.checked;
-        this._ready = false;
-        this._reflectReadyButton();
-        if (this._joined) this.net.setSpectator(this._spectator);
-      });
-    }
-
     // Start: host-only; the server ignores it from non-hosts but we also gate the UI.
     this.btnStart.addEventListener("click", () => {
       if (this.btnStart.disabled) return;
@@ -190,24 +176,15 @@ export class Lobby {
       });
     }
 
-    if (this.selTeamPreset) {
-      this._populateTeamPresetOptions();
-      this.selTeamPreset.addEventListener("change", () => {
-        const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
-        if (!isHost || this.selTeamPreset.disabled) return;
-        this.net.setTeamPreset(this.selTeamPreset.value);
-      });
-    }
   }
 
   _join() {
     const name = (this.elName && this.elName.value.trim()) || "Commander";
     const room = (this.elRoom && this.elRoom.value.trim()) || "main";
-    const spectator = !!this.chkSpectatorInput?.checked;
     this._persistName(name);
-    this.net.join(name, room, spectator);
+    this.net.join(name, room, false);
     this._joined = true;
-    this._spectator = spectator;
+    this._spectator = false;
     this._reflectJoinedState(false);
     this.setStatus(`Joining "${room}"…`);
     this._reflectReadyButton();
@@ -251,7 +228,7 @@ export class Lobby {
     this._hostId = m.hostId;
     this._canStart = !!m.canStart;
     this._quickstart = !!m.quickstart;
-    this._teamPreset = m.teamPreset || "ffa";
+    this._teamPreset = m.teamPreset || "custom";
     this._selectedMap = m.map || "";
     this._availableMaps = Array.isArray(m.maps) ? m.maps : [];
 
@@ -291,12 +268,10 @@ export class Lobby {
     if (mine) {
       this._ready = !!mine.ready;
       this._spectator = !!mine.isSpectator;
-      if (this.chkSpectatorInput) this.chkSpectatorInput.checked = this._spectator;
     }
     this._reflectReadyButton();
     this.rosterView.render({
       players,
-      teamPreset: this._teamPreset,
       myId,
       hostId: this._hostId,
       isHost,
@@ -393,11 +368,10 @@ export class Lobby {
 
   _reflectSummary(room, players) {
     const { seatedPlayers, spectatorPlayers } = splitLobbyPlayers(players);
-    const preset = presetById(this._teamPreset);
     const mapEntry = this._availableMaps.find((entry) => entry.name === this._selectedMap);
     const mapLabel = mapEntry ? mapEntry.name : (this._selectedMap || "Default");
     if (this.elRoomDisplay) this.elRoomDisplay.textContent = room || "main";
-    if (this.elModeSummary) this.elModeSummary.textContent = preset.label;
+    if (this.elModeSummary) this.elModeSummary.textContent = "Teams";
     if (this.elMapSummary) this.elMapSummary.textContent = mapLabel;
     if (this.elSeatsSummary) this.elSeatsSummary.textContent = `${seatedPlayers.length} / ${MAX_PLAYERS}`;
     if (this.elObserversSummary) this.elObserversSummary.textContent = String(spectatorPlayers.length);
@@ -478,30 +452,10 @@ export class Lobby {
     this._reflectTeamPreset();
   }
 
-  _populateTeamPresetOptions() {
-    if (!this.selTeamPreset || this.selTeamPreset.options.length) return;
-    for (const preset of TEAM_PRESETS) {
-      const opt = document.createElement("option");
-      opt.value = preset.id;
-      opt.textContent = preset.label;
-      this.selTeamPreset.appendChild(opt);
-    }
-  }
-
-  /** Render the team preset selector (host) or preset label (non-host). */
+  /** Hide the deprecated team preset controls if older markup is present. */
   _reflectTeamPreset() {
-    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
-    const preset = presetById(this._teamPreset);
-    if (this.selTeamPreset) {
-      this._populateTeamPresetOptions();
-      this.selTeamPreset.value = preset.id;
-      this.selTeamPreset.disabled = this._countdownActive || !isHost;
-      this.selTeamPreset.hidden = !isHost;
-    }
-    if (this.elTeamPresetDisplay) {
-      this.elTeamPresetDisplay.textContent = preset.label;
-      this.elTeamPresetDisplay.hidden = isHost;
-    }
+    const teamRow = this.root.querySelector(".lobby-team-row");
+    if (teamRow) teamRow.hidden = true;
   }
 
   _handleJoinReplayPrompt(m) {
@@ -519,7 +473,6 @@ export class Lobby {
     this.net.join(name, room, true, true);
     this._joined = true;
     this._spectator = true;
-    if (this.chkSpectatorInput) this.chkSpectatorInput.checked = true;
     this._reflectJoinedState(false);
     this.setStatus(`Joining replay in "${room}"...`);
     this._reflectReadyButton();

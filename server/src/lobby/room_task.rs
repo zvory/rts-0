@@ -54,56 +54,7 @@ struct AiSlot {
     team_id: TeamId,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TeamPreset {
-    Solo,
-    Ffa,
-    OneVsTwo,
-    OneVsThree,
-    TwoVsTwo,
-}
-
-impl TeamPreset {
-    fn parse(value: &str) -> Option<Self> {
-        match value {
-            "solo" => Some(Self::Solo),
-            "ffa" => Some(Self::Ffa),
-            "1v2" => Some(Self::OneVsTwo),
-            "1v3" => Some(Self::OneVsThree),
-            "2v2" => Some(Self::TwoVsTwo),
-            _ => None,
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Solo => "solo",
-            Self::Ffa => "ffa",
-            Self::OneVsTwo => "1v2",
-            Self::OneVsThree => "1v3",
-            Self::TwoVsTwo => "2v2",
-        }
-    }
-
-    fn template(self) -> Option<&'static [TeamId]> {
-        match self {
-            Self::Solo => Some(&[1]),
-            Self::Ffa => None,
-            Self::OneVsTwo => Some(&[1, 2, 2]),
-            Self::OneVsThree => Some(&[1, 2, 2, 2]),
-            Self::TwoVsTwo => Some(&[1, 1, 2, 2]),
-        }
-    }
-
-    fn required_count(self) -> Option<usize> {
-        self.template().map(|template| template.len())
-    }
-
-    fn team_capacity(self, team_id: TeamId) -> Option<usize> {
-        self.template()
-            .map(|template| template.iter().filter(|id| **id == team_id).count())
-    }
-}
+const MAX_LOBBY_TEAMS: TeamId = 4;
 
 const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
     ["itest-", "ai-itest-", "client-smoke-", "reg-"];
@@ -760,8 +711,7 @@ pub(super) struct RoomTask {
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
     /// only when the room empties of humans.
     ai_players: Vec<AiSlot>,
-    /// Current lobby team preset. FFA remains the default for ordinary rooms.
-    team_preset: TeamPreset,
+    /// Team ids are freeform host-managed slots in the range `1..=MAX_LOBBY_TEAMS`.
     /// Per-human active-seat team assignment. Spectators are omitted and broadcast as team 0.
     human_team_assignments: HashMap<u32, TeamId>,
     /// Lobby toggle: start matches with boosted opening resources.
@@ -825,7 +775,6 @@ impl RoomTask {
             order: Vec::new(),
             players: HashMap::new(),
             ai_players: Vec::new(),
-            team_preset: TeamPreset::Ffa,
             human_team_assignments: HashMap::new(),
             quickstart: false,
             selected_map: "Default".to_string(),
@@ -1105,6 +1054,19 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
+        if !spectator && self.total_player_count() >= MAX_PLAYERS {
+            send_or_log(
+                &self.room,
+                player_id,
+                &msg_tx,
+                ServerMessage::Error {
+                    msg: "Lobby is full — try another room.".to_string(),
+                },
+            );
+            crate::log_debug!(room = %self.room, player_id, "rejecting join; lobby full");
+            let _ = ack.send(false);
+            return;
+        }
         let color = if spectator {
             "#6f8fa8".to_string()
         } else {
@@ -1181,7 +1143,6 @@ impl RoomTask {
             // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
             // joiner under this room name should start from a clean lobby.
             self.ai_players.clear();
-            self.team_preset = TeamPreset::Ffa;
             self.human_team_assignments.clear();
             self.dev_driver = None;
             self.dev_view_player_id = None;
@@ -1286,14 +1247,7 @@ impl RoomTask {
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
-        let Some(preset) = TeamPreset::parse(preset.as_str()) else {
-            crate::log_debug!(room = %self.room, preset = %preset, "ignoring unknown team preset");
-            return;
-        };
-        self.team_preset = preset;
-        self.reassign_teams_for_preset();
-        crate::log_debug!(room = %self.room, preset = self.team_preset.as_str(), "team preset selected");
-        self.broadcast_lobby();
+        crate::log_debug!(room = %self.room, preset = %preset, "ignoring deprecated team preset command");
     }
 
     fn on_set_team(&mut self, player_id: u32, target: u32, team_id: TeamId) {
@@ -1483,26 +1437,6 @@ impl RoomTask {
         ids
     }
 
-    fn assignment_order(&self) -> Vec<u32> {
-        let mut ids = Vec::new();
-        if let Some(host_id) = self.host_id {
-            if self
-                .players
-                .get(&host_id)
-                .map(|player| !player.spectator)
-                .unwrap_or(false)
-            {
-                ids.push(host_id);
-            }
-        }
-        ids.extend(
-            self.active_human_ids()
-                .filter(|id| Some(*id) != self.host_id),
-        );
-        ids.extend(self.ai_players.iter().map(|ai| ai.id));
-        ids
-    }
-
     fn team_id_for_active_seat(&self, id: u32) -> TeamId {
         if let Some(team_id) = self.human_team_assignments.get(&id) {
             return *team_id;
@@ -1534,31 +1468,17 @@ impl RoomTask {
             .entry(team_id)
             .and_modify(|count| *count += 1)
             .or_insert(1);
-        match self.team_preset {
-            TeamPreset::Ffa => *new_count <= 1,
-            preset => preset
-                .team_capacity(team_id)
-                .map(|capacity| *new_count <= capacity)
-                .unwrap_or(false),
-        }
+        team_id <= MAX_LOBBY_TEAMS && *new_count <= MAX_PLAYERS
     }
 
     fn next_default_team_for_new_seat(&self, new_id: u32) -> TeamId {
-        match self.team_preset {
-            TeamPreset::Ffa => new_id,
-            preset => {
-                let counts = self.team_counts_except(None);
-                preset
-                    .template()
-                    .and_then(|template| {
-                        template.iter().copied().find(|team_id| {
-                            counts.get(team_id).copied().unwrap_or(0)
-                                < preset.team_capacity(*team_id).unwrap_or(0)
-                        })
-                    })
-                    .unwrap_or(new_id)
+        let counts = self.team_counts_except(None);
+        for team_id in 1..=MAX_LOBBY_TEAMS {
+            if counts.get(&team_id).copied().unwrap_or(0) == 0 {
+                return team_id;
             }
         }
+        new_id.clamp(1, MAX_LOBBY_TEAMS)
     }
 
     fn assign_missing_team_for(&mut self, player_id: u32) {
@@ -1569,68 +1489,18 @@ impl RoomTask {
         self.human_team_assignments.insert(player_id, team_id);
     }
 
-    fn reassign_teams_for_preset(&mut self) {
-        if self.team_preset == TeamPreset::Ffa {
-            let active: HashSet<u32> = self.active_human_ids().collect();
-            self.human_team_assignments
-                .retain(|id, _| active.contains(id));
-            for id in active {
-                self.human_team_assignments.insert(id, id);
-            }
-            for ai in &mut self.ai_players {
-                ai.team_id = ai.id;
-            }
-            return;
-        }
-
-        let Some(template) = self.team_preset.template() else {
-            return;
-        };
-        let ordered = self.assignment_order();
-        let active_humans: HashSet<u32> = self.active_human_ids().collect();
-        self.human_team_assignments
-            .retain(|id, _| active_humans.contains(id));
-        for (idx, id) in ordered.iter().copied().enumerate() {
-            let team_id = template.get(idx).copied().unwrap_or(id);
-            if let Some(ai) = self.ai_players.iter_mut().find(|ai| ai.id == id) {
-                ai.team_id = team_id;
-            } else if active_humans.contains(&id) {
-                self.human_team_assignments.insert(id, team_id);
-            }
-        }
-    }
-
     fn team_composition_valid(&self) -> bool {
         let active_ids = self.active_seat_ids();
         if active_ids.is_empty() || active_ids.len() > MAX_PLAYERS {
             return false;
         }
-        if let Some(required) = self.team_preset.required_count() {
-            if active_ids.len() != required {
-                return false;
-            }
-        }
-        let mut counts = HashMap::new();
         for id in active_ids {
             let team_id = self.team_id_for_active_seat(id);
-            if team_id == 0 {
+            if team_id == 0 || team_id > MAX_LOBBY_TEAMS {
                 return false;
             }
-            *counts.entry(team_id).or_insert(0) += 1;
         }
-        match self.team_preset {
-            TeamPreset::Ffa => counts.values().all(|count| *count == 1),
-            preset => {
-                let Some(template) = preset.template() else {
-                    return false;
-                };
-                let mut required = HashMap::new();
-                for team_id in template {
-                    *required.entry(*team_id).or_insert(0) += 1;
-                }
-                counts == required
-            }
-        }
+        true
     }
 
     fn spectator_visible_player_ids(&self) -> Vec<u32> {
@@ -2056,7 +1926,7 @@ impl RoomTask {
             players,
             can_start: self.can_start(),
             quickstart: self.quickstart,
-            team_preset: self.team_preset.as_str().to_string(),
+            team_preset: "custom".to_string(),
             map: self.selected_map.clone(),
             maps: Map::list_available(),
         };

@@ -114,7 +114,7 @@ pub enum RoomEvent {
     Ready { player_id: u32, ready: bool },
     /// The host requested the match to begin (honored only from the host when `can_start`).
     StartRequest { player_id: u32 },
-    /// The host selected a team preset (lobby phase only; honored only from the host).
+    /// Deprecated compatibility command. Team slots are host-managed via `SetTeam`.
     SetTeamPreset { player_id: u32, preset: String },
     /// The host assigned one active lobby seat to a team (lobby phase only; honored only from host).
     SetTeam {

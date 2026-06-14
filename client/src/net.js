@@ -128,7 +128,7 @@ export class Net {
     this._send(msg.start());
   }
 
-  /** Select a scripted lobby team preset (host-only; ignored by the server otherwise). */
+  /** Deprecated compatibility command; the current server ignores team presets. */
   setTeamPreset(preset) {
     this._send(msg.setTeamPreset(preset));
   }
