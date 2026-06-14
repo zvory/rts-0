@@ -48,6 +48,14 @@ pub enum AbilityTargetMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbilityEffectHook {
+    SelfStatus,
+    OwnedAreaStatus,
+    DelayedWorld,
+    ArtilleryPointFire,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AbilityDefinition {
     pub kind: AbilityKind,
     pub carriers: &'static [EntityKind],
@@ -61,6 +69,7 @@ pub struct AbilityDefinition {
     pub may_queue: bool,
     pub autocast: bool,
     pub command_card: bool,
+    pub effect_hook: AbilityEffectHook,
 }
 
 pub fn definition(kind: AbilityKind) -> AbilityDefinition {
@@ -82,9 +91,48 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
         may_queue: entry.may_queue,
         autocast: entry.autocast,
         command_card: entry.command_card,
+        effect_hook: effect_hook(kind),
     }
 }
 
 pub fn carried_by(kind: AbilityKind, entity_kind: EntityKind) -> bool {
     definition(kind).carriers.contains(&entity_kind)
+}
+
+pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
+    match kind {
+        AbilityKind::Charge => AbilityEffectHook::SelfStatus,
+        AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
+        AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
+        AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{definition, AbilityEffectHook, AbilityKind};
+
+    #[test]
+    fn existing_abilities_are_classified_by_effect_hook() {
+        assert_eq!(
+            definition(AbilityKind::Charge).effect_hook,
+            AbilityEffectHook::SelfStatus
+        );
+        assert_eq!(
+            definition(AbilityKind::Smoke).effect_hook,
+            AbilityEffectHook::DelayedWorld
+        );
+        assert_eq!(
+            definition(AbilityKind::MortarFire).effect_hook,
+            AbilityEffectHook::DelayedWorld
+        );
+        assert_eq!(
+            definition(AbilityKind::PointFire).effect_hook,
+            AbilityEffectHook::ArtilleryPointFire
+        );
+        assert_eq!(
+            definition(AbilityKind::Breakthrough).effect_hook,
+            AbilityEffectHook::OwnedAreaStatus
+        );
+    }
 }

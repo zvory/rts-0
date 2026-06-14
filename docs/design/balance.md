@@ -171,7 +171,9 @@ authoritative `rules::defs` records.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
   catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, queueability,
   autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
-  against that registry for client-visible ability descriptors.
+  against that registry for client-visible ability descriptors. Server execution maps those
+  registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
+  world effect, and the one-off artillery point-fire path.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles

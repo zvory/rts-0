@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
+use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -155,9 +155,8 @@ pub(crate) fn launch_world_ability(
         return false;
     }
 
-    match ability {
-        AbilityKind::Charge | AbilityKind::PointFire | AbilityKind::Breakthrough => false,
-        AbilityKind::MortarFire => {
+    match (definition.effect_hook, ability) {
+        (AbilityEffectHook::DelayedWorld, AbilityKind::MortarFire) => {
             let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
                 return false;
             };
@@ -176,7 +175,7 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        AbilityKind::Smoke => {
+        (AbilityEffectHook::DelayedWorld, AbilityKind::Smoke) => {
             let Some(caster_pos) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
                 return false;
             };
@@ -224,6 +223,7 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
+        _ => false,
     }
 }
 
@@ -244,8 +244,8 @@ pub(crate) fn launch_self_ability(
     if definition.target_mode != AbilityTargetMode::SelfTarget {
         return false;
     }
-    match ability {
-        AbilityKind::Charge => {
+    match (definition.effect_hook, ability) {
+        (AbilityEffectHook::SelfStatus, AbilityKind::Charge) => {
             let Some(e) = entities.get_mut(caster) else {
                 return false;
             };
@@ -253,7 +253,7 @@ pub(crate) fn launch_self_ability(
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
             true
         }
-        AbilityKind::Breakthrough => {
+        (AbilityEffectHook::OwnedAreaStatus, AbilityKind::Breakthrough) => {
             let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
             else {
                 return false;
@@ -283,7 +283,7 @@ pub(crate) fn launch_self_ability(
             }
             true
         }
-        AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::PointFire => false,
+        _ => false,
     }
 }
 

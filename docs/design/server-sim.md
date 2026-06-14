@@ -261,16 +261,29 @@ second source of metadata. Adding a registry-backed ability means adding a globa
 protocol id, adding the faction catalog entry, updating the client mirror/parity check, and then
 adding only the effect-specific code that the registry cannot express.
 
+`AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
+effect shapes that actually exist today: self status (`charge` legacy compatibility), owned area
+status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), and the intentionally
+one-off artillery point-fire path. The hook receives the owning player's faction id at execution
+time through the normal command/order helpers, so wrong-faction ability use fails before effects,
+resource spending, cooldowns, or events are applied. The hook is deliberately not a generic script
+engine; new faction signature mechanics should add a tightly scoped hook only when the approved
+ability cannot use one of these shapes.
+
 `services::ability_orders` owns the tick-path execution helpers:
 - `order_or_launch_world_ability` — for `WorldPoint` abilities: if the caster is in range, launch
   immediately; otherwise compute a staging point inside range and issue an `Order::Ability`
   movement order via `MoveCoordinator`.
 - `launch_world_ability` — reads range/cost/cooldown from the registry, deducts resources, sets
   the caster's cooldown, clears the active order,
-  and executes the effect (currently: schedules a smoke cloud or delayed mortar shell). Guards:
+  and dispatches a delayed-world effect hook (currently: schedules a smoke cloud or delayed mortar
+  shell). Guards:
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
+- `launch_self_ability` — validates the self-targeted registry row and dispatches self-status or
+  owned-area-status hooks. Breakthrough remains an owned-unit area buff; legacy Charge remains
+  decodable but has no current carriers.
 - `caster_can_attempt`, `tech_requirement_met`, `caster_in_range` — pure predicates used by both
   command validation and order-queue promotion.
 
