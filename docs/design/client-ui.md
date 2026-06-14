@@ -165,8 +165,9 @@ Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`
 `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Faction catalog
 actions are stored under `factionBindings[factionId]` with namespaced command ids shaped as
 `kriegsia.build.<kind>`, `kriegsia.train.<kind>`, `kriegsia.research.<upgrade>`, and
-`kriegsia.ability.<ability>`; Ekaterina reserves the same `ekaterina.*` namespace but has no
-command cards yet. Imports migrate old flat Kriegsia ids like `build.city_centre` into the
+`kriegsia.ability.<ability>`; Ekaterina uses the same `ekaterina.*` namespace for the approved
+Phase 10/11 command-card slices in `plans/faction/ekaterina-rules-spec.md`. Imports migrate old
+flat Kriegsia ids like `build.city_centre` into the
 Kriegsia binding set, preserve structurally valid unavailable faction commands with warnings,
 ignore unknown non-faction commands with warnings, reject invalid keys and same-context duplicates,
 and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to avoid local

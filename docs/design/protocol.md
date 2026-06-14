@@ -235,7 +235,9 @@ start player, lobby seat, and replay branch seat, and replay artifacts store `fa
 player. Normal lobby, AI, quickstart, self-play, and dev starts all default to `kriegsia` through
 server-side faction policy validation. Other ids are rejected unless a lifecycle path explicitly
 accepts recorded replay data or a test fixture; the reserved future `ekaterina` id has no protocol
-or catalog payload yet.
+or catalog payload yet. Phase 9 approves Ekaterina's brief/spec without changing protocol payload
+shapes; Phase 10 may use the existing `factionId` field for a dev-only Ekaterina assignment path
+and may add mirrored kind ids for the approved start/economy slice.
 
 Prediction start compatibility metadata is present only for live active players. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version

@@ -176,6 +176,12 @@ only at the narrow compatibility boundary, while unknown non-empty ids get no fa
 loadout, no starting entities/resources, no supply credit for Kriegsia units/buildings, and no
 legal build/train/research/gather/ability surface.
 
+Phase 9 approves the `ekaterina` faction brief and rules spec under `plans/faction/`. Phase 10 may
+start Ekaterina only through an explicit server-owned dev scenario such as
+`dev:ekaterina_opening`, with `FactionRequestContext::DevScenario` accepting `ekaterina` only for
+that path. Normal lobby, quickstart, AI seats, self-play, replay branch launch, and match-history
+replay remain Kriegsia-only until later phases opt in.
+
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and
 under-attack notice routing use `TeamRelations` snapshots derived from `PlayerState`. Hostile target

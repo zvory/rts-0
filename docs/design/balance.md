@@ -43,6 +43,13 @@ be a separate migration across player state, snapshots, compact transport, repla
 observer analysis, scoring, HUD rows, command-card costs, protocol parity, and prediction/WASM
 compatibility.
 
+Phase 9 approves Ekaterina as the first real second faction in
+`plans/faction/ekaterina-brief.md` and `plans/faction/ekaterina-rules-spec.md`. Ekaterina still
+uses Steel, Oil, and Supply; Phase 10 may add only the approved start/economy/first-production
+slice, and Phase 11 may add the approved baseline combat/signature ability slice. Normal lobby
+selection, AI, prediction, generic resources, and any roster beyond those specs require later
+explicit phases.
+
 ### 5.1 Target theme and MVP combat loop
 
 The target gameplay direction is a simplified World War II-inspired battlefield with
