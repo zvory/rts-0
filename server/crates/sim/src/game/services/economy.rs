@@ -20,7 +20,7 @@ pub(crate) fn gather_system(
 ) {
     for id in entities.ids() {
         let node = match entities.get(id) {
-            Some(e) if e.hp > 0 && e.kind.is_worker() => match e.order().gather_node() {
+            Some(e) if e.hp > 0 && e.kind == EntityKind::Worker => match e.order().gather_node() {
                 Some(node) => node,
                 None => continue,
             },

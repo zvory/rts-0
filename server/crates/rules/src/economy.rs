@@ -181,7 +181,7 @@ fn requirements_met(requirements: &[EntityKind], owned: &[EntityKind]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::faction::{DEFAULT_FACTION_ID, EKATERINA_FACTION_ID};
+    use crate::faction::DEFAULT_FACTION_ID;
 
     #[test]
     fn ww2_production_chain_matches_design() {
@@ -375,50 +375,6 @@ mod tests {
             crate::faction::TANK_UNLOCK_UPGRADE,
             EntityKind::ResearchComplex
         ));
-    }
-
-    #[test]
-    fn ekaterina_economy_queries_route_phase_ten_slice() {
-        assert_eq!(
-            trainable_units_for_faction(EKATERINA_FACTION_ID, EntityKind::EkaterinaCommandPost),
-            vec![EntityKind::EkaterinaEngineer]
-        );
-        assert_eq!(
-            trainable_units_for_faction(EKATERINA_FACTION_ID, EntityKind::EkaterinaWorkshop),
-            vec![
-                EntityKind::EkaterinaConscript,
-                EntityKind::EkaterinaSignalTeam
-            ]
-        );
-        assert!(build_requirement_met_for_faction(
-            EKATERINA_FACTION_ID,
-            EntityKind::EkaterinaSupplyCache,
-            &[EntityKind::EkaterinaCommandPost]
-        ));
-        assert!(build_requirement_met_for_faction(
-            EKATERINA_FACTION_ID,
-            EntityKind::EkaterinaWorkshop,
-            &[EntityKind::EkaterinaCommandPost]
-        ));
-        assert!(!build_requirement_met_for_faction(
-            DEFAULT_FACTION_ID,
-            EntityKind::EkaterinaWorkshop,
-            &[EntityKind::EkaterinaCommandPost]
-        ));
-        assert!(!train_requirement_met_for_faction(
-            DEFAULT_FACTION_ID,
-            EntityKind::EkaterinaConscript,
-            &[EntityKind::EkaterinaWorkshop]
-        ));
-        assert_eq!(cost(EntityKind::EkaterinaEngineer), (50, 0));
-        assert_eq!(cost(EntityKind::EkaterinaConscript), (45, 0));
-        assert_eq!(cost(EntityKind::EkaterinaSignalTeam), (90, 25));
-        assert_eq!(cost(EntityKind::EkaterinaSupplyCache), (80, 0));
-        assert_eq!(cost(EntityKind::EkaterinaWorkshop), (140, 35));
-        assert_eq!(supply_provided(EntityKind::EkaterinaCommandPost), 8);
-        assert_eq!(supply_provided(EntityKind::EkaterinaSupplyCache), 8);
-        assert_eq!(supply_cost(EntityKind::EkaterinaConscript), 1);
-        assert_eq!(supply_cost(EntityKind::EkaterinaSignalTeam), 2);
     }
 
     #[test]

@@ -7,7 +7,6 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
-use crate::game::mark_target::MarkTargetStore;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services::ability_orders::{
     active_ability_order_ready, launch_self_ability, launch_world_ability,
@@ -101,7 +100,6 @@ pub(crate) fn promote_ready_orders(
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
-    mark_targets: &mut MarkTargetStore,
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
@@ -147,7 +145,6 @@ pub(crate) fn promote_ready_orders(
                 &teams,
                 smokes,
                 mortar_shells,
-                mark_targets,
                 events,
                 owner,
                 &faction_id,
@@ -206,7 +203,6 @@ pub(crate) fn promote_ready_orders(
                     coordinator,
                     smokes,
                     mortar_shells,
-                    mark_targets,
                     events,
                     owner,
                     &faction_id,
@@ -659,7 +655,7 @@ fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, ta
 }
 
 fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u32) -> bool {
-    let is_worker = matches!(entities.get(worker), Some(e) if e.kind.is_worker());
+    let is_worker = matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker);
     if !is_worker {
         return false;
     }
@@ -688,7 +684,7 @@ fn build_intent_promotion_error(
     tile_x: u32,
     tile_y: u32,
 ) -> Option<String> {
-    if !matches!(entities.get(worker), Some(e) if e.kind.is_worker()) {
+    if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
         return Some(String::new());
     }
     if matches!(entities.get(worker), Some(e)
@@ -812,7 +808,6 @@ mod tests {
         fog.recompute(&player_ids, entities, map);
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
-        let mut mark_targets = MarkTargetStore::default();
         let mut events = std::collections::HashMap::new();
         promote_ready_orders(
             map,
@@ -822,7 +817,6 @@ mod tests {
             &mut coordinator,
             &mut smokes,
             &mut mortar_shells,
-            &mut mark_targets,
             &mut events,
             1,
         );

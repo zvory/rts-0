@@ -73,7 +73,7 @@ impl Entity {
             },
             production: None,
             construction: None,
-            worker: kind.is_worker().then(WorkerState::default),
+            worker: (kind == EntityKind::Worker).then(WorkerState::default),
             resource_node: None,
             ability_cooldowns: BTreeMap::new(),
             ability_uses_remaining: initial_ability_uses(kind),

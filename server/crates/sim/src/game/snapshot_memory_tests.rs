@@ -34,7 +34,6 @@ fn empty_flat_game() -> Game {
     }
     game.smokes = SmokeCloudStore::new();
     game.mortar_shells = MortarShellStore::default();
-    game.mark_targets = super::mark_target::MarkTargetStore::default();
     game.artillery_shells = artillery::ArtilleryShellStore::default();
     systems::recompute_supply(&mut game.players, &game.entities);
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);

@@ -16,7 +16,6 @@ fn empty_flat_game(players: &[PlayerInit]) -> Game {
     }
     game.smokes = SmokeCloudStore::new();
     game.mortar_shells = MortarShellStore::default();
-    game.mark_targets = crate::game::mark_target::MarkTargetStore::default();
     game.artillery_shells = artillery::ArtilleryShellStore::default();
     refresh_world(&mut game);
     game

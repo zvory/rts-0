@@ -5,35 +5,6 @@ mod layouts;
 use layouts::*;
 
 impl Game {
-    pub fn new_ekaterina_opening_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
-        let player_id = 1;
-        let players = [PlayerInit {
-            id: player_id,
-            team_id: player_id,
-            faction_id: rts_rules::faction::EKATERINA_FACTION_ID.to_string(),
-            name: "Ekaterina".to_string(),
-            color: "#4878c8".to_string(),
-            is_ai: false,
-        }];
-        let mut game = Game::new_without_ai_controllers(&players, seed);
-        let Some(player) = game.players.iter().find(|player| player.id == player_id) else {
-            return Err("failed to create Ekaterina scenario player".to_string());
-        };
-        let start = game
-            .map
-            .tile_center(player.start_tile.0, player.start_tile.1);
-        game.map_metadata = super::dev_map_metadata("dev:ekaterina_opening");
-        game.debug_path_overlays = true;
-
-        Ok(DevScenarioSetup {
-            game,
-            player_id,
-            units: Vec::new(),
-            goal: start,
-            issue_after_ticks: u32::MAX,
-        })
-    }
-
     pub fn new_snaking_corridor_scenario(
         unit: EntityKind,
         unit_count: usize,

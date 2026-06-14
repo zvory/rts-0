@@ -247,9 +247,7 @@ impl SelfPlayRunner {
                     | Event::ArtilleryImpact { .. }
                     | Event::MortarLaunch { .. }
                     | Event::MortarImpact { .. }
-                    | Event::SmokeLaunch { .. }
-                    | Event::MarkTarget { .. }
-                    | Event::MarkTargetImpact { .. } => None,
+                    | Event::SmokeLaunch { .. } => None,
                 };
                 progressed |= self
                     .milestones

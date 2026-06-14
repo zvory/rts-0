@@ -5,7 +5,6 @@ use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMo
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
-use crate::game::mark_target::{MarkTargetSchedule, MarkTargetStore};
 use crate::game::mortar::{mortar_current_facing_ready, rotate_mortar_for_fire, MortarShellStore};
 use crate::game::services::commands::{notice, notice_positioned};
 use crate::game::services::dist2;
@@ -34,7 +33,6 @@ pub(crate) fn order_or_launch_world_ability(
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
-    mark_targets: &mut MarkTargetStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     faction_id: &str,
@@ -81,7 +79,6 @@ pub(crate) fn order_or_launch_world_ability(
             teams,
             smokes,
             mortar_shells,
-            mark_targets,
             events,
             player,
             faction_id,
@@ -114,7 +111,6 @@ pub(crate) fn launch_world_ability(
     teams: &TeamRelations,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
-    mark_targets: &mut MarkTargetStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     faction_id: &str,
@@ -225,29 +221,6 @@ pub(crate) fn launch_world_ability(
                 x,
                 y,
             );
-            true
-        }
-        (AbilityEffectHook::DelayedWorld, AbilityKind::MarkTarget) => {
-            let Some(e) = entities.get_mut(caster) else {
-                return false;
-            };
-            if !ps.spend_cost(definition.cost) {
-                return false;
-            }
-            e.start_ability_cooldown(ability, definition.cooldown_ticks);
-            if !preserve_active_order {
-                e.clear_active_order();
-            }
-            mark_targets.schedule(MarkTargetSchedule {
-                events,
-                fog,
-                teams,
-                owner: player,
-                caster,
-                x,
-                y,
-                tick,
-            });
             true
         }
         _ => false,

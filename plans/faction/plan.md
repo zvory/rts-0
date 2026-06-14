@@ -2,12 +2,11 @@
 
 ## Purpose
 
-Add support for multiple factions without turning every new tech tree, roster, or ability into a
-cross-codebase rewrite. The immediate target is a second faction with its own tech tree, unit
-roster, and ability-heavy mechanics while continuing to use the game's current Steel, Oil, and
-Supply economy. The longer-term target is a repeatable faction catalog where additional factions
-can be added through explicit data and small behavior hooks instead of scattered `EntityKind`
-special cases.
+Add support for multiple factions without turning every new faction identity into a cross-codebase
+rewrite. The immediate playable faction remains Kriegsia, the many-unit RTS faction. Ekaterina is
+reserved as the first future second faction, but its previous RTS-style roster/economy/ability spec
+has been purged. Its design restarts from a clean slate as a MOBA-like, hero-centric faction where
+the player mostly controls one hero unit.
 
 This plan follows the multi-phase planning convention in `docs/context/planning.md` and
 `plans/README.md`: this `plan.md` is the entry point, each phase has its own file, and every phase
@@ -69,9 +68,9 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
   The first real new faction is **Ekaterina** and its reserved id is `ekaterina`. Earlier Phase 1/2
   work introduced `steel_vanguard` as a temporary current-faction id; Phase 3A must rename that id
   before later phases build durable replay, command, hotkey, or prediction contracts on it.
-- **Economy:** all factions use the existing Steel, Oil, and Supply resource contract for now.
-  Different faction flavor can be represented through costs, starting stockpiles, production rules,
-  labels, or later balance changes; truly generic resources are deferred to a separate future plan.
+- **Economy:** Kriegsia and architecture fixtures use the existing Steel, Oil, and Supply resource
+  contract. Ekaterina has no approved economy, production, building, or resource contract yet; do
+  not infer one from Kriegsia.
 - **Data ownership:** faction catalogs are Rust-authoritative. Client data is generated or
   mechanically checked from the Rust catalog.
 - **Entity identity:** keep one global `EntityKind`/wire-kind namespace for now; faction catalogs
@@ -79,7 +78,8 @@ must be implemented, committed, merged to `main`, and pushed before the next pha
 - **Command legality:** the server rejects out-of-faction build/train/research/economy/ability
   commands even if the referenced global kind exists.
 - **Starts:** faction starting loadouts define starting entities, resources, supply model, and
-  optional opening upgrades/flags.
+  optional opening upgrades/flags only after a faction rules spec is approved. Ekaterina has no
+  approved loadout.
 - **AI:** AI remains current-faction-only until an explicit AI phase implements another faction.
 - **Prediction:** prediction stays enabled for supported local-player factions only. It must be
   disabled when the local player is on an unsupported faction, but remote opponents using an
@@ -161,25 +161,17 @@ centralizes replay faction/loadout validation, documents the Point Fire ability 
 and decides whether the checked client catalog mirror is sufficient for Phase 10. This phase should
 not add Ekaterina gameplay or change Kriegsia behavior.
 
-Phase 9 is the approval gate for the real second faction. It creates or references the faction
-brief plus rules/balance spec, including Steel/Oil/Supply usage, loadout, production, roster slices,
-abilities, art readability, and explicit AI/prediction policy. No implementation code for the real
-faction should land until this phase is approved.
+Phase 9 is reset to a design gate for Ekaterina's clean-slate hero faction direction. It may only
+produce a user-approved brief and rules/balance spec. No Rust, JS, protocol, balance, art, tests, or
+other implementation files for Ekaterina should land until that spec exists.
 
-Phase 10 implements the second faction's start, Steel/Oil/Supply tuning, and first production path.
-It should be a playable but narrow slice: the faction can enter a match, see the normal resource
-HUD, create its basic production loop, and reject all illegal cross-faction commands. It should
-keep AI and prediction disabled for the new faction unless the approved brief says otherwise.
+Phase 10 is blocked until Phase 9 approves a hero-centric Ekaterina rules spec. It must not recreate
+the purged RTS-style worker/building/production slice.
 
-Phase 11 adds the second faction's first combat and signature ability slice. It should include one
-baseline combat unit, one signature ability-heavy unit, readable client art, fog-safe events, and
-targeted server/client tests. The goal is a short playable match that demonstrates the faction's
-mechanical identity without trying to finish the whole roster.
+Phase 11 is blocked until Phase 10 has an approved hero-centric implementation slice. It must not
+recreate the purged Signal Team, Conscript, Workshop, or Mark Target content.
 
-Phase 12 expands the roster as approved, hardens integration, updates docs, and decides rollout.
-It verifies mixed-faction match shapes, replay/branch/dev scenario flows under the new non-backcompat
-schema, match history, spectators, quickstart, AI restrictions, prediction restrictions, performance,
-and balance documentation. This phase is where faction choice becomes ready for regular playtesting.
+Phase 12 remains undefined until the hero-faction design and implementation sequence are approved.
 
 ## Phase Index
 
@@ -207,10 +199,8 @@ and balance documentation. This phase is where faction choice becomes ready for 
 
 - [Faction Lifecycle Matrix](lifecycle-matrix.md) — assignment, AI, prediction, replay, branch,
   spectator, dev-tool, and match-history source-of-truth tracker.
-- [Ekaterina Faction Brief](ekaterina-brief.md) — approved product identity, strategic role,
-  economy, production, readability, and implementation gates for the first real second faction.
-- [Ekaterina Rules and Balance Spec](ekaterina-rules-spec.md) — approved Phase 10/11 loadout,
-  roster, costs, ability policy, assignment path, AI/prediction policy, and command-id namespace.
+- [Ekaterina Clean-Slate Brief](ekaterina-brief.md) — reserved-id product direction and explicit
+  non-approval of the purged RTS-style content.
 
 ## Testing Strategy
 

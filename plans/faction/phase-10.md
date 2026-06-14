@@ -1,23 +1,23 @@
 # Phase 10 - Second Faction Start and Economy Slice
 
-Status: Done.
+Status: Blocked until Phase 9 approves a hero-centric Ekaterina rules spec.
 
 ## Objective
 
-Implement the second faction's start, Steel/Oil/Supply tuning, and first production path from the
-approved brief/spec. This phase should produce a narrow playable economy slice, not the full
-faction.
+Implement only the first Phase 9-approved hero-centric Ekaterina slice. The old RTS-style
+start/economy/production path was purged and must not be recreated without explicit approval.
 
 ## Scope
 
-- Add the real second faction id and Rust catalog entry.
-- Expose the second faction only through the Phase 9-approved assignment path unless this phase
-  explicitly implements normal lobby selection.
-- Add the approved starting loadout, starting Steel/Oil/Supply values, supply/capacity rules, and
-  first production anchor.
-- Add the minimum builder/producer path or equivalent mechanic needed to create one basic unit path.
-- Add client command-card entries, hotkeys, and readable placeholder/final art for the start and
-  first production path while keeping the shared Steel/Oil/Supply HUD.
+- Use the existing reserved `ekaterina` id only if the approved spec says the slice is ready to run.
+- Expose Ekaterina only through the Phase 9-approved assignment path unless this phase explicitly
+  implements normal lobby selection.
+- Add only the approved hero start state, controls, progression/economy, abilities, and supporting
+  entities.
+- Do not add workers, base buildings, supply structures, production buildings, or trainable infantry
+  unless the user explicitly approves them by name in the new spec.
+- Add client command-card/control entries, hotkeys, and readable placeholder/final art for the
+  approved hero slice.
 - Keep server catalog strictness: reject current-faction build/train/research/economy commands from
   second-faction players and reject second-faction commands from current-faction players.
 - Keep AI unable to select or be assigned the second faction.
@@ -47,30 +47,26 @@ faction.
 
 ## Verification
 
-- Rust tests for second-faction start loadout, Steel/Oil/Supply values, supply/capacity, and
-  production legality.
+- Rust tests for the approved hero start state, commands, progression/economy, and legality.
 - Rust command tests for illegal cross-faction commands in both directions.
-- Protocol parity tests for new faction/kind ids touched by this slice and unchanged resource
-  payload assumptions.
-- Client command-card descriptor tests for start/economy/production commands.
-- Server integration test for mixed current-faction plus second-faction match start.
-- Prediction-disable test for second-faction starts if WASM is not updated.
-- Replay/branch schema test for the second-faction start slice if replay or branch start is exposed.
-- Balance docs updated with player-facing Steel/Oil/Supply start/economy/production data.
+- Protocol parity tests for any new faction/kind/ability/event ids touched by this slice.
+- Client command-card/control descriptor tests for the approved hero actions.
+- Server integration test for the approved Ekaterina start path.
+- Prediction-disable test for Ekaterina starts if WASM is not updated.
+- Replay/branch schema test for the Ekaterina start slice if replay or branch start is exposed.
+- Balance/design docs updated with player-facing hero stats and progression/economy behavior.
 
 ## Manual Testing Focus
 
-Start a local match as the second faction and verify start entities, Steel/Oil/Supply display, first
-production path, command legality, AI restriction, and prediction-disabled state. Also start a
-current-faction match and verify the original start and economy were not regressed.
+Start a local match as Ekaterina and verify the approved hero controls, start state,
+progression/economy, command legality, AI restriction, and prediction-disabled state. Also start a
+Kriegsia match and verify the original RTS start and economy were not regressed.
 
 ## Handoff Expectations
 
-The handoff must include patch-note bullets, the implemented start/economy/production list, the
-assignment path used, lifecycle matrix updates, tests run, known limitations, and exactly what
-Phase 11 may add next.
+The handoff must include patch-note bullets, the implemented hero-slice details, the assignment path
+used, lifecycle matrix updates, tests run, known limitations, and exactly what Phase 11 may add next.
 
 ## Player-Facing Outcome
 
-Players can enter a dev/local match as the new faction and exercise its starting economy and first
-production path.
+Players can enter the approved dev/local Ekaterina path and exercise the first hero-centric slice.
