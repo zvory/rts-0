@@ -137,6 +137,15 @@ json_get_status() {
   ' "$1"
 }
 
+phase_marked_done() {
+  local phase_file="$1"
+  node -e '
+    const fs = require("fs");
+    const text = fs.readFileSync(process.argv[1], "utf8");
+    process.exit(/^Status:\s*Done\.?\s*$/im.test(text) ? 0 : 1);
+  ' "$phase_file"
+}
+
 previous_ref="$BASE_BRANCH"
 
 for raw_phase in "${PHASES[@]}"; do
@@ -181,16 +190,23 @@ This is an executor pass only:
 - Do not run a final review pass.
 - Do not merge, push, or open a PR.
 - Implement only this phase.
-- Mark plans/$PLAN_NAME/$phase_id.md done if and only if the phase is completed.
+- Stage and commit only files belonging to this phase.
+- The phase is not completed until your task changes are committed successfully on $branch.
+- Mark plans/$PLAN_NAME/$phase_id.md done if and only if the phase is committed successfully.
 - Run the smallest targeted verification appropriate for the changed files.
-- Let the final git commit hook run the full local test gate; do not duplicate broad full-suite
-  verification inside the executor pass.
+- Commit with the normal git commit hook and let it run the full local test gate. Do not duplicate
+  broad full-suite verification inside the executor pass before committing.
+- If the commit hook fails, do not return completed. Inspect the failure, keep working, run focused
+  checks, and retry the commit until it succeeds.
+- You may commit with --no-verify only for pure documentation changes or when you have conclusively
+  confirmed the only failing hook check is unrelated to this phase. Document that evidence in the
+  JSON handoff verification or notes.
 - Avoid broad formatting commands such as workspace-wide cargo fmt unless they are required for the
   phase diff. If formatting is needed, keep any formatter drift outside the phase scope out of the
   final diff.
-- Prefer plain filesystem renames/moves over git mv inside this sandboxed executor session; the
-  outer runner owns staging and committing.
-- If the phase is ambiguous, too broad, blocked by failing verification, or needs human design/product input, stop and report status "blocked".
+- Prefer plain filesystem renames/moves over git mv inside this sandboxed executor session.
+- If the phase is ambiguous, too broad, blocked by failing verification or commit-hook failure you
+  cannot repair, or needs human design/product input, stop and report status "blocked".
 
 Return a compact JSON handoff matching the requested schema.
 EOF
@@ -241,22 +257,35 @@ EOF
     exit 1
   fi
 
-  commit_seconds=0
-  if [ -z "$(git -C "$worktree_path" status --porcelain=v1)" ]; then
-    echo "phase-runner: $phase_id completed but produced no file changes; leaving branch uncommitted" >&2
-  else
-    git -C "$worktree_path" add -A
-    commit_args=(
-      commit
-      -m "Execute $PLAN_NAME $phase_id"
-      -m "Executor pass for plans/$PLAN_NAME/$phase_id.md."
-      -m "Handoff saved to plans/$PLAN_NAME/handoffs/$phase_id.json."
-    )
-    commit_start=$SECONDS
-    git -C "$worktree_path" "${commit_args[@]}"
-    commit_seconds=$((SECONDS - commit_start))
-    echo "phase-runner: committed $branch"
+  status="$(json_get_status "$handoff_file")"
+  if [ "$status" != "completed" ]; then
+    echo "phase-runner: $phase_id reported status '$status'; leaving worktree for inspection: $worktree_path" >&2
+    echo "phase-runner: last 80 log lines from $codex_log" >&2
+    tail -80 "$codex_log" >&2 || true
+    exit 1
   fi
+
+  if [ -n "$(git -C "$worktree_path" status --porcelain=v1)" ]; then
+    echo "phase-runner: $phase_id reported completed but left uncommitted changes; leaving worktree for inspection: $worktree_path" >&2
+    git -C "$worktree_path" status --short >&2
+    echo "phase-runner: last 80 log lines from $codex_log" >&2
+    tail -80 "$codex_log" >&2 || true
+    exit 1
+  fi
+
+  if [ "$(git -C "$worktree_path" rev-list --count "$previous_ref..HEAD")" -eq 0 ]; then
+    echo "phase-runner: $phase_id reported completed but created no commit over $previous_ref; leaving worktree for inspection: $worktree_path" >&2
+    echo "phase-runner: last 80 log lines from $codex_log" >&2
+    tail -80 "$codex_log" >&2 || true
+    exit 1
+  fi
+
+  if ! phase_marked_done "$worktree_path/plans/$PLAN_NAME/$phase_id.md"; then
+    echo "phase-runner: $phase_id reported completed but did not mark the phase document done" >&2
+    exit 1
+  fi
+
+  echo "phase-runner: executor committed $branch"
   total_seconds=$((SECONDS - phase_start))
   PLAN_NAME="$PLAN_NAME" \
   PHASE_ID="$phase_id" \
@@ -265,7 +294,6 @@ EOF
   WORKTREE="$worktree_path" \
   CODEX_LOG="$codex_log" \
   EXECUTOR_SECONDS="$executor_seconds" \
-  COMMIT_SECONDS="$commit_seconds" \
   TOTAL_SECONDS="$total_seconds" \
   TIMING_FILE="$timing_file" \
   node -e '
@@ -279,7 +307,6 @@ EOF
       codexLog: process.env.CODEX_LOG,
       timingsSeconds: {
         executor: Number(process.env.EXECUTOR_SECONDS),
-        commit: Number(process.env.COMMIT_SECONDS),
         total: Number(process.env.TOTAL_SECONDS),
       },
     };
