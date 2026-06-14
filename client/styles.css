@@ -321,12 +321,17 @@ body {
 }
 
 .lobby-shell {
-  width: min(1360px, 100%);
+  width: min(520px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+}
+
+#lobby-screen.is-joined .lobby-shell {
+  width: min(1360px, 100%);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
 }
 
 .lobby-box {
@@ -335,6 +340,24 @@ body {
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+#lobby-screen:not(.is-joined) .lobby-box {
+  display: none;
+}
+
+.lobby-joined-only {
+  display: none !important;
+}
+
+#lobby-screen.is-joined .lobby-joined-only {
+  display: revert !important;
+}
+
+#lobby-screen.is-joined .lobby-actions.lobby-joined-only,
+#lobby-screen.is-joined .lobby-host-tools.lobby-joined-only,
+#lobby-screen.is-joined .lobby-control-field.lobby-joined-only {
+  display: grid !important;
 }
 
 .lobby-masthead {
@@ -773,6 +796,10 @@ input[type="text"]:focus {
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+#lobby-screen:not(.is-joined) .lobby-setup-panel {
+  grid-template-rows: auto auto auto;
+}
+
 .lobby-setup-header,
 .lobby-launch-panel {
   padding: 20px;
@@ -870,6 +897,10 @@ input[type="text"]:focus {
   background: rgba(17, 17, 15, 0.32);
 }
 
+#lobby-screen:not(.is-joined) .lobby-launch-panel {
+  padding-top: 14px;
+}
+
 .status {
   margin: 9px 0 0;
   min-height: 1em;
@@ -884,6 +915,10 @@ input[type="text"]:focus {
 
 @media (max-width: 980px) {
   .lobby-shell {
+    grid-template-columns: 1fr;
+  }
+
+  #lobby-screen.is-joined .lobby-shell {
     grid-template-columns: 1fr;
   }
 }
@@ -2928,8 +2963,12 @@ input[type="text"]:focus {
 /* ---- Match history (lobby front page) ---------------------------------- */
 .match-history {
   width: min(960px, 100%);
-  margin: 0;
+  margin: 18px auto 0;
   padding: 0;
+}
+
+#lobby-screen:not(.is-joined) .match-history {
+  width: min(520px, 100%);
 }
 .match-history-panel {
   border: 1px solid var(--panel-edge);

@@ -38,6 +38,8 @@ export class Lobby {
     this.elName = rootEl.querySelector("#lobby-name");
     this.elRoom = rootEl.querySelector("#lobby-room");
     this.btnJoin = rootEl.querySelector("#lobby-join");
+    this.elSetupKicker = rootEl.querySelector("#lobby-setup-kicker");
+    this.elSetupTitle = rootEl.querySelector("#lobby-setup-title");
     this.chkSpectator = rootEl.querySelector("#lobby-spectator");
     this.chkSpectatorInput = this.chkSpectator?.querySelector("input[type='checkbox']") || null;
     this.roomBlock = rootEl.querySelector(".lobby-room");
@@ -96,6 +98,7 @@ export class Lobby {
     this._onReplayPromptKeydown = (ev) => this._handleReplayPromptKeydown(ev);
 
     this._restoreName();
+    this._reflectJoinedState();
     this._buildReplayPrompt();
     this._wireDom();
     this._wireNet();
@@ -205,7 +208,7 @@ export class Lobby {
     this.net.join(name, room, spectator);
     this._joined = true;
     this._spectator = spectator;
-    if (this.roomBlock) this.roomBlock.hidden = false;
+    this._reflectJoinedState(false);
     this.setStatus(`Joining "${room}"…`);
     this._reflectReadyButton();
   }
@@ -254,7 +257,7 @@ export class Lobby {
 
     // Once a lobby arrives we are definitively joined; make sure the room block shows.
     this._joined = true;
-    if (this.roomBlock) this.roomBlock.hidden = false;
+    this._reflectJoinedState(true);
 
     const players = m.players || [];
     this._playerCount = players.filter((p) => !p.isSpectator).length;
@@ -504,6 +507,7 @@ export class Lobby {
   _handleJoinReplayPrompt(m) {
     const room = (m?.room || "").trim() || ((this.elRoom && this.elRoom.value.trim()) || "main");
     this._joined = false;
+    this._reflectJoinedState(false);
     this.setStatus(`Room "${room}" is watching a replay.`, true);
     this._showReplayPrompt(room);
   }
@@ -516,7 +520,7 @@ export class Lobby {
     this._joined = true;
     this._spectator = true;
     if (this.chkSpectatorInput) this.chkSpectatorInput.checked = true;
-    if (this.roomBlock) this.roomBlock.hidden = false;
+    this._reflectJoinedState(false);
     this.setStatus(`Joining replay in "${room}"...`);
     this._reflectReadyButton();
   }
@@ -635,5 +639,13 @@ export class Lobby {
     } catch (_) {
       // Ignore storage failures.
     }
+  }
+
+  _reflectJoinedState(hasLobby = this._joined && this._hostId != null) {
+    this.root.classList.toggle("is-joined", !!hasLobby);
+    if (this.roomBlock) this.roomBlock.hidden = !hasLobby;
+    if (this.elSetupKicker) this.elSetupKicker.textContent = hasLobby ? "Host controls" : "Join lobby";
+    if (this.elSetupTitle) this.elSetupTitle.textContent = hasLobby ? "Match setup" : "Choose room";
+    if (this.btnJoin) this.btnJoin.textContent = hasLobby ? "Switch room" : "Join room";
   }
 }
