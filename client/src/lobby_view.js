@@ -109,10 +109,6 @@ export class LobbyRosterView {
     const header = document.createElement("header");
     header.className = "lobby-team-header";
 
-    const mark = document.createElement("span");
-    mark.className = "lobby-team-mark";
-    mark.setAttribute("aria-hidden", "true");
-
     const title = document.createElement("div");
     title.className = "lobby-team-title";
     const kicker = document.createElement("span");
@@ -126,7 +122,7 @@ export class LobbyRosterView {
     count.className = "lobby-team-count team-row-count";
     count.textContent = String(players.length);
 
-    header.append(mark, title, count);
+    header.append(title, count);
     if (isHost && slot.isNew) {
       const add = document.createElement("button");
       add.type = "button";

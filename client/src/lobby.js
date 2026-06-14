@@ -42,7 +42,6 @@ export class Lobby {
     this.roomBlock = rootEl.querySelector(".lobby-room");
     this.elPlayers = rootEl.querySelector("#lobby-players");
     this.elRoomDisplay = rootEl.querySelector("#lobby-room-display");
-    this.elModeSummary = rootEl.querySelector("#lobby-mode-summary");
     this.elMapSummary = rootEl.querySelector("#lobby-map-summary");
     this.elSeatsSummary = rootEl.querySelector("#lobby-seats-summary");
     this.elObserversSummary = rootEl.querySelector("#lobby-observers-summary");
@@ -53,7 +52,6 @@ export class Lobby {
     this.btnStart = rootEl.querySelector("#lobby-start");
     this.elStatus = rootEl.querySelector("#lobby-status");
     this.selMap = rootEl.querySelector("#lobby-map");
-    this.elMapDisplay = rootEl.querySelector("#lobby-map-display");
     this.rosterView = new LobbyRosterView(this.elPlayers);
 
     // Local lobby state.
@@ -246,14 +244,7 @@ export class Lobby {
     this._reflectMap();
     this._reflectTeamPreset();
 
-    const participantCount = this._playerCount;
-    const spectatorCount = players.filter((p) => p.isSpectator).length;
-    const specText = spectatorCount > 0
-      ? `, ${spectatorCount} spectator${spectatorCount === 1 ? "" : "s"}`
-      : "";
-    this.setStatus(
-      `Room "${m.room}" — ${participantCount} player${participantCount === 1 ? "" : "s"}${specText}.`,
-    );
+    this.setStatus("");
   }
 
   /** Rebuild the player list: color swatch, name, (host) tag, ready check. */
@@ -304,9 +295,11 @@ export class Lobby {
     this.chkQuickstartInput.checked = !!this._quickstart;
   }
 
-  /** Render the map selector (host) or map name label (non-host). */
+  /** Render the map selector in the summary row for hosts, or the map name for non-hosts. */
   _reflectMap() {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+    const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
+    const label = entry ? entry.name : (this._selectedMap || "Default");
     if (this.selMap) {
       // Rebuild the option list only when the available maps have changed.
       // Each entry is {name, description}; name is the stable key, description is display text.
@@ -327,11 +320,9 @@ export class Lobby {
       this.selMap.disabled = this._countdownActive || !isHost;
       this.selMap.hidden = !isHost;
     }
-    if (this.elMapDisplay) {
-      const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
-      const label = entry ? entry.name : this._selectedMap;
-      this.elMapDisplay.textContent = label;
-      this.elMapDisplay.hidden = isHost;
+    if (this.elMapSummary) {
+      this.elMapSummary.textContent = label;
+      this.elMapSummary.hidden = isHost;
     }
   }
 
@@ -371,7 +362,6 @@ export class Lobby {
     const mapEntry = this._availableMaps.find((entry) => entry.name === this._selectedMap);
     const mapLabel = mapEntry ? mapEntry.name : (this._selectedMap || "Default");
     if (this.elRoomDisplay) this.elRoomDisplay.textContent = room || "main";
-    if (this.elModeSummary) this.elModeSummary.textContent = "Teams";
     if (this.elMapSummary) this.elMapSummary.textContent = mapLabel;
     if (this.elSeatsSummary) this.elSeatsSummary.textContent = `${seatedPlayers.length} / ${MAX_PLAYERS}`;
     if (this.elObserversSummary) this.elObserversSummary.textContent = String(spectatorPlayers.length);

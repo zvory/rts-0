@@ -57,15 +57,29 @@ try {
   ok(true, "joined room; lobby player list populated");
   const teamUi = await page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll("#lobby-players .team-row"));
+    const seat = document.querySelector("#lobby-players .lobby-seat");
     return {
       teamRows: rows.map((row) => row.textContent || ""),
       newTeamRows: rows.filter((row) => row.classList.contains("is-new-team")).length,
       draggableSeats: Array.from(document.querySelectorAll("#lobby-players .lobby-seat[draggable='true']")).length,
+      hasModeSummary: !!document.querySelector("#lobby-mode-summary"),
+      hasTeamMarks: !!document.querySelector("#lobby-players .lobby-team-mark"),
+      hasLaunchCopy: /Launch|Ready check/.test(document.querySelector(".lobby-launch-panel")?.textContent || ""),
+      mapSelectInSummary: !!document.querySelector(".lobby-status-grid #lobby-map:not([hidden])"),
+      mapSelectInSidePanel: !!document.querySelector(".lobby-form #lobby-map"),
+      statusText: document.querySelector("#lobby-status")?.textContent || "",
+      seatDisplay: seat ? getComputedStyle(seat).display : "",
     };
   });
-  ok(teamUi.teamRows.some((text) => /Team 1/.test(text)) && teamUi.newTeamRows === 1,
+  ok(teamUi.teamRows.some((text) => /Team \d+/.test(text)) && teamUi.newTeamRows === 1,
     `lobby renders occupied teams plus one new-team row (${teamUi.teamRows.join(" | ")})`);
   ok(teamUi.draggableSeats >= 1, `host lobby seats are draggable (${teamUi.draggableSeats})`);
+  ok(!teamUi.hasModeSummary && !teamUi.hasLaunchCopy && !teamUi.statusText,
+    "lobby omits mode summary, launch header copy, and room/player status text");
+  ok(teamUi.mapSelectInSummary && !teamUi.mapSelectInSidePanel,
+    "host map selector renders in the summary row instead of the setup panel");
+  ok(!teamUi.hasTeamMarks && teamUi.seatDisplay === "grid",
+    `lobby teams have no color marks and player rows align with grid (${teamUi.seatDisplay})`);
 
   await page.click("#lobby-ready");
   await page.waitForFunction(() => { const b = document.querySelector("#lobby-start"); return b && !b.disabled; }, { timeout: 5000 });
