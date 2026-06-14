@@ -19,27 +19,31 @@ and other non-combat selectable entities, count as 1.
 
 Phase 0 inventories the current selection, command validation, balance mirror, and HUD assumptions
 before behavior changes start. It records every path that admits selected units or sends multi-unit
-commands, including the current client `.slice(0, 12)` caps and the server `MAX_UNITS_PER_COMMAND`
-hardening seam. The outcome is a narrow implementation map and a decision on whether this rollout
-starts with manual mirrored constants or introduces generated client config.
+commands, including the current client `.slice(0, 12)` caps, `GameState.MAX_SELECTION_SIZE` users,
+and the server `MAX_UNITS_PER_COMMAND` hardening seam. The outcome is a narrow implementation map
+and a decision on whether this rollout starts with manual mirrored constants or introduces
+generated client config.
 
-Phase 1 defines the shared command-budget contract and enforces it on the server. It replaces the
-raw count-only command cap with a dedupe-then-budget validation step that rejects oversized unit
-commands, while preserving a defensive absolute id-list bound for tick-loop safety. The outcome is
-authoritative hardening that treats legal human commands, including stacked Command Cars, the same
-way the client will.
+Phase 1 defines the shared command-budget contract, enforces it on the server, and adds a minimal
+client command-send guard for existing selections. It replaces the raw count-only command cap with a
+dedupe-then-budget validation step that rejects oversized unit commands, while preserving a
+defensive absolute id-list bound for tick-loop safety. The outcome is authoritative hardening that
+treats legal human commands, including stacked Command Cars, the same way the client will, without
+making the current 12-count client send newly rejected commands during the interim phase.
 
 Phase 2 adds the client-side selection budget model and applies it to direct selection, shift
-selection, drag-box selection, and double-click same-kind selection. It keeps the existing candidate
-ordering, but pre-admits Command Cars from the candidate set so their budget bonus is not dependent
-on box order. The outcome is playable client behavior where the old 12-unit limit is gone and
-overflow candidates are ignored instead of replacing or trimming already-selected units.
+selection, drag-box selection, and double-click same-kind selection. It replaces the `GameState`
+count cap for ordinary playable selections, keeps the existing candidate ordering, and pre-admits
+Command Cars from the candidate set so their budget bonus is not dependent on box order. The outcome
+is playable client behavior where the old 12-unit limit is gone and overflow candidates are ignored
+instead of replacing or trimming already-selected units.
 
-Phase 3 applies the same client budget rules to control groups and command composition. It makes
-control-group save, add, and recall unable to preserve or restore an over-budget human selection,
-and it ensures every outgoing human multi-unit command is checked against the same budget before it
-is sent. The outcome is that control groups and command hotkeys cannot bypass the selection supply
-limit, while AI command generation remains unaffected.
+Phase 3 applies the same client budget rules to control groups and removes the temporary command
+guard's dependence on old count-capped assumptions. It makes control-group save, add, and recall
+unable to preserve or restore an over-budget human selection, and it ensures every outgoing human
+multi-unit command still passes through the same budget guard before it is sent. The outcome is that
+control groups and command hotkeys cannot bypass the selection supply limit, while AI command
+generation remains unaffected.
 
 Phase 4 replaces the multi-selected HUD summary with a two-row command-budget grid. It renders
 selected entities as acronym blocks spanning their command weight, shows `used / cap`, expands when
@@ -57,7 +61,7 @@ rollout whose contract is documented and whose highest-risk seams are covered by
 1. [Phase 0 - Inventory and Contract Decision](phase-0.md)
 2. [Phase 1 - Server Command Budget Validation](phase-1.md)
 3. [Phase 2 - Client Selection Budget](phase-2.md)
-4. [Phase 3 - Control Groups and Command Sending](phase-3.md)
+4. [Phase 3 - Control Groups and Command Guard Hardening](phase-3.md)
 5. [Phase 4 - Selection Budget Grid UI](phase-4.md)
 6. [Phase 5 - Cleanup, Docs, and Regression Coverage](phase-5.md)
 
@@ -78,10 +82,13 @@ rollout whose contract is documented and whose highest-risk seams are covered by
   unbounded per-id work before budget validation finishes.
 - Use authoritative/mirrored supply as command weight. Selectable entities without supply count as
   1, including buildings and non-combat selectable objects.
-- AI is out of scope for the command-budget limit. AI may continue to produce command lists through
-  its existing server-side action layer unless a later AI-specific balance plan changes that.
+- Live AI is out of scope for the command-budget gameplay limit. Because live AI currently emits
+  ordinary `SimCommand`s through the same `Game::enqueue(player, cmd)` seam as humans, Phase 1 must
+  make the source policy explicit before enforcement: either exempt players marked `is_ai`, add
+  narrow command-source metadata, or deliberately apply the same limit to AI and update this plan.
 - Spectator and replay selection are out of scope except for not breaking existing inspection
-  behavior. Old replay compatibility does not matter for this pre-alpha project.
+  behavior. Budget admission should apply to local playable own selections only unless a phase
+  explicitly says otherwise. Old replay compatibility does not matter for this pre-alpha project.
 - Keep the wire protocol mirrored if command rejection reasons or command payload contracts change:
   `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`, `client/src/protocol.js`, and
   `docs/design/protocol.md` must stay aligned.

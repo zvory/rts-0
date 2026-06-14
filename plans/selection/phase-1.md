@@ -4,9 +4,10 @@ Status: Not started.
 
 ## Goal
 
-Replace count-only multi-unit command hardening with authoritative command-budget validation. The
-server should reject over-budget human unit-list commands while retaining an absolute defensive
-id-list bound against huge malformed payloads.
+Replace count-only multi-unit command hardening with authoritative command-budget validation and a
+minimal client command-send guard. The server should reject over-budget human unit-list commands
+while retaining an absolute defensive id-list bound against huge malformed payloads, and the current
+count-capped client should avoid sending commands this phase makes illegal.
 
 ## Scope
 
@@ -17,6 +18,12 @@ id-list bound against huge malformed payloads.
     `MAX_UNITS_PER_COMMAND`
 - Add a command weight helper that uses authoritative supply where available and falls back to 1
   for selectable entities without supply.
+- Before enforcing the budget, resolve the live AI source policy explicitly. The current `Game`
+  queue carries only `(player, SimCommand)`, and live AI uses the same `Game::enqueue` path as
+  human commands. Choose one of these strategies and document it in the phase notes:
+  - exempt commands issued by players whose `PlayerState.is_ai` is true
+  - add narrow command-source metadata at the `Game::enqueue` boundary
+  - intentionally apply the same budget to AI and update this plan plus AI expectations
 - Replace or wrap `dedupe_cap_units` with a validation helper that:
   - dedupes while preserving first-seen order
   - resolves valid owned/controllable command entities
@@ -35,9 +42,19 @@ id-list bound against huge malformed payloads.
   - `setupAntiTankGuns`
   - `tearDownAntiTankGuns`
   - `useAbility`
-- Keep AI out of scope unless the command application path cannot distinguish human/AI commands.
-  If the existing path has no source distinction, document that as a blocker or add the narrowest
-  source metadata needed before enforcing the limit.
+  - `setAutocast`
+- Add a narrow client command-send guard in the existing command issuing paths so honest clients do
+  not send over-budget unit lists after this phase. This is not the full selection overhaul; it
+  should:
+  - reuse or mirror the same base cap, Command Car bonus, and weight rules
+  - cover right-click, targeted command-card commands, stop/setup/teardown/ability/autocast command
+    sends, and minimap command sends
+  - block the outgoing command and trigger a lightweight overflow signal or existing notice path
+  - leave selection size, control-group storage, and HUD rendering otherwise unchanged until later
+    phases
+- Define server rejection feedback before adding new rejection reasons. Prefer a local player notice
+  or existing command-rejection path that is visible enough for debugging, but do not introduce a
+  broad protocol change unless the existing event/notice path cannot express the rejection.
 - Update `docs/design/hardening.md` and `docs/design/server-sim.md` if command validation semantics
   change.
 
@@ -47,6 +64,9 @@ id-list bound against huge malformed payloads.
 - Existing command validation still dedupes and bounds malformed id lists.
 - Command Cars stack their +12 cap bonus.
 - Overflow is rejected, not filtered.
+- Existing honest-client command paths do not send over-budget unit lists after this phase, even
+  before Phase 2 removes the old selected-count cap.
+- The AI source policy is documented and implemented consistently.
 - Any protocol rejection reason additions are mirrored in protocol files and docs.
 
 ## Verification
@@ -59,14 +79,19 @@ id-list bound against huge malformed payloads.
   - one Command Car increases the legal cap by 12 while consuming its own supply
   - multiple Command Cars stack
   - huge duplicate id lists remain bounded
+- Add or update focused client tests proving the interim command-send guard blocks an over-budget
+  Tank-heavy selected command and still allows a legal command.
 - Do not run broad bundles during development; rely on the commit hook when the phase is ready.
 
 ## Manual Testing Focus
 
-Start a local match and issue normal small move, attack-move, stop, setup, and ability commands.
-Confirm normal commands still work and malformed oversized commands do not crash the room task.
+Start a local match and issue normal small move, attack-move, stop, setup, autocast, and ability
+commands. Select an over-budget Tank-heavy group through the existing 12-count client behavior and
+confirm the client does not send the command, while malformed oversized commands still do not crash
+the room task.
 
 ## Handoff Expectations
 
-The handoff must identify how the server distinguishes human commands from AI commands, list the
-command variants covered, and call out any validation paths left for Phase 2 or Phase 3.
+The handoff must identify the chosen AI/source policy, list the command variants covered on the
+server, list the client command-send paths guarded, and call out any validation paths left for Phase
+2 or Phase 3.
