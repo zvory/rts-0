@@ -61,6 +61,12 @@ not an authored lane schema, route-summary cache, dynamic influence map, or visu
 AI routing queries should derive those later through a public map-owned API instead of importing
 private simulation state.
 
+`GET /maps/atlas?map=<name>&playerCount=4&seed=0` is a dev/editor diagnostic path for the
+standalone map editor. The server loads the named authored map through `Map::load`, generates the
+same static atlas, and serializes movement-class passability, component ids, clearance, regions,
+portals, and semantic anchors for read-only inspection. This endpoint is not live match UI and does
+not expose dynamic entities, hidden fog state, route scores, or AI decisions.
+
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
 `game-core` implementer: provide exactly these. `server-shell` implementer: call only these.

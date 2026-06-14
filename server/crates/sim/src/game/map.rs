@@ -315,6 +315,12 @@ impl Map {
         atlas::MapAtlas::generate(self)
     }
 
+    /// Serializable static atlas facts for dev/editor diagnostics. This is derived from public
+    /// authored map data only and intentionally excludes live entities, fog, or AI state.
+    pub fn atlas_diagnostics(&self) -> serde_json::Value {
+        atlas::atlas_diagnostics_json(self)
+    }
+
     fn validate_static_atlas(&self) {
         self.atlas().validate();
     }

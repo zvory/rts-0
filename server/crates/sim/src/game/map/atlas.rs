@@ -5,8 +5,10 @@ use crate::game::map::{Map, Tile};
 use crate::rules::terrain::{self, TerrainKind};
 
 mod anchors;
+mod diagnostics;
 
 use anchors::{build_anchors, AtlasAnchor};
+pub(super) use diagnostics::atlas_diagnostics_json;
 
 const REGION_SIZE_TILES: u32 = 16;
 
@@ -36,6 +38,13 @@ enum MovementClass {
 
 impl MovementClass {
     pub const ALL: [MovementClass; 2] = [MovementClass::Infantry, MovementClass::Vehicle];
+
+    fn as_str(self) -> &'static str {
+        match self {
+            MovementClass::Infantry => "infantry",
+            MovementClass::Vehicle => "vehicle",
+        }
+    }
 
     fn representative_kind(self) -> EntityKind {
         match self {

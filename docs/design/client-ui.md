@@ -33,6 +33,12 @@ src/
   bootstrap.js    # DOM lookup, ws/dev-watch config, startup helpers
 ```
 
+`map-editor.html` also owns the dev-only static atlas inspection tab. The Atlas view fetches
+`/maps/atlas` for the selected bundled authored map and overlays passability, component ids,
+clearance, regions, portals, and semantic anchors on the existing editor canvas. The tab is
+diagnostic and read-only: it does not mutate map JSON, display live match state, export generated
+images, or feed AI decisions directly.
+
 ### 4.1 Module export contracts
 
 `net.js`

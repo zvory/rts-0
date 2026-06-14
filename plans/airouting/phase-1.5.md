@@ -1,6 +1,6 @@
 # Phase 1.5 - Static Atlas Editor View
 
-Status: Planned.
+Status: Done.
 
 ## Objective
 

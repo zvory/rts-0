@@ -30,6 +30,57 @@ fn atlas_generates_required_layers_for_every_bundled_map() {
 }
 
 #[test]
+fn atlas_diagnostics_exposes_editor_layers() {
+    let map = Map::load("Default", 4, 0x1234_5678).expect("default map should load");
+    let diagnostics = map.atlas_diagnostics();
+    let len = (map.size * map.size) as usize;
+    let movement_classes = diagnostics["movementClasses"]
+        .as_array()
+        .expect("movement classes");
+    let layers = diagnostics["layers"].as_array().expect("layers");
+    let anchors = diagnostics["anchors"].as_array().expect("anchors");
+
+    assert_eq!(diagnostics["size"], map.size);
+    assert_eq!(movement_classes, &vec!["infantry", "vehicle"]);
+    assert_eq!(layers.len(), MovementClass::ALL.len());
+    assert!(!anchors.is_empty());
+
+    for layer in layers {
+        assert_eq!(
+            layer["passableTiles"].as_array().expect("passable").len(),
+            len
+        );
+        assert_eq!(
+            layer["clearanceTiles"].as_array().expect("clearance").len(),
+            len
+        );
+        assert_eq!(
+            layer["componentByTile"]
+                .as_array()
+                .expect("components")
+                .len(),
+            len
+        );
+        assert_eq!(
+            layer["regionByTile"].as_array().expect("regions").len(),
+            len
+        );
+        assert!(!layer["components"]
+            .as_array()
+            .expect("component list")
+            .is_empty());
+        assert!(!layer["regions"].as_array().expect("region list").is_empty());
+        assert!(anchors
+            .iter()
+            .any(|anchor| anchor["movementClass"] == layer["movementClass"]));
+    }
+
+    assert!(diagnostics.get("movementClasses").is_some());
+    assert!(diagnostics["layers"][0].get("componentByTile").is_some());
+    assert!(diagnostics["layers"][0].get("clearanceTiles").is_some());
+}
+
+#[test]
 fn anchors_attach_to_passable_regions() {
     let map = Map::load("Low Econ", 4, 0x5566_7788).expect("low econ map should load");
     let atlas = map.atlas();

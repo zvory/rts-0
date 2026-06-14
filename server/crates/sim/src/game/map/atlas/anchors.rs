@@ -1,14 +1,15 @@
 use crate::config;
 use crate::game::map::{Map, Tile};
+use serde_json::{json, Value};
 
 use super::{MovementClass, MovementLayerAtlas};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AtlasAnchor {
-    id: String,
-    kind: AtlasAnchorKind,
-    tile: Tile,
-    movement_class: MovementClass,
+    pub(super) id: String,
+    pub(super) kind: AtlasAnchorKind,
+    pub(super) tile: Tile,
+    pub(super) movement_class: MovementClass,
     pub(super) component_id: Option<usize>,
     pub(super) region_id: Option<usize>,
 }
@@ -28,14 +29,36 @@ impl AtlasAnchor {
         debug_assert!(MovementClass::ALL.contains(&self.movement_class));
         debug_assert_eq!(self.component_id.is_some(), self.region_id.is_some());
     }
+
+    pub(super) fn diagnostics_json(&self) -> Value {
+        json!({
+            "id": &self.id,
+            "kind": self.kind.as_str(),
+            "tile": { "x": self.tile.0, "y": self.tile.1 },
+            "movementClass": self.movement_class.as_str(),
+            "componentId": self.component_id,
+            "regionId": self.region_id,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum AtlasAnchorKind {
+pub(super) enum AtlasAnchorKind {
     Main,
     Natural,
     ResourceCluster,
     ResourceLineApproach,
+}
+
+impl AtlasAnchorKind {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            AtlasAnchorKind::Main => "main",
+            AtlasAnchorKind::Natural => "natural",
+            AtlasAnchorKind::ResourceCluster => "resourceCluster",
+            AtlasAnchorKind::ResourceLineApproach => "resourceLineApproach",
+        }
+    }
 }
 
 pub(super) fn build_anchors(map: &Map, layers: &[MovementLayerAtlas]) -> Vec<AtlasAnchor> {

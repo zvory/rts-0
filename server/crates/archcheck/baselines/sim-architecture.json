@@ -1,17 +1,21 @@
 {
-  "reason": "Phase 1 faction identity adds PlayerInit fields to game tests",
+  "reason": "phase 1.5 exposes map atlas diagnostics for editor",
   "line_counts": [
     {
       "path": "ability.rs",
-      "lines": 133
+      "lines": 138
+    },
+    {
+      "path": "analysis.rs",
+      "lines": 116
     },
     {
       "path": "artillery.rs",
-      "lines": 176
+      "lines": 226
     },
     {
       "path": "building_memory.rs",
-      "lines": 294
+      "lines": 312
     },
     {
       "path": "command.rs",
@@ -23,7 +27,7 @@
     },
     {
       "path": "entity/entity.rs",
-      "lines": 1053
+      "lines": 1086
     },
     {
       "path": "entity/kind.rs",
@@ -39,7 +43,7 @@
     },
     {
       "path": "entity/state.rs",
-      "lines": 235
+      "lines": 240
     },
     {
       "path": "entity/store.rs",
@@ -55,43 +59,71 @@
     },
     {
       "path": "invariants.rs",
-      "lines": 880
+      "lines": 894
     },
     {
       "path": "map.rs",
-      "lines": 545
+      "lines": 620
+    },
+    {
+      "path": "map/atlas.rs",
+      "lines": 462
+    },
+    {
+      "path": "map/atlas/anchors.rs",
+      "lines": 169
+    },
+    {
+      "path": "map/atlas/atlas_tests.rs",
+      "lines": 173
+    },
+    {
+      "path": "map/atlas/diagnostics.rs",
+      "lines": 76
     },
     {
       "path": "map/authored.rs",
-      "lines": 335
+      "lines": 344
+    },
+    {
+      "path": "map/authored/assignment.rs",
+      "lines": 185
+    },
+    {
+      "path": "map/team_assignment_tests.rs",
+      "lines": 238
     },
     {
       "path": "mod.rs",
-      "lines": 422
+      "lines": 443
     },
     {
       "path": "mortar.rs",
-      "lines": 327
+      "lines": 338
     },
     {
       "path": "pathfinding.rs",
       "lines": 273
     },
     {
+      "path": "phase7_privacy_tests.rs",
+      "lines": 314
+    },
+    {
       "path": "player_state.rs",
-      "lines": 65
+      "lines": 74
     },
     {
       "path": "replay.rs",
-      "lines": 419
+      "lines": 471
     },
     {
       "path": "scoring.rs",
-      "lines": 53
+      "lines": 55
     },
     {
       "path": "services/ability_orders.rs",
-      "lines": 457
+      "lines": 490
     },
     {
       "path": "services/combat/acquisition.rs",
@@ -103,15 +135,15 @@
     },
     {
       "path": "services/combat/damage.rs",
-      "lines": 284
+      "lines": 293
     },
     {
       "path": "services/combat/events.rs",
-      "lines": 99
+      "lines": 118
     },
     {
       "path": "services/combat/mod.rs",
-      "lines": 389
+      "lines": 409
     },
     {
       "path": "services/combat/projection.rs",
@@ -119,7 +151,7 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "lines": 2863
+      "lines": 3067
     },
     {
       "path": "services/combat/weapons.rs",
@@ -127,19 +159,19 @@
     },
     {
       "path": "services/commands.rs",
-      "lines": 4470
+      "lines": 4784
     },
     {
       "path": "services/construction.rs",
-      "lines": 557
+      "lines": 586
     },
     {
       "path": "services/death.rs",
-      "lines": 150
+      "lines": 153
     },
     {
       "path": "services/economy.rs",
-      "lines": 315
+      "lines": 316
     },
     {
       "path": "services/geometry.rs",
@@ -163,7 +195,7 @@
     },
     {
       "path": "services/movement/mod.rs",
-      "lines": 115
+      "lines": 120
     },
     {
       "path": "services/movement/pivot_drive.rs",
@@ -183,11 +215,11 @@
     },
     {
       "path": "services/movement/tests.rs",
-      "lines": 5132
+      "lines": 5175
     },
     {
       "path": "services/movement/waypoints.rs",
-      "lines": 818
+      "lines": 820
     },
     {
       "path": "services/occupancy.rs",
@@ -199,7 +231,7 @@
     },
     {
       "path": "services/order_queue.rs",
-      "lines": 1361
+      "lines": 1384
     },
     {
       "path": "services/pathing.rs",
@@ -207,7 +239,7 @@
     },
     {
       "path": "services/production.rs",
-      "lines": 644
+      "lines": 642
     },
     {
       "path": "services/spatial.rs",
@@ -219,7 +251,7 @@
     },
     {
       "path": "services/supply.rs",
-      "lines": 27
+      "lines": 32
     },
     {
       "path": "services/world_query.rs",
@@ -227,11 +259,11 @@
     },
     {
       "path": "setup.rs",
-      "lines": 721
+      "lines": 801
     },
     {
       "path": "setup/dev_scenarios.rs",
-      "lines": 330
+      "lines": 336
     },
     {
       "path": "setup/dev_scenarios/layouts.rs",
@@ -239,35 +271,35 @@
     },
     {
       "path": "setup/dev_scenarios/tests.rs",
-      "lines": 759
+      "lines": 812
     },
     {
       "path": "setup/tests.rs",
-      "lines": 153
+      "lines": 403
     },
     {
       "path": "smoke.rs",
-      "lines": 265
+      "lines": 267
     },
     {
       "path": "snapshot.rs",
-      "lines": 225
+      "lines": 249
     },
     {
       "path": "snapshot_memory_tests.rs",
-      "lines": 150
+      "lines": 243
     },
     {
       "path": "systems.rs",
-      "lines": 393
+      "lines": 397
     },
     {
       "path": "teams.rs",
-      "lines": 231
+      "lines": 267
     },
     {
       "path": "tests.rs",
-      "lines": 3885
+      "lines": 3916
     },
     {
       "path": "upgrade.rs",
@@ -315,13 +347,13 @@
       "source": "combat",
       "target": "line_of_sight",
       "path": "services/combat/mod.rs",
-      "line": 16
+      "line": 18
     },
     {
       "source": "combat",
       "target": "move_coordinator",
       "path": "services/combat/mod.rs",
-      "line": 17
+      "line": 19
     },
     {
       "source": "combat",
@@ -333,7 +365,7 @@
       "source": "combat",
       "target": "occupancy",
       "path": "services/combat/mod.rs",
-      "line": 18
+      "line": 20
     },
     {
       "source": "combat",
@@ -345,7 +377,7 @@
       "source": "combat",
       "target": "spatial",
       "path": "services/combat/mod.rs",
-      "line": 19
+      "line": 21
     },
     {
       "source": "combat",
@@ -405,13 +437,13 @@
       "source": "construction",
       "target": "occupancy",
       "path": "services/construction.rs",
-      "line": 6
+      "line": 7
     },
     {
       "source": "construction",
       "target": "standability",
       "path": "services/construction.rs",
-      "line": 7
+      "line": 8
     },
     {
       "source": "economy",
@@ -675,12 +707,12 @@
   "broad_mutable_signatures": [
     {
       "path": "services/ability_orders.rs",
-      "line": 98,
+      "line": 106,
       "name": "launch_world_ability"
     },
     {
       "path": "services/ability_orders.rs",
-      "line": 26,
+      "line": 27,
       "name": "order_or_launch_world_ability"
     },
     {
@@ -690,47 +722,47 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 558,
+      "line": 596,
       "name": "apply_planned_unit_order"
     },
     {
       "path": "services/commands.rs",
-      "line": 1307,
+      "line": 1416,
       "name": "artillery_point_fire_system"
     },
     {
       "path": "services/commands.rs",
-      "line": 1061,
+      "line": 1146,
       "name": "order_artillery_point_fire"
     },
     {
       "path": "services/commands.rs",
-      "line": 1705,
+      "line": 1822,
       "name": "order_cancel"
     },
     {
       "path": "services/commands.rs",
-      "line": 1588,
+      "line": 1707,
       "name": "order_train"
     },
     {
       "path": "services/commands.rs",
-      "line": 1207,
+      "line": 1296,
       "name": "try_fire_artillery"
     },
     {
       "path": "services/commands.rs",
-      "line": 919,
+      "line": 990,
       "name": "use_ability"
     },
     {
       "path": "services/construction.rs",
-      "line": 18,
+      "line": 21,
       "name": "construction_system"
     },
     {
       "path": "services/death.rs",
-      "line": 17,
+      "line": 19,
       "name": "death_system"
     },
     {
@@ -777,17 +809,17 @@
   "player_state_usages": [
     {
       "path": "mod.rs",
-      "line": 113,
+      "line": 127,
       "code": "players: Vec<PlayerState>,"
     },
     {
       "path": "mod.rs",
-      "line": 77,
+      "line": 89,
       "code": "pub(crate) struct PlayerState {"
     },
     {
       "path": "player_state.rs",
-      "line": 5,
+      "line": 6,
       "code": "impl PlayerState {"
     },
     {
@@ -802,17 +834,17 @@
     },
     {
       "path": "services/ability_orders.rs",
-      "line": 29,
+      "line": 30,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/ability_orders.rs",
-      "line": 101,
+      "line": 109,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/ability_orders.rs",
-      "line": 14,
+      "line": 15,
       "code": "use crate::game::PlayerState;"
     },
     {
@@ -827,22 +859,22 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 83,
+      "line": 84,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 91,
+      "line": 92,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 99,
+      "line": 100,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 109,
+      "line": 110,
       "code": "players: &[PlayerState],"
     },
     {
@@ -852,7 +884,12 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 1517,
+      "line": 908,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 1630,
       "code": "players: &[PlayerState],"
     },
     {
@@ -862,37 +899,37 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 561,
+      "line": 599,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 922,
+      "line": 993,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1064,
+      "line": 1149,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1209,
+      "line": 1298,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1310,
+      "line": 1419,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1590,
+      "line": 1709,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1707,
+      "line": 1824,
       "code": "players: &mut [PlayerState],"
     },
     {
@@ -902,27 +939,27 @@
     },
     {
       "path": "services/construction.rs",
-      "line": 21,
+      "line": 24,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/construction.rs",
-      "line": 9,
+      "line": 11,
       "code": "use crate::game::PlayerState;"
     },
     {
       "path": "services/death.rs",
-      "line": 21,
+      "line": 24,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/death.rs",
-      "line": 136,
+      "line": 139,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/death.rs",
-      "line": 7,
+      "line": 8,
       "code": "use crate::game::PlayerState;"
     },
     {
@@ -992,17 +1029,17 @@
     },
     {
       "path": "services/order_queue.rs",
-      "line": 280,
+      "line": 301,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/order_queue.rs",
-      "line": 463,
+      "line": 484,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/order_queue.rs",
-      "line": 659,
+      "line": 680,
       "code": "players: &[PlayerState],"
     },
     {
@@ -1022,7 +1059,7 @@
     },
     {
       "path": "services/production.rs",
-      "line": 6,
+      "line": 5,
       "code": "use crate::game::PlayerState;"
     },
     {
@@ -1037,32 +1074,32 @@
     },
     {
       "path": "setup.rs",
-      "line": 248,
+      "line": 291,
       "code": "let mut ps = PlayerState {"
     },
     {
       "path": "setup.rs",
-      "line": 451,
+      "line": 515,
       "code": "player: &mut PlayerState,"
     },
     {
       "path": "setup.rs",
-      "line": 494,
+      "line": 561,
       "code": "player: &mut PlayerState,"
     },
     {
       "path": "setup.rs",
-      "line": 636,
+      "line": 711,
       "code": "players.push(PlayerState {"
     },
     {
       "path": "setup.rs",
-      "line": 577,
+      "line": 644,
       "code": "players: &mut Vec<PlayerState>,"
     },
     {
       "path": "snapshot.rs",
-      "line": 186,
+      "line": 192,
       "code": "fn player(&self, id: u32) -> Option<&PlayerState> {"
     },
     {
@@ -1079,19 +1116,19 @@
   "player_state_field_writes": [
     {
       "path": "services/movement/tests.rs",
-      "line": 2609,
+      "line": 2615,
       "field": "oil",
       "code": "players[0].oil = 1;"
     },
     {
       "path": "tests.rs",
-      "line": 1404,
+      "line": 1696,
       "field": "oil",
       "code": "game.players[0].oil = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 1403,
+      "line": 1695,
       "field": "steel",
       "code": "game.players[0].steel = 0;"
     }
@@ -1099,19 +1136,19 @@
   "entity_field_writes": [
     {
       "path": "services/combat/tests.rs",
-      "line": 1033,
+      "line": 1044,
       "field": "hp",
       "code": "dead_target.hp = 0;"
     },
     {
       "path": "services/construction.rs",
-      "line": 236,
+      "line": 259,
       "field": "pos_x",
       "code": "w.pos_x = cx;"
     },
     {
       "path": "services/construction.rs",
-      "line": 237,
+      "line": 260,
       "field": "pos_y",
       "code": "w.pos_y = cy;"
     },
@@ -1141,85 +1178,91 @@
     },
     {
       "path": "services/movement/tests.rs",
-      "line": 3936,
+      "line": 3980,
       "field": "pos_x",
       "code": "e.pos_x = sx + 0.0001;"
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 384,
+      "line": 385,
       "field": "pos_x",
       "code": "e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);"
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 385,
+      "line": 386,
       "field": "pos_y",
       "code": "e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);"
     },
     {
       "path": "tests.rs",
-      "line": 2963,
+      "line": 3356,
       "field": "hp",
       "code": ".hp = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 1365,
+      "line": 1657,
       "field": "hp",
       "code": "e.hp = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 2812,
+      "line": 3115,
       "field": "hp",
       "code": "entity.hp = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 3151,
+      "line": 3181,
+      "field": "hp",
+      "code": "entity.hp = 0;"
+    },
+    {
+      "path": "tests.rs",
+      "line": 3548,
       "field": "pos_x",
       "code": "holder_entity.pos_x = node_x;"
     },
     {
       "path": "tests.rs",
-      "line": 3159,
+      "line": 3556,
       "field": "pos_x",
       "code": "ordered_entity.pos_x = node_x + 4.0;"
     },
     {
       "path": "tests.rs",
-      "line": 1314,
+      "line": 1606,
       "field": "pos_x",
       "code": "unit.pos_x = smoke_pos.0;"
     },
     {
       "path": "tests.rs",
-      "line": 3216,
+      "line": 3614,
       "field": "pos_x",
       "code": "worker_entity.pos_x = node_x + worker_radius + node_radius - 1.0;"
     },
     {
       "path": "tests.rs",
-      "line": 3152,
+      "line": 3549,
       "field": "pos_y",
       "code": "holder_entity.pos_y = node_y;"
     },
     {
       "path": "tests.rs",
-      "line": 3160,
+      "line": 3557,
       "field": "pos_y",
       "code": "ordered_entity.pos_y = node_y;"
     },
     {
       "path": "tests.rs",
-      "line": 1315,
+      "line": 1607,
       "field": "pos_y",
       "code": "unit.pos_y = smoke_pos.1;"
     },
     {
       "path": "tests.rs",
-      "line": 3217,
+      "line": 3615,
       "field": "pos_y",
       "code": "worker_entity.pos_y = node_y;"
     }
@@ -1227,7 +1270,11 @@
   "public_export_counts": [
     {
       "path": "ability.rs",
-      "count": 7
+      "count": 8
+    },
+    {
+      "path": "analysis.rs",
+      "count": 1
     },
     {
       "path": "artillery.rs",
@@ -1247,7 +1294,7 @@
     },
     {
       "path": "entity/entity.rs",
-      "count": 112
+      "count": 114
     },
     {
       "path": "entity/mod.rs",
@@ -1275,11 +1322,15 @@
     },
     {
       "path": "map.rs",
-      "count": 16
+      "count": 19
+    },
+    {
+      "path": "map/atlas.rs",
+      "count": 1
     },
     {
       "path": "mod.rs",
-      "count": 27
+      "count": 29
     },
     {
       "path": "mortar.rs",
@@ -1291,11 +1342,11 @@
     },
     {
       "path": "player_state.rs",
-      "count": 9
+      "count": 11
     },
     {
       "path": "replay.rs",
-      "count": 13
+      "count": 12
     },
     {
       "path": "scoring.rs",
@@ -1303,7 +1354,7 @@
     },
     {
       "path": "services/ability_orders.rs",
-      "count": 11
+      "count": 12
     },
     {
       "path": "services/combat/mod.rs",
@@ -1395,7 +1446,7 @@
     },
     {
       "path": "setup.rs",
-      "count": 20
+      "count": 21
     },
     {
       "path": "setup/dev_scenarios.rs",
@@ -1407,7 +1458,7 @@
     },
     {
       "path": "snapshot.rs",
-      "count": 3
+      "count": 4
     },
     {
       "path": "systems.rs",
@@ -1415,7 +1466,7 @@
     },
     {
       "path": "teams.rs",
-      "count": 16
+      "count": 18
     },
     {
       "path": "upgrade.rs",

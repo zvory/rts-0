@@ -136,6 +136,7 @@ async fn main() {
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
         .route("/maps/catalog", get(map_catalog_handler))
+        .route("/maps/atlas", get(map_atlas_handler))
         .route("/maps/save", post(map_save_handler))
         .route("/api/matches", get(matches_handler))
         .route(
@@ -1720,6 +1721,23 @@ struct MapCatalogResponse {
     maps: Vec<MapCatalogEntry>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MapAtlasQuery {
+    map: String,
+    player_count: Option<usize>,
+    seed: Option<u32>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MapAtlasResponse {
+    map: String,
+    player_count: usize,
+    seed: u32,
+    atlas: serde_json::Value,
+}
+
 /// GET /maps/catalog — list built-in authored map JSON files for editor selection.
 async fn map_catalog_handler(State(state): State<AppState>) -> impl IntoResponse {
     let mut entries = match tokio::fs::read_dir(&state.maps_dir).await {
@@ -1774,6 +1792,38 @@ async fn map_catalog_handler(State(state): State<AppState>) -> impl IntoResponse
     }
     maps.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.file.cmp(&b.file)));
     Json(MapCatalogResponse { maps }).into_response()
+}
+
+/// GET /maps/atlas — dev/editor-only static atlas diagnostics for an authored map.
+async fn map_atlas_handler(Query(query): Query<MapAtlasQuery>) -> impl IntoResponse {
+    let map_name = query.map.trim();
+    if map_name.is_empty() {
+        return (StatusCode::BAD_REQUEST, "map query is required").into_response();
+    }
+    let player_count = query.player_count.unwrap_or(4);
+    if !(1..=4).contains(&player_count) {
+        return (
+            StatusCode::BAD_REQUEST,
+            "playerCount must be between 1 and 4",
+        )
+            .into_response();
+    }
+    let seed = query.seed.unwrap_or(0);
+    let map = match Map::load(map_name, player_count, seed) {
+        Ok(map) => map,
+        Err(err) => {
+            rts_server::log_warn!(%err, map = %map_name, "map atlas: load failed");
+            return (StatusCode::NOT_FOUND, err).into_response();
+        }
+    };
+
+    Json(MapAtlasResponse {
+        map: map_name.to_string(),
+        player_count,
+        seed,
+        atlas: map.atlas_diagnostics(),
+    })
+    .into_response()
 }
 
 /// POST /maps/save — write a map JSON file directly into the server's assets/maps directory.
