@@ -1,12 +1,13 @@
-# Phase 3 - Control Groups and Command Sending
+# Phase 3 - Control Groups and Command Guard Hardening
 
 Status: Not started.
 
 ## Goal
 
-Prevent control groups and outgoing human commands from bypassing the selection supply budget.
-Control-group save, add, and recall should preserve only legal selections, and command sending
-should refuse to send over-budget unit lists that the server would reject.
+Prevent control groups from bypassing the selection supply budget and harden the Phase 1
+command-send guard against the new control-group paths. Control-group save, add, and recall should
+preserve only legal selections, and outgoing commands should continue to refuse over-budget unit
+lists that the server would reject.
 
 ## Scope
 
@@ -23,14 +24,17 @@ should refuse to send over-budget unit lists that the server would reject.
   - pre-admit Command Cars from the group so their bonus is reliable
   - fill remaining entities in saved order until budget is full
   - update selection to the admitted set
-- Apply the same client budget assertion to outgoing human commands in command composition/sending
-  paths. Honest clients should not send commands the Phase 1 server validation will reject.
+- Re-audit outgoing human command composition/sending paths after control-group changes. The Phase 1
+  command-send guard should remain the single client-side send gate; extend it only for paths missed
+  by Phase 1 or introduced by this phase. Honest clients should not send commands the Phase 1 server
+  validation will reject.
 - Keep AI command generation unaffected.
 
 ## Expected Deliverables
 
 - Control groups cannot save, add, or recall over-budget human selections.
-- Outgoing human command unit lists are checked against the client budget before send.
+- Outgoing human command unit lists are still checked against the client budget before send, using
+  the same guard introduced in Phase 1.
 - Overflow from control-group recall or command sending can trigger the same UI feedback signal as
   ordinary selection overflow.
 - Double-tap camera jump still operates on the recalled legal control-group entities.
@@ -42,7 +46,8 @@ should refuse to send over-budget unit lists that the server would reject.
   - over-budget Tanks
   - one and multiple Command Cars
   - a Command Car late in stored order
-- Add or update command composition tests proving over-budget commands are not sent.
+- Add or update command composition tests proving over-budget commands restored through
+  control-group recall are not sent.
 - Run the relevant targeted Node test files only.
 
 ## Manual Testing Focus
@@ -53,5 +58,6 @@ group and normal command hotkeys still issue orders.
 
 ## Handoff Expectations
 
-The handoff must name every control-group operation touched and explain how outgoing command
-overflow is presented to the player or suppressed.
+The handoff must name every control-group operation touched, identify any additions made to the
+Phase 1 command-send guard, and explain how outgoing command overflow is presented to the player or
+suppressed.

@@ -15,10 +15,15 @@ or introduce generated client configuration for command-budget values.
   - `client/src/input/control_groups.js`
   - any `GameState` selection/control-group helpers
   - command composition paths under `client/src/input/` and `client/src/command_composer.js`
+  - minimap and HUD command issuing paths that can send selected unit ids
+- Inventory current count-cap sites, including both helper-level `.slice(0, 12)` caps and
+  `GameState.MAX_SELECTION_SIZE` enforcement in selection/control-group helpers.
 - Inventory selected-panel rendering in `client/src/hud.js` and related CSS.
 - Inventory server command validation in `server/crates/sim/src/game/services/commands.rs`,
   including `MAX_UNITS_PER_COMMAND`, `dedupe_cap_units`, planner facts, and every `SimCommand`
   variant that carries unit ids.
+- Inventory the command source seam for human, AI, replay, and dev-scenario commands, including
+  `Game::enqueue`, room-task live AI enqueueing, and any replay/dev harness enqueue paths.
 - Inventory balance/config mirrors:
   - `server/crates/rules/src/balance.rs`
   - `server/src/config.rs`
@@ -32,6 +37,8 @@ or introduce generated client configuration for command-budget values.
 - A short note in this phase file listing:
   - every old 12-unit cap site found
   - every server command unit-list validation site found
+  - every client command-send path that must be guarded before or with server rejection
+  - how Phase 1 should distinguish or explicitly handle live AI commands
   - the recommended mirror strategy for command-budget constants and weights
   - the tests that later phases should extend
 - No gameplay behavior changes.
@@ -48,5 +55,6 @@ None. This is an inventory phase with no intended player-facing change.
 
 ## Handoff Expectations
 
-The handoff must name the chosen mirror strategy and the exact files Phase 1 should edit for server
-budget validation.
+The handoff must name the chosen mirror strategy, the exact files Phase 1 should edit for server
+budget validation, the client send paths Phase 1 must guard, and the command-source policy Phase 1
+must implement or deliberately revise.
