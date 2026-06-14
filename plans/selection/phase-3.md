@@ -1,0 +1,57 @@
+# Phase 3 - Control Groups and Command Sending
+
+Status: Not started.
+
+## Goal
+
+Prevent control groups and outgoing human commands from bypassing the selection supply budget.
+Control-group save, add, and recall should preserve only legal selections, and command sending
+should refuse to send over-budget unit lists that the server would reject.
+
+## Scope
+
+- Apply budget admission to `client/src/input/control_groups.js` and any underlying `GameState`
+  control-group storage helpers.
+- Decide from Phase 0 inventory whether illegal over-budget saved groups can exist from older
+  runtime state. If so, recall should filter to a legal admitted set rather than restoring the full
+  group.
+- Control-group save should store the current legal selection.
+- Control-group add should add current legal selection candidates until the saved group reaches a
+  legal budget. It should ignore overflow instead of trimming unrelated existing group members.
+- Control-group recall should:
+  - remove dead/missing/invisible entities according to existing behavior
+  - pre-admit Command Cars from the group so their bonus is reliable
+  - fill remaining entities in saved order until budget is full
+  - update selection to the admitted set
+- Apply the same client budget assertion to outgoing human commands in command composition/sending
+  paths. Honest clients should not send commands the Phase 1 server validation will reject.
+- Keep AI command generation unaffected.
+
+## Expected Deliverables
+
+- Control groups cannot save, add, or recall over-budget human selections.
+- Outgoing human command unit lists are checked against the client budget before send.
+- Overflow from control-group recall or command sending can trigger the same UI feedback signal as
+  ordinary selection overflow.
+- Double-tap camera jump still operates on the recalled legal control-group entities.
+
+## Verification
+
+- Add focused tests for control-group save/add/recall with:
+  - 24 one-supply units
+  - over-budget Tanks
+  - one and multiple Command Cars
+  - a Command Car late in stored order
+- Add or update command composition tests proving over-budget commands are not sent.
+- Run the relevant targeted Node test files only.
+
+## Manual Testing Focus
+
+Assign and recall legal and over-budget groups, including Tank-heavy groups and groups with
+Command Cars late in order. Confirm double-tap camera jump still centers on the recalled legal
+group and normal command hotkeys still issue orders.
+
+## Handoff Expectations
+
+The handoff must name every control-group operation touched and explain how outgoing command
+overflow is presented to the player or suppressed.
