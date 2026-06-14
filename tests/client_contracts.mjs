@@ -4009,6 +4009,91 @@ function fakeAudioContext() {
     Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,450,404",
     "shift-add can admit a Command Car bonus and then later candidates",
   );
+  budgetSelectionState.setControlGroup(0, budgetRiflemen.map((entity) => entity.id));
+  assert(
+    budgetSelectionState.controlGroups[0].length === BASE_COMMAND_SUPPLY_CAP,
+    "control-group save admits 24 one-supply units",
+  );
+  assert(
+    budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
+    "control-group save records overflow for ignored one-supply units",
+  );
+  budgetSelectionState.setControlGroup(1, budgetTanks.map((entity) => entity.id));
+  assert(
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    "control-group save ignores over-budget Tanks",
+  );
+  budgetSelectionState.addToControlGroup(1, [budgetRiflemen[0].id]);
+  assert(
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    "control-group add ignores overflow without trimming existing legal members",
+  );
+  budgetSelectionState.addToControlGroup(1, [budgetCommandCar.id, budgetTanks[4].id]);
+  assert(
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403,450,404",
+    "control-group add can admit one Command Car bonus and then later candidates",
+  );
+  const secondBudgetCommandCar = {
+    id: 451,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 96,
+    y: 20,
+    hp: 80,
+    maxHp: 80,
+    state: STATE.IDLE,
+  };
+  budgetSelectionState.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 80,
+    entities: budgetRiflemen.concat(budgetTanks, budgetCommandCar, secondBudgetCommandCar),
+    events: [],
+  });
+  budgetSelectionState.setControlGroup(2, budgetTanks.map((entity) => entity.id).concat([budgetCommandCar.id, secondBudgetCommandCar.id]));
+  assert(
+    budgetSelectionState.controlGroups[2].join(",") === "450,451,400,401,402,403,404",
+    "control-group save stacks multiple Command Car bonuses",
+  );
+  budgetSelectionState.controlGroups[3] = budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id);
+  const recalledLateCar = budgetSelectionState.selectControlGroup(3);
+  assert(
+    recalledLateCar.join(",") === "450,400,401,402,403,404",
+    "control-group recall pre-admits a Command Car stored late in old runtime order",
+  );
+  assert(
+    budgetSelectionState.controlGroups[3].join(",") === "450,400,401,402,403,404",
+    "control-group recall rewrites old over-budget runtime groups to legal admitted order",
+  );
+  budgetSelectionState.controlGroups[4] = budgetTanks.map((entity) => entity.id);
+  const recalledOverBudgetTanks = budgetSelectionState.selectControlGroup(4);
+  assert(
+    recalledOverBudgetTanks.join(",") === "400,401,402,403",
+    "control-group recall filters old over-budget Tank groups before selection",
+  );
+  assert(
+    budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
+    "control-group recall records overflow feedback for old over-budget groups",
+  );
+  const controlGroupCommands = [];
+  const controlGroupToasts = [];
+  const guardedControlGroupIssuer = {
+    issueCommand(command) {
+      const budget = commandWithinBudget(budgetSelectionState, command);
+      if (!budget.ok) {
+        controlGroupToasts.push(budget);
+        return { sent: false, blocked: "commandBudget", budget };
+      }
+      controlGroupCommands.push(command);
+      return { sent: true };
+    },
+  };
+  guardedControlGroupIssuer.issueCommand(cmd.move(Array.from(budgetSelectionState.selection), 10, 20));
+  guardedControlGroupIssuer.issueCommand(cmd.move(budgetTanks.map((entity) => entity.id), 10, 20));
+  assert(controlGroupCommands.length === 1, "legal recalled control-group command is sent through the budget guard");
+  assert(controlGroupToasts.length === 1, "over-budget command restored from stale group data is blocked before send");
 
   // Command-card submenu is local-only and is closed by mode-changing actions.
   state.openWorkerBuildMenu();
@@ -4030,7 +4115,7 @@ function fakeAudioContext() {
   state.setSelection([1]);
   assert(state.commandCardMode === null, "selection replacement closes the worker build submenu");
 
-  // Control groups are local-only, own controllable entities only, and capped like selection.
+  // Control groups are local-only, own controllable entities only, and budgeted like selection.
   const cgState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   const ownControllables = Array.from({ length: 14 }, (_, i) => ({
     id: 100 + i,
@@ -4062,11 +4147,11 @@ function fakeAudioContext() {
   assertHasMethod(cgState, "controlGroupEntities", "GameState");
   cgState.setControlGroup(0, [100, 160, 101, 161, 112, 113, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111]);
   assert(
-    cgState.controlGroups[0].join(",") === "100,101,112,113,102,103,104,105,106,107,108,109",
-    "control groups store own units/buildings only in selection order up to 12",
+    cgState.controlGroups[0].join(",") === "100,101,112,113,102,103,104,105,106,107,108,109,110,111",
+    "control groups store own units/buildings only in selection order within budget",
   );
   cgState.addToControlGroup(0, [110, 111, 112, 113]);
-  assert(cgState.controlGroups[0].length === 12, "adding to a full control group ignores overflow");
+  assert(cgState.controlGroups[0].length === 14, "adding duplicates to a budgeted control group is stable");
   cgState.setControlGroup(1, [100, 101]);
   cgState.addToControlGroup(1, [101, 102, 103]);
   assert(cgState.controlGroups[1].join(",") === "100,101,102,103", "adding to a control group dedupes existing ids");

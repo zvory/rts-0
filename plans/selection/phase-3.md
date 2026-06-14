@@ -1,6 +1,6 @@
 # Phase 3 - Control Groups and Command Guard Hardening
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

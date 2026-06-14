@@ -172,11 +172,6 @@ export class GameState {
     this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
   }
 
-  /** Temporary count cap for control-group storage until selection Phase 3. */
-  static get MAX_SELECTION_SIZE() {
-    return 12;
-  }
-
   /** World pixels per tile. */
   get tileSize() {
     return this.map.tileSize;
@@ -936,9 +931,10 @@ export class GameState {
    */
   setControlGroup(slot, ids) {
     if (!this._validControlGroupSlot(slot)) return [];
-    const next = this._ownControllableIds(ids, GameState.MAX_SELECTION_SIZE);
-    this.controlGroups[slot] = next;
-    return next.slice();
+    const admitted = this._admitControlGroupIds(ids);
+    this.controlGroups[slot] = admitted.ids;
+    this._recordSelectionBudgetOverflow(admitted);
+    return admitted.ids.slice();
   }
 
   /**
@@ -949,17 +945,11 @@ export class GameState {
    */
   addToControlGroup(slot, ids) {
     if (!this._validControlGroupSlot(slot)) return [];
-    const merged = this.controlGroups[slot] ? this.controlGroups[slot].slice() : [];
-    const seen = new Set(merged);
-    const additions = this._ownControllableIds(ids, GameState.MAX_SELECTION_SIZE);
-    for (const id of additions) {
-      if (merged.length >= GameState.MAX_SELECTION_SIZE) break;
-      if (seen.has(id)) continue;
-      merged.push(id);
-      seen.add(id);
-    }
-    this.controlGroups[slot] = merged;
-    return merged.slice();
+    this._pruneControlGroup(slot);
+    const admitted = this._admitControlGroupIds(ids, { baseIds: this.controlGroups[slot] || [] });
+    this.controlGroups[slot] = admitted.ids;
+    this._recordSelectionBudgetOverflow(admitted);
+    return admitted.ids.slice();
   }
 
   /**
@@ -985,21 +975,22 @@ export class GameState {
    */
   selectControlGroup(slot) {
     if (!this._validControlGroupSlot(slot)) return [];
-    this._pruneControlGroup(slot);
+    const pruned = this._pruneControlGroup(slot);
     const ids = this.controlGroups[slot] || [];
-    if (ids.length > 0) this.setSelection(ids);
-    return ids.slice();
+    if (ids.length === 0) return [];
+    this.setSelection(ids);
+    if (pruned?.overflow) this._recordSelectionBudgetOverflow(pruned);
+    return Array.from(this.selection);
   }
 
   _validControlGroupSlot(slot) {
     return Number.isInteger(slot) && slot >= 0 && slot < this.controlGroups.length;
   }
 
-  _ownControllableIds(ids, limit) {
+  _ownControllableIds(ids) {
     const out = [];
     const seen = new Set();
     for (const id of ids || []) {
-      if (out.length >= limit) break;
       if (seen.has(id)) continue;
       const e = this._curById.get(id);
       if (!e || e.owner !== this.playerId) continue;
@@ -1010,32 +1001,24 @@ export class GameState {
     return out;
   }
 
+  _admitControlGroupIds(ids, { baseIds = [] } = {}) {
+    const base = this._ownControllableIds(baseIds);
+    const candidates = this._ownControllableIds(ids);
+    return admitSelectionIds(this, candidates, { baseIds: base });
+  }
+
   _pruneControlGroups() {
     for (let i = 0; i < this.controlGroups.length; i++) this._pruneControlGroup(i);
   }
 
   _pruneControlGroup(slot) {
     const group = this.controlGroups[slot];
-    if (!group || group.length === 0) return;
-    const live = [];
-    let changed = false;
-    const seen = new Set();
-    for (const id of group) {
-      const e = this._curById.get(id);
-      if (
-        e &&
-        e.owner === this.playerId &&
-        (isUnit(e.kind) || isBuilding(e.kind)) &&
-        !seen.has(id) &&
-        live.length < GameState.MAX_SELECTION_SIZE
-      ) {
-        live.push(id);
-        seen.add(id);
-      } else {
-        changed = true;
-      }
+    if (!group || group.length === 0) return null;
+    const admitted = this._admitControlGroupIds(group);
+    if (admitted.ids.length !== group.length || admitted.ids.some((id, index) => id !== group[index])) {
+      this.controlGroups[slot] = admitted.ids;
     }
-    if (changed) this.controlGroups[slot] = live;
+    return admitted;
   }
 
   // --- build placement (client-only) -------------------------------------
