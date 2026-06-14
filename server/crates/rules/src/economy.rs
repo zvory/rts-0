@@ -6,6 +6,19 @@ use crate::defs;
 use crate::faction::catalog_for_or_default;
 use crate::EntityKind;
 
+/// The faction plan intentionally keeps resource costs shaped as fixed Steel/Oil fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResourceCost {
+    pub steel: u32,
+    pub oil: u32,
+}
+
+impl ResourceCost {
+    pub const fn new(steel: u32, oil: u32) -> Self {
+        Self { steel, oil }
+    }
+}
+
 /// Which units a given building can train.
 pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
     let units = defs::building_def(building_kind)
@@ -104,6 +117,12 @@ pub fn node_amount(kind: EntityKind) -> u32 {
     defs::node_def(kind).map(|d| d.amount).unwrap_or(0)
 }
 
+/// Cost of a unit or building kind as fixed Steel/Oil fields.
+pub fn resource_cost(kind: EntityKind) -> ResourceCost {
+    let (steel, oil) = cost(kind);
+    ResourceCost::new(steel, oil)
+}
+
 /// Cost of a unit or building kind as `(steel, oil)`. Returns `(0, 0)` for unknown kinds.
 pub fn cost(kind: EntityKind) -> (u32, u32) {
     if let Some(s) = defs::unit_def(kind).map(|d| d.stats) {
@@ -113,6 +132,11 @@ pub fn cost(kind: EntityKind) -> (u32, u32) {
     } else {
         (0, 0)
     }
+}
+
+/// Human-readable notice for a fixed Steel/Oil resource shortage.
+pub fn resource_shortage_notice_for_cost(steel: u32, oil: u32, cost: ResourceCost) -> &'static str {
+    resource_shortage_notice(steel, oil, cost.steel, cost.oil)
 }
 
 /// Human-readable notice for a resource shortage. Oil is reported first because

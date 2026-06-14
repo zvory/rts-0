@@ -46,6 +46,15 @@ for (const anchor of [
   assert(inventory.includes(`## ${anchor}`), `inventory is missing section: ${anchor}`);
 }
 
+const balanceDoc = read("docs/design/balance.md");
+for (const anchor of [
+  "### 5.0 Faction economy contract",
+  "Approved direct Steel/Oil/Supply modules",
+  "Generic resources are deferred.",
+]) {
+  assert(balanceDoc.includes(anchor), `balance design is missing resource policy note: ${anchor}`);
+}
+
 const phase = read("plans/faction/phase-0.md");
 assert(
   phase.includes("Status: Done"),

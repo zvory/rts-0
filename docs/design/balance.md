@@ -11,6 +11,35 @@ colors, and command-card descriptors). Keep both in sync; run
 `node scripts/check-faction-catalog-parity.mjs` to mechanically compare the Rust-authoritative
 default faction catalog to the client descriptors.
 
+### 5.0 Faction economy contract
+
+The faction rollout keeps Steel, Oil, and Supply as the global economy contract. Faction catalogs
+may decide which global units, buildings, upgrades, and abilities are legal for a player and may
+later define different starting Steel/Oil/Supply loadouts or costs, but they still use fixed
+`steel`, `oil`, `supplyUsed`, and `supplyCap` fields. Start-map resource nodes remain Steel and Oil
+nodes. Score values, replay analysis values, command-card costs, affordability checks, refunds, and
+supply reservation are intentionally Steel/Oil/Supply-shaped.
+
+Approved direct Steel/Oil/Supply modules for this plan are:
+
+- `server/crates/rules/src/defs.rs`, `server/crates/rules/src/economy.rs`, and
+  `server/crates/rules/src/balance.rs` for authoritative costs, node amounts, and supply values.
+- `server/crates/sim/src/game/player_state.rs`, `services/commands.rs`,
+  `services/construction.rs`, `services/economy.rs`, `services/supply.rs`, `scoring.rs`,
+  `analysis.rs`, `snapshot.rs`, `replay.rs`, and `setup.rs` for fixed-field simulation,
+  score/replay analysis, and start/loadout shims.
+- `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`,
+  `server/crates/sim/src/protocol.rs`, and `client/src/protocol.js` for the mirrored wire and
+  compact transport fields.
+- `client/src/config.js`, `client/src/hud.js`, `client/src/hud_command_card.js`,
+  `client/src/observer_analysis_overlay.js`, `client/src/scoreboard.js`, and resource rendering
+  helpers for current HUD, command-card, replay-analysis, score, and map-resource display.
+
+Generic resources are deferred. If a future faction needs a non-Steel/Oil resource, that work must
+be a separate migration across player state, snapshots, compact transport, replay artifacts,
+observer analysis, scoring, HUD rows, command-card costs, protocol parity, and prediction/WASM
+compatibility.
+
 ### 5.1 Target theme and MVP combat loop
 
 The target gameplay direction is a simplified World War II-inspired battlefield with

@@ -131,6 +131,12 @@ pub(crate) fn promote_ready_orders(
             if !world_ability_facing_ready(entities, id, ability, x, y) {
                 continue;
             }
+            let faction_id = players
+                .iter()
+                .find(|p| p.id == owner)
+                .map(|p| p.faction_id.as_str())
+                .unwrap_or(crate::rules::faction::DEFAULT_FACTION_ID)
+                .to_string();
             let launched = launch_world_ability(
                 map,
                 entities,
@@ -141,6 +147,7 @@ pub(crate) fn promote_ready_orders(
                 mortar_shells,
                 events,
                 owner,
+                &faction_id,
                 id,
                 ability,
                 x,
@@ -181,6 +188,12 @@ pub(crate) fn promote_ready_orders(
                     execute_artillery_point_fire(entities, id, x, y);
                     continue;
                 }
+                let faction_id = players
+                    .iter()
+                    .find(|p| p.id == owner)
+                    .map(|p| p.faction_id.as_str())
+                    .unwrap_or(crate::rules::faction::DEFAULT_FACTION_ID)
+                    .to_string();
                 order_or_launch_world_ability(
                     map,
                     entities,
@@ -192,6 +205,7 @@ pub(crate) fn promote_ready_orders(
                     mortar_shells,
                     events,
                     owner,
+                    &faction_id,
                     id,
                     ability,
                     x,
@@ -204,7 +218,12 @@ pub(crate) fn promote_ready_orders(
                 let Some(owner) = entities.get(id).map(|e| e.owner) else {
                     continue;
                 };
-                launch_self_ability(entities, owner, id, ability);
+                let faction_id = players
+                    .iter()
+                    .find(|p| p.id == owner)
+                    .map(|p| p.faction_id.as_str())
+                    .unwrap_or(crate::rules::faction::DEFAULT_FACTION_ID);
+                launch_self_ability(entities, faction_id, owner, id, ability);
             }
             PromotedIntent::SetupAntiTankGuns { x, y } => {
                 execute_anti_tank_gun_setup(entities, id, x, y);

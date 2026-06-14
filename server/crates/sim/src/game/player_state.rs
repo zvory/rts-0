@@ -1,6 +1,7 @@
 use super::PlayerState;
 use crate::config;
 use crate::game::entity::EntityKind;
+use crate::rules::economy::ResourceCost;
 
 impl PlayerState {
     pub(crate) fn reset_for_dev_scenario(&mut self, start_tile: (u32, u32)) {
@@ -26,9 +27,17 @@ impl PlayerState {
         true
     }
 
+    pub(crate) fn spend_cost(&mut self, cost: ResourceCost) -> bool {
+        self.spend_resources(cost.steel, cost.oil)
+    }
+
     pub(crate) fn refund_resources(&mut self, steel: u32, oil: u32) {
         self.steel = self.steel.saturating_add(steel);
         self.oil = self.oil.saturating_add(oil);
+    }
+
+    pub(crate) fn refund_cost(&mut self, cost: ResourceCost) {
+        self.refund_resources(cost.steel, cost.oil);
     }
 
     pub(crate) fn add_gathered_resources(&mut self, kind: EntityKind, amount: u32) {
