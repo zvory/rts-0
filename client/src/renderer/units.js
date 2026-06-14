@@ -136,7 +136,8 @@ export function _tankMotionVisual(e, facing, state, body) {
 }
 
 function workerIsBusy(e) {
-  return e.kind === KIND.WORKER && (e.latchedNode || e.state === STATE.BUILD);
+  return (e.kind === KIND.WORKER || e.kind === KIND.EKATERINA_ENGINEER) &&
+    (e.latchedNode || e.state === STATE.BUILD);
 }
 
 function drawWorkerBusyIndicator(g, r) {
@@ -352,10 +353,26 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   g.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
   g.lineStyle(2, 0x1a1712, 0.95);
 
-  if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER) {
+  if (
+    e.kind === KIND.RIFLEMAN ||
+    e.kind === KIND.MACHINE_GUNNER ||
+    e.kind === KIND.EKATERINA_CONSCRIPT ||
+    e.kind === KIND.EKATERINA_SIGNAL_TEAM
+  ) {
     drawInfantryBase(g, r, tint, facing);
-    if (e.kind === KIND.RIFLEMAN) {
+    if (e.kind === KIND.RIFLEMAN || e.kind === KIND.EKATERINA_CONSCRIPT || e.kind === KIND.EKATERINA_SIGNAL_TEAM) {
       drawInfantryRifle(g, r, facing, recoil);
+      if (e.kind === KIND.EKATERINA_CONSCRIPT) {
+        g.lineStyle(2, 0xd8c267, 0.88);
+        g.moveTo(-r * 0.4, -r * 0.78);
+        g.lineTo(r * 0.36, -r * 0.78);
+      } else if (e.kind === KIND.EKATERINA_SIGNAL_TEAM) {
+        g.lineStyle(2, 0x8fd5ff, 0.92);
+        g.drawCircle(-r * 0.36, -r * 0.62, r * 0.28);
+        g.moveTo(-r * 0.36, -r * 0.94);
+        g.lineTo(-r * 0.36, -r * 1.46);
+        g.lineTo(r * 0.08, -r * 1.12);
+      }
     } else {
       drawInfantryMachineGun(g, r, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
     }
@@ -419,11 +436,19 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     ]);
     g.endFill();
     if (workerIsBusy(e)) drawWorkerBusyIndicator(g, r);
+    if (e.kind === KIND.EKATERINA_ENGINEER) {
+      g.lineStyle(2, 0xd8c267, 0.9);
+      g.moveTo(-r * 0.55, r * 0.2);
+      g.lineTo(r * 0.55, -r * 0.2);
+      g.drawCircle(r * 0.45, -r * 0.28, r * 0.18);
+    }
   }
 
   // Facing indicator: a short pale tick from center outward.
   if (
     e.kind !== KIND.RIFLEMAN &&
+    e.kind !== KIND.EKATERINA_CONSCRIPT &&
+    e.kind !== KIND.EKATERINA_SIGNAL_TEAM &&
     e.kind !== KIND.MACHINE_GUNNER &&
     e.kind !== KIND.ANTI_TANK_GUN &&
     e.kind !== KIND.MORTAR_TEAM &&

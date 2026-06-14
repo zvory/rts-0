@@ -153,7 +153,7 @@ impl EntityStore {
             return false;
         };
         worker.hp > 0
-            && worker.kind == EntityKind::Worker
+            && worker.kind.is_worker()
             && worker.order().gather_node() == Some(node_id)
             && worker.gather_phase() == Some(GatherPhase::Harvesting)
     }

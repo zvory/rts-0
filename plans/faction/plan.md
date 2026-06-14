@@ -207,6 +207,10 @@ and balance documentation. This phase is where faction choice becomes ready for 
 
 - [Faction Lifecycle Matrix](lifecycle-matrix.md) — assignment, AI, prediction, replay, branch,
   spectator, dev-tool, and match-history source-of-truth tracker.
+- [Ekaterina Faction Brief](ekaterina-brief.md) — approved product identity, strategic role,
+  economy, production, readability, and implementation gates for the first real second faction.
+- [Ekaterina Rules and Balance Spec](ekaterina-rules-spec.md) — approved Phase 10/11 loadout,
+  roster, costs, ability policy, assignment path, AI/prediction policy, and command-id namespace.
 
 ## Testing Strategy
 

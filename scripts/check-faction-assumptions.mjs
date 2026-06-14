@@ -80,7 +80,7 @@ for (const pathName of [
 assert(!matrix.includes("| TBD |"), "lifecycle matrix should name owning checks instead of TBD");
 
 const rulesKind = read("server/crates/rules/src/kind.rs");
-assert(rulesKind.includes("pub const ALL: [EntityKind; 18]"), "EntityKind::ALL count changed");
+assert(rulesKind.includes("pub const ALL: [EntityKind; 24]"), "EntityKind::ALL count changed");
 
 const protocol = read("server/crates/protocol/src/lib.rs");
 const clientProtocol = read("client/src/protocol.js");
@@ -89,8 +89,8 @@ for (const token of ["WORKER", "CITY_CENTRE", "STEEL", "OIL"]) {
   assert(clientProtocol.includes(`${token}:`), `client protocol missing ${token}`);
 }
 assert(
-  protocol.includes("COMPACT_SNAPSHOT_VERSION: u8 = 19") &&
-    clientProtocol.includes("COMPACT_SNAPSHOT_VERSION = 19"),
+  protocol.includes("COMPACT_SNAPSHOT_VERSION: u8 = 20") &&
+    clientProtocol.includes("COMPACT_SNAPSHOT_VERSION = 20"),
   "compact snapshot version changed; update protocol parity and inventory deliberately",
 );
 
@@ -176,11 +176,14 @@ const sourceRoots = [
 ];
 const offenders = [];
 const approvedSpecialCaseBudgets = new Map([
-  ["server/crates/rules/src/faction.rs", 78],
+  // Phase 10: the real Ekaterina catalog adds new explicit current/default catalog rows, and
+  // commands.rs still carries in-file command-service tests that exercise cross-faction rejection.
+  // Keep the ratchet explicit until those helpers shrink or test modules move out of counted files.
+  ["server/crates/rules/src/faction.rs", 83],
   ["server/crates/rules/src/economy.rs", 98],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
-  ["server/crates/sim/src/game/services/commands.rs", 225],
+  ["server/crates/sim/src/game/services/commands.rs", 234],
   ["server/crates/sim/src/game/invariants.rs", 13],
 ]);
 const budgetOverruns = [];

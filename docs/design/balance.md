@@ -43,6 +43,13 @@ be a separate migration across player state, snapshots, compact transport, repla
 observer analysis, scoring, HUD rows, command-card costs, protocol parity, and prediction/WASM
 compatibility.
 
+Phase 9 approves Ekaterina as the first real second faction in
+`plans/faction/ekaterina-brief.md` and `plans/faction/ekaterina-rules-spec.md`. Ekaterina still
+uses Steel, Oil, and Supply. Phase 10 implements only the approved start/economy/first-production
+slice through `dev:ekaterina_opening`; Phase 11 adds the approved baseline combat/signature
+ability slice with the Signal Team and Mark Target ability. Normal lobby selection, AI,
+prediction, generic resources, and any roster beyond those specs require later explicit phases.
+
 ### 5.1 Target theme and MVP combat loop
 
 The target gameplay direction is a simplified World War II-inspired battlefield with
@@ -196,6 +203,13 @@ authoritative `rules::defs` records.
   effects do not stack; a shorter refresh cannot reduce an active buff. Enemies see the status only
   when the affected unit is otherwise visible through authoritative fog. Fake Army and allied-unit
   support are deferred.
+- **Signal Team Mark Target** (hotkey `D`): Ekaterina Signal Teams are trained from the Workshop
+  for 90 steel / 25 oil, use 2 supply, take 420 ticks (~14s), have 42 HP, 2 damage, 4-tile attack
+  range, 24-tick attack cooldown, 1.45 px/tick movement, and 9 sight. Mark Target costs 15 steel,
+  has 8-tile range, a 750-tick (~25s) cooldown, can be queued, shows a marker immediately, and
+  pulses after 60 ticks (~2s). The pulse has a 1.25-tile radius, deals 20 normal damage to units
+  only, includes friendly fire, and does not damage buildings. Fog-filtered marker events may omit
+  the caster id so enemies who can see the target point do not learn hidden Signal Team positions.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
@@ -244,6 +258,9 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| ekaterina_engineer | 35 | 3 | 1 | 26 | 2.0 | 7 | 50 | 0 | 1 | 360 (~12s); Ekaterina worker/gatherer/builder; trained at Command Post |
+| ekaterina_conscript | 38 | 4 | 4 | 18 | 1.7 | 8 | 45 | 0 | 1 | 300 (~10s); Ekaterina Phase 10 baseline infantry; trained at Workshop |
+| ekaterina_signal_team | 42 | 2 | 4 | 24 | 1.45 | 9 | 90 | 25 | 2 | 420 (~14s); Ekaterina Phase 11 ability unit; trained at Workshop; carries Mark Target |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
@@ -256,6 +273,14 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 620       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
+| ekaterina_command_post     | Command Post       | 520 | 9     | 200 steel | 3x3 | 400 | Ekaterina start building; trains ekaterina_engineer; +8 supply |
+| ekaterina_supply_cache     | Supply Cache       | 95  | 4     | 80 steel | 2x2 | 260 | Ekaterina supply building; requires Command Post; +8 supply |
+| ekaterina_workshop         | Workshop           | 260 | 6     | 140 steel + 35 oil | 3x2 | 520 | Ekaterina first production building; requires Command Post; trains ekaterina_conscript and ekaterina_signal_team |
+
+Ekaterina standard start (`ekaterina.standard`) begins with 85 Steel, 0 Oil, one completed
+Command Post, and four completed Engineers. It uses existing Steel/Oil map patches and the same
+hard supply cap of 200. The Phase 10 command-card slice exposes Engineer build commands for Supply
+Cache and Workshop, Command Post training for Engineers, and Workshop training for Conscripts.
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

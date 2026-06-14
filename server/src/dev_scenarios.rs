@@ -16,6 +16,13 @@ pub struct DevScenarioSpec {
     pub launches: &'static [DevScenarioLaunch],
 }
 
+const EKATERINA_OPENING_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "ekaterina_opening",
+    unit: EntityKind::EkaterinaEngineer,
+    count: 1,
+    blocker: None,
+}];
+
 const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
@@ -466,7 +473,13 @@ const FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES: [DevScenarioLaunch; 3] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 6] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 7] = [
+    DevScenarioSpec {
+        id: "ekaterina_opening",
+        title: "Ekaterina Opening",
+        description: "Phase 10 Ekaterina start, resources, supply, and first production loop.",
+        launches: &EKATERINA_OPENING_LAUNCHES,
+    },
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -546,6 +559,7 @@ pub fn parse_dev_scenario_room(raw: &str) -> Option<DevScenarioLaunch> {
 
 pub fn parse_dev_scenario_blocker(id: &str, blocker: Option<&str>) -> Option<Option<EntityKind>> {
     match (id, blocker) {
+        ("ekaterina_opening", None) => Some(None),
         ("vehicle_small_block_baseline", None) => Some(Some(EntityKind::Worker)),
         (_, None) => Some(None),
         ("vehicle_small_block_baseline", Some("none")) => Some(None),
@@ -568,6 +582,7 @@ pub fn parse_dev_scenario_blocker(id: &str, blocker: Option<&str>) -> Option<Opt
 pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
     match unit {
         EntityKind::Worker => "worker",
+        EntityKind::EkaterinaEngineer => "engineer",
         EntityKind::Rifleman => "rifleman",
         EntityKind::MachineGunner => "machine gunner",
         EntityKind::AntiTankGun => "anti-tank gun",
@@ -594,6 +609,15 @@ mod tests {
 
     #[test]
     fn parses_supported_launches() {
+        assert_eq!(
+            parse_dev_scenario_room("ekaterina_opening:unit=ekaterina_engineer:count=1"),
+            Some(DevScenarioLaunch {
+                id: "ekaterina_opening",
+                unit: EntityKind::EkaterinaEngineer,
+                count: 1,
+                blocker: None,
+            })
+        );
         assert_eq!(
             parse_dev_scenario_launch("scout_car_snaking_corridor", "worker", "1", None),
             Some(DevScenarioLaunch {

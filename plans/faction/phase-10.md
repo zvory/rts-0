@@ -1,6 +1,6 @@
 # Phase 10 - Second Faction Start and Economy Slice
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

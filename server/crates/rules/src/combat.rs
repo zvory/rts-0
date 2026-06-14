@@ -80,7 +80,12 @@ pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
 fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Worker | EntityKind::Rifleman | EntityKind::MachineGunner
+        EntityKind::Worker
+            | EntityKind::Rifleman
+            | EntityKind::MachineGunner
+            | EntityKind::EkaterinaEngineer
+            | EntityKind::EkaterinaConscript
+            | EntityKind::EkaterinaSignalTeam
     )
 }
 
@@ -248,6 +253,9 @@ mod tests {
             (EntityKind::Worker, false, false, false),
             (EntityKind::Rifleman, false, false, false),
             (EntityKind::MachineGunner, false, false, false),
+            (EntityKind::EkaterinaEngineer, false, false, false),
+            (EntityKind::EkaterinaConscript, false, false, false),
+            (EntityKind::EkaterinaSignalTeam, false, false, false),
             (EntityKind::AntiTankGun, false, true, true),
             (EntityKind::MortarTeam, false, false, false),
             (EntityKind::ScoutCar, false, false, false),
@@ -258,6 +266,9 @@ mod tests {
             (EntityKind::TrainingCentre, true, false, false),
             (EntityKind::Factory, true, false, false),
             (EntityKind::Steelworks, true, false, false),
+            (EntityKind::EkaterinaCommandPost, true, false, false),
+            (EntityKind::EkaterinaSupplyCache, true, false, false),
+            (EntityKind::EkaterinaWorkshop, true, false, false),
             (EntityKind::Steel, false, false, false),
             (EntityKind::Oil, false, false, false),
         ];
@@ -275,15 +286,27 @@ mod tests {
 
     #[test]
     fn anti_tank_gun_miss_chance_applies_only_to_infantry_sized_targets() {
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Worker), 0.65);
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman), 0.65);
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Worker),
+            0.65
+        );
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman),
+            0.65
+        );
         assert_eq!(
             miss_chance(EntityKind::AntiTankGun, EntityKind::MachineGunner),
             0.65
         );
 
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar), 0.0);
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun), 0.0);
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar),
+            0.0
+        );
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun),
+            0.0
+        );
         assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Tank), 0.0);
     }
 

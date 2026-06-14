@@ -8,6 +8,7 @@ import {
   factionCommandId,
 } from "../client/src/hud_command_card.js";
 import {
+  EKATERINA_FACTION_ID,
   FIXTURE_FACTION_ID,
   WORKER_BUILDABLE,
   commandCardAbilitiesForFaction,
@@ -16,6 +17,7 @@ import {
 import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
+const ekaterinaCommandId = (family, subject) => factionCommandId(EKATERINA_FACTION_ID, family, subject);
 
 const researchComplex = {
   id: 10,
@@ -230,4 +232,76 @@ function buttonSlots(card) {
     firstSlotIndex: 0,
     duplicateSlotIndex: 2,
   }]);
+}
+
+{
+  const engineer = { id: 50, owner: 1, kind: KIND.EKATERINA_ENGINEER };
+  const buildCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: EKATERINA_FACTION_ID,
+    selection: [engineer],
+    commandCardMode: "workerBuild",
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: (kind) => kind === KIND.EKATERINA_COMMAND_POST,
+    groupCooldownClocks: () => [],
+  });
+  assert.deepEqual(workerBuildablesForFaction(EKATERINA_FACTION_ID), [
+    KIND.EKATERINA_SUPPLY_CACHE,
+    KIND.EKATERINA_WORKSHOP,
+  ]);
+  assert.equal(buildCard.slots[0].commandId, ekaterinaCommandId("build", KIND.EKATERINA_SUPPLY_CACHE));
+  assert.equal(buildCard.slots[0].hotkey, "Q");
+  assert.equal(buildCard.slots[1].commandId, ekaterinaCommandId("build", KIND.EKATERINA_WORKSHOP));
+  assert.equal(buildCard.slots[1].hotkey, "W");
+  assert.equal(buildCard.slots[8].commandId, "worker.return");
+
+  const commandPost = { id: 51, owner: 1, kind: KIND.EKATERINA_COMMAND_POST, buildProgress: null };
+  const commandPostCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: EKATERINA_FACTION_ID,
+    selection: [commandPost],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(commandPostCard.slots[0].commandId, ekaterinaCommandId("train", KIND.EKATERINA_ENGINEER));
+  assert.equal(commandPostCard.slots[0].hotkey, "Q");
+
+  const workshop = { id: 52, owner: 1, kind: KIND.EKATERINA_WORKSHOP, buildProgress: null };
+  const workshopCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: EKATERINA_FACTION_ID,
+    selection: [workshop],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(workshopCard.slots[0].commandId, ekaterinaCommandId("train", KIND.EKATERINA_CONSCRIPT));
+  assert.equal(workshopCard.slots[0].hotkey, "Q");
+  assert.equal(workshopCard.slots[1].commandId, ekaterinaCommandId("train", KIND.EKATERINA_SIGNAL_TEAM));
+  assert.equal(workshopCard.slots[1].hotkey, "W");
+
+  const signalTeam = {
+    id: 53,
+    owner: 1,
+    kind: KIND.EKATERINA_SIGNAL_TEAM,
+    abilities: [{ ability: ABILITY.MARK_TARGET, cooldownLeft: 0, remainingUses: null }],
+  };
+  const signalCard = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: EKATERINA_FACTION_ID,
+    selection: [signalTeam],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const markTarget = signalCard.slots.find((slot) =>
+    slot?.commandId === ekaterinaCommandId("ability", ABILITY.MARK_TARGET)
+  );
+  assert.equal(markTarget?.hotkey, "D");
+  assert.equal(markTarget?.intent.targetMode, "worldPoint");
 }

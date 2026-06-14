@@ -1,6 +1,6 @@
 # Phase 9 - Second Faction Brief and Rules Spec
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 
@@ -66,3 +66,14 @@ it.
 ## Player-Facing Outcome
 
 No gameplay change. The second faction is designed and scoped before implementation starts.
+
+## Implementation Notes
+
+Phase 9 added the approved Ekaterina brief and rules/balance spec:
+
+- [Ekaterina Faction Brief](ekaterina-brief.md)
+- [Ekaterina Rules and Balance Spec](ekaterina-rules-spec.md)
+
+Phase 10 may implement only the start, economy, and first production path described in the spec,
+using the dev-only `dev:ekaterina_opening` assignment path. AI, prediction, normal lobby faction
+selection, generic resources, and the signature ability effect remain out of scope for Phase 10.

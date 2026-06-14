@@ -28,9 +28,6 @@ use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
 
-use rts_rules::faction::{
-    catalog_for, catalog_loadout_for, DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
-};
 use rts_server::db::Db;
 use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
@@ -427,72 +424,7 @@ fn replay_incompatibility_reason(artifact: &ReplayArtifactV1, build_sha: &str) -
     {
         return Some(reason);
     }
-    replay_faction_incompatibility_reason(artifact)
-}
-
-fn replay_faction_incompatibility_reason(artifact: &ReplayArtifactV1) -> Option<String> {
-    let mut loadout_player_ids = std::collections::HashSet::new();
-    for loadout in &artifact.player_loadouts {
-        if !loadout_player_ids.insert(loadout.player_id) {
-            return Some(format!(
-                "Replay has duplicate loadout records for player {}.",
-                loadout.player_id
-            ));
-        }
-    }
-    for player in &artifact.players {
-        let faction_id = player.faction_id.trim();
-        if faction_id.is_empty() {
-            return Some(format!(
-                "Replay player {} is missing a faction id.",
-                player.id
-            ));
-        }
-        if catalog_for(faction_id).is_none() {
-            return Some(format!(
-                "Replay player {} has unknown faction {:?}.",
-                player.id, faction_id
-            ));
-        }
-        if faction_id == EMPTY_FIXTURE_FACTION_ID {
-            return Some(format!(
-                "Replay player {} uses fixture-only faction {:?}.",
-                player.id, faction_id
-            ));
-        }
-        if faction_id != DEFAULT_FACTION_ID {
-            return Some(format!(
-                "Replay player {} uses unsupported faction {:?}.",
-                player.id, faction_id
-            ));
-        }
-        let Some(loadout) = artifact
-            .player_loadouts
-            .iter()
-            .find(|loadout| loadout.player_id == player.id)
-        else {
-            return Some(format!("Replay player {} is missing a loadout.", player.id));
-        };
-        if loadout.faction_id != player.faction_id {
-            return Some(format!(
-                "Replay player {} loadout faction {:?} does not match player faction {:?}.",
-                player.id, loadout.faction_id, player.faction_id
-            ));
-        }
-        if loadout.loadout_id.trim().is_empty() {
-            return Some(format!(
-                "Replay player {} is missing a loadout id.",
-                player.id
-            ));
-        }
-        if catalog_loadout_for(faction_id, loadout.loadout_id.trim()).is_none() {
-            return Some(format!(
-                "Replay player {} uses unknown loadout {:?} for faction {:?}.",
-                player.id, loadout.loadout_id, faction_id
-            ));
-        }
-    }
-    None
+    lobby::replay_faction_loadout_incompatibility_reason(artifact)
 }
 
 fn replay_build_warning(server_build_sha: &str, replay_build_sha: &str) -> String {
@@ -753,6 +685,7 @@ fn collect_js_modules(dir: &std::path::Path, prefix: &std::path::Path, out: &mut
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_rules::faction::{DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
 
     const TEST_PLAYER_ID: u32 = 42;
 
@@ -1120,15 +1053,39 @@ mod tests {
     #[test]
     fn match_history_replay_launch_rejects_unsupported_or_fixture_factions() {
         let mut unknown = replay_artifact_for_faction(DEFAULT_FACTION_ID);
-        unknown.players[0].faction_id = "ekaterina".to_string();
+        unknown.players[0].faction_id = "unknown-faction".to_string();
         let err = replay_incompatibility_reason(&unknown, "current-build")
-            .expect("unsupported future faction should reject");
+            .expect("unknown faction should reject");
         assert!(err.contains("unknown faction"), "unexpected reject: {err}");
+
+        let mut unsupported = replay_artifact_for_faction(DEFAULT_FACTION_ID);
+        unsupported.players[0].faction_id = "ekaterina".to_string();
+        let err = replay_incompatibility_reason(&unsupported, "current-build")
+            .expect("unsupported future faction should reject");
+        assert!(
+            err.contains("unsupported faction"),
+            "unexpected reject: {err}"
+        );
 
         let fixture = replay_artifact_for_faction(EMPTY_FIXTURE_FACTION_ID);
         let err = replay_incompatibility_reason(&fixture, "current-build")
             .expect("fixture faction should reject persisted replay launch");
         assert!(err.contains("fixture-only"), "unexpected reject: {err}");
+    }
+
+    #[test]
+    fn match_history_replay_launch_rejects_unknown_player_loadout() {
+        let mut artifact = replay_artifact_for_faction(DEFAULT_FACTION_ID);
+        let mut extra_loadout = artifact.player_loadouts[0].clone();
+        extra_loadout.player_id = 999;
+        artifact.player_loadouts.push(extra_loadout);
+
+        let err = replay_incompatibility_reason(&artifact, "current-build")
+            .expect("unknown-player replay loadout should reject");
+        assert!(
+            err.contains("unknown player 999"),
+            "unexpected reject: {err}"
+        );
     }
 }
 

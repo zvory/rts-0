@@ -169,12 +169,20 @@ is never allied with a player.
 `PlayerInit.faction_id` is canonical faction identity. The default current faction is
 `kriegsia`, and the server/lobby layer validates requested or recorded faction ids before match
 assembly. That policy is separate from `rules::faction` catalog existence: normal lobby,
-quickstart, AI, self-play, and dev starts default to or accept only Kriegsia in Phase 3A, replay
-paths require explicit recorded faction ids, and `phase2_empty_fixture` is accepted only by
-test-fixture contexts. The lower rules/sim layer also fails closed: empty faction ids may default
-only at the narrow compatibility boundary, while unknown non-empty ids get no faction catalog
-loadout, no starting entities/resources, no supply credit for Kriegsia units/buildings, and no
-legal build/train/research/gather/ability surface.
+quickstart, AI, and self-play default to or accept only Kriegsia, replay paths require explicit
+recorded faction ids, `phase2_empty_fixture` is accepted only by test-fixture contexts, and
+`ekaterina` is accepted only by the Phase 10 `dev:ekaterina_opening` scenario. The lower rules/sim
+layer also fails closed: empty faction ids may default only at the narrow compatibility boundary,
+while unknown non-empty ids get no faction catalog loadout, no starting entities/resources, no
+supply credit for Kriegsia units/buildings, and no legal build/train/research/gather/ability
+surface.
+
+Phase 10 implements the `ekaterina.standard` loadout: 85 Steel, 0 Oil, one completed
+Ekaterina Command Post, four completed Ekaterina Engineers, Command Post Engineer training,
+Engineer-built Supply Caches and Workshops, and Workshop Conscript training. Phase 11 extends that
+dev-opening slice with Workshop Signal Team training plus the Signal Team `markTarget` world-point
+ability. Normal lobby, quickstart, AI seats, self-play, replay branch launch, and match-history
+replay remain Kriegsia-only until later phases opt in.
 
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and
@@ -263,12 +271,16 @@ adding only the effect-specific code that the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
 effect shapes that actually exist today: self status (`charge` legacy compatibility), owned area
-status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), and the intentionally
-one-off artillery point-fire path. The hook receives the owning player's faction id at execution
+status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`, `markTarget`), and the
+intentionally one-off artillery point-fire path. The hook receives the owning player's faction id at execution
 time through the normal command/order helpers, so wrong-faction ability use fails before effects,
 resource spending, cooldowns, or events are applied. The hook is deliberately not a generic script
-engine; new faction signature mechanics should add a tightly scoped hook only when the approved
-ability cannot use one of these shapes.
+engine. Mark Target uses the delayed-world hook to schedule a Signal Team pulse in
+`game/mark_target.rs`; marker events carry optional caster ids so enemies who can see the target
+point do not learn hidden caster positions. Future signature abilities should first use one of the
+existing shapes; if they cannot, add either a narrow explicit hook or a named one-off path with
+faction validation, cost validation, and fog-safe event tests rather than widening the hook into
+generic scripting.
 
 `services::ability_orders` owns the tick-path execution helpers:
 - `order_or_launch_world_ability` — for `WorldPoint` abilities: if the caster is in range, launch
@@ -276,8 +288,8 @@ ability cannot use one of these shapes.
   movement order via `MoveCoordinator`.
 - `launch_world_ability` — reads range/cost/cooldown from the registry, deducts resources, sets
   the caster's cooldown, clears the active order,
-  and dispatches a delayed-world effect hook (currently: schedules a smoke cloud or delayed mortar
-  shell). Guards:
+  and dispatches a delayed-world effect hook (currently: schedules a smoke cloud, delayed mortar
+  shell, or delayed Mark Target pulse). Guards:
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.

@@ -154,6 +154,10 @@ export class GameState {
     this.artilleryLaunches = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
     this.artilleryImpacts = [];
+    /** @type {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>} */
+    this.markTargets = [];
+    /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
+    this.markTargetImpacts = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
@@ -318,6 +322,10 @@ export class GameState {
         this.addArtilleryTarget(ev, now);
       } else if (ev && ev.e === "artilleryImpact") {
         this.addArtilleryImpact(ev, now);
+      } else if (ev && ev.e === "markTarget") {
+        this.addMarkTarget(ev, now);
+      } else if (ev && ev.e === "markTargetImpact") {
+        this.addMarkTargetImpact(ev, now);
       }
     }
     if (this.muzzleFlashes.length > 256) {
@@ -346,6 +354,12 @@ export class GameState {
     }
     if (this.artilleryImpacts.length > 32) {
       this.artilleryImpacts.splice(0, this.artilleryImpacts.length - 32);
+    }
+    if (this.markTargets.length > 48) {
+      this.markTargets.splice(0, this.markTargets.length - 48);
+    }
+    if (this.markTargetImpacts.length > 32) {
+      this.markTargetImpacts.splice(0, this.markTargetImpacts.length - 32);
     }
   }
 
@@ -456,6 +470,33 @@ export class GameState {
     });
   }
 
+  addMarkTarget(ev, now = performance.now()) {
+    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
+    if (typeof ev.from === "number") this.weaponRecoilById.set(ev.from, now);
+    this.markTargets.push({
+      x: ev.x,
+      y: ev.y,
+      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.25,
+      delayTicks: Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0,
+      seed: Math.floor(ev.x * 31 + ev.y * 37 + now) >>> 0,
+      createdAt: now,
+    });
+  }
+
+  addMarkTargetImpact(ev, now = performance.now()) {
+    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
+    this.markTargets = this.markTargets.filter(
+      (target) => Math.hypot(target.x - ev.x, target.y - ev.y) > 2,
+    );
+    this.markTargetImpacts.push({
+      x: ev.x,
+      y: ev.y,
+      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.25,
+      seed: Math.floor(ev.x * 41 + ev.y * 43 + now) >>> 0,
+      createdAt: now,
+    });
+  }
+
   addSmokeCanister(ev, now = performance.now()) {
     if (
       !Number.isFinite(ev.fromX) ||
@@ -541,6 +582,20 @@ export class GameState {
       return now - f.createdAt <= ttlMs;
     });
     return this.artilleryTargets;
+  }
+
+  liveMarkTargets(now) {
+    this.markTargets = this.markTargets.filter((f) => {
+      const ttlMs = Math.max(700, ((f.delayTicks || 0) / 30) * 1000 + 250);
+      return now - f.createdAt <= ttlMs;
+    });
+    return this.markTargets;
+  }
+
+  liveMarkTargetImpacts(now) {
+    const ttlMs = 760;
+    this.markTargetImpacts = this.markTargetImpacts.filter((f) => now - f.createdAt <= ttlMs);
+    return this.markTargetImpacts;
   }
 
   /**

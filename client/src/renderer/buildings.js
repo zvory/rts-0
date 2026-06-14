@@ -76,19 +76,40 @@ export function _drawBuilding(e, colorByOwner, state) {
   // Player-tinted roof/yard slabs, all neutral geometry.
   g.lineStyle(0);
   g.beginFill(tint, bodyAlpha * 0.82);
-  if (e.kind === KIND.CITY_CENTRE) {
+  if (e.kind === KIND.CITY_CENTRE || e.kind === KIND.EKATERINA_COMMAND_POST) {
     g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
     g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
     g.beginFill(0x1a1712, bodyAlpha * 0.7);
     g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
+    if (e.kind === KIND.EKATERINA_COMMAND_POST) {
+      g.lineStyle(2, 0xd8c267, bodyAlpha * 0.9);
+      g.moveTo(x0 + w * 0.18, y0 + h * 0.78);
+      g.lineTo(x0 + w * 0.86, y0 + h * 0.78);
+      g.moveTo(x0 + w * 0.78, y0 + h * 0.02);
+      g.lineTo(x0 + w * 0.92, y0 - h * 0.16);
+    }
   } else if (e.kind === KIND.FACTORY) {
     g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
     g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
     g.beginFill(0x1a1712, bodyAlpha * 0.55);
     for (let i = 0; i < 3; i++) g.drawRect(x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
-  } else if (e.kind === KIND.DEPOT) {
+  } else if (e.kind === KIND.DEPOT || e.kind === KIND.EKATERINA_SUPPLY_CACHE) {
     g.drawRect(x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
     g.drawRect(x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
+    if (e.kind === KIND.EKATERINA_SUPPLY_CACHE) {
+      g.lineStyle(2, 0xd8c267, bodyAlpha * 0.82);
+      g.moveTo(x0 + w * 0.1, y0 + h * 0.18);
+      g.lineTo(x0 + w * 0.9, y0 + h * 0.72);
+    }
+  } else if (e.kind === KIND.EKATERINA_WORKSHOP) {
+    g.drawRect(x0 + w * 0.1, y0 + h * 0.2, w * 0.8, h * 0.22);
+    g.drawRect(x0 + w * 0.2, y0 + h * 0.54, w * 0.6, h * 0.22);
+    g.beginFill(0x1a1712, bodyAlpha * 0.5);
+    g.drawRect(x0 + w * 0.24, y0 + h * 0.08, w * 0.08, h * 0.72);
+    g.drawRect(x0 + w * 0.68, y0 + h * 0.08, w * 0.08, h * 0.72);
+    g.lineStyle(2, 0xd8c267, bodyAlpha * 0.82);
+    g.moveTo(x0 + w * 0.18, y0 + h * 0.16);
+    g.lineTo(x0 + w * 0.82, y0 + h * 0.16);
   } else {
     g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
     g.beginFill(0x1a1712, bodyAlpha * 0.42);
