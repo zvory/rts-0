@@ -10,6 +10,14 @@ Use this skill when an existing phased plan under `plans/<name>/` needs an execu
 This skill is intentionally narrow. Planning is manual and happens before this skill is used.
 Final review is manual and happens after the selected executor passes finish.
 
+## Calling-Agent Behavior
+
+`scripts/phase-runner.sh` starts a nested Codex executor that commonly runs for 10-20 minutes.
+After launching the runner, the calling agent should sleep and wait for the runner to report
+completion or failure. If the tool requires polling, poll no more than once every 5 minutes, and do
+not tail the executor log during normal progress. The runner prints the last log lines itself when a
+phase fails or reports an invalid handoff.
+
 ## Inputs
 
 - Plan directory: `plans/<name>/`

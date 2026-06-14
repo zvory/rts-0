@@ -24,6 +24,10 @@ Runs executor passes only. Each phase gets a separate worktree and branch under
 from the previous phase branch so the final branch contains the accumulated work.
 
 The runner never merges, pushes, creates plans, or performs final review.
+Calling agents should treat the inner Codex executor as a long-running job:
+wait for the command to finish, and if polling is unavoidable, poll no more than
+once every 5 minutes. Do not tail the executor log during normal progress; the
+runner prints the relevant tail on failure.
 
 Options:
   --plan NAME       Plan directory name under plans/. Required.
@@ -240,6 +244,7 @@ EOF
   codex_args+=("$prompt")
 
   echo "phase-runner: running Codex executor for $phase_id (log: $codex_log)"
+  echo "phase-runner: inner executor may run for 10-20 minutes; calling agents should wait and poll no more than once every 5 minutes"
   executor_start=$SECONDS
   if ! codex "${codex_args[@]}" >"$codex_log" 2>&1; then
     echo "phase-runner: Codex failed for $phase_id; leaving worktree at $worktree_path" >&2
