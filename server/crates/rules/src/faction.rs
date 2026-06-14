@@ -8,6 +8,7 @@
 use crate::{balance, defs, economy::ResourceCost, EntityKind};
 
 pub const DEFAULT_FACTION_ID: &str = "kriegsia";
+pub const EKATERINA_FACTION_ID: &str = "ekaterina";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 
 pub const METHAMPHETAMINES_UPGRADE: &str = "methamphetamines";
@@ -57,6 +58,23 @@ const EMPTY_FIXTURE_START_ENTITIES: &[StartingEntityGroup] = &[
     },
 ];
 
+const EKATERINA_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
+    StartingEntityGroup {
+        kind: EntityKind::EkaterinaCommandPost,
+        count: 1,
+        formation: StartingFormation::Center,
+        completed: true,
+    },
+    StartingEntityGroup {
+        kind: EntityKind::EkaterinaEngineer,
+        count: 4,
+        formation: StartingFormation::Ring {
+            radius_tiles_x10: 25,
+        },
+        completed: true,
+    },
+];
+
 pub const CURRENT_STANDARD_LOADOUT: FactionLoadout = FactionLoadout {
     id: "kriegsia.standard",
     initial_steel: crate::balance::STARTING_STEEL,
@@ -70,6 +88,14 @@ pub const EMPTY_FIXTURE_LOADOUT: FactionLoadout = FactionLoadout {
     initial_steel: 125,
     initial_oil: 25,
     starting_entities: EMPTY_FIXTURE_START_ENTITIES,
+    opening_upgrades: &[],
+};
+
+pub const EKATERINA_STANDARD_LOADOUT: FactionLoadout = FactionLoadout {
+    id: "ekaterina.standard",
+    initial_steel: 85,
+    initial_oil: 0,
+    starting_entities: EKATERINA_STANDARD_START_ENTITIES,
     opening_upgrades: &[],
 };
 
@@ -103,6 +129,22 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::ResearchComplex,
     EntityKind::Factory,
     EntityKind::Steelworks,
+];
+
+const EKATERINA_UNITS: &[EntityKind] = &[
+    EntityKind::EkaterinaEngineer,
+    EntityKind::EkaterinaConscript,
+];
+
+const EKATERINA_BUILDINGS: &[EntityKind] = &[
+    EntityKind::EkaterinaCommandPost,
+    EntityKind::EkaterinaSupplyCache,
+    EntityKind::EkaterinaWorkshop,
+];
+
+const EKATERINA_ENGINEER_BUILDABLES: &[EntityKind] = &[
+    EntityKind::EkaterinaSupplyCache,
+    EntityKind::EkaterinaWorkshop,
 ];
 
 const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
@@ -269,7 +311,24 @@ pub const EMPTY_FIXTURE_CATALOG: FactionCatalog = FactionCatalog {
     production_anchors: &[],
 };
 
-pub const CATALOGS: &[FactionCatalog] = &[CURRENT_CATALOG, EMPTY_FIXTURE_CATALOG];
+pub const EKATERINA_CATALOG: FactionCatalog = FactionCatalog {
+    id: EKATERINA_FACTION_ID,
+    loadout: EKATERINA_STANDARD_LOADOUT,
+    units: EKATERINA_UNITS,
+    buildings: EKATERINA_BUILDINGS,
+    buildables: EKATERINA_ENGINEER_BUILDABLES,
+    upgrades: &[],
+    abilities: &[],
+    builders: &[EntityKind::EkaterinaEngineer],
+    gatherers: &[EntityKind::EkaterinaEngineer],
+    production_anchors: &[
+        EntityKind::EkaterinaCommandPost,
+        EntityKind::EkaterinaWorkshop,
+    ],
+};
+
+pub const CATALOGS: &[FactionCatalog] =
+    &[CURRENT_CATALOG, EMPTY_FIXTURE_CATALOG, EKATERINA_CATALOG];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpgradeCatalogEntry {
@@ -456,10 +515,30 @@ mod tests {
 
     #[test]
     fn default_catalog_matches_defs_inventory() {
-        let units: Vec<_> = defs::UNITS.iter().map(|d| d.kind).collect();
+        let units: Vec<_> = defs::UNITS
+            .iter()
+            .map(|d| d.kind)
+            .filter(|kind| {
+                !matches!(
+                    kind,
+                    EntityKind::EkaterinaEngineer | EntityKind::EkaterinaConscript
+                )
+            })
+            .collect();
         assert_eq!(CURRENT_CATALOG.units, units.as_slice());
 
-        let buildings: Vec<_> = defs::BUILDINGS.iter().map(|d| d.kind).collect();
+        let buildings: Vec<_> = defs::BUILDINGS
+            .iter()
+            .map(|d| d.kind)
+            .filter(|kind| {
+                !matches!(
+                    kind,
+                    EntityKind::EkaterinaCommandPost
+                        | EntityKind::EkaterinaSupplyCache
+                        | EntityKind::EkaterinaWorkshop
+                )
+            })
+            .collect();
         assert_eq!(CURRENT_CATALOG.buildings, buildings.as_slice());
     }
 
@@ -563,6 +642,37 @@ mod tests {
     }
 
     #[test]
+    fn ekaterina_catalog_routes_phase_ten_slice() {
+        let catalog = EKATERINA_CATALOG;
+
+        assert_eq!(catalog.loadout.id, "ekaterina.standard");
+        assert_eq!(catalog.loadout.initial_steel, 85);
+        assert_eq!(catalog.loadout.initial_oil, 0);
+        assert_eq!(
+            catalog.loadout.starting_entities,
+            EKATERINA_STANDARD_START_ENTITIES
+        );
+        assert_eq!(
+            catalog.trainable_units(EntityKind::EkaterinaCommandPost),
+            vec![EntityKind::EkaterinaEngineer]
+        );
+        assert_eq!(
+            catalog.trainable_units(EntityKind::EkaterinaWorkshop),
+            vec![EntityKind::EkaterinaConscript]
+        );
+        assert!(catalog.can_build(
+            EntityKind::EkaterinaEngineer,
+            EntityKind::EkaterinaSupplyCache
+        ));
+        assert!(catalog.can_build(EntityKind::EkaterinaEngineer, EntityKind::EkaterinaWorkshop));
+        assert!(catalog.can_gather(EntityKind::EkaterinaEngineer));
+        assert!(!catalog.allows_unit(EntityKind::Worker));
+        assert!(!catalog.allows_building(EntityKind::CityCentre));
+        assert!(!CURRENT_CATALOG.allows_unit(EntityKind::EkaterinaEngineer));
+        assert!(!CURRENT_CATALOG.allows_building(EntityKind::EkaterinaWorkshop));
+    }
+
+    #[test]
     fn unknown_non_empty_catalog_ids_fail_closed() {
         assert!(catalog_for("unknown_faction").is_none());
         assert!(catalog_for_or_default_empty("unknown_faction").is_none());
@@ -573,6 +683,7 @@ mod tests {
         assert!(catalog_loadout_for("unknown_faction", "kriegsia.standard").is_none());
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "missing.loadout").is_none());
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "kriegsia.standard").is_some());
+        assert!(catalog_loadout_for(EKATERINA_FACTION_ID, "ekaterina.standard").is_some());
     }
 
     #[test]
@@ -596,6 +707,13 @@ mod tests {
         assert_eq!(
             EMPTY_FIXTURE_CATALOG.loadout.starting_entities,
             EMPTY_FIXTURE_START_ENTITIES
+        );
+
+        assert_eq!(EKATERINA_CATALOG.loadout.initial_steel, 85);
+        assert_eq!(EKATERINA_CATALOG.loadout.initial_oil, 0);
+        assert_eq!(
+            EKATERINA_CATALOG.loadout.starting_entities,
+            EKATERINA_STANDARD_START_ENTITIES
         );
     }
 }

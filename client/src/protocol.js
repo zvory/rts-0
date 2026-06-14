@@ -81,6 +81,8 @@ export const KIND = Object.freeze({
   SCOUT_CAR: "scout_car",
   TANK: "tank",
   COMMAND_CAR: "command_car",
+  EKATERINA_ENGINEER: "ekaterina_engineer",
+  EKATERINA_CONSCRIPT: "ekaterina_conscript",
   CITY_CENTRE: "city_centre",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -88,6 +90,9 @@ export const KIND = Object.freeze({
   RESEARCH_COMPLEX: "research_complex",
   FACTORY: "factory",
   STEELWORKS: "steelworks",
+  EKATERINA_COMMAND_POST: "ekaterina_command_post",
+  EKATERINA_SUPPLY_CACHE: "ekaterina_supply_cache",
+  EKATERINA_WORKSHOP: "ekaterina_workshop",
   STEEL: "steel",
   OIL: "oil",
 });
@@ -101,6 +106,8 @@ export const UNIT_KINDS = Object.freeze([
   KIND.SCOUT_CAR,
   KIND.TANK,
   KIND.COMMAND_CAR,
+  KIND.EKATERINA_ENGINEER,
+  KIND.EKATERINA_CONSCRIPT,
 ]);
 export const BUILDING_KINDS = Object.freeze([
   KIND.CITY_CENTRE,
@@ -110,6 +117,9 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.RESEARCH_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
+  KIND.EKATERINA_COMMAND_POST,
+  KIND.EKATERINA_SUPPLY_CACHE,
+  KIND.EKATERINA_WORKSHOP,
 ]);
 export const RESOURCE_KINDS = Object.freeze([KIND.STEEL, KIND.OIL]);
 
@@ -183,6 +193,8 @@ export const KIND_CODE = Object.freeze({
   [KIND.ARTILLERY]: 16,
   [KIND.TANK]: 5,
   [KIND.SCOUT_CAR]: 14,
+  [KIND.EKATERINA_ENGINEER]: 19,
+  [KIND.EKATERINA_CONSCRIPT]: 20,
   [KIND.CITY_CENTRE]: 6,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
@@ -193,6 +205,9 @@ export const KIND_CODE = Object.freeze({
   [KIND.STEEL]: 11,
   [KIND.OIL]: 12,
   [KIND.STEELWORKS]: 13,
+  [KIND.EKATERINA_COMMAND_POST]: 21,
+  [KIND.EKATERINA_SUPPLY_CACHE]: 22,
+  [KIND.EKATERINA_WORKSHOP]: 23,
 });
 
 export const STATE_CODE = Object.freeze({

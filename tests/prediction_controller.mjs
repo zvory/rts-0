@@ -237,6 +237,21 @@ function sentSeqs(sent) {
     predictionVersion: PREDICTION_PROTOCOL_VERSION,
     predictionBuildId: "same-build",
     players: [
+      { id: 1, factionId: "ekaterina" },
+      { id: 2, factionId: DEFAULT_FACTION_ID },
+    ],
+  }, { clientBuildId: "same-build" });
+  assert(compatibility.ok === false, "Ekaterina local player disables prediction until WASM support exists");
+  assert(compatibility.reason === "unsupported-local-faction", "Ekaterina uses stable diagnostic reason");
+}
+
+{
+  const compatibility = predictionCompatibility({
+    playerId: 1,
+    spectator: false,
+    predictionVersion: PREDICTION_PROTOCOL_VERSION,
+    predictionBuildId: "same-build",
+    players: [
       { id: 1, factionId: DEFAULT_FACTION_ID },
       { id: 2, factionId: "phase2_empty_fixture" },
     ],

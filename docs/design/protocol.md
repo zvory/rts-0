@@ -232,12 +232,11 @@ simulation/replay/test-helper boundaries default to singleton FFA: the player's 
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
 The canonical current faction id is `kriegsia`. Start payloads emit `factionId` for every active
 start player, lobby seat, and replay branch seat, and replay artifacts store `faction_id` for every
-player. Normal lobby, AI, quickstart, self-play, and dev starts all default to `kriegsia` through
-server-side faction policy validation. Other ids are rejected unless a lifecycle path explicitly
-accepts recorded replay data or a test fixture; the reserved future `ekaterina` id has no protocol
-or catalog payload yet. Phase 9 approves Ekaterina's brief/spec without changing protocol payload
-shapes; Phase 10 may use the existing `factionId` field for a dev-only Ekaterina assignment path
-and may add mirrored kind ids for the approved start/economy slice.
+player. Normal lobby, AI, quickstart, and self-play all default to `kriegsia` through server-side
+faction policy validation. Other ids are rejected unless a lifecycle path explicitly accepts
+recorded replay data, a test fixture, or the Phase 10 `dev:ekaterina_opening` scenario. Ekaterina
+uses the existing `factionId` field and adds only mirrored kind ids for the approved start/economy
+slice; no resource, player, replay, or snapshot payload shape changes.
 
 Prediction start compatibility metadata is present only for live active players. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version
@@ -356,7 +355,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekaterina_engineer`, 20 `ekaterina_conscript`, 21 `ekaterina_command_post`, 22 `ekaterina_supply_cache`, 23 `ekaterina_workshop` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock` |
@@ -428,7 +427,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","tank","command_car","city_centre","depot","barracks","training_centre","research_complex","factory","steelworks"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","tank","command_car","ekaterina_engineer","ekaterina_conscript","city_centre","depot","barracks","training_centre","research_complex","factory","steelworks","ekaterina_command_post","ekaterina_supply_cache","ekaterina_workshop"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"

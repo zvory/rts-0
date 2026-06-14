@@ -1,4 +1,6 @@
-use rts_rules::faction::{catalog_for, DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
+use rts_rules::faction::{
+    catalog_for, DEFAULT_FACTION_ID, EKATERINA_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum FactionRequestContext {
@@ -95,6 +97,12 @@ pub(super) fn validate_faction_request(
         };
     }
 
+    if faction_id == EKATERINA_FACTION_ID && context == FactionRequestContext::DevScenario {
+        return FactionValidation::AcceptedPlayable {
+            faction_id: faction_id.to_string(),
+        };
+    }
+
     FactionValidation::Rejected {
         requested: Some(faction_id.to_string()),
         reason: FactionRejectReason::FactionNotAllowedInContext,
@@ -116,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn normal_lobby_rejects_fixture_or_unknown_reserved_ids() {
+    fn normal_lobby_rejects_fixture_or_unsupported_playable_ids() {
         assert_eq!(
             validate_faction_request(
                 FactionRequestContext::NormalLobby,
@@ -128,10 +136,13 @@ mod tests {
             }
         );
         assert_eq!(
-            validate_faction_request(FactionRequestContext::NormalLobby, Some("ekaterina")),
+            validate_faction_request(
+                FactionRequestContext::NormalLobby,
+                Some(EKATERINA_FACTION_ID)
+            ),
             FactionValidation::Rejected {
-                requested: Some("ekaterina".to_string()),
-                reason: FactionRejectReason::UnknownCatalog,
+                requested: Some(EKATERINA_FACTION_ID.to_string()),
+                reason: FactionRejectReason::FactionNotAllowedInContext,
             }
         );
     }
@@ -181,6 +192,22 @@ mod tests {
             FactionValidation::Rejected {
                 requested: Some(EMPTY_FIXTURE_FACTION_ID.to_string()),
                 reason: FactionRejectReason::FixtureNotAllowed,
+            }
+        );
+        assert_eq!(
+            validate_faction_request(
+                FactionRequestContext::DevScenario,
+                Some(EKATERINA_FACTION_ID)
+            ),
+            FactionValidation::AcceptedPlayable {
+                faction_id: EKATERINA_FACTION_ID.to_string()
+            }
+        );
+        assert_eq!(
+            validate_faction_request(FactionRequestContext::AiSeat, Some(EKATERINA_FACTION_ID)),
+            FactionValidation::Rejected {
+                requested: Some(EKATERINA_FACTION_ID.to_string()),
+                reason: FactionRejectReason::FactionNotAllowedInContext,
             }
         );
     }

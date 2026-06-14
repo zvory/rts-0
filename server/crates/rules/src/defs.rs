@@ -55,7 +55,9 @@ pub struct NodeDef {
 }
 
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
+const EKATERINA_ENGINEER_ONLY: &[EntityKind] = &[EntityKind::EkaterinaEngineer];
 const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
+const EKATERINA_WORKSHOP_UNITS: &[EntityKind] = &[EntityKind::EkaterinaConscript];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
@@ -75,6 +77,7 @@ const CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
 const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
+const EKATERINA_COMMAND_POST_REQUIRED: &[EntityKind] = &[EntityKind::EkaterinaCommandPost];
 
 pub const UNITS: &[UnitDef] = &[
     UnitDef {
@@ -266,6 +269,48 @@ pub const UNITS: &[UnitDef] = &[
         trained_at: Some(EntityKind::Factory),
         train_requires: FACTORY_BUILDING_REQUIRED,
     },
+    UnitDef {
+        kind: EntityKind::EkaterinaEngineer,
+        stats: balance::UnitStats {
+            hp: 35,
+            dmg: 3,
+            range_tiles: 1,
+            cooldown: 26,
+            speed: 2.0,
+            sight_tiles: 7,
+            cost_steel: 50,
+            cost_oil: 0,
+            supply: 1,
+            build_ticks: 360,
+            radius: 9.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
+        trained_at: Some(EntityKind::EkaterinaCommandPost),
+        train_requires: &[],
+    },
+    UnitDef {
+        kind: EntityKind::EkaterinaConscript,
+        stats: balance::UnitStats {
+            hp: 38,
+            dmg: 4,
+            range_tiles: 4,
+            cooldown: 18,
+            speed: 1.7,
+            sight_tiles: 8,
+            cost_steel: 45,
+            cost_oil: 0,
+            supply: 1,
+            build_ticks: 300,
+            radius: 9.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
+        trained_at: Some(EntityKind::EkaterinaWorkshop),
+        train_requires: &[],
+    },
 ];
 
 pub const BUILDINGS: &[BuildingDef] = &[
@@ -409,6 +454,66 @@ pub const BUILDINGS: &[BuildingDef] = &[
         trains: STEELWORKS_UNITS,
         build_requires: FACTORY_REQUIRED,
     },
+    BuildingDef {
+        kind: EntityKind::EkaterinaCommandPost,
+        stats: balance::BuildingStats {
+            hp: 520,
+            sight_tiles: 9,
+            cost_steel: 200,
+            cost_oil: 0,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: 400,
+            provides_supply: 8,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: EKATERINA_ENGINEER_ONLY,
+        build_requires: &[],
+    },
+    BuildingDef {
+        kind: EntityKind::EkaterinaSupplyCache,
+        stats: balance::BuildingStats {
+            hp: 95,
+            sight_tiles: 4,
+            cost_steel: 80,
+            cost_oil: 0,
+            foot_w: 2,
+            foot_h: 2,
+            build_ticks: 260,
+            provides_supply: 8,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: EKATERINA_COMMAND_POST_REQUIRED,
+    },
+    BuildingDef {
+        kind: EntityKind::EkaterinaWorkshop,
+        stats: balance::BuildingStats {
+            hp: 260,
+            sight_tiles: 6,
+            cost_steel: 140,
+            cost_oil: 35,
+            foot_w: 3,
+            foot_h: 2,
+            build_ticks: 520,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: EKATERINA_WORKSHOP_UNITS,
+        build_requires: EKATERINA_COMMAND_POST_REQUIRED,
+    },
 ];
 
 pub const NODES: &[NodeDef] = &[
@@ -483,7 +588,16 @@ mod tests {
 
     #[test]
     fn current_faction_catalog_matches_phase0_inventory() {
-        let units: Vec<_> = UNITS.iter().map(|d| d.kind).collect();
+        let units: Vec<_> = UNITS
+            .iter()
+            .map(|d| d.kind)
+            .filter(|kind| {
+                !matches!(
+                    kind,
+                    EntityKind::EkaterinaEngineer | EntityKind::EkaterinaConscript
+                )
+            })
+            .collect();
         assert_eq!(
             units,
             vec![
@@ -499,7 +613,18 @@ mod tests {
             ]
         );
 
-        let buildings: Vec<_> = BUILDINGS.iter().map(|d| d.kind).collect();
+        let buildings: Vec<_> = BUILDINGS
+            .iter()
+            .map(|d| d.kind)
+            .filter(|kind| {
+                !matches!(
+                    kind,
+                    EntityKind::EkaterinaCommandPost
+                        | EntityKind::EkaterinaSupplyCache
+                        | EntityKind::EkaterinaWorkshop
+                )
+            })
+            .collect();
         assert_eq!(
             buildings,
             vec![
@@ -528,6 +653,16 @@ mod tests {
         assert_eq!(
             building_def(EntityKind::Steelworks).unwrap().trains,
             STEELWORKS_UNITS
+        );
+        assert_eq!(
+            building_def(EntityKind::EkaterinaCommandPost)
+                .unwrap()
+                .trains,
+            EKATERINA_ENGINEER_ONLY
+        );
+        assert_eq!(
+            building_def(EntityKind::EkaterinaWorkshop).unwrap().trains,
+            EKATERINA_WORKSHOP_UNITS
         );
         assert_eq!(
             node_def(EntityKind::Steel).unwrap().amount,
@@ -581,5 +716,41 @@ mod tests {
         assert_eq!((stats.cost_steel, stats.cost_oil), (100, 100));
         assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
         assert_eq!(stats.build_ticks, balance::TICK_HZ * 15);
+    }
+
+    #[test]
+    fn ekaterina_phase_ten_stats_match_spec() {
+        let engineer = unit_def(EntityKind::EkaterinaEngineer).unwrap().stats;
+        assert_eq!(engineer.hp, 35);
+        assert_eq!(engineer.dmg, 3);
+        assert_eq!(engineer.cooldown, 26);
+        assert_eq!((engineer.cost_steel, engineer.cost_oil), (50, 0));
+        assert_eq!(engineer.supply, 1);
+
+        let conscript = unit_def(EntityKind::EkaterinaConscript).unwrap().stats;
+        assert_eq!(conscript.hp, 38);
+        assert_eq!(conscript.dmg, 4);
+        assert_eq!(conscript.range_tiles, 4);
+        assert_eq!(conscript.cooldown, 18);
+        assert_eq!((conscript.cost_steel, conscript.cost_oil), (45, 0));
+        assert_eq!(conscript.supply, 1);
+
+        let command_post = building_def(EntityKind::EkaterinaCommandPost)
+            .unwrap()
+            .stats;
+        assert_eq!(command_post.hp, 520);
+        assert_eq!(command_post.provides_supply, 8);
+
+        let supply_cache = building_def(EntityKind::EkaterinaSupplyCache)
+            .unwrap()
+            .stats;
+        assert_eq!(supply_cache.hp, 95);
+        assert_eq!((supply_cache.cost_steel, supply_cache.cost_oil), (80, 0));
+        assert_eq!(supply_cache.provides_supply, 8);
+
+        let workshop = building_def(EntityKind::EkaterinaWorkshop).unwrap().stats;
+        assert_eq!(workshop.hp, 260);
+        assert_eq!((workshop.cost_steel, workshop.cost_oil), (140, 35));
+        assert_eq!((workshop.foot_w, workshop.foot_h), (3, 2));
     }
 }

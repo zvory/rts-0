@@ -1,6 +1,6 @@
 use super::*;
 use rayon::prelude::*;
-use rts_rules::faction::DEFAULT_FACTION_ID;
+use rts_rules::faction::{DEFAULT_FACTION_ID, EKATERINA_FACTION_ID};
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
     game.entities
@@ -315,6 +315,34 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
     for setup in scenarios {
         assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
     }
+}
+
+#[test]
+fn ekaterina_opening_scenario_uses_phase_ten_loadout() {
+    let setup =
+        Game::new_ekaterina_opening_scenario(0x5150_1000).expect("scenario setup should succeed");
+    let payload = setup.game.start_payload();
+
+    assert_eq!(payload.players.len(), 1);
+    assert_eq!(payload.players[0].faction_id, EKATERINA_FACTION_ID);
+    assert_eq!(setup.game.starting_steel(), 85);
+    assert_eq!(setup.game.starting_oil(), 0);
+    assert_eq!(
+        owned_kind_count(
+            &setup.game,
+            setup.player_id,
+            EntityKind::EkaterinaCommandPost
+        ),
+        1
+    );
+    assert_eq!(
+        owned_kind_count(&setup.game, setup.player_id, EntityKind::EkaterinaEngineer),
+        4
+    );
+    assert_eq!(
+        setup.game.starting_loadouts()[0].loadout_id,
+        "ekaterina.standard"
+    );
 }
 
 #[test]

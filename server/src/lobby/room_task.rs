@@ -226,6 +226,7 @@ pub(super) struct DevScenarioConfig {
 
 #[derive(Clone)]
 pub(super) enum DevScenarioId {
+    EkaterinaOpening,
     ScoutCarSnakingCorridor,
     DirectReverseOrder,
     ScoutCarWallChokepoint,
@@ -2428,103 +2429,110 @@ impl RoomTask {
                 let game = Game::new_without_ai_controllers(&players, seed);
                 Ok((game, DevDriver::Live(driver), view_player_id))
             }
-            RoomMode::DevScenario(config) => {
-                let _scenario_faction_id =
-                    default_faction_id_for(FactionRequestContext::DevScenario);
-                match config.id {
-                    DevScenarioId::ScoutCarSnakingCorridor => {
-                        let setup = Game::new_snaking_corridor_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::DirectReverseOrder => {
-                        let setup = Game::new_direct_reverse_order_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::ScoutCarWallChokepoint => {
-                        let setup = Game::new_scout_car_wall_chokepoint_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::VehicleCornerWall => {
-                        let setup = Game::new_vehicle_corner_wall_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::VehicleSmallBlockBaseline => {
-                        let setup = Game::new_vehicle_small_block_baseline_scenario(
-                            config.unit,
-                            config.count,
-                            config.blocker,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::FactoryZeroGapPerpendicular => {
-                        let setup = Game::new_factory_zero_gap_perpendicular_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
+            RoomMode::DevScenario(config) => match config.id {
+                DevScenarioId::EkaterinaOpening => {
+                    let setup = Game::new_ekaterina_opening_scenario(match_seed())?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
                 }
-            }
+                DevScenarioId::ScoutCarSnakingCorridor => {
+                    let setup = Game::new_snaking_corridor_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::DirectReverseOrder => {
+                    let setup = Game::new_direct_reverse_order_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::ScoutCarWallChokepoint => {
+                    let setup = Game::new_scout_car_wall_chokepoint_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::VehicleCornerWall => {
+                    let setup = Game::new_vehicle_corner_wall_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::VehicleSmallBlockBaseline => {
+                    let setup = Game::new_vehicle_small_block_baseline_scenario(
+                        config.unit,
+                        config.count,
+                        config.blocker,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::FactoryZeroGapPerpendicular => {
+                    let setup = Game::new_factory_zero_gap_perpendicular_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+            },
         }
     }
 
@@ -4388,14 +4396,26 @@ mod tests {
     fn replay_session_rejects_unknown_or_fixture_faction_ids() {
         let players = replay_test_players(2);
         let (_live, mut unknown_artifact) = replay_test_artifact(&players, 0);
-        unknown_artifact.players[0].faction_id = "ekaterina".to_string();
+        unknown_artifact.players[0].faction_id = "unknown-faction".to_string();
 
         let err = match ReplaySession::new(unknown_artifact) {
-            Ok(_) => panic!("unsupported replay faction should be rejected"),
+            Ok(_) => panic!("unknown replay faction should be rejected"),
             Err(err) => err,
         };
         assert!(
             err.contains("unknown faction"),
+            "unexpected artifact reject: {err}"
+        );
+
+        let (_live, mut unsupported_artifact) = replay_test_artifact(&players, 0);
+        unsupported_artifact.players[0].faction_id = "ekaterina".to_string();
+
+        let err = match ReplaySession::new(unsupported_artifact) {
+            Ok(_) => panic!("unsupported replay faction should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unsupported faction"),
             "unexpected artifact reject: {err}"
         );
 

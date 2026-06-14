@@ -2422,6 +2422,117 @@ mod tests {
     }
 
     #[test]
+    fn ekaterina_and_kriegsia_reject_cross_faction_build_and_train_commands() {
+        let map = flat_map(24);
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].faction_id = rules::faction::EKATERINA_FACTION_ID.to_string();
+        let mut entities = EntityStore::new();
+        let engineer = entities
+            .spawn_unit(1, EntityKind::EkaterinaEngineer, 96.0, 96.0)
+            .expect("engineer should spawn");
+        let worker = entities
+            .spawn_unit(2, EntityKind::Worker, 320.0, 96.0)
+            .expect("worker should spawn");
+        let (cp_x, cp_y) = footprint_center(&map, EntityKind::EkaterinaCommandPost, 5, 5);
+        let command_post = entities
+            .spawn_building(1, EntityKind::EkaterinaCommandPost, cp_x, cp_y, true)
+            .expect("command post should spawn");
+        let (ws_x, ws_y) = footprint_center(&map, EntityKind::EkaterinaWorkshop, 10, 5);
+        let workshop = entities
+            .spawn_building(1, EntityKind::EkaterinaWorkshop, ws_x, ws_y, true)
+            .expect("workshop should spawn");
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 15, 5);
+        let city_centre = entities
+            .spawn_building(2, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![
+                (
+                    1,
+                    SimCommand::Build {
+                        units: vec![engineer],
+                        building: EntityKind::Depot,
+                        tile_x: 8,
+                        tile_y: 8,
+                        queued: false,
+                    },
+                ),
+                (
+                    2,
+                    SimCommand::Build {
+                        units: vec![worker],
+                        building: EntityKind::EkaterinaSupplyCache,
+                        tile_x: 16,
+                        tile_y: 8,
+                        queued: false,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Train {
+                        building: command_post,
+                        unit: EntityKind::Worker,
+                    },
+                ),
+                (
+                    2,
+                    SimCommand::Train {
+                        building: city_centre,
+                        unit: EntityKind::EkaterinaEngineer,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Train {
+                        building: workshop,
+                        unit: EntityKind::EkaterinaConscript,
+                    },
+                ),
+            ],
+        );
+
+        assert!(
+            !matches!(
+                entities.get(engineer).expect("engineer").order(),
+                Order::Build(_)
+            ),
+            "Ekaterina engineer must not receive a Kriegsia build order"
+        );
+        assert!(
+            !matches!(
+                entities.get(worker).expect("worker").order(),
+                Order::Build(_)
+            ),
+            "Kriegsia worker must not receive an Ekaterina build order"
+        );
+        assert!(
+            entities
+                .get(command_post)
+                .expect("command post")
+                .prod_queue()
+                .is_empty(),
+            "Ekaterina Command Post must not train Kriegsia workers"
+        );
+        assert!(
+            entities
+                .get(city_centre)
+                .expect("city centre")
+                .prod_queue()
+                .is_empty(),
+            "Kriegsia City Centre must not train Ekaterina engineers"
+        );
+        assert_eq!(
+            entities.get(workshop).expect("workshop").prod_queue().len(),
+            1,
+            "Ekaterina Workshop should train Conscripts"
+        );
+    }
+
+    #[test]
     fn fixture_faction_point_fire_does_not_spend_steel() {
         let map = flat_map(64);
         let mut players = vec![player_state(1), player_state(2)];

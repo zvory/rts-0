@@ -16,6 +16,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
         if let Some(launch) = parse_dev_scenario_room(raw) {
             return RoomMode::DevScenario(DevScenarioConfig {
                 id: match launch.id {
+                    "ekaterina_opening" => DevScenarioId::EkaterinaOpening,
                     "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
                     "direct_reverse_order" => DevScenarioId::DirectReverseOrder,
                     "scout_car_wall_chokepoint" => DevScenarioId::ScoutCarWallChokepoint,

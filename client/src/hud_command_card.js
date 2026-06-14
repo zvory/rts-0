@@ -224,8 +224,8 @@ export function buildUnitCard(ctx, selection) {
     .filter((e) => e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY)
     .map((e) => e.id);
   const abilityAffordances = selectedAbilityAffordances(ctx, selection);
-  const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
-  const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
+  const hasArmyUnit = ownUnits.some((e) => !isWorkerKind(e.kind));
+  const workerSelected = !hasArmyUnit && ownUnits.some((e) => isWorkerKind(e.kind));
   const signature =
     `units|${unitIds.join(".")}|target:${commandTargetSig(ctx.commandTarget)}|` +
     `|setup:${setupGunIds.join(".")}|` +
@@ -556,7 +556,11 @@ function selectedOwnUnits(ctx, selection) {
 
 function workerOnlySelection(ctx, selection) {
   const ownUnits = selectedOwnUnits(ctx, selection);
-  return ownUnits.length > 0 && ownUnits.every((e) => e.kind === KIND.WORKER);
+  return ownUnits.length > 0 && ownUnits.every((e) => isWorkerKind(e.kind));
+}
+
+function isWorkerKind(kind) {
+  return kind === KIND.WORKER || kind === KIND.EKATERINA_ENGINEER;
 }
 
 function researchesOf(kind) {

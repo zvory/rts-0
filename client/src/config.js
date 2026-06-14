@@ -139,6 +139,10 @@ export const STATS = Object.freeze({
     rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.COMMAND_CAR_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
+  [KIND.EKATERINA_ENGINEER]: { label: "Engineer", icon: "EEN", size: 9, sight: 7,
+    rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 360 },
+  [KIND.EKATERINA_CONSCRIPT]: { label: "Conscript", icon: "CON", size: 9, sight: 8,
+    rangeTiles: 4, cost: { steel: 45, oil: 0 }, supply: 1, buildTicks: 300 },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
@@ -168,6 +172,13 @@ export const STATS = Object.freeze({
     cost: { steel: 125, oil: 125 }, buildTicks: 620,
     trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
+  [KIND.EKATERINA_COMMAND_POST]: { label: "Command Post", icon: "CP", footW: 3, footH: 3, sight: 9,
+    cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.EKATERINA_ENGINEER] },
+  [KIND.EKATERINA_SUPPLY_CACHE]: { label: "Supply Cache", icon: "SC", footW: 2, footH: 2, sight: 4,
+    cost: { steel: 80, oil: 0 }, buildTicks: 260, trains: [], requires: KIND.EKATERINA_COMMAND_POST },
+  [KIND.EKATERINA_WORKSHOP]: { label: "Workshop", icon: "WS", footW: 3, footH: 2, sight: 6,
+    cost: { steel: 140, oil: 35 }, buildTicks: 520,
+    trains: [KIND.EKATERINA_CONSCRIPT], requires: KIND.EKATERINA_COMMAND_POST },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -319,6 +330,7 @@ export const WORKER_BUILDABLE = Object.freeze([
 ]);
 
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
+export const EKATERINA_FACTION_ID = "ekaterina";
 
 function freezeCatalog(catalog) {
   const trainables = {};
@@ -390,6 +402,23 @@ export const FACTION_CATALOGS = Object.freeze({
     buildings: [KIND.DEPOT],
     buildables: [],
     trainables: {},
+    research: {},
+    abilities: [],
+  }),
+  [EKATERINA_FACTION_ID]: freezeCatalog({
+    id: EKATERINA_FACTION_ID,
+    loadoutId: "ekaterina.standard",
+    units: [KIND.EKATERINA_ENGINEER, KIND.EKATERINA_CONSCRIPT],
+    buildings: [
+      KIND.EKATERINA_COMMAND_POST,
+      KIND.EKATERINA_SUPPLY_CACHE,
+      KIND.EKATERINA_WORKSHOP,
+    ],
+    buildables: [KIND.EKATERINA_SUPPLY_CACHE, KIND.EKATERINA_WORKSHOP],
+    trainables: {
+      [KIND.EKATERINA_COMMAND_POST]: [KIND.EKATERINA_ENGINEER],
+      [KIND.EKATERINA_WORKSHOP]: [KIND.EKATERINA_CONSCRIPT],
+    },
     research: {},
     abilities: [],
   }),

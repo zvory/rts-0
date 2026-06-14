@@ -12,6 +12,8 @@ pub enum EntityKind {
     ScoutCar,
     Tank,
     CommandCar,
+    EkaterinaEngineer,
+    EkaterinaConscript,
     CityCentre,
     Depot,
     Barracks,
@@ -19,12 +21,15 @@ pub enum EntityKind {
     ResearchComplex,
     Factory,
     Steelworks,
+    EkaterinaCommandPost,
+    EkaterinaSupplyCache,
+    EkaterinaWorkshop,
     Steel,
     Oil,
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 18] = [
+    pub const ALL: [EntityKind; 23] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
@@ -34,6 +39,8 @@ impl EntityKind {
         EntityKind::ScoutCar,
         EntityKind::Tank,
         EntityKind::CommandCar,
+        EntityKind::EkaterinaEngineer,
+        EntityKind::EkaterinaConscript,
         EntityKind::CityCentre,
         EntityKind::Depot,
         EntityKind::Barracks,
@@ -41,6 +48,9 @@ impl EntityKind {
         EntityKind::ResearchComplex,
         EntityKind::Factory,
         EntityKind::Steelworks,
+        EntityKind::EkaterinaCommandPost,
+        EntityKind::EkaterinaSupplyCache,
+        EntityKind::EkaterinaWorkshop,
         EntityKind::Steel,
         EntityKind::Oil,
     ];
@@ -57,6 +67,10 @@ impl EntityKind {
         crate::defs::node_def(self).is_some()
     }
 
+    pub fn is_worker(self) -> bool {
+        matches!(self, EntityKind::Worker | EntityKind::EkaterinaEngineer)
+    }
+
     pub fn stable_id(self) -> &'static str {
         match self {
             EntityKind::Worker => "worker",
@@ -68,6 +82,8 @@ impl EntityKind {
             EntityKind::ScoutCar => "scout_car",
             EntityKind::Tank => "tank",
             EntityKind::CommandCar => "command_car",
+            EntityKind::EkaterinaEngineer => "ekaterina_engineer",
+            EntityKind::EkaterinaConscript => "ekaterina_conscript",
             EntityKind::CityCentre => "city_centre",
             EntityKind::Depot => "depot",
             EntityKind::Barracks => "barracks",
@@ -75,6 +91,9 @@ impl EntityKind {
             EntityKind::ResearchComplex => "research_complex",
             EntityKind::Factory => "factory",
             EntityKind::Steelworks => "steelworks",
+            EntityKind::EkaterinaCommandPost => "ekaterina_command_post",
+            EntityKind::EkaterinaSupplyCache => "ekaterina_supply_cache",
+            EntityKind::EkaterinaWorkshop => "ekaterina_workshop",
             EntityKind::Steel => "steel",
             EntityKind::Oil => "oil",
         }
@@ -95,6 +114,8 @@ impl FromStr for EntityKind {
             "scout_car" => Ok(EntityKind::ScoutCar),
             "tank" => Ok(EntityKind::Tank),
             "command_car" => Ok(EntityKind::CommandCar),
+            "ekaterina_engineer" => Ok(EntityKind::EkaterinaEngineer),
+            "ekaterina_conscript" => Ok(EntityKind::EkaterinaConscript),
             "city_centre" => Ok(EntityKind::CityCentre),
             "depot" => Ok(EntityKind::Depot),
             "barracks" => Ok(EntityKind::Barracks),
@@ -102,6 +123,9 @@ impl FromStr for EntityKind {
             "research_complex" => Ok(EntityKind::ResearchComplex),
             "factory" => Ok(EntityKind::Factory),
             "steelworks" => Ok(EntityKind::Steelworks),
+            "ekaterina_command_post" => Ok(EntityKind::EkaterinaCommandPost),
+            "ekaterina_supply_cache" => Ok(EntityKind::EkaterinaSupplyCache),
+            "ekaterina_workshop" => Ok(EntityKind::EkaterinaWorkshop),
             "steel" => Ok(EntityKind::Steel),
             "oil" => Ok(EntityKind::Oil),
             _ => Err(()),

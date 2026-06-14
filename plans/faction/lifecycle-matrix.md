@@ -1,6 +1,6 @@
 # Faction Lifecycle Matrix
 
-Status: Updated through Phase 4 resource-policy hardening. Every later phase that touches a match
+Status: Updated through Phase 10 Ekaterina dev-opening slice. Every later phase that touches a match
 lifecycle path must keep this matrix updated.
 
 ## Purpose
@@ -12,7 +12,8 @@ or explicitly rejected.
 Canonical faction ids:
 
 - Existing faction: `kriegsia` (**Kriegsia**).
-- Reserved future faction: `ekaterina` (**Ekaterina**), not playable until later approved phases.
+- First real second faction: `ekaterina` (**Ekaterina**), playable only through the Phase 10
+  `dev:ekaterina_opening` scenario until later approved phases.
 - Architecture fixture: `phase2_empty_fixture`, test/dev-only and not a product faction.
 
 ## Columns
@@ -37,7 +38,7 @@ Canonical faction ids:
 | Fixture/dev faction start | Explicit Rust test/dev harness only; fixture catalog loadout starts with alternate Steel/Oil, Depot, and Scout Car | `phase2_empty_fixture` accepted only by `TestFixture` validation context or direct sim tests; not normal lobby selectable | Reject AI unless explicitly allowed by a later phase | Disabled when local fixture player is unsupported | Record fixture id/loadout only in explicit test artifacts | `server/crates/sim/src/game/setup/tests.rs`, `tests/prediction_controller.mjs`, `scripts/check-faction-assumptions.mjs`, `server/src/lobby/faction_validation.rs` tests | Fixture is architecture coverage, not a product faction. |
 | Replay playback | `ReplayArtifactV1.players[].faction_id` and `playerLoadouts[]` in artifact schema 2, validated before playback | Recorded Kriegsia in live replay paths; unknown, fixture-only, and unsupported catalog ids reject | No new AI assignment | Disabled for viewer prediction | Load from artifact schema, never lobby state; schema 1 or missing/mismatched faction/loadout records rejected | `server/crates/sim/src/game/replay.rs` tests, `server/src/lobby/room_task.rs` replay tests | Old artifacts without faction ids or loadout records are incompatible. |
 | Replay branch staging/launch | Branch seed seats copy recorded `factionId` from replay players and validate before launch | Recorded Kriegsia in Phase 3D; unsupported seat faction ids reject before live launch | Reject AI seats unless explicitly supported later | Disabled unless supported by branch schema/WASM | Reconstruct from branch seed and cloned keyframe | `server/src/lobby/room_task.rs` tests, `tests/protocol_parity.mjs` | Seat claims do not alter faction ids. |
-| Dev scenarios | Scenario definition plus Kriegsia default start unless scenario explicitly owns a test fixture | Kriegsia only in Phase 3D; fixture rejected outside explicit test fixture context | Not applicable unless scenario declares AI | Disabled only for unsupported local-player faction | Not replayed unless scenario recording exists | `server/crates/sim/src/game/setup/dev_scenarios/tests.rs`, `docs/context/testing.md` | No arbitrary client spawning. |
+| Dev scenarios | Scenario definition plus Kriegsia default start unless the scenario explicitly owns faction assignment; `dev:ekaterina_opening` constructs `PlayerInit { faction_id: "ekaterina" }` and the `ekaterina.standard` loadout | Kriegsia for existing scenarios; Ekaterina only for `dev:ekaterina_opening`; fixture rejected outside explicit test fixture context | Not applicable unless scenario declares AI; Ekaterina scenario has no AI | Dev-watch viewers stay prediction-disabled; local Ekaterina prediction support is not implemented | Not replayed unless scenario recording exists; no replay/branch promotion for Ekaterina in Phase 10 | `server/crates/sim/src/game/setup/dev_scenarios/tests.rs`, `server/src/dev_scenarios.rs` tests, `server/src/lobby/faction_validation.rs` tests | Phase 10 exposes start/economy/first production only. |
 | Self-play | Self-play `PlayerInit.faction_id`, validated by `lobby::faction_validation` | Kriegsia until AI support expands | Kriegsia-only | Not applicable | Artifact schema 2 records faction ids and per-player loadouts | `server/crates/ai/src/selfplay` tests | Separate AI plan needed for other factions. |
 | Match history replay | Stored schema-2 match artifact | Recorded Kriegsia in live replay paths; unknown, fixture-only, and unsupported catalog ids reject at replay launch | From artifact only | Disabled for replay viewers | Load from persisted schema; schema 1 rejected by decode/compatibility and unsupported or missing/mismatched faction/loadout rows reject before room creation | `server/src/main.rs` replay compatibility tests, `docs/design/match-history.md` | Old persisted replays without loadout records are incompatible. |
 | Spectator/no-fog view | Live match start payload or replay schema | Match factions from start/replay metadata | Not applicable | Disabled | Preserve recorded faction metadata | `tests/server_integration.mjs`, future observer faction metadata test | Resource rows stay fixed Steel/Oil/Supply fields. |

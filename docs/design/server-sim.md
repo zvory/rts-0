@@ -169,18 +169,19 @@ is never allied with a player.
 `PlayerInit.faction_id` is canonical faction identity. The default current faction is
 `kriegsia`, and the server/lobby layer validates requested or recorded faction ids before match
 assembly. That policy is separate from `rules::faction` catalog existence: normal lobby,
-quickstart, AI, self-play, and dev starts default to or accept only Kriegsia in Phase 3A, replay
-paths require explicit recorded faction ids, and `phase2_empty_fixture` is accepted only by
-test-fixture contexts. The lower rules/sim layer also fails closed: empty faction ids may default
-only at the narrow compatibility boundary, while unknown non-empty ids get no faction catalog
-loadout, no starting entities/resources, no supply credit for Kriegsia units/buildings, and no
-legal build/train/research/gather/ability surface.
+quickstart, AI, and self-play default to or accept only Kriegsia, replay paths require explicit
+recorded faction ids, `phase2_empty_fixture` is accepted only by test-fixture contexts, and
+`ekaterina` is accepted only by the Phase 10 `dev:ekaterina_opening` scenario. The lower rules/sim
+layer also fails closed: empty faction ids may default only at the narrow compatibility boundary,
+while unknown non-empty ids get no faction catalog loadout, no starting entities/resources, no
+supply credit for Kriegsia units/buildings, and no legal build/train/research/gather/ability
+surface.
 
-Phase 9 approves the `ekaterina` faction brief and rules spec under `plans/faction/`. Phase 10 may
-start Ekaterina only through an explicit server-owned dev scenario such as
-`dev:ekaterina_opening`, with `FactionRequestContext::DevScenario` accepting `ekaterina` only for
-that path. Normal lobby, quickstart, AI seats, self-play, replay branch launch, and match-history
-replay remain Kriegsia-only until later phases opt in.
+Phase 10 implements the `ekaterina.standard` loadout: 85 Steel, 0 Oil, one completed
+Ekaterina Command Post, four completed Ekaterina Engineers, Command Post Engineer training,
+Engineer-built Supply Caches and Workshops, and Workshop Conscript training. Normal lobby,
+quickstart, AI seats, self-play, replay branch launch, and match-history replay remain
+Kriegsia-only until later phases opt in.
 
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and

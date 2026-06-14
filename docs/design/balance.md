@@ -45,10 +45,10 @@ compatibility.
 
 Phase 9 approves Ekaterina as the first real second faction in
 `plans/faction/ekaterina-brief.md` and `plans/faction/ekaterina-rules-spec.md`. Ekaterina still
-uses Steel, Oil, and Supply; Phase 10 may add only the approved start/economy/first-production
-slice, and Phase 11 may add the approved baseline combat/signature ability slice. Normal lobby
-selection, AI, prediction, generic resources, and any roster beyond those specs require later
-explicit phases.
+uses Steel, Oil, and Supply. Phase 10 implements only the approved start/economy/first-production
+slice through `dev:ekaterina_opening`; Phase 11 may add the approved baseline combat/signature
+ability slice. Normal lobby selection, AI, prediction, generic resources, and any roster beyond
+those specs require later explicit phases.
 
 ### 5.1 Target theme and MVP combat loop
 
@@ -251,6 +251,8 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| ekaterina_engineer | 35 | 3 | 1 | 26 | 2.0 | 7 | 50 | 0 | 1 | 360 (~12s); Ekaterina worker/gatherer/builder; trained at Command Post |
+| ekaterina_conscript | 38 | 4 | 4 | 18 | 1.7 | 8 | 45 | 0 | 1 | 300 (~10s); Ekaterina Phase 10 baseline infantry; trained at Workshop |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
@@ -263,6 +265,14 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 620       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
+| ekaterina_command_post     | Command Post       | 520 | 9     | 200 steel | 3x3 | 400 | Ekaterina start building; trains ekaterina_engineer; +8 supply |
+| ekaterina_supply_cache     | Supply Cache       | 95  | 4     | 80 steel | 2x2 | 260 | Ekaterina supply building; requires Command Post; +8 supply |
+| ekaterina_workshop         | Workshop           | 260 | 6     | 140 steel + 35 oil | 3x2 | 520 | Ekaterina first production building; requires Command Post; trains ekaterina_conscript |
+
+Ekaterina standard start (`ekaterina.standard`) begins with 85 Steel, 0 Oil, one completed
+Command Post, and four completed Engineers. It uses existing Steel/Oil map patches and the same
+hard supply cap of 200. The Phase 10 command-card slice exposes Engineer build commands for Supply
+Cache and Workshop, Command Post training for Engineers, and Workshop training for Conscripts.
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

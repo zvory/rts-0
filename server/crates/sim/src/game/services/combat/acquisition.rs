@@ -31,7 +31,7 @@ pub(super) fn combat_mode(e: &Entity) -> CombatMode {
         Order::AttackMove(_) => CombatMode::Aggressive,
         Order::Move(_) if can_fire_while_moving(e) => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
-        Order::Idle if e.is_unit() && e.kind != EntityKind::Worker => CombatMode::Aggressive,
+        Order::Idle if e.is_unit() && !e.kind.is_worker() => CombatMode::Aggressive,
         _ => CombatMode::Passive,
     }
 }

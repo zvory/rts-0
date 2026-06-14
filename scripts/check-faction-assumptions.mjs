@@ -80,7 +80,7 @@ for (const pathName of [
 assert(!matrix.includes("| TBD |"), "lifecycle matrix should name owning checks instead of TBD");
 
 const rulesKind = read("server/crates/rules/src/kind.rs");
-assert(rulesKind.includes("pub const ALL: [EntityKind; 18]"), "EntityKind::ALL count changed");
+assert(rulesKind.includes("pub const ALL: [EntityKind; 23]"), "EntityKind::ALL count changed");
 
 const protocol = read("server/crates/protocol/src/lib.rs");
 const clientProtocol = read("client/src/protocol.js");
@@ -176,13 +176,14 @@ const sourceRoots = [
 ];
 const offenders = [];
 const approvedSpecialCaseBudgets = new Map([
-  // Phase 8.5: catalog data and command-service tests intentionally grew during the fixture,
-  // ability, and client-surface phases; keep the ratchet explicit until those helpers shrink.
-  ["server/crates/rules/src/faction.rs", 81],
+  // Phase 10: the real Ekaterina catalog adds new explicit current/default catalog rows, and
+  // commands.rs still carries in-file command-service tests that exercise cross-faction rejection.
+  // Keep the ratchet explicit until those helpers shrink or test modules move out of counted files.
+  ["server/crates/rules/src/faction.rs", 83],
   ["server/crates/rules/src/economy.rs", 98],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
-  ["server/crates/sim/src/game/services/commands.rs", 229],
+  ["server/crates/sim/src/game/services/commands.rs", 234],
   ["server/crates/sim/src/game/invariants.rs", 13],
 ]);
 const budgetOverruns = [];

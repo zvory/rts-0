@@ -655,7 +655,7 @@ fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, ta
 }
 
 fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u32) -> bool {
-    let is_worker = matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker);
+    let is_worker = matches!(entities.get(worker), Some(e) if e.kind.is_worker());
     if !is_worker {
         return false;
     }
@@ -684,7 +684,7 @@ fn build_intent_promotion_error(
     tile_x: u32,
     tile_y: u32,
 ) -> Option<String> {
-    if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
+    if !matches!(entities.get(worker), Some(e) if e.kind.is_worker()) {
         return Some(String::new());
     }
     if matches!(entities.get(worker), Some(e)

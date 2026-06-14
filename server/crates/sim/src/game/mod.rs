@@ -264,7 +264,7 @@ impl Game {
         let retreat_px = AI_WORKER_RETREAT_TILES * config::TILE_SIZE as f32;
         let mut commands = Vec::new();
         for entity in self.entities.iter() {
-            if entity.owner != player || entity.kind != EntityKind::Worker || entity.hp == 0 {
+            if entity.owner != player || !entity.kind.is_worker() || entity.hp == 0 {
                 continue;
             }
             if matches!(entity.build_phase(), Some(BuildPhase::Constructing { .. })) {

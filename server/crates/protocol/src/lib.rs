@@ -43,6 +43,8 @@ pub mod kinds {
     pub const SCOUT_CAR: &str = "scout_car";
     pub const TANK: &str = "tank";
     pub const COMMAND_CAR: &str = "command_car";
+    pub const EKATERINA_ENGINEER: &str = "ekaterina_engineer";
+    pub const EKATERINA_CONSCRIPT: &str = "ekaterina_conscript";
     pub const CITY_CENTRE: &str = "city_centre";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -50,6 +52,9 @@ pub mod kinds {
     pub const RESEARCH_COMPLEX: &str = "research_complex";
     pub const FACTORY: &str = "factory";
     pub const STEELWORKS: &str = "steelworks";
+    pub const EKATERINA_COMMAND_POST: &str = "ekaterina_command_post";
+    pub const EKATERINA_SUPPLY_CACHE: &str = "ekaterina_supply_cache";
+    pub const EKATERINA_WORKSHOP: &str = "ekaterina_workshop";
     pub const STEEL: &str = "steel";
     pub const OIL: &str = "oil";
 }
@@ -1156,6 +1161,8 @@ fn kind_code(kind: &str) -> u8 {
         kinds::ARTILLERY => 16,
         kinds::TANK => 5,
         kinds::SCOUT_CAR => 14,
+        kinds::EKATERINA_ENGINEER => 19,
+        kinds::EKATERINA_CONSCRIPT => 20,
         kinds::CITY_CENTRE => 6,
         kinds::DEPOT => 7,
         kinds::BARRACKS => 8,
@@ -1166,6 +1173,9 @@ fn kind_code(kind: &str) -> u8 {
         kinds::STEELWORKS => 13,
         kinds::RESEARCH_COMPLEX => 17,
         kinds::COMMAND_CAR => 18,
+        kinds::EKATERINA_COMMAND_POST => 21,
+        kinds::EKATERINA_SUPPLY_CACHE => 22,
+        kinds::EKATERINA_WORKSHOP => 23,
         _ => 255,
     }
 }
