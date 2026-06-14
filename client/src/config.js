@@ -100,6 +100,8 @@ export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 7;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
 export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
+export const BASE_COMMAND_SUPPLY_CAP = 24;
+export const COMMAND_CAR_SUPPLY_CAP_BONUS = 12;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([

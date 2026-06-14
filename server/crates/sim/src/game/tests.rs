@@ -2984,17 +2984,18 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
         assert!((entity.facing() - north).abs() < 0.001);
     }
 
+    let command_units: Vec<u32> = setup.units.iter().copied().take(8).collect();
     game.enqueue(
         setup.player_id,
         Command::Move {
-            units: setup.units.clone(),
+            units: command_units.clone(),
             x: setup.goal.0,
             y: setup.goal.1,
             queued: false,
         },
     );
     game.tick();
-    for unit in setup.units {
+    for unit in command_units {
         let view = game
             .snapshot_for(setup.player_id)
             .entities

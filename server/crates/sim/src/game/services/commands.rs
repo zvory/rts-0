@@ -30,8 +30,10 @@ use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules;
 
-/// Max unique unit ids honored per multi-unit command. Caps the per-id work a single command can
-/// force, so a repeated/huge id list can't be used to stall the tick loop.
+const BASE_COMMAND_SUPPLY_CAP: u32 = 24;
+const COMMAND_CAR_SUPPLY_CAP_BONUS: u32 = 12;
+/// Max submitted unit ids inspected per multi-unit command. Caps the per-id work a single command
+/// can force, so a repeated/huge id list can't be used to stall the tick loop.
 const MAX_UNITS_PER_COMMAND: usize = 256;
 const MAX_RALLY_STAGES: usize = 4;
 
@@ -57,6 +59,12 @@ pub(crate) fn apply_commands(
             players.iter().map(|p| (p.id, p.faction_id.as_str())),
             player,
         );
+        let enforce_command_budget = !player_is_ai(
+            players
+                .iter()
+                .map(|candidate| (candidate.id, candidate.is_ai)),
+            player,
+        );
         match cmd {
             SimCommand::Move {
                 units,
@@ -64,6 +72,11 @@ pub(crate) fn apply_commands(
                 y,
                 queued,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -95,6 +108,11 @@ pub(crate) fn apply_commands(
                 y,
                 queued,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -125,6 +143,11 @@ pub(crate) fn apply_commands(
                 target,
                 queued,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 let target_valid =
                     attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
                 let request = planner::OrderRequest {
@@ -159,6 +182,11 @@ pub(crate) fn apply_commands(
                 y,
                 queued,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -186,7 +214,12 @@ pub(crate) fn apply_commands(
                 );
             }
             SimCommand::TearDownAntiTankGuns { units } => {
-                for id in dedupe_cap_units(units) {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
+                for id in units {
                     if !owns_unit(entities, player, id) || is_constructing(entities, id) {
                         continue;
                     }
@@ -218,6 +251,11 @@ pub(crate) fn apply_commands(
                 y,
                 queued,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 use_ability(
                     map,
                     entities,
@@ -245,6 +283,11 @@ pub(crate) fn apply_commands(
                 units,
                 enabled,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 let definition = ability::definition(ability);
                 if !definition.autocast {
                     continue;
@@ -256,7 +299,7 @@ pub(crate) fn apply_commands(
                 {
                     continue;
                 }
-                for id in dedupe_cap_units(units) {
+                for id in units {
                     if owns_unit(entities, player, id)
                         && ability_orders::caster_allowed_by_faction(
                             entities,
@@ -276,6 +319,11 @@ pub(crate) fn apply_commands(
                 node,
                 queued,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 let node_valid = gather_node_valid(entities, player, node);
                 let request = planner::OrderRequest {
                     units: units.clone(),
@@ -307,6 +355,11 @@ pub(crate) fn apply_commands(
                 tile_y,
                 queued,
             } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
                 let (target_x, target_y) = build_target_center(building, tile_x, tile_y);
                 let request = planner::OrderRequest {
                     units: units.clone(),
@@ -416,7 +469,12 @@ pub(crate) fn apply_commands(
                 order_cancel(entities, players, player, building);
             }
             SimCommand::Stop { units } => {
-                for id in dedupe_cap_units(units) {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
+                for id in units {
                     if owns_unit(entities, player, id) && !is_constructing(entities, id) {
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
@@ -447,20 +505,60 @@ pub(crate) fn apply_commands(
     }
 }
 
-/// Dedupe a command's unit ids (preserving first-seen order) and cap the count at
+/// Dedupe a command's unit ids (preserving first-seen order) and cap inspected ids at
 /// `MAX_UNITS_PER_COMMAND`.
 fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
     let mut seen = HashSet::new();
     let mut out = Vec::with_capacity(units.len().min(MAX_UNITS_PER_COMMAND));
-    for id in units {
-        if out.len() >= MAX_UNITS_PER_COMMAND {
-            break;
-        }
+    for id in units.into_iter().take(MAX_UNITS_PER_COMMAND) {
         if seen.insert(id) {
             out.push(id);
         }
     }
     out
+}
+
+fn player_is_ai(mut players: impl Iterator<Item = (u32, bool)>, player: u32) -> bool {
+    players
+        .find(|(candidate, _)| *candidate == player)
+        .is_some_and(|(_, is_ai)| is_ai)
+}
+
+fn validate_command_units(
+    entities: &EntityStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    units: Vec<u32>,
+    enforce_budget: bool,
+) -> Option<Vec<u32>> {
+    let units = dedupe_cap_units(units);
+    if enforce_budget && command_budget_exceeded(entities, player, &units) {
+        notice(events, player, "Command supply exceeded");
+        return None;
+    }
+    Some(units)
+}
+
+fn command_budget_exceeded(entities: &EntityStore, player: u32, units: &[u32]) -> bool {
+    let mut used = 0u32;
+    let mut cap = BASE_COMMAND_SUPPLY_CAP;
+    for id in units {
+        let Some(entity) = entities.get(*id) else {
+            continue;
+        };
+        if entity.owner != player || !entity.is_unit() || entity.under_construction() {
+            continue;
+        }
+        used = used.saturating_add(command_weight(entity.kind));
+        if entity.kind == EntityKind::CommandCar {
+            cap = cap.saturating_add(COMMAND_CAR_SUPPLY_CAP_BONUS);
+        }
+    }
+    used > cap
+}
+
+fn command_weight(kind: EntityKind) -> u32 {
+    rules::economy::supply_cost(kind).max(1)
 }
 
 fn issue_mode(queued: bool) -> planner::IssueMode {
@@ -4693,6 +4791,145 @@ mod tests {
         );
     }
 
+    #[test]
+    fn command_budget_allows_twenty_four_one_supply_units() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let units = spawn_units(&mut entities, 1, EntityKind::Rifleman, 24);
+        mark_units_moving(&mut entities, &units);
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Stop {
+                    units: units.clone(),
+                },
+            )],
+        );
+
+        assert!(
+            units.iter().all(|id| matches!(
+                entities.get(*id).map(|entity| entity.order()),
+                Some(Order::Idle)
+            )),
+            "24 one-supply units should fit the base command budget"
+        );
+    }
+
+    #[test]
+    fn command_budget_rejects_fifth_tank_without_command_car() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let units = spawn_units(&mut entities, 1, EntityKind::Tank, 5);
+        mark_units_moving(&mut entities, &units);
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut [player_state(1), player_state(2)],
+            vec![(
+                1,
+                SimCommand::Stop {
+                    units: units.clone(),
+                },
+            )],
+        );
+
+        assert!(
+            units.iter().all(|id| matches!(
+                entities.get(*id).map(|entity| entity.order()),
+                Some(Order::Move(_))
+            )),
+            "five tanks should exceed the base command budget and keep their orders"
+        );
+        assert_notice(&events, 1, "Command supply exceeded");
+    }
+
+    #[test]
+    fn command_car_bonus_stacks_while_consuming_supply() {
+        let map = flat_map(64);
+
+        let mut one_car_entities = EntityStore::new();
+        let mut one_car_units = spawn_units(&mut one_car_entities, 1, EntityKind::Tank, 5);
+        one_car_units.extend(spawn_units(
+            &mut one_car_entities,
+            1,
+            EntityKind::CommandCar,
+            1,
+        ));
+        mark_units_moving(&mut one_car_entities, &one_car_units);
+        apply(
+            &map,
+            &mut one_car_entities,
+            vec![(
+                1,
+                SimCommand::Stop {
+                    units: one_car_units.clone(),
+                },
+            )],
+        );
+        assert!(
+            one_car_units.iter().all(|id| matches!(
+                one_car_entities.get(*id).map(|entity| entity.order()),
+                Some(Order::Idle)
+            )),
+            "one Command Car should make five tanks legal: 34 used / 36 cap"
+        );
+
+        let mut two_car_entities = EntityStore::new();
+        let mut two_car_units = spawn_units(&mut two_car_entities, 1, EntityKind::Tank, 6);
+        two_car_units.extend(spawn_units(
+            &mut two_car_entities,
+            1,
+            EntityKind::CommandCar,
+            2,
+        ));
+        mark_units_moving(&mut two_car_entities, &two_car_units);
+        apply(
+            &map,
+            &mut two_car_entities,
+            vec![(
+                1,
+                SimCommand::Stop {
+                    units: two_car_units.clone(),
+                },
+            )],
+        );
+        assert!(
+            two_car_units.iter().all(|id| matches!(
+                two_car_entities.get(*id).map(|entity| entity.order()),
+                Some(Order::Idle)
+            )),
+            "two Command Cars should stack: 44 used / 48 cap"
+        );
+    }
+
+    #[test]
+    fn command_unit_id_processing_remains_absolutely_bounded() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::move_to(10.0, 10.0));
+        let mut units = vec![worker; MAX_UNITS_PER_COMMAND + 2_000];
+        units.extend(spawn_units(&mut entities, 1, EntityKind::Tank, 20));
+
+        apply(&map, &mut entities, vec![(1, SimCommand::Stop { units })]);
+
+        assert!(
+            matches!(
+                entities.get(worker).map(|entity| entity.order()),
+                Some(Order::Idle)
+            ),
+            "only the bounded leading id window should be inspected"
+        );
+    }
+
     /// Run `apply_commands` with throwaway derived state for command-validation tests.
     fn apply(map: &Map, entities: &mut EntityStore, pending: Vec<(u32, SimCommand)>) {
         let mut players = vec![player_state(1), player_state(2)];
@@ -4771,6 +5008,43 @@ mod tests {
             score: ScoreState::default(),
             upgrades: Default::default(),
         }
+    }
+
+    fn spawn_units(
+        entities: &mut EntityStore,
+        owner: u32,
+        kind: EntityKind,
+        count: usize,
+    ) -> Vec<u32> {
+        (0..count)
+            .map(|index| {
+                let x = 96.0 + (index % 8) as f32 * 32.0;
+                let y = 96.0 + (index / 8) as f32 * 32.0;
+                entities
+                    .spawn_unit(owner, kind, x, y)
+                    .expect("unit should spawn")
+            })
+            .collect()
+    }
+
+    fn mark_units_moving(entities: &mut EntityStore, units: &[u32]) {
+        for id in units {
+            entities
+                .get_mut(*id)
+                .expect("unit should exist")
+                .set_order(Order::move_to(10.0, 10.0));
+        }
+    }
+
+    fn assert_notice(events: &HashMap<u32, Vec<Event>>, player: u32, message: &str) {
+        assert!(
+            events
+                .get(&player)
+                .is_some_and(|player_events| player_events
+                    .iter()
+                    .any(|event| matches!(event, Event::Notice { msg, .. } if msg == message))),
+            "expected notice {message:?} for player {player}: {events:?}"
+        );
     }
 
     fn fill_queue(entities: &mut EntityStore, id: u32) {

@@ -25,9 +25,12 @@ import {
   RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
   ABILITIES,
+  BASE_COMMAND_SUPPLY_CAP,
+  COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
   UPGRADES,
 } from "../client/src/config.js";
+import { commandWithinBudget } from "../client/src/command_budget.js";
 import {
   HUD,
   formatTankOilUsed,
@@ -2623,6 +2626,62 @@ function fakeAudioContext() {
   assert(
     msg.replayVisionPlayers([1, 2]).vision.playerIds.join(",") === "1,2",
     "replay subset vision builder payload",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Command Budget
+// ---------------------------------------------------------------------------
+{
+  function budgetState(entities) {
+    const byId = new Map(entities.map((entity) => [entity.id, entity]));
+    return {
+      entityById(id) {
+        return byId.get(id);
+      },
+      isOwnOwner(owner) {
+        return owner === 1;
+      },
+    };
+  }
+
+  const tanks = Array.from({ length: 5 }, (_, index) => ({
+    id: index + 1,
+    owner: 1,
+    kind: KIND.TANK,
+    state: STATE.IDLE,
+  }));
+  const overBudget = commandWithinBudget(
+    budgetState(tanks),
+    cmd.move(tanks.map((tank) => tank.id), 100, 100),
+  );
+  assert(!overBudget.ok, "client command guard rejects five tanks without a Command Car");
+  assert(overBudget.used === 30 && overBudget.cap === BASE_COMMAND_SUPPLY_CAP, "client reports base command budget usage");
+
+  const commandCar = { id: 99, owner: 1, kind: KIND.COMMAND_CAR, state: STATE.IDLE };
+  const legalWithCar = commandWithinBudget(
+    budgetState(tanks.concat(commandCar)),
+    cmd.attackMove(tanks.map((tank) => tank.id).concat(commandCar.id), 100, 100),
+  );
+  assert(legalWithCar.ok, "client command guard allows five tanks with one Command Car");
+  assert(
+    legalWithCar.used === 34 &&
+      legalWithCar.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
+    "client command guard counts Command Car supply and bonus",
+  );
+
+  const legalInfantry = Array.from({ length: 24 }, (_, index) => ({
+    id: index + 200,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    state: STATE.IDLE,
+  }));
+  assert(
+    commandWithinBudget(
+      budgetState(legalInfantry),
+      cmd.stop(legalInfantry.map((entity) => entity.id)),
+    ).ok,
+    "client command guard allows 24 one-supply units",
   );
 }
 

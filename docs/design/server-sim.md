@@ -352,8 +352,12 @@ spatial indexes across later mutations.
 The authoritative command model is: clients compose intent; the server validates and plans it.
 Keyboard latching, double-tap quick-cast, Shift lifetime, and cursor previews are client UX. The
 simulation contract begins when a `SimCommand` reaches `services::commands`: the command service
-dedupes and caps unit-id lists, builds issue-time facts for the referenced units/targets, and must
-produce unit-local actions that match the policy below. `services::order_planner` is the pure
+dedupes and caps unit-id lists, rejects over-budget human unit-list commands, builds issue-time
+facts for the referenced units/targets, and must produce unit-local actions that match the policy
+below. Human command budget is supply-based: 24 base command supply plus 12 per submitted owned
+Command Car, with Command Cars also consuming their mirrored supply weight. AI-owned players are
+exempt from this budget because live AI still issues ordinary `SimCommand`s through
+`Game::enqueue`. `services::order_planner` is the pure
 reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
 economy, or cooldown mutation dependency; it accepts plain facts and emits one of three effects:
 
