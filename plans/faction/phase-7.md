@@ -1,6 +1,6 @@
 # Phase 7 - Ability Effect Hooks
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

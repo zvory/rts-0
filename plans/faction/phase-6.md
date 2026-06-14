@@ -1,6 +1,6 @@
 # Phase 6 - Ability Registry Parity
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

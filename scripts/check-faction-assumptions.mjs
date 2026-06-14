@@ -175,13 +175,27 @@ const sourceRoots = [
   "server/src",
 ];
 const offenders = [];
+const approvedSpecialCaseBudgets = new Map([
+  ["server/crates/rules/src/faction.rs", 78],
+  ["server/crates/rules/src/economy.rs", 98],
+  ["server/crates/sim/src/game/setup.rs", 30],
+  ["server/crates/sim/src/game/services/ability_orders.rs", 18],
+  ["server/crates/sim/src/game/services/commands.rs", 225],
+  ["server/crates/sim/src/game/invariants.rs", 13],
+]);
+const budgetOverruns = [];
 for (const root of sourceRoots) {
   for (const relPath of walk(root)) {
     if (!relPath.endsWith(".rs")) continue;
     if (relPath.endsWith("/tests.rs") || relPath.endsWith("_tests.rs") || relPath.includes("/tests/")) {
       continue;
     }
-    if (!currentFactionSpecialCase.test(read(relPath))) continue;
+    const source = read(relPath);
+    const directSpecialCases = source.match(new RegExp(currentFactionSpecialCase.source, "g")) ?? [];
+    if (approvedSpecialCaseBudgets.has(relPath) && directSpecialCases.length > approvedSpecialCaseBudgets.get(relPath)) {
+      budgetOverruns.push(`${relPath}: ${directSpecialCases.length} > ${approvedSpecialCaseBudgets.get(relPath)}`);
+    }
+    if (directSpecialCases.length === 0) continue;
     if (!approvedCurrentFactionFiles.has(relPath)) offenders.push(relPath);
   }
 }
@@ -189,6 +203,11 @@ for (const root of sourceRoots) {
 assert(
   offenders.length === 0,
   `new current-faction special-case file(s) need catalog API or checker approval:\n${offenders.join("\n")}`,
+);
+
+assert(
+  budgetOverruns.length === 0,
+  `approved high-risk file(s) added direct current-faction special cases; route through catalog APIs or raise the budget deliberately:\n${budgetOverruns.join("\n")}`,
 );
 
 console.log("faction assumption inventory check passed");

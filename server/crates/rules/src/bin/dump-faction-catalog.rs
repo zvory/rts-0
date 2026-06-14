@@ -1,27 +1,63 @@
 use rts_rules::{defs, economy, faction, EntityKind};
 
 fn main() {
-    let catalog = faction::CURRENT_CATALOG;
-    println!("{{");
-    println!("  \"id\": \"{}\",", catalog.id);
-    print_kind_array("units", catalog.units, true);
-    print_kind_array("buildings", catalog.buildings, true);
-    println!("  \"buildables\": [");
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let catalogs: Vec<_> = if args.iter().any(|arg| arg == "--all") {
+        faction::CATALOGS.to_vec()
+    } else if let Some(index) = args.iter().position(|arg| arg == "--faction") {
+        let Some(id) = args.get(index + 1) else {
+            eprintln!("--faction requires an id");
+            std::process::exit(2);
+        };
+        let Some(catalog) = faction::catalog_for(id) else {
+            eprintln!("unknown faction catalog: {id}");
+            std::process::exit(1);
+        };
+        vec![catalog]
+    } else {
+        vec![faction::CURRENT_CATALOG]
+    };
+
+    if catalogs.len() == 1 && !args.iter().any(|arg| arg == "--all") {
+        print_catalog(catalogs[0], "");
+        println!();
+    } else {
+        println!("{{");
+        println!("  \"catalogs\": [");
+        for (index, catalog) in catalogs.iter().enumerate() {
+            print_catalog(*catalog, "    ");
+            println!("{}", if index + 1 == catalogs.len() { "" } else { "," });
+        }
+        println!("  ]");
+        println!("}}");
+    }
+}
+
+fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
+    println!("{indent}{{");
+    println!("{indent}  \"id\": \"{}\",", catalog.id);
+    println!("{indent}  \"loadoutId\": \"{}\",", catalog.loadout.id);
+    print_kind_array("units", catalog.units, true, indent);
+    print_kind_array("buildings", catalog.buildings, true, indent);
+    println!("{indent}  \"buildables\": [");
     for (index, kind) in catalog.buildables.iter().enumerate() {
         let comma = if index + 1 == catalog.buildables.len() {
             ""
         } else {
             ","
         };
-        print!("    {{\"kind\":\"{}\",\"requires\":", kind.stable_id());
+        print!(
+            "{indent}    {{\"kind\":\"{}\",\"requires\":",
+            kind.stable_id()
+        );
         let requires = defs::building_def(*kind)
             .map(|def| def.build_requires)
             .unwrap_or(&[]);
         print_kind_array_inline(requires);
         println!("}}{comma}");
     }
-    println!("  ],");
-    println!("  \"trainables\": [");
+    println!("{indent}  ],");
+    println!("{indent}  \"trainables\": [");
     let producers: Vec<_> = catalog
         .buildings
         .iter()
@@ -34,12 +70,15 @@ fn main() {
         } else {
             ","
         };
-        print!("    {{\"building\":\"{}\",\"units\":", building.stable_id());
+        print!(
+            "{indent}    {{\"building\":\"{}\",\"units\":",
+            building.stable_id()
+        );
         print_kind_vec_inline(&catalog.trainable_units(*building));
         println!("}}{comma}");
     }
-    println!("  ],");
-    println!("  \"research\": [");
+    println!("{indent}  ],");
+    println!("{indent}  \"research\": [");
     for (index, upgrade) in catalog.upgrades.iter().enumerate() {
         let comma = if index + 1 == catalog.upgrades.len() {
             ""
@@ -47,25 +86,48 @@ fn main() {
             ","
         };
         println!(
-            "    {{\"id\":\"{}\",\"researchedAt\":\"{}\"}}{comma}",
+            "{indent}    {{\"id\":\"{}\",\"researchedAt\":\"{}\"}}{comma}",
             upgrade.id,
             upgrade.researched_at.stable_id()
         );
     }
-    println!("  ],");
-    println!("  \"abilities\": [");
+    println!("{indent}  ],");
+    println!("{indent}  \"abilities\": [");
     for (index, ability) in catalog.abilities.iter().enumerate() {
         let comma = if index + 1 == catalog.abilities.len() {
             ""
         } else {
             ","
         };
-        print!("    {{\"id\":\"{}\",\"carriers\":", ability.id);
+        print!(
+            "{indent}    {{\"id\":\"{}\",\"label\":\"{}\",\"icon\":\"{}\",\"hotkey\":{},\"title\":\"{}\",\"carriers\":",
+            ability.id,
+            ability.label,
+            ability.icon,
+            json_string_or_null(ability.hotkey),
+            ability.title,
+        );
         print_kind_array_inline(ability.carriers);
+        print!(
+            ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"mayQueue\":{},\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
+            ability.target_mode.stable_id(),
+            json_u32_or_null(ability.range_tiles),
+            json_u32_or_null(ability.min_range_tiles),
+            ability.cooldown_ticks,
+            json_u16_or_null(ability.charges),
+            ability.cost.steel,
+            ability.cost.oil,
+            json_kind_or_null(ability.tech_requirement),
+            ability.may_queue,
+            ability.autocast,
+            ability.command_card,
+            ability.protocol_code,
+            ability.order_stage_code,
+        );
         println!("}}{comma}");
     }
-    println!("  ],");
-    println!("  \"costs\": {{");
+    println!("{indent}  ],");
+    println!("{indent}  \"costs\": {{");
     let priced: Vec<_> = catalog
         .units
         .iter()
@@ -76,18 +138,18 @@ fn main() {
         let comma = if index + 1 == priced.len() { "" } else { "," };
         let (steel, oil) = economy::cost(*kind);
         println!(
-            "    \"{}\": {{\"steel\":{},\"oil\":{}}}{comma}",
+            "{indent}    \"{}\": {{\"steel\":{},\"oil\":{}}}{comma}",
             kind.stable_id(),
             steel,
             oil
         );
     }
-    println!("  }}");
-    println!("}}");
+    println!("{indent}  }}");
+    print!("{indent}}}");
 }
 
-fn print_kind_array(name: &str, kinds: &[EntityKind], comma: bool) {
-    print!("  \"{name}\": ");
+fn print_kind_array(name: &str, kinds: &[EntityKind], comma: bool, indent: &str) {
+    print!("{indent}  \"{name}\": ");
     print_kind_array_inline(kinds);
     println!("{}", if comma { "," } else { "" });
 }
@@ -105,4 +167,28 @@ fn print_kind_array_inline(kinds: &[EntityKind]) {
 
 fn print_kind_vec_inline(kinds: &[EntityKind]) {
     print_kind_array_inline(kinds);
+}
+
+fn json_string_or_null(value: Option<&str>) -> String {
+    value
+        .map(|value| format!("\"{value}\""))
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn json_u32_or_null(value: Option<u32>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn json_u16_or_null(value: Option<u16>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn json_kind_or_null(value: Option<EntityKind>) -> String {
+    value
+        .map(|kind| format!("\"{}\"", kind.stable_id()))
+        .unwrap_or_else(|| "null".to_string())
 }

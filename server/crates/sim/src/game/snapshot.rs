@@ -101,6 +101,7 @@ impl Game {
                     target,
                     include_debug_path: self.debug_path_overlays,
                     teams: Some(&teams),
+                    owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
                 },
             ) {
                 entities.push(view);
@@ -216,6 +217,9 @@ impl Game {
                             target: None,
                             include_debug_path: false,
                             teams: Some(teams),
+                            owner_faction_id: self
+                                .player(entity.owner)
+                                .map(|p| p.faction_id.as_str()),
                         },
                     )
                     .is_some()

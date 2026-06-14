@@ -278,7 +278,7 @@ function workerBuildCard(factionId = "kriegsia") {
   }, { activate: true });
   assert.equal(imported.ok, true, "Kriegsia faction bindings import successfully");
   assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "B", "Kriegsia custom build binding applies to Kriegsia");
-  assert.equal(hotkeys.resolveCard(workerBuildCard("ekaterina")).slots[0].hotkey, "Q", "Kriegsia custom build binding does not apply to Ekaterina command ids");
+  assert.equal(workerBuildCard("ekaterina").slots[0], null, "unknown future factions do not inherit Kriegsia build commands");
 }
 
 {

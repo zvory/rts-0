@@ -70,10 +70,13 @@ impl Game {
     /// Create a live lobby match where each AI chooses one strategy from the live profile pool.
     pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game;
 
-    /// Create a match with explicit starting steel/oil for every player.
+    /// Compatibility helper for tests and debug starts that still need explicit starting
+    /// Steel/Oil. Production replay/lifecycle reconstruction should use per-player
+    /// `PlayerStartingLoadout` records instead.
     pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
-    /// Create a live lobby match with explicit starting steel/oil and random AI strategies.
+    /// Compatibility helper for callers that still name AI profile setup plus explicit starting
+    /// resources. AI controllers are owned by the caller, not by `Game`.
     pub fn new_with_starting_resources_and_random_ai_profiles(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
     /// Rebuild replay playback with recorded per-player faction loadouts, map, and map metadata.
@@ -168,7 +171,10 @@ is never allied with a player.
 assembly. That policy is separate from `rules::faction` catalog existence: normal lobby,
 quickstart, AI, self-play, and dev starts default to or accept only Kriegsia in Phase 3A, replay
 paths require explicit recorded faction ids, and `phase2_empty_fixture` is accepted only by
-test-fixture contexts.
+test-fixture contexts. The lower rules/sim layer also fails closed: empty faction ids may default
+only at the narrow compatibility boundary, while unknown non-empty ids get no faction catalog
+loadout, no starting entities/resources, no supply credit for Kriegsia units/buildings, and no
+legal build/train/research/gather/ability surface.
 
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and
@@ -246,22 +252,38 @@ policy is centralized instead of scattered through services.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
-`game/ability.rs` defines `AbilityKind` (legacy `Charge` plus active `Smoke`), `AbilityDefinition`,
-`AbilityTargetMode` (`SelfTarget` or `WorldPoint`), `ResourceCost`, and the compile-time
-definition table accessed via `ability::definition(kind)`. Ability definitions include the carrier
-entity kinds, target mode, optional tile range, cooldown in ticks, resource cost, tech requirement,
-and whether the ability may be queued. Adding a new ability means adding an `AbilityKind` variant
-and a `definition` match arm; no other files need to change for the definition itself.
+`rules::faction` owns the faction-aware ability registry. Each `AbilityCatalogEntry` records the
+stable id, label/icon/hotkey/title, legal carriers, target mode, optional min/max range, cooldown,
+finite charges, Steel/Oil cost, tech requirement, queue behavior, autocast support, command-card
+visibility, and compact protocol/order-stage codes. `game/ability.rs` keeps the typed
+`AbilityKind` and converts those registry rows into the sim-facing `AbilityDefinition`; it is not a
+second source of metadata. Adding a registry-backed ability means adding a global `AbilityKind` and
+protocol id, adding the faction catalog entry, updating the client mirror/parity check, and then
+adding only the effect-specific code that the registry cannot express.
+
+`AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
+effect shapes that actually exist today: self status (`charge` legacy compatibility), owned area
+status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), and the intentionally
+one-off artillery point-fire path. The hook receives the owning player's faction id at execution
+time through the normal command/order helpers, so wrong-faction ability use fails before effects,
+resource spending, cooldowns, or events are applied. The hook is deliberately not a generic script
+engine; new faction signature mechanics should add a tightly scoped hook only when the approved
+ability cannot use one of these shapes.
 
 `services::ability_orders` owns the tick-path execution helpers:
 - `order_or_launch_world_ability` — for `WorldPoint` abilities: if the caster is in range, launch
   immediately; otherwise compute a staging point inside range and issue an `Order::Ability`
   movement order via `MoveCoordinator`.
-- `launch_world_ability` — deducts resources, sets the caster's cooldown, clears the active order,
-  and executes the effect (currently: schedules a smoke cloud or delayed mortar shell). Guards:
+- `launch_world_ability` — reads range/cost/cooldown from the registry, deducts resources, sets
+  the caster's cooldown, clears the active order,
+  and dispatches a delayed-world effect hook (currently: schedules a smoke cloud or delayed mortar
+  shell). Guards:
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
+- `launch_self_ability` — validates the self-targeted registry row and dispatches self-status or
+  owned-area-status hooks. Breakthrough remains an owned-unit area buff; legacy Charge remains
+  decodable but has no current carriers.
 - `caster_can_attempt`, `tech_requirement_met`, `caster_in_range` — pure predicates used by both
   command validation and order-queue promotion.
 
@@ -276,6 +298,10 @@ Rules functions have no imports from `services/`; classification and formula rul
 kind-specific data from `rules::defs`. `config.rs` holds scalar constants and compatibility
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
+
+Snapshot ability affordances are projected from the owning player's faction catalog, so fixture or
+future factions do not inherit Kriegsia command-card buttons merely because they reuse a global
+entity kind.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource

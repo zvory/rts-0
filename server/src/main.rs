@@ -28,7 +28,9 @@ use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
 
-use rts_rules::faction::{catalog_for, DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
+use rts_rules::faction::{
+    catalog_for, catalog_loadout_for, DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
+};
 use rts_server::db::Db;
 use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
@@ -481,6 +483,12 @@ fn replay_faction_incompatibility_reason(artifact: &ReplayArtifactV1) -> Option<
             return Some(format!(
                 "Replay player {} is missing a loadout id.",
                 player.id
+            ));
+        }
+        if catalog_loadout_for(faction_id, loadout.loadout_id.trim()).is_none() {
+            return Some(format!(
+                "Replay player {} uses unknown loadout {:?} for faction {:?}.",
+                player.id, loadout.loadout_id, faction_id
             ));
         }
     }

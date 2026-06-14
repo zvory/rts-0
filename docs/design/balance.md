@@ -16,9 +16,11 @@ default faction catalog to the client descriptors.
 The faction rollout keeps Steel, Oil, and Supply as the global economy contract. Faction catalogs
 decide which global units, buildings, upgrades, and abilities are legal for a player and define
 starting Steel/Oil values plus starting entity loadouts, but they still use fixed `steel`, `oil`,
-`supplyUsed`, and `supplyCap` fields. Start-map resource nodes remain Steel and Oil nodes. Score
-values, replay analysis values, command-card costs, affordability checks, refunds, and supply
-reservation are intentionally Steel/Oil/Supply-shaped.
+`supplyUsed`, and `supplyCap` fields. Unknown non-empty faction ids do not fall back to the
+Kriegsia catalog in lower-level economy queries: catalog-gated build/train/research/gather,
+production-anchor, and supply checks return empty or false. Start-map resource nodes remain Steel
+and Oil nodes. Score values, replay analysis values, command-card costs, affordability checks,
+refunds, and supply reservation are intentionally Steel/Oil/Supply-shaped.
 
 Approved direct Steel/Oil/Supply modules for this plan are:
 
@@ -27,7 +29,8 @@ Approved direct Steel/Oil/Supply modules for this plan are:
 - `server/crates/sim/src/game/player_state.rs`, `services/commands.rs`,
   `services/construction.rs`, `services/economy.rs`, `services/supply.rs`, `scoring.rs`,
   `analysis.rs`, `snapshot.rs`, `replay.rs`, and `setup.rs` for fixed-field simulation,
-  score/replay analysis, and start/loadout shims.
+  score/replay analysis, and start/loadout compatibility shims. New lifecycle/replay starts should
+  prefer per-player `PlayerStartingLoadout` records over global starting Steel/Oil overrides.
 - `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`,
   `server/crates/sim/src/protocol.rs`, and `client/src/protocol.js` for the mirrored wire and
   compact transport fields.
@@ -165,6 +168,12 @@ authoritative `rules::defs` records.
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
   can still turn autocast off per selected Mortar Team.
+- Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
+  catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, queueability,
+  autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
+  against that registry for client-visible ability descriptors. Server execution maps those
+  registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
+  world effect, and the one-off artillery point-fire path.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles

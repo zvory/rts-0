@@ -1,4 +1,6 @@
 use super::*;
+use crate::game::ability::AbilityKind;
+use crate::game::entity::Order;
 use crate::rules::faction::EMPTY_FIXTURE_FACTION_ID;
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
@@ -60,6 +62,127 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
         resource_nodes > 0,
         "fixture starts still use universal Steel/Oil nodes"
     );
+}
+
+#[test]
+fn unknown_faction_start_and_commands_fail_closed() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: "unknown_faction".to_string(),
+        name: "Unknown".to_string(),
+        color: "#cc1111".to_string(),
+        is_ai: false,
+    }];
+    let mut game = Game::new(&players, 9);
+    game.assert_invariants();
+
+    assert_eq!(
+        (
+            game.players[0].steel,
+            game.players[0].oil,
+            game.players[0].supply_used,
+            game.players[0].supply_cap
+        ),
+        (0, 0, 0, 0)
+    );
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::CityCentre), 0);
+    let loadout = &game.starting_loadouts()[0];
+    assert_eq!(loadout.loadout_id, "unknown_faction.invalid");
+    assert_eq!((loadout.starting_steel, loadout.starting_oil), (0, 0));
+
+    let (x, y) = game.map.tile_center(4, 4);
+    let worker = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, x, y)
+        .unwrap();
+    let city_centre = game
+        .entities
+        .spawn_building(1, EntityKind::CityCentre, x + 96.0, y, true)
+        .unwrap();
+    let research_complex = game
+        .entities
+        .spawn_building(1, EntityKind::ResearchComplex, x + 192.0, y, true)
+        .unwrap();
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, x, y + 96.0)
+        .unwrap();
+    let node = game
+        .entities
+        .spawn_node(EntityKind::Steel, x + 320.0, y + 320.0)
+        .unwrap();
+    systems::recompute_supply(&mut game.players, &game.entities);
+    let resources_before = (
+        game.players[0].steel,
+        game.players[0].oil,
+        game.players[0].supply_used,
+        game.players[0].supply_cap,
+    );
+    assert_eq!(resources_before, (0, 0, 0, 0));
+
+    for cmd in [
+        SimCommand::Build {
+            units: vec![worker],
+            building: EntityKind::Depot,
+            tile_x: 8,
+            tile_y: 8,
+            queued: false,
+        },
+        SimCommand::Train {
+            building: city_centre,
+            unit: EntityKind::Worker,
+        },
+        SimCommand::Research {
+            building: research_complex,
+            upgrade: upgrade::UpgradeKind::TankUnlock,
+        },
+        SimCommand::Gather {
+            units: vec![worker],
+            node,
+            queued: false,
+        },
+        SimCommand::UseAbility {
+            ability: AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(x + 256.0),
+            y: Some(y + 96.0),
+            queued: false,
+        },
+    ] {
+        game.enqueue(1, cmd);
+    }
+    game.tick();
+
+    assert_eq!(
+        (
+            game.players[0].steel,
+            game.players[0].oil,
+            game.players[0].supply_used,
+            game.players[0].supply_cap
+        ),
+        resources_before,
+        "rejected unknown-faction commands must not spend resources or reserve supply"
+    );
+    assert!(!matches!(
+        game.entities.get(worker).expect("worker").order(),
+        Order::Build(_) | Order::Gather(_)
+    ));
+    assert!(game
+        .entities
+        .get(city_centre)
+        .expect("city centre")
+        .prod_queue()
+        .is_empty());
+    assert!(game
+        .entities
+        .get(research_complex)
+        .expect("research complex")
+        .research_queue()
+        .is_empty());
+    let artillery = game.entities.get(artillery).expect("artillery");
+    assert!(!matches!(artillery.order(), Order::Ability(_)));
+    assert_eq!(artillery.ability_cooldown_ticks(AbilityKind::PointFire), 0);
 }
 
 #[test]
