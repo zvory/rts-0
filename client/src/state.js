@@ -184,6 +184,14 @@ export class GameState {
     return this.players.find((player) => player.id === playerId) || null;
   }
 
+  get localPlayer() {
+    return this.playerById(this.playerId);
+  }
+
+  get localFactionId() {
+    return this.localPlayer?.factionId || null;
+  }
+
   teamIdForPlayer(id) {
     const player = this.playerById(id);
     return player ? player.teamId : null;

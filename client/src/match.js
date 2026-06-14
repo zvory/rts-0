@@ -16,10 +16,11 @@ import { Renderer } from "./renderer/index.js";
 import { ObserverAnalysisOverlay, shouldMountObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
+import { predictionBlockedReason, predictionCompatibility } from "./prediction_compatibility.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, KIND, NOTICE_SEVERITY, PREDICTION_PROTOCOL_VERSION, S } from "./protocol.js";
+import { EVENT, KIND, NOTICE_SEVERITY, S } from "./protocol.js";
 import {
   UNDER_ATTACK_ID,
   VIEWPORT_ALERT_MARGIN_PX,
@@ -1034,66 +1035,6 @@ export class Match {
       }
     }
   }
-}
-
-function predictionCompatibility(payload) {
-  const serverVersion = Number(payload?.predictionVersion) || 0;
-  if (serverVersion !== PREDICTION_PROTOCOL_VERSION) {
-    return {
-      ok: false,
-      reason: serverVersion ? "prediction-version-mismatch" : "prediction-unavailable",
-      clientVersion: PREDICTION_PROTOCOL_VERSION,
-      serverVersion,
-      clientBuildId: clientBuildId(),
-      serverBuildId: payload?.predictionBuildId || null,
-    };
-  }
-  const client = clientBuildId();
-  const server = typeof payload?.predictionBuildId === "string" ? payload.predictionBuildId : "";
-  if (client && server && client !== server) {
-    return {
-      ok: false,
-      reason: "prediction-build-mismatch",
-      clientVersion: PREDICTION_PROTOCOL_VERSION,
-      serverVersion,
-      clientBuildId: client,
-      serverBuildId: server,
-    };
-  }
-  return {
-    ok: true,
-    reason: null,
-    clientVersion: PREDICTION_PROTOCOL_VERSION,
-    serverVersion,
-    clientBuildId: client || null,
-    serverBuildId: server || null,
-  };
-}
-
-function predictionBlockedReason({ enabled, replayViewer, spectator, compatibility }) {
-  if (!enabled) return "user-disabled";
-  if (replayViewer) return "replay-viewer";
-  if (spectator) return "spectator";
-  if (compatibility && !compatibility.ok) return compatibility.reason || "compatibility-mismatch";
-  return null;
-}
-
-function clientBuildId() {
-  if (typeof globalThis.__RTS_BUILD__ === "string" && globalThis.__RTS_BUILD__ !== "unknown") {
-    return globalThis.__RTS_BUILD__;
-  }
-  const scripts = typeof document !== "undefined" ? Array.from(document.scripts || []) : [];
-  for (const script of scripts) {
-    const src = script?.src || "";
-    if (!src.includes("/src/main.js")) continue;
-    try {
-      const version = new URL(src, window.location.href).searchParams.get("v");
-      if (version) return version;
-    } catch {
-      // Ignore malformed script URLs and fall through to unknown build compatibility.
-    }
-  }
-  return "";
 }
 
 function clampU16(value) {

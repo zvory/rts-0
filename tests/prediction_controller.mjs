@@ -4,6 +4,8 @@ import {
   PredictionController,
   PREDICTION_STATE,
 } from "../client/src/prediction_controller.js";
+import { predictionCompatibility } from "../client/src/prediction_compatibility.js";
+import { DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION } from "../client/src/protocol.js";
 import { GameState } from "../client/src/state.js";
 
 function assert(cond, msg) {
@@ -207,6 +209,39 @@ function sentSeqs(sent) {
     "authoritative reads can ignore prediction for fog",
   );
   assert(state.entityById(10).x === 52, "entityById exposes predicted owned position for local UX");
+  assert(state.localFactionId === DEFAULT_FACTION_ID, "GameState exposes normalized local faction identity");
+}
+
+{
+  const compatibility = predictionCompatibility({
+    playerId: 1,
+    spectator: false,
+    predictionVersion: PREDICTION_PROTOCOL_VERSION,
+    predictionBuildId: "same-build",
+    players: [
+      { id: 1, factionId: "phase2_empty_fixture" },
+      { id: 2, factionId: DEFAULT_FACTION_ID },
+    ],
+  }, { clientBuildId: "same-build" });
+  assert(compatibility.ok === false, "unsupported local faction disables prediction");
+  assert(
+    compatibility.reason === "unsupported-local-faction",
+    "unsupported local faction uses stable diagnostic reason",
+  );
+}
+
+{
+  const compatibility = predictionCompatibility({
+    playerId: 1,
+    spectator: false,
+    predictionVersion: PREDICTION_PROTOCOL_VERSION,
+    predictionBuildId: "same-build",
+    players: [
+      { id: 1, factionId: DEFAULT_FACTION_ID },
+      { id: 2, factionId: "phase2_empty_fixture" },
+    ],
+  }, { clientBuildId: "same-build" });
+  assert(compatibility.ok === true, "unsupported remote faction alone does not disable local prediction");
 }
 
 {
