@@ -570,10 +570,10 @@
         anchors: document.getElementById("atlas-anchors"),
       };
       const atlasHelpText = {
-        passability: "Passability\nWhether each terrain tile can be crossed by the selected movement class.",
-        components: "Components\nConnected passable areas. Tiles in different components cannot reach each other without changing movement rules.",
+        passability: "Passability\nWhether each terrain tile can be crossed by the selected movement class from the selected start component.",
+        components: "Components\nConnected playable areas. Disconnected decorative islands outside the selected start component are treated as unpathable.",
         clearance: "Clearance\nDistance from blocked terrain or the map edge. Higher values mean wider, safer-feeling space for routes.",
-        regions: "Regions\nCoarse buckets of nearby passable tiles inside a component. They compress raw terrain into named areas the AI can reason about.",
+        regions: "Regions\nTwelve-tile buckets of nearby passable tiles inside a component. They compress raw terrain into named areas the AI can reason about.",
         portals: "Portals\nConnections between adjacent regions. A portal records the crossing center, the two region ids, movement class, and approximate width.",
         anchors: "Anchors\nStrategic map points attached to topology: starts, mains, naturals, resource clusters, and resource-line approaches.",
       };

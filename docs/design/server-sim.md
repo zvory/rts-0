@@ -50,10 +50,12 @@ new code should prefer the owning crate directly when that does not make local c
 
 `game::map::atlas` owns deterministic topology derived from public authored map data. `Map::atlas()`
 builds movement-class layers for current ground infantry and vehicle representatives, including
-terrain passability, connected components, static clearance from terrain and map edges, coarse
-regions, and portals between adjacent regions. It also attaches semantic anchors for selected
-mains, naturals, generated resource clusters, and resource-line approach tiles to component and
-region ids.
+terrain passability reachable from the selected start component, connected components, static
+clearance from terrain and map edges, twelve-tile coarse regions, and portals between adjacent
+regions. Disconnected passable terrain outside the selected start component is treated as
+unpathable decorative terrain, so it does not create components, regions, portals, clearance, or
+anchor attachments. The atlas also attaches semantic anchors for selected mains, naturals,
+generated resource clusters, and resource-line approach tiles to component and region ids.
 
 The atlas is static and fog-safe: it uses terrain, selected starts, and selected expansion sites
 already available through normal map loading, not live entities or hidden enemy observations. It is

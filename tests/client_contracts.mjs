@@ -5415,7 +5415,7 @@ function fakeAudioContext() {
   for (const helpKey of ["passability", "components", "clearance", "regions", "portals", "anchors"]) {
     assert(editorHtml.includes(`data-atlas-help="${helpKey}"`), `map editor exposes ${helpKey} atlas help`);
   }
-  assert(editorHtml.includes("Coarse buckets of nearby passable tiles"), "map editor explains atlas regions");
+  assert(editorHtml.includes("Twelve-tile buckets of nearby passable tiles"), "map editor explains atlas regions");
   assert(editorHtml.includes("Connections between adjacent regions"), "map editor explains atlas portals");
   assert(editorHtml.includes("Strategic map points attached to topology"), "map editor explains atlas anchors");
 }
