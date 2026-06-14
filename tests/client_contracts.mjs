@@ -5397,27 +5397,9 @@ function fakeAudioContext() {
 
 {
   const editorHtml = fs.readFileSync(new URL("../client/map-editor.html", import.meta.url), "utf8");
-  assert(editorHtml.includes('data-view="atlas"'), "map editor exposes an Atlas tab");
-  assert(editorHtml.includes('const MAP_ATLAS_URL = "/maps/atlas"'), "map editor requests server atlas diagnostics");
-  for (const id of [
-    "atlas-movement",
-    "atlas-passability",
-    "atlas-components",
-    "atlas-clearance",
-    "atlas-regions",
-    "atlas-portals",
-    "atlas-anchors",
-    "atlas-readout",
-  ]) {
-    assert(editorHtml.includes(`id="${id}"`), `map editor includes ${id} control`);
-  }
-  assert(editorHtml.includes('activeView !== "edit"'), "map editor gates mutation while the Atlas tab is active");
-  for (const helpKey of ["passability", "components", "clearance", "regions", "portals", "anchors"]) {
-    assert(editorHtml.includes(`data-atlas-help="${helpKey}"`), `map editor exposes ${helpKey} atlas help`);
-  }
-  assert(editorHtml.includes("Connected twelve-tile areas of nearby passable tiles"), "map editor explains atlas regions");
-  assert(editorHtml.includes("Connections between adjacent regions"), "map editor explains atlas portals");
-  assert(editorHtml.includes("Strategic map points attached to topology"), "map editor explains atlas anchors");
+  assert(!editorHtml.includes('data-view="atlas"'), "map editor does not expose an Atlas tab");
+  assert(!editorHtml.includes('MAP_ATLAS_URL'), "map editor does not request atlas diagnostics");
+  assert(!editorHtml.includes("atlas-readout"), "map editor does not include atlas controls");
 }
 
 function textWithin(node) {

@@ -1,5 +1,5 @@
 {
-  "reason": "phase 1.5 exposes map atlas diagnostics for editor",
+  "reason": "remove map atlas routing prototype",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -63,23 +63,7 @@
     },
     {
       "path": "map.rs",
-      "lines": 620
-    },
-    {
-      "path": "map/atlas.rs",
-      "lines": 462
-    },
-    {
-      "path": "map/atlas/anchors.rs",
-      "lines": 169
-    },
-    {
-      "path": "map/atlas/atlas_tests.rs",
-      "lines": 173
-    },
-    {
-      "path": "map/atlas/diagnostics.rs",
-      "lines": 76
+      "lines": 601
     },
     {
       "path": "map/authored.rs",
@@ -1322,11 +1306,7 @@
     },
     {
       "path": "map.rs",
-      "count": 19
-    },
-    {
-      "path": "map/atlas.rs",
-      "count": 1
+      "count": 18
     },
     {
       "path": "mod.rs",
