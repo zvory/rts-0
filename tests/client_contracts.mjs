@@ -4108,7 +4108,7 @@ function fakeAudioContext() {
   budgetSelectionState.setSelection(budgetRiflemen.map((entity) => entity.id));
   assert(
     budgetSelectionState.selection.size === BASE_COMMAND_SUPPLY_CAP,
-    "selection budget admits 24 one-supply units instead of the old 12-count cap",
+    "selection budget admits 24 one-supply units by command supply",
   );
   assert(
     budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
@@ -4363,6 +4363,89 @@ function fakeAudioContext() {
   assert(
     stopIntent?.unitIds?.join(",") === String(ownWorker.id),
     "mixed own/allied command card emits commands only for own entity ids",
+  );
+
+  const budgetInputState = new GameState({
+    ...start,
+    map: { ...start.map, width: 12, height: 12, resources: [] },
+  });
+  const boxRiflemen = Array.from({ length: 30 }, (_, index) => ({
+    id: 5100 + index,
+    owner: 1,
+    kind: KIND.RIFLEMAN,
+    x: 8 + index * 4,
+    y: 140,
+    hp: 45,
+    maxHp: 45,
+    state: STATE.IDLE,
+  }));
+  const doubleClickRiflemen = Array.from({ length: 30 }, (_, index) => ({
+    id: 5200 + index,
+    owner: 1,
+    kind: KIND.MACHINE_GUNNER,
+    x: 8 + index * 4,
+    y: 180,
+    hp: 55,
+    maxHp: 55,
+    state: STATE.IDLE,
+  }));
+  const budgetInputTanks = Array.from({ length: 5 }, (_, index) => ({
+    id: 5300 + index,
+    owner: 1,
+    kind: KIND.TANK,
+    x: 8 + index * 16,
+    y: 220,
+    hp: 292,
+    maxHp: 292,
+    state: STATE.IDLE,
+  }));
+  const lateBoxCommandCar = {
+    id: 5400,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 96,
+    y: 220,
+    hp: 225,
+    maxHp: 225,
+    state: STATE.IDLE,
+  };
+  budgetInputState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 80,
+    entities: boxRiflemen.concat(doubleClickRiflemen, budgetInputTanks, lateBoxCommandCar),
+    events: [],
+  });
+  const budgetSelectionInput = Object.create(Input.prototype);
+  budgetSelectionInput.state = budgetInputState;
+  budgetSelectionInput.camera = selectionInput.camera;
+  budgetSelectionInput.dom = selectionInput.dom;
+  budgetSelectionInput._worldAt = Input.prototype._worldAt;
+  budgetSelectionInput._entityAtWorld = Input.prototype._entityAtWorld;
+  budgetSelectionInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
+  budgetSelectionInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
+  budgetSelectionInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
+  budgetSelectionInput._commitClickSelection = Input.prototype._commitClickSelection;
+  budgetSelectionInput._commitBoxSelection = Input.prototype._commitBoxSelection;
+  budgetSelectionInput._ownBuildingsOfKindInViewport = Input.prototype._ownBuildingsOfKindInViewport;
+  budgetSelectionInput._closestOwnUnitKindInViewport = Input.prototype._closestOwnUnitKindInViewport;
+  budgetSelectionInput._commitBoxSelection({ x0: 0, y0: 124, x1: 140, y1: 156 }, false);
+  assert(
+    Array.from(budgetInputState.selection).length === BASE_COMMAND_SUPPLY_CAP,
+    "drag selection admits the base budget of one-supply units",
+  );
+  budgetSelectionInput._commitClickSelection({ x: doubleClickRiflemen[0].x, y: doubleClickRiflemen[0].y }, false, true);
+  assert(
+    Array.from(budgetInputState.selection).length === BASE_COMMAND_SUPPLY_CAP / STATS[KIND.MACHINE_GUNNER].supply &&
+      Array.from(budgetInputState.selection).every((id) => id >= 5200 && id < 5300),
+    "double-click same-kind selection is filtered by command supply",
+  );
+  budgetSelectionInput._commitBoxSelection({ x0: 0, y0: 204, x1: 120, y1: 236 }, false);
+  assert(
+    Array.from(budgetInputState.selection).join(",") === "5400,5300,5301,5302,5303,5304",
+    "drag selection pre-admits a late Command Car before budget-filling Tanks",
   );
   const alliedRightClickCommands = [];
   const rightClickInput = Object.create(Input.prototype);
