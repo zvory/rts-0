@@ -1,66 +1,71 @@
-# Phase 2 - Static Route Evaluator
+# Phase 2 - AI Route Query Layer
 
 Status: Planned.
 
 ## Objective
 
-Build a deterministic AI-only route candidate evaluator that can score harassment corridors before
-any live command behavior changes. It should prove, with focused tests, that the known Default map
-top-right versus bottom-right spawn case does not prefer the one-tile right-edge choke when better
-static terrain options exist.
+Expose atlas-backed route queries to AI code without changing live decisions. The AI should be able
+to ask for route options and receive route facts, but it should not inspect raw terrain strings or
+recompute map topology inside decision managers.
 
 ## Scope
 
-- Add a small routing module under `server/crates/ai/src/ai_core/decision/` or
-  `server/crates/ai/src/ai_core/` for route candidates, scores, waypoints, and route reasons.
-- Generate a bounded set of harassment corridor candidates from public map data. Initial candidates
-  can be simple and deterministic: direct lane, left/right or top/bottom outer lanes, natural-side
-  lanes, and map-edge approaches derived from own start, enemy start, and enemy steel-line target.
-- Implement static route scoring with penalties for unreachable paths, excessive path length,
-  narrow choke width or low local passability clearance, overlap with the direct army lane, and
-  early proximity to enemy start or natural areas.
-- Use the terrain helpers from Phase 1 and avoid importing private simulation pathing internals.
-- Include compact score details for tests and later traces, such as selected corridor id, total
-  score, path length, worst choke width, and main-lane overlap.
-- Add a deterministic test fixture using the Default map right-side spawn pairing. The test should
-  assert that the route evaluator recognizes the far-right midpoint/edge passage as highly choked
-  and selects an alternate candidate or reports that no acceptable flank exists.
-- Keep live AI behavior unchanged in this phase. Existing harassment commands should still come from
-  the old geometric planner until Phase 3.
+- Add a public, fog-safe route query surface that AI can consume from the same public start/snapshot
+  inputs it already receives.
+- Keep `Game` AI-free. If the query needs to live in sim/map code, expose it as a public map or
+  route service API rather than an AI-specific backdoor into private simulation state.
+- Support route queries from point/anchor to point/anchor for a movement class.
+- Return structured route facts:
+  - route id or stable debug key
+  - component match or no-route reason
+  - region path
+  - portal path
+  - approximate distance or cost
+  - minimum clearance along the route
+  - first waypoint candidates in world coordinates
+  - blocker/rejection reason when no acceptable route exists
+- Derive route families from queries rather than authoring them in map JSON. Initial route families
+  can include shortest/front route, wider alternate route, outside-biased route, and resource-line
+  approach route when the atlas supports those distinctions.
+- Add tests using bundled maps that prove route queries are deterministic and consistent with atlas
+  connectivity and clearance.
+- Keep live Scout Car harassment on the existing behavior until Phase 3.
+- Update `docs/design/ai.md` to describe the AI route query surface and its fog-safety boundary.
 
 ## Expected Touch Points
 
-- New `server/crates/ai/src/ai_core/decision/routing.rs` or similar
-- `server/crates/ai/src/ai_core/decision/mod.rs`
-- `server/crates/ai/src/ai_core/decision/harassment.rs` only for shared target helpers if needed,
-  not behavior integration
-- `server/crates/ai/src/ai_core/decision/tests.rs`
-- `server/assets/maps/default-handcrafted.json` as test input only; avoid changing the map asset
+- Atlas module from Phase 1
+- Public route query API in sim/map or an AI-owned adapter over public atlas data
+- `server/crates/ai/src/ai_core/observation.rs` only if AI observations need to carry an atlas
+  handle, route summary, or map id
+- New or updated AI routing tests under `server/crates/ai`
 - `docs/design/ai.md`
+- `docs/design/server-sim.md` if a public map API changes
 
 ## Verification
 
-Run focused route and decision tests:
+Run focused map and AI route tests:
 
 ```bash
+cargo test --manifest-path server/Cargo.toml -p rts-sim map
 cargo test --manifest-path server/Cargo.toml -p rts-ai routing
-cargo test --manifest-path server/Cargo.toml -p rts-ai scout_car_harassment
 ```
 
-The new tests should be fast, deterministic, and not require a running server.
+If the new query API lives entirely in `rts-sim`, the `rts-ai routing` filter may not exist yet;
+run the smallest relevant AI test filter that covers the adapter or observation changes.
 
 ## Manual Testing Focus
 
-No gameplay manual test is required because live behavior should not change. If route score output
-is temporarily logged for development, remove or gate it before committing.
+No gameplay manual test is required because decisions should not change. If development logging is
+added while building the query layer, remove it or gate it before committing.
 
 ## Handoff Expectations
 
-The handoff must describe the route candidate model, the scoring dimensions, and the exact assertion
-used for the right-side Default map failure case. It should also tell Phase 3 how to obtain the
-selected corridor waypoints and what fallback to use when no acceptable route is returned.
+The handoff must name the query API, list the route facts it returns, and describe how Phase 3
+should ask for a Scout Car resource-line approach route. It must also list fallback behavior for
+missing atlas data, no-route results, and routes with insufficient clearance.
 
 ## Player-Facing Outcome
 
-No intended player-facing change. This phase creates tested route intelligence but does not yet use
-it to command Scout Cars.
+No intended player-facing change. This phase gives AI managers a tested route knowledge API without
+using it for live commands yet.
