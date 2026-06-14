@@ -311,9 +311,11 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::AntiTankGun
         | EntityKind::MortarTeam
         | EntityKind::ScoutCar
-        | EntityKind::Tank => true,
+        | EntityKind::Tank
+        | EntityKind::Ekaterina => true,
         EntityKind::Worker
         | EntityKind::CityCentre
+        | EntityKind::Zamok
         | EntityKind::Depot
         | EntityKind::Barracks
         | EntityKind::TrainingCentre

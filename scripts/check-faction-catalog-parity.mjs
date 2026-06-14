@@ -79,11 +79,6 @@ assert.equal(
   true,
   "all-catalog dump exposes fixture catalogs for explicit unsupported handling",
 );
-assert.equal(
-  allRustCatalogs.catalogs.some((catalog) => catalog.id === "ekaterina"),
-  false,
-  "reserved future factions are not client-exposed until their catalog exists",
-);
 assert.deepEqual(
   WORKER_BUILDABLE,
   asClientKinds(rustCatalog.buildables.map((entry) => entry.kind)),

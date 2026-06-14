@@ -16,6 +16,7 @@ pub mod command;
 mod commands;
 pub mod entity;
 pub(crate) mod fog;
+mod hero_abilities;
 mod invariants;
 pub mod map;
 mod mortar;

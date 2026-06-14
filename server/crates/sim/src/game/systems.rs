@@ -251,6 +251,9 @@ pub(crate) fn run_tick(
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         artillery_shells.resolve_due(entities, &teams, fog, events, tick);
     });
+    crate::perf::timed(perf.as_deref_mut(), "hero_regeneration", || {
+        services::hero::hero_regeneration_system(entities, tick);
+    });
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         services::death::death_system(

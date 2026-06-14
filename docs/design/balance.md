@@ -173,7 +173,15 @@ authoritative `rules::defs` records.
   autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
-  world effect, and the one-off artillery point-fire path.
+  world effect, teleport, immediate line damage, and the one-off artillery point-fire path.
+- **Ekaterina** is the first playable one-hero faction unit. The `ekaterina` catalog starts with
+  one Ekaterina and one Zamok, no workers, no buildable menu, no research, and no other
+  controllable combat units. Ekaterina has 300 HP, 1 HP/s regeneration while alive, 2.0 px/tick
+  speed, 9-tile sight, a basic 10-damage / 4-tile attack, and no Steel/Oil/Supply cost. Her
+  Teleport ability targets up to 5 tiles, has no resource cost, has an 8s cooldown, and requires a
+  statically standable landing point. Her Line Shot ability targets up to 6 tiles, has no resource
+  cost, has a 10s cooldown, and deals 40 damage to enemy targetable entities intersecting a
+  0.6-tile-wide line.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
@@ -244,12 +252,14 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| ekaterina       | 300 | 10  | 4     | 24 | 2.0   | 9     | 0   | 0   | 0   | 0; Ekaterina faction hero; regenerates 1 HP/s |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
 | city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
+| zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekaterina start building; inert in first playable slice |
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
