@@ -5,9 +5,9 @@ Status: Not started.
 ## Goal
 
 Replace count-only multi-unit command hardening with authoritative command-budget validation and a
-minimal client command-send guard. The server should reject over-budget human unit-list commands
-while retaining an absolute defensive id-list bound against huge malformed payloads, and the current
-count-capped client should avoid sending commands this phase makes illegal.
+minimal client command-send guard. The server should reject over-budget submitted human unit-list
+commands while retaining an absolute defensive id-list bound against huge malformed payloads, and the
+current count-capped client should avoid sending commands this phase makes illegal.
 
 ## Scope
 
@@ -32,6 +32,9 @@ count-capped client should avoid sending commands this phase makes illegal.
   - rejects the command when the submitted legal unit set exceeds the effective cap
   - rejects or ignores duplicate/missing ids according to the existing command semantics, but does
     not silently trim valid overflow units
+- Validate command budget against the submitted command unit ids only. Do not depend on local
+  selection context that the server cannot verify. Command Cars increase a command's budget only when
+  they are included in that submitted unit list.
 - Apply the helper consistently to human `SimCommand` variants that carry unit ids, including:
   - `move`
   - `attackMove`
@@ -47,6 +50,8 @@ count-capped client should avoid sending commands this phase makes illegal.
   not send over-budget unit lists after this phase. This is not the full selection overhaul; it
   should:
   - reuse or mirror the same base cap, Command Car bonus, and weight rules
+  - validate the exact ids being submitted for each command, including subset commands such as
+    worker-only build/gather, ability carriers, setup/teardown-capable units, and minimap commands
   - cover right-click, targeted command-card commands, stop/setup/teardown/ability/autocast command
     sends, and minimap command sends
   - block the outgoing command and trigger a lightweight overflow signal or existing notice path
@@ -80,7 +85,8 @@ count-capped client should avoid sending commands this phase makes illegal.
   - multiple Command Cars stack
   - huge duplicate id lists remain bounded
 - Add or update focused client tests proving the interim command-send guard blocks an over-budget
-  Tank-heavy selected command and still allows a legal command.
+  Tank-heavy selected command, still allows a legal command, and validates subset command ids rather
+  than broader selected context.
 - Do not run broad bundles during development; rely on the commit hook when the phase is ready.
 
 ## Manual Testing Focus
@@ -93,5 +99,5 @@ the room task.
 ## Handoff Expectations
 
 The handoff must identify the chosen AI/source policy, list the command variants covered on the
-server, list the client command-send paths guarded, and call out any validation paths left for Phase
-2 or Phase 3.
+server, list the client command-send paths guarded, confirm the submitted-id validation rule for
+subset commands, and call out any validation paths left for Phase 2 or Phase 3.

@@ -24,15 +24,21 @@ lists that the server would reject.
   - pre-admit Command Cars from the group so their bonus is reliable
   - fill remaining entities in saved order until budget is full
   - update selection to the admitted set
+  - rewrite the saved control group to that same legal admitted set, so tab counts, repeated recall,
+    selected-group highlighting, and double-tap camera jumps all use the same entities
 - Re-audit outgoing human command composition/sending paths after control-group changes. The Phase 1
   command-send guard should remain the single client-side send gate; extend it only for paths missed
   by Phase 1 or introduced by this phase. Honest clients should not send commands the Phase 1 server
   validation will reject.
+- Command-send checks should validate the exact ids being submitted by each command path, not the
+  broader current selection. This matters for subset commands such as workers-only gather/build,
+  setup/teardown-capable units, ability carriers, and selected production buildings.
 - Keep AI command generation unaffected.
 
 ## Expected Deliverables
 
 - Control groups cannot save, add, or recall over-budget human selections.
+- Any over-budget saved group discovered at recall is normalized to its legal admitted ids.
 - Outgoing human command unit lists are still checked against the client budget before send, using
   the same guard introduced in Phase 1.
 - Overflow from control-group recall or command sending can trigger the same UI feedback signal as
@@ -48,6 +54,8 @@ lists that the server would reject.
   - a Command Car late in stored order
 - Add or update command composition tests proving over-budget commands restored through
   control-group recall are not sent.
+- Add subset-command tests proving the send guard validates submitted ids only, including at least one
+  workers-only or ability-carrier command from a broader legal selection.
 - Run the relevant targeted Node test files only.
 
 ## Manual Testing Focus
@@ -58,6 +66,6 @@ group and normal command hotkeys still issue orders.
 
 ## Handoff Expectations
 
-The handoff must name every control-group operation touched, identify any additions made to the
-Phase 1 command-send guard, and explain how outgoing command overflow is presented to the player or
-suppressed.
+The handoff must name every control-group operation touched, confirm whether recall rewrites saved
+groups to the admitted ids, identify any additions made to the Phase 1 command-send guard, and
+explain how outgoing command overflow is presented to the player or suppressed.

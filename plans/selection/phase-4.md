@@ -14,7 +14,7 @@ budget.
 - Update `client/src/hud.js` selected-panel rendering for multi-selection.
 - Add or update CSS for:
   - two-row command-budget grid
-  - fixed-size cells
+  - responsive cells whose width narrows as Command Car-expanded caps add columns
   - selected entity blocks spanning one or more cells
   - larger text for high-supply blocks
   - red overflow flash text/counter state
@@ -29,6 +29,9 @@ budget.
 - Keep packing deterministic and simple. Do not build an expensive optimal bin-packer unless the
   simple layout visibly fails for expected selections.
 - Show `used / cap` where cap is 24 plus 12 for each selected Command Car.
+- Keep the grid as two rows at every cap. Expanded Command Car budget adds columns, and the cell
+  width should shrink within the selected-panel width instead of introducing summarization,
+  collapsing, hidden overflow, paging, or horizontal scroll.
 - On overflow, briefly show red text. Prefer concise text such as `Selection limit reached` near
   the `used / cap` counter; if full rule text is used, keep it short:
   `You can command up to 24 supply at once.`
@@ -38,7 +41,8 @@ budget.
 
 - Multi-selection uses the budget grid instead of only per-kind chips.
 - Tanks visibly occupy six cells as a two-row by three-column block.
-- Command Cars expand the cap and visible grid.
+- Command Cars expand the cap and visible grid by adding narrower columns, with every selected entity
+  still represented directly.
 - Overflow selection attempts produce a brief red warning/counter flash.
 - Single-selection detail remains intact.
 
@@ -47,11 +51,12 @@ budget.
 - Add focused HUD tests or DOM-render tests for:
   - 24/24 infantry-style selection
   - four 6-supply Tanks
-  - Command Car-expanded cap
+  - Command Car-expanded cap with narrower cells and no collapsed/summarized entries
   - overflow flash state
 - Run the targeted HUD/command-card Node tests identified in Phase 0.
 - Use a browser/manual check for layout at normal desktop and narrow viewport sizes if automated
-  screenshots are not already available.
+  screenshots are not already available. Include at least one stacked-Command-Car selection large
+  enough to prove the two-row narrower-cell rule is still legible.
 
 ## Manual Testing Focus
 
@@ -61,5 +66,6 @@ without being noisy.
 
 ## Handoff Expectations
 
-The handoff must describe the final visual grammar for 1-, 2-, 3-, 4-, 5-, and 6-supply entities
-and call out any layout compromises that should be watched in playtests.
+The handoff must describe the final visual grammar for 1-, 2-, 3-, 4-, 5-, and 6-supply entities,
+state how narrow cells become for stacked Command Cars, and call out any layout compromises that
+should be watched in playtests.
