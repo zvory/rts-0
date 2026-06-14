@@ -10,7 +10,7 @@ mod diagnostics;
 use anchors::{build_anchors, AtlasAnchor};
 pub(super) use diagnostics::atlas_diagnostics_json;
 
-const REGION_SIZE_TILES: u32 = 16;
+const REGION_SIZE_TILES: u32 = 12;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct MapAtlas {
@@ -115,7 +115,7 @@ impl MapAtlas {
 
 impl MovementLayerAtlas {
     fn generate(map: &Map, movement_class: MovementClass) -> Self {
-        let passable_tiles = build_passable_tiles(map, movement_class);
+        let passable_tiles = build_playable_passable_tiles(map, movement_class);
         let clearance_tiles = build_clearance_field(map, &passable_tiles);
         let (component_by_tile, components) = build_components(map, &passable_tiles);
         let (region_by_tile, regions) = build_regions(map, &passable_tiles, &component_by_tile);
@@ -176,7 +176,44 @@ impl MovementLayerAtlas {
     }
 }
 
-fn build_passable_tiles(map: &Map, movement_class: MovementClass) -> Vec<bool> {
+fn build_playable_passable_tiles(map: &Map, movement_class: MovementClass) -> Vec<bool> {
+    let terrain_passable_tiles = build_terrain_passable_tiles(map, movement_class);
+    let (component_by_tile, _) = build_components(map, &terrain_passable_tiles);
+    let playable_component = playable_component_id(map, &component_by_tile);
+
+    match playable_component {
+        Some(component_id) => terrain_passable_tiles
+            .into_iter()
+            .enumerate()
+            .map(|(idx, passable)| passable && component_by_tile[idx] == Some(component_id))
+            .collect(),
+        None => terrain_passable_tiles,
+    }
+}
+
+fn playable_component_id(map: &Map, component_by_tile: &[Option<usize>]) -> Option<usize> {
+    let playable_component = map.starts.iter().find_map(|&(x, y)| {
+        if x < map.size && y < map.size {
+            component_by_tile[map.index(x, y)]
+        } else {
+            None
+        }
+    });
+
+    debug_assert!(
+        map.starts.iter().all(|&(x, y)| {
+            x >= map.size
+                || y >= map.size
+                || component_by_tile[map.index(x, y)].is_none()
+                || component_by_tile[map.index(x, y)] == playable_component
+        }),
+        "atlas generation assumes selected starts share one passable component"
+    );
+
+    playable_component
+}
+
+fn build_terrain_passable_tiles(map: &Map, movement_class: MovementClass) -> Vec<bool> {
     (0..map.size)
         .flat_map(|y| {
             (0..map.size).map(move |x| {

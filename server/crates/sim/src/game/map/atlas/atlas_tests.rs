@@ -111,6 +111,48 @@ fn clearance_is_bounded_by_impassable_tiles_and_edges() {
     assert!(layer.clearance_tiles[map.index(2, 2)] > 1);
 }
 
+#[test]
+fn atlas_ignores_passable_islands_unreachable_from_start() {
+    let mut map = all_rock_map(12, (1, 1));
+    set_grass_rect(&mut map, 1, 1, 3, 3);
+    set_grass_rect(&mut map, 8, 8, 9, 9);
+
+    let atlas = map.atlas();
+    let layer = atlas
+        .layer(MovementClass::Infantry)
+        .expect("infantry layer");
+
+    assert_eq!(layer.components.len(), 1);
+    assert_eq!(layer.components[0].tile_count, 9);
+
+    let reachable_idx = map.index(2, 2);
+    assert!(layer.passable_tiles[reachable_idx]);
+    assert_eq!(layer.component_by_tile[reachable_idx], Some(0));
+    assert!(layer.region_by_tile[reachable_idx].is_some());
+    assert!(layer.clearance_tiles[reachable_idx] > 0);
+
+    let island_idx = map.index(8, 8);
+    assert!(!layer.passable_tiles[island_idx]);
+    assert_eq!(layer.component_by_tile[island_idx], None);
+    assert_eq!(layer.region_by_tile[island_idx], None);
+    assert_eq!(layer.clearance_tiles[island_idx], 0);
+}
+
+#[test]
+fn atlas_regions_use_twelve_tile_buckets() {
+    let map = all_grass_map(24, (1, 1));
+    let atlas = map.atlas();
+    let layer = atlas
+        .layer(MovementClass::Infantry)
+        .expect("infantry layer");
+
+    assert_eq!(layer.regions.len(), 4);
+    for region in &layer.regions {
+        assert!(region.max_tile.0 - region.min_tile.0 < REGION_SIZE_TILES);
+        assert!(region.max_tile.1 - region.min_tile.1 < REGION_SIZE_TILES);
+    }
+}
+
 fn assert_layer_consistent(map: &Map, layer: &MovementLayerAtlas) {
     let len = (map.size * map.size) as usize;
     assert_eq!(layer.passable_tiles.len(), len);
@@ -157,12 +199,7 @@ fn assert_layer_consistent(map: &Map, layer: &MovementLayerAtlas) {
 }
 
 fn map_with_rock_rect(size: u32, min_x: u32, min_y: u32, max_x: u32, max_y: u32) -> Map {
-    let mut map = Map {
-        size,
-        terrain: vec![map_terrain::GRASS; (size * size) as usize],
-        starts: vec![(1, 1)],
-        expansion_sites: vec![(size - 2, size - 2)],
-    };
+    let mut map = all_grass_map(size, (1, 1));
     for y in min_y..=max_y {
         for x in min_x..=max_x {
             let idx = map.index(x, y);
@@ -170,4 +207,31 @@ fn map_with_rock_rect(size: u32, min_x: u32, min_y: u32, max_x: u32, max_y: u32)
         }
     }
     map
+}
+
+fn all_grass_map(size: u32, start: Tile) -> Map {
+    Map {
+        size,
+        terrain: vec![map_terrain::GRASS; (size * size) as usize],
+        starts: vec![start],
+        expansion_sites: vec![(size - 2, size - 2)],
+    }
+}
+
+fn all_rock_map(size: u32, start: Tile) -> Map {
+    Map {
+        size,
+        terrain: vec![map_terrain::ROCK; (size * size) as usize],
+        starts: vec![start],
+        expansion_sites: vec![(size - 2, size - 2)],
+    }
+}
+
+fn set_grass_rect(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u32) {
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let idx = map.index(x, y);
+            map.terrain[idx] = map_terrain::GRASS;
+        }
+    }
 }
