@@ -433,7 +433,7 @@ mod tests {
             players: vec![PlayerStart {
                 id: 1,
                 team_id: 1,
-                faction_id: "steel_vanguard".to_string(),
+                faction_id: "kriegsia".to_string(),
                 name: "Alpha".into(),
                 color: "#111".into(),
                 start_tile_x: 10,

@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 pub type TeamId = u32;
-pub const DEFAULT_FACTION_ID: &str = "steel_vanguard";
+pub const DEFAULT_FACTION_ID: &str = "kriegsia";
 
 fn is_false(value: &bool) -> bool {
     !*value

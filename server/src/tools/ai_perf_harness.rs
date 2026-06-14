@@ -441,7 +441,7 @@ fn four_ai_players() -> Vec<PlayerInit> {
         PlayerInit {
             id: 1,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Perf AI 1".to_string(),
             color: "#4878c8".to_string(),
             is_ai: true,
@@ -449,7 +449,7 @@ fn four_ai_players() -> Vec<PlayerInit> {
         PlayerInit {
             id: 2,
             team_id: 2,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Perf AI 2".to_string(),
             color: "#c84848".to_string(),
             is_ai: true,
@@ -457,7 +457,7 @@ fn four_ai_players() -> Vec<PlayerInit> {
         PlayerInit {
             id: 3,
             team_id: 3,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Perf AI 3".to_string(),
             color: "#30a090".to_string(),
             is_ai: true,
@@ -465,7 +465,7 @@ fn four_ai_players() -> Vec<PlayerInit> {
         PlayerInit {
             id: 4,
             team_id: 4,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Perf AI 4".to_string(),
             color: "#8040c8".to_string(),
             is_ai: true,

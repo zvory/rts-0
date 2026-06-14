@@ -8,7 +8,7 @@ fn players() -> [PlayerInit; 2] {
         PlayerInit {
             id: 1,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -16,7 +16,7 @@ fn players() -> [PlayerInit; 2] {
         PlayerInit {
             id: 2,
             team_id: 2,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: true,
@@ -94,7 +94,7 @@ fn remembered_buildings_use_team_visible_observations() {
         PlayerInit {
             id: 1,
             team_id: 7,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -102,7 +102,7 @@ fn remembered_buildings_use_team_visible_observations() {
         PlayerInit {
             id: 2,
             team_id: 7,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Two".into(),
             color: "#bbb".into(),
             is_ai: false,
@@ -110,7 +110,7 @@ fn remembered_buildings_use_team_visible_observations() {
         PlayerInit {
             id: 3,
             team_id: 3,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Three".into(),
             color: "#000".into(),
             is_ai: false,

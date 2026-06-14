@@ -14,7 +14,7 @@ impl LiveSelfPlay {
             PlayerInit {
                 id: 1,
                 team_id: 1,
-                faction_id: "steel_vanguard".to_string(),
+                faction_id: "kriegsia".to_string(),
                 name: "Alpha Script".to_string(),
                 color: "#6f8fa8".to_string(),
                 is_ai: true,
@@ -22,7 +22,7 @@ impl LiveSelfPlay {
             PlayerInit {
                 id: 2,
                 team_id: 2,
-                faction_id: "steel_vanguard".to_string(),
+                faction_id: "kriegsia".to_string(),
                 name: "Bravo Script".to_string(),
                 color: "#b2775f".to_string(),
                 is_ai: true,

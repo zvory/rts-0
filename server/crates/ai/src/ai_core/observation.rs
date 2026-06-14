@@ -416,7 +416,7 @@ mod tests {
                 PlayerStart {
                     id: 2,
                     team_id: 2,
-                    faction_id: "steel_vanguard".to_string(),
+                    faction_id: "kriegsia".to_string(),
                     name: "Bravo".into(),
                     color: "#222".into(),
                     start_tile_x: 48,
@@ -425,7 +425,7 @@ mod tests {
                 PlayerStart {
                     id: 1,
                     team_id: 1,
-                    faction_id: "steel_vanguard".to_string(),
+                    faction_id: "kriegsia".to_string(),
                     name: "Alpha".into(),
                     color: "#111".into(),
                     start_tile_x: 8,
@@ -516,7 +516,7 @@ mod tests {
         start.players.push(PlayerStart {
             id: 3,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Charlie".into(),
             color: "#333".into(),
             start_tile_x: 10,

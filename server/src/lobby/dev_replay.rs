@@ -111,7 +111,7 @@ mod tests {
         vec![PlayerInit {
             id: 1,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Loader".to_string(),
             color: "#ffffff".to_string(),
             is_ai: false,

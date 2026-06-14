@@ -1,6 +1,6 @@
 # Phase 3A - Canonical Faction Validation and Lifecycle Matrix
 
-Status: Designed, not implemented.
+Status: Done.
 
 ## Objective
 

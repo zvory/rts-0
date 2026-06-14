@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn ww2_production_chain_matches_design() {
-        assert_eq!(DEFAULT_FACTION_ID, "steel_vanguard");
+        assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::CityCentre),
             &[EntityKind::Worker]

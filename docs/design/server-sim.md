@@ -166,8 +166,11 @@ on `Game` are available for future team-aware systems: `team_of_player`, `same_t
 is never allied with a player.
 
 `PlayerInit.faction_id` is canonical faction identity. The default current faction is
-`steel_vanguard`, and Phase 1 stores it on player state, start payload players, and replay player
-metadata without changing starting entities, resources, or command legality.
+`kriegsia`, and the server/lobby layer validates requested or recorded faction ids before match
+assembly. That policy is separate from `rules::faction` catalog existence: normal lobby,
+quickstart, AI, self-play, and dev starts default to or accept only Kriegsia in Phase 3A, replay
+paths require explicit recorded faction ids, and `phase2_empty_fixture` is accepted only by
+test-fixture contexts.
 
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and
@@ -226,8 +229,9 @@ policy is centralized instead of scattered through services.
   `EntityKind`, upgrade id, ability id, and Steel/Oil/Supply costs; reuse a global id across
   factions only when gameplay semantics are identical for every faction that can use it. Divergent
   behavior, stats, production role, or ability meaning requires a distinct global id gated through
-  catalog availability. The default catalog is `steel_vanguard`; `phase2_empty_fixture` exists only
-  as a command-validation test fixture.
+  catalog availability. The default catalog is `kriegsia`; `phase2_empty_fixture` exists only
+  as a command-validation test fixture. Server-side lifecycle policy lives in
+  `server/src/lobby/faction_validation.rs`.
 - `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
   `attack_profile(kind) -> AttackProfile`, and
   `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.

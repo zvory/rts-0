@@ -2,14 +2,15 @@ use super::connection::send_or_log;
 use super::connection::SnapshotSendStatus;
 use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::dev_replay::{load_replay_artifact, match_seed};
+use super::faction_validation::{
+    default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
+};
 use super::snapshots::{compact_snapshot_for_wire, union_events};
 use super::*;
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::replay::{ReplayArtifactV1, ReplayValidationError};
-use crate::protocol::{
-    ReplayPlaybackState, SnapshotNetStatus, DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION,
-};
+use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -450,6 +451,15 @@ impl ReplaySession {
                 return Err(format!(
                     "replay artifact has duplicate player id {}",
                     player.id
+                ));
+            }
+            if let FactionValidation::Rejected { requested, reason } = validate_faction_request(
+                FactionRequestContext::ReplayPlayback,
+                Some(&player.faction_id),
+            ) {
+                return Err(format!(
+                    "replay player {} has unsupported faction {:?}: {:?}",
+                    player.id, requested, reason
                 ));
             }
         }
@@ -2012,6 +2022,8 @@ impl RoomTask {
     /// Build and broadcast the current `lobby` message to everyone in the room.
     fn broadcast_lobby(&mut self) {
         let host_id = self.host_id.unwrap_or(0);
+        let human_faction_id = default_faction_id_for(FactionRequestContext::NormalLobby);
+        let ai_faction_id = default_faction_id_for(FactionRequestContext::AiSeat);
         // Humans first (in join order), then AI opponents. AIs always read as ready.
         let mut players: Vec<LobbyPlayer> = self
             .order
@@ -2024,7 +2036,7 @@ impl RoomTask {
                     } else {
                         self.team_id_for_active_seat(*id)
                     },
-                    faction_id: DEFAULT_FACTION_ID.to_string(),
+                    faction_id: human_faction_id.clone(),
                     name: p.name.clone(),
                     ready: p.ready,
                     color: p.color.clone(),
@@ -2037,7 +2049,7 @@ impl RoomTask {
             players.push(LobbyPlayer {
                 id: ai.id,
                 team_id: ai.team_id,
-                faction_id: DEFAULT_FACTION_ID.to_string(),
+                faction_id: ai_faction_id.clone(),
                 name: ai.name.clone(),
                 ready: true,
                 color: Self::ai_color(seat),
@@ -2107,13 +2119,19 @@ impl RoomTask {
     fn start_match(&mut self) {
         self.match_countdown_deadline = None;
         self.reset_match_net_status();
+        let human_faction_id = default_faction_id_for(if self.quickstart {
+            FactionRequestContext::Quickstart
+        } else {
+            FactionRequestContext::NormalLobby
+        });
+        let ai_faction_id = default_faction_id_for(FactionRequestContext::AiSeat);
         let mut inits: Vec<PlayerInit> = self
             .active_human_ids()
             .filter_map(|id| {
                 self.players.get(&id).map(|p| PlayerInit {
                     id,
                     team_id: self.team_id_for_active_seat(id),
-                    faction_id: DEFAULT_FACTION_ID.to_string(),
+                    faction_id: human_faction_id.clone(),
                     name: p.name.clone(),
                     color: p.color.clone(),
                     is_ai: false,
@@ -2126,7 +2144,7 @@ impl RoomTask {
             inits.push(PlayerInit {
                 id: ai.id,
                 team_id: ai.team_id,
-                faction_id: DEFAULT_FACTION_ID.to_string(),
+                faction_id: ai_faction_id.clone(),
                 name: ai.name.clone(),
                 color: Self::ai_color(seat),
                 is_ai: true,
@@ -2260,6 +2278,23 @@ impl RoomTask {
                 return;
             }
         };
+        for seat in &staging.seed.seats {
+            if let FactionValidation::Rejected { requested, reason } = validate_faction_request(
+                FactionRequestContext::ReplayBranch,
+                Some(&seat.faction_id),
+            ) {
+                crate::log_warn!(
+                    room = %self.room,
+                    seat_player_id = seat.player_id,
+                    faction_id = ?requested,
+                    reason = ?reason,
+                    "replay branch seat rejected by faction policy"
+                );
+                self.phase = Phase::BranchStaging(staging);
+                self.broadcast_branch_staging();
+                return;
+            }
+        }
         let Some(seat_by_connection) = staging.connection_to_seat_map() else {
             self.phase = Phase::BranchStaging(staging);
             self.broadcast_branch_staging();
@@ -2379,6 +2414,19 @@ impl RoomTask {
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) => {
                 let driver = LiveSelfPlay::default_match();
                 let players = driver.players().to_vec();
+                for player in &players {
+                    if let FactionValidation::Rejected { requested, reason } =
+                        validate_faction_request(
+                            FactionRequestContext::SelfPlay,
+                            Some(&player.faction_id),
+                        )
+                    {
+                        return Err(format!(
+                            "self-play player {} has unsupported faction {:?}: {:?}",
+                            player.id, requested, reason
+                        ));
+                    }
+                }
                 let view_player_id = players
                     .first()
                     .map(|p| p.id)
@@ -2387,99 +2435,103 @@ impl RoomTask {
                 let game = Game::new_without_ai_controllers(&players, seed);
                 Ok((game, DevDriver::Live(driver), view_player_id))
             }
-            RoomMode::DevScenario(config) => match config.id {
-                DevScenarioId::ScoutCarSnakingCorridor => {
-                    let setup = Game::new_snaking_corridor_scenario(
-                        config.unit,
-                        config.count,
-                        match_seed(),
-                    )?;
-                    let driver = DevScenarioDriver {
-                        player_id: setup.player_id,
-                        units: setup.units,
-                        goal: setup.goal,
-                        issue_after_ticks: setup.issue_after_ticks,
-                        issued: false,
-                    };
-                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+            RoomMode::DevScenario(config) => {
+                let _scenario_faction_id =
+                    default_faction_id_for(FactionRequestContext::DevScenario);
+                match config.id {
+                    DevScenarioId::ScoutCarSnakingCorridor => {
+                        let setup = Game::new_snaking_corridor_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::DirectReverseOrder => {
+                        let setup = Game::new_direct_reverse_order_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::ScoutCarWallChokepoint => {
+                        let setup = Game::new_scout_car_wall_chokepoint_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::VehicleCornerWall => {
+                        let setup = Game::new_vehicle_corner_wall_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::VehicleSmallBlockBaseline => {
+                        let setup = Game::new_vehicle_small_block_baseline_scenario(
+                            config.unit,
+                            config.count,
+                            config.blocker,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::FactoryZeroGapPerpendicular => {
+                        let setup = Game::new_factory_zero_gap_perpendicular_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
                 }
-                DevScenarioId::DirectReverseOrder => {
-                    let setup = Game::new_direct_reverse_order_scenario(
-                        config.unit,
-                        config.count,
-                        match_seed(),
-                    )?;
-                    let driver = DevScenarioDriver {
-                        player_id: setup.player_id,
-                        units: setup.units,
-                        goal: setup.goal,
-                        issue_after_ticks: setup.issue_after_ticks,
-                        issued: false,
-                    };
-                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                }
-                DevScenarioId::ScoutCarWallChokepoint => {
-                    let setup = Game::new_scout_car_wall_chokepoint_scenario(
-                        config.unit,
-                        config.count,
-                        match_seed(),
-                    )?;
-                    let driver = DevScenarioDriver {
-                        player_id: setup.player_id,
-                        units: setup.units,
-                        goal: setup.goal,
-                        issue_after_ticks: setup.issue_after_ticks,
-                        issued: false,
-                    };
-                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                }
-                DevScenarioId::VehicleCornerWall => {
-                    let setup = Game::new_vehicle_corner_wall_scenario(
-                        config.unit,
-                        config.count,
-                        match_seed(),
-                    )?;
-                    let driver = DevScenarioDriver {
-                        player_id: setup.player_id,
-                        units: setup.units,
-                        goal: setup.goal,
-                        issue_after_ticks: setup.issue_after_ticks,
-                        issued: false,
-                    };
-                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                }
-                DevScenarioId::VehicleSmallBlockBaseline => {
-                    let setup = Game::new_vehicle_small_block_baseline_scenario(
-                        config.unit,
-                        config.count,
-                        config.blocker,
-                        match_seed(),
-                    )?;
-                    let driver = DevScenarioDriver {
-                        player_id: setup.player_id,
-                        units: setup.units,
-                        goal: setup.goal,
-                        issue_after_ticks: setup.issue_after_ticks,
-                        issued: false,
-                    };
-                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                }
-                DevScenarioId::FactoryZeroGapPerpendicular => {
-                    let setup = Game::new_factory_zero_gap_perpendicular_scenario(
-                        config.unit,
-                        config.count,
-                        match_seed(),
-                    )?;
-                    let driver = DevScenarioDriver {
-                        player_id: setup.player_id,
-                        units: setup.units,
-                        goal: setup.goal,
-                        issue_after_ticks: setup.issue_after_ticks,
-                        issued: false,
-                    };
-                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                }
-            },
+            }
         }
     }
 
@@ -3747,13 +3799,14 @@ fn saturating_duration_ms_u16(duration: Duration) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::DEFAULT_FACTION_ID;
 
     fn replay_test_players(count: usize) -> Vec<PlayerInit> {
         (1..=count as u32)
             .map(|id| PlayerInit {
                 id,
                 team_id: id,
-                faction_id: "steel_vanguard".to_string(),
+                faction_id: "kriegsia".to_string(),
                 name: format!("Player {id}"),
                 color: PLAYER_PALETTE[(id as usize - 1) % PLAYER_PALETTE.len()].to_string(),
                 is_ai: false,

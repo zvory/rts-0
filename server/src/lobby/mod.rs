@@ -41,6 +41,7 @@ use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
 mod connection;
 mod crash_replay;
 mod dev_replay;
+mod faction_validation;
 mod room_task;
 mod snapshots;
 

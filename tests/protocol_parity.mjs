@@ -158,7 +158,7 @@ assert(
 assert(
   rustContract.includes("DEFAULT_FACTION_ID") &&
     rustContract.includes("faction_id") &&
-    DEFAULT_FACTION_ID === "steel_vanguard",
+    DEFAULT_FACTION_ID === "kriegsia",
   "start/player contract must expose the canonical default faction id",
 );
 assert(

@@ -101,7 +101,7 @@ fn start_payload_reports_team_id_with_assigned_start_tile() {
         crate::game::PlayerInit {
             id: 10,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Alpha".to_string(),
             color: "#f00".to_string(),
             is_ai: false,
@@ -109,7 +109,7 @@ fn start_payload_reports_team_id_with_assigned_start_tile() {
         crate::game::PlayerInit {
             id: 20,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Bravo".to_string(),
             color: "#0f0".to_string(),
             is_ai: false,
@@ -117,7 +117,7 @@ fn start_payload_reports_team_id_with_assigned_start_tile() {
         crate::game::PlayerInit {
             id: 30,
             team_id: 2,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Charlie".to_string(),
             color: "#00f".to_string(),
             is_ai: true,
@@ -143,7 +143,7 @@ fn replay_reconstruction_preserves_team_aware_start_assignment() {
         crate::game::PlayerInit {
             id: 1,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Alpha".to_string(),
             color: "#f00".to_string(),
             is_ai: false,
@@ -151,7 +151,7 @@ fn replay_reconstruction_preserves_team_aware_start_assignment() {
         crate::game::PlayerInit {
             id: 2,
             team_id: 1,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Bravo".to_string(),
             color: "#0f0".to_string(),
             is_ai: false,
@@ -159,7 +159,7 @@ fn replay_reconstruction_preserves_team_aware_start_assignment() {
         crate::game::PlayerInit {
             id: 3,
             team_id: 2,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Charlie".to_string(),
             color: "#00f".to_string(),
             is_ai: true,
@@ -167,7 +167,7 @@ fn replay_reconstruction_preserves_team_aware_start_assignment() {
         crate::game::PlayerInit {
             id: 4,
             team_id: 2,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: "Delta".to_string(),
             color: "#ff0".to_string(),
             is_ai: true,

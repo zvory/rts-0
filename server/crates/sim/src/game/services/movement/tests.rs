@@ -82,7 +82,7 @@ fn player_with_oil(id: u32, oil: u32) -> PlayerState {
     PlayerState {
         id,
         team_id: id,
-        faction_id: "steel_vanguard".to_string(),
+        faction_id: "kriegsia".to_string(),
         name: format!("p{id}"),
         color: "#ffffff".to_string(),
         start_tile: (0, 0),

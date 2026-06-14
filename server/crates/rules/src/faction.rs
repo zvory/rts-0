@@ -7,7 +7,7 @@
 
 use crate::{defs, EntityKind};
 
-pub const DEFAULT_FACTION_ID: &str = "steel_vanguard";
+pub const DEFAULT_FACTION_ID: &str = "kriegsia";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 
 pub const METHAMPHETAMINES_UPGRADE: &str = "methamphetamines";

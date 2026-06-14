@@ -171,7 +171,7 @@ export const REPLAY_VISION = Object.freeze({
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
-export const DEFAULT_FACTION_ID = "steel_vanguard";
+export const DEFAULT_FACTION_ID = "kriegsia";
 export const COMPACT_SNAPSHOT_VERSION = 19;
 
 export const KIND_CODE = Object.freeze({

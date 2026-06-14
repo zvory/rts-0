@@ -4622,7 +4622,7 @@ mod tests {
         PlayerState {
             id,
             team_id: id,
-            faction_id: "steel_vanguard".to_string(),
+            faction_id: "kriegsia".to_string(),
             name: format!("Player {id}"),
             color: "#fff".to_string(),
             start_tile: (0, 0),

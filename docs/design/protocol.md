@@ -230,11 +230,12 @@ list only active match players in `players`.
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
-The canonical current faction id is `steel_vanguard`. Phase 1 emits `factionId` for every active
-start player, lobby seat, and replay branch seat, and `faction_id` for every replay artifact
-player. Normal lobby, AI,
-quickstart, self-play, and dev starts all default to `steel_vanguard`; selection of any other
-faction is invalid until later phases add explicit validation and UI.
+The canonical current faction id is `kriegsia`. Start payloads emit `factionId` for every active
+start player, lobby seat, and replay branch seat, and replay artifacts store `faction_id` for every
+player. Normal lobby, AI, quickstart, self-play, and dev starts all default to `kriegsia` through
+server-side faction policy validation. Other ids are rejected unless a lifecycle path explicitly
+accepts recorded replay data or a test fixture; the reserved future `ekaterina` id has no protocol
+or catalog payload yet.
 
 Prediction start compatibility metadata is present only for live active players. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version
