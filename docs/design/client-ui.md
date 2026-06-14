@@ -408,9 +408,9 @@ export class Lobby {
   constructor(rootEl, net)
   show(), hide()
   // owns lobby state, joins, ready/start/spectator role, and delegates roster DOM to lobby_view.js.
-  // Host lobby controls expose team presets (ffa, solo, 1v2, 1v3, 2v2), grouped team cards,
-  // per-seat team assignment, and team/rail AI add buttons through Net setTeamPreset/setTeam/addAi.
-  // Non-hosts see the selected preset and team labels without mutation controls.
+  // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
+  // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
+  // Teams are layout groups only; player colors come from each player record.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }
 ```

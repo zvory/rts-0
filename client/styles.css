@@ -409,7 +409,6 @@ body {
 .lobby-kicker,
 .lobby-seat-meta,
 .lobby-setup-header span,
-.lobby-launch-panel > span,
 .lobby-form label,
 .lobby-control-field > label {
   color: var(--ink-dim);
@@ -467,7 +466,7 @@ input[type="text"]:focus {
 
 .lobby-status-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   border-bottom: 1px solid rgba(91, 83, 65, 0.58);
 }
 
@@ -517,36 +516,11 @@ input[type="text"]:focus {
 
 .lobby-team-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
   padding: 14px;
   border-bottom: 1px solid rgba(91, 83, 65, 0.58);
-}
-
-.lobby-team-mark {
-  width: 12px;
-  height: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 2px;
-  background: var(--accent);
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-.lobby-team-card:nth-of-type(1) .lobby-team-mark {
-  background: #4f83c4;
-}
-
-.lobby-team-card:nth-of-type(2) .lobby-team-mark {
-  background: #c1584c;
-}
-
-.lobby-team-card:nth-of-type(3) .lobby-team-mark {
-  background: #8fbf6a;
-}
-
-.lobby-team-card:nth-of-type(4) .lobby-team-mark {
-  background: #a47dc4;
 }
 
 .lobby-team-title {
@@ -601,7 +575,10 @@ input[type="text"]:focus {
 
 .lobby-seat,
 .lobby-observer-row {
+  display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
 }
 
 .lobby-observer-row .player-ready {
@@ -609,9 +586,6 @@ input[type="text"]:focus {
 }
 
 .lobby-observer-row {
-  display: grid;
-  gap: 12px;
-  align-items: center;
   min-height: 84px;
   padding: 12px;
   border: 1px solid rgba(91, 83, 65, 0.62);
@@ -742,7 +716,7 @@ input[type="text"]:focus {
 }
 
 .player-team-select,
-.lobby-map-row select,
+.lobby-status-grid select,
 .lobby-team-row select {
   width: 100%;
   appearance: none;
@@ -764,20 +738,19 @@ input[type="text"]:focus {
   padding: 7px 28px 7px 10px;
 }
 
-.lobby-map-row select:focus,
+.lobby-status-grid select:focus,
 .lobby-team-row select:focus,
 .player-team-select:focus {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px rgba(199, 208, 122, 0.22);
 }
-.lobby-map-row select:disabled,
+.lobby-status-grid select:disabled,
 .lobby-team-row select:disabled,
 .player-team-select:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.lobby-map-row #lobby-map-display,
 .lobby-team-row #lobby-team-preset-display {
   display: block;
   min-height: 42px;
@@ -970,12 +943,12 @@ input[type="text"]:focus {
   }
 
   .lobby-team-header {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .lobby-team-count,
   .team-add-ai {
-    grid-column: 2;
+    grid-column: 1;
     justify-self: start;
   }
 
