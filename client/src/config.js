@@ -155,7 +155,7 @@ export const STATS = Object.freeze({
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.COMMAND_CAR_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.EKAT]: { label: "Ekat", icon: "EK", size: 10, sight: 9,
-    rangeTiles: 4, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
+    rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },

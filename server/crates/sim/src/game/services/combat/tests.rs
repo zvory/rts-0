@@ -1271,6 +1271,32 @@ fn idle_workers_do_not_auto_acquire_targets() {
 }
 
 #[test]
+fn ekat_has_no_default_attack() {
+    let mut entities = EntityStore::new();
+    let ekat_id = entities
+        .spawn_unit(1, EntityKind::Ekat, 100.0, 100.0)
+        .expect("Ekat should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("enemy rifleman should spawn");
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+    entities
+        .get_mut(ekat_id)
+        .expect("Ekat should exist")
+        .set_order(Order::attack(enemy_id));
+    run_combat_tick(&mut entities);
+
+    let ekat = entities.get(ekat_id).expect("Ekat should exist");
+    assert!(!ekat.can_attack(), "Ekat should not expose a default weapon");
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp,
+        "Ekat should not damage enemies through the default combat service"
+    );
+}
+
+#[test]
 fn direct_hits_record_damage_signal_on_victim() {
     let mut entities = EntityStore::new();
     let worker_id = entities
