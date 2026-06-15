@@ -551,7 +551,7 @@ body {
 .subtitle {
   margin: 6px 0 0;
   color: var(--ink-dim);
-  font-size: 16px;
+  font-size: 32px;
   font-weight: 400;
   letter-spacing: 0;
 }
@@ -626,6 +626,8 @@ input[type="text"]:focus {
 
 .lobby-form .btn {
   margin-top: 4px;
+  justify-self: start;
+  width: auto;
 }
 
 .lobby-room {
@@ -1066,15 +1068,19 @@ input[type="text"]:focus {
 }
 
 .lobby-host-tools {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .lobby-actions {
-  display: grid;
-  grid-template-columns: 1fr 1.25fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
   margin-top: 14px;
 }
 
@@ -1082,6 +1088,7 @@ input[type="text"]:focus {
 .lobby-host-tools .btn,
 .lobby-host-tools .toggle {
   min-height: 42px;
+  width: auto;
 }
 
 .lobby-host-tools .toggle {

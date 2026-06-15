@@ -14,6 +14,7 @@ import {
   LobbyRosterView,
   PLAYABLE_FACTIONS,
   shouldAcceptSpectatorDrop,
+  shouldAcceptTeamDrop,
   splitLobbyPlayers,
   teamSlotsForLobby,
 } from "./lobby_view.js";
@@ -22,8 +23,14 @@ const NAME_STORAGE_KEY = "rts.playerName";
 
 const MAX_PLAYERS = 4;
 
-export { MAX_LOBBY_TEAMS, PLAYABLE_FACTIONS, shouldAcceptSpectatorDrop, teamSlotsForLobby };
-export { DEFAULT_AI_PROFILE_ID };
+export {
+  DEFAULT_AI_PROFILE_ID,
+  MAX_LOBBY_TEAMS,
+  PLAYABLE_FACTIONS,
+  shouldAcceptSpectatorDrop,
+  shouldAcceptTeamDrop,
+  teamSlotsForLobby,
+};
 
 export function betaFactionSelectEnabledForLocation(locationLike) {
   const host = String(locationLike?.hostname || "").toLowerCase();

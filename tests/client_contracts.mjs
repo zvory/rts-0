@@ -13,6 +13,7 @@ import {
   PLAYABLE_FACTIONS,
   betaFactionSelectEnabledForLocation,
   shouldAcceptSpectatorDrop,
+  shouldAcceptTeamDrop,
   teamSlotsForLobby,
 } from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
@@ -2792,6 +2793,22 @@ function fakeAudioContext() {
       countdownActive: false,
     }),
     "spectator drop is host-only",
+  );
+  assert(
+    shouldAcceptTeamDrop({
+      draggedPlayer: { id: 3, isSpectator: true },
+      isHost: true,
+      countdownActive: false,
+    }),
+    "host can drag a spectator back into a team slot",
+  );
+  assert(
+    !shouldAcceptTeamDrop({
+      draggedPlayer: { id: 3, isSpectator: true },
+      isHost: false,
+      countdownActive: false,
+    }),
+    "team drop is host-only",
   );
 }
 

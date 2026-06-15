@@ -158,10 +158,11 @@ match starts. `isSpectator` is true for human observers; they do not consume act
 block readiness, or count toward win/loss.
 
 `teamId` is nonzero for active match players and AI seats. New active players and default-added AI
-opponents are assigned to the first empty team in `1..=4`; the host may move active human or AI
-seats between those team slots. The normal lobby UI shows occupied teams plus one "New team" drop
-target while fewer than four teams are occupied, plus a bottom spectator drop target for host-managed
-observer moves. Spectator lobby rows carry `teamId: 0` because they are not match players. `canStart` is false until there is at least one active seat, every
+opponents are assigned to the next empty team after the currently occupied teams when possible,
+falling back to the first empty team in `1..=4`; the host may move active human or AI seats between
+those team slots. The normal lobby UI shows occupied teams plus one "New team" drop target while
+fewer than four teams are occupied, plus a bottom spectator drop target for host-managed observer
+moves. Spectator lobby rows carry `teamId: 0` because they are not match players. `canStart` is false until there is at least one active seat, every
 active human is ready, every active seat has a team in `1..=4`, and the active seat count is at or
 below the four-player map-start cap.
 

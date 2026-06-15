@@ -46,6 +46,14 @@ export function shouldAcceptSpectatorDrop({
   );
 }
 
+export function shouldAcceptTeamDrop({
+  draggedPlayer,
+  isHost,
+  countdownActive,
+} = {}) {
+  return !!isHost && !countdownActive && !!draggedPlayer;
+}
+
 export class LobbyRosterView {
   constructor(rootEl) {
     this.root = rootEl;
@@ -72,12 +80,14 @@ export class LobbyRosterView {
 
     const { seatedPlayers, spectatorPlayers } = splitLobbyPlayers(players);
     const slots = teamSlotsForLobby(seatedPlayers);
+    const occupiedSlotCount = slots.filter((slot) => !slot.isNew).length;
     for (const slot of slots) {
       const teamPlayers = seatedPlayers.filter((player) => Number(player.teamId) === Number(slot.id));
       this.root.appendChild(this._buildTeamColumn({
         slot,
+        occupiedSlotCount,
         players: teamPlayers,
-        seatedPlayers,
+        allPlayers: players,
         myId,
         hostId,
         isHost,
@@ -88,6 +98,7 @@ export class LobbyRosterView {
         onAddAi,
         onRemoveAi,
         onSetTeam,
+        onSetSpectator,
         onSetFaction,
         onSetAiProfile,
       }));
@@ -106,8 +117,9 @@ export class LobbyRosterView {
 
   _buildTeamColumn({
     slot,
+    occupiedSlotCount,
     players,
-    seatedPlayers,
+    allPlayers,
     myId,
     hostId,
     isHost,
@@ -118,6 +130,7 @@ export class LobbyRosterView {
     onAddAi,
     onRemoveAi,
     onSetTeam,
+    onSetSpectator,
     onSetFaction,
     onSetAiProfile,
   }) {
@@ -136,8 +149,10 @@ export class LobbyRosterView {
         section.classList.remove("is-drop-target");
         const draggedId = Number(ev.dataTransfer?.getData("application/x-rts-player-id"));
         if (!draggedId) return;
-        const dragged = seatedPlayers.find((player) => player.id === draggedId);
+        const dragged = allPlayers.find((player) => player.id === draggedId);
+        if (!shouldAcceptTeamDrop({ draggedPlayer: dragged, isHost, countdownActive })) return;
         if (dragged && Number(dragged.teamId) === Number(slot.id)) return;
+        if (dragged?.isSpectator) onSetSpectator?.(draggedId, false);
         onSetTeam?.(draggedId, Number(slot.id));
       });
     }
@@ -149,10 +164,11 @@ export class LobbyRosterView {
     title.className = "lobby-team-title";
     const kicker = document.createElement("span");
     kicker.className = "lobby-kicker";
-    kicker.textContent = slot.isNew ? "Open command" : teamKicker(slot.id);
+    kicker.textContent = slot.isNew ? "Open slot" : "";
     const name = document.createElement("h2");
-    name.textContent = slot.isNew ? "New team" : `Team ${slot.id}`;
-    title.append(kicker, name);
+    name.textContent = slot.isNew ? "New team" : occupiedSlotCount === 1 ? "Team" : `Team ${slot.id}`;
+    if (kicker.textContent) title.appendChild(kicker);
+    title.appendChild(name);
 
     const count = document.createElement("span");
     count.className = "lobby-team-count team-row-count";
@@ -390,7 +406,13 @@ export class LobbyRosterView {
     const list = document.createElement("div");
     list.className = "lobby-observer-list";
     for (const player of players) {
-      list.appendChild(this._buildSpectatorRow(player, myId, hostId));
+      list.appendChild(this._buildSpectatorRow({
+        player,
+        myId,
+        hostId,
+        isHost,
+        countdownActive,
+      }));
     }
     if (players.length === 0) {
       const empty = document.createElement("div");
@@ -403,10 +425,19 @@ export class LobbyRosterView {
     return section;
   }
 
-  _buildSpectatorRow(player, myId, hostId) {
+  _buildSpectatorRow({ player, myId, hostId, isHost, countdownActive }) {
     const row = document.createElement("div");
     row.className = "player-row lobby-observer-row is-spectator";
     if (player.id === myId) row.classList.add("is-you");
+    if (isHost && !countdownActive) {
+      row.draggable = true;
+      row.addEventListener("dragstart", (ev) => {
+        ev.dataTransfer?.setData("application/x-rts-player-id", String(player.id));
+        ev.dataTransfer.effectAllowed = "move";
+        row.classList.add("is-dragging");
+      });
+      row.addEventListener("dragend", () => row.classList.remove("is-dragging"));
+    }
 
     const swatch = document.createElement("span");
     swatch.className = "player-color";
@@ -492,8 +523,4 @@ function playableFactionId(factionId) {
 function factionLabel(factionId) {
   const entry = PLAYABLE_FACTIONS.find((item) => item.id === factionId);
   return entry ? entry.label : "Kriegsia";
-}
-
-function teamKicker(teamId) {
-  return "Command group";
 }
