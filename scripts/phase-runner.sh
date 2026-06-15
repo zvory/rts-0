@@ -110,7 +110,7 @@ if [ -n "$FROM_PHASE" ] && [ "${#PHASES[@]}" -ne 0 ]; then
 fi
 
 case "$PLAN_NAME" in
-  *[!a-z0-9_-]*|"")
+  *[!a-z0-9_.-]*|*/*|.|..|"")
     echo "error: plan name must be a simple plans/ directory name: $PLAN_NAME" >&2
     exit 2
     ;;
