@@ -196,6 +196,14 @@ assert(
   "setTeam builder must emit the exact wire shape",
 );
 assert(
+  rust.includes("SetFaction") && C.SET_FACTION === "setFaction",
+  "setFaction client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.setFaction("ekat")) === JSON.stringify({ t: "setFaction", factionId: "ekat" }),
+  "setFaction builder must emit the exact wire shape",
+);
+assert(
   rust.includes("AddAi") && JSON.stringify(msg.addAi(2)) === JSON.stringify({ t: "addAi", teamId: 2 }),
   "addAi builder must support optional teamId",
 );

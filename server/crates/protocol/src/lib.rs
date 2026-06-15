@@ -120,6 +120,11 @@ pub enum ClientMessage {
         #[serde(rename = "teamId")]
         team_id: TeamId,
     },
+    /// A player selects their own playable faction while in the lobby.
+    SetFaction {
+        #[serde(rename = "factionId")]
+        faction_id: String,
+    },
     /// Host adds a computer-controlled opponent to the room (lobby phase only).
     AddAi {
         #[serde(rename = "teamId")]

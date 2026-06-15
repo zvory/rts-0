@@ -52,6 +52,7 @@ struct AiSlot {
     id: u32,
     name: String,
     team_id: TeamId,
+    faction_id: String,
 }
 
 const MAX_LOBBY_TEAMS: TeamId = 4;
@@ -714,6 +715,8 @@ pub(super) struct RoomTask {
     /// Team ids are freeform host-managed slots in the range `1..=MAX_LOBBY_TEAMS`.
     /// Per-human active-seat team assignment. Spectators are omitted and broadcast as team 0.
     human_team_assignments: HashMap<u32, TeamId>,
+    /// Per-human active-seat faction selection. Spectators are omitted.
+    human_faction_assignments: HashMap<u32, String>,
     /// Lobby toggle: start matches with boosted opening resources.
     quickstart: bool,
     /// Name of the map the host has selected (display name from JSON `name` field).
@@ -776,6 +779,7 @@ impl RoomTask {
             players: HashMap::new(),
             ai_players: Vec::new(),
             human_team_assignments: HashMap::new(),
+            human_faction_assignments: HashMap::new(),
             quickstart: false,
             selected_map: "Default".to_string(),
             host_id: None,
@@ -899,6 +903,10 @@ impl RoomTask {
                 target,
                 team_id,
             } => self.on_set_team(player_id, target, team_id),
+            RoomEvent::SetFaction {
+                player_id,
+                faction_id,
+            } => self.on_set_faction(player_id, faction_id),
             RoomEvent::AddAi { player_id, team_id } => self.on_add_ai(player_id, team_id),
             RoomEvent::RemoveAi { player_id, target } => self.on_remove_ai(player_id, target),
             RoomEvent::SetQuickstart { player_id, enabled } => {
@@ -1090,6 +1098,7 @@ impl RoomTask {
         self.reassign_host_if_needed();
         if !spectator {
             self.assign_missing_team_for(player_id);
+            self.assign_missing_faction_for(player_id);
         }
         crate::log_debug!(room = %self.room, player_id, "joined");
         // The player is now in the room; tell the connection it may mark itself joined.
@@ -1124,6 +1133,7 @@ impl RoomTask {
         let was_spectator = removed.spectator;
         self.order.retain(|&id| id != player_id);
         self.human_team_assignments.remove(&player_id);
+        self.human_faction_assignments.remove(&player_id);
         self.outcome_sent.remove(&player_id);
         self.reassign_host_if_needed();
         crate::log_debug!(room = %self.room, player_id, "left");
@@ -1144,6 +1154,7 @@ impl RoomTask {
             // joiner under this room name should start from a clean lobby.
             self.ai_players.clear();
             self.human_team_assignments.clear();
+            self.human_faction_assignments.clear();
             self.dev_driver = None;
             self.dev_view_player_id = None;
             if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
@@ -1287,6 +1298,54 @@ impl RoomTask {
         self.broadcast_lobby();
     }
 
+    /// Active humans can select their own playable faction in the lobby. The server validates and
+    /// ignores unknown, fixture, spectator, countdown, and in-game requests.
+    fn on_set_faction(&mut self, player_id: u32, faction_id: String) {
+        if self.is_live_dev_watch() {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby) {
+            return;
+        }
+        if self
+            .players
+            .get(&player_id)
+            .map(|player| player.spectator)
+            .unwrap_or(true)
+        {
+            crate::log_debug!(room = %self.room, player_id, "ignoring spectator faction selection");
+            return;
+        }
+        let context = if self.quickstart {
+            FactionRequestContext::Quickstart
+        } else {
+            FactionRequestContext::NormalLobby
+        };
+        let accepted = match validate_faction_request(context, Some(&faction_id)) {
+            FactionValidation::AcceptedPlayable { faction_id }
+            | FactionValidation::Defaulted { faction_id } => faction_id,
+            FactionValidation::AcceptedFixture { .. } => return,
+            FactionValidation::Rejected { requested, reason } => {
+                crate::log_debug!(
+                    room = %self.room,
+                    player_id,
+                    faction_id = ?requested,
+                    reason = ?reason,
+                    "ignoring invalid faction selection"
+                );
+                return;
+            }
+        };
+        if self.human_faction_for(player_id) == accepted {
+            return;
+        }
+        self.human_faction_assignments.insert(player_id, accepted);
+        self.broadcast_lobby();
+    }
+
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
     /// the room is full (humans + AI == [`MAX_PLAYERS`]).
     fn on_add_ai(&mut self, player_id: u32, requested_team_id: Option<TeamId>) {
@@ -1314,7 +1373,12 @@ impl RoomTask {
         } else {
             self.next_default_team_for_new_seat(id)
         };
-        self.ai_players.push(AiSlot { id, name, team_id });
+        self.ai_players.push(AiSlot {
+            id,
+            name,
+            team_id,
+            faction_id: default_faction_id_for(FactionRequestContext::AiSeat),
+        });
         crate::log_debug!(room = %self.room, ai_id = id, "AI opponent added");
         self.broadcast_lobby();
     }
@@ -1396,6 +1460,7 @@ impl RoomTask {
                 player.color = "#6f8fa8".to_string();
             }
             self.human_team_assignments.remove(&player_id);
+            self.human_faction_assignments.remove(&player_id);
         } else {
             if self.total_player_count() >= MAX_PLAYERS {
                 crate::log_debug!(room = %self.room, player_id, "ignoring player role switch; room full");
@@ -1408,6 +1473,7 @@ impl RoomTask {
                 player.color = color;
             }
             self.assign_missing_team_for(player_id);
+            self.assign_missing_faction_for(player_id);
         }
         self.broadcast_lobby();
     }
@@ -1445,6 +1511,13 @@ impl RoomTask {
             return ai.team_id;
         }
         id
+    }
+
+    fn human_faction_for(&self, id: u32) -> String {
+        self.human_faction_assignments
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| default_faction_id_for(FactionRequestContext::NormalLobby))
     }
 
     fn team_counts_except(&self, except_id: Option<u32>) -> HashMap<TeamId, usize> {
@@ -1487,6 +1560,16 @@ impl RoomTask {
         }
         let team_id = self.next_default_team_for_new_seat(player_id);
         self.human_team_assignments.insert(player_id, team_id);
+    }
+
+    fn assign_missing_faction_for(&mut self, player_id: u32) {
+        if self.human_faction_assignments.contains_key(&player_id) {
+            return;
+        }
+        self.human_faction_assignments.insert(
+            player_id,
+            default_faction_id_for(FactionRequestContext::NormalLobby),
+        );
     }
 
     fn team_composition_valid(&self) -> bool {
@@ -1885,8 +1968,6 @@ impl RoomTask {
     /// Build and broadcast the current `lobby` message to everyone in the room.
     fn broadcast_lobby(&mut self) {
         let host_id = self.host_id.unwrap_or(0);
-        let human_faction_id = default_faction_id_for(FactionRequestContext::NormalLobby);
-        let ai_faction_id = default_faction_id_for(FactionRequestContext::AiSeat);
         // Humans first (in join order), then AI opponents. AIs always read as ready.
         let mut players: Vec<LobbyPlayer> = self
             .order
@@ -1899,7 +1980,11 @@ impl RoomTask {
                     } else {
                         self.team_id_for_active_seat(*id)
                     },
-                    faction_id: human_faction_id.clone(),
+                    faction_id: if p.spectator {
+                        default_faction_id_for(FactionRequestContext::NormalLobby)
+                    } else {
+                        self.human_faction_for(*id)
+                    },
                     name: p.name.clone(),
                     ready: p.ready,
                     color: p.color.clone(),
@@ -1912,7 +1997,7 @@ impl RoomTask {
             players.push(LobbyPlayer {
                 id: ai.id,
                 team_id: ai.team_id,
-                faction_id: ai_faction_id.clone(),
+                faction_id: ai.faction_id.clone(),
                 name: ai.name.clone(),
                 ready: true,
                 color: self.ai_color(seat),
@@ -1982,19 +2067,13 @@ impl RoomTask {
     fn start_match(&mut self) {
         self.match_countdown_deadline = None;
         self.reset_match_net_status();
-        let human_faction_id = default_faction_id_for(if self.quickstart {
-            FactionRequestContext::Quickstart
-        } else {
-            FactionRequestContext::NormalLobby
-        });
-        let ai_faction_id = default_faction_id_for(FactionRequestContext::AiSeat);
         let mut inits: Vec<PlayerInit> = self
             .active_human_ids()
             .filter_map(|id| {
                 self.players.get(&id).map(|p| PlayerInit {
                     id,
                     team_id: self.team_id_for_active_seat(id),
-                    faction_id: human_faction_id.clone(),
+                    faction_id: self.human_faction_for(id),
                     name: p.name.clone(),
                     color: p.color.clone(),
                     is_ai: false,
@@ -2007,7 +2086,7 @@ impl RoomTask {
             inits.push(PlayerInit {
                 id: ai.id,
                 team_id: ai.team_id,
-                faction_id: ai_faction_id.clone(),
+                faction_id: ai.faction_id.clone(),
                 name: ai.name.clone(),
                 color: self.ai_color(seat),
                 is_ai: true,

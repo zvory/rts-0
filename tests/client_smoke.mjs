@@ -73,6 +73,8 @@ try {
   });
   ok(teamUi.teamRows.some((text) => /Team \d+/.test(text)) && teamUi.newTeamRows === 1,
     `lobby renders occupied teams plus one new-team row (${teamUi.teamRows.join(" | ")})`);
+  ok(!teamUi.teamRows.some((text) => /Allied command|Opposing command/.test(text)),
+    "lobby team headers omit old Allied/Opposing command copy");
   ok(teamUi.draggableSeats >= 1, `host lobby seats are draggable (${teamUi.draggableSeats})`);
   ok(!teamUi.hasModeSummary && !teamUi.hasLaunchCopy && !teamUi.statusText,
     "lobby omits mode summary, launch header copy, and room/player status text");

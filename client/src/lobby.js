@@ -269,10 +269,17 @@ export class Lobby {
       countdownActive: this._countdownActive,
       playerCount: this._playerCount,
       maxPlayers: MAX_PLAYERS,
+      betaFactionSelect: this._betaFactionSelectEnabled(),
       onAddAi: (teamId) => this.net.addAi(teamId),
       onRemoveAi: (id) => this.net.removeAi(id),
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
+      onSetFaction: (factionId) => this.net.setFaction(factionId),
     });
+  }
+
+  _betaFactionSelectEnabled() {
+    const host = window.location.hostname;
+    return host.includes("beta") || window.location.pathname.startsWith("/beta");
   }
 
   /**

@@ -2710,6 +2710,7 @@ function fakeAudioContext() {
   assertHasMethod(net, "removeAi", "Net");
   assertHasMethod(net, "setTeamPreset", "Net");
   assertHasMethod(net, "setTeam", "Net");
+  assertHasMethod(net, "setFaction", "Net");
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
@@ -2738,6 +2739,7 @@ function fakeAudioContext() {
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
   assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
+  assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(msg.requestReplayBranch().t === "requestReplayBranch", "replay branch builder tag");
   assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");

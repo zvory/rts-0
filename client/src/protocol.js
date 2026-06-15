@@ -26,6 +26,7 @@ export const C = Object.freeze({
   START: "start",
   SET_TEAM_PRESET: "setTeamPreset",
   SET_TEAM: "setTeam",
+  SET_FACTION: "setFaction",
   ADD_AI: "addAi",
   REMOVE_AI: "removeAi",
   SET_QUICKSTART: "setQuickstart",
@@ -822,6 +823,7 @@ export const msg = Object.freeze({
   start: () => ({ t: C.START }),
   setTeamPreset: (preset) => ({ t: C.SET_TEAM_PRESET, preset }),
   setTeam: (id, teamId) => ({ t: C.SET_TEAM, id, teamId }),
+  setFaction: (factionId) => ({ t: C.SET_FACTION, factionId }),
   addAi: (teamId = undefined) => {
     const payload = { t: C.ADD_AI };
     if (teamId != null) payload.teamId = teamId;
