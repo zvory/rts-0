@@ -10,7 +10,9 @@ use serde::Serialize;
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
-use crate::ai_core::profiles::{profile_by_id, required_profiles, AI_1_0_TECH_ID};
+use crate::ai_core::profiles::{
+    profile_by_id, required_profiles, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
+};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayArtifactV1,
@@ -159,6 +161,7 @@ pub fn available_profile_ids() -> Vec<&'static str> {
 pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "ai1" | "ai_1_0" | "ai_1_0_tech" | "default" => Some(AI_1_0_TECH_ID),
+        "ai_1_1" | "ai11" => Some(AI_1_1_TANK_MG_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
 }
@@ -785,18 +788,28 @@ mod tests {
         available_profile_ids, canonical_profile_id, run_profile_matchup_result,
         ProfileMatchupOptions, ScorecardCollector,
     };
-    use crate::ai_core::profiles::AI_1_0_TECH_ID;
+    use crate::ai_core::profiles::{AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID};
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
     use rts_sim::protocol::kinds;
     use rts_sim::protocol::{EntityView, Event, Snapshot, SnapshotNetStatus};
 
     #[test]
-    fn only_ai_1_0_profile_is_selectable() {
+    fn ai_1_0_remains_default_while_ai_1_1_is_selectable() {
         assert_eq!(canonical_profile_id("ai"), Some(AI_1_0_TECH_ID));
         assert_eq!(canonical_profile_id("ai1"), Some(AI_1_0_TECH_ID));
+        assert_eq!(canonical_profile_id("ai_1_0"), Some(AI_1_0_TECH_ID));
         assert_eq!(canonical_profile_id("default"), Some(AI_1_0_TECH_ID));
-        assert_eq!(available_profile_ids(), vec![AI_1_0_TECH_ID]);
+        assert_eq!(
+            available_profile_ids(),
+            vec![AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID]
+        );
+        assert_eq!(
+            canonical_profile_id("ai_1_1_tank_mg"),
+            Some(AI_1_1_TANK_MG_ID)
+        );
+        assert_eq!(canonical_profile_id("ai_1_1"), Some(AI_1_1_TANK_MG_ID));
+        assert_eq!(canonical_profile_id("ai11"), Some(AI_1_1_TANK_MG_ID));
         assert_eq!(canonical_profile_id("rifle_flood_full_saturation"), None);
         assert_eq!(canonical_profile_id("saturation"), None);
     }

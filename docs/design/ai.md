@@ -55,10 +55,10 @@ plan owns ready combat groups, required-unit readiness, attack reissue cadence, 
 combat target selection, and blockers such as waiting for units, waiting for a required Tank,
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
-The only selectable code-defined profile is `ai_1_0_tech`; it parameterizes worker targets, supply
-buffers, building/tech goals, production priorities, resource timing, expansion timing, harassment,
-and attack thresholds without providing its own `think()` function. It opens with four-Rifleman
-frontal waves, expands off a completed Training Centre, builds Research
+The live lobby default and promoted profile is `ai_1_0_tech`; it parameterizes worker targets,
+supply buffers, building/tech goals, production priorities, resource timing, expansion timing,
+harassment, and attack thresholds without providing its own `think()` function. It opens with
+four-Rifleman frontal waves, expands off a completed Training Centre, builds Research
 Complex and Factory without adding Machine Gunners, Anti-Tank Guns, Artillery, or Command Cars,
 produces Scout Cars while Tank research or Methamphetamines is blocked or pending, then prioritizes
 Tanks once both Tank research and Methamphetamines complete. It reserves up to two completed Scout
@@ -86,10 +86,18 @@ the relevant support tech is absent, production falls back to Riflemen and panic
 create tech buildings.
 If the pressure persists through the panic window, the AI asks for an additional Barracks before
 resuming its normal profile once the threat has cleared.
+Developer self-play tooling also registers `ai_1_1_tank_mg` for direct comparison through
+`ai-matchup` and related profile-backed scripts. AI 1.1 is a close AI 1.0 fork that keeps the same
+economy, expansion timing, Tank tech path, Methamphetamines-before-Tanks gate, and Tank-required
+frontal-wave posture, but removes Scout Car production and harassment, caps ordinary Barracks growth
+at two, and carries a bounded defensive Machine Gunner target for later perimeter-staging behavior.
+The aliases `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`; `ai`, `ai1`, `ai_1_0`, and `default`
+still resolve to `ai_1_0_tech` until release replay evidence justifies promotion.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
 promoted `ai_1_0_tech` default. Profiles are still not client-selectable, and older experimental
-profile ids are no longer listed or accepted by developer tooling.
+profile ids are no longer listed or accepted by developer tooling. AI 1.1 is available only in
+developer tooling at this stage; it is not the live lobby default.
 
 **Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player
