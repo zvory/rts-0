@@ -24,10 +24,13 @@ scope, or the lobby front-page table.
 - **Server is the only writer.** Clients never write history. `/api/matches` is read-only.
 - **Detached write at `end_match`.** A slow Supabase write must never stall the room. Errors
   log and are dropped.
-- **Recording scope.** Only matches with `match_human_count >= 2` AND not a dev/scenario/replay
-  or automated test room get a row. Human-vs-AI, smoke, integration, and regression test matches
-  are excluded. `RTS_RECORD_MATCHES` truthy records public rows; with `DATABASE_URL` set and the
-  gate off, local `cargo run` records `local_only` rows that only localhost reads can see.
+- **Recording scope.** Beta/mainline writes are enabled only when `RTS_RECORD_MATCHES` is truthy.
+  Deployed normal matches, including solo, player-vs-AI, and AI-only matches, get replay-backed
+  rows unless they are dev/scenario/replay rooms or automated test fingerprints. Local `cargo run`
+  with the gate off can read history but does not upload rows or replay artifacts.
+- **Recent Matches visibility.** `/api/matches` returns only rows with `human_count >= 1` and
+  `debug_mode = false`, so AI-only and lobby Debug/quickstart rows can be stored for replay launch
+  without appearing in the lobby table.
 - **Score-screen schema.** `score_screen` is JSONB holding `Vec<PlayerScore>` from
   `contract::PlayerScore`. Adding fields requires no migration.
 - **Replay storage.** `match_replays.artifact_json` stores `ReplayArtifactV1`; summaries and

@@ -26,6 +26,10 @@ pub struct MatchRecord {
     pub participants: Vec<String>,
     /// Full PlayerScore[] from `Game::scores()`, opaque JSON to the DB.
     pub score_screen: serde_json::Value,
+    /// Number of non-AI players in the match. Public recent-match reads hide rows with none.
+    pub human_count: i32,
+    /// True when the lobby Debug mode / quickstart loadout was enabled for this match.
+    pub debug_mode: bool,
     /// True for developer-local rows that should only be visible from localhost requests.
     pub local_only: bool,
     /// Optional deterministic replay artifact for replay launch.
@@ -87,6 +91,10 @@ pub struct MatchSummary {
     pub participants: Vec<String>,
     #[serde(rename = "scoreScreen")]
     pub score_screen: serde_json::Value,
+    #[serde(rename = "humanCount")]
+    pub human_count: i32,
+    #[serde(rename = "debugMode")]
+    pub debug_mode: bool,
     #[serde(rename = "localOnly")]
     pub local_only: bool,
     #[serde(rename = "replayAvailable")]
@@ -136,8 +144,9 @@ impl Db {
                 r#"
             insert into matches
                 (started_at, ended_at, duration_ms, map_name,
-                 winner_name, outcome, participants, score_screen, local_only)
-            values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 winner_name, outcome, participants, score_screen,
+                 human_count, debug_mode, local_only)
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             returning id
             "#,
             )
@@ -149,6 +158,8 @@ impl Db {
             .bind(outcome)
             .bind(&rec.participants)
             .bind(&rec.score_screen)
+            .bind(rec.human_count)
+            .bind(rec.debug_mode)
             .bind(rec.local_only)
             .fetch_one(&mut *tx)
             .await?;
@@ -210,6 +221,8 @@ impl Db {
                    matches.outcome as outcome,
                    matches.participants as participants,
                    matches.score_screen as score_screen,
+                   matches.human_count as human_count,
+                   matches.debug_mode as debug_mode,
                    matches.local_only as local_only,
                    r.artifact_schema_version as replay_artifact_schema_version,
                    r.build_sha as replay_build_sha,
@@ -219,14 +232,15 @@ impl Db {
             from matches
             left join match_replays r on r.match_id = matches.id
             where ($2 or not matches.local_only)
+              and matches.human_count >= 1
+              and not matches.debug_mode
               and (
                 $2
                 or (
                   not exists (
                     select 1
                     from unnest(participants) as participant(name)
-                    where participant.name like 'Computer %'
-                       or lower(participant.name) = 'smoke'
+                    where lower(participant.name) = 'smoke'
                   )
                   and not (participants @> array['Alpha', 'Bravo']::text[])
                 )
@@ -295,6 +309,8 @@ fn row_to_summary(row: PgRow) -> MatchSummary {
         outcome: row.get("outcome"),
         participants: row.get("participants"),
         score_screen: row.get("score_screen"),
+        human_count: row.get("human_count"),
+        debug_mode: row.get("debug_mode"),
         local_only: row.get("local_only"),
         replay_available: replay_metadata.is_some(),
         replay_unavailable_reason: replay_metadata
