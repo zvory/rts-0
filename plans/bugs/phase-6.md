@@ -14,6 +14,8 @@ without expanding into a production ticketing system.
   - in-match report submission
   - replay-viewer report submission
   - human-vs-AI report-backed replay persistence
+  - solo or AI-vs-AI report-backed replay persistence where practical
+  - pending-to-available replay resolution through `replay_key`
   - match ending after the report form opens but before submission, if earlier phases support that
     lifecycle directly
   - report dashboard replay launch near the report tick

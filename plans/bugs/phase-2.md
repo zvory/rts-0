@@ -5,19 +5,26 @@ Status: planned.
 ## Goal
 
 Make replay evidence durable for reportable matches independently of ordinary match-history
-eligibility. A submitted bug report must be able to force or reuse a persisted replay artifact even
-for human-vs-AI matches and even before the match naturally reaches its normal end-of-match write.
+eligibility. A submitted bug report must force final replay upload for the match's server-generated
+`replay_key`, even for AI-vs-AI, human-vs-AI, and solo matches, and even though the final artifact
+is normally written at match end.
 
 ## Scope
 
 - Audit current replay capture and match-history write paths.
-- Add a server-side helper that can persist or retrieve a replay row for a reportable room/match.
-- Relax replay persistence for report-backed human-vs-AI cases without making all AI matches appear
-  as ordinary public match-history rows unless explicitly intended.
+- Ensure normal match start allocates and retains a stable `replay_key` for the match.
+- Add a server-side helper that marks a room/match `replay_key` as report-backed and therefore
+  force-persisted at match end.
+- Relax replay persistence for report-backed AI-vs-AI, human-vs-AI, and solo cases without making
+  all such matches appear as ordinary public match-history rows unless explicitly intended.
 - Ensure the replay artifact includes enough deterministic context for AI-seat replay playback and
   later review.
-- Make report-backed replay persistence block the report submission path, while ordinary match
-  history writes remain detached/non-critical.
+- Make report submission block until the report row is saved and the force-persist replay flag is
+  registered for that `replay_key`. The final replay artifact may remain pending until match end.
+- Write the final replay artifact under the same `replay_key` at match end. If a matching report
+  already exists, the review dashboard should transition from pending to available once this write
+  succeeds.
+- Keep ordinary match history writes detached/non-critical.
 - Ensure deploy drain accounts for report/replay writes that are in progress or required by
   submitted reports.
 
@@ -33,11 +40,12 @@ for human-vs-AI matches and even before the match naturally reaches its normal e
 
 ## Important Design Decisions
 
-- Prefer creating/reusing a normal `matches` row plus `match_replays` row when a report needs replay
-  evidence. If a live match has no resolved match row yet, define a clear placeholder or report-only
-  match-record policy before implementing.
-- If placeholder match rows are introduced, make their lifecycle explicit: what fields are known at
-  report time, what updates at match end, and what the review UI should display before resolution.
+- Prefer the `replay_key` association over placeholder replay rows. The bug report can store
+  `replay_key` before a `match_replays` row exists, and the final replay row can be resolved by the
+  same key later.
+- If the implementation still introduces placeholder rows, make their lifecycle explicit: what
+  fields are known at report time, what updates at match end, and what the review UI should display
+  before resolution.
 - If the existing room task cannot safely create an in-progress replay artifact, stop and document
   the blocker instead of faking replay durability.
 
@@ -45,8 +53,9 @@ for human-vs-AI matches and even before the match naturally reaches its normal e
 
 - Do not add player-facing report UI in this phase.
 - Do not block normal match-end transitions on ordinary match-history writes.
-- Do not silently drop report-backed replay persistence failures. The eventual report API must be
-  able to return a failure instead of a false success.
+- Do not silently drop report-backed replay persistence failures. The eventual report API must show
+  whether the force-persist flag was registered, and the dashboard must show pending or missing
+  replay state instead of a false available replay.
 - Keep replay compatibility validation aligned with the existing match-history replay launch rules.
 
 ## Verification
@@ -54,20 +63,22 @@ for human-vs-AI matches and even before the match naturally reaches its normal e
 - Add focused server/Rust tests showing report-backed replay persistence works for:
   - a normal two-human match context
   - a human-vs-AI match context
-  - a match still in progress, if the implementation supports live artifact capture in this phase
+  - an AI-vs-AI or solo context if those paths can be exercised without broad harness work
+  - a match still in progress where the report stores `replay_key` before the final replay row exists
 - Add or update tests around deploy drain/write tracking if drain behavior changes.
 - Run the smallest relevant Rust test target plus formatting.
 
 ## Manual Testing Focus
 
 - Start a local server with database configured.
-- Exercise a human-vs-AI match and confirm a report-backed replay artifact can be persisted even if
-  it would not appear in normal public match history.
+- Exercise a human-vs-AI or solo match, submit/mark a report-backed `replay_key`, and confirm the
+  final replay artifact is persisted under that same key even if it would not appear in normal
+  public match history.
 - Confirm ordinary match-history behavior did not start showing every AI/debug/test match unless the
   phase explicitly chose that policy.
 
 ## Handoff
 
-After implementation, mark this phase done and summarize exactly how a later report API obtains or
-creates a durable replay id. Call out whether live in-progress replay capture is fully implemented
-or whether Phase 3 must constrain reporting to contexts where a replay artifact already exists.
+After implementation, mark this phase done and summarize exactly how a later report API obtains the
+match `replay_key`, how it marks that key for forced replay upload, and how the dashboard should
+distinguish pending, available, and missing replay states.

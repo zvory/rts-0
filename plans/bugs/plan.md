@@ -14,7 +14,11 @@ diagnostics.
 - Screenshot capture is explicitly out of scope for V1.
 - Pause is explicitly out of scope for V1. Any later pause support must be server-authoritative,
   not client-only, and the V1 architecture must not make that harder.
-- Reports live in the database and reference persisted replay rows when a replay exists.
+- Each match gets a server-generated stable `replay_key` UUID at match start. Reports and replay
+  rows both store that key so mid-match reports can be associated with a replay before the final
+  replay artifact exists.
+- Reports live in the database and reference `replay_key` immediately. A strict foreign key to a
+  replay row is not required because the report can exist before the final replay row is written.
 - Reports should be stored indefinitely for now. Manual database cleanup is acceptable later.
 - Anyone can submit and anyone can view the admin/review page. No authentication, privacy layer,
   spam controls, or rate limiting are required for this pre-alpha utility.
@@ -24,7 +28,8 @@ diagnostics.
 - A successful submission must show a report id and tell the tester to let Alex know they submitted
   it.
 - Report submission is blocking. The client should not claim success until the server has persisted
-  the report and guaranteed the linked replay evidence is durable.
+  the report and guaranteed that replay persistence for the report's `replay_key` is forced for the
+  match.
 - If the player disconnects during report submission, losing the report is acceptable. If the match
   ends after the player opened the report form but before they submit, submission should still work.
 - Server shutdown/deploy drain must not exit before report/replay persistence needed by submitted
@@ -33,15 +38,16 @@ diagnostics.
 ## Phase Summaries
 
 Phase 1 establishes the persistence contract for bug reports and report-backed replays. It adds the
-database schema, server-side data model, and the rules for linking reports to `match_replays`
-without exposing a player UI yet. It also documents how report writes differ from ordinary
-match-history writes: reports are blocking evidence capture, while normal match history remains a
-non-critical summary.
+database schema, server-side data model, and the stable server-generated `replay_key` used to
+associate reports with the eventual replay row without requiring a strict foreign key. It also
+documents how report writes differ from ordinary match-history writes: reports are blocking
+evidence capture, while normal match history remains a non-critical summary.
 
-Phase 2 makes replay persistence usable for reportable matches, including human-vs-AI and
-in-progress/live matches. It should ensure a report can force or reuse a durable replay artifact
+Phase 2 makes replay persistence usable for reportable matches, including AI-vs-AI, human-vs-AI,
+solo, and in-progress/live matches. It should ensure a report sets a force-persist flag for that
+match's `replay_key`, then the final replay artifact is written under the same key at match end
 even when the match would not normally qualify for match history. The phase ends with server-side
-tests proving that a report can be anchored to a replay before the match naturally ends.
+tests proving that a report can be anchored to a replay key before the match naturally ends.
 
 Phase 3 adds the server API for creating bug reports and serving a reviewable report list. It
 validates and bounds untrusted client payloads, captures authoritative server context, writes the
@@ -78,7 +84,7 @@ where lobby-only reporting can be enabled if the earlier phases left a clear nul
   search, auth, privacy controls, rate limiting, or screenshots unless a later product decision
   explicitly expands scope.
 - Preserve the server-authoritative architecture. The server owns report ids, authoritative match
-  metadata, replay persistence, and database writes.
+  metadata, `replay_key` allocation, replay persistence, and database writes.
 - Treat clients as untrusted. Bound text length and JSON diagnostics, validate report context, and
   never trust client-supplied player ids, room state, replay ids, or ticks without checking server
   state where possible.
@@ -91,6 +97,10 @@ where lobby-only reporting can be enabled if the earlier phases left a clear nul
 - Keep report persistence separate from normal match-history policy. Normal match history may remain
   eligibility-gated; report-backed replay persistence must work for human-vs-AI and other reportable
   playtest contexts.
+- A submitted report must force replay upload for its `replay_key`, even when the match is AI-vs-AI,
+  human-vs-AI, or solo. The review dashboard must handle the period where a report exists but the
+  replay artifact is still pending, and must show a clear missing-replay state if final replay
+  persistence fails.
 - Do not make normal room transitions wait on non-report match history writes. Blocking behavior is
   required only for submitted report evidence.
 - The review route may warn about build/map incompatibility just like match-history replay launch.
