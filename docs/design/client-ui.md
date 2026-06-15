@@ -439,6 +439,10 @@ the input module enters targeted cursor mode:
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
   hotkey is still held for repeated world-point targeting.
+- If the selected unit's owner-only ability affordance includes an active return object, the command
+  card sends `recastAbility(ability, readyIds, targetObjectId, queued)` directly instead of arming a
+  world-point cursor. The server remains authoritative for the availability tick and destination
+  validity.
 - While the resolved hotkey remains held, repeated left-clicks keep the current selection intact and
   keep targeted mode armed so multi-selected Mortar Teams and Scout Cars can distribute repeated
   point commands without the next click falling back to normal selection.
@@ -450,15 +454,30 @@ owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that bu
 `setAutocast(mortarFire, enabled=false)` and does not arm manual targeting.
 
 `state.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
-(null or `{ ability, x, y, rangeCenters, inRange }`). `commandTarget` is a transient UI state;
-`abilityTargetPreview` is rebuilt every mouse move from the cursor world position and the current
-selection.
+(null or `{ ability, mouseX, mouseY, carriers, rangeOrigins, pathOrigins, returnMarkers,
+hoverInRange }`). `commandTarget` is a transient UI state; `abilityTargetPreview` is rebuilt every
+mouse move from the cursor world position and the current selection. Server-projected complex
+ability world objects are stored separately as `state.abilityObjects` from
+`Snapshot.abilityObjects`. They are authoritative, fog-filtered data for return-marker, Magic
+Anchor, and line-projectile rendering, so the client must not infer gameplay authority from local
+preview state.
 
 Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
 - While in targeted ability mode, draws a dotted range ring (radius = `rangeTiles × tileSize`) around
   each eligible carrier.
+- `rangeOrigins` keeps normal range rings tied to carrier units, while `pathOrigins` can add
+  server-projected origins such as Magic Anchors for multi-origin line-shot previews.
+- `returnMarkers` can draw owner-visible dash-return markers while the dash ability is armed.
 - At the cursor position, draws the cloud radius preview (2-tile circle) colored green when in
   range of at least one carrier, grey when out of range.
+
+Ability object rendering (`renderer/feedback.js`, `_drawAbilityObjects`; drawn on the same ground
+overlay container as smoke clouds, below selection rings and HP bars):
+- Each frame, iterates `state.abilityObjects` (the latest snapshot's fog-filtered object list).
+- Return markers draw as small blue ground marks; Magic Anchors draw as persistent diamond-shaped
+  ground objects; line-projectile/debug objects draw as small red circles when projected.
+- Ability objects are never routed through entity selection, minimap blips, HUD command-card state,
+  or local prediction. They disappear when absent from the next authoritative snapshot.
 
 Smoke rendering (`renderer/feedback.js`, `_drawSmokes`; layer `smokes` between `selectionRings`
 and unit layer):

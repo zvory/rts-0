@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::{
@@ -47,6 +48,7 @@ pub(crate) fn apply_commands(
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
     pending: Vec<(u32, SimCommand)>,
@@ -93,6 +95,7 @@ pub(crate) fn apply_commands(
                     &teams,
                     fog,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     artillery_shells,
                     events,
@@ -129,6 +132,7 @@ pub(crate) fn apply_commands(
                     &teams,
                     fog,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     artillery_shells,
                     events,
@@ -167,6 +171,7 @@ pub(crate) fn apply_commands(
                     &teams,
                     fog,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     artillery_shells,
                     events,
@@ -204,6 +209,7 @@ pub(crate) fn apply_commands(
                     &teams,
                     fog,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     artillery_shells,
                     events,
@@ -264,6 +270,7 @@ pub(crate) fn apply_commands(
                     coordinator,
                     fog,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     artillery_shells,
                     events,
@@ -275,6 +282,30 @@ pub(crate) fn apply_commands(
                         y,
                         queued,
                     },
+                    tick,
+                );
+            }
+            SimCommand::RecastAbility {
+                ability,
+                units,
+                target_object_id,
+                queued: _,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
+                ability_orders::execute_recast_return(
+                    map,
+                    entities,
+                    ability_runtime,
+                    events,
+                    player,
+                    &faction_id,
+                    ability,
+                    units,
+                    target_object_id,
                     tick,
                 );
             }
@@ -339,6 +370,7 @@ pub(crate) fn apply_commands(
                     &teams,
                     fog,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     artillery_shells,
                     events,
@@ -381,6 +413,7 @@ pub(crate) fn apply_commands(
                     &teams,
                     fog,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     artillery_shells,
                     events,
@@ -706,6 +739,7 @@ fn apply_planned_unit_order(
     teams: &TeamRelations,
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -824,6 +858,7 @@ fn apply_planned_unit_order(
                         teams,
                         coordinator,
                         smokes,
+                        ability_runtime,
                         mortar_shells,
                         events,
                         player,
@@ -926,6 +961,7 @@ fn apply_planned_unit_order(
                             fog,
                             teams,
                             smokes,
+                            ability_runtime,
                             mortar_shells,
                             events,
                             player,
@@ -1103,6 +1139,7 @@ fn use_ability(
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -1240,6 +1277,7 @@ fn use_ability(
         &teams,
         fog,
         smokes,
+        ability_runtime,
         mortar_shells,
         artillery_shells,
         events,
@@ -2033,6 +2071,7 @@ mod tests {
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
+        let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         let mut events: HashMap<u32, Vec<Event>> = players
@@ -2048,6 +2087,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -2108,6 +2148,7 @@ mod tests {
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
+        let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         let mut events: HashMap<u32, Vec<Event>> = players
@@ -2123,6 +2164,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -2181,6 +2223,7 @@ mod tests {
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
+        let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         let mut events = HashMap::new();
@@ -2193,6 +2236,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -2259,6 +2303,7 @@ mod tests {
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
+        let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         let mut events = HashMap::new();
@@ -2271,6 +2316,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -4976,6 +5022,7 @@ mod tests {
             .collect();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
+        let mut ability_runtime = AbilityRuntime::new();
         apply_commands(
             map,
             entities,
@@ -4984,6 +5031,7 @@ mod tests {
             &mut coordinator,
             &fog,
             smokes,
+            &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
             pending,

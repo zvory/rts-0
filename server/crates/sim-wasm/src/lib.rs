@@ -295,6 +295,7 @@ impl CorePredictor {
                 .collect(),
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
+            ability_objects: Vec::new(),
             visible_tiles: Vec::new(),
             remembered_buildings: Vec::new(),
             events: Vec::new(),
@@ -378,6 +379,7 @@ impl CorePredictor {
             | Command::TearDownAntiTankGuns { .. }
             | Command::Charge { .. }
             | Command::UseAbility { .. }
+            | Command::RecastAbility { .. }
             | Command::SetAutocast { .. }
             | Command::Gather { .. }
             | Command::Train { .. }
@@ -714,6 +716,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::TearDownAntiTankGuns { .. } => "tearDownAntiTankGuns",
         Command::Charge { .. } => "charge",
         Command::UseAbility { .. } => "useAbility",
+        Command::RecastAbility { .. } => "recastAbility",
         Command::SetAutocast { .. } => "setAutocast",
         Command::Gather { .. } => "gather",
         Command::Build { .. } => "build",
@@ -803,6 +806,7 @@ mod tests {
             entities: vec![owned, hidden_shape],
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
+            ability_objects: Vec::new(),
             visible_tiles: vec![0; 64 * 64],
             remembered_buildings: Vec::new(),
             events: Vec::new(),

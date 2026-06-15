@@ -387,6 +387,7 @@ mod tests {
             entities: Vec::new(),
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
+            ability_objects: Vec::new(),
             visible_tiles: Vec::new(),
             remembered_buildings: Vec::new(),
             events: Vec::new(),
@@ -584,7 +585,11 @@ mod tests {
         let start = start_payload();
 
         let observation = AiObservation::from_selfplay_snapshot(&start, &snapshot, 1, []).unwrap();
-        let building = observation.owned.iter().find(|entity| entity.id == 40).unwrap();
+        let building = observation
+            .owned
+            .iter()
+            .find(|entity| entity.id == 40)
+            .unwrap();
 
         assert_eq!(building.kind, EntityKind::ResearchComplex);
         assert_eq!(building.production_queue_len, Some(0));

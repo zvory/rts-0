@@ -272,10 +272,10 @@ const EKAT_BUILDINGS: &[EntityKind] = &[EntityKind::Zamok];
 const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
     AbilityCatalogEntry {
         id: EKAT_TELEPORT_ABILITY,
-        label: "Teleport",
-        icon: "TP",
+        label: "Dash",
+        icon: "DSH",
         hotkey: Some("D"),
-        title: "Teleport up to 5 tiles",
+        title: "Dash up to 5 tiles, then recast to return",
         carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_TELEPORT_RANGE_TILES),

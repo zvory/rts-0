@@ -9,6 +9,8 @@
 //! enemy entities on tiles they currently see.
 
 pub(crate) mod ability;
+mod ability_projection;
+pub(crate) mod ability_runtime;
 mod analysis;
 mod artillery;
 mod building_memory;
@@ -40,6 +42,7 @@ use crate::protocol::{
     ResourceDelta, ResourceNode, Snapshot, StartPayload, DEFAULT_FACTION_ID,
 };
 use crate::rules::{economy as economy_rules, projection};
+use ability_runtime::AbilityRuntime;
 use serde::{Deserialize, Serialize};
 
 use artillery::ArtilleryShellStore;
@@ -142,6 +145,8 @@ pub struct Game {
     lingering_sight: Vec<LingeringSightSource>,
     /// Neutral smoke clouds that block authoritative fog and combat LOS without being entities.
     smokes: SmokeCloudStore,
+    /// Persistent ability runtime state that is not a normal entity or one-off projectile event.
+    ability_runtime: AbilityRuntime,
     /// Delayed mortar shell impacts waiting to resolve area damage.
     mortar_shells: MortarShellStore,
     /// Delayed artillery shell impacts waiting to resolve area damage.
@@ -221,6 +226,7 @@ impl Game {
             &mut self.rng,
             &mut self.lingering_sight,
             &mut self.smokes,
+            &mut self.ability_runtime,
             &mut self.mortar_shells,
             &mut self.artillery_shells,
             &mut self.active_construction_sites,
@@ -390,6 +396,15 @@ impl Game {
         Some(id)
     }
 
+    #[allow(dead_code)]
+    #[cfg(any(test, debug_assertions))]
+    pub(in crate::game) fn spawn_ability_world_object_for_test(
+        &mut self,
+        spec: ability_runtime::AbilityWorldObjectSpec,
+    ) -> Option<u32> {
+        self.ability_runtime.spawn_world_object(spec)
+    }
+
     /// Authoritative commands applied so far, in exact application order.
     #[allow(dead_code)]
     pub fn command_log(&self) -> &[CommandLogEntry] {
@@ -440,6 +455,8 @@ impl Game {
     }
 }
 
+#[cfg(test)]
+mod ability_projection_tests;
 #[cfg(test)]
 mod phase7_privacy_tests;
 #[cfg(test)]

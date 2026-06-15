@@ -1,6 +1,6 @@
 # Phase 4 - Recast and Per-Caster State Contract
 
-Status: Not Started.
+Status: Done.
 
 ## Goal
 

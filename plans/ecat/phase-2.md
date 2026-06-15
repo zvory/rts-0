@@ -1,6 +1,6 @@
 # Phase 2 - Ability Object Projection Protocol
 
-Status: Not Started.
+Status: Done.
 
 ## Goal
 

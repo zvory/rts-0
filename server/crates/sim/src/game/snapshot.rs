@@ -103,6 +103,8 @@ impl Game {
                     active_construction_sites: Some(&self.active_construction_sites),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
+                    ability_runtime: Some(&self.ability_runtime),
+                    tick: self.tick,
                 },
             ) {
                 entities.push(view);
@@ -144,6 +146,14 @@ impl Game {
                 .collect::<Vec<_>>()
         };
         smokes.sort_by_key(|smoke| smoke.id);
+        let mut ability_objects = ability_projection::ability_object_views_for(
+            self,
+            player,
+            fog,
+            fogged,
+            include_player_resources,
+        );
+        ability_objects.sort_by_key(|object| object.id);
 
         let player_resources = if include_player_resources {
             self.players
@@ -169,6 +179,7 @@ impl Game {
             entities,
             resource_deltas,
             smokes,
+            ability_objects,
             visible_tiles: if fogged {
                 fog.visible_tiles_for(player)
             } else {
@@ -222,6 +233,8 @@ impl Game {
                             owner_faction_id: self
                                 .player(entity.owner)
                                 .map(|p| p.faction_id.as_str()),
+                            ability_runtime: Some(&self.ability_runtime),
+                            tick: self.tick,
                         },
                     )
                     .is_some()

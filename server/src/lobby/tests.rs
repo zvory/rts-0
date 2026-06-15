@@ -59,6 +59,7 @@ fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
         )],
         resource_deltas,
         smokes: Vec::new(),
+        ability_objects: Vec::new(),
         visible_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
         events: Vec::new(),
@@ -462,6 +463,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
             remaining: 1498,
         }],
         smokes: Vec::new(),
+        ability_objects: Vec::new(),
         visible_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
         events: vec![Event::Notice {
@@ -504,6 +506,7 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
         )],
         smokes: Vec::new(),
         resource_deltas: Vec::new(),
+        ability_objects: Vec::new(),
         visible_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
         events: vec![Event::Death {

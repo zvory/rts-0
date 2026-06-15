@@ -314,6 +314,18 @@ fn command_trace_label(command: &Command) -> String {
             y,
             queued
         ),
+        Command::RecastAbility {
+            units,
+            ability,
+            target_object_id,
+            queued,
+        } => format!(
+            "recast_ability units={} ability={:?} target_object_id={:?} queued={}",
+            id_list(units),
+            ability,
+            target_object_id,
+            queued
+        ),
         Command::SetAutocast {
             units,
             ability,
@@ -329,10 +341,7 @@ fn command_trace_label(command: &Command) -> String {
 }
 
 fn id_list(ids: &[u32]) -> String {
-    ids.iter()
-        .map(u32::to_string)
-        .collect::<Vec<_>>()
-        .join(",")
+    ids.iter().map(u32::to_string).collect::<Vec<_>>().join(",")
 }
 
 pub(crate) struct BuildPlacementRequest<'a, F>
@@ -1178,7 +1187,9 @@ mod tests {
             ],
             Vec::new(),
         );
-        with_steelworks.upgrades.push(UpgradeKind::AntiTankGunUnlock);
+        with_steelworks
+            .upgrades
+            .push(UpgradeKind::AntiTankGunUnlock);
         let facts = AiFacts::from_observation(&with_steelworks);
         let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_steelworks));
 

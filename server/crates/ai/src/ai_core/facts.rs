@@ -410,6 +410,7 @@ mod tests {
             ],
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
+            ability_objects: Vec::new(),
             visible_tiles: Vec::new(),
             remembered_buildings: Vec::new(),
             events: Vec::new(),

@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 
 use crate::config;
 use crate::game::ability;
+use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
 use crate::game::entity::{
     fires_while_moving, Entity, EntityKind, EntityStore, GatherPhase, Order, OrderIntent,
 };
@@ -31,6 +32,8 @@ pub struct EntityProjectionContext<'a> {
     pub active_construction_sites: Option<&'a BTreeSet<u32>>,
     pub teams: Option<&'a TeamRelations>,
     pub owner_faction_id: Option<&'a str>,
+    pub ability_runtime: Option<&'a AbilityRuntime>,
+    pub tick: u32,
 }
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
@@ -328,6 +331,10 @@ pub fn project_entity(
                 cooldown_left: *cooldown_left,
                 remaining_uses: entity.ability_uses_remaining(*kind),
                 autocast_enabled: entity.autocast_enabled(*kind),
+                active_object_id: active_return_object_id(&context, entity, *kind),
+                available_tick: return_available_tick(&context, entity, *kind),
+                lockout_until_tick: None,
+                expires_in: active_return_expires_in(&context, entity, *kind),
             })
             .collect();
         for entry in catalog
@@ -349,6 +356,10 @@ pub fn project_entity(
                     cooldown_left: 0,
                     remaining_uses: entity.ability_uses_remaining(kind),
                     autocast_enabled: entity.autocast_enabled(kind),
+                    active_object_id: active_return_object_id(&context, entity, kind),
+                    available_tick: return_available_tick(&context, entity, kind),
+                    lockout_until_tick: None,
+                    expires_in: active_return_expires_in(&context, entity, kind),
                 });
             }
         }
@@ -560,6 +571,45 @@ fn debug_path_point(x: f32, y: f32) -> Option<DebugPathPoint> {
     (x.is_finite() && y.is_finite()).then_some(DebugPathPoint { x, y })
 }
 
+fn active_return_object_id(
+    context: &EntityProjectionContext<'_>,
+    entity: &Entity,
+    ability: ability::AbilityKind,
+) -> Option<u32> {
+    context
+        .ability_runtime?
+        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
+        .map(|object| object.id.get())
+}
+
+fn return_available_tick(
+    context: &EntityProjectionContext<'_>,
+    entity: &Entity,
+    ability: ability::AbilityKind,
+) -> Option<u32> {
+    match context
+        .ability_runtime?
+        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)?
+        .payload
+    {
+        AbilityObjectPayload::DashReturn {
+            earliest_return_tick,
+        } => Some(earliest_return_tick),
+        _ => None,
+    }
+}
+
+fn active_return_expires_in(
+    context: &EntityProjectionContext<'_>,
+    entity: &Entity,
+    ability: ability::AbilityKind,
+) -> Option<u16> {
+    context
+        .ability_runtime?
+        .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
+        .and_then(|object| object.expires_in(context.tick))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -622,6 +672,8 @@ mod tests {
                 active_construction_sites,
                 teams: None,
                 owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
+                ability_runtime: None,
+                tick: 0,
             },
         )
     }

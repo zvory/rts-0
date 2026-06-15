@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   ABILITY_CODE,
+  ABILITY_OBJECT_KIND_CODE,
   EVENT_CODE,
   KIND_CODE,
   NOTICE_SEVERITY_CODE,
@@ -89,6 +90,7 @@ const rustConstants = new Map([
   ...extractModuleStringConstants("kinds"),
   ...extractModuleStringConstants("states"),
   ...extractModuleStringConstants("abilities"),
+  ...extractModuleStringConstants("ability_object_kinds"),
   ...extractModuleStringConstants("upgrades"),
 ]);
 
@@ -149,6 +151,11 @@ assertSameCodes("setup state", extractCodeFunction("setup_state_code"), SETUP_CO
 assertSameCodes("event", extractEventCodes(), EVENT_CODE);
 assertSameCodes("order stage", extractCodeFunction("order_stage_code"), ORDER_STAGE_CODE);
 assertSameCodes("ability", extractCodeFunction("ability_code"), ABILITY_CODE);
+assertSameCodes(
+  "ability object kind",
+  extractCodeFunction("ability_object_kind_code"),
+  ABILITY_OBJECT_KIND_CODE,
+);
 assertSameCodes("upgrade", extractCodeFunction("upgrade_code"), UPGRADE_CODE);
 assertSameCodes("notice severity", extractCodeFunction("notice_severity_code"), NOTICE_SEVERITY_CODE);
 
@@ -176,7 +183,7 @@ assert(
   "start/player contract must expose the canonical default faction id",
 );
 assert(
-  rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 21") && COMPACT_SNAPSHOT_VERSION === 21,
+  rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 22") && COMPACT_SNAPSHOT_VERSION === 22,
   "compact snapshot version must match Rust",
 );
 assert(
@@ -224,11 +231,18 @@ const decodedAck = decodeServerMessage({
   v: COMPACT_SNAPSHOT_VERSION,
   s: [12, 75, 0, 4, 10],
   e: [],
+  ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null]]],
   n: [1, 2, 0, 3, 4, PREDICTION_PROTOCOL_VERSION, 7, 12],
 });
 assert(decodedAck.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact predictionVersion decodes");
 assert(decodedAck.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client seq decodes");
 assert(decodedAck.netStatus.lastSimConsumedClientTick === 12, "compact consumed client tick decodes");
+assert(decodedAck.abilityObjects[0].kind === "returnMarker", "compact ability object kind decodes");
+assert(decodedAck.abilityObjects[0].sourceCasterId === 7, "compact ability source caster decodes");
+assert(
+  decodedAck.abilityObjects[0].ownerState.earliestReturnTick === 45,
+  "compact ability owner state decodes",
+);
 assert(
   rust.includes("RequestReplayBranch") && C.REQUEST_REPLAY_BRANCH === "requestReplayBranch",
   "requestReplayBranch client message tag must match Rust",

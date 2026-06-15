@@ -304,6 +304,24 @@ Snapshot ability affordances are projected from the owning player's faction cata
 future factions do not inherit Kriegsia command-card buttons merely because they reuse a global
 entity kind.
 
+Complex ability runtime state lives in `game::ability_runtime`. Its `AbilityRuntime` owns
+deterministic active instances and lightweight ability world objects that are not normal entities:
+they do not participate in supply, pathing, production, selection, scoring, or combat target
+queries unless a later phase explicitly adds such behavior. `Game::snapshot_for`,
+`snapshot_for_spectator`, and `snapshot_full_for` project active world objects through
+`Snapshot.abilityObjects`, filtered by the same current-team fog / spectator union / full-world
+mode used by other snapshot data. Enemy-visible objects expose only public render fields; owner-only
+payload state and safe caster ids are withheld from enemies.
+
+Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
+id, availability tick, and remaining lifetime are projected only for the owning player's command
+card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,
+moves Ekat, and creates a four-second return marker at the original position. `recastAbility`
+commands are explicit and validate a live owned caster plus matching active runtime state; missing
+state, same-tick/too-early return, stale caster ids, and invalid return destinations are ignored
+rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
+marker and consumes it.
+
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is

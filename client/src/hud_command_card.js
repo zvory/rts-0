@@ -279,8 +279,9 @@ export function buildUnitCard(ctx, selection) {
   for (const affordance of abilityAffordances) {
     if (!affordance.unlocked) continue;
     const definition = affordance.definition;
-    const readyCount = affordance.readyIds.length;
-    const abilityReadyIds = intentReadyIds(definition, affordance);
+    const recastActive = affordance.recastTargetObjectId != null;
+    const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
+    const abilityReadyIds = recastActive ? affordance.recastReadyIds : intentReadyIds(definition, affordance);
     const showReadyCount = readyCount < affordance.carrierIds.length;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     const slot = claimSlot(preferred);
@@ -293,8 +294,9 @@ export function buildUnitCard(ctx, selection) {
       intent: {
         type: "ability",
         ability: definition.ability,
-        targetMode: definition.targetMode,
+        targetMode: recastActive ? "recast" : definition.targetMode,
         readyIds: abilityReadyIds,
+        targetObjectId: recastActive ? affordance.recastTargetObjectId : null,
       },
       icon: definition.icon,
       label: definition.label,
@@ -481,6 +483,7 @@ export function selectedAbilityAffordances(ctx, selection) {
       const unlocked = abilityUnlocked(ctx, definition);
       const canAfford = affordable(definition.cost, resources);
       const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
+      const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
       );
@@ -502,6 +505,10 @@ export function selectedAbilityAffordances(ctx, selection) {
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
         readyUnits,
+        recastReadyIds: recastUnits.map((e) => e.id),
+        recastTargetObjectId: recastUnits.length > 0
+          ? abilityActiveObjectId(recastUnits[0], definition.ability)
+          : null,
         autocastEnabledIds,
         cooldownClocks: ctx.groupCooldownClocks(cooldowns, definition.cooldownTicks),
       };
@@ -634,6 +641,15 @@ function abilityAutocastEnabled(entity, ability) {
   return projected && typeof projected.autocastEnabled === "boolean"
     ? projected.autocastEnabled
     : false;
+}
+
+function abilityActiveObjectId(entity, ability) {
+  const projected = Array.isArray(entity.abilities)
+    ? entity.abilities.find((entry) => entry.ability === ability)
+    : null;
+  return projected && typeof projected.activeObjectId === "number"
+    ? projected.activeObjectId
+    : null;
 }
 
 function abilityUnitReady(entity, definition) {

@@ -1,6 +1,6 @@
 # Phase 1 - Server Ability Runtime Skeleton
 
-Status: Not Started.
+Status: Done.
 
 ## Goal
 

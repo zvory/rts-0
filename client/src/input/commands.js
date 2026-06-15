@@ -1,4 +1,14 @@
-import { ABILITY, cmd, PASSABLE, isUnit, isBuilding, isResource, KIND, ORDER_STAGE } from "../protocol.js";
+import {
+  ABILITY,
+  ABILITY_OBJECT_KIND,
+  cmd,
+  PASSABLE,
+  isUnit,
+  isBuilding,
+  isResource,
+  KIND,
+  ORDER_STAGE,
+} from "../protocol.js";
 import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { commandHotkeyFromEvent } from "./placement.js";
@@ -219,11 +229,55 @@ export function _refreshAbilityTargetPreview() {
       break;
     }
   }
+  const abilityObjects = Array.isArray(this.state.abilityObjects) ? this.state.abilityObjects : [];
+  const returnMarkers = abilityObjects
+    .filter((object) =>
+      object.kind === ABILITY_OBJECT_KIND.RETURN_MARKER &&
+      object.ability === target.ability &&
+      ownOwner(this.state, object.owner) &&
+      Number.isFinite(object.x) &&
+      Number.isFinite(object.y))
+    .map((object) => ({
+      id: object.id,
+      kind: object.kind,
+      x: object.x,
+      y: object.y,
+      radiusPx: 13,
+      expiresIn: object.expiresIn,
+    }));
+  const anchorOrigins = target.ability === ABILITY.EKAT_LINE_SHOT
+    ? abilityObjects
+      .filter((object) =>
+        object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR &&
+        ownOwner(this.state, object.owner) &&
+        Number.isFinite(object.x) &&
+        Number.isFinite(object.y))
+      .map((object) => ({
+        id: object.id,
+        kind: object.kind,
+        x: object.x,
+        y: object.y,
+        radiusPx: object.ownerState?.radius || 8,
+        expiresIn: object.expiresIn,
+      }))
+    : [];
+  const carrierOrigins = carriers.map((carrier) => ({
+    id: carrier.id,
+    kind: carrier.kind,
+    x: carrier.x,
+    y: carrier.y,
+    radiusPx: Math.max(5, (STATS[carrier.kind]?.size || 8) * 0.45),
+  }));
   this.state.updateAbilityTargetPreview({
     ability: target.ability,
     mouseX: world.x,
     mouseY: world.y,
     carriers,
+    rangeOrigins: carrierOrigins,
+    pathOrigins: target.ability === ABILITY.EKAT_LINE_SHOT
+      ? carrierOrigins.concat(anchorOrigins)
+      : [],
+    returnMarkers,
     rangePx,
     minRangePx,
     radiusPx: (definition.radiusTiles || 0) * tileSize,

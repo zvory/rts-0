@@ -366,6 +366,7 @@ impl Game {
             pathing,
             lingering_sight: Vec::new(),
             smokes: SmokeCloudStore::new(),
+            ability_runtime: crate::game::ability_runtime::AbilityRuntime::new(),
             mortar_shells: crate::game::mortar::MortarShellStore::default(),
             artillery_shells: crate::game::artillery::ArtilleryShellStore::default(),
             seed,
