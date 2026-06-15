@@ -138,6 +138,11 @@ export class Net {
     this._send(msg.setTeam(id, teamId));
   }
 
+  /** Select this player's own lobby faction. */
+  setFaction(factionId) {
+    this._send(msg.setFaction(factionId));
+  }
+
   /** Add a computer opponent to the room (host-only; ignored by the server otherwise). */
   addAi(teamId = undefined) {
     this._send(msg.addAi(teamId));

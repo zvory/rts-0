@@ -39,9 +39,11 @@ export class LobbyRosterView {
     countdownActive,
     playerCount,
     maxPlayers,
+    betaFactionSelect,
     onAddAi,
     onRemoveAi,
     onSetTeam,
+    onSetFaction,
   }) {
     if (!this.root) return;
     this.root.innerHTML = "";
@@ -60,9 +62,11 @@ export class LobbyRosterView {
         countdownActive,
         playerCount,
         maxPlayers,
+        betaFactionSelect,
         onAddAi,
         onRemoveAi,
         onSetTeam,
+        onSetFaction,
       }));
     }
 
@@ -81,9 +85,11 @@ export class LobbyRosterView {
     countdownActive,
     playerCount,
     maxPlayers,
+    betaFactionSelect,
     onAddAi,
     onRemoveAi,
     onSetTeam,
+    onSetFaction,
   }) {
     const section = document.createElement("section");
     section.className = "lobby-team-card team-row";
@@ -145,7 +151,9 @@ export class LobbyRosterView {
         hostId,
         isHost,
         countdownActive,
+        betaFactionSelect,
         onRemoveAi,
+        onSetFaction,
       }));
     }
     if (players.length === 0) {
@@ -159,7 +167,16 @@ export class LobbyRosterView {
     return section;
   }
 
-  _buildSeatRow({ player, myId, hostId, isHost, countdownActive, onRemoveAi }) {
+  _buildSeatRow({
+    player,
+    myId,
+    hostId,
+    isHost,
+    countdownActive,
+    betaFactionSelect,
+    onRemoveAi,
+    onSetFaction,
+  }) {
     const row = document.createElement("div");
     row.className = "player-row lobby-seat";
     if (player.id === myId) row.classList.add("is-you");
@@ -198,6 +215,14 @@ export class LobbyRosterView {
       tags.appendChild(tag("ai", "AI"));
     }
     nameLine.appendChild(tags);
+    if (betaFactionSelect) {
+      nameLine.appendChild(this._buildFactionControl({
+        player,
+        myId,
+        countdownActive,
+        onSetFaction,
+      }));
+    }
 
     const meta = document.createElement("div");
     meta.className = "lobby-seat-meta";
@@ -211,6 +236,31 @@ export class LobbyRosterView {
 
     row.append(swatch, body, controls);
     return row;
+  }
+
+  _buildFactionControl({ player, myId, countdownActive, onSetFaction }) {
+    if (player.isAi) {
+      const label = document.createElement("span");
+      label.className = "player-faction-label";
+      label.textContent = factionLabel(player.factionId);
+      return label;
+    }
+
+    const select = document.createElement("select");
+    select.className = "player-faction-select";
+    select.setAttribute("aria-label", `${player.name || "Player"} faction`);
+    for (const entry of PLAYABLE_FACTIONS) {
+      const option = document.createElement("option");
+      option.value = entry.id;
+      option.textContent = entry.label;
+      select.appendChild(option);
+    }
+    select.value = playableFactionId(player.factionId);
+    select.disabled = countdownActive || player.id !== myId || player.isSpectator;
+    select.addEventListener("change", () => {
+      if (!select.disabled) onSetFaction?.(select.value);
+    });
+    return select;
   }
 
   _buildReadyState(player, isHost, onRemoveAi) {
@@ -310,8 +360,20 @@ function tag(kind, text) {
   return el;
 }
 
+const PLAYABLE_FACTIONS = Object.freeze([
+  { id: "kriegsia", label: "Kriegsia" },
+  { id: "ekat", label: "Ekaterina" },
+]);
+
+function playableFactionId(factionId) {
+  return PLAYABLE_FACTIONS.some((entry) => entry.id === factionId) ? factionId : "kriegsia";
+}
+
+function factionLabel(factionId) {
+  const entry = PLAYABLE_FACTIONS.find((item) => item.id === factionId);
+  return entry ? entry.label : "Kriegsia";
+}
+
 function teamKicker(teamId) {
-  if (Number(teamId) === 1) return "Allied command";
-  if (Number(teamId) === 2) return "Opposing command";
   return "Command group";
 }

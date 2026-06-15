@@ -122,6 +122,8 @@ pub enum RoomEvent {
         target: u32,
         team_id: TeamId,
     },
+    /// A connected active human selected their own playable faction in the lobby.
+    SetFaction { player_id: u32, faction_id: String },
     /// The host asked to add a computer opponent (lobby phase only; honored only from the host).
     AddAi {
         player_id: u32,

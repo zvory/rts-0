@@ -1452,6 +1452,17 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::SetFaction { faction_id } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetFaction {
+                    player_id,
+                    faction_id,
+                },
+            )
+            .await;
+        }
         ClientMessage::AddAi { team_id } => {
             send_room_event(
                 player_id,

@@ -682,16 +682,30 @@ input[type="text"]:focus {
 
 .player-ready,
 .player-remove,
-.player-team-label {
+.player-team-label,
+.player-faction-label,
+.player-faction-select {
   min-width: 84px;
   padding: 8px 10px;
   border: 1px solid rgba(124, 164, 90, 0.52);
   border-radius: var(--radius);
+  background: rgba(17, 17, 15, 0.9);
   color: var(--good);
   text-align: center;
   font-family: var(--mono);
   font-size: 12px;
   text-transform: uppercase;
+}
+
+.player-faction-select {
+  min-width: 126px;
+  color: var(--ink);
+  text-align: left;
+}
+
+.player-faction-select:disabled {
+  color: var(--ink-dim);
+  opacity: 0.72;
 }
 
 .player-ready.waiting {
