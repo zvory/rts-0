@@ -1,5 +1,6 @@
 # Rust
 /server/target
+/server/crates/*/target
 **/*.rs.bk
 Cargo.lock.orig
 
