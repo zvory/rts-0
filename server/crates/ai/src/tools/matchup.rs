@@ -310,10 +310,10 @@ fn print_profiles() {
     }
     println!();
     println!("aliases:");
-    println!("  ai -> ai_1_0_tech");
+    println!("  ai -> ai_1_1_tank_mg");
     println!("  ai1 -> ai_1_0_tech");
     println!("  ai_1_0 -> ai_1_0_tech");
-    println!("  default -> ai_1_0_tech");
+    println!("  default -> ai_1_1_tank_mg");
     println!("  ai_1_1 -> ai_1_1_tank_mg");
     println!("  ai11 -> ai_1_1_tank_mg");
 }

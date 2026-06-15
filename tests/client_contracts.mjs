@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import { Net } from "../client/src/net.js";
 import {
+  DEFAULT_AI_PROFILE_ID,
   MAX_LOBBY_TEAMS,
   PLAYABLE_FACTIONS,
   betaFactionSelectEnabledForLocation,
@@ -2859,7 +2860,12 @@ function fakeAudioContext() {
   assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
+  assert(DEFAULT_AI_PROFILE_ID === "ai_1_1_tank_mg", "lobby defaults to the highest AI profile version");
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
+  assert(
+    msg.addAi(2, DEFAULT_AI_PROFILE_ID).aiProfileId === DEFAULT_AI_PROFILE_ID,
+    "addAi builder can include default aiProfileId",
+  );
   assert(msg.requestReplayBranch().t === "requestReplayBranch", "replay branch builder tag");
   assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");
   assert(msg.releaseBranchSeat(7).t === "releaseBranchSeat", "branch seat release builder tag");

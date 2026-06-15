@@ -22,6 +22,7 @@ import {
   uniqueRoom,
 } from "./team_harness.mjs";
 import { DEFAULT_FACTION_ID } from "../client/src/protocol.js";
+import { DEFAULT_AI_PROFILE_ID } from "../client/src/lobby.js";
 
 const ROOM = uniqueRoom("ai-itest");
 const assertions = createAssertions();
@@ -43,6 +44,7 @@ const { ok } = assertions;
   ok(ai && ai.ready === true, "AI is always ready");
   ok(ai && ai.id !== A.playerId, "AI got its own player id");
   ok(ai && ai.factionId === DEFAULT_FACTION_ID, `AI defaults to ${DEFAULT_FACTION_ID}`);
+  ok(ai && ai.aiProfileId === DEFAULT_AI_PROFILE_ID, `AI defaults to ${DEFAULT_AI_PROFILE_ID}`);
 
   // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
   // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.

@@ -9,6 +9,7 @@
 
 import { S } from "./protocol.js";
 import {
+  DEFAULT_AI_PROFILE_ID,
   MAX_LOBBY_TEAMS,
   LobbyRosterView,
   PLAYABLE_FACTIONS,
@@ -22,6 +23,7 @@ const NAME_STORAGE_KEY = "rts.playerName";
 const MAX_PLAYERS = 4;
 
 export { MAX_LOBBY_TEAMS, PLAYABLE_FACTIONS, shouldAcceptSpectatorDrop, teamSlotsForLobby };
+export { DEFAULT_AI_PROFILE_ID };
 
 export function betaFactionSelectEnabledForLocation(locationLike) {
   const host = String(locationLike?.hostname || "").toLowerCase();
@@ -178,7 +180,7 @@ export class Lobby {
     if (this.btnAddAi) {
       this.btnAddAi.addEventListener("click", () => {
         if (this.btnAddAi.disabled) return;
-        this.net.addAi();
+        this.net.addAi(undefined, DEFAULT_AI_PROFILE_ID);
       });
     }
 
@@ -287,7 +289,7 @@ export class Lobby {
       playerCount: this._playerCount,
       maxPlayers: MAX_PLAYERS,
       betaFactionSelect: this._betaFactionSelectEnabled(),
-      onAddAi: (teamId) => this.net.addAi(teamId),
+      onAddAi: (teamId) => this.net.addAi(teamId, DEFAULT_AI_PROFILE_ID),
       onRemoveAi: (id) => this.net.removeAi(id),
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
       onSetSpectator: (id, spectator) => this.net.setSpectator(spectator, id),
