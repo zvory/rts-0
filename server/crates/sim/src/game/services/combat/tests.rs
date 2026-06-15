@@ -1601,7 +1601,7 @@ fn anti_tank_gun_turns_slowly_before_firing() {
 }
 
 #[test]
-fn mortar_turns_before_auto_firing() {
+fn mortar_snaps_and_auto_fires_immediately() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
@@ -1620,38 +1620,14 @@ fn mortar_turns_before_auto_firing() {
 
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
-        mortar.facing().abs() <= config::MORTAR_TURN_RATE_RAD_PER_TICK + 0.001,
-        "mortar should only slew by its turn-rate cap, got {:.4}",
-        mortar.facing()
-    );
-    assert_eq!(
-        mortar.attack_cd(),
-        0,
-        "mortar should not fire until its tube is within tolerance"
-    );
-
-    for _ in 0..20 {
-        run_combat_tick(&mut entities);
-        if entities
-            .get(mortar_id)
-            .expect("mortar should exist")
-            .attack_cd()
-            > 0
-        {
-            break;
-        }
-    }
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert!(
         angle_delta(mortar.facing(), -std::f32::consts::FRAC_PI_2).abs()
             <= config::MORTAR_FIRE_TOLERANCE_RAD + 0.001,
-        "mortar should face the target before firing, got {:.4}",
+        "mortar should snap to face the target before firing, got {:.4}",
         mortar.facing()
     );
     assert!(
         mortar.attack_cd() > 0,
-        "mortar should eventually fire after rotating into tolerance"
+        "mortar should fire on the first combat tick once it has a valid autocast target"
     );
 }
 

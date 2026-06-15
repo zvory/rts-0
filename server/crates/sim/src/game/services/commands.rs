@@ -3704,9 +3704,12 @@ mod tests {
 
         let mortar_entity = entities.get(mortar).expect("mortar should remain alive");
         assert!(
-            matches!(mortar_entity.order(), Order::Ability(order)
-                if order.intent.ability == AbilityKind::MortarFire),
-            "manual Mortar Fire should replace the active move with an ability order"
+            !matches!(mortar_entity.order(), Order::Move(_)),
+            "manual Mortar Fire should replace the active move immediately"
+        );
+        assert!(
+            mortar_entity.ability_cooldown_ticks(AbilityKind::MortarFire) > 0,
+            "manual Mortar Fire should launch immediately and start cooldown"
         );
         assert!(
             mortar_entity.path_is_empty(),

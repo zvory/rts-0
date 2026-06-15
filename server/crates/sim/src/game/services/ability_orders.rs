@@ -182,6 +182,7 @@ pub(crate) fn launch_world_ability(
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
             if !preserve_active_order {
                 e.clear_active_order();
+                e.set_path_goal(None);
             }
             mortar_shells.schedule(
                 events, fog, teams, player, caster, from_x, from_y, x, y, tick, false,
@@ -534,19 +535,19 @@ fn caster_base_ready(e: &crate::game::entity::Entity, player: u32, ability: Abil
         && e.ability_cooldown_ticks(ability) == 0
 }
 
-fn ability_order_ready(kind: EntityKind, setup: WeaponSetup, ability: AbilityKind) -> bool {
+fn ability_order_ready(kind: EntityKind, _setup: WeaponSetup, ability: AbilityKind) -> bool {
     ability != AbilityKind::MortarFire
-        || (kind == EntityKind::MortarTeam && setup == WeaponSetup::Deployed)
+        || kind == EntityKind::MortarTeam
 }
 
 fn ability_launch_ready(
     kind: EntityKind,
-    setup: WeaponSetup,
-    path_empty: bool,
+    _setup: WeaponSetup,
+    _path_empty: bool,
     ability: AbilityKind,
 ) -> bool {
     ability != AbilityKind::MortarFire
-        || (kind == EntityKind::MortarTeam && path_empty && setup == WeaponSetup::Deployed)
+        || kind == EntityKind::MortarTeam
 }
 
 pub(crate) fn world_ability_facing_ready(

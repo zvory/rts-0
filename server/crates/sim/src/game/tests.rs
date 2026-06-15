@@ -2384,7 +2384,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
 }
 
 #[test]
-fn manual_mortar_fire_waits_for_tube_alignment() {
+fn manual_mortar_fire_launches_immediately_after_snapping_to_target() {
     let players = [
         PlayerInit {
             id: 1,
@@ -2437,27 +2437,16 @@ fn manual_mortar_fire_waits_for_tube_alignment() {
 
     game.tick();
     let mortar_entity = game.entities.get(mortar).expect("mortar should exist");
-    assert_eq!(
-        mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire),
-        0,
-        "manual mortar fire should not launch while the tube is still turning"
+    assert!(
+        mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire) > 0,
+        "manual mortar fire should launch on the first tick"
     );
     assert!(
-        mortar_entity.facing().abs() <= config::MORTAR_TURN_RATE_RAD_PER_TICK + 0.001,
-        "mortar should begin turning toward the manual target, got {:.4}",
+        (mortar_entity.facing() + std::f32::consts::FRAC_PI_2).abs()
+            <= config::MORTAR_FIRE_TOLERANCE_RAD + 0.001,
+        "mortar should snap toward the manual target, got {:.4}",
         mortar_entity.facing()
     );
-
-    let mut launched = false;
-    for _ in 0..20 {
-        game.tick();
-        let mortar_entity = game.entities.get(mortar).expect("mortar should exist");
-        if mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire) > 0 {
-            launched = true;
-            break;
-        }
-    }
-    assert!(launched, "manual mortar fire should launch once aligned");
     let hp_before_impact = game
         .entities
         .get(target)

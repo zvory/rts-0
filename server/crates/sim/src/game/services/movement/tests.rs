@@ -4772,7 +4772,7 @@ fn anti_tank_gun_facing_turns_gradually_along_path() {
 }
 
 #[test]
-fn mortar_team_facing_turns_gradually_along_path() {
+fn mortar_team_facing_snaps_along_path() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
@@ -4791,8 +4791,8 @@ fn mortar_team_facing_turns_gradually_along_path() {
 
     let facing = entities.get(mortar).expect("mortar should exist").facing();
     assert!(
-        facing > 0.0 && facing <= ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
-        "mortar should turn by at most the support-weapon turn-rate constant, got {facing:.4}"
+        (facing - std::f32::consts::FRAC_PI_2).abs() <= 0.0001,
+        "mortar should snap to its movement direction, got {facing:.4}"
     );
 }
 

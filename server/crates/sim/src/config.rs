@@ -14,5 +14,4 @@ pub use rts_rules::balance::{
     TANK_UNLOCK_COST_OIL, TANK_UNLOCK_COST_STEEL, TANK_UNLOCK_RESEARCH_TICKS,
 };
 
-pub const MORTAR_TURN_RATE_RAD_PER_TICK: f32 = 0.035 * 3.0;
 pub const MORTAR_FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
