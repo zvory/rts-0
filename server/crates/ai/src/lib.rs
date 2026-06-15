@@ -13,7 +13,10 @@ mod config {
 }
 mod live;
 
-pub use live::{random_live_profile_id, AiController, AiThinkContext, DEFAULT_LIVE_PROFILE_ID};
+pub use live::{
+    canonical_live_profile_id, random_live_profile_id, AiController, AiThinkContext,
+    DEFAULT_LIVE_PROFILE_ID, LIVE_PROFILE_IDS,
+};
 
 #[cfg(test)]
 const FULL_AI_TESTS_ENV: &str = "RTS_FULL_AI_TESTS";

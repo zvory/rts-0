@@ -289,6 +289,7 @@ export class Lobby {
       onRemoveAi: (id) => this.net.removeAi(id),
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
       onSetFaction: (factionId) => this.net.setFaction(factionId),
+      onSetAiProfile: (id, aiProfileId) => this.net.setAiProfile(id, aiProfileId),
     });
   }
 

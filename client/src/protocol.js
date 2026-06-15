@@ -28,6 +28,7 @@ export const C = Object.freeze({
   SET_TEAM: "setTeam",
   SET_FACTION: "setFaction",
   ADD_AI: "addAi",
+  SET_AI_PROFILE: "setAiProfile",
   REMOVE_AI: "removeAi",
   SET_QUICKSTART: "setQuickstart",
   SET_SPECTATOR: "setSpectator",
@@ -824,11 +825,13 @@ export const msg = Object.freeze({
   setTeamPreset: (preset) => ({ t: C.SET_TEAM_PRESET, preset }),
   setTeam: (id, teamId) => ({ t: C.SET_TEAM, id, teamId }),
   setFaction: (factionId) => ({ t: C.SET_FACTION, factionId }),
-  addAi: (teamId = undefined) => {
+  addAi: (teamId = undefined, aiProfileId = undefined) => {
     const payload = { t: C.ADD_AI };
     if (teamId != null) payload.teamId = teamId;
+    if (aiProfileId != null) payload.aiProfileId = aiProfileId;
     return payload;
   },
+  setAiProfile: (id, aiProfileId) => ({ t: C.SET_AI_PROFILE, id, aiProfileId }),
   removeAi: (id) => ({ t: C.REMOVE_AI, id }),
   setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
   setSpectator: (spectator) => ({ t: C.SET_SPECTATOR, spectator: !!spectator }),

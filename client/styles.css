@@ -852,7 +852,8 @@ input[type="text"]:focus {
 .player-remove,
 .player-team-label,
 .player-faction-label,
-.player-faction-select {
+.player-faction-select,
+.player-ai-profile-select {
   min-width: 84px;
   padding: 8px 10px;
   border: 1px solid rgba(124, 164, 90, 0.52);
@@ -865,13 +866,15 @@ input[type="text"]:focus {
   text-transform: uppercase;
 }
 
-.player-faction-select {
+.player-faction-select,
+.player-ai-profile-select {
   min-width: 126px;
   color: var(--ink);
   text-align: left;
 }
 
-.player-faction-select:disabled {
+.player-faction-select:disabled,
+.player-ai-profile-select:disabled {
   color: var(--ink-dim);
   opacity: 0.72;
 }

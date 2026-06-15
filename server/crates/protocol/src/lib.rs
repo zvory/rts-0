@@ -130,6 +130,15 @@ pub enum ClientMessage {
         #[serde(rename = "teamId")]
         #[serde(default)]
         team_id: Option<TeamId>,
+        #[serde(rename = "aiProfileId")]
+        #[serde(default)]
+        ai_profile_id: Option<String>,
+    },
+    /// Host selects the live AI profile for one AI lobby seat.
+    SetAiProfile {
+        id: u32,
+        #[serde(rename = "aiProfileId")]
+        ai_profile_id: String,
     },
     /// Host removes a previously-added AI opponent by its player id (lobby phase only).
     RemoveAi { id: u32 },
@@ -509,6 +518,9 @@ pub struct LobbyPlayer {
     /// True for computer opponents (no socket). The client uses this to label the row and show a
     /// host-only "remove" control instead of a ready indicator.
     pub is_ai: bool,
+    /// Live AI profile id for computer opponents. Omitted for human players and spectators.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_profile_id: Option<String>,
     /// True for human observers. Spectators do not count toward match starts or win conditions.
     pub is_spectator: bool,
 }

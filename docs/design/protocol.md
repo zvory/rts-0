@@ -26,7 +26,8 @@ crate.
 | `setTeamPreset` | `preset: string` | Deprecated compatibility command. The server ignores it; lobby teams are host-managed slots. |
 | `setTeam` | `id: u32`, `teamId: u32` | Host assigns an active human or AI lobby seat to team `1..=4` (lobby phase only, host-only). Unknown ids, spectators, team id `0`, and team ids outside the supported range are ignored. |
 | `setFaction` | `factionId: string` | Active human players select their own playable lobby faction (lobby phase only). Unknown ids, fixture ids, spectators, countdown, and in-game requests are ignored. The normal client only exposes this during the beta UI rollout. |
-| `addAi`    | `teamId?: u32` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. |
+| `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. `aiProfileId` may be one of the supported live AI profiles; omitted or unknown values default to AI 1.0. |
+| `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects the live AI profile for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile ids are ignored. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setQuickstart` | `enabled: bool` | Host toggles "Debug mode" for the next match in this room. |
 | `setSpectator` | `spectator: bool` | Switch between active player and spectator role while still in the lobby. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
@@ -148,10 +149,12 @@ authority.
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
 
-`LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, isSpectator: bool }`. `isAi` is
-true for computer opponents (always shown ready; the client renders an "AI" tag and a host-only
-remove control instead of a ready toggle). `isSpectator` is true for human observers; they do not
-consume active map starts, block readiness, or count toward win/loss.
+`LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
+true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
+profile selector, and a host-only remove control instead of a ready toggle). `aiProfileId` is
+present only for computer opponents and identifies the live AI profile that seat will use when the
+match starts. `isSpectator` is true for human observers; they do not consume active map starts,
+block readiness, or count toward win/loss.
 
 `teamId` is nonzero for active match players and AI seats. New active players and default-added AI
 opponents are assigned to the first empty team in `1..=4`; the host may move active human or AI
