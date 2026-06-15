@@ -255,9 +255,9 @@ for raw_phase in "${PHASES[@]}"; do
 
   branch="zvorygin/$PLAN_NAME-$phase_id"
   worktree_path="$WORKTREE_ROOT/$PLAN_NAME-$phase_id"
-  handoff_dir="$worktree_path/plans/$PLAN_NAME/handoffs"
-  handoff_file="$handoff_dir/$phase_id.json"
   log_dir="$WORKTREE_ROOT/phase-runner-logs/$PLAN_NAME"
+  handoff_dir="$log_dir/handoffs"
+  handoff_file="$handoff_dir/$phase_id.json"
   codex_log="$log_dir/$phase_id.codex.log"
   timing_file="$log_dir/$phase_id.timing.json"
 
