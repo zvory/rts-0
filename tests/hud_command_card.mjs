@@ -227,6 +227,33 @@ function buttonSlots(card) {
 }
 
 {
+  const ekat = {
+    id: 42,
+    owner: 1,
+    kind: KIND.EKAT,
+    abilities: [{
+      ability: ABILITY.EKAT_MAGIC_ANCHOR,
+      cooldownLeft: 0,
+      lockoutUntilTick: 1900,
+    }],
+  };
+  const card = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: EKAT_FACTION_ID,
+    selection: [ekat],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const anchor = card.slots.find((slot) =>
+    slot?.commandId === ekatCommandId("ability", ABILITY.EKAT_MAGIC_ANCHOR),
+  );
+  assert.equal(anchor.enabled, false);
+  assert.equal(anchor.title, "On cooldown");
+}
+
+{
   const catalog = buildCommandCardContextCatalog();
   assert.deepEqual(catalog.map((entry) => entry.id), [
     "empty",

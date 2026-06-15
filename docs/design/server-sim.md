@@ -263,13 +263,14 @@ adding only the effect-specific code that the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
 effect shapes that actually exist today: self status (`charge` legacy compatibility), owned area
-status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), and the intentionally
-one-off artillery point-fire path. The hook receives the owning player's faction id at execution
-time through the normal command/order helpers, so wrong-faction ability use fails before effects,
-resource spending, cooldowns, or events are applied. The hook is deliberately not a generic script
-engine. Phase 11 signature abilities should first use one of the existing shapes; if they cannot,
-add either a narrow explicit hook or a named one-off path with faction validation, cost validation,
-and fog-safe event tests rather than widening the hook into generic scripting.
+status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), dash return, line
+projectile, Magic Anchor placement, and the intentionally one-off artillery point-fire path. The
+hook receives the owning player's faction id at execution time through the normal command/order
+helpers, so wrong-faction ability use fails before effects, resource spending, cooldowns, or events
+are applied. The hook is deliberately not a generic script engine. Phase 11 signature abilities
+should first use one of the existing shapes; if they cannot, add either a narrow explicit hook or a
+named one-off path with faction validation, cost validation, and fog-safe event tests rather than
+widening the hook into generic scripting.
 
 `services::ability_orders` owns the tick-path execution helpers:
 - `order_or_launch_world_ability` — for `WorldPoint` abilities: if the caster is in range, launch
@@ -321,6 +322,20 @@ commands are explicit and validate a live owned caster plus matching active runt
 state, same-tick/too-early return, stale caster ids, and invalid return destinations are ignored
 rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
 marker and consumes it.
+
+Ekat's `ekatLineShot` world-point activation clamps the endpoint to ability range, spawns an
+ability-runtime line projectile at Ekat's current position, and starts cooldown when the projectile
+is accepted. The projectile travels outbound to the clamped endpoint, then returns toward Ekat's
+current server position each tick, so moving or dashing after firing can bend the return path.
+Enemies intersecting the swept line are damaged once per leg; stale or dead casters remove the
+projectile without resolving further hits.
+
+Ekat's `ekatMagicAnchor` world-point activation places one replacement-style, non-blocking runtime
+object at the target point. It naturally expires after 10 seconds without lockout, can be damaged by
+enemy combat when visible and in line of sight, and applies the 60-second owner-only placement
+lockout only when destroyed by enemies. If an active anchor exists when `ekatLineShot` is accepted,
+the runtime spawns one projectile from Ekat and one from the anchor toward the same cursor point;
+both return toward Ekat's current server position.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource

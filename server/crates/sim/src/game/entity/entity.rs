@@ -48,6 +48,7 @@ pub struct Entity {
     pub worker: Option<WorkerState>,
     pub resource_node: Option<ResourceNodeState>,
     pub ability_cooldowns: BTreeMap<AbilityKind, u16>,
+    pub ability_lockouts_until_tick: BTreeMap<AbilityKind, u32>,
     pub ability_uses_remaining: BTreeMap<AbilityKind, u16>,
 }
 
@@ -76,6 +77,7 @@ impl Entity {
             worker: (kind == EntityKind::Worker).then(WorkerState::default),
             resource_node: None,
             ability_cooldowns: BTreeMap::new(),
+            ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: initial_ability_uses(kind),
         })
     }
@@ -119,6 +121,7 @@ impl Entity {
             worker: None,
             resource_node: None,
             ability_cooldowns: BTreeMap::new(),
+            ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
         })
     }
@@ -149,6 +152,7 @@ impl Entity {
                 miner: None,
             }),
             ability_cooldowns: BTreeMap::new(),
+            ability_lockouts_until_tick: BTreeMap::new(),
             ability_uses_remaining: BTreeMap::new(),
         })
     }
@@ -494,6 +498,13 @@ impl Entity {
         self.ability_cooldowns.get(&ability).copied().unwrap_or(0)
     }
 
+    pub fn ability_lockout_until_tick(&self, ability: AbilityKind, tick: u32) -> Option<u32> {
+        self.ability_lockouts_until_tick
+            .get(&ability)
+            .copied()
+            .filter(|until| *until > tick)
+    }
+
     pub fn autocast_enabled(&self, ability: AbilityKind) -> Option<bool> {
         match (self.kind, ability) {
             (EntityKind::MortarTeam, AbilityKind::MortarFire) => Some(
@@ -550,6 +561,10 @@ impl Entity {
         } else {
             self.ability_cooldowns.insert(ability, ticks);
         }
+    }
+
+    pub fn start_ability_lockout_until(&mut self, ability: AbilityKind, until_tick: u32) {
+        self.ability_lockouts_until_tick.insert(ability, until_tick);
     }
 
     pub fn tick_ability_cooldowns(&mut self) {

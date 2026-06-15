@@ -176,6 +176,7 @@ export const ABILITY = Object.freeze({
   BREAKTHROUGH: "breakthrough",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
+  EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
 });
 
 export const REPLAY_VISION = Object.freeze({
@@ -273,6 +274,7 @@ export const ORDER_STAGE = Object.freeze({
   BREAKTHROUGH: "breakthrough",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
+  EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
 
@@ -290,6 +292,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.BREAKTHROUGH]: 11,
   [ORDER_STAGE.EKAT_TELEPORT]: 12,
   [ORDER_STAGE.EKAT_LINE_SHOT]: 13,
+  [ORDER_STAGE.EKAT_MAGIC_ANCHOR]: 14,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -300,6 +303,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.BREAKTHROUGH]: 5,
   [ABILITY.EKAT_TELEPORT]: 6,
   [ABILITY.EKAT_LINE_SHOT]: 7,
+  [ABILITY.EKAT_MAGIC_ANCHOR]: 8,
 });
 
 export const ABILITY_OBJECT_KIND_CODE = Object.freeze({

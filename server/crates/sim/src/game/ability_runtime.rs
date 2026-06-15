@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
 use crate::game::ability::AbilityKind;
+use crate::game::ability_projectile::{AbilityProjectile, AbilityProjectileSpec};
 use crate::game::entity::EntityStore;
+use crate::game::services::spatial::SpatialIndex;
+use crate::game::teams::TeamRelations;
 
 pub(in crate::game) const MAX_ACTIVE_ABILITY_OBJECTS: usize = 512;
 
@@ -111,16 +114,13 @@ pub(in crate::game) struct AbilityWorldObjectStore {
 
 impl AbilityWorldObjectStore {
     fn new() -> Self {
-        AbilityWorldObjectStore {
+        Self {
             objects: Vec::new(),
         }
     }
 
-    fn can_insert(&self, x: f32, y: f32) -> bool {
-        if !x.is_finite() || !y.is_finite() {
-            return false;
-        }
-        if self.objects.len() >= MAX_ACTIVE_ABILITY_OBJECTS {
+    pub(super) fn can_insert(&self, x: f32, y: f32) -> bool {
+        if !x.is_finite() || !y.is_finite() || self.objects.len() >= MAX_ACTIVE_ABILITY_OBJECTS {
             return false;
         }
         true
@@ -143,7 +143,11 @@ impl AbilityWorldObjectStore {
         self.objects.iter().find(|object| object.id.get() == id)
     }
 
-    fn remove(&mut self, id: u32) -> Option<AbilityWorldObject> {
+    pub(super) fn get_mut(&mut self, id: u32) -> Option<&mut AbilityWorldObject> {
+        self.objects.iter_mut().find(|object| object.id.get() == id)
+    }
+
+    pub(super) fn remove(&mut self, id: u32) -> Option<AbilityWorldObject> {
         let index = self
             .objects
             .iter()
@@ -159,6 +163,15 @@ impl AbilityWorldObjectStore {
                 && object.kind == AbilityWorldObjectKind::ReturnMarker)
         });
     }
+
+    fn remove_active_anchors(&mut self, owner: u32, caster_id: u32, ability: AbilityKind) {
+        self.objects.retain(|object| {
+            !(object.owner == owner
+                && object.caster_id == caster_id
+                && object.ability == ability
+                && object.kind == AbilityWorldObjectKind::MagicAnchor)
+        });
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -166,6 +179,7 @@ pub(crate) struct AbilityRuntime {
     next_id: u32,
     instances: Vec<ActiveAbilityInstance>,
     world_objects: AbilityWorldObjectStore,
+    projectiles: Vec<AbilityProjectile>,
 }
 
 impl Default for AbilityRuntime {
@@ -180,6 +194,7 @@ impl AbilityRuntime {
             next_id: 1,
             instances: Vec::new(),
             world_objects: AbilityWorldObjectStore::new(),
+            projectiles: Vec::new(),
         }
     }
 
@@ -226,6 +241,17 @@ impl AbilityRuntime {
             payload: spec.payload,
         });
         id.get()
+    }
+
+    pub(in crate::game) fn spawn_projectile(&mut self, spec: AbilityProjectileSpec) -> Option<u32> {
+        if !AbilityProjectile::can_spawn(&self.projectiles, &self.world_objects, &spec) {
+            return None;
+        }
+        let id = self.allocate_id();
+        let projectile = AbilityProjectile::new(id, spec);
+        self.world_objects.insert(projectile.visual_object());
+        self.projectiles.push(projectile);
+        Some(id.get())
     }
 
     pub(in crate::game) fn tick(&mut self, entities: &EntityStore, tick: u32) {
@@ -307,6 +333,142 @@ impl AbilityRuntime {
             })
             .map(|object| object.id.get())
     }
+
+    pub(crate) fn clear_active_anchors(
+        &mut self,
+        owner: u32,
+        caster_id: u32,
+        ability: AbilityKind,
+    ) {
+        self.world_objects
+            .remove_active_anchors(owner, caster_id, ability);
+    }
+
+    pub(in crate::game) fn projectiles(&self) -> impl Iterator<Item = &AbilityProjectile> {
+        self.projectiles.iter()
+    }
+
+    pub(crate) fn active_anchor(
+        &self,
+        owner: u32,
+        caster_id: u32,
+        ability: AbilityKind,
+        tick: u32,
+    ) -> Option<&AbilityWorldObject> {
+        self.world_objects().find(|object| {
+            object.owner == owner
+                && object.caster_id == caster_id
+                && object.ability == ability
+                && object.kind == AbilityWorldObjectKind::MagicAnchor
+                && object.active_at(tick)
+        })
+    }
+
+    pub(in crate::game) fn first_enemy_anchor_in_range(
+        &self,
+        attacker_owner: u32,
+        teams: &TeamRelations,
+        x: f32,
+        y: f32,
+        range_px: f32,
+        tick: u32,
+    ) -> Option<AbilityWorldObject> {
+        self.world_objects()
+            .filter(|object| {
+                object.kind == AbilityWorldObjectKind::MagicAnchor
+                    && object.active_at(tick)
+                    && teams.is_enemy_owner(attacker_owner, object.owner)
+                    && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
+            })
+            .filter(|object| {
+                let AbilityObjectPayload::MagicAnchor { radius, .. } = object.payload else {
+                    return false;
+                };
+                let dx = object.x - x;
+                let dy = object.y - y;
+                let effective_range = range_px + radius;
+                dx * dx + dy * dy <= effective_range * effective_range
+            })
+            .min_by(|a, b| {
+                let da = {
+                    let dx = a.x - x;
+                    let dy = a.y - y;
+                    dx * dx + dy * dy
+                };
+                let db = {
+                    let dx = b.x - x;
+                    let dy = b.y - y;
+                    dx * dx + dy * dy
+                };
+                da.partial_cmp(&db)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.id.get().cmp(&b.id.get()))
+            })
+            .copied()
+    }
+
+    pub(in crate::game) fn damage_anchor(
+        &mut self,
+        id: u32,
+        damage: u32,
+    ) -> Option<DestroyedAbilityAnchor> {
+        let object = self.world_objects.get_mut(id)?;
+        let AbilityObjectPayload::MagicAnchor {
+            hp,
+            radius,
+            destroyed_lockout_ticks,
+        } = object.payload
+        else {
+            return None;
+        };
+        if damage < hp as u32 {
+            object.payload = AbilityObjectPayload::MagicAnchor {
+                hp: hp.saturating_sub(damage as u16),
+                radius,
+                destroyed_lockout_ticks,
+            };
+            return None;
+        }
+        let removed = self.world_objects.remove(id)?;
+        Some(DestroyedAbilityAnchor {
+            owner: removed.owner,
+            caster_id: removed.caster_id,
+            ability: removed.ability,
+            x: removed.x,
+            y: removed.y,
+            destroyed_lockout_ticks,
+        })
+    }
+
+    pub(in crate::game) fn tick_projectiles(
+        &mut self,
+        entities: &mut EntityStore,
+        teams: &TeamRelations,
+        spatial: &SpatialIndex,
+        tick: u32,
+    ) {
+        let mut active = Vec::with_capacity(self.projectiles.len());
+        for mut projectile in std::mem::take(&mut self.projectiles) {
+            let keep = projectile.advance(entities, teams, spatial, tick);
+            if keep {
+                projectile.sync_visual_object(&mut self.world_objects);
+                active.push(projectile);
+            } else {
+                self.world_objects.remove(projectile.id.get());
+            }
+        }
+        self.projectiles = active;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(in crate::game) struct DestroyedAbilityAnchor {
+    pub(in crate::game) owner: u32,
+    pub(in crate::game) caster_id: u32,
+    pub(in crate::game) ability: AbilityKind,
+    pub(in crate::game) x: f32,
+    pub(in crate::game) y: f32,
+    pub(in crate::game) destroyed_lockout_ticks: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

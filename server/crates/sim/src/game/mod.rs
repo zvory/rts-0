@@ -9,6 +9,7 @@
 //! enemy entities on tiles they currently see.
 
 pub(crate) mod ability;
+pub(crate) mod ability_projectile;
 mod ability_projection;
 pub(crate) mod ability_runtime;
 mod analysis;

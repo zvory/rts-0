@@ -177,7 +177,8 @@ authoritative `rules::defs` records.
   autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
-  world effect, dash return, immediate line damage, and the one-off artillery point-fire path.
+  world effect, dash return, line projectile, Magic Anchor placement, and the one-off artillery
+  point-fire path.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
   controllable combat units. Ekat has 300 HP, 1 HP/s regeneration while alive, 2.0 px/tick
@@ -185,8 +186,12 @@ authoritative `rules::defs` records.
   Dash ability targets up to 5 tiles, has no resource cost, has an 8s cooldown, requires a
   statically standable landing point, and leaves a four-second return marker that can be recast
   after one tick if the marker destination remains standable. Her Line Shot ability targets up to
-  6 tiles, has no resource cost, has a 10s cooldown, and deals 40 damage to enemy targetable
-  entities intersecting a 0.6-tile-wide line.
+  6 tiles, has no resource cost, has a 10s cooldown, and launches an 8 px/tick out-and-back
+  projectile that deals 40 damage to enemy targetable entities intersecting each 0.6-tile-wide
+  swept leg once per leg; if her Magic Anchor is active, the same activation also launches a second
+  projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 5 tiles, has
+  no resource cost, places one replacement-style non-blocking 100 HP anchor for 10 seconds, and
+  applies a 60-second placement lockout only if enemies destroy the anchor before natural expiry.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles

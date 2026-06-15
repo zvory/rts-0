@@ -14,6 +14,7 @@ pub enum AbilityKind {
     Breakthrough,
     EkatTeleport,
     EkatLineShot,
+    EkatMagicAnchor,
 }
 
 impl AbilityKind {
@@ -26,6 +27,7 @@ impl AbilityKind {
             AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
             AbilityKind::EkatTeleport => protocol::abilities::EKAT_TELEPORT,
             AbilityKind::EkatLineShot => protocol::abilities::EKAT_LINE_SHOT,
+            AbilityKind::EkatMagicAnchor => protocol::abilities::EKAT_MAGIC_ANCHOR,
         }
     }
 }
@@ -42,6 +44,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
             protocol::abilities::EKAT_TELEPORT => Ok(AbilityKind::EkatTeleport),
             protocol::abilities::EKAT_LINE_SHOT => Ok(AbilityKind::EkatLineShot),
+            protocol::abilities::EKAT_MAGIC_ANCHOR => Ok(AbilityKind::EkatMagicAnchor),
             _ => Err(()),
         }
     }
@@ -59,8 +62,9 @@ pub enum AbilityEffectHook {
     OwnedAreaStatus,
     DelayedWorld,
     ArtilleryPointFire,
-    Teleport,
-    LineDamage,
+    DashReturn,
+    LineProjectile,
+    MagicAnchor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,8 +117,9 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
-        AbilityKind::EkatTeleport => AbilityEffectHook::Teleport,
-        AbilityKind::EkatLineShot => AbilityEffectHook::LineDamage,
+        AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
+        AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
+        AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
     }
 }
 
@@ -146,11 +151,15 @@ mod tests {
         );
         assert_eq!(
             definition(AbilityKind::EkatTeleport).effect_hook,
-            AbilityEffectHook::Teleport
+            AbilityEffectHook::DashReturn
         );
         assert_eq!(
             definition(AbilityKind::EkatLineShot).effect_hook,
-            AbilityEffectHook::LineDamage
+            AbilityEffectHook::LineProjectile
+        );
+        assert_eq!(
+            definition(AbilityKind::EkatMagicAnchor).effect_hook,
+            AbilityEffectHook::MagicAnchor
         );
     }
 }

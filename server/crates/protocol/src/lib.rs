@@ -78,6 +78,7 @@ pub mod abilities {
     pub const BREAKTHROUGH: &str = "breakthrough";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
+    pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
 }
 
 /// `AbilityObjectView.kind` values.
@@ -1337,6 +1338,7 @@ fn order_stage_code(kind: &str) -> u8 {
         abilities::BREAKTHROUGH => 11,
         abilities::EKAT_TELEPORT => 12,
         abilities::EKAT_LINE_SHOT => 13,
+        abilities::EKAT_MAGIC_ANCHOR => 14,
         "setupAntiTankGuns" => 7,
         abilities::CHARGE => 8,
         _ => 255,
@@ -1352,6 +1354,7 @@ fn ability_code(ability: &str) -> u8 {
         abilities::BREAKTHROUGH => 5,
         abilities::EKAT_TELEPORT => 6,
         abilities::EKAT_LINE_SHOT => 7,
+        abilities::EKAT_MAGIC_ANCHOR => 8,
         _ => 255,
     }
 }
