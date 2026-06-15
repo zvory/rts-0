@@ -2691,9 +2691,9 @@ fn steel_expansion_tanks_sends_workers_to_oil_after_expansion_is_planned() {
             _ => None,
         })
         .sum::<usize>();
-    assert!(
-        oil_assignments >= 5,
-        "support tech should send most idle workers to oil once expanding, got {oil_assignments}"
+    assert_eq!(
+        oil_assignments, 3,
+        "support tech should fill the three free mineable oil nodes once expanding"
     );
 }
 

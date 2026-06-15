@@ -15,6 +15,8 @@ pub(super) struct EconomyPlan {
     pub(super) current_oil_workers: usize,
     pub(super) resource_counts: BTreeMap<EntityKind, usize>,
     pub(super) occupied_nodes: BTreeSet<u32>,
+    pub(super) mineable_steel_nodes: BTreeSet<u32>,
+    pub(super) mineable_oil_nodes: BTreeSet<u32>,
     pub(super) max_worker_resource_distance_px: Option<f32>,
 }
 
@@ -69,6 +71,8 @@ pub(super) fn plan_economy(
         current_oil_workers,
         resource_counts,
         occupied_nodes: occupied_resource_nodes(observation),
+        mineable_steel_nodes: availability.free_mineable_node_ids(EntityKind::Steel),
+        mineable_oil_nodes: availability.free_mineable_node_ids(EntityKind::Oil),
         max_worker_resource_distance_px: max_worker_resource_assignment_distance_px(
             observation,
             facts,

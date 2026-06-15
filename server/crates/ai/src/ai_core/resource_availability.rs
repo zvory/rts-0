@@ -112,6 +112,10 @@ impl ResourceAvailability {
         })
     }
 
+    pub(crate) fn free_mineable_node_ids(&self, kind: EntityKind) -> BTreeSet<u32> {
+        self.free_mineable_nodes(kind).map(|node| node.id).collect()
+    }
+
     pub(crate) fn occupied_node_count(&self, kind: EntityKind) -> usize {
         self.occupied_by_kind.get(&kind).copied().unwrap_or(0)
     }
