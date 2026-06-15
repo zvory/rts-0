@@ -17,9 +17,10 @@ turning every new ability into a bespoke tick-path branch.
   same tick or same instant as the dash.
 - Ekat can activate the return while the return marker is active. Returning moves her to the marked
   original position only if the destination is still valid under the server's standability rules.
-- Ekat has an out-and-back line projectile. It damages on the outbound pass and again on the return
-  pass, with enough runtime metadata for a later phase to scale damage by time out, distance
-  traveled, or leg.
+- Ekat has an out-and-back line projectile. It damages on the outbound pass and again while returning
+  toward Ekat's current position, so the return path may curve if she moves or dashes after firing.
+  The runtime keeps enough metadata for a later phase to scale damage by time out, distance traveled,
+  or leg.
 - Ekat can place a Magic Anchor on the ground. The anchor lasts 10 seconds, is projected through
   authoritative fog, and can be destroyed by enemies.
 - If Ekat has an active anchor, the line projectile launches from both Ekat and the anchor toward
@@ -60,21 +61,22 @@ owner-only affordances such as return availability, remaining lifetime, and lock
 outcome is a general enough contract for dash-return and future two-stage abilities without
 overloading missing `x`/`y` fields ambiguously.
 
-Phase 5 implements the dash and delayed return marker using the new runtime. It replaces or
-supersedes the current immediate teleport behavior with a dash that creates a return marker, blocks
-instant snapback, and returns only while the marker is active and the destination is standable. The
-outcome is the first product ability proving ability objects, recast semantics, cooldowns, and
-client rendering work together.
+Phase 5 implements the dash and delayed return marker using the new runtime. It scrubs the current
+immediate teleport behavior and replaces it with a dash that creates a return marker, blocks instant
+snapback, and returns only while the marker is active and the destination is standable. The outcome
+is the first product ability proving ability objects, recast semantics, cooldowns, and client
+rendering work together.
 
 Phase 6 adds a generic moving projectile runtime for ability-owned hit volumes. It supports
 outbound and returning line projectiles, per-leg hit dedupe, owner/team filtering, travel metadata,
 and fog-safe visual events or object projection. The outcome is a reusable projectile system that
 can support Ekat's line projectile without hard-coding damage into command acceptance.
 
-Phase 7 implements Ekat's out-and-back line projectile on top of the projectile runtime. It
-launches from Ekat toward the target point, turns around at its endpoint, damages valid enemies on
-both legs, and records enough metadata for distance or time-out damage scaling. The outcome is that
-the old immediate line-shot hook is retired or isolated behind the new projectile path.
+Phase 7 implements Ekat's out-and-back line projectile on top of the projectile runtime. It launches
+from Ekat toward the target point, turns around at its endpoint, then returns toward Ekat's current
+position so the return path can curve as she moves. The projectile damages valid enemies on both legs
+and records enough metadata for distance or time-out damage scaling; the old immediate line-damage
+hook is scrubbed rather than kept as a product path.
 
 Phase 8 implements Magic Anchor placement as a persistent, destructible ability world object. It
 lasts 10 seconds, projects through fog, can take enemy damage or destruction events according to
@@ -84,14 +86,14 @@ destructibility, owner state, and lockout rules.
 
 Phase 9 composes Magic Anchor with the line projectile. It makes line projectile activation query
 Ekat's active anchor, launch a second projectile from the anchor toward the same cursor point, and
-render client previews for both origins before the command is sent. The outcome is the first
-ability interaction that proves the systems can combine independent world objects and projectiles.
+return both projectiles toward Ekat's current position. It renders client previews for both origins
+before the command is sent, proving the systems can combine independent world objects and projectiles.
 
 Phase 10 consolidates docs, tests, diagnostics, and old special-case cleanup. It updates the
 server-sim, protocol, client-ui, and balance design docs to describe the new ability runtime,
-removes obsolete one-off Ekat paths where possible, and adds regression coverage for the highest
-risk replay, fog, and client-command cases. The outcome is a shippable 0.1 foundation with clear
-follow-up hooks for tuning, art, sound, AI awareness, and future hero abilities.
+verifies the obsolete one-off Ekat teleport and line-damage paths are gone, and adds regression
+coverage for the highest risk replay, fog, and client-command cases. The outcome is a shippable 0.1
+foundation with clear follow-up hooks for tuning, art, sound, AI awareness, and future hero abilities.
 
 ## Phase Index
 

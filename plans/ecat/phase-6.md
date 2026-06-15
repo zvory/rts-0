@@ -16,6 +16,7 @@ Ekat's out-and-back line projectile without being hard-coded to Ekat.
   - ability kind
   - origin
   - endpoint
+  - return target, either a fixed world point or a live caster/entity id depending on the ability
   - current position or progress
   - leg, such as outbound or return
   - speed or duration
@@ -29,14 +30,16 @@ Ekat's out-and-back line projectile without being hard-coded to Ekat.
   projectile should damage enemies only unless Phase 0 revised the product contract.
 - Emit fog-safe launch, travel, hit, or impact visuals through the projection/event strategy chosen
   earlier.
-- Add tests for travel, endpoint turnaround, return completion, hit dedupe, stale source caster,
-  destroyed source object, and fog-safe visuals.
+- Add tests for travel, endpoint turnaround, fixed-point return completion, live-caster return
+  steering, hit dedupe, stale source caster, destroyed source object, and fog-safe visuals.
 
 ## Expected Deliverables
 
 - A reusable projectile runtime that advances independently of command acceptance.
 - Projectile damage is applied during tick progression, not immediately in `useAbility`.
 - Outbound and return legs can carry different damage formulas later.
+- The runtime can support projectiles whose return leg steers toward a live caster each tick without
+  hard-coding that behavior to Ekat inside command acceptance.
 - Existing mortar and artillery shell systems are not regressed or folded into the new runtime
   unless the phase explicitly justifies a tiny shared helper.
 
@@ -60,5 +63,6 @@ not visibly leak through fog. No normal player-facing ability needs to be comple
 
 ## Handoff Expectations
 
-The handoff must describe projectile fields, tick order placement, damage/filtering policy, visual
-projection strategy, and the exact helper Phase 7 should call to spawn Ekat's line projectile.
+The handoff must describe projectile fields, tick order placement, return-target policy, stale/dead
+caster behavior, damage/filtering policy, visual projection strategy, and the exact helper Phase 7
+should call to spawn Ekat's line projectile.

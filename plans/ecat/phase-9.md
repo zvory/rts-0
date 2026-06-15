@@ -16,6 +16,8 @@ interact through typed server queries rather than bespoke command branches.
   - also launch from the active anchor when one exists and is still valid
   - use the same cursor target point for both origins
   - apply range, endpoint, or clamping rules explicitly for the anchor-origin projectile
+  - return both hero-origin and anchor-origin projectiles toward Ekat's current position using the
+    Phase 7 return-target behavior
   - avoid double-spending cost or double-starting cooldowns unless the product contract says so
 - Define hit dedupe across multiple simultaneous origins:
   - whether the same target can be hit by both hero-origin and anchor-origin projectiles
@@ -31,6 +33,7 @@ interact through typed server queries rather than bespoke command branches.
 
 - With an active anchor, Ekat's line projectile launches from both Ekat and the anchor.
 - Without an active anchor, the line projectile behaves exactly as Phase 7 defined.
+- Both projectiles return toward Ekat's current position, not their launch origins.
 - Client preview accurately shows the extra origin for the owning player.
 - Hidden anchors or hidden projectile origins do not leak through enemy snapshots or events.
 
@@ -58,4 +61,5 @@ falls back to the single-origin behavior.
 ## Handoff Expectations
 
 The handoff must state the cross-origin dedupe rule, range/clamping rule for anchor-origin shots,
-visual/fog behavior, tests added, and any damage-tuning concerns left for a future balance pass.
+confirmation that both return legs target current Ekat, visual/fog behavior, tests added, and any
+damage-tuning concerns left for a future balance pass.

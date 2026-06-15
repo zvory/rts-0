@@ -45,6 +45,11 @@ changing behavior. Define the shared naming and contracts that later phases will
   - the initial object kinds needed by this plan, such as return marker, anchor, and projectile
   - whether projectile visuals are projected as active objects, transient events, or both
   - the recast command shape to be implemented in Phase 4
+  - whether the existing `ekatTeleport` and `ekatLineShot` ids should be repurposed for the new
+    dash and projectile behavior or replaced with new ids; choose the convenient path, but do not
+    preserve the old immediate teleport or immediate line-damage semantics as product behavior
+  - the projectile return-target contract, including Ekat projectiles returning toward Ekat's current
+    position rather than a fixed launch origin
   - how anchors are damaged or targeted in Phase 8 without becoming ordinary production entities
 
 ## Expected Deliverables
@@ -72,6 +77,6 @@ None. This is a contract and inventory phase with no intended player-facing chan
 
 ## Handoff Expectations
 
-The handoff must name the chosen runtime/object names, the recast command shape, the anchor
-targetability decision, the projection strategy for projectile visuals, and the exact files Phase 1
-should edit first.
+The handoff must name the chosen runtime/object names, the recast command shape, the old-id
+repurpose/removal decision, the projectile return-target contract, the anchor targetability decision,
+the projection strategy for projectile visuals, and the exact files Phase 1 should edit first.
