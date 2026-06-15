@@ -137,7 +137,7 @@ export const STATS = Object.freeze({
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 7,
-    rangeTiles: 9, cost: { steel: 100, oil: 50 }, supply: 3, buildTicks: 460,
+    rangeTiles: 9, cost: { steel: 100, oil: 50 }, supply: 2, buildTicks: 460,
     requires: KIND.STEELWORKS },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 4, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
