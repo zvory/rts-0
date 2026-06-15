@@ -18,9 +18,10 @@ return the report id only after durable writes succeed.
   - update `resolved`
 - Return a success payload with the created report id.
 - Return clear failures when the database is unavailable, the report context is invalid, or replay
-  evidence cannot be persisted.
-- Capture authoritative server context: room, current phase, server build SHA, map, replay id,
-  match id, current tick when available, reporter seat identity when known, and report receipt time.
+  force-persistence cannot be registered.
+- Capture authoritative server context: room, current phase, server build SHA, map, `replay_key`,
+  replay id when already available, match id when already available, current tick when available,
+  reporter seat identity when known, and report receipt time.
 
 ## Recommended API Shape
 
@@ -59,7 +60,8 @@ report with that token.
 
 - No auth, categories, annotations, screenshots, spam controls, or privacy filtering.
 - Submission is blocking. Do not return success until the report row and required replay linkage are
-  persisted.
+  persisted. For in-progress matches, required replay linkage means the report row stores
+  `replay_key` and the server has registered forced final replay upload for that key.
 - If the database is unavailable, return a visible failure; do not pretend the report was accepted.
 - Do not expose arbitrary replay artifacts outside existing compatibility checks.
 
