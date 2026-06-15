@@ -468,8 +468,10 @@ Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
 - `rangeOrigins` keeps normal range rings tied to carrier units, while `pathOrigins` can add
   server-projected origins such as Magic Anchors for multi-origin line-shot previews.
 - `returnMarkers` can draw owner-visible dash-return markers while the dash ability is armed.
-- At the cursor position, draws the cloud radius preview (2-tile circle) colored green when in
-  range of at least one carrier, grey when out of range.
+- At the cursor position, draws the ability-specific target feedback: smoke uses a 2-tile cloud
+  radius, Magic Anchor uses the configured anchor radius, and Ekat Line Shot draws projected path
+  segments from every current origin. Feedback is colored green when in range of at least one
+  carrier, grey when out of range.
 
 Ability object rendering (`renderer/feedback.js`, `_drawAbilityObjects`; drawn on the same ground
 overlay container as smoke clouds, below selection rings and HP bars):

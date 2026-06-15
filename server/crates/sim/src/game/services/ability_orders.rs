@@ -236,12 +236,12 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        (AbilityEffectHook::Teleport, AbilityKind::EkatTeleport) => {
+        (AbilityEffectHook::DashReturn, AbilityKind::EkatTeleport) => {
             let Some((origin_x, origin_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
             else {
                 return false;
             };
-            let Some((blink_x, blink_y)) = hero_abilities::ekat_teleport_destination(
+            let Some((blink_x, blink_y)) = hero_abilities::ekat_dash_destination(
                 map,
                 entities,
                 caster,

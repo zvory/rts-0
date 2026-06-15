@@ -246,7 +246,28 @@ fn replay_keyframe_clone_preserves_ability_runtime_state() {
         })
         .expect("ability object should spawn");
 
-    let clone = game.clone_for_replay_keyframe();
+    let projectile_id = game
+        .ability_runtime
+        .spawn_projectile(ability_projectile::AbilityProjectileSpec {
+            owner: 1,
+            caster_id: caster,
+            source_object_id: None,
+            ability: ability::AbilityKind::EkatLineShot,
+            origin: (128.0, 128.0),
+            endpoint: (192.0, 128.0),
+            return_target: ability_projectile::AbilityProjectileReturnTarget::FixedPoint {
+                x: 128.0,
+                y: 128.0,
+            },
+            speed_px_per_tick: 16.0,
+            width_px: 4.0,
+            damage: 0,
+            created_tick: 0,
+            expires_tick: 30,
+        })
+        .expect("ability projectile should spawn");
+
+    let mut clone = game.clone_for_replay_keyframe();
 
     assert_eq!(
         clone
@@ -254,7 +275,27 @@ fn replay_keyframe_clone_preserves_ability_runtime_state() {
             .world_objects()
             .map(|object| object.id.get())
             .collect::<Vec<_>>(),
-        vec![object_id]
+        vec![object_id, projectile_id]
+    );
+    assert_eq!(
+        clone
+            .ability_runtime
+            .projectiles()
+            .map(|projectile| projectile.id.get())
+            .collect::<Vec<_>>(),
+        vec![projectile_id]
+    );
+
+    clone.tick();
+
+    let projectile_object = clone
+        .ability_runtime
+        .world_objects()
+        .find(|object| object.id.get() == projectile_id)
+        .expect("cloned projectile visual should still exist after ticking");
+    assert!(
+        projectile_object.x > 128.0,
+        "cloned keyframe projectile should continue advancing after replay restore"
     );
 }
 

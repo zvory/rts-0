@@ -62,7 +62,7 @@ pub enum AbilityEffectHook {
     OwnedAreaStatus,
     DelayedWorld,
     ArtilleryPointFire,
-    Teleport,
+    DashReturn,
     LineProjectile,
     MagicAnchor,
 }
@@ -117,7 +117,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
-        AbilityKind::EkatTeleport => AbilityEffectHook::Teleport,
+        AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
     }
@@ -151,7 +151,7 @@ mod tests {
         );
         assert_eq!(
             definition(AbilityKind::EkatTeleport).effect_hook,
-            AbilityEffectHook::Teleport
+            AbilityEffectHook::DashReturn
         );
         assert_eq!(
             definition(AbilityKind::EkatLineShot).effect_hook,

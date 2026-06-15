@@ -27,7 +27,7 @@ pub(crate) fn clamped_world_ability_vector(
     Some((from_x + dx * scale, from_y + dy * scale))
 }
 
-pub(crate) fn ekat_teleport_destination(
+pub(crate) fn ekat_dash_destination(
     map: &Map,
     entities: &EntityStore,
     caster: u32,
