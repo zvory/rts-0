@@ -494,6 +494,14 @@ fn active_anchor_id(game: &Game, hero: u32) -> Option<u32> {
         .map(|anchor| anchor.id.get())
 }
 
+fn line_projectiles(game: &Game) -> Vec<ability_projectile::AbilityProjectile> {
+    game.ability_runtime
+        .projectiles()
+        .filter(|projectile| projectile.ability == ability::AbilityKind::EkatLineShot)
+        .cloned()
+        .collect()
+}
+
 fn refresh_visibility(game: &mut Game) {
     systems::recompute_supply(&mut game.players, &game.entities);
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
@@ -977,6 +985,11 @@ fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate
         "projectile should move out from Ekat instead of applying instant full-line damage"
     );
     assert_eq!(
+        line_projectiles(&game).len(),
+        1,
+        "line shot without an anchor should keep the Phase 7 single-origin behavior"
+    );
+    assert_eq!(
         game.entities.get(enemy).expect("enemy exists").hp,
         game.entities.get(enemy).expect("enemy exists").max_hp
     );
@@ -987,6 +1000,202 @@ fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate
             .expect("hero exists")
             .ability_cooldown_ticks(ability::AbilityKind::EkatLineShot),
         config::EKAT_LINE_SHOT_COOLDOWN_TICKS.saturating_sub(1)
+    );
+}
+
+#[test]
+fn ekat_line_shot_with_active_anchor_launches_from_both_origins_once() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let hero_pos = game.map.tile_center(10, 10);
+    let anchor_pos = game.map.tile_center(10, 13);
+    let target = game.map.tile_center(17, 10);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_anchor(&mut game, hero, anchor_pos);
+    game.tick();
+    let anchor_id = active_anchor_id(&game, hero).expect("anchor should exist");
+
+    enqueue_ekat_line_shot(&mut game, hero, target);
+    game.tick();
+
+    let projectiles = line_projectiles(&game);
+    assert_eq!(projectiles.len(), 2);
+    assert!(
+        projectiles
+            .iter()
+            .any(|projectile| projectile.source_object_id.is_none()),
+        "hero-origin projectile should launch from Ekat"
+    );
+    assert!(
+        projectiles
+            .iter()
+            .any(|projectile| projectile.source_object_id == Some(anchor_id)),
+        "anchor-origin projectile should carry the source anchor id"
+    );
+    assert_eq!(
+        game.entities
+            .get(hero)
+            .expect("hero exists")
+            .ability_cooldown_ticks(ability::AbilityKind::EkatLineShot),
+        config::EKAT_LINE_SHOT_COOLDOWN_TICKS.saturating_sub(1),
+        "dual-origin launch should start one line-shot cooldown"
+    );
+}
+
+#[test]
+fn ekat_line_shot_ignores_expired_or_destroyed_anchors() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut expired_game = empty_flat_game(&players);
+    let pos = expired_game.map.tile_center(10, 10);
+    let anchor_pos = expired_game.map.tile_center(12, 10);
+    let target = expired_game.map.tile_center(17, 10);
+    let expired_hero = expired_game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_anchor(&mut expired_game, expired_hero, anchor_pos);
+    expired_game.tick();
+    for _ in 0..config::EKAT_MAGIC_ANCHOR_DURATION_TICKS {
+        expired_game.tick();
+    }
+    assert!(active_anchor_id(&expired_game, expired_hero).is_none());
+    enqueue_ekat_line_shot(&mut expired_game, expired_hero, target);
+    expired_game.tick();
+    assert_eq!(line_projectiles(&expired_game).len(), 1);
+
+    let mut destroyed_game = empty_flat_game(&players);
+    let destroyed_hero = destroyed_game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+    enqueue_ekat_anchor(&mut destroyed_game, destroyed_hero, anchor_pos);
+    destroyed_game.tick();
+    let anchor_id = active_anchor_id(&destroyed_game, destroyed_hero).expect("anchor exists");
+    let destroyed = destroyed_game
+        .ability_runtime
+        .damage_anchor(anchor_id, config::EKAT_MAGIC_ANCHOR_HP as u32)
+        .expect("anchor should be destroyed");
+    let lockout_until = destroyed_game
+        .current_tick()
+        .saturating_add(destroyed.destroyed_lockout_ticks);
+    destroyed_game
+        .entities
+        .get_mut(destroyed.caster_id)
+        .expect("anchor caster exists")
+        .start_ability_lockout_until(destroyed.ability, lockout_until);
+    assert!(destroyed_game
+        .entities
+        .get(destroyed_hero)
+        .expect("hero exists")
+        .ability_lockout_until_tick(
+            ability::AbilityKind::EkatMagicAnchor,
+            destroyed_game.current_tick()
+        )
+        .is_some());
+
+    enqueue_ekat_line_shot(&mut destroyed_game, destroyed_hero, target);
+    destroyed_game.tick();
+    assert_eq!(line_projectiles(&destroyed_game).len(), 1);
+}
+
+#[test]
+fn ekat_anchor_line_projectiles_have_independent_hit_dedupe_and_return_to_ekat() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let hero_pos = game.map.tile_center(10, 10);
+    let anchor_pos = game.map.tile_center(10, 12);
+    let target = game.map.tile_center(16, 10);
+    let dash_target = game.map.tile_center(10, 15);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
+        .expect("hero should spawn");
+    let enemy = game
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::Depot,
+            game.map.tile_center(13, 10).0,
+            game.map.tile_center(13, 10).1,
+            true,
+        )
+        .expect("enemy should spawn");
+    let enemy_max_hp = game.entities.get(enemy).expect("enemy exists").max_hp;
+
+    enqueue_ekat_anchor(&mut game, hero, anchor_pos);
+    game.tick();
+    enqueue_ekat_line_shot(&mut game, hero, target);
+    for _ in 0..23 {
+        game.tick();
+    }
+    assert!(
+        game.entities.get(enemy).expect("enemy exists").hp
+            <= enemy_max_hp.saturating_sub(config::EKAT_LINE_SHOT_DAMAGE * 2),
+        "the same target may be hit by both simultaneous origin projectiles"
+    );
+
+    enqueue_ekat_dash(&mut game, hero, dash_target);
+    game.tick();
+    for _ in 0..18 {
+        game.tick();
+    }
+
+    assert!(
+        line_projectiles(&game)
+            .iter()
+            .any(|projectile| projectile.y > hero_pos.1),
+        "returning anchor and hero projectiles should steer toward Ekat's current position"
+    );
+}
+
+#[test]
+fn ekat_anchor_origin_projectile_clamps_from_anchor_and_stays_fog_filtered() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let hero_pos = game.map.tile_center(10, 10);
+    let anchor_pos = game.map.tile_center(10, 15);
+    let far_target = game.map.tile_center(40, 15);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
+        .expect("hero should spawn");
+    game.entities
+        .spawn_unit(2, EntityKind::Worker, far_target.0 + 400.0, far_target.1 + 400.0)
+        .expect("distant enemy should spawn");
+    refresh_visibility(&mut game);
+
+    enqueue_ekat_anchor(&mut game, hero, anchor_pos);
+    game.tick();
+    let anchor_id = active_anchor_id(&game, hero).expect("anchor exists");
+    enqueue_ekat_line_shot(&mut game, hero, far_target);
+    game.tick();
+
+    let projectiles = line_projectiles(&game);
+    let anchor_projectile = projectiles
+        .iter()
+        .find(|projectile| projectile.source_object_id == Some(anchor_id))
+        .expect("anchor projectile exists");
+    let max_range = config::EKAT_LINE_SHOT_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let endpoint_distance = ((anchor_projectile.endpoint.0 - anchor_pos.0).powi(2)
+        + (anchor_projectile.endpoint.1 - anchor_pos.1).powi(2))
+    .sqrt();
+    assert!(
+        endpoint_distance <= max_range + 0.01,
+        "anchor-origin projectile should clamp endpoint from the anchor origin"
+    );
+    assert!(game
+        .snapshot_for(1)
+        .ability_objects
+        .iter()
+        .any(|object| object.id == anchor_projectile.id.get()));
+    assert!(
+        game.snapshot_for(2).ability_objects.is_empty(),
+        "hidden anchor-origin projectiles should not leak through enemy snapshots"
     );
 }
 

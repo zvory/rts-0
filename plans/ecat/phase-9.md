@@ -1,6 +1,27 @@
 # Phase 9 - Anchor and Projectile Composition
 
-Status: Not Started.
+Status: Done.
+
+## Implementation Notes
+
+- Ekat Line Shot now queries the active Magic Anchor at launch time and builds projectile specs from
+  both Ekat and the anchor when the anchor is active.
+- Anchor-origin shots use the same cursor point but clamp their endpoint from the anchor origin with
+  the normal Line Shot range. Both hero-origin and anchor-origin projectiles return toward Ekat's
+  current entity position.
+- The command spends cost and starts cooldown once. An active anchor does not double-spend cost or
+  double-start cooldown.
+- Hit dedupe remains per projectile and per leg: a target can be hit by both the hero-origin and
+  anchor-origin projectiles, and each projectile keeps separate outbound and return hit sets.
+- Projectile visuals remain active ability objects and use the existing fog-filtered projection:
+  enemies only receive a projectile object when its current position is visible.
+- The existing client preview path already draws owned Magic Anchors as extra Line Shot origins.
+
+## Patch Notes
+
+- Ekat's Line Shot now fires a second projectile from her active Magic Anchor.
+- Anchor-enhanced Line Shots use the same target cursor, but each origin has its own range clamp.
+- Destroyed or expired anchors fall back to the normal single-projectile Line Shot.
 
 ## Goal
 

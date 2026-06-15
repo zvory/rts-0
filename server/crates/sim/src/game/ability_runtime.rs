@@ -344,6 +344,10 @@ impl AbilityRuntime {
             .remove_active_anchors(owner, caster_id, ability);
     }
 
+    pub(in crate::game) fn projectiles(&self) -> impl Iterator<Item = &AbilityProjectile> {
+        self.projectiles.iter()
+    }
+
     pub(crate) fn active_anchor(
         &self,
         owner: u32,

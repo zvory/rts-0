@@ -79,8 +79,29 @@ pub(crate) fn ekat_line_projectile_spec(
     tick: u32,
 ) -> Option<AbilityProjectileSpec> {
     let (from_x, from_y) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))?;
+    ekat_line_projectile_spec_from_origin(
+        player,
+        caster,
+        None,
+        (from_x, from_y),
+        (target_x, target_y),
+        range_tiles,
+        tick,
+    )
+}
+
+pub(crate) fn ekat_line_projectile_spec_from_origin(
+    player: u32,
+    caster: u32,
+    source_object_id: Option<u32>,
+    origin: (f32, f32),
+    target: (f32, f32),
+    range_tiles: Option<u32>,
+    tick: u32,
+) -> Option<AbilityProjectileSpec> {
+    let (from_x, from_y) = origin;
     let (to_x, to_y) =
-        clamped_world_ability_vector(from_x, from_y, target_x, target_y, range_tiles)?;
+        clamped_world_ability_vector(from_x, from_y, target.0, target.1, range_tiles)?;
     let range_px =
         range_tiles.unwrap_or(config::EKAT_LINE_SHOT_RANGE_TILES) as f32 * config::TILE_SIZE as f32;
     let max_round_trip_ticks =
@@ -88,7 +109,7 @@ pub(crate) fn ekat_line_projectile_spec(
     Some(AbilityProjectileSpec {
         owner: player,
         caster_id: caster,
-        source_object_id: None,
+        source_object_id,
         ability: AbilityKind::EkatLineShot,
         origin: (from_x, from_y),
         endpoint: (to_x, to_y),

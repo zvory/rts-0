@@ -286,7 +286,7 @@ pub(crate) fn launch_world_ability(
             true
         }
         (AbilityEffectHook::LineProjectile, AbilityKind::EkatLineShot) => {
-            let Some(projectile_spec) = hero_abilities::ekat_line_projectile_spec(
+            let Some(hero_projectile_spec) = hero_abilities::ekat_line_projectile_spec(
                 entities,
                 player,
                 caster,
@@ -297,13 +297,36 @@ pub(crate) fn launch_world_ability(
             ) else {
                 return false;
             };
-            let target_x = projectile_spec.endpoint.0;
-            let target_y = projectile_spec.endpoint.1;
+            let target_x = hero_projectile_spec.endpoint.0;
+            let target_y = hero_projectile_spec.endpoint.1;
+            let mut projectile_specs = vec![hero_projectile_spec];
+            if let Some(anchor) = ability_runtime.active_anchor(
+                player,
+                caster,
+                AbilityKind::EkatMagicAnchor,
+                tick,
+            ) {
+                if let Some(anchor_projectile_spec) =
+                    hero_abilities::ekat_line_projectile_spec_from_origin(
+                        player,
+                        caster,
+                        Some(anchor.id.get()),
+                        (anchor.x, anchor.y),
+                        (x, y),
+                        definition.range_tiles,
+                        tick,
+                    )
+                {
+                    projectile_specs.push(anchor_projectile_spec);
+                }
+            }
             if !ps.spend_cost(definition.cost) {
                 return false;
             }
-            if ability_runtime.spawn_projectile(projectile_spec).is_none() {
-                return false;
+            for projectile_spec in projectile_specs {
+                if ability_runtime.spawn_projectile(projectile_spec).is_none() {
+                    return false;
+                }
             }
             if let Some(e) = entities.get_mut(caster) {
                 e.start_ability_cooldown(ability, definition.cooldown_ticks);
