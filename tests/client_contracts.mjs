@@ -1675,6 +1675,31 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
   {
+    const selectionArea = { hidden: false };
+    const commandCard = { hidden: false };
+    const giveUpConfirm = { hidden: false };
+    dom.selectionArea = selectionArea;
+    dom.commandCard = commandCard;
+    dom.giveUpConfirm = giveUpConfirm;
+
+    const replayMatch = Object.create(Match.prototype);
+    replayMatch.replayViewer = true;
+    replayMatch.state = { spectator: false };
+    replayMatch.applySpectatorUi();
+    assert(selectionArea.hidden, "replay viewer hides the selected-unit HUD area");
+    assert(commandCard.hidden, "replay viewer keeps command card hidden");
+    assert(giveUpConfirm.hidden, "replay viewer hides give-up confirmation");
+
+    selectionArea.hidden = true;
+    commandCard.hidden = true;
+    const liveMatch = Object.create(Match.prototype);
+    liveMatch.replayViewer = false;
+    liveMatch.state = { spectator: false };
+    liveMatch.applySpectatorUi();
+    assert(!selectionArea.hidden, "live player match restores the selected-unit HUD area");
+    assert(!commandCard.hidden, "live player match restores the command card");
+  }
+  {
     const priorWindowForReplayInput = globalThis.window;
     const listeners = new Map();
     const options = new Map();

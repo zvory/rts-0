@@ -493,6 +493,7 @@ export class Match {
 
   applySpectatorUi() {
     const spectator = !!this.state?.spectator || this.replayViewer;
+    if (dom.selectionArea) dom.selectionArea.hidden = spectator;
     if (dom.commandCard) dom.commandCard.hidden = spectator;
     if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
   }
@@ -1025,6 +1026,7 @@ export class Match {
     this.predictionAdapter?.destroy();
     this.replayControls = null;
     this.observerAnalysisOverlay = null;
+    if (dom.selectionArea) dom.selectionArea.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;
     if (this.unregisterHudInputZone) {
       this.unregisterHudInputZone();

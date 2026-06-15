@@ -187,6 +187,7 @@ export const dom = {
   giveUpConfirm: document.getElementById("give-up-confirm"),
   giveUpCancel: document.getElementById("give-up-cancel"),
   giveUpConfirmButton: document.getElementById("give-up-confirm-button"),
+  selectionArea: document.getElementById("selection-area"),
   commandCard: document.getElementById("command-card"),
   devBanner: document.getElementById("dev-banner"),
   devLinks: document.getElementById("dev-links"),
