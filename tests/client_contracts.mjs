@@ -10,6 +10,7 @@ import { Net } from "../client/src/net.js";
 import {
   MAX_LOBBY_TEAMS,
   betaFactionSelectEnabledForLocation,
+  shouldAcceptSpectatorDrop,
   teamSlotsForLobby,
 } from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
@@ -2714,6 +2715,38 @@ function fakeAudioContext() {
   ]);
   assert(fullSlots.length === 4 && fullSlots.every((slot) => !slot.isNew),
     "lobby omits the new-team slot when all four teams are occupied");
+  assert(
+    shouldAcceptSpectatorDrop({
+      draggedPlayer: { id: 2, teamId: 2 },
+      isHost: true,
+      countdownActive: false,
+    }),
+    "host can drag an active human player to spectators",
+  );
+  assert(
+    !shouldAcceptSpectatorDrop({
+      draggedPlayer: { id: 9, teamId: 2, isAi: true },
+      isHost: true,
+      countdownActive: false,
+    }),
+    "spectator drop rejects AI seats",
+  );
+  assert(
+    !shouldAcceptSpectatorDrop({
+      draggedPlayer: { id: 3, isSpectator: true },
+      isHost: true,
+      countdownActive: false,
+    }),
+    "spectator drop rejects existing spectators",
+  );
+  assert(
+    !shouldAcceptSpectatorDrop({
+      draggedPlayer: { id: 2, teamId: 2 },
+      isHost: false,
+      countdownActive: false,
+    }),
+    "spectator drop is host-only",
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -1524,12 +1524,13 @@ async fn handle_client_message(
             )
             .await;
         }
-        ClientMessage::SetSpectator { spectator } => {
+        ClientMessage::SetSpectator { spectator, id } => {
             send_room_event(
                 player_id,
                 current_room,
                 RoomEvent::SetSpectator {
                     player_id,
+                    target: id.unwrap_or(player_id),
                     spectator,
                 },
             )

@@ -11,6 +11,7 @@ import { S } from "./protocol.js";
 import {
   MAX_LOBBY_TEAMS,
   LobbyRosterView,
+  shouldAcceptSpectatorDrop,
   splitLobbyPlayers,
   teamSlotsForLobby,
 } from "./lobby_view.js";
@@ -19,7 +20,7 @@ const NAME_STORAGE_KEY = "rts.playerName";
 
 const MAX_PLAYERS = 4;
 
-export { MAX_LOBBY_TEAMS, teamSlotsForLobby };
+export { MAX_LOBBY_TEAMS, shouldAcceptSpectatorDrop, teamSlotsForLobby };
 
 export function betaFactionSelectEnabledForLocation(locationLike) {
   const host = String(locationLike?.hostname || "").toLowerCase();
@@ -288,6 +289,7 @@ export class Lobby {
       onAddAi: (teamId) => this.net.addAi(teamId),
       onRemoveAi: (id) => this.net.removeAi(id),
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
+      onSetSpectator: (id, spectator) => this.net.setSpectator(spectator, id),
       onSetFaction: (factionId) => this.net.setFaction(factionId),
       onSetAiProfile: (id, aiProfileId) => this.net.setAiProfile(id, aiProfileId),
     });
