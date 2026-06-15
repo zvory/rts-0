@@ -17,6 +17,8 @@ written yet.
   submission.
 - Add `replay_key` storage to `match_replays` with a uniqueness guarantee so review tooling can
   resolve a report to the eventual replay row when it exists.
+- Preserve the current one replay row per match model. `replay_key` is an alternate stable lookup
+  key for reports, not a reason to create multiple replay artifacts for one match.
 - Add server-side report data structs and database helpers.
 - Decide and document whether non-match/lobby reports use nullable `replay_key` or are deferred
   until a later phase.
@@ -70,6 +72,8 @@ Prefer indexes for newest-first review and replay/match lookup:
   writer.
 - Do not require a strict replay foreign key for mid-match reports. The whole point of `replay_key`
   is to let reports exist before the final replay row exists.
+- Do not regress current replay-history behavior: deployed resolved solo, player-vs-AI, and AI-only
+  normal matches can already persist replay-backed rows when `RTS_RECORD_MATCHES` is enabled.
 - Do not change ordinary `/api/matches` response shape unless required for the report linkage.
 
 ## Verification
@@ -89,4 +93,4 @@ Prefer indexes for newest-first review and replay/match lookup:
 
 After implementation, mark this phase done and summarize the final schema, how `replay_key` is
 allocated and stored, nullable lobby-report behavior, and any database helper APIs that Phase 2
-should call when it needs to force replay persistence for a report.
+should call when it needs to register that a report expects final replay evidence.
