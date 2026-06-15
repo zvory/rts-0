@@ -2,107 +2,112 @@ import { hash2, terrainColor, terrainOverlayColor } from "./src/renderer/shared.
 
 const canvas = document.getElementById("unit-lab-canvas");
 const ctx = canvas.getContext("2d");
-const promptEl = document.getElementById("unit-lab-prompt");
-const baseEl = document.getElementById("unit-lab-base");
-const generateEl = document.getElementById("unit-lab-generate");
+const refreshEl = document.getElementById("unit-lab-refresh");
 const statusEl = document.getElementById("unit-lab-status");
-const attemptsEl = document.getElementById("unit-lab-attempts");
+const treeEl = document.getElementById("unit-lab-tree");
 const nameEl = document.getElementById("unit-lab-name");
 const roleEl = document.getElementById("unit-lab-role");
 const sourceEl = document.getElementById("unit-lab-source");
+const promptEl = document.getElementById("unit-lab-prompt");
 const notesEl = document.getElementById("unit-lab-notes");
 
-let attempts = [];
+let files = new Map();
+let catalogTree = [];
 let selected = null;
 let startedAt = performance.now();
 
-generateEl.addEventListener("click", () => {
-  generateAttempt();
+refreshEl.addEventListener("click", () => {
+  loadCatalog();
 });
-
-promptEl.addEventListener("keydown", (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-    event.preventDefault();
-    generateAttempt();
-  }
-});
-
 window.addEventListener("resize", draw);
 
-loadAttempts();
+loadCatalog();
 requestAnimationFrame(tick);
 
-async function loadAttempts() {
-  setStatus("Loading versions");
+async function loadCatalog() {
+  setStatus("Loading generation files");
   try {
     const res = await fetch("/api/unit-designs");
     if (!res.ok) throw new Error(await res.text());
     const payload = await res.json();
-    attempts = payload.attempts || [];
-    selected = attempts[0] || null;
-    renderHistory();
+    files = new Map((payload.attempts || []).map((file) => [file.path, file]));
+    catalogTree = payload.tree || [];
+    selected = files.get(selected?.path) || payload.attempts?.[0] || null;
+    renderTree(catalogTree);
     renderDetails();
-    setStatus(selected ? "Loaded latest version" : "Ready");
+    setStatus(selected ? `${files.size} generation file${files.size === 1 ? "" : "s"}` : `No JSON files in ${payload.root}`);
   } catch (err) {
-    setStatus(err.message || "Failed to load versions", true);
+    selected = null;
+    catalogTree = [];
+    renderTree([]);
+    renderDetails();
+    setStatus(err.message || "Failed to load generation files", true);
   }
   draw();
 }
 
-async function generateAttempt() {
-  const prompt = promptEl.value.trim();
-  if (!prompt) {
-    setStatus("Prompt is required", true);
+function renderTree(tree) {
+  treeEl.replaceChildren();
+  if (tree.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "unit-lab-empty";
+    empty.textContent = "No generation files found.";
+    treeEl.append(empty);
     return;
   }
-  generateEl.disabled = true;
-  setStatus("Generating");
-  try {
-    const res = await fetch("/api/unit-designs", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt, baseKind: baseEl.value }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const payload = await res.json();
-    selected = payload.attempt;
-    attempts = [selected, ...attempts.filter((attempt) => attempt.id !== selected.id)];
-    renderHistory();
-    renderDetails();
-    setStatus(payload.warning || "Generated version");
-  } catch (err) {
-    setStatus(err.message || "Generation failed", true);
-  } finally {
-    generateEl.disabled = false;
-  }
+  treeEl.append(renderNodeList(tree, 0));
 }
 
-function renderHistory() {
-  attemptsEl.replaceChildren();
-  for (const attempt of attempts) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `unit-lab-attempt${attempt.id === selected?.id ? " is-selected" : ""}`;
-    button.innerHTML = `<strong>${escapeHtml(attempt.spec?.name || attempt.id)}</strong><span>${escapeHtml(attempt.id)}</span>`;
-    button.addEventListener("click", () => {
-      selected = attempt;
-      renderHistory();
-      renderDetails();
-      draw();
-    });
-    attemptsEl.append(button);
+function renderNodeList(nodes, depth) {
+  const list = document.createElement("div");
+  list.className = "unit-lab-tree-list";
+  list.style.setProperty("--depth", depth);
+  for (const node of nodes) {
+    list.append(renderNode(node, depth));
   }
+  return list;
+}
+
+function renderNode(node, depth) {
+  if (node.kind === "directory") {
+    const details = document.createElement("details");
+    details.className = "unit-lab-tree-dir";
+    details.open = true;
+    const summary = document.createElement("summary");
+    summary.textContent = node.name;
+    details.append(summary);
+    details.append(renderNodeList(node.children || [], depth + 1));
+    return details;
+  }
+
+  const file = files.get(node.path);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `unit-lab-file${node.path === selected?.path ? " is-selected" : ""}`;
+  button.style.setProperty("--depth", depth);
+  button.innerHTML = `<strong>${escapeHtml(file?.attempt?.spec?.name || node.name)}</strong><span>${escapeHtml(node.path)}</span>`;
+  button.addEventListener("click", () => {
+    selected = file || null;
+    renderTree(catalogTree);
+    renderDetails();
+    draw();
+  });
+  return button;
 }
 
 function renderDetails() {
-  const spec = selected?.spec;
-  nameEl.textContent = spec?.name || "No attempt selected";
-  roleEl.textContent = spec?.role || "";
+  const attempt = selected?.attempt;
+  const spec = attempt?.spec;
+  nameEl.textContent = spec?.name || "No generation selected";
+  roleEl.textContent = spec?.role || spec?.silhouette || "";
   sourceEl.textContent = selected
-    ? `${selected.source}${selected.model ? ` / ${selected.model}` : ""} / ${selected.createdAt}`
+    ? [selected.path, attempt?.source, attempt?.model, attempt?.createdAt || attempt?.created_at]
+      .filter(Boolean)
+      .join(" / ")
     : "";
+  promptEl.textContent = attempt?.prompt ? `Prompt: ${attempt.prompt}` : "";
   notesEl.replaceChildren();
-  for (const note of spec?.animationNotes || []) {
+  for (const note of spec?.animationNotes || spec?.animation_notes || []) {
     const li = document.createElement("li");
     li.textContent = note;
     notesEl.append(li);
@@ -128,10 +133,10 @@ function draw(now = performance.now()) {
   const cssH = h / dpr;
   drawGrass(cssW, cssH);
   drawRangeGrid(cssW, cssH);
-  if (selected) {
-    drawUnit(selected.spec, cssW * 0.5, cssH * 0.48, 2.15, now);
-    drawUnit(selected.spec, cssW * 0.22, cssH * 0.32, 1.0, now);
-    drawUnit(selected.spec, cssW * 0.78, cssH * 0.66, 0.62, now);
+  if (selected?.attempt?.spec) {
+    drawUnit(selected.attempt.spec, cssW * 0.5, cssH * 0.48, 2.15, now);
+    drawUnit(selected.attempt.spec, cssW * 0.22, cssH * 0.32, 1.0, now);
+    drawUnit(selected.attempt.spec, cssW * 0.78, cssH * 0.66, 0.62, now);
   }
 }
 
