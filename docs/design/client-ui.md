@@ -439,6 +439,10 @@ the input module enters targeted cursor mode:
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
   hotkey is still held for repeated world-point targeting.
+- If the selected unit's owner-only ability affordance includes an active return object, the command
+  card sends `recastAbility(ability, readyIds, targetObjectId, queued)` directly instead of arming a
+  world-point cursor. The server remains authoritative for the availability tick and destination
+  validity.
 - While the resolved hotkey remains held, repeated left-clicks keep the current selection intact and
   keep targeted mode armed so multi-selected Mortar Teams and Scout Cars can distribute repeated
   point commands without the next click falling back to normal selection.

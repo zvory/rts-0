@@ -139,6 +139,7 @@ pub(crate) fn run_tick(
             &mut coordinator,
             fog,
             smokes,
+            ability_runtime,
             mortar_shells,
             artillery_shells,
             pending,

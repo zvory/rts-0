@@ -313,6 +313,12 @@ queries unless a later phase explicitly adds such behavior. `Game::snapshot_for`
 mode used by other snapshot data. Enemy-visible objects expose only public render fields; owner-only
 payload state and safe caster ids are withheld from enemies.
 
+Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
+id, availability tick, and remaining lifetime are projected only for the owning player's command
+card. `recastAbility` commands are explicit and validate a live owned caster plus matching active
+runtime state; missing state, same-tick/too-early return, stale caster ids, and invalid return
+destinations are ignored rather than overloading world-point `useAbility` commands.
+
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is

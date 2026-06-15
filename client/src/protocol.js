@@ -58,6 +58,7 @@ export const CMD = Object.freeze({
   TEAR_DOWN_ANTI_TANK_GUNS: "tearDownAntiTankGuns",
   CHARGE: "charge",
   USE_ABILITY: "useAbility",
+  RECAST_ABILITY: "recastAbility",
   SET_AUTOCAST: "setAutocast",
   GATHER: "gather",
   BUILD: "build",
@@ -612,8 +613,8 @@ function assignAbilities(target, fields, index) {
 }
 
 function readAbilityCooldown(record, label) {
-  const fields = readArray(record, label, 4);
-  if (fields.length < 2 || fields.length > 4) throw new Error(`${label} field count mismatch`);
+  const fields = readArray(record, label, 8);
+  if (fields.length < 2 || fields.length > 8) throw new Error(`${label} field count mismatch`);
   const ability = {
     ability: readCode(fields[0], ABILITY_BY_CODE, `${label}.ability`),
     cooldownLeft: readU32(fields[1], `${label}.cooldownLeft`),
@@ -623,6 +624,18 @@ function readAbilityCooldown(record, label) {
   }
   if (fields.length > 3 && fields[3] != null) {
     ability.autocastEnabled = readBool(fields[3], `${label}.autocastEnabled`);
+  }
+  if (fields.length > 4 && fields[4] != null) {
+    ability.activeObjectId = readU32(fields[4], `${label}.activeObjectId`);
+  }
+  if (fields.length > 5 && fields[5] != null) {
+    ability.availableTick = readU32(fields[5], `${label}.availableTick`);
+  }
+  if (fields.length > 6 && fields[6] != null) {
+    ability.lockoutUntilTick = readU32(fields[6], `${label}.lockoutUntilTick`);
+  }
+  if (fields.length > 7 && fields[7] != null) {
+    ability.expiresIn = readU32(fields[7], `${label}.expiresIn`);
   }
   return ability;
 }
@@ -944,6 +957,11 @@ export const cmd = Object.freeze({
     const command = { c: CMD.USE_ABILITY, ability, units };
     if (x != null) command.x = x;
     if (y != null) command.y = y;
+    return withQueued(command, queued);
+  },
+  recastAbility: (ability, units, targetObjectId = null, queued = false) => {
+    const command = { c: CMD.RECAST_ABILITY, ability, units };
+    if (targetObjectId != null) command.targetObjectId = targetObjectId;
     return withQueued(command, queued);
   },
   setAutocast: (ability, units, enabled) => ({ c: CMD.SET_AUTOCAST, ability, units, enabled }),

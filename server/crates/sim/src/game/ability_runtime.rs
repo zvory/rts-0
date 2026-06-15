@@ -6,10 +6,10 @@ use crate::game::entity::EntityStore;
 pub(in crate::game) const MAX_ACTIVE_ABILITY_OBJECTS: usize = 512;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(in crate::game) struct AbilityRuntimeObjectId(u32);
+pub(crate) struct AbilityRuntimeObjectId(u32);
 
 impl AbilityRuntimeObjectId {
-    pub(in crate::game) fn get(self) -> u32 {
+    pub(crate) fn get(self) -> u32 {
         self.0
     }
 }
@@ -31,7 +31,7 @@ pub(in crate::game) enum AbilityWorldObjectKind {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub(in crate::game) enum AbilityObjectPayload {
+pub(crate) enum AbilityObjectPayload {
     #[default]
     None,
     DashReturn {
@@ -49,7 +49,7 @@ pub(in crate::game) enum AbilityObjectPayload {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(in crate::game) struct ActiveAbilityInstance {
+pub(crate) struct ActiveAbilityInstance {
     pub(in crate::game) id: AbilityRuntimeObjectId,
     pub(in crate::game) owner: u32,
     pub(in crate::game) caster_id: u32,
@@ -73,17 +73,17 @@ impl ActiveAbilityInstance {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(in crate::game) struct AbilityWorldObject {
-    pub(in crate::game) id: AbilityRuntimeObjectId,
-    pub(in crate::game) owner: u32,
-    pub(in crate::game) caster_id: u32,
-    pub(in crate::game) ability: AbilityKind,
+pub(crate) struct AbilityWorldObject {
+    pub(crate) id: AbilityRuntimeObjectId,
+    pub(crate) owner: u32,
+    pub(crate) caster_id: u32,
+    pub(crate) ability: AbilityKind,
     pub(in crate::game) kind: AbilityWorldObjectKind,
-    pub(in crate::game) x: f32,
-    pub(in crate::game) y: f32,
+    pub(crate) x: f32,
+    pub(crate) y: f32,
     pub(in crate::game) created_tick: u32,
     pub(in crate::game) expires_tick: u32,
-    pub(in crate::game) payload: AbilityObjectPayload,
+    pub(crate) payload: AbilityObjectPayload,
 }
 
 impl AbilityWorldObject {
@@ -91,7 +91,7 @@ impl AbilityWorldObject {
         self.expires_tick > tick
     }
 
-    pub(in crate::game) fn expires_in(self, tick: u32) -> Option<u16> {
+    pub(crate) fn expires_in(self, tick: u32) -> Option<u16> {
         self.expires_tick
             .checked_sub(tick)
             .map(|remaining| remaining.min(u16::MAX as u32) as u16)
@@ -138,10 +138,14 @@ impl AbilityWorldObjectStore {
     pub(in crate::game) fn iter(&self) -> impl Iterator<Item = &AbilityWorldObject> {
         self.objects.iter()
     }
+
+    fn get(&self, id: u32) -> Option<&AbilityWorldObject> {
+        self.objects.iter().find(|object| object.id.get() == id)
+    }
 }
 
 #[derive(Debug, Clone)]
-pub(in crate::game) struct AbilityRuntime {
+pub(crate) struct AbilityRuntime {
     next_id: u32,
     instances: Vec<ActiveAbilityInstance>,
     world_objects: AbilityWorldObjectStore,
@@ -219,6 +223,47 @@ impl AbilityRuntime {
 
     pub(in crate::game) fn world_objects(&self) -> impl Iterator<Item = &AbilityWorldObject> {
         self.world_objects.iter()
+    }
+
+    pub(crate) fn active_return_marker(
+        &self,
+        owner: u32,
+        caster_id: u32,
+        ability: AbilityKind,
+        target_object_id: Option<u32>,
+        tick: u32,
+    ) -> Option<&AbilityWorldObject> {
+        let matches_return_marker = |object: &&AbilityWorldObject| {
+            object.owner == owner
+                && object.caster_id == caster_id
+                && object.ability == ability
+                && object.kind == AbilityWorldObjectKind::ReturnMarker
+                && object.active_at(tick)
+                && matches!(object.payload, AbilityObjectPayload::DashReturn { .. })
+                && target_object_id.is_none_or(|id| object.id.get() == id)
+        };
+        match target_object_id {
+            Some(id) => self.world_objects.get(id).filter(matches_return_marker),
+            None => self.world_objects.iter().find(matches_return_marker),
+        }
+    }
+
+    pub(in crate::game) fn active_anchor_id(
+        &self,
+        owner: u32,
+        caster_id: u32,
+        ability: AbilityKind,
+        tick: u32,
+    ) -> Option<u32> {
+        self.world_objects()
+            .find(|object| {
+                object.owner == owner
+                    && object.caster_id == caster_id
+                    && object.ability == ability
+                    && object.kind == AbilityWorldObjectKind::MagicAnchor
+                    && object.active_at(tick)
+            })
+            .map(|object| object.id.get())
     }
 }
 

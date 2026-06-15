@@ -698,6 +698,16 @@ export class HUD {
   }
 
   _dispatchAbilityIntent(intent, ev = {}) {
+    if (intent.targetMode === "recast") {
+      this._issueCommand(cmd.recastAbility(
+        intent.ability,
+        intent.readyIds || [],
+        intent.targetObjectId ?? null,
+        !!ev.shiftKey,
+      ));
+      this.state.endCommandTarget();
+      return;
+    }
     if (intent.targetMode === "worldPoint") {
       this.state.beginCommandTarget({ kind: "ability", ability: intent.ability });
     } else {

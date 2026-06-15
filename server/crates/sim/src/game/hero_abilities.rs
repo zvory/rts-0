@@ -39,14 +39,22 @@ pub(crate) fn ekat_teleport_destination(
     let destination =
         clamped_world_ability_vector(caster_entity.pos_x, caster_entity.pos_y, x, y, range_tiles)?;
     let occ = Occupancy::build(map, entities);
-    standability::unit_static_standable(
-        map,
-        &occ,
-        EntityKind::Ekat,
-        destination.0,
-        destination.1,
-    )
-    .then_some(destination)
+    standability::unit_static_standable(map, &occ, EntityKind::Ekat, destination.0, destination.1)
+        .then_some(destination)
+}
+
+pub(crate) fn ekat_return_destination_valid(
+    map: &Map,
+    entities: &EntityStore,
+    caster: u32,
+    x: f32,
+    y: f32,
+) -> bool {
+    let Some(caster_entity) = entities.get(caster) else {
+        return false;
+    };
+    let occ = Occupancy::build(map, entities);
+    standability::unit_static_standable(map, &occ, caster_entity.kind, x, y)
 }
 
 pub(crate) fn move_ekat_to(entities: &mut EntityStore, caster: u32, x: f32, y: f32) -> bool {
@@ -126,10 +134,7 @@ fn apply_line_shot_damage(
     }
     for id in hits {
         if let Some(target) = entities.get_mut(id) {
-            target.apply_damage(
-                config::EKAT_LINE_SHOT_DAMAGE,
-                Some((player, from, tick)),
-            );
+            target.apply_damage(config::EKAT_LINE_SHOT_DAMAGE, Some((player, from, tick)));
         }
     }
 }

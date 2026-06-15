@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
+use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::hero_abilities;
@@ -486,6 +487,57 @@ pub(crate) fn tech_requirement_met(
         }
         None => true,
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn validate_recast_return(
+    map: &Map,
+    entities: &EntityStore,
+    ability_runtime: &AbilityRuntime,
+    player: u32,
+    faction_id: &str,
+    ability: AbilityKind,
+    units: Vec<u32>,
+    target_object_id: Option<u32>,
+    tick: u32,
+) -> bool {
+    let definition = ability::definition(ability);
+    if definition.target_mode != AbilityTargetMode::WorldPoint {
+        return false;
+    }
+    for caster in units {
+        let Some(entity) = entities.get(caster) else {
+            continue;
+        };
+        if entity.owner != player || entity.hp == 0 {
+            continue;
+        }
+        if !caster_allowed_by_faction(entities, faction_id, caster, ability)
+            || !tech_requirement_met(entities, player, ability)
+        {
+            continue;
+        }
+        let Some(marker) =
+            ability_runtime.active_return_marker(player, caster, ability, target_object_id, tick)
+        else {
+            continue;
+        };
+        let AbilityObjectPayload::DashReturn {
+            earliest_return_tick,
+        } = marker.payload
+        else {
+            continue;
+        };
+        if tick < earliest_return_tick {
+            continue;
+        }
+        if !hero_abilities::ekat_return_destination_valid(map, entities, caster, marker.x, marker.y)
+        {
+            continue;
+        }
+        return true;
+    }
+    false
 }
 
 pub(crate) fn caster_in_range(

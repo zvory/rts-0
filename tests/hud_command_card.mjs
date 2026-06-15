@@ -8,6 +8,7 @@ import {
   factionCommandId,
 } from "../client/src/hud_command_card.js";
 import {
+  EKAT_FACTION_ID,
   FIXTURE_FACTION_ID,
   WORKER_BUILDABLE,
   commandCardAbilitiesForFaction,
@@ -16,6 +17,7 @@ import {
 import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
+const ekatCommandId = (family, subject) => factionCommandId(EKAT_FACTION_ID, family, subject);
 
 const researchComplex = {
   id: 10,
@@ -187,6 +189,41 @@ function buttonSlots(card) {
     groupCooldownClocks: () => [],
   });
   assert(!fixtureScoutCard.slots.some((slot) => slot?.action === "ability"), "fixture Scout Car does not inherit Smoke");
+}
+
+{
+  const ekat = {
+    id: 41,
+    owner: 1,
+    kind: KIND.EKAT,
+    abilities: [{
+      ability: ABILITY.EKAT_TELEPORT,
+      cooldownLeft: 120,
+      activeObjectId: 77,
+      availableTick: 45,
+      expiresIn: 90,
+    }],
+  };
+  const card = buildCommandCardDescriptors({
+    playerId: 1,
+    factionId: EKAT_FACTION_ID,
+    selection: [ekat],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const teleport = card.slots.find((slot) =>
+    slot?.commandId === ekatCommandId("ability", ABILITY.EKAT_TELEPORT),
+  );
+  assert.deepEqual(teleport.intent, {
+    type: "ability",
+    ability: ABILITY.EKAT_TELEPORT,
+    targetMode: "recast",
+    readyIds: [41],
+    targetObjectId: 77,
+  });
+  assert.equal(teleport.enabled, true);
 }
 
 {

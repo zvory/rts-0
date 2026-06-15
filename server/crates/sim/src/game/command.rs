@@ -44,6 +44,12 @@ pub enum SimCommand {
         y: Option<f32>,
         queued: bool,
     },
+    RecastAbility {
+        ability: AbilityKind,
+        units: Vec<u32>,
+        target_object_id: Option<u32>,
+        queued: bool,
+    },
     SetAutocast {
         ability: AbilityKind,
         units: Vec<u32>,
@@ -151,7 +157,9 @@ impl SimCommand {
                 y,
                 queued,
             },
-            protocol::Command::TearDownAntiTankGuns { units } => SimCommand::TearDownAntiTankGuns { units },
+            protocol::Command::TearDownAntiTankGuns { units } => {
+                SimCommand::TearDownAntiTankGuns { units }
+            }
             protocol::Command::Charge { units } => SimCommand::UseAbility {
                 ability: AbilityKind::Charge,
                 units,
@@ -171,6 +179,22 @@ impl SimCommand {
                     units,
                     x,
                     y,
+                    queued,
+                },
+                Err(_) => SimCommand::Rejected {
+                    reason: CommandRejection::Ability,
+                },
+            },
+            protocol::Command::RecastAbility {
+                ability,
+                units,
+                target_object_id,
+                queued,
+            } => match ability.parse::<AbilityKind>() {
+                Ok(ability) => SimCommand::RecastAbility {
+                    ability,
+                    units,
+                    target_object_id,
                     queued,
                 },
                 Err(_) => SimCommand::Rejected {
@@ -313,6 +337,17 @@ impl SimCommand {
                 units: units.clone(),
                 x: *x,
                 y: *y,
+                queued: *queued,
+            },
+            SimCommand::RecastAbility {
+                ability,
+                units,
+                target_object_id,
+                queued,
+            } => protocol::Command::RecastAbility {
+                ability: ability.to_protocol_str().to_string(),
+                units: units.clone(),
+                target_object_id: *target_object_id,
                 queued: *queued,
             },
             SimCommand::SetAutocast {
@@ -520,6 +555,30 @@ mod tests {
                 x: Some(320.0),
                 y: Some(384.0),
                 queued: true,
+            }
+        );
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()).to_protocol(),
+            Some(command)
+        );
+    }
+
+    #[test]
+    fn protocol_recast_ability_command_round_trips() {
+        let command = protocol::Command::RecastAbility {
+            ability: protocol::abilities::EKAT_TELEPORT.to_string(),
+            units: vec![21],
+            target_object_id: Some(77),
+            queued: false,
+        };
+
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()),
+            SimCommand::RecastAbility {
+                ability: AbilityKind::EkatTeleport,
+                units: vec![21],
+                target_object_id: Some(77),
+                queued: false,
             }
         );
         assert_eq!(

@@ -2383,7 +2383,7 @@ function fakeAudioContext() {
           [ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE], 320, 352],
         ],
         87,
-        [[ABILITY_CODE[ABILITY.CHARGE], 87, 2]],
+        [[ABILITY_CODE[ABILITY.CHARGE], 87, 2, null, 77, 45, null, 90]],
         66,
         true,
         [[[112, 128], [144, 160]], [192, 224], 12, 2, 1, 2],
@@ -2486,7 +2486,10 @@ function fakeAudioContext() {
   assert(
     decoded.entities[0].abilities[0].ability === ABILITY.CHARGE &&
       decoded.entities[0].abilities[0].cooldownLeft === 87 &&
-      decoded.entities[0].abilities[0].remainingUses === 2,
+      decoded.entities[0].abilities[0].remainingUses === 2 &&
+      decoded.entities[0].abilities[0].activeObjectId === 77 &&
+      decoded.entities[0].abilities[0].availableTick === 45 &&
+      decoded.entities[0].abilities[0].expiresIn === 90,
     "entity ability cooldowns decode",
   );
   assert(
@@ -2589,6 +2592,15 @@ function fakeAudioContext() {
       abilityCommand.y === 384 &&
       abilityCommand.queued === true,
     "useAbility command builder emits targeted ability wire shape",
+  );
+  const recastCommand = cmd.recastAbility(ABILITY.EKAT_TELEPORT, [9], 77, true);
+  assert(
+    recastCommand.c === "recastAbility" &&
+      recastCommand.ability === ABILITY.EKAT_TELEPORT &&
+      recastCommand.units.length === 1 &&
+      recastCommand.targetObjectId === 77 &&
+      recastCommand.queued === true,
+    "recastAbility command builder emits explicit recast wire shape",
   );
   const buildCommand = cmd.build([7, 8], KIND.DEPOT, 12, 14, true);
   assert(

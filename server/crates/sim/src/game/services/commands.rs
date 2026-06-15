@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::{
@@ -47,6 +48,7 @@ pub(crate) fn apply_commands(
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
     pending: Vec<(u32, SimCommand)>,
@@ -275,6 +277,29 @@ pub(crate) fn apply_commands(
                         y,
                         queued,
                     },
+                    tick,
+                );
+            }
+            SimCommand::RecastAbility {
+                ability,
+                units,
+                target_object_id,
+                queued: _,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
+                ability_orders::validate_recast_return(
+                    map,
+                    entities,
+                    ability_runtime,
+                    player,
+                    &faction_id,
+                    ability,
+                    units,
+                    target_object_id,
                     tick,
                 );
             }
@@ -2048,6 +2073,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &AbilityRuntime::new(),
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -2123,6 +2149,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &AbilityRuntime::new(),
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -2193,6 +2220,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &AbilityRuntime::new(),
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -2271,6 +2299,7 @@ mod tests {
             &mut coordinator,
             &fog,
             &mut smokes,
+            &AbilityRuntime::new(),
             &mut mortar_shells,
             &mut artillery_shells,
             vec![(
@@ -4984,6 +5013,7 @@ mod tests {
             &mut coordinator,
             &fog,
             smokes,
+            &AbilityRuntime::new(),
             &mut mortar_shells,
             &mut artillery_shells,
             pending,

@@ -22,6 +22,12 @@ fn human_vs_ai_players() -> [PlayerInit; 2] {
     ]
 }
 
+fn ekat_vs_ai_players() -> [PlayerInit; 2] {
+    let mut players = human_vs_ai_players();
+    players[0].faction_id = "ekat".to_string();
+    players
+}
+
 fn first_tile_matching(game: &Game, predicate: impl Fn(f32, f32) -> bool) -> (f32, f32) {
     (0..game.map.size)
         .flat_map(|ty| (0..game.map.size).map(move |tx| (tx, ty)))
@@ -180,4 +186,134 @@ fn spectator_and_full_snapshots_project_ability_objects() {
         .ability_objects
         .iter()
         .any(|object| object.id == hidden_id && object.source_caster_id == Some(caster)));
+}
+
+#[test]
+fn owner_entity_abilities_project_active_return_affordance() {
+    let players = ekat_vs_ai_players();
+    let mut game = Game::new(&players, 0xCAFE_BABE);
+    let caster = game
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
+        .map(|entity| entity.id)
+        .expect("Ekat loadout should spawn a caster");
+    let (x, y) = game
+        .entities
+        .get(caster)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .expect("caster should exist");
+    let marker_id = game
+        .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))
+        .expect("return marker should spawn");
+
+    let owner_snapshot = game.snapshot_for(1);
+    let owner_ekat = owner_snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == caster)
+        .expect("owner should see Ekat");
+    let affordance = owner_ekat
+        .abilities
+        .iter()
+        .find(|ability| ability.ability == crate::protocol::abilities::EKAT_TELEPORT)
+        .expect("Ekat teleport affordance should project");
+    assert_eq!(affordance.active_object_id, Some(marker_id));
+    assert_eq!(affordance.available_tick, Some(8));
+    assert_eq!(affordance.expires_in, Some(120));
+
+    let enemy_snapshot = game.snapshot_for(2);
+    assert!(enemy_snapshot
+        .entities
+        .iter()
+        .filter(|entity| entity.id == caster)
+        .all(|entity| entity.abilities.is_empty()));
+}
+
+#[test]
+fn recast_return_validation_accepts_active_marker() {
+    let players = ekat_vs_ai_players();
+    let mut game = Game::new(&players, 0xCAFE_BABE);
+    let caster = game
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
+        .map(|entity| entity.id)
+        .expect("Ekat loadout should spawn a caster");
+    let (x, y) = game
+        .entities
+        .get(caster)
+        .map(|entity| (entity.pos_x + 96.0, entity.pos_y))
+        .expect("caster should exist");
+    let marker_id = game
+        .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))
+        .expect("return marker should spawn");
+
+    assert!(services::ability_orders::validate_recast_return(
+        &game.map,
+        &game.entities,
+        &game.ability_runtime,
+        1,
+        "ekat",
+        ability::AbilityKind::EkatTeleport,
+        vec![caster],
+        Some(marker_id),
+        8,
+    ));
+}
+
+#[test]
+fn recast_return_validation_rejects_missing_too_early_and_stale_state() {
+    let players = ekat_vs_ai_players();
+    let mut game = Game::new(&players, 0xCAFE_BABE);
+    let caster = game
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
+        .map(|entity| entity.id)
+        .expect("Ekat loadout should spawn a caster");
+    let (x, y) = game
+        .entities
+        .get(caster)
+        .map(|entity| (entity.pos_x + 96.0, entity.pos_y))
+        .expect("caster should exist");
+    let marker_id = game
+        .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))
+        .expect("return marker should spawn");
+
+    assert!(!services::ability_orders::validate_recast_return(
+        &game.map,
+        &game.entities,
+        &game.ability_runtime,
+        1,
+        "ekat",
+        ability::AbilityKind::EkatTeleport,
+        vec![caster],
+        Some(marker_id + 1),
+        8,
+    ));
+    assert!(!services::ability_orders::validate_recast_return(
+        &game.map,
+        &game.entities,
+        &game.ability_runtime,
+        1,
+        "ekat",
+        ability::AbilityKind::EkatTeleport,
+        vec![caster],
+        Some(marker_id),
+        7,
+    ));
+
+    game.entities.remove(caster);
+    assert!(!services::ability_orders::validate_recast_return(
+        &game.map,
+        &game.entities,
+        &game.ability_runtime,
+        1,
+        "ekat",
+        ability::AbilityKind::EkatTeleport,
+        vec![caster],
+        Some(marker_id),
+        9,
+    ));
 }

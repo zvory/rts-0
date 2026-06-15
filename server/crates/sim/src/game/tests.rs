@@ -142,6 +142,10 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
                     cooldown_left: e.ability_cooldown_ticks(kind),
                     remaining_uses: e.ability_uses_remaining(kind),
                     autocast_enabled: e.autocast_enabled(kind),
+                    active_object_id: None,
+                    available_tick: None,
+                    lockout_until_tick: None,
+                    expires_in: None,
                 });
             }
         }

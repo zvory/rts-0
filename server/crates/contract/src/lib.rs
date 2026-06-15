@@ -287,6 +287,14 @@ pub struct AbilityCooldownView {
     pub remaining_uses: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub autocast_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_object_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub available_tick: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lockout_until_tick: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_in: Option<u16>,
 }
 
 /// One entity as seen by one player. Optional fields are omitted when not applicable.

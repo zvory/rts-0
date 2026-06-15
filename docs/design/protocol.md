@@ -64,6 +64,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `tearDownAntiTankGuns` | `units: u32[]` | Pack up owned anti-tank guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but no longer has eligible carriers. |
 | `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"|"breakthrough"|"ekatTeleport"|"ekatLineShot"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. Ability ids, carriers, target mode, cost, cooldown, finite uses, queueability, autocast support, and command-card exposure are mirrored from the Rust faction ability registry. `charge` is legacy/no-op; `smoke`, `mortarFire`, deployed Artillery `pointFire`, Ekat `ekatTeleport`, and Ekat `ekatLineShot` target a world point. Command Car `breakthrough` is self-targeted and ignores `x`/`y`. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Artillery point fire requires a deployed gun and is terminal in the unit order queue: once accepted, later queued unit orders are not appended after it. Ekat teleport moves her within the target range if the landing point is statically standable; Ekat line shot applies immediate line damage to enemy targetables. |
+| `recastAbility` | `ability: "ekatTeleport"`, `units: u32[]`, `targetObjectId?: u32`, `queued?: bool` | Explicit second activation for an existing per-caster ability state. The server does not infer recast from missing `x`/`y`; it validates ownership, live caster eligibility, matching active return marker state, the no-instant-return availability tick, and destination standability before later dash-return execution phases can act. |
 | `setAutocast` | `ability: "mortarFire"`, `units: u32[]`, `enabled: bool` | Toggle server-authoritative autocast for owned Mortar Teams. Other unit/ability combinations are ignored. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
@@ -389,14 +390,18 @@ after `debugPath` in compact snapshots to preserve older optional slot positions
 capped at four stages, and uses the same `[kind, x, y]` compact stage encoding with `move` and
 `attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
-`[ability, cooldownLeft, remainingUses?, autocastEnabled?]`, where `ability` is 2 `smoke`,
-3 `mortarFire`, 4 `pointFire`, or 5 `breakthrough`; 1 `charge` is legacy.
+`[ability, cooldownLeft, remainingUses?, autocastEnabled?, activeObjectId?, availableTick?, lockoutUntilTick?, expiresIn?]`,
+where `ability` is 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`,
+6 `ekatTeleport`, or 7 `ekatLineShot`; 1 `charge` is legacy.
 The server projects ability affordances only when the owning player's faction catalog exposes that
 ability for the entity's global kind.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
 means the ability is depleted and cannot be used by that caster.
 `autocastEnabled` is present for Mortar Team `mortarFire` so the command card can display and
 toggle autocast without exposing enemy data.
+`activeObjectId`, `availableTick`, and `expiresIn` are owner-only per-caster affordance fields for
+two-stage ability state such as Ekat's return marker. `lockoutUntilTick` is reserved for owner-only
+anchor placement lockouts.
 `breakthroughTicks` is present only while the affected visible unit has active Breakthrough speed
 status. Owner snapshots also expose the Command Car's `breakthrough` ability cooldown through
 `abilities`.
@@ -479,8 +484,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
   abilities?: [                  // owner-only ability affordance/cooldown data
-    { ability: "smoke"|"mortarFire"|"pointFire"|"breakthrough", cooldownLeft: u16,
-      remainingUses?: u16, autocastEnabled?: bool }
+    { ability: "smoke"|"mortarFire"|"pointFire"|"breakthrough"|"ekatTeleport"|"ekatLineShot",
+      cooldownLeft: u16, remainingUses?: u16, autocastEnabled?: bool,
+      activeObjectId?: u32, availableTick?: u32, lockoutUntilTick?: u32, expiresIn?: u16 }
   ],
   breakthroughTicks?: u16,       // active Breakthrough speed status; visible only with the entity
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only

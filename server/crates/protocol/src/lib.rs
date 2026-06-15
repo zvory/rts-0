@@ -288,6 +288,14 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    RecastAbility {
+        ability: String,
+        units: Vec<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_object_id: Option<u32>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
+    },
     SetAutocast {
         ability: String,
         units: Vec<u32>,
@@ -983,6 +991,18 @@ impl Serialize for CompactAbilityCooldown<'_> {
         if ability.autocast_enabled.is_some() {
             len = 4;
         }
+        if ability.active_object_id.is_some() {
+            len = 5;
+        }
+        if ability.available_tick.is_some() {
+            len = 6;
+        }
+        if ability.lockout_until_tick.is_some() {
+            len = 7;
+        }
+        if ability.expires_in.is_some() {
+            len = 8;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&ability_code(&ability.ability))?;
         seq.serialize_element(&ability.cooldown_left)?;
@@ -991,6 +1011,18 @@ impl Serialize for CompactAbilityCooldown<'_> {
         }
         if len > 3 {
             seq.serialize_element(&ability.autocast_enabled)?;
+        }
+        if len > 4 {
+            seq.serialize_element(&ability.active_object_id)?;
+        }
+        if len > 5 {
+            seq.serialize_element(&ability.available_tick)?;
+        }
+        if len > 6 {
+            seq.serialize_element(&ability.lockout_until_tick)?;
+        }
+        if len > 7 {
+            seq.serialize_element(&ability.expires_in)?;
         }
         seq.end()
     }
@@ -1575,6 +1607,10 @@ mod tests {
             cooldown_left: 87,
             remaining_uses: Some(2),
             autocast_enabled: None,
+            active_object_id: None,
+            available_tick: None,
+            lockout_until_tick: None,
+            expires_in: None,
         }];
         worker.vision_only = true;
 

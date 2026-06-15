@@ -149,6 +149,7 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
         Command::SetupAntiTankGuns { .. }
         | Command::TearDownAntiTankGuns { .. }
         | Command::UseAbility { .. }
+        | Command::RecastAbility { .. }
         | Command::SetAutocast { .. }
         | Command::Gather { .. }
         | Command::Build { .. }

@@ -103,6 +103,8 @@ impl Game {
                     active_construction_sites: Some(&self.active_construction_sites),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
+                    ability_runtime: Some(&self.ability_runtime),
+                    tick: self.tick,
                 },
             ) {
                 entities.push(view);
@@ -231,6 +233,8 @@ impl Game {
                             owner_faction_id: self
                                 .player(entity.owner)
                                 .map(|p| p.faction_id.as_str()),
+                            ability_runtime: Some(&self.ability_runtime),
+                            tick: self.tick,
                         },
                     )
                     .is_some()
