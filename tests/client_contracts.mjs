@@ -2673,6 +2673,10 @@ function fakeAudioContext() {
     "lobby faction select shows on loopback host",
   );
   assert(
+    betaFactionSelectEnabledForLocation({ hostname: "0.0.0.0", pathname: "/" }),
+    "lobby faction select shows on wildcard bind host",
+  );
+  assert(
     !betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin.fly.dev", pathname: "/" }),
     "lobby faction select stays hidden on mainline host",
   );
