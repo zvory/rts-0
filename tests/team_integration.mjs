@@ -239,6 +239,21 @@ async function hostOnlyAndInvalidMutationsAreIgnored() {
     "host can move active players onto the same team");
   ok(last.players.length === 3 && !last.players.some((player) => player.isAi),
     "invalid addAi(teamId) requests are ignored");
+
+  B.send({ t: "setSpectator", id: A.playerId, spectator: true });
+  await sleep(300);
+  last = A.msgs.filter((msg) => msg.t === "lobby").at(-1);
+  ok(!last.players.find((player) => player.id === A.playerId)?.isSpectator,
+    "non-host targeted spectator assignment is ignored");
+
+  A.send({ t: "setSpectator", id: B.playerId, spectator: true });
+  last = await A.waitFor((msg) =>
+    msg.t === "lobby" && msg.players.find((player) => player.id === B.playerId)?.isSpectator,
+    3000,
+    "host spectator assignment",
+  );
+  ok(last.players.find((player) => player.id === B.playerId)?.teamId === 0,
+    "host can move a human player into spectators");
   closeClients(A, B, C);
 }
 

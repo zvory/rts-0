@@ -835,7 +835,11 @@ export const msg = Object.freeze({
   setAiProfile: (id, aiProfileId) => ({ t: C.SET_AI_PROFILE, id, aiProfileId }),
   removeAi: (id) => ({ t: C.REMOVE_AI, id }),
   setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
-  setSpectator: (spectator) => ({ t: C.SET_SPECTATOR, spectator: !!spectator }),
+  setSpectator: (spectator, id = undefined) => {
+    const payload = { t: C.SET_SPECTATOR, spectator: !!spectator };
+    if (id != null) payload.id = id;
+    return payload;
+  },
   command: (cmd, clientSeq) => ({ t: C.COMMAND, clientSeq, cmd }),
   giveUp: () => ({ t: C.GIVE_UP }),
   returnToLobby: () => ({ t: C.RETURN_TO_LOBBY }),

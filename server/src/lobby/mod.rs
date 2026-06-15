@@ -140,8 +140,13 @@ pub enum RoomEvent {
     RemoveAi { player_id: u32, target: u32 },
     /// The host toggled the lobby's start-with-more-money mode.
     SetQuickstart { player_id: u32, enabled: bool },
-    /// A connected human switched between active player and spectator role in the lobby.
-    SetSpectator { player_id: u32, spectator: bool },
+    /// A connected human switched between active player and spectator role in the lobby. `target`
+    /// may differ from `player_id` only for host-managed lobby moves.
+    SetSpectator {
+        player_id: u32,
+        target: u32,
+        spectator: bool,
+    },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command {
         player_id: u32,

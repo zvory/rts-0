@@ -933,8 +933,9 @@ impl RoomTask {
             }
             RoomEvent::SetSpectator {
                 player_id,
+                target,
                 spectator,
-            } => self.on_set_spectator(player_id, spectator),
+            } => self.on_set_spectator(player_id, target, spectator),
             RoomEvent::Command {
                 player_id,
                 client_seq,
@@ -1503,7 +1504,7 @@ impl RoomTask {
         }
     }
 
-    fn on_set_spectator(&mut self, player_id: u32, spectator: bool) {
+    fn on_set_spectator(&mut self, player_id: u32, target: u32, spectator: bool) {
         if self.is_live_dev_watch() {
             return;
         }
@@ -1513,31 +1514,40 @@ impl RoomTask {
         if !matches!(self.phase, Phase::Lobby) {
             return;
         }
-        let current = self.players.get(&player_id).map(|p| p.spectator);
+        if target != player_id && self.host_id != Some(player_id) {
+            crate::log_debug!(
+                room = %self.room,
+                player_id,
+                target,
+                "ignoring non-host spectator assignment"
+            );
+            return;
+        }
+        let current = self.players.get(&target).map(|p| p.spectator);
         if current == Some(spectator) || current.is_none() {
             return;
         }
         if spectator {
-            if let Some(player) = self.players.get_mut(&player_id) {
+            if let Some(player) = self.players.get_mut(&target) {
                 player.spectator = true;
                 player.ready = false;
                 player.color = "#6f8fa8".to_string();
             }
-            self.human_team_assignments.remove(&player_id);
-            self.human_faction_assignments.remove(&player_id);
+            self.human_team_assignments.remove(&target);
+            self.human_faction_assignments.remove(&target);
         } else {
             if self.total_player_count() >= MAX_PLAYERS {
-                crate::log_debug!(room = %self.room, player_id, "ignoring player role switch; room full");
+                crate::log_debug!(room = %self.room, player_id, target, "ignoring player role switch; room full");
                 return;
             }
             let color = self.next_human_color();
-            if let Some(player) = self.players.get_mut(&player_id) {
+            if let Some(player) = self.players.get_mut(&target) {
                 player.spectator = false;
                 player.ready = false;
                 player.color = color;
             }
-            self.assign_missing_team_for(player_id);
-            self.assign_missing_faction_for(player_id);
+            self.assign_missing_team_for(target);
+            self.assign_missing_faction_for(target);
         }
         self.broadcast_lobby();
     }
@@ -3954,6 +3964,39 @@ mod tests {
         );
     }
 
+    #[test]
+    fn host_can_move_another_human_to_spectators() {
+        let mut task = RoomTask::new(
+            "host-spectator-target".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        task.host_id = Some(1);
+        add_test_room_player(&mut task, 1, true);
+        add_test_room_player(&mut task, 2, true);
+        add_test_room_player(&mut task, 3, true);
+        task.human_team_assignments.insert(2, 2);
+        task.human_faction_assignments
+            .insert(2, "kriegsia".to_string());
+
+        task.on_set_spectator(3, 2, true);
+        assert!(
+            !task.players.get(&2).unwrap().spectator,
+            "non-host targeted spectator move must be ignored"
+        );
+
+        task.on_set_spectator(1, 2, true);
+
+        let target = task.players.get(&2).unwrap();
+        assert!(target.spectator);
+        assert!(!target.ready);
+        assert_eq!(target.color, "#6f8fa8");
+        assert!(!task.human_team_assignments.contains_key(&2));
+        assert!(!task.human_faction_assignments.contains_key(&2));
+    }
+
     fn add_branch_occupant(task: &mut RoomTask, id: u32) -> ConnectionWriter {
         let (msg_tx, writer) = ConnectionSink::new();
         task.order.push(id);
@@ -4972,7 +5015,7 @@ mod tests {
         task.on_add_ai(100, None, None);
         task.on_remove_ai(100, 999);
         task.on_set_quickstart(100, true);
-        task.on_set_spectator(100, false);
+        task.on_set_spectator(100, 100, false);
         task.on_select_map(100, "Badlands".to_string());
         task.on_start_request(100);
 

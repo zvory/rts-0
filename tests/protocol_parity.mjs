@@ -196,6 +196,18 @@ assert(
   "setTeam builder must emit the exact wire shape",
 );
 assert(
+  rust.includes("SetSpectator") && C.SET_SPECTATOR === "setSpectator",
+  "setSpectator client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.setSpectator(true)) === JSON.stringify({ t: "setSpectator", spectator: true }),
+  "setSpectator builder must preserve the self-targeting wire shape",
+);
+assert(
+  JSON.stringify(msg.setSpectator(true, 7)) === JSON.stringify({ t: "setSpectator", spectator: true, id: 7 }),
+  "setSpectator builder must support optional host-targeted id",
+);
+assert(
   rust.includes("SetFaction") && C.SET_FACTION === "setFaction",
   "setFaction client message tag must match Rust",
 );

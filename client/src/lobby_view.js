@@ -30,6 +30,20 @@ export function splitLobbyPlayers(players = []) {
   };
 }
 
+export function shouldAcceptSpectatorDrop({
+  draggedPlayer,
+  isHost,
+  countdownActive,
+} = {}) {
+  return (
+    !!isHost &&
+    !countdownActive &&
+    !!draggedPlayer &&
+    !draggedPlayer.isAi &&
+    !draggedPlayer.isSpectator
+  );
+}
+
 export class LobbyRosterView {
   constructor(rootEl) {
     this.root = rootEl;
@@ -47,6 +61,7 @@ export class LobbyRosterView {
     onAddAi,
     onRemoveAi,
     onSetTeam,
+    onSetSpectator,
     onSetFaction,
     onSetAiProfile,
   }) {
@@ -76,9 +91,15 @@ export class LobbyRosterView {
       }));
     }
 
-    if (spectatorPlayers.length > 0) {
-      this.root.appendChild(this._buildSpectatorSection(spectatorPlayers, myId, hostId));
-    }
+    this.root.appendChild(this._buildSpectatorSection({
+      players: spectatorPlayers,
+      allPlayers: players,
+      myId,
+      hostId,
+      isHost,
+      countdownActive,
+      onSetSpectator,
+    }));
   }
 
   _buildTeamColumn({
@@ -322,10 +343,33 @@ export class LobbyRosterView {
     return ready;
   }
 
-  _buildSpectatorSection(players, myId, hostId) {
+  _buildSpectatorSection({
+    players,
+    allPlayers,
+    myId,
+    hostId,
+    isHost,
+    countdownActive,
+    onSetSpectator,
+  }) {
     const section = document.createElement("section");
     section.className = "lobby-spectator-card";
     section.setAttribute("aria-label", "Spectators");
+    if (isHost && !countdownActive) {
+      section.addEventListener("dragover", (ev) => {
+        ev.preventDefault();
+        section.classList.add("is-drop-target");
+      });
+      section.addEventListener("dragleave", () => section.classList.remove("is-drop-target"));
+      section.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        section.classList.remove("is-drop-target");
+        const draggedId = Number(ev.dataTransfer?.getData("application/x-rts-player-id"));
+        const draggedPlayer = allPlayers.find((player) => player.id === draggedId);
+        if (!shouldAcceptSpectatorDrop({ draggedPlayer, isHost, countdownActive })) return;
+        onSetSpectator?.(draggedId, true);
+      });
+    }
 
     const header = document.createElement("header");
     header.className = "lobby-spectator-header";
@@ -345,6 +389,12 @@ export class LobbyRosterView {
     list.className = "lobby-observer-list";
     for (const player of players) {
       list.appendChild(this._buildSpectatorRow(player, myId, hostId));
+    }
+    if (players.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "lobby-empty-spectators";
+      empty.textContent = isHost ? "Drop a player here" : "No observers";
+      list.appendChild(empty);
     }
 
     section.append(header, list);

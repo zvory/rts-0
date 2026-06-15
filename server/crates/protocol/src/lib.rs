@@ -144,8 +144,13 @@ pub enum ClientMessage {
     RemoveAi { id: u32 },
     /// Host toggles the lobby's debug mode.
     SetQuickstart { enabled: bool },
-    /// Switch between player and spectator role while still in the lobby.
-    SetSpectator { spectator: bool },
+    /// Switch between player and spectator role while still in the lobby. `id` is optional for
+    /// self-targeting compatibility; host-targeted changes include the target human player id.
+    SetSpectator {
+        spectator: bool,
+        #[serde(default)]
+        id: Option<u32>,
+    },
     /// Issue a gameplay command (ignored unless in-game).
     Command {
         #[serde(rename = "clientSeq")]

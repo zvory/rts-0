@@ -167,11 +167,12 @@ export class Net {
   }
 
   /**
-   * Switch between player and spectator role while still in the lobby.
+   * Switch a player between player and spectator role while still in the lobby.
    * @param {boolean} spectator
+   * @param {number|undefined} [id] optional host-targeted player id; omitted means self.
    */
-  setSpectator(spectator) {
-    this._send(msg.setSpectator(spectator));
+  setSpectator(spectator, id = undefined) {
+    this._send(msg.setSpectator(spectator, id));
   }
 
   /**

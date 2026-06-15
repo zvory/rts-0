@@ -30,7 +30,7 @@ crate.
 | `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects the live AI profile for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile ids are ignored. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setQuickstart` | `enabled: bool` | Host toggles "Debug mode" for the next match in this room. |
-| `setSpectator` | `spectator: bool` | Switch between active player and spectator role while still in the lobby. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
+| `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
@@ -159,8 +159,8 @@ block readiness, or count toward win/loss.
 `teamId` is nonzero for active match players and AI seats. New active players and default-added AI
 opponents are assigned to the first empty team in `1..=4`; the host may move active human or AI
 seats between those team slots. The normal lobby UI shows occupied teams plus one "New team" drop
-target while fewer than four teams are occupied. Spectator lobby rows carry `teamId: 0` because
-they are not match players. `canStart` is false until there is at least one active seat, every
+target while fewer than four teams are occupied, plus a bottom spectator drop target for host-managed
+observer moves. Spectator lobby rows carry `teamId: 0` because they are not match players. `canStart` is false until there is at least one active seat, every
 active human is ready, every active seat has a team in `1..=4`, and the active seat count is at or
 below the four-player map-start cap.
 
