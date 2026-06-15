@@ -32,6 +32,7 @@ the outbound and return passes and preserve metadata for later damage scaling.
 - Damage happens on both legs and is server-authoritative.
 - Damage scaling hooks are present even if the first fun-test value is simple.
 - The old immediate line-shot behavior no longer defines the product path.
+- Ekat can move or dash after firing th eline projective, which will meant he line projectile's return path can curve, but it always returns directly to Ekat.
 
 ## Out of Scope
 

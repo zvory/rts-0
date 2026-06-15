@@ -36,6 +36,7 @@ recast contract. This is the first complete product ability in the 0.1 plan.
 - Ekat can return while the marker is active and the destination remains valid.
 - Hidden markers do not leak to enemies without vision.
 - Existing Ekat faction start and non-Ekat factions remain intact.
+- Delete existing Ekat teleport behaviour
 
 ## Out of Scope
 
