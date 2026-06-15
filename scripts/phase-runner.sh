@@ -110,7 +110,7 @@ if [ -n "$FROM_PHASE" ] && [ "${#PHASES[@]}" -ne 0 ]; then
 fi
 
 case "$PLAN_NAME" in
-  *[!a-z0-9_-]*|"")
+  *[!a-z0-9_.-]*|*/*|.|..|"")
     echo "error: plan name must be a simple plans/ directory name: $PLAN_NAME" >&2
     exit 2
     ;;
@@ -226,7 +226,9 @@ phase_marked_done() {
   node -e '
     const fs = require("fs");
     const text = fs.readFileSync(process.argv[1], "utf8");
-    process.exit(/^Status:\s*Done\.?\s*$/im.test(text) ? 0 : 1);
+    const singleLineStatus = /^Status:\s*Done\.?\s*$/im.test(text);
+    const headingStatus = /^##\s+Status\s*\n+\s*Done\.?\s*$/im.test(text);
+    process.exit(singleLineStatus || headingStatus ? 0 : 1);
   ' "$phase_file"
 }
 
@@ -255,9 +257,9 @@ for raw_phase in "${PHASES[@]}"; do
 
   branch="zvorygin/$PLAN_NAME-$phase_id"
   worktree_path="$WORKTREE_ROOT/$PLAN_NAME-$phase_id"
-  handoff_dir="$worktree_path/plans/$PLAN_NAME/handoffs"
-  handoff_file="$handoff_dir/$phase_id.json"
   log_dir="$WORKTREE_ROOT/phase-runner-logs/$PLAN_NAME"
+  handoff_dir="$log_dir/handoffs"
+  handoff_file="$handoff_dir/$phase_id.json"
   codex_log="$log_dir/$phase_id.codex.log"
   timing_file="$log_dir/$phase_id.timing.json"
 
