@@ -75,9 +75,9 @@ Core unit roles:
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
   infantry and cannot fire outside their emplacement arc.
-- **Mortar Team** is the Superior Firepower path-entry pressure unit from Gun Works: it sets up
-  before firing, cannot shoot while moving, and lands delayed area shells that punish static
-  positions and clumped units.
+- **Mortar Team** is the Superior Firepower path-entry pressure unit from Gun Works: its setup time
+  is provisionally set to zero ticks for balance improvement, it cannot shoot while moving, and it
+  lands delayed area shells that punish static positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
   gameplay footprint but reads as an exposed field piece, must deploy into a narrow firing arc,
   cannot shoot inside its minimum range, and spends steel on each long-range point-fire shell.
