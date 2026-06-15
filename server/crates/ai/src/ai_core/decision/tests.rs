@@ -1,4 +1,4 @@
-use super::defense::main_steel_cluster_center;
+use super::defense::{main_steel_cluster_center, DEFENSIVE_MG_PERIMETER_DISTANCE_TILES};
 use super::expansion::{
     expansion_candidate_resources, expansion_city_centre_site, nearest_enemy_start_distance2,
 };
@@ -1487,7 +1487,9 @@ fn ai_1_1_reserves_machine_gunner_perimeter_from_tank_wave() {
         let dy = *y - steel_center.1;
         let front_tiles = (dx * dir.0 + dy * dir.1) / ts;
         assert!(
-            (2.0..=4.0).contains(&front_tiles),
+            ((DEFENSIVE_MG_PERIMETER_DISTANCE_TILES - 1.0)
+                ..=(DEFENSIVE_MG_PERIMETER_DISTANCE_TILES + 1.0))
+                .contains(&front_tiles),
             "perimeter point should be in front of the steel patch, got {front_tiles} tiles"
         );
         lateral_offsets.push((dx * perp.0 + dy * perp.1) / ts);

@@ -93,8 +93,9 @@ frontal-wave posture, but removes Scout Car production and harassment, caps ordi
 at two, and trains a bounded defensive Machine Gunner group. It reserves up to four ready Machine
 Gunners before frontal-wave readiness is calculated, so those MGs do not satisfy Tank wave sizes.
 When there is no local base threat, the reserved MGs receive deterministic individual attack-move
-stage orders on the enemy-facing side of the main steel line, using the nearest living public enemy
-start and public resource geometry rather than hidden enemy positions. Visible threats near the
+stage orders roughly 20 tiles past the main steel line toward the nearest living public enemy start,
+using public resource geometry rather than hidden enemy positions. This pushes the defensive group
+out far enough to contest approaches before attackers reach the expansion. Visible threats near the
 base, home resource line, or workers still take priority over passive perimeter staging.
 The aliases `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`; `ai`, `ai1`, `ai_1_0`, and `default`
 still resolve to `ai_1_0_tech` until release replay evidence justifies promotion.
