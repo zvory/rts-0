@@ -32,9 +32,9 @@ instead of reaching into entity stores from the server layer.
 **Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
-`ai_1_0_tech` profile by default and keep that profile for the whole match. Hosts can select
+`ai_1_1_tank_mg` profile by default and keep that profile for the whole match. Hosts can select
 `ai_1_0_tech` or `ai_1_1_tank_mg` per AI seat from the lobby before countdown/start; unsupported
-profile ids are ignored or defaulted to AI 1.0. Team relationships are observation-only safety
+profile ids are ignored or defaulted to the highest supported live AI version. Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
 current living player set so attack waves keep choosing living enemies. AI teammates still do not
@@ -70,7 +70,7 @@ so an upstream economy mistake cannot knowingly emit a `Gather` command to non-m
 free mineable steel exists. Self-play regression coverage preserves the pre-expansion case where
 oil is known but outside completed-City-Centre mining range, and the post-expansion case where oil
 assignment begins after the expansion City Centre completes.
-The live lobby default and promoted profile is `ai_1_0_tech`; it parameterizes worker targets,
+The AI 1.0 profile is `ai_1_0_tech`; it parameterizes worker targets,
 supply buffers, building/tech goals, production priorities, resource timing, expansion timing, and
 attack thresholds without providing its own `think()` function. It opens with
 four-Rifleman frontal waves, expands off a completed Training Centre, builds Research
@@ -110,13 +110,13 @@ stage orders roughly 20 tiles past the main steel line toward the nearest living
 using public resource geometry rather than hidden enemy positions. This pushes the defensive group
 out far enough to contest approaches before attackers reach the expansion. Visible threats near the
 base, home resource line, or workers still take priority over passive perimeter staging.
-The aliases `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`; `ai`, `ai1`, `ai_1_0`, and `default`
-still resolve to `ai_1_0_tech` until release replay evidence justifies promotion.
+The aliases `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`; `ai_1_0`, `ai_1_0_tech`, and `ai1`
+resolve to `ai_1_0_tech`; `ai` and `default` resolve to the live default.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
-promoted `ai_1_0_tech` default. The ordinary lobby exposes only AI 1.0 and AI 1.1; older
-experimental profile ids are no longer listed or accepted by developer tooling. AI 1.1 is
-client-selectable but is not the live lobby default.
+highest supported live AI version, currently `ai_1_1_tank_mg`. The ordinary lobby exposes only
+AI 1.0 and AI 1.1; older experimental profile ids are no longer listed or accepted by developer
+tooling. AI 1.1 is the live lobby default.
 
 **Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player

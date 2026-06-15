@@ -22,15 +22,16 @@ use rts_sim::protocol::{Snapshot, StartPayload};
 
 const DECISION_INTERVAL: u32 = 9;
 
-/// Default live-lobby profile. Live lobby AI uses the promoted AI 1.0 tech behavior.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_0_TECH_ID;
+/// Default live-lobby profile. Keep this on the highest supported live AI version.
+pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_1_TANK_MG_ID;
 
 /// Profiles available to ordinary lobby AI opponents.
 pub const LIVE_PROFILE_IDS: [&str; 2] = [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
-        "ai" | "ai1" | "ai_1_0" | "ai_1_0_tech" | "default" => Some(AI_1_0_TECH_ID),
+        "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
+        "ai1" | "ai_1_0" | "ai_1_0_tech" => Some(AI_1_0_TECH_ID),
         "ai_1_1" | "ai11" | "ai_1_1_tank_mg" => Some(AI_1_1_TANK_MG_ID),
         _ => None,
     }
@@ -63,7 +64,7 @@ impl AiController {
     }
 
     pub fn with_profile_id(player: u32, profile_id: &'static str) -> Self {
-        let profile = profile_by_id(profile_id).unwrap_or(&AI_1_0_TECH);
+        let profile = profile_by_id(profile_id).unwrap_or_else(default_live_profile);
         Self {
             player,
             profile_id: profile.id,
@@ -83,7 +84,7 @@ impl AiController {
     }
 
     fn profile(&self) -> &'static AiProfile {
-        profile_by_id(self.profile_id).unwrap_or(&AI_1_0_TECH)
+        profile_by_id(self.profile_id).unwrap_or_else(default_live_profile)
     }
 
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
@@ -226,6 +227,10 @@ impl AiController {
     }
 }
 
+fn default_live_profile() -> &'static AiProfile {
+    profile_by_id(DEFAULT_LIVE_PROFILE_ID).unwrap_or(&AI_1_0_TECH)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,12 +241,23 @@ mod tests {
         let ai = AiController::new(2);
 
         assert_eq!(ai.player_id(), 2);
-        assert_eq!(ai.profile_id(), AI_1_0_TECH_ID);
+        assert_eq!(ai.profile_id(), AI_1_1_TANK_MG_ID);
     }
 
     #[test]
     fn live_profile_pool_exposes_supported_lobby_profiles() {
         assert_eq!(LIVE_PROFILE_IDS, [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID]);
+    }
+
+    #[test]
+    fn live_default_tracks_highest_semantic_profile_version() {
+        let highest = LIVE_PROFILE_IDS
+            .iter()
+            .copied()
+            .max_by_key(|profile_id| semantic_version_parts(profile_id))
+            .unwrap();
+
+        assert_eq!(DEFAULT_LIVE_PROFILE_ID, highest);
     }
 
     #[test]
@@ -257,16 +273,31 @@ mod tests {
     fn unknown_profile_id_falls_back_to_default_profile() {
         let ai = AiController::with_profile_id(2, "missing_profile");
 
-        assert_eq!(ai.profile_id(), AI_1_0_TECH_ID);
+        assert_eq!(ai.profile_id(), DEFAULT_LIVE_PROFILE_ID);
     }
 
     #[test]
     fn live_profile_aliases_are_bounded_to_supported_profiles() {
+        assert_eq!(canonical_live_profile_id("ai"), Some(DEFAULT_LIVE_PROFILE_ID));
+        assert_eq!(
+            canonical_live_profile_id("default"),
+            Some(DEFAULT_LIVE_PROFILE_ID)
+        );
         assert_eq!(canonical_live_profile_id("ai_1_0"), Some(AI_1_0_TECH_ID));
         assert_eq!(
             canonical_live_profile_id("ai_1_1"),
             Some(AI_1_1_TANK_MG_ID)
         );
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
+    }
+
+    fn semantic_version_parts(profile_id: &str) -> Vec<u32> {
+        let Some(rest) = profile_id.strip_prefix("ai_") else {
+            return vec![0];
+        };
+        rest.split('_')
+            .take_while(|part| part.chars().all(|ch| ch.is_ascii_digit()))
+            .map(|part| part.parse::<u32>().unwrap_or(0))
+            .collect()
     }
 }

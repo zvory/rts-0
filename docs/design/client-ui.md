@@ -49,7 +49,7 @@ export class Net {
   start()
   setTeamPreset(preset)                  // host-only scripted lobby preset: solo, ffa, 1v2, 1v3, 2v2
   setTeam(id, teamId)                    // host-only scripted lobby team assignment
-  addAi(teamId?)
+  addAi(teamId?, aiProfileId?)
   removeAi(id)
   setQuickstart(enabled)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope

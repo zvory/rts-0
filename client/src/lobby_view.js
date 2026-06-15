@@ -7,6 +7,8 @@ export const AI_PROFILES = Object.freeze([
   { id: "ai_1_1_tank_mg", label: "AI 1.1" },
 ]);
 
+export const DEFAULT_AI_PROFILE_ID = highestSemanticAiProfile(AI_PROFILES).id;
+
 export function teamSlotsForLobby(players = []) {
   const seatedPlayers = players.filter((player) => !player.isSpectator);
   const occupied = [];
@@ -446,11 +448,36 @@ function tag(kind, text) {
 }
 
 function playableAiProfileId(id) {
-  return AI_PROFILES.some((entry) => entry.id === id) ? id : AI_PROFILES[0].id;
+  return AI_PROFILES.some((entry) => entry.id === id) ? id : DEFAULT_AI_PROFILE_ID;
 }
 
 function aiProfileLabel(id) {
-  return AI_PROFILES.find((entry) => entry.id === id)?.label || AI_PROFILES[0].label;
+  const fallback = AI_PROFILES.find((entry) => entry.id === DEFAULT_AI_PROFILE_ID) || AI_PROFILES[0];
+  return AI_PROFILES.find((entry) => entry.id === id)?.label || fallback?.label || "AI";
+}
+
+function highestSemanticAiProfile(profiles) {
+  return profiles.reduce((best, candidate) => {
+    if (!best) return candidate;
+    return compareAiProfileVersion(candidate, best) > 0 ? candidate : best;
+  }, null) || profiles[0];
+}
+
+function compareAiProfileVersion(a, b) {
+  const aVersion = aiProfileVersionParts(a);
+  const bVersion = aiProfileVersionParts(b);
+  const length = Math.max(aVersion.length, bVersion.length);
+  for (let idx = 0; idx < length; idx += 1) {
+    const delta = (aVersion[idx] || 0) - (bVersion[idx] || 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
+function aiProfileVersionParts(profile) {
+  const text = `${profile?.label || ""} ${profile?.id || ""}`;
+  const match = text.match(/\bAI\s+(\d+(?:[._]\d+)*)\b/i) || text.match(/\bai[_-]?(\d+(?:[._]\d+)*)\b/i);
+  return match ? match[1].split(/[._]/).map((part) => Number(part) || 0) : [0];
 }
 
 export const PLAYABLE_FACTIONS = Object.freeze([
