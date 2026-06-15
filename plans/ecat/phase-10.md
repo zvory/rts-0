@@ -15,7 +15,9 @@ runtime contracts. This is a cleanup and hardening phase, not a feature expansio
   - `docs/design/client-ui.md` for projected ability objects and richer previews
   - `docs/design/balance.md` for factual Ekat ability behavior and fun-test caveats
 - Refresh any affected context capsules if section structure changed.
-- Remove or isolate obsolete one-off Ekat teleport/line-shot hooks that are no longer used.
+- Verify obsolete one-off Ekat teleport and immediate line-damage hooks are removed from reachable
+  product behavior. If any replay/test compatibility shim remains, it must be explicitly named,
+  unreachable from current command cards, and covered by a narrow test.
 - Ensure ability metadata remains Rust-authoritative and client catalog parity still covers Ekat
   command-card descriptors.
 - Add or consolidate regression coverage for:
@@ -33,6 +35,8 @@ runtime contracts. This is a cleanup and hardening phase, not a feature expansio
 
 - Design docs describe the actual implemented ability foundation.
 - Obsolete Ekat special paths are removed or clearly marked as compatibility/test-only.
+- No player-facing command, command card, docs entry, or normal replay fixture still describes the
+  old instant teleport or immediate line-damage behavior.
 - Focused regression coverage exists for the highest-risk server, protocol, and client seams.
 - The plan can be handed to a final review pass with known follow-ups rather than hidden
   architecture debt.
@@ -54,11 +58,13 @@ runtime contracts. This is a cleanup and hardening phase, not a feature expansio
 
 ## Manual Testing Focus
 
-Run one Ekat fun-test match and exercise dash/return, line projectile, anchor placement, anchor
-destruction, and anchor-enhanced line projectile. Confirm no obvious console errors, hidden object
-leaks, or stuck cooldown/lockout states appear during the core loop.
+Run one Ekat fun-test match and exercise dash/return, line projectile, moving or dashing while the
+line projectile returns toward Ekat, anchor placement, anchor destruction, and anchor-enhanced line
+projectile. Confirm no obvious console errors, hidden object leaks, or stuck cooldown/lockout states
+appear during the core loop.
 
 ## Handoff Expectations
 
-The handoff must summarize final docs, tests, removed special cases, patch-note bullets, and the
-remaining follow-ups that should be considered outside the 0.1 system foundation.
+The handoff must summarize final docs, tests, removed special cases or explicitly quarantined
+compatibility shims, patch-note bullets, and the remaining follow-ups that should be considered
+outside the 0.1 system foundation.

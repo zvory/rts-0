@@ -9,8 +9,9 @@ recast contract. This is the first complete product ability in the 0.1 plan.
 
 ## Scope
 
-- Add or revise Ekat ability catalog entries for dash and return behavior while preserving
-  faction gating.
+- Add or revise Ekat ability catalog entries for dash and return behavior while preserving faction
+  gating. It is acceptable to repurpose the existing `ekatTeleport` id if that is the lowest-friction
+  migration path, but the old instant teleport behavior must not remain reachable.
 - On dash activation:
   - validate target range and static standability
   - record the original position as an ability object
@@ -36,6 +37,8 @@ recast contract. This is the first complete product ability in the 0.1 plan.
 - Ekat can return while the marker is active and the destination remains valid.
 - Hidden markers do not leak to enemies without vision.
 - Existing Ekat faction start and non-Ekat factions remain intact.
+- Existing Ekat instant teleport behavior is scrubbed from player-facing runtime, docs, and tests
+  except for any explicitly justified replay/test compatibility shim.
 
 ## Out of Scope
 
@@ -61,4 +64,5 @@ second client if practical to confirm the marker is visible only when the spot i
 ## Handoff Expectations
 
 The handoff must state the final dash and return ability ids, cooldown and return-window behavior,
-manual fog result, tests added, and any remaining UX roughness for later cleanup.
+what old teleport code/docs/tests were removed or quarantined, manual fog result, tests added, and
+any remaining UX roughness for later cleanup.
