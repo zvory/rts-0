@@ -35,8 +35,9 @@ mod resources;
 mod trace;
 
 use self::defense::{
-    defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
-    local_defense_target, local_defense_units, stage_main_steel_defensive_line,
+    defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
+    defensive_panic_response, local_defense_target, local_defense_units,
+    stage_defensive_machine_gunner_perimeter, stage_main_steel_defensive_line,
     stages_expansion_defensive_line, DefensivePanic, DefensivePanicResponse, ALL_COMBAT_UNITS,
     DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
@@ -501,7 +502,11 @@ where
         production_policy.unit_priorities,
         facts.completed_upgrades(),
     );
-    let effective_unit_priorities = effective_unit_priorities.as_slice();
+    let effective_unit_priorities = effective_unit_priorities_for_defensive_machine_gunners(
+        profile,
+        &facts,
+        &effective_unit_priorities,
+    );
     queue_required_unit_unlocks(
         &mut actions,
         &facts,
@@ -510,8 +515,9 @@ where
         &mut intents,
     );
     let production_unit_counts =
-        unit_counts_for_priorities(observation, &facts, effective_unit_priorities);
-    for building_kind in production_building_order(effective_unit_priorities) {
+        unit_counts_for_priorities(observation, &facts, &effective_unit_priorities);
+    let defensive_machine_gunner_max_counts = defensive_machine_gunner_max_counts(profile);
+    for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
             continue;
@@ -522,18 +528,19 @@ where
         let save_for_tech = (save_for_unplanned_expansion
             || (save_for_first_tech_unit && !planned_train_in_intents(&intents, key_tech_unit))
             || save_for_required_tech_building)
-            && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
+            && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit)
+            && !can_train_pre_tank_defensive_machine_gunner(profile, &facts, building_kind);
         let trained_units = actions::train_units(
             &mut actions,
             TrainUnitsRequest {
                 buildings,
-                unit_priorities: effective_unit_priorities,
+                unit_priorities: &effective_unit_priorities,
                 completed_building_kinds: facts.complete_building_kinds(),
                 completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: production_policy.queue_depth,
                 save_for_tech,
                 current_counts: &production_unit_counts,
-                max_counts: &[],
+                max_counts: &defensive_machine_gunner_max_counts,
                 balance_unit_priorities: production_policy.balance_unit_priorities,
             },
         );
@@ -619,12 +626,19 @@ where
         )
     };
     let harassment_units: BTreeSet<u32> = harassment_plan.reserved_units.iter().copied().collect();
+    let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
+    let defensive_machine_gunner_units: BTreeSet<u32> =
+        defensive_machine_gunners.iter().copied().collect();
+    let excluded_frontal_units: BTreeSet<u32> = harassment_units
+        .union(&defensive_machine_gunner_units)
+        .copied()
+        .collect();
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
         memory,
         profile,
-        &harassment_units,
+        &excluded_frontal_units,
     );
     let ready_units_count = frontal_wave.ready_units.len();
     let attack_size = frontal_wave.desired_size;
@@ -642,6 +656,7 @@ where
         || !local_ready_units.is_empty()
         || !rifle_raid_units.is_empty()
         || !harassment_plan.reserved_units.is_empty()
+        || !defensive_machine_gunners.is_empty()
     {
         let mut handled_local_defense = false;
         let mut local_defense_assigned = BTreeSet::new();
@@ -704,6 +719,11 @@ where
         harassment_plan
             .reserved_units
             .retain(|id| !local_defense_assigned.contains(id));
+        let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
+            .iter()
+            .copied()
+            .filter(|id| !local_defense_assigned.contains(id))
+            .collect();
         if !handled_raid_target {
             if let Some(intent) = issue_scout_car_harassment(
                 &mut actions,
@@ -714,6 +734,22 @@ where
             ) {
                 intents.push(intent);
                 handled_harassment = true;
+            }
+        }
+
+        if !handled_local_defense
+            && !handled_raid_target
+            && !defensive_machine_gunners_available.is_empty()
+        {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                if let Some(units) = stage_defensive_machine_gunner_perimeter(
+                    &mut actions,
+                    observation,
+                    &defensive_machine_gunners_available,
+                    enemy_base,
+                ) {
+                    intents.push(AiIntent::Stage { units });
+                }
             }
         }
 
@@ -808,6 +844,55 @@ fn effective_unit_priorities_for_upgrades(
         .copied()
         .filter(|unit| *unit != EntityKind::Tank || methamphetamines_ready)
         .collect()
+}
+
+fn effective_unit_priorities_for_defensive_machine_gunners(
+    profile: &AiProfile,
+    facts: &AiFacts,
+    unit_priorities: &[EntityKind],
+) -> Vec<EntityKind> {
+    let mut priorities = unit_priorities.to_vec();
+    let Some(policy) = profile.defensive_machine_gunners else {
+        return priorities;
+    };
+    if policy.target_count == 0 || facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
+        return priorities;
+    }
+    if priorities.contains(&EntityKind::MachineGunner) {
+        return priorities;
+    }
+    let insert_at = priorities
+        .iter()
+        .position(|unit| *unit == EntityKind::Tank)
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    priorities.insert(insert_at, EntityKind::MachineGunner);
+    priorities
+}
+
+fn defensive_machine_gunner_max_counts(profile: &AiProfile) -> Vec<(EntityKind, usize)> {
+    profile
+        .defensive_machine_gunners
+        .map(|policy| vec![(EntityKind::MachineGunner, policy.target_count)])
+        .unwrap_or_default()
+}
+
+fn can_train_pre_tank_defensive_machine_gunner(
+    profile: &AiProfile,
+    facts: &AiFacts,
+    building_kind: EntityKind,
+) -> bool {
+    if profile.defensive_machine_gunners.is_none() || building_kind != EntityKind::Barracks {
+        return false;
+    }
+    let tank_production_available = !facts.production_buildings(EntityKind::Factory).is_empty()
+        && facts
+            .completed_upgrades()
+            .contains(&UpgradeKind::TankUnlock)
+        && facts
+            .completed_upgrades()
+            .contains(&UpgradeKind::Methamphetamines);
+    !tank_production_available
 }
 
 fn queue_upgrade_if_available(

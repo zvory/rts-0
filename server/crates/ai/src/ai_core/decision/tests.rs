@@ -14,8 +14,8 @@ use crate::ai_core::observation::{
     AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AI_1_0_TECH, RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS,
-    TECH_TO_TANKS,
+    AI_1_0_TECH, AI_1_1_TANK_MG, RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION,
+    STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
@@ -1320,6 +1320,229 @@ fn ai_1_0_tech_path_omits_support_weapon_buildings() {
     assert!(!decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::AntiTankGun
     }));
+}
+
+#[test]
+fn ai_1_1_trains_bounded_machine_gunners_without_scout_cars() {
+    let observation = observation(
+        AiEconomy {
+            steel: 800,
+            oil: 300,
+            supply_used: 30,
+            supply_cap: 80,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, Some(0)),
+            building(13, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::Factory, Some(0)),
+            combat(30, EntityKind::MachineGunner),
+            combat(31, EntityKind::MachineGunner),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::MachineGunner
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar
+    }));
+    assert!(!decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Train {
+                unit: EntityKind::ScoutCar,
+                ..
+            }
+        )
+    }));
+}
+
+#[test]
+fn ai_1_1_stops_machine_gunner_training_at_perimeter_target() {
+    let observation = observation(
+        AiEconomy {
+            steel: 800,
+            oil: 300,
+            supply_used: 30,
+            supply_cap: 80,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, Some(0)),
+            building(13, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::Factory, Some(0)),
+            combat(30, EntityKind::MachineGunner),
+            combat(31, EntityKind::MachineGunner),
+            combat(32, EntityKind::MachineGunner),
+            combat(33, EntityKind::MachineGunner),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::MachineGunner
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar
+    }));
+}
+
+#[test]
+fn ai_1_1_reserves_machine_gunner_perimeter_from_tank_wave() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = with_enemy_main_resources(observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 54,
+            supply_cap: 100,
+        },
+        vec![
+            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            building(13, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::Factory, Some(0)),
+            combat_at(30, EntityKind::MachineGunner, 8.5 * ts, 8.5 * ts),
+            combat_at(31, EntityKind::MachineGunner, 9.0 * ts, 8.5 * ts),
+            combat_at(32, EntityKind::MachineGunner, 9.5 * ts, 8.5 * ts),
+            combat_at(33, EntityKind::MachineGunner, 10.0 * ts, 8.5 * ts),
+            combat_at(40, EntityKind::Tank, 13.0 * ts, 13.0 * ts),
+            combat_at(41, EntityKind::Tank, 13.5 * ts, 13.0 * ts),
+            combat_at(42, EntityKind::Tank, 14.0 * ts, 13.0 * ts),
+            combat_at(43, EntityKind::Rifleman, 14.5 * ts, 13.0 * ts),
+            combat_at(44, EntityKind::Rifleman, 15.0 * ts, 13.0 * ts),
+            combat_at(45, EntityKind::Rifleman, 15.5 * ts, 13.0 * ts),
+        ],
+    ));
+    observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    let perimeter_targets: Vec<(u32, f32, f32)> = decision
+        .commands
+        .iter()
+        .filter_map(|command| match command {
+            Command::AttackMove { units, x, y, .. }
+                if units.len() == 1 && (30..=33).contains(&units[0]) =>
+            {
+                Some((units[0], *x, *y))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        perimeter_targets
+            .iter()
+            .map(|(id, _, _)| *id)
+            .collect::<Vec<_>>(),
+        vec![30, 31, 32, 33]
+    );
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::AttackMove { units, .. } if units.as_slice() == [40, 41, 42, 43, 44, 45]
+        )
+    }));
+    assert!(
+        !decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::AttackMove { units, .. } if units.iter().any(|id| (30..=33).contains(id)) && units.len() > 1
+            )
+        }),
+        "reserved Machine Gunners should not join the Tank frontal wave"
+    );
+
+    let steel_center =
+        main_steel_cluster_center(&observation).expect("main steel cluster should be found");
+    let enemy = AiFacts::from_observation(&observation)
+        .nearest_public_enemy_base
+        .expect("enemy base should be public");
+    let dir = normalized_direction(steel_center, (enemy.x, enemy.y))
+        .expect("enemy should not overlap the main steel");
+    let perp = (-dir.1, dir.0);
+    let mut lateral_offsets = Vec::new();
+    for (_, x, y) in &perimeter_targets {
+        let dx = *x - steel_center.0;
+        let dy = *y - steel_center.1;
+        let front_tiles = (dx * dir.0 + dy * dir.1) / ts;
+        assert!(
+            (2.0..=4.0).contains(&front_tiles),
+            "perimeter point should be in front of the steel patch, got {front_tiles} tiles"
+        );
+        lateral_offsets.push((dx * perp.0 + dy * perp.1) / ts);
+    }
+    lateral_offsets.sort_by(|left, right| left.total_cmp(right));
+    let spread = lateral_offsets.last().unwrap() - lateral_offsets.first().unwrap();
+    assert!(
+        spread >= 4.0,
+        "Machine Gunners should spread across the perimeter, got {spread} tiles"
+    );
+}
+
+#[test]
+fn ai_1_1_local_defense_pulls_perimeter_machine_gunners() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = with_enemy_main_resources(observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 40,
+            supply_cap: 80,
+        },
+        vec![
+            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            combat_at(30, EntityKind::MachineGunner, 8.5 * ts, 8.5 * ts),
+            combat_at(31, EntityKind::MachineGunner, 9.0 * ts, 8.5 * ts),
+        ],
+    ));
+    observation
+        .visible_enemies
+        .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Attack { units, target, .. } if units.as_slice() == [30, 31] && *target == 90
+        )
+    }));
+    assert!(
+        !decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::AttackMove { units, .. } if units.iter().any(|id| [30, 31].contains(id))
+            )
+        }),
+        "local defense should take priority over passive perimeter staging"
+    );
 }
 
 #[test]
@@ -3449,15 +3672,18 @@ fn scout_car_harassment_routes_through_outer_flank_then_enemy_steel_back_side() 
         &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
     );
 
-    let mut harassment_moves = decision.commands.iter().filter_map(|command| match command {
-        Command::Move {
-            units,
-            x,
-            y,
-            queued,
-        } if units.as_slice() == [30] => Some((*x, *y, *queued)),
-        _ => None,
-    });
+    let mut harassment_moves = decision
+        .commands
+        .iter()
+        .filter_map(|command| match command {
+            Command::Move {
+                units,
+                x,
+                y,
+                queued,
+            } if units.as_slice() == [30] => Some((*x, *y, *queued)),
+            _ => None,
+        });
     let flank = harassment_moves
         .next()
         .expect("Scout Car should receive an initial flank move");
@@ -3469,8 +3695,14 @@ fn scout_car_harassment_routes_through_outer_flank_then_enemy_steel_back_side() 
     let behind_progress =
         (target.0 - steel_center.0) * forward.0 + (target.1 - steel_center.1) * forward.1;
 
-    assert!(!flank.2, "first harassment move should replace the active order");
-    assert!(target.2, "final harassment move should be queued behind the flank waypoint");
+    assert!(
+        !flank.2,
+        "first harassment move should replace the active order"
+    );
+    assert!(
+        target.2,
+        "final harassment move should be queued behind the flank waypoint"
+    );
     assert!(
         behind_progress > 6.0 * ts,
         "harassment target should be behind the enemy main steel line"
@@ -3585,7 +3817,8 @@ fn scout_car_harassment_evades_visible_combat_threats() {
     let center = (44.25 * ts, 44.0 * ts);
 
     assert!(
-        dist2(evasion.0, evasion.1, threat.0, threat.1) > dist2(center.0, center.1, threat.0, threat.1),
+        dist2(evasion.0, evasion.1, threat.0, threat.1)
+            > dist2(center.0, center.1, threat.0, threat.1),
         "evasion point should increase distance from the visible combat threat"
     );
     assert!(
