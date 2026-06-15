@@ -1,4 +1,4 @@
-use super::defense::main_steel_cluster_center;
+use super::defense::{main_steel_cluster_center, DEFENSIVE_MG_PERIMETER_DISTANCE_TILES};
 use super::expansion::{
     expansion_candidate_resources, expansion_city_centre_site, nearest_enemy_start_distance2,
 };
@@ -1460,7 +1460,7 @@ fn ai_1_1_reserves_machine_gunner_perimeter_from_tank_wave() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::AttackMove { units, .. } if units.as_slice() == [40, 41, 42, 43, 44, 45]
+            Command::AttackMove { units, .. } if units.as_slice() == [40, 41, 42]
         )
     }));
     assert!(
@@ -1487,7 +1487,9 @@ fn ai_1_1_reserves_machine_gunner_perimeter_from_tank_wave() {
         let dy = *y - steel_center.1;
         let front_tiles = (dx * dir.0 + dy * dir.1) / ts;
         assert!(
-            (2.0..=4.0).contains(&front_tiles),
+            ((DEFENSIVE_MG_PERIMETER_DISTANCE_TILES - 1.0)
+                ..=(DEFENSIVE_MG_PERIMETER_DISTANCE_TILES + 1.0))
+                .contains(&front_tiles),
             "perimeter point should be in front of the steel patch, got {front_tiles} tiles"
         );
         lateral_offsets.push((dx * perp.0 + dy * perp.1) / ts);
@@ -1543,6 +1545,82 @@ fn ai_1_1_local_defense_pulls_perimeter_machine_gunners() {
         }),
         "local defense should take priority over passive perimeter staging"
     );
+}
+
+#[test]
+fn ai_1_1_builds_second_factory_for_tank_production() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 1_500,
+            oil: 800,
+            supply_used: 54,
+            supply_cap: 120,
+        },
+        vec![
+            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+            building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
+            building(12, EntityKind::Barracks, Some(0)),
+            building(13, EntityKind::TrainingCentre, None),
+            building(14, EntityKind::ResearchComplex, None),
+            building(15, EntityKind::Factory, Some(0)),
+            worker(60, AiEntityState::Idle),
+            combat(30, EntityKind::MachineGunner),
+            combat(31, EntityKind::MachineGunner),
+            combat(32, EntityKind::MachineGunner),
+            combat(33, EntityKind::MachineGunner),
+        ],
+    ));
+    observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+}
+
+#[test]
+fn ai_1_1_tank_transition_does_not_train_riflemen() {
+    let mut observation = observation(
+        AiEconomy {
+            steel: 600,
+            oil: 300,
+            supply_used: 54,
+            supply_cap: 120,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            building(13, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::Factory, Some(0)),
+            combat(30, EntityKind::MachineGunner),
+            combat(31, EntityKind::MachineGunner),
+            combat(32, EntityKind::MachineGunner),
+            combat(33, EntityKind::MachineGunner),
+        ],
+    );
+    observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Tank
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
+    }));
 }
 
 #[test]
