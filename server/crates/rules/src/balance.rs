@@ -110,6 +110,11 @@ pub const EKAT_LINE_SHOT_WIDTH_TILES: f32 = 0.6;
 pub const EKAT_LINE_SHOT_SPEED_PX_PER_TICK: f32 = 8.0;
 pub const EKAT_LINE_SHOT_DAMAGE: u32 = 40;
 pub const EKAT_LINE_SHOT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 10;
+pub const EKAT_MAGIC_ANCHOR_RANGE_TILES: u32 = 5;
+pub const EKAT_MAGIC_ANCHOR_DURATION_TICKS: u32 = TICK_HZ * 10;
+pub const EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS: u32 = TICK_HZ * 60;
+pub const EKAT_MAGIC_ANCHOR_HP: u16 = 100;
+pub const EKAT_MAGIC_ANCHOR_RADIUS_TILES: f32 = 0.4;
 
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;

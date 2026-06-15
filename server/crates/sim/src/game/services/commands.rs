@@ -718,14 +718,20 @@ struct AbilityFactInput<'a> {
 fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::Smoke | AbilityKind::EkatTeleport | AbilityKind::EkatLineShot
+        AbilityKind::Smoke
+            | AbilityKind::EkatTeleport
+            | AbilityKind::EkatLineShot
+            | AbilityKind::EkatMagicAnchor
     )
 }
 
 fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::MortarFire | AbilityKind::EkatTeleport | AbilityKind::EkatLineShot
+        AbilityKind::MortarFire
+            | AbilityKind::EkatTeleport
+            | AbilityKind::EkatLineShot
+            | AbilityKind::EkatMagicAnchor
     )
 }
 
@@ -1106,6 +1112,7 @@ fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
         AbilityKind::Breakthrough => planner::AbilityId(4),
         AbilityKind::EkatTeleport => planner::AbilityId(5),
         AbilityKind::EkatLineShot => planner::AbilityId(6),
+        AbilityKind::EkatMagicAnchor => planner::AbilityId(7),
     }
 }
 
@@ -1118,6 +1125,7 @@ fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
         4 => Some(AbilityKind::Breakthrough),
         5 => Some(AbilityKind::EkatTeleport),
         6 => Some(AbilityKind::EkatLineShot),
+        7 => Some(AbilityKind::EkatMagicAnchor),
         _ => None,
     }
 }

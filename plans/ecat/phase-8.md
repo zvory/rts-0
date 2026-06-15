@@ -1,6 +1,27 @@
 # Phase 8 - Magic Anchor Lifecycle
 
-Status: Not Started.
+Status: Done.
+
+## Implementation Notes
+
+- Magic Anchor uses ability id `ekatMagicAnchor`, command-card hotkey `C`, 5-tile placement range,
+  no resource cost, no normal cooldown, 10-second natural lifetime, 100 HP, and a 0.4-tile
+  targetability radius.
+- Placement is replace-on-recast: a new accepted anchor removes Ekat's previous active anchor.
+  Anchors are non-selectable, non-blocking ability world objects, not normal entities.
+- Enemy weapons can opportunistically shoot visible enemy anchors when no entity target is resolved.
+  Destroying an anchor removes it, emits fog-safe positioned feedback, and locks that caster's
+  Magic Anchor placement until `destroy_tick + 60s`; natural expiry and replacement do not apply
+  that lockout.
+- Owner snapshots project active anchor object id, remaining lifetime, HP/radius owner state, and
+  `lockoutUntilTick` while the destruction lockout is active. Enemy snapshots only project anchors
+  when the anchor position is visible and do not include owner-only state.
+
+## Patch Notes
+
+- Ekat gains Magic Anchor: place one 10-second destructible anchor within 5 tiles.
+- Recasting Magic Anchor replaces the current anchor instead of stacking multiple anchors.
+- Destroyed anchors lock Magic Anchor placement for 60 seconds; naturally expired anchors do not.
 
 ## Goal
 

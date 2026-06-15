@@ -25,6 +25,7 @@ pub const BREAKTHROUGH_ABILITY: &str = "breakthrough";
 pub const CHARGE_ABILITY: &str = "charge";
 pub const EKAT_TELEPORT_ABILITY: &str = "ekatTeleport";
 pub const EKAT_LINE_SHOT_ABILITY: &str = "ekatLineShot";
+pub const EKAT_MAGIC_ANCHOR_ABILITY: &str = "ekatMagicAnchor";
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
@@ -310,6 +311,26 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         protocol_code: 7,
         order_stage_code: 13,
     },
+    AbilityCatalogEntry {
+        id: EKAT_MAGIC_ANCHOR_ABILITY,
+        label: "Magic Anchor",
+        icon: "ANC",
+        hotkey: Some("C"),
+        title: "Place a destructible 10-second anchor",
+        carriers: &[EntityKind::Ekat],
+        target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
+        min_range_tiles: None,
+        cooldown_ticks: 0,
+        charges: None,
+        cost: ResourceCost::new(0, 0),
+        tech_requirement: None,
+        may_queue: false,
+        autocast: false,
+        command_card: true,
+        protocol_code: 8,
+        order_stage_code: 14,
+    },
 ];
 
 pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
@@ -356,8 +377,7 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
     production_anchors: &[],
 };
 
-pub const CATALOGS: &[FactionCatalog] =
-    &[CURRENT_CATALOG, EKAT_CATALOG, EMPTY_FIXTURE_CATALOG];
+pub const CATALOGS: &[FactionCatalog] = &[CURRENT_CATALOG, EKAT_CATALOG, EMPTY_FIXTURE_CATALOG];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpgradeCatalogEntry {
@@ -596,6 +616,7 @@ mod tests {
         assert_eq!(catalog.loadout.starting_entities, EKAT_START_ENTITIES);
         assert!(catalog.allows_ability(EKAT_TELEPORT_ABILITY, EntityKind::Ekat));
         assert!(catalog.allows_ability(EKAT_LINE_SHOT_ABILITY, EntityKind::Ekat));
+        assert!(catalog.allows_ability(EKAT_MAGIC_ANCHOR_ABILITY, EntityKind::Ekat));
         assert!(!catalog.allows_unit(EntityKind::Rifleman));
         assert!(!catalog.allows_building(EntityKind::CityCentre));
     }
@@ -647,22 +668,25 @@ mod tests {
         assert!(!charge.command_card);
         assert!(charge.carriers.is_empty());
 
-        let teleport = EKAT_CATALOG
-            .ability(EKAT_TELEPORT_ABILITY)
-            .unwrap();
+        let teleport = EKAT_CATALOG.ability(EKAT_TELEPORT_ABILITY).unwrap();
         assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES)
         );
 
-        let line_shot = EKAT_CATALOG
-            .ability(EKAT_LINE_SHOT_ABILITY)
-            .unwrap();
+        let line_shot = EKAT_CATALOG.ability(EKAT_LINE_SHOT_ABILITY).unwrap();
         assert_eq!(line_shot.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             line_shot.range_tiles,
             Some(balance::EKAT_LINE_SHOT_RANGE_TILES)
+        );
+
+        let anchor = EKAT_CATALOG.ability(EKAT_MAGIC_ANCHOR_ABILITY).unwrap();
+        assert_eq!(anchor.carriers, &[EntityKind::Ekat]);
+        assert_eq!(
+            anchor.range_tiles,
+            Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
         );
     }
 
@@ -719,9 +743,6 @@ mod tests {
 
         assert_eq!(EKAT_CATALOG.loadout.initial_steel, 0);
         assert_eq!(EKAT_CATALOG.loadout.initial_oil, 0);
-        assert_eq!(
-            EKAT_CATALOG.loadout.starting_entities,
-            EKAT_START_ENTITIES
-        );
+        assert_eq!(EKAT_CATALOG.loadout.starting_entities, EKAT_START_ENTITIES);
     }
 }

@@ -108,6 +108,11 @@ export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
+export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 5;
+export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
+export const EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS = TICK_HZ * 60;
+export const EKAT_MAGIC_ANCHOR_HP = 100;
+export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 0.4;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 12;
 
@@ -278,6 +283,23 @@ export const ABILITIES = Object.freeze({
     damage: EKAT_LINE_SHOT_DAMAGE,
     queued: false,
   }),
+  [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze({
+    ability: ABILITY.EKAT_MAGIC_ANCHOR,
+    label: "Magic Anchor",
+    icon: "ANC",
+    hotkey: "C",
+    title: "Place a destructible 10-second anchor",
+    carriers: Object.freeze([KIND.EKAT]),
+    targetMode: "worldPoint",
+    rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
+    cooldownTicks: 0,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    radiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,
+    durationTicks: EKAT_MAGIC_ANCHOR_DURATION_TICKS,
+    lockoutTicks: EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS,
+    hp: EKAT_MAGIC_ANCHOR_HP,
+    queued: false,
+  }),
 });
 
 export const UPGRADES = Object.freeze({
@@ -445,7 +467,7 @@ export const FACTION_CATALOGS = Object.freeze({
     buildables: [],
     trainables: {},
     research: {},
-    abilities: [ABILITY.EKAT_TELEPORT, ABILITY.EKAT_LINE_SHOT],
+    abilities: [ABILITY.EKAT_TELEPORT, ABILITY.EKAT_LINE_SHOT, ABILITY.EKAT_MAGIC_ANCHOR],
   }),
 });
 

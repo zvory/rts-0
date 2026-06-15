@@ -3198,10 +3198,12 @@ function fakeAudioContext() {
   assert(ABILITY_CODE[ABILITY.BREAKTHROUGH] === 5, "Breakthrough compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.EKAT_TELEPORT] === 6, "Ekat Teleport compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.EKAT_LINE_SHOT] === 7, "Ekat Line Shot compact ability code should be reserved");
+  assert(ABILITY_CODE[ABILITY.EKAT_MAGIC_ANCHOR] === 8, "Ekat Magic Anchor compact ability code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE] === 10, "Point Fire compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.BREAKTHROUGH] === 11, "Breakthrough compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_TELEPORT] === 12, "Ekat Teleport compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_LINE_SHOT] === 13, "Ekat Line Shot compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_MAGIC_ANCHOR] === 14, "Ekat Magic Anchor compact order stage code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");

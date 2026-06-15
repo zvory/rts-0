@@ -216,6 +216,7 @@ pub(crate) fn run_tick(
             &mut coordinator,
             fog,
             smokes,
+            ability_runtime,
             mortar_shells,
             rng,
             events,

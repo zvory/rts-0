@@ -655,7 +655,15 @@ function abilityActiveObjectId(entity, ability) {
 function abilityUnitReady(entity, definition) {
   return abilityCooldownLeft(entity, definition.ability) === 0 &&
     abilityRemainingUses(entity, definition.ability) !== 0 &&
+    !abilityLockoutActive(entity, definition.ability) &&
     !abilityRequiresSetup(entity, definition);
+}
+
+function abilityLockoutActive(entity, ability) {
+  const projected = Array.isArray(entity.abilities)
+    ? entity.abilities.find((entry) => entry.ability === ability)
+    : null;
+  return projected && typeof projected.lockoutUntilTick === "number";
 }
 
 function abilityRequiresSetup(entity, definition) {

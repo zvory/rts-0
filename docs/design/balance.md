@@ -177,7 +177,8 @@ authoritative `rules::defs` records.
   autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
-  world effect, dash return, line projectile, and the one-off artillery point-fire path.
+  world effect, dash return, line projectile, Magic Anchor placement, and the one-off artillery
+  point-fire path.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
   controllable combat units. Ekat has 300 HP, 1 HP/s regeneration while alive, 2.0 px/tick
@@ -187,7 +188,9 @@ authoritative `rules::defs` records.
   after one tick if the marker destination remains standable. Her Line Shot ability targets up to
   6 tiles, has no resource cost, has a 10s cooldown, and launches an 8 px/tick out-and-back
   projectile that deals 40 damage to enemy targetable entities intersecting each 0.6-tile-wide
-  swept leg once per leg.
+  swept leg once per leg. Her Magic Anchor ability targets up to 5 tiles, has no resource cost,
+  places one replacement-style non-blocking 100 HP anchor for 10 seconds, and applies a 60-second
+  placement lockout only if enemies destroy the anchor before natural expiry.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles

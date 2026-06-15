@@ -57,6 +57,9 @@ pub(crate) fn order_or_launch_world_ability(
     if !caster_can_accept_order(entities, player, caster, ability) {
         return AbilityOrderResult::Skipped;
     }
+    if caster_locked_out(entities, caster, ability, tick) {
+        return AbilityOrderResult::Skipped;
+    }
     if !tech_requirement_met(entities, player, ability) {
         return AbilityOrderResult::Skipped;
     }
@@ -136,6 +139,7 @@ pub(crate) fn launch_world_ability(
     if !caster_can_attempt(entities, player, caster, ability)
         || !caster_allowed_by_faction(entities, faction_id, caster, ability)
         || !tech_requirement_met(entities, player, ability)
+        || caster_locked_out(entities, caster, ability, tick)
         || !(caster_in_range(map, entities, caster, ability, x, y)
             || ability_clamps_world_target(ability))
         || !world_ability_facing_ready(entities, caster, ability, x, y)
@@ -317,12 +321,65 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
+        (AbilityEffectHook::MagicAnchor, AbilityKind::EkatMagicAnchor) => {
+            let Some((anchor_x, anchor_y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
+                return false;
+            };
+            if !ps.spend_cost(definition.cost) {
+                return false;
+            }
+            let Some(e) = entities.get_mut(caster) else {
+                return false;
+            };
+            ability_runtime.clear_active_anchors(player, caster, ability);
+            let radius = config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * config::TILE_SIZE as f32;
+            if ability_runtime
+                .spawn_world_object(AbilityWorldObjectSpec {
+                    owner: player,
+                    caster_id: caster,
+                    ability,
+                    kind: AbilityWorldObjectKind::MagicAnchor,
+                    x: anchor_x,
+                    y: anchor_y,
+                    created_tick: tick,
+                    expires_tick: tick.saturating_add(config::EKAT_MAGIC_ANCHOR_DURATION_TICKS),
+                    payload: AbilityObjectPayload::MagicAnchor {
+                        hp: config::EKAT_MAGIC_ANCHOR_HP,
+                        radius,
+                        destroyed_lockout_ticks: config::EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS,
+                    },
+                })
+                .is_none()
+            {
+                return false;
+            }
+            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            if !preserve_active_order {
+                e.clear_active_order();
+            }
+            notice_positioned(
+                events,
+                player,
+                "Magic Anchor",
+                crate::protocol::NoticeSeverity::Info,
+                anchor_x,
+                anchor_y,
+            );
+            true
+        }
         _ => false,
     }
 }
 
 fn ability_clamps_world_target(ability: AbilityKind) -> bool {
     matches!(ability, AbilityKind::EkatLineShot)
+}
+
+fn caster_locked_out(entities: &EntityStore, caster: u32, ability: AbilityKind, tick: u32) -> bool {
+    entities
+        .get(caster)
+        .and_then(|e| e.ability_lockout_until_tick(ability, tick))
+        .is_some()
 }
 
 pub(crate) fn launch_self_ability(

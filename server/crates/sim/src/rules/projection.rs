@@ -333,8 +333,8 @@ pub fn project_entity(
                 autocast_enabled: entity.autocast_enabled(*kind),
                 active_object_id: active_return_object_id(&context, entity, *kind),
                 available_tick: return_available_tick(&context, entity, *kind),
-                lockout_until_tick: None,
-                expires_in: active_return_expires_in(&context, entity, *kind),
+                lockout_until_tick: entity.ability_lockout_until_tick(*kind, context.tick),
+                expires_in: active_ability_object_expires_in(&context, entity, *kind),
             })
             .collect();
         for entry in catalog
@@ -358,8 +358,8 @@ pub fn project_entity(
                     autocast_enabled: entity.autocast_enabled(kind),
                     active_object_id: active_return_object_id(&context, entity, kind),
                     available_tick: return_available_tick(&context, entity, kind),
-                    lockout_until_tick: None,
-                    expires_in: active_return_expires_in(&context, entity, kind),
+                    lockout_until_tick: entity.ability_lockout_until_tick(kind, context.tick),
+                    expires_in: active_ability_object_expires_in(&context, entity, kind),
                 });
             }
         }
@@ -576,6 +576,12 @@ fn active_return_object_id(
     entity: &Entity,
     ability: ability::AbilityKind,
 ) -> Option<u32> {
+    if ability == ability::AbilityKind::EkatMagicAnchor {
+        return context
+            .ability_runtime?
+            .active_anchor(entity.owner, entity.id, ability, context.tick)
+            .map(|object| object.id.get());
+    }
     context
         .ability_runtime?
         .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
@@ -599,11 +605,17 @@ fn return_available_tick(
     }
 }
 
-fn active_return_expires_in(
+fn active_ability_object_expires_in(
     context: &EntityProjectionContext<'_>,
     entity: &Entity,
     ability: ability::AbilityKind,
 ) -> Option<u16> {
+    if ability == ability::AbilityKind::EkatMagicAnchor {
+        return context
+            .ability_runtime?
+            .active_anchor(entity.owner, entity.id, ability, context.tick)
+            .and_then(|object| object.expires_in(context.tick));
+    }
     context
         .ability_runtime?
         .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
