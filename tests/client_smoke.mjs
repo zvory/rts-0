@@ -71,8 +71,10 @@ try {
       seatDisplay: seat ? getComputedStyle(seat).display : "",
     };
   });
-  ok(teamUi.teamRows.some((text) => /Team \d+/.test(text)) && teamUi.newTeamRows === 1,
+  ok(teamUi.teamRows.some((text) => /Team/.test(text)) && teamUi.newTeamRows === 1,
     `lobby renders occupied teams plus one new-team row (${teamUi.teamRows.join(" | ")})`);
+  ok(!teamUi.teamRows.some((text) => /Command group/.test(text)),
+    "lobby team headers omit redundant command group copy");
   ok(!teamUi.teamRows.some((text) => /Allied command|Opposing command/.test(text)),
     "lobby team headers omit old Allied/Opposing command copy");
   ok(teamUi.draggableSeats >= 1, `host lobby seats are draggable (${teamUi.draggableSeats})`);

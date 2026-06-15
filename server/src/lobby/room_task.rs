@@ -1618,7 +1618,17 @@ impl RoomTask {
     }
 
     fn next_default_team_for_new_seat(&self, new_id: u32) -> TeamId {
-        let counts = self.team_counts_except(None);
+        let counts = self.team_counts_except(Some(new_id));
+        if let Some(next_after_occupied) = counts
+            .keys()
+            .copied()
+            .filter(|team_id| (1..=MAX_LOBBY_TEAMS).contains(team_id))
+            .max()
+            .and_then(|team_id| team_id.checked_add(1))
+            .filter(|team_id| *team_id <= MAX_LOBBY_TEAMS && !counts.contains_key(team_id))
+        {
+            return next_after_occupied;
+        }
         for team_id in 1..=MAX_LOBBY_TEAMS {
             if counts.get(&team_id).copied().unwrap_or(0) == 0 {
                 return team_id;
@@ -3988,6 +3998,49 @@ mod tests {
         assert_eq!(target.color, "#6f8fa8");
         assert!(!task.human_team_assignments.contains_key(&2));
         assert!(!task.human_faction_assignments.contains_key(&2));
+    }
+
+    #[test]
+    fn host_can_move_spectator_back_to_active_lobby_seat() {
+        let mut task = RoomTask::new(
+            "host-spectator-return".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        task.host_id = Some(1);
+        add_test_room_player(&mut task, 1, true);
+        add_test_room_spectator(&mut task, 2);
+        task.human_team_assignments.insert(1, 1);
+
+        task.on_set_spectator(1, 2, false);
+
+        let target = task.players.get(&2).unwrap();
+        assert!(!target.spectator);
+        assert!(!target.ready);
+        assert_ne!(target.color, "#6f8fa8");
+        assert_eq!(task.human_team_assignments.get(&2), Some(&2));
+        assert_eq!(
+            task.human_faction_assignments.get(&2).map(String::as_str),
+            Some("kriegsia")
+        );
+    }
+
+    #[test]
+    fn default_ai_team_appends_after_occupied_teams_when_possible() {
+        let mut task = RoomTask::new(
+            "ai-default-team-append".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        task.host_id = Some(1);
+        add_test_room_player(&mut task, 1, true);
+        task.human_team_assignments.insert(1, 2);
+
+        assert_eq!(task.next_default_team_for_new_seat(999_999), 3);
     }
 
     fn add_branch_occupant(task: &mut RoomTask, id: u32) -> ConnectionWriter {
