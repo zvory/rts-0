@@ -11,6 +11,7 @@ import { S } from "./protocol.js";
 import {
   MAX_LOBBY_TEAMS,
   LobbyRosterView,
+  PLAYABLE_FACTIONS,
   shouldAcceptSpectatorDrop,
   splitLobbyPlayers,
   teamSlotsForLobby,
@@ -20,7 +21,7 @@ const NAME_STORAGE_KEY = "rts.playerName";
 
 const MAX_PLAYERS = 4;
 
-export { MAX_LOBBY_TEAMS, shouldAcceptSpectatorDrop, teamSlotsForLobby };
+export { MAX_LOBBY_TEAMS, PLAYABLE_FACTIONS, shouldAcceptSpectatorDrop, teamSlotsForLobby };
 
 export function betaFactionSelectEnabledForLocation(locationLike) {
   const host = String(locationLike?.hostname || "").toLowerCase();

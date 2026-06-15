@@ -36,7 +36,7 @@ const { ok } = assertions;
   ok(changed.players.find((p) => p.id === A.playerId)?.factionId === DEFAULT_FACTION_ID,
     `A remains ${DEFAULT_FACTION_ID}`);
   ok(changed.players.find((p) => p.id === B.playerId)?.factionId === "ekat",
-    "B selected Ekaterina faction");
+    "B selected Ekat faction");
 
   A.send({ t: "setFaction", factionId: "phase2_empty_fixture" });
   await new Promise((resolve) => setTimeout(resolve, 200));
