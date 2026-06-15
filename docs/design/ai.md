@@ -56,6 +56,20 @@ plan owns ready combat groups, required-unit readiness, attack reissue cadence, 
 combat target selection, and blockers such as waiting for units, waiting for a required Tank,
 waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
+
+The economy plan is backed by an AI-owned resource availability model derived only from the
+fog-filtered observation, public start-payload resource positions, completed own City Centres,
+visible resource deltas, current worker latches, and AI-owned reservations. The model keeps
+known resources separate from resources that are mineable now: a steel or oil node is assignable
+only when it has remaining resources, is in range of a completed own City Centre, is not occupied by
+a latched worker, and is not already reserved by the current think. Known but non-mineable nodes
+remain visible to expansion planning as future candidates, but economy worker assignment suppresses
+oil demand when there is no free mineable oil and passes only free mineable node ids to
+`assign_workers_to_resource`. The action layer also requires callers to provide that assignable set,
+so an upstream economy mistake cannot knowingly emit a `Gather` command to non-mineable oil while
+free mineable steel exists. Self-play regression coverage preserves the pre-expansion case where
+oil is known but outside completed-City-Centre mining range, and the post-expansion case where oil
+assignment begins after the expansion City Centre completes.
 The live lobby default and promoted profile is `ai_1_0_tech`; it parameterizes worker targets,
 supply buffers, building/tech goals, production priorities, resource timing, expansion timing,
 harassment, and attack thresholds without providing its own `think()` function. It opens with
