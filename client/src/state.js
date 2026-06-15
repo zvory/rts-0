@@ -135,6 +135,8 @@ export class GameState {
     this.abilityTargetPreview = null;
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
     this.smokes = [];
+    /** @type {Array<{id:number,owner:number,ability:string,kind:string,x:number,y:number,expiresIn?:number,sourceCasterId?:number,ownerState?:object}>} */
+    this.abilityObjects = [];
     /** @type {Array<{id:number,owner:number,kind:string,x:number,y:number,footprint:Array<[number,number]>,observedTick:number}>} */
     this.rememberedBuildings = [];
     /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>} */
@@ -288,6 +290,7 @@ export class GameState {
     this.playerResources = msg.playerResources || [];
     this.upgrades = Array.isArray(msg.upgrades) ? msg.upgrades : [];
     this.smokes = Array.isArray(msg.smokes) ? msg.smokes : [];
+    this.abilityObjects = Array.isArray(msg.abilityObjects) ? msg.abilityObjects : [];
     this.rememberedBuildings = Array.isArray(msg.rememberedBuildings)
       ? msg.rememberedBuildings
       : [];

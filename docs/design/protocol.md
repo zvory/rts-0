@@ -287,6 +287,7 @@ transport decode:
   entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/death vision
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
+  abilityObjects?: AbilityObject[], // active ability world objects visible to this recipient; omitted when empty
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
   rememberedBuildings?: RememberedBuilding[], // recipient-only stale enemy building intel
   events: Event[],               // transient things to surface (see 2.5)
@@ -325,16 +326,20 @@ construction activity hints, ability controls/autocast toggles, debug paths, and
 remain exact-owner-only.
 Snapshot-only lingering death sight may make non-owned units/buildings visible as `visionOnly`;
 those views are visual intel only and do not refresh remembered buildings or validate targeted
-commands.
+commands. Ability world objects are projected separately in `abilityObjects`: normal players
+receive only objects whose world position is visible in their current team fog, while full-world
+dev snapshots include every object and spectator/replay snapshots use the existing union vision.
+Enemy objects never carry owner-only state, and `sourceCasterId` is omitted unless the caster is
+safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 21. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 22. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 21,
+  "v": 22,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -347,6 +352,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   ],
   "r": [[id, remaining]],         // omitted when empty
   "sm": [[id, x, y, radiusTiles, expiresIn]], // omitted when empty
+  "ao": [[id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState?]], // abilityObjects; omitted when empty
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
@@ -363,6 +369,7 @@ Compact numeric codes:
 | `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
+| `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch |
@@ -404,6 +411,13 @@ staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` 
 points in traversal order and `waypoints[0]` is the current movement target. The compact slot
 encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`,
 with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
+
+`AbilityObject`: `{ id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState? }`.
+The compact `ao` slot uses ability ids from the existing ability code table and
+`abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data
+encoded as `[earliestReturnTick?, hp?, radius?, destroyedLockoutTicks?, distanceTraveled?, ticksOut?]`.
+Normal enemy snapshots receive only the public object fields needed to render a marker at a visible
+position.
 
 `RememberedBuilding`: `{ id, owner, kind, x, y, footprint, observedTick }`. These records are
 recipient-only last-seen enemy building memory, refreshed from team-current actionable observations

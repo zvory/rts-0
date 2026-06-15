@@ -1163,6 +1163,7 @@ fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot
         )],
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
+        ability_objects: Vec::new(),
         visible_tiles: Vec::new(),
         remembered_buildings: Vec::new(),
         events: Vec::new(),
@@ -1682,10 +1683,7 @@ fn real_ai_vs_real_ai() {
                         .copied()
                         .unwrap_or_default()
                         >= MIN_SCOUT_CAR_TRAIN_COMMANDS
-                    && tank_train_cmds
-                        .get(&player.id)
-                        .copied()
-                        .unwrap_or_default()
+                    && tank_train_cmds.get(&player.id).copied().unwrap_or_default()
                         >= MIN_TANK_TRAIN_COMMANDS
                     && attack_move_cmds
                         .get(&player.id)
@@ -1721,10 +1719,7 @@ fn real_ai_vs_real_ai() {
                 .get(&player.id)
                 .copied()
                 .unwrap_or_default();
-            let tank_trains = tank_train_cmds
-                .get(&player.id)
-                .copied()
-                .unwrap_or_default();
+            let tank_trains = tank_train_cmds.get(&player.id).copied().unwrap_or_default();
             let seen_scout_cars = seen_scout_cars
                 .get(&player.id)
                 .map(|ids| ids.len())
@@ -1741,10 +1736,7 @@ fn real_ai_vs_real_ai() {
                 .get(&player.id)
                 .copied()
                 .unwrap_or_default();
-            let peak_tanks = max_tanks_alive
-                .get(&player.id)
-                .copied()
-                .unwrap_or_default();
+            let peak_tanks = max_tanks_alive.get(&player.id).copied().unwrap_or_default();
             let barracks_builds = barracks_build_cmds
                 .get(&player.id)
                 .copied()

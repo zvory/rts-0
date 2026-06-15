@@ -304,6 +304,15 @@ Snapshot ability affordances are projected from the owning player's faction cata
 future factions do not inherit Kriegsia command-card buttons merely because they reuse a global
 entity kind.
 
+Complex ability runtime state lives in `game::ability_runtime`. Its `AbilityRuntime` owns
+deterministic active instances and lightweight ability world objects that are not normal entities:
+they do not participate in supply, pathing, production, selection, scoring, or combat target
+queries unless a later phase explicitly adds such behavior. `Game::snapshot_for`,
+`snapshot_for_spectator`, and `snapshot_full_for` project active world objects through
+`Snapshot.abilityObjects`, filtered by the same current-team fog / spectator union / full-world
+mode used by other snapshot data. Enemy-visible objects expose only public render fields; owner-only
+payload state and safe caster ids are withheld from enemies.
+
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is

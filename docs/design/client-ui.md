@@ -452,7 +452,10 @@ owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that bu
 `state.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
 (null or `{ ability, x, y, rangeCenters, inRange }`). `commandTarget` is a transient UI state;
 `abilityTargetPreview` is rebuilt every mouse move from the cursor world position and the current
-selection.
+selection. Server-projected complex ability world objects are stored separately as
+`state.abilityObjects` from `Snapshot.abilityObjects`. They are authoritative, fog-filtered data
+for later return-marker, Magic Anchor, and line-projectile rendering; Phase 2 only decodes and
+stores them, so the client must not infer gameplay authority from local preview state.
 
 Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
 - While in targeted ability mode, draws a dotted range ring (radius = `rangeTiles × tileSize`) around

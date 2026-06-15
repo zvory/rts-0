@@ -155,6 +155,12 @@ export const EVENT = Object.freeze({
   ARTILLERY_IMPACT: "artilleryImpact",
 });
 
+export const ABILITY_OBJECT_KIND = Object.freeze({
+  RETURN_MARKER: "returnMarker",
+  MAGIC_ANCHOR: "magicAnchor",
+  LINE_PROJECTILE: "lineProjectile",
+});
+
 export const NOTICE_SEVERITY = Object.freeze({
   INFO: "info",
   WARN: "warn",
@@ -180,7 +186,7 @@ export const REPLAY_VISION = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 21;
+export const COMPACT_SNAPSHOT_VERSION = 22;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -295,6 +301,12 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EKAT_LINE_SHOT]: 7,
 });
 
+export const ABILITY_OBJECT_KIND_CODE = Object.freeze({
+  [ABILITY_OBJECT_KIND.RETURN_MARKER]: 1,
+  [ABILITY_OBJECT_KIND.MAGIC_ANCHOR]: 2,
+  [ABILITY_OBJECT_KIND.LINE_PROJECTILE]: 3,
+});
+
 export const NOTICE_SEVERITY_CODE = Object.freeze({
   [NOTICE_SEVERITY.INFO]: 1,
   [NOTICE_SEVERITY.WARN]: 2,
@@ -308,11 +320,13 @@ const EVENT_BY_CODE = Object.freeze(reverseCodes(EVENT_CODE));
 const ORDER_STAGE_BY_CODE = Object.freeze(reverseCodes(ORDER_STAGE_CODE));
 const ABILITY_BY_CODE = Object.freeze(reverseCodes(ABILITY_CODE));
 const UPGRADE_BY_CODE = Object.freeze(reverseCodes(UPGRADE_CODE));
+const ABILITY_OBJECT_KIND_BY_CODE = Object.freeze(reverseCodes(ABILITY_OBJECT_KIND_CODE));
 const NOTICE_SEVERITY_BY_CODE = Object.freeze(reverseCodes(NOTICE_SEVERITY_CODE));
 
 const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
 const MAX_COMPACT_SMOKES = 1024;
+const MAX_COMPACT_ABILITY_OBJECTS = 1024;
 const MAX_COMPACT_EVENTS = 5000;
 const MAX_COMPACT_ORDER_PLAN = 9;
 const MAX_COMPACT_ABILITIES = 8;
@@ -355,6 +369,11 @@ function decodeCompactSnapshot(raw) {
       MAX_COMPACT_RESOURCE_DELTAS,
     ).map(decodeCompactResourceDelta),
     smokes: readOptionalArray(raw.sm, "smokes", MAX_COMPACT_SMOKES).map(decodeCompactSmoke),
+    abilityObjects: readOptionalArray(
+      raw.ao,
+      "abilityObjects",
+      MAX_COMPACT_ABILITY_OBJECTS,
+    ).map(decodeCompactAbilityObject),
     visibleTiles: decodeVisibilityRuns(raw.fg),
     rememberedBuildings: readOptionalArray(
       raw.mb,
@@ -428,6 +447,49 @@ function decodeCompactSmoke(record, index) {
     radiusTiles: readNumber(fields[3], "smoke.radiusTiles"),
     expiresIn: readU32(fields[4], "smoke.expiresIn"),
   };
+}
+
+function decodeCompactAbilityObject(record, index) {
+  const fields = readArray(record, `ability object ${index}`, 9);
+  if (fields.length !== 9) throw new Error(`ability object ${index} field count mismatch`);
+  const object = {
+    id: readU32(fields[0], "abilityObject.id"),
+    owner: readU32(fields[1], "abilityObject.owner"),
+    ability: readCode(fields[2], ABILITY_BY_CODE, "abilityObject.ability"),
+    kind: readCode(fields[3], ABILITY_OBJECT_KIND_BY_CODE, "abilityObject.kind"),
+    x: readNumber(fields[4], "abilityObject.x"),
+    y: readNumber(fields[5], "abilityObject.y"),
+  };
+  if (fields[6] != null) object.expiresIn = readU32(fields[6], "abilityObject.expiresIn");
+  if (fields[7] != null) {
+    object.sourceCasterId = readU32(fields[7], "abilityObject.sourceCasterId");
+  }
+  if (fields[8] != null) {
+    object.ownerState = decodeCompactAbilityObjectOwnerState(fields[8]);
+  }
+  return object;
+}
+
+function decodeCompactAbilityObjectOwnerState(record) {
+  const fields = readArray(record, "abilityObject.ownerState", 6);
+  if (fields.length !== 6) throw new Error("abilityObject.ownerState field count mismatch");
+  const state = {};
+  if (fields[0] != null) {
+    state.earliestReturnTick = readU32(fields[0], "abilityObject.ownerState.earliestReturnTick");
+  }
+  if (fields[1] != null) state.hp = readU32(fields[1], "abilityObject.ownerState.hp");
+  if (fields[2] != null) state.radius = readNumber(fields[2], "abilityObject.ownerState.radius");
+  if (fields[3] != null) {
+    state.destroyedLockoutTicks = readU32(
+      fields[3],
+      "abilityObject.ownerState.destroyedLockoutTicks",
+    );
+  }
+  if (fields[4] != null) {
+    state.distanceTraveled = readNumber(fields[4], "abilityObject.ownerState.distanceTraveled");
+  }
+  if (fields[5] != null) state.ticksOut = readU32(fields[5], "abilityObject.ownerState.ticksOut");
+  return state;
 }
 
 function decodeCompactNetStatus(record) {

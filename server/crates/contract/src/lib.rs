@@ -124,6 +124,8 @@ pub struct Snapshot {
     pub resource_deltas: Vec<ResourceDelta>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub smokes: Vec<SmokeCloudView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ability_objects: Vec<AbilityObjectView>,
     /// Row-major current visibility grid for this recipient, one byte per map tile.
     /// Populated only for fog-filtered snapshots; clients keep explored history locally.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -140,6 +142,40 @@ pub struct Snapshot {
     pub player_resources: Vec<PlayerResourceSnapshot>,
     /// Per-recipient server/network diagnostics for the current match.
     pub net_status: SnapshotNetStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AbilityObjectView {
+    pub id: u32,
+    pub owner: u32,
+    pub ability: String,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_in: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_caster_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_state: Option<AbilityObjectOwnerStateView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AbilityObjectOwnerStateView {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub earliest_return_tick: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hp: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destroyed_lockout_ticks: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub distance_traveled: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ticks_out: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

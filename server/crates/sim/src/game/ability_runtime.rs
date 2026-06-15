@@ -91,6 +91,12 @@ impl AbilityWorldObject {
         self.expires_tick > tick
     }
 
+    pub(in crate::game) fn expires_in(self, tick: u32) -> Option<u16> {
+        self.expires_tick
+            .checked_sub(tick)
+            .map(|remaining| remaining.min(u16::MAX as u32) as u16)
+    }
+
     fn caster_alive(self, entities: &EntityStore) -> bool {
         entities
             .get(self.caster_id)
@@ -162,7 +168,10 @@ impl AbilityRuntime {
         id
     }
 
-    pub(in crate::game) fn spawn_world_object(&mut self, spec: AbilityWorldObjectSpec) -> Option<u32> {
+    pub(in crate::game) fn spawn_world_object(
+        &mut self,
+        spec: AbilityWorldObjectSpec,
+    ) -> Option<u32> {
         if !self.world_objects.can_insert(spec.x, spec.y) {
             return None;
         }

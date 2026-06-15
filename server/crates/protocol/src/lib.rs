@@ -10,10 +10,11 @@ use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 
 pub use rts_contract::{
-    AbilityCooldownView, AttackReveal, DebugPathPoint, DebugPathView, EntityView, Event, MapInfo,
-    NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
-    RememberedBuildingView, ReplayPlaybackState, ReplayStartMetadata, ResourceDelta, ResourceNode,
-    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, DEFAULT_FACTION_ID,
+    AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
+    DebugPathPoint, DebugPathView, EntityView, Event, MapInfo, NoticeSeverity, OrderPlanMarker,
+    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ReplayPlaybackState,
+    ReplayStartMetadata, ResourceDelta, ResourceNode, SmokeCloudView, Snapshot, SnapshotNetStatus,
+    StartPayload, TeamId, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -77,6 +78,13 @@ pub mod abilities {
     pub const BREAKTHROUGH: &str = "breakthrough";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
+}
+
+/// `AbilityObjectView.kind` values.
+pub mod ability_object_kinds {
+    pub const RETURN_MARKER: &str = "returnMarker";
+    pub const MAGIC_ANCHOR: &str = "magicAnchor";
+    pub const LINE_PROJECTILE: &str = "lineProjectile";
 }
 
 /// Permanent upgrade ids used by production/research and snapshot projection.
@@ -535,7 +543,7 @@ pub struct LobbyPlayer {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 21;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 22;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -590,6 +598,16 @@ impl Serialize for CompactSnapshot<'_> {
                     .smokes
                     .iter()
                     .map(CompactSmokeCloud)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        if !snapshot.ability_objects.is_empty() {
+            map.serialize_entry(
+                "ao",
+                &snapshot
+                    .ability_objects
+                    .iter()
+                    .map(CompactAbilityObject)
                     .collect::<Vec<_>>(),
             )?;
         }
@@ -692,6 +710,52 @@ impl Serialize for CompactSmokeCloud<'_> {
         seq.serialize_element(&smoke.y)?;
         seq.serialize_element(&smoke.radius_tiles)?;
         seq.serialize_element(&smoke.expires_in)?;
+        seq.end()
+    }
+}
+
+struct CompactAbilityObject<'a>(&'a AbilityObjectView);
+
+impl Serialize for CompactAbilityObject<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let object = self.0;
+        let mut seq = serializer.serialize_seq(Some(9))?;
+        seq.serialize_element(&object.id)?;
+        seq.serialize_element(&object.owner)?;
+        seq.serialize_element(&ability_code(&object.ability))?;
+        seq.serialize_element(&ability_object_kind_code(&object.kind))?;
+        seq.serialize_element(&object.x)?;
+        seq.serialize_element(&object.y)?;
+        seq.serialize_element(&object.expires_in)?;
+        seq.serialize_element(&object.source_caster_id)?;
+        seq.serialize_element(
+            &object
+                .owner_state
+                .as_ref()
+                .map(CompactAbilityObjectOwnerState),
+        )?;
+        seq.end()
+    }
+}
+
+struct CompactAbilityObjectOwnerState<'a>(&'a AbilityObjectOwnerStateView);
+
+impl Serialize for CompactAbilityObjectOwnerState<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let state = self.0;
+        let mut seq = serializer.serialize_seq(Some(6))?;
+        seq.serialize_element(&state.earliest_return_tick)?;
+        seq.serialize_element(&state.hp)?;
+        seq.serialize_element(&state.radius)?;
+        seq.serialize_element(&state.destroyed_lockout_ticks)?;
+        seq.serialize_element(&state.distance_traveled)?;
+        seq.serialize_element(&state.ticks_out)?;
         seq.end()
     }
 }
@@ -1255,6 +1319,15 @@ fn ability_code(ability: &str) -> u8 {
     }
 }
 
+fn ability_object_kind_code(kind: &str) -> u8 {
+    match kind {
+        ability_object_kinds::RETURN_MARKER => 1,
+        ability_object_kinds::MAGIC_ANCHOR => 2,
+        ability_object_kinds::LINE_PROJECTILE => 3,
+        _ => 255,
+    }
+}
+
 fn upgrade_code(upgrade: &str) -> u8 {
     match upgrade {
         upgrades::METHAMPHETAMINES => 1,
@@ -1565,6 +1638,20 @@ mod tests {
                 radius_tiles: 2.0,
                 expires_in: 120,
             }],
+            ability_objects: vec![AbilityObjectView {
+                id: 70,
+                owner: 1,
+                ability: abilities::EKAT_TELEPORT.to_string(),
+                kind: ability_object_kinds::RETURN_MARKER.to_string(),
+                x: 384.0,
+                y: 416.0,
+                expires_in: Some(90),
+                source_caster_id: Some(7),
+                owner_state: Some(AbilityObjectOwnerStateView {
+                    earliest_return_tick: Some(45),
+                    ..Default::default()
+                }),
+            }],
             visible_tiles: vec![1, 1, 0, 0, 0, 1],
             remembered_buildings: vec![RememberedBuildingView {
                 id: 99,
@@ -1713,6 +1800,20 @@ mod tests {
             value["sm"],
             serde_json::json!([[50, 320.0, 352.0, 2.0, 120]])
         );
+        assert_eq!(
+            value["ao"],
+            serde_json::json!([[
+                70,
+                1,
+                6,
+                1,
+                384.0,
+                416.0,
+                90,
+                7,
+                [45, null, null, null, null, null]
+            ]])
+        );
         assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
         assert_eq!(
             value["mb"],
@@ -1760,6 +1861,7 @@ mod tests {
             )],
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
+            ability_objects: Vec::new(),
             visible_tiles: Vec::new(),
             remembered_buildings: Vec::new(),
             events: Vec::new(),

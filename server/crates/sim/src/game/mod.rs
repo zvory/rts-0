@@ -9,6 +9,7 @@
 //! enemy entities on tiles they currently see.
 
 pub(crate) mod ability;
+mod ability_projection;
 pub(crate) mod ability_runtime;
 mod analysis;
 mod artillery;
@@ -395,6 +396,15 @@ impl Game {
         Some(id)
     }
 
+    #[allow(dead_code)]
+    #[cfg(any(test, debug_assertions))]
+    pub(in crate::game) fn spawn_ability_world_object_for_test(
+        &mut self,
+        spec: ability_runtime::AbilityWorldObjectSpec,
+    ) -> Option<u32> {
+        self.ability_runtime.spawn_world_object(spec)
+    }
+
     /// Authoritative commands applied so far, in exact application order.
     #[allow(dead_code)]
     pub fn command_log(&self) -> &[CommandLogEntry] {
@@ -445,6 +455,8 @@ impl Game {
     }
 }
 
+#[cfg(test)]
+mod ability_projection_tests;
 #[cfg(test)]
 mod phase7_privacy_tests;
 #[cfg(test)]
