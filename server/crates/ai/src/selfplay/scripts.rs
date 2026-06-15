@@ -11,6 +11,7 @@ use crate::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
 use crate::ai_core::facts::AiFacts;
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID};
+use crate::ai_core::resource_availability::ResourceAvailability;
 use crate::ai_shared;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
@@ -325,12 +326,15 @@ fn assign_steel_workers(
         .filter_map(|worker| worker.latched_node)
         .collect();
     let skipped_workers = BTreeSet::new();
+    let availability = ResourceAvailability::from_observation(observation, &latched_nodes);
+    let mineable_steel_nodes = availability.free_mineable_node_ids(EntityKind::Steel);
     actions::assign_workers_to_resource(
         actions,
         ResourceAssignmentPolicy {
             workers: &observation.owned,
             resources: &observation.resources,
             resource_kind: EntityKind::Steel,
+            assignable_node_ids: &mineable_steel_nodes,
             candidate_worker_ids: None,
             skip_workers: &skipped_workers,
             pre_reserved_nodes: &latched_nodes,

@@ -1,6 +1,6 @@
 # Phase 3 - Availability-Safe Assignment
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

@@ -1,7 +1,7 @@
 use super::expansion::{active_expansion, expansion_blocks_tech_path};
-use super::geometry::{dist2, squared};
 use super::policies::{active_resource_policy, active_worker_policy};
 use super::*;
+use crate::ai_core::resource_availability::ResourceAvailability;
 
 pub(super) const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 =
     config::MINING_CC_RANGE_TILES + 3.0;
@@ -15,6 +15,8 @@ pub(super) struct EconomyPlan {
     pub(super) current_oil_workers: usize,
     pub(super) resource_counts: BTreeMap<EntityKind, usize>,
     pub(super) occupied_nodes: BTreeSet<u32>,
+    pub(super) mineable_steel_nodes: BTreeSet<u32>,
+    pub(super) mineable_oil_nodes: BTreeSet<u32>,
     pub(super) max_worker_resource_distance_px: Option<f32>,
 }
 
@@ -26,12 +28,15 @@ pub(super) fn plan_economy(
     panic_oil_workers: Option<usize>,
 ) -> EconomyPlan {
     let worker_policy = active_worker_policy(profile, recovery_active);
+    let availability = resource_availability(observation);
     let complete_gate_count = worker_policy
         .pressure_until_complete
         .map(|kind| facts.complete_building_count(kind))
         .unwrap_or(usize::MAX);
-    let base_steel_target =
-        worker_policy.target_steel_workers(facts.target_steel_workers, complete_gate_count);
+    let base_steel_target = worker_policy.target_steel_workers(
+        availability.current_steel_saturation_target(),
+        complete_gate_count,
+    );
     let target_steel_workers = target_steel_workers_for_profile(
         observation,
         facts,
@@ -39,15 +44,19 @@ pub(super) fn plan_economy(
         recovery_active,
         base_steel_target,
     );
-    let desired_oil_workers = panic_oil_workers.unwrap_or_else(|| {
-        desired_oil_workers(
-            observation,
-            facts,
-            profile,
-            recovery_active,
-            target_steel_workers,
-        )
-    });
+    let desired_oil_workers = if availability.has_free_mineable_oil() {
+        panic_oil_workers.unwrap_or_else(|| {
+            desired_oil_workers(
+                observation,
+                facts,
+                profile,
+                recovery_active,
+                target_steel_workers,
+            )
+        })
+    } else {
+        0
+    };
     let resource_counts = resource_worker_counts(observation);
     let current_steel_workers = resource_counts
         .get(&EntityKind::Steel)
@@ -62,6 +71,8 @@ pub(super) fn plan_economy(
         current_oil_workers,
         resource_counts,
         occupied_nodes: occupied_resource_nodes(observation),
+        mineable_steel_nodes: availability.free_mineable_node_ids(EntityKind::Steel),
+        mineable_oil_nodes: availability.free_mineable_node_ids(EntityKind::Oil),
         max_worker_resource_distance_px: max_worker_resource_assignment_distance_px(
             observation,
             facts,
@@ -93,30 +104,7 @@ pub(super) fn target_steel_workers_for_profile(
 }
 
 pub(super) fn completed_cc_steel_saturation_target(observation: &AiObservation) -> usize {
-    let completed_ccs: Vec<&AiEntitySummary> = observation
-        .owned
-        .iter()
-        .filter(|entity| {
-            entity.kind == EntityKind::CityCentre
-                && entity.is_complete
-                && entity.state != AiEntityState::Dead
-        })
-        .collect();
-    if completed_ccs.is_empty() {
-        return 0;
-    }
-    let max_dist_px = (config::CC_RESOURCE_MAX_DIST_TILES + 0.5) * observation.map.tile_size as f32;
-    let max_dist2 = squared(max_dist_px);
-    observation
-        .resources
-        .iter()
-        .filter(|resource| resource.kind == EntityKind::Steel && resource.remaining > 0)
-        .filter(|resource| {
-            completed_ccs
-                .iter()
-                .any(|cc| dist2(resource.x, resource.y, cc.x, cc.y) <= max_dist2)
-        })
-        .count()
+    resource_availability(observation).current_steel_saturation_target()
 }
 
 pub(super) fn max_worker_resource_assignment_distance_px(
@@ -141,8 +129,12 @@ pub(super) fn desired_oil_workers(
 ) -> usize {
     let worker_policy = active_worker_policy(profile, recovery_active);
     let resource_policy = active_resource_policy(profile, recovery_active);
+    let availability = resource_availability(observation);
 
     if worker_policy.extra_oil_workers == 0 {
+        return 0;
+    }
+    if !availability.has_free_mineable_oil() {
         return 0;
     }
     if expansion_blocks_tech_path(observation, facts, profile, recovery_active) {
@@ -195,6 +187,10 @@ pub(super) fn desired_oil_workers(
     }
 
     target.min(max_oil_workers)
+}
+
+fn resource_availability(observation: &AiObservation) -> ResourceAvailability {
+    ResourceAvailability::from_observation(observation, &BTreeSet::new())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

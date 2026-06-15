@@ -1,6 +1,6 @@
 # Phase 1 - Resource Availability Facts
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

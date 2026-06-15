@@ -9,3 +9,4 @@ pub(crate) mod decision;
 pub(crate) mod facts;
 pub(crate) mod observation;
 pub(crate) mod profiles;
+pub(crate) mod resource_availability;

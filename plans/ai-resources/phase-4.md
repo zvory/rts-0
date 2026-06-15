@@ -1,6 +1,6 @@
 # Phase 4 - Regression Scenarios and Documentation
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 
@@ -78,3 +78,18 @@ After implementation, mark this phase done and summarize the regression scenario
 matchup evidence, docs updated, and any remaining economy risks to watch in playtests. Include
 factual gameplay patch notes describing the worker-idle fix and any observed AI economy timing
 changes.
+
+## Completed Handoff
+
+- Added profile-backed self-play regression coverage for the low-to-mid supply pre-expansion case:
+  while free steel is mineable and known oil is not covered by a completed City Centre, player 1's
+  gather command targets steel and any oil gather command must target a currently mineable node.
+- Added a complementary profile-backed self-play regression where AI 1.0 completes an expansion
+  City Centre, oil becomes mineable, and a later worker assignment targets oil.
+- Updated `docs/design/ai.md` with the AI-owned resource availability contract, the
+  known-vs-mineable distinction, and the action-layer assignable-node guard.
+- Targeted verification: `cargo test -p rts-ai profile_backed_ai_` passed.
+- Profile-backed checkup: `cargo run -p rts-ai --bin ai-matchup -- ai_1_0_tech ai_1_0_tech --ticks 6000 --seed 7 --json` passed after implementation.
+- Gameplay patch note: AI workers now have regression coverage proving they prefer currently
+  mineable resources and do not spend the pre-expansion worker opportunity on known but
+  non-mineable oil; post-expansion oil assignment still occurs after City Centre coverage exists.

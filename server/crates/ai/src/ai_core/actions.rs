@@ -569,6 +569,7 @@ pub(crate) struct ResourceAssignmentPolicy<'a> {
     pub(crate) workers: &'a [AiEntitySummary],
     pub(crate) resources: &'a [AiResourceSummary],
     pub(crate) resource_kind: EntityKind,
+    pub(crate) assignable_node_ids: &'a BTreeSet<u32>,
     pub(crate) candidate_worker_ids: Option<&'a [u32]>,
     pub(crate) skip_workers: &'a BTreeSet<u32>,
     pub(crate) pre_reserved_nodes: &'a BTreeSet<u32>,
@@ -784,6 +785,9 @@ fn nearest_unreserved_node(
         if node.kind != policy.resource_kind || node.remaining == 0 {
             continue;
         }
+        if !policy.assignable_node_ids.contains(&node.id) {
+            continue;
+        }
         if policy.pre_reserved_nodes.contains(&node.id)
             || reservations.resource_node_reserved(node.id)
         {
@@ -825,6 +829,7 @@ fn point_toward(from: (f32, f32), to: (f32, f32), distance: f32) -> (f32, f32) {
 mod tests {
     use super::*;
     use crate::ai_core::observation::{AiEconomy, AiMapSummary, AiObservation, AiPlayerSummary};
+    use crate::ai_core::resource_availability::ResourceAvailability;
 
     fn worker(id: u32, x: f32, y: f32, state: AiEntityState) -> AiEntitySummary {
         AiEntitySummary {
@@ -1239,6 +1244,7 @@ mod tests {
         let facts = facts_from_observation(&observation);
         let mut ctx = context_from_facts(&facts, &observation);
         let empty = BTreeSet::new();
+        let assignable_node_ids = BTreeSet::from([30, 31]);
 
         let assigned = assign_workers_to_resource(
             &mut ctx,
@@ -1246,6 +1252,7 @@ mod tests {
                 workers: &observation.owned,
                 resources: &observation.resources,
                 resource_kind: EntityKind::Steel,
+                assignable_node_ids: &assignable_node_ids,
                 candidate_worker_ids: None,
                 skip_workers: &empty,
                 pre_reserved_nodes: &empty,
@@ -1281,6 +1288,7 @@ mod tests {
         let facts = facts_from_observation(&observation);
         let mut ctx = context_from_facts(&facts, &observation);
         let empty = BTreeSet::new();
+        let assignable_node_ids = BTreeSet::from([31]);
 
         let assigned = assign_workers_to_resource(
             &mut ctx,
@@ -1288,6 +1296,7 @@ mod tests {
                 workers: &observation.owned,
                 resources: &observation.resources,
                 resource_kind: EntityKind::Oil,
+                assignable_node_ids: &assignable_node_ids,
                 candidate_worker_ids: Some(&[10]),
                 skip_workers: &empty,
                 pre_reserved_nodes: &empty,
@@ -1327,6 +1336,7 @@ mod tests {
         let mut reserved = BTreeSet::new();
         reserved.insert(30);
         let empty = BTreeSet::new();
+        let assignable_node_ids = BTreeSet::from([30, 31]);
 
         let assigned = assign_workers_to_resource(
             &mut ctx,
@@ -1334,6 +1344,7 @@ mod tests {
                 workers: &observation.owned,
                 resources: &observation.resources,
                 resource_kind: EntityKind::Steel,
+                assignable_node_ids: &assignable_node_ids,
                 candidate_worker_ids: None,
                 skip_workers: &empty,
                 pre_reserved_nodes: &reserved,
@@ -1346,6 +1357,131 @@ mod tests {
 
         assert!(assigned.is_empty());
         assert!(ctx.into_commands().is_empty());
+    }
+
+    #[test]
+    fn assign_workers_to_resource_ignores_non_mineable_oil_without_reserving_worker() {
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 10,
+            },
+            vec![worker(10, 0.0, 0.0, AiEntityState::Idle)],
+            vec![
+                resource(30, EntityKind::Steel, 32.0, 0.0),
+                resource(31, EntityKind::Oil, 64.0, 0.0),
+            ],
+        );
+        let facts = facts_from_observation(&observation);
+        let mut ctx = context_from_facts(&facts, &observation);
+        let empty = BTreeSet::new();
+        let no_mineable_oil = BTreeSet::new();
+
+        let assigned_oil = assign_workers_to_resource(
+            &mut ctx,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Oil,
+                assignable_node_ids: &no_mineable_oil,
+                candidate_worker_ids: Some(&[10]),
+                skip_workers: &empty,
+                pre_reserved_nodes: &empty,
+                idle_only: true,
+                allow_latched_reassignment: false,
+                max_assignments: Some(1),
+                max_worker_resource_distance_px: None,
+            },
+        );
+
+        assert!(assigned_oil.is_empty());
+        assert_eq!(
+            ctx.reservations().counts(),
+            ReservationCounts {
+                workers: 0,
+                resource_nodes: 0,
+                production_buildings: 0
+            }
+        );
+
+        let mineable_steel = BTreeSet::from([30]);
+        let assigned_steel = assign_workers_to_resource(
+            &mut ctx,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Steel,
+                assignable_node_ids: &mineable_steel,
+                candidate_worker_ids: Some(&[10]),
+                skip_workers: &empty,
+                pre_reserved_nodes: &empty,
+                idle_only: true,
+                allow_latched_reassignment: false,
+                max_assignments: Some(1),
+                max_worker_resource_distance_px: None,
+            },
+        );
+
+        assert_eq!(
+            assigned_steel,
+            vec![ResourceAssignment {
+                worker: 10,
+                node: 30
+            }]
+        );
+        assert!(matches!(
+            ctx.into_commands().as_slice(),
+            [Command::Gather { units, node: 30, queued: false }] if units == &vec![10]
+        ));
+    }
+
+    #[test]
+    fn assign_workers_to_resource_accepts_completed_expansion_oil_candidate() {
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 10,
+            },
+            vec![
+                complete_building(20, EntityKind::CityCentre),
+                worker(10, 0.0, 0.0, AiEntityState::Idle),
+            ],
+            vec![resource(31, EntityKind::Oil, 0.0, 0.0)],
+        );
+        let facts = facts_from_observation(&observation);
+        let mut ctx = context_from_facts(&facts, &observation);
+        let empty = BTreeSet::new();
+        let availability = ResourceAvailability::from_observation(&observation, &empty);
+        let mineable_oil = availability.free_mineable_node_ids(EntityKind::Oil);
+
+        let assigned = assign_workers_to_resource(
+            &mut ctx,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Oil,
+                assignable_node_ids: &mineable_oil,
+                candidate_worker_ids: Some(&[10]),
+                skip_workers: &empty,
+                pre_reserved_nodes: &empty,
+                idle_only: true,
+                allow_latched_reassignment: false,
+                max_assignments: Some(1),
+                max_worker_resource_distance_px: None,
+            },
+        );
+
+        assert_eq!(
+            assigned,
+            vec![ResourceAssignment {
+                worker: 10,
+                node: 31
+            }]
+        );
     }
 
     #[test]
