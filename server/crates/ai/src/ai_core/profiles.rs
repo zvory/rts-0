@@ -17,7 +17,6 @@ pub(crate) struct AiProfile {
     pub(crate) buildings: BuildingPolicy,
     pub(crate) production: ProductionPolicy,
     pub(crate) attack: AttackPolicy,
-    pub(crate) harassment: Option<HarassmentPolicy>,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
@@ -168,16 +167,6 @@ pub(crate) struct AttackPolicy {
     pub(crate) required_unit: Option<EntityKind>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct HarassmentPolicy {
-    pub(crate) unit_kind: EntityKind,
-    pub(crate) group_size: usize,
-    pub(crate) reissue_cadence_ticks: u32,
-    pub(crate) back_offset_tiles: f32,
-    pub(crate) side_offset_tiles: f32,
-    pub(crate) visible_threat_radius_tiles: f32,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
@@ -297,7 +286,6 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         unit_kinds: &RIFLE_ONLY,
         required_unit: None,
     },
-    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 10,
         oil_after_full_steel_saturation: false,
@@ -434,7 +422,6 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         unit_kinds: &RIFLE_ONLY,
         required_unit: None,
     },
-    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 10,
         oil_after_full_steel_saturation: true,
@@ -519,7 +506,6 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         unit_kinds: &TANK_AND_RIFLE,
         required_unit: Some(EntityKind::Tank),
     },
-    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
@@ -584,7 +570,6 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         unit_kinds: &SUPPORT_WEAPONS,
         required_unit: None,
     },
-    harassment: None,
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
@@ -667,14 +652,6 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         unit_kinds: &RIFLE_ONLY,
         required_unit: None,
     },
-    harassment: Some(HarassmentPolicy {
-        unit_kind: EntityKind::ScoutCar,
-        group_size: 2,
-        reissue_cadence_ticks: 90,
-        back_offset_tiles: 8.0,
-        side_offset_tiles: 12.0,
-        visible_threat_radius_tiles: 12.0,
-    }),
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
         oil_after_full_steel_saturation: false,
@@ -741,7 +718,6 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
     },
     production: AI_1_0_TECH.production,
     attack: AI_1_0_TECH.attack,
-    harassment: None,
     resources: AI_1_0_TECH.resources,
     expansion: Some(ExpansionPolicy {
         target_city_centres: 2,
@@ -828,7 +804,6 @@ mod tests {
                 .target(2_000, 30, 18),
             1
         );
-        assert_eq!(AI_1_1_TANK_MG.harassment, None);
         assert_eq!(transition.production.unit_priorities, &[EntityKind::Tank]);
         assert!(!transition
             .production
