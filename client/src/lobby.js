@@ -21,6 +21,20 @@ const MAX_PLAYERS = 4;
 
 export { MAX_LOBBY_TEAMS, teamSlotsForLobby };
 
+export function betaFactionSelectEnabledForLocation(locationLike) {
+  const host = String(locationLike?.hostname || "").toLowerCase();
+  const path = String(locationLike?.pathname || "");
+  return (
+    host.includes("beta") ||
+    path.startsWith("/beta") ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host.endsWith(".localhost") ||
+    host === ""
+  );
+}
+
 /**
  * The lobby screen controller.
  */
@@ -278,8 +292,7 @@ export class Lobby {
   }
 
   _betaFactionSelectEnabled() {
-    const host = window.location.hostname;
-    return host.includes("beta") || window.location.pathname.startsWith("/beta");
+    return betaFactionSelectEnabledForLocation(window.location);
   }
 
   /**

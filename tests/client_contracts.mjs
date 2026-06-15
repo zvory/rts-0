@@ -7,7 +7,11 @@
 
 import fs from "node:fs";
 import { Net } from "../client/src/net.js";
-import { MAX_LOBBY_TEAMS, teamSlotsForLobby } from "../client/src/lobby.js";
+import {
+  MAX_LOBBY_TEAMS,
+  betaFactionSelectEnabledForLocation,
+  teamSlotsForLobby,
+} from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
 import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
 import { GameState } from "../client/src/state.js";
@@ -2656,6 +2660,22 @@ function fakeAudioContext() {
 // ---------------------------------------------------------------------------
 {
   assert(MAX_LOBBY_TEAMS === 4, "lobby exposes four host-managed team slots");
+  assert(
+    betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
+    "lobby faction select shows on beta host",
+  );
+  assert(
+    betaFactionSelectEnabledForLocation({ hostname: "localhost", pathname: "/" }),
+    "lobby faction select shows on local runserver host",
+  );
+  assert(
+    betaFactionSelectEnabledForLocation({ hostname: "127.0.0.1", pathname: "/" }),
+    "lobby faction select shows on loopback host",
+  );
+  assert(
+    !betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin.fly.dev", pathname: "/" }),
+    "lobby faction select stays hidden on mainline host",
+  );
   const slots = teamSlotsForLobby([
     { id: 3, teamId: 1 },
     { id: 4, teamId: 2 },
