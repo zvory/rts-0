@@ -18,6 +18,9 @@ Cargo.lock.orig
 # Logs
 *.log
 
+# Local generated unit-design lab attempts
+/server/assets/unit-design-lab/*.json
+
 # Secrets
 .env
 .env.local
