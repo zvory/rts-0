@@ -120,7 +120,7 @@ authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons).
-- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 30` (~1s setup), `MORTAR_SHELL_DELAY_TICKS = 68`
+- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_SHELL_DELAY_TICKS = 68`
   (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`, `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 30`, `MORTAR_INNER_DAMAGE = 60`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
   The inner radius uses semi-armor-piercing damage against armored targets: it applies half of the
