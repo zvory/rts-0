@@ -28,6 +28,8 @@ use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
 
+mod unit_design_lab;
+
 use rts_server::db::Db;
 use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
@@ -132,6 +134,11 @@ async fn main() {
         .route("/beta/", get(beta_redirect_handler))
         .route("/version", get(version_handler))
         .route("/ws", get(ws_handler))
+        .route("/dev/unit-lab", get(unit_design_lab_handler))
+        .route(
+            "/api/unit-designs",
+            get(unit_design_lab_list_handler).post(unit_design_lab_generate_handler),
+        )
         .route("/dev/selfplay", get(dev_selfplay_handler))
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
@@ -449,6 +456,26 @@ async fn dev_selfplay_handler(
         target.push_str(replay);
     }
     Redirect::temporary(&target)
+}
+
+async fn unit_design_lab_handler() -> impl IntoResponse {
+    Redirect::temporary("/unit-lab.html")
+}
+
+async fn unit_design_lab_list_handler() -> impl IntoResponse {
+    match unit_design_lab::list_attempts().await {
+        Ok(payload) => Json(payload).into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err).into_response(),
+    }
+}
+
+async fn unit_design_lab_generate_handler(
+    Json(payload): Json<unit_design_lab::UnitDesignRequest>,
+) -> impl IntoResponse {
+    match unit_design_lab::generate_attempt(payload).await {
+        Ok(payload) => Json(payload).into_response(),
+        Err(err) => (StatusCode::BAD_REQUEST, err).into_response(),
+    }
 }
 
 async fn dev_scenario_handler(
