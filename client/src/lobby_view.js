@@ -453,9 +453,9 @@ function aiProfileLabel(id) {
   return AI_PROFILES.find((entry) => entry.id === id)?.label || AI_PROFILES[0].label;
 }
 
-const PLAYABLE_FACTIONS = Object.freeze([
+export const PLAYABLE_FACTIONS = Object.freeze([
   { id: "kriegsia", label: "Kriegsia" },
-  { id: "ekat", label: "Ekaterina" },
+  { id: "ekat", label: "Ekat" },
 ]);
 
 function playableFactionId(factionId) {

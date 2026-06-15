@@ -9,6 +9,7 @@ import fs from "node:fs";
 import { Net } from "../client/src/net.js";
 import {
   MAX_LOBBY_TEAMS,
+  PLAYABLE_FACTIONS,
   betaFactionSelectEnabledForLocation,
   shouldAcceptSpectatorDrop,
   teamSlotsForLobby,
@@ -2718,6 +2719,10 @@ function fakeAudioContext() {
 // ---------------------------------------------------------------------------
 {
   assert(MAX_LOBBY_TEAMS === 4, "lobby exposes four host-managed team slots");
+  assert(
+    PLAYABLE_FACTIONS.find((entry) => entry.id === "ekat")?.label === "Ekat",
+    "lobby faction selector labels the ekat faction as Ekat",
+  );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
     "lobby faction select shows on beta host",
