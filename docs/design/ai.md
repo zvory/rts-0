@@ -71,22 +71,17 @@ free mineable steel exists. Self-play regression coverage preserves the pre-expa
 oil is known but outside completed-City-Centre mining range, and the post-expansion case where oil
 assignment begins after the expansion City Centre completes.
 The live lobby default and promoted profile is `ai_1_0_tech`; it parameterizes worker targets,
-supply buffers, building/tech goals, production priorities, resource timing, expansion timing,
-harassment, and attack thresholds without providing its own `think()` function. It opens with
+supply buffers, building/tech goals, production priorities, resource timing, expansion timing, and
+attack thresholds without providing its own `think()` function. It opens with
 four-Rifleman frontal waves, expands off a completed Training Centre, builds Research
 Complex and Factory without adding Machine Gunners, Anti-Tank Guns, Artillery, or Command Cars,
 produces Scout Cars while Tank research or Methamphetamines is blocked or pending, then prioritizes
-Tanks once both Tank research and Methamphetamines complete. It reserves up to two completed Scout
-Cars for harassment before frontal-wave readiness is calculated, so those cars do not satisfy Tank
-wave sizes. The harassment manager chooses the nearest living enemy public start, derives the enemy
-main steel-line center from public start-resource locations plus visible resource deltas, and moves
-the Scout Cars through an outer flank waypoint before queueing a back-side, off-axis point beyond
-that steel line. If the harassment group sees enemy combat units near its route, it breaks contact
-with a fog-respecting evasive `Move`; otherwise it reissues the harassment route on a short cadence.
-It does not focus workers, ignore hidden
-buildings, regroup, or use Scout Car smoke in AI 1.0. Tank frontal waves require a Tank in
-the ready group and Methamphetamines before launch; while waiting, ready Tank groups stage toward
-the enemy instead of dribbling into attack orders. Methamphetamines is enforced before first Tank
+Tanks once both Tank research and Methamphetamines complete. Scout Cars are not reserved for
+harassment, flank routes, or threat evasion; if they are present in the ready combat group, they use
+the same frontal-wave attack-move behavior as Tanks and Riflemen. It does not focus workers, ignore
+hidden buildings, regroup, or use Scout Car smoke in AI 1.0. Tank frontal waves require a Tank in the
+ready group and Methamphetamines before launch; while waiting, ready Tank groups stage toward the
+enemy instead of dribbling into attack orders. Methamphetamines is enforced before first Tank
 production, not only before Tank attack launch, so Tank production and Tank-wave readiness cannot
 race ahead of the upgrade.
 The profile includes a defensive panic mode. Visible enemy units near the AI's base, home resource
@@ -127,8 +122,8 @@ client-selectable but is not the live lobby default.
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player
 results include army value, building value, final worker count, final unit counts, command count,
 attack command count, damage events dealt, deduplicated deaths, first attack command, first
-Rifleman attack command, first Scout Car completion, first Scout Car harassment command, first
-expansion City Centre planned/completed, and first Tank completion. Match-level results include
+Rifleman attack command, first Scout Car completion, first legacy Scout Car harassment-style `Move`
+command, first expansion City Centre planned/completed, and first Tank completion. Match-level results include
 winner or tick-cap status, first damage, attack events, death events, replay verification status,
 and optional replay artifact path. Compact baseline scenario metadata for opening pressure,
 mid-game expansion, tank tech, and blocked-goal pressure lives in

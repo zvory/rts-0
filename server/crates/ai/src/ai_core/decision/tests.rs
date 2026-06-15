@@ -3828,80 +3828,7 @@ fn moving_rifle_raid_ignores_visible_buildings_until_arrival() {
 }
 
 #[test]
-fn scout_car_harassment_routes_through_outer_flank_then_enemy_steel_back_side() {
-    let ts = config::TILE_SIZE as f32;
-    let mut observation = with_enemy_main_resources(observation(
-        AiEconomy {
-            steel: 0,
-            oil: 0,
-            supply_used: 30,
-            supply_cap: 60,
-        },
-        vec![
-            building(10, EntityKind::CityCentre, Some(0)),
-            combat_at(30, EntityKind::ScoutCar, 20.0 * ts, 20.0 * ts),
-        ],
-    ));
-    observation.tick = 1_000;
-    let enemy_base = enemy_base_fact(&observation);
-    let steel_center = enemy_main_steel_center(&observation, enemy_base)
-        .expect("enemy steel line should be public from start payload resources");
-
-    let decision = decide(
-        &observation,
-        &AI_1_0_TECH,
-        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
-    );
-
-    let mut harassment_moves = decision
-        .commands
-        .iter()
-        .filter_map(|command| match command {
-            Command::Move {
-                units,
-                x,
-                y,
-                queued,
-            } if units.as_slice() == [30] => Some((*x, *y, *queued)),
-            _ => None,
-        });
-    let flank = harassment_moves
-        .next()
-        .expect("Scout Car should receive an initial flank move");
-    let target = harassment_moves
-        .next()
-        .expect("Scout Car should receive a queued harassment move");
-    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let forward = normalized_direction(own_base, (enemy_base.x, enemy_base.y)).unwrap();
-    let behind_progress =
-        (target.0 - steel_center.0) * forward.0 + (target.1 - steel_center.1) * forward.1;
-
-    assert!(
-        !flank.2,
-        "first harassment move should replace the active order"
-    );
-    assert!(
-        target.2,
-        "final harassment move should be queued behind the flank waypoint"
-    );
-    assert!(
-        behind_progress > 6.0 * ts,
-        "harassment target should be behind the enemy main steel line"
-    );
-    assert!(
-        point_line_distance2((target.0, target.1), own_base, (enemy_base.x, enemy_base.y))
-            > squared(6.0 * ts),
-        "harassment target should be offset from the direct frontal approach"
-    );
-    assert!(
-        point_line_distance2((flank.0, flank.1), own_base, (enemy_base.x, enemy_base.y))
-            > point_line_distance2((target.0, target.1), own_base, (enemy_base.x, enemy_base.y)),
-        "initial flank waypoint should be farther from the normal line of advance"
-    );
-}
-
-#[test]
-fn scout_car_harassment_reserves_units_from_frontal_wave() {
+fn scout_cars_join_the_normal_frontal_wave() {
     let ts = config::TILE_SIZE as f32;
     let mut owned = vec![
         building(10, EntityKind::CityCentre, Some(0)),
@@ -3935,82 +3862,17 @@ fn scout_car_harassment_reserves_units_from_frontal_wave() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Move { units, .. } if units.as_slice() == [30, 31]
-        )
-    }));
-    assert!(decision.commands.iter().any(|command| {
-        matches!(
-            command,
-            Command::AttackMove { units, .. } if units.as_slice() == [40, 41, 42, 43, 44, 45]
+            Command::AttackMove { units, .. } if units.as_slice() == [30, 31, 40, 41, 42, 43, 44, 45]
         )
     }));
     assert!(
         !decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::AttackMove { units, .. } if units.contains(&30) || units.contains(&31)
+                Command::Move { units, .. } if units.contains(&30) || units.contains(&31)
             )
         }),
-        "reserved Scout Cars should not be counted in the frontal wave"
-    );
-}
-
-#[test]
-fn scout_car_harassment_evades_visible_combat_threats() {
-    let ts = config::TILE_SIZE as f32;
-    let mut observation = with_enemy_main_resources(observation(
-        AiEconomy {
-            steel: 0,
-            oil: 0,
-            supply_used: 30,
-            supply_cap: 60,
-        },
-        vec![
-            building(10, EntityKind::CityCentre, Some(0)),
-            combat_at(30, EntityKind::ScoutCar, 44.0 * ts, 44.0 * ts),
-            combat_at(31, EntityKind::ScoutCar, 44.5 * ts, 44.0 * ts),
-        ],
-    ));
-    observation
-        .visible_enemies
-        .push(enemy(80, EntityKind::Worker, 44.5 * ts, 44.5 * ts));
-    observation
-        .visible_enemies
-        .push(enemy(90, EntityKind::ScoutCar, 45.0 * ts, 44.5 * ts));
-
-    let decision = decide(
-        &observation,
-        &AI_1_0_TECH,
-        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
-    );
-
-    let evasion = decision.commands.iter().find_map(|command| match command {
-        Command::Move {
-            units,
-            x,
-            y,
-            queued,
-        } if units.as_slice() == [30, 31] && !queued => Some((*x, *y)),
-        _ => None,
-    });
-    let evasion = evasion.expect("Scout Cars should break contact with an evasive move");
-    let threat = (45.0 * ts, 44.5 * ts);
-    let center = (44.25 * ts, 44.0 * ts);
-
-    assert!(
-        dist2(evasion.0, evasion.1, threat.0, threat.1)
-            > dist2(center.0, center.1, threat.0, threat.1),
-        "evasion point should increase distance from the visible combat threat"
-    );
-    assert!(
-        !decision.commands.iter().any(|command| {
-            matches!(
-                command,
-                Command::Attack { units, target, .. }
-                    if units.as_slice() == [30, 31] && *target == 90
-            )
-        }),
-        "harassing Scout Cars should not stand and fight visible combat threats"
+        "Scout Cars should not receive separate flank or evasion moves"
     );
 }
 

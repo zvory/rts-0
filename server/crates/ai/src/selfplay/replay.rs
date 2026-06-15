@@ -589,12 +589,7 @@ fn is_attack_command(command: &rts_sim::game::command::SimCommand) -> bool {
 }
 
 fn is_harass_command(command: &rts_sim::game::command::SimCommand) -> bool {
-    matches!(
-        command,
-        rts_sim::game::command::SimCommand::Move { .. }
-            | rts_sim::game::command::SimCommand::AttackMove { .. }
-            | rts_sim::game::command::SimCommand::Attack { .. }
-    )
+    matches!(command, rts_sim::game::command::SimCommand::Move { .. })
 }
 
 fn write_replay_artifact(
@@ -843,6 +838,17 @@ mod tests {
         collector.observe_command(
             120,
             1,
+            &SimCommand::AttackMove {
+                units: vec![3],
+                x: 600.0,
+                y: 600.0,
+                queued: false,
+            },
+            &snapshot,
+        );
+        collector.observe_command(
+            125,
+            1,
             &SimCommand::Move {
                 units: vec![3],
                 x: 600.0,
@@ -897,7 +903,7 @@ mod tests {
         assert_eq!(score.first_tank_tick, Some(100));
         assert_eq!(score.first_expansion_city_centre_completed_tick, Some(100));
         assert_eq!(score.first_rifleman_attack_command_tick, Some(110));
-        assert_eq!(score.first_scout_car_harass_command_tick, Some(120));
+        assert_eq!(score.first_scout_car_harass_command_tick, Some(125));
         assert_eq!(score.first_expansion_city_centre_planned_tick, Some(130));
         assert_eq!(score.damage_dealt_events, 1);
         assert_eq!(score.death_count, 1);

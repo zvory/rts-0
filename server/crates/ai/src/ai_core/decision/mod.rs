@@ -26,7 +26,6 @@ mod defense;
 mod expansion;
 mod frontal;
 mod geometry;
-mod harassment;
 mod policies;
 mod production;
 mod proxy;
@@ -45,7 +44,6 @@ use self::expansion::{plan_expansion, try_build_expansion_city_centre, Expansion
 use self::frontal::{issue_frontal_wave, plan_frontal_wave};
 #[cfg(test)]
 use self::geometry::tile_center;
-use self::harassment::{issue_scout_car_harassment, plan_scout_car_harassment};
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
     active_required_tech_path, recovery_delay_ticks,
@@ -113,7 +111,6 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_last_tick: Option<u32>,
     defensive_panic_response: DefensivePanicResponse,
     pending_upgrades: BTreeSet<UpgradeKind>,
-    last_harassment_tick: Option<u32>,
 }
 
 impl AiDecisionMemory {
@@ -130,7 +127,6 @@ impl AiDecisionMemory {
             defensive_panic_last_tick: None,
             defensive_panic_response: DefensivePanicResponse::Riflemen,
             pending_upgrades: BTreeSet::new(),
-            last_harassment_tick: None,
         }
     }
 
@@ -183,7 +179,6 @@ impl AiDecisionMemory {
         self.defensive_panic_last_tick = None;
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
         self.pending_upgrades.clear();
-        self.last_harassment_tick = None;
     }
 
     fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
@@ -255,20 +250,6 @@ impl AiDecisionMemory {
         self.recovery_active
     }
 
-    fn note_harassment_for(&mut self, profile: &AiProfile, tick: u32) {
-        self.ensure_profile(profile);
-        self.last_harassment_tick = Some(tick);
-    }
-
-    fn harassment_due_for(&mut self, profile: &AiProfile, tick: u32) -> bool {
-        self.ensure_profile(profile);
-        let Some(policy) = profile.harassment else {
-            return false;
-        };
-        self.last_harassment_tick
-            .map(|last| tick.saturating_sub(last) >= policy.reissue_cadence_ticks)
-            .unwrap_or(true)
-    }
 }
 
 pub(crate) fn decide_profile<F>(
@@ -641,30 +622,15 @@ where
         }
     }
 
-    let harassment_plan = if defensive_panic.active {
-        harassment::HarassmentPlan::inactive()
-    } else {
-        plan_scout_car_harassment(
-            observation,
-            profile,
-            memory,
-            facts.nearest_public_enemy_base,
-        )
-    };
-    let harassment_units: BTreeSet<u32> = harassment_plan.reserved_units.iter().copied().collect();
     let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
     let defensive_machine_gunner_units: BTreeSet<u32> =
         defensive_machine_gunners.iter().copied().collect();
-    let excluded_frontal_units: BTreeSet<u32> = harassment_units
-        .union(&defensive_machine_gunner_units)
-        .copied()
-        .collect();
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
         memory,
         profile,
-        &excluded_frontal_units,
+        &defensive_machine_gunner_units,
     );
     let ready_units_count = frontal_wave.ready_units.len();
     let attack_size = frontal_wave.desired_size;
@@ -677,11 +643,9 @@ where
     } else {
         Vec::new()
     };
-    let mut handled_harassment = false;
     if !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
         || !rifle_raid_units.is_empty()
-        || !harassment_plan.reserved_units.is_empty()
         || !defensive_machine_gunners.is_empty()
     {
         let mut handled_local_defense = false;
@@ -741,27 +705,11 @@ where
             }
         }
 
-        let mut harassment_plan = harassment_plan.clone();
-        harassment_plan
-            .reserved_units
-            .retain(|id| !local_defense_assigned.contains(id));
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
             .copied()
             .filter(|id| !local_defense_assigned.contains(id))
             .collect();
-        if !handled_raid_target {
-            if let Some(intent) = issue_scout_car_harassment(
-                &mut actions,
-                memory,
-                profile,
-                observation,
-                &harassment_plan,
-            ) {
-                intents.push(intent);
-                handled_harassment = true;
-            }
-        }
 
         if !handled_local_defense
             && !handled_raid_target
@@ -833,9 +781,6 @@ where
         frontal_wave_blockers: &frontal_wave.blockers,
         rifle_raid_policy,
         rifle_raid_units: rifle_raid_units.len(),
-        harassment_policy: profile.harassment.is_some(),
-        harassment_units: harassment_units.len(),
-        harassment_selected: handled_harassment,
         required_tech_path,
     });
 
