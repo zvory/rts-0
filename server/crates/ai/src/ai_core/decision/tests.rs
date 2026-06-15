@@ -381,7 +381,14 @@ fn trace_goal(decision: &AiDecision, goal: trace::StrategicGoal) -> &trace::Goal
 
 #[test]
 fn economy_manager_plan_tracks_steel_and_oil_targets() {
-    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![building_at(
+        10,
+        EntityKind::CityCentre,
+        Some(0),
+        8.5 * ts,
+        8.5 * ts,
+    )];
     owned.extend((0..17).map(|i| steel_worker(20 + i, 100 + i)));
     owned.push(worker(60, AiEntityState::Idle));
     let observation = observation(
@@ -411,7 +418,14 @@ fn economy_manager_plan_tracks_steel_and_oil_targets() {
 
 #[test]
 fn economy_manager_plan_allows_oil_after_steel_floor() {
-    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![building_at(
+        10,
+        EntityKind::CityCentre,
+        Some(0),
+        8.5 * ts,
+        8.5 * ts,
+    )];
     owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
     owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
     let observation = observation(
@@ -429,6 +443,82 @@ fn economy_manager_plan_allows_oil_after_steel_floor() {
 
     assert_eq!(plan.target_steel_workers, 12);
     assert_eq!(plan.current_steel_workers, 8);
+    assert_eq!(plan.desired_oil_workers, 3);
+}
+
+#[test]
+fn economy_manager_plan_suppresses_oil_when_only_steel_is_mineable() {
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![building_at(
+        10,
+        EntityKind::CityCentre,
+        Some(0),
+        8.5 * ts,
+        8.5 * ts,
+    )];
+    owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
+    owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
+    let mut observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 11,
+            supply_cap: 20,
+        },
+        owned,
+    );
+    observation
+        .resources
+        .retain(|resource| resource.kind == EntityKind::Steel);
+    observation
+        .resources
+        .push(resource(500, EntityKind::Oil, 40.5 * ts, 40.5 * ts));
+    let facts = AiFacts::from_observation(&observation);
+
+    let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, None);
+
+    assert_eq!(plan.target_steel_workers, 12);
+    assert_eq!(plan.current_steel_workers, 8);
+    assert_eq!(plan.desired_oil_workers, 0);
+}
+
+#[test]
+fn economy_manager_plan_waits_for_completed_expansion_before_oil() {
+    let ts = config::TILE_SIZE as f32;
+    let mut incomplete_expansion =
+        building_at(11, EntityKind::CityCentre, Some(0), 40.5 * ts, 40.5 * ts);
+    incomplete_expansion.is_complete = false;
+    let mut owned = vec![
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+        incomplete_expansion,
+    ];
+    owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
+    owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
+    let mut observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 11,
+            supply_cap: 20,
+        },
+        owned,
+    );
+    observation
+        .resources
+        .retain(|resource| resource.kind == EntityKind::Steel);
+    observation
+        .resources
+        .push(resource(500, EntityKind::Oil, 40.5 * ts, 40.5 * ts));
+    let facts = AiFacts::from_observation(&observation);
+
+    let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, None);
+
+    assert_eq!(plan.desired_oil_workers, 0);
+
+    observation.owned[1].is_complete = true;
+    let facts = AiFacts::from_observation(&observation);
+    let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, None);
+
     assert_eq!(plan.desired_oil_workers, 3);
 }
 
@@ -581,6 +671,7 @@ fn manager_trace_formats_goals_and_blockers_deterministically() {
 
 #[test]
 fn manager_trace_records_emitted_command_labels() {
+    let ts = config::TILE_SIZE as f32;
     let observation = observation(
         AiEconomy {
             steel: 500,
@@ -589,7 +680,7 @@ fn manager_trace_records_emitted_command_labels() {
             supply_cap: 10,
         },
         vec![
-            building(1, EntityKind::CityCentre, Some(0)),
+            building_at(1, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
             worker(10, AiEntityState::Idle),
             worker(11, AiEntityState::Idle),
         ],
@@ -723,7 +814,14 @@ fn assert_hidden_proxy_site(observation: &AiObservation, tile: (u32, u32)) {
 
 #[test]
 fn fast_flood_sends_proxy_worker_before_barracks_is_affordable() {
-    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![building_at(
+        10,
+        EntityKind::CityCentre,
+        Some(0),
+        8.5 * ts,
+        8.5 * ts,
+    )];
     owned.extend((0..4).map(|i| worker(20 + i, AiEntityState::Idle)));
     let observation = observation(
         AiEconomy {
@@ -965,8 +1063,9 @@ fn fast_flood_does_not_replace_missing_proxy_worker() {
 
 #[test]
 fn fast_flood_spends_first_fifty_steel_on_rifle_where_full_saturation_trains_worker() {
+    let ts = config::TILE_SIZE as f32;
     let mut owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
         building(11, EntityKind::Barracks, Some(0)),
     ];
     owned.extend((0..8).map(|i| worker(20 + i, AiEntityState::Gather)));
@@ -1004,8 +1103,9 @@ fn fast_flood_spends_first_fifty_steel_on_rifle_where_full_saturation_trains_wor
 
 #[test]
 fn fast_flood_recovers_after_barracks_rifle_window() {
+    let ts = config::TILE_SIZE as f32;
     let mut owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
         building(11, EntityKind::Barracks, Some(0)),
     ];
     owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
@@ -1052,8 +1152,9 @@ fn fast_flood_recovers_after_barracks_rifle_window() {
 
 #[test]
 fn fast_flood_recovery_builds_support_tech_and_takes_oil() {
+    let ts = config::TILE_SIZE as f32;
     let mut owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
         building(11, EntityKind::Barracks, Some(0)),
     ];
     owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
@@ -1094,8 +1195,9 @@ fn fast_flood_recovery_builds_support_tech_and_takes_oil() {
 
 #[test]
 fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_tech() {
+    let ts = config::TILE_SIZE as f32;
     let mut owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
         building(11, EntityKind::Barracks, Some(0)),
         building(12, EntityKind::TrainingCentre, None),
     ];
@@ -1149,7 +1251,7 @@ fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_tech() {
     );
 
     let mut steel_floor_owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
         building(11, EntityKind::Barracks, Some(0)),
         building(12, EntityKind::TrainingCentre, None),
         building(13, EntityKind::ResearchComplex, None),
@@ -1663,8 +1765,9 @@ fn ai_1_0_can_expand_while_transitioning_to_vehicles() {
 
 #[test]
 fn full_saturation_pivots_to_tank_tech_but_waits_for_full_steel_before_oil() {
+    let ts = config::TILE_SIZE as f32;
     let mut owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
         building(11, EntityKind::Barracks, Some(0)),
     ];
     owned.extend((0..17).map(|i| steel_worker(20 + i, 100 + i)));
@@ -1734,7 +1837,7 @@ fn full_saturation_pivots_to_tank_tech_but_waits_for_full_steel_before_oil() {
 fn full_saturation_oil_timing_tracks_observed_steel_patch_count() {
     let ts = config::TILE_SIZE as f32;
     let mut owned = vec![
-        building(10, EntityKind::CityCentre, Some(0)),
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
         building(11, EntityKind::Barracks, Some(0)),
     ];
     owned.extend((0..18).map(|i| steel_worker(20 + i, 100 + i)));
