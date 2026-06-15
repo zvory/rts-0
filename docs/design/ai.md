@@ -32,8 +32,9 @@ instead of reaching into entity stores from the server layer.
 **Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
-`ai_1_0_tech` profile by default and keep that profile for the whole match. There is no lobby
-protocol or UI for selecting AI profiles. Team relationships are observation-only safety
+`ai_1_0_tech` profile by default and keep that profile for the whole match. Hosts can select
+`ai_1_0_tech` or `ai_1_1_tank_mg` per AI seat from the lobby before countdown/start; unsupported
+profile ids are ignored or defaulted to AI 1.0. Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
 current living player set so attack waves keep choosing living enemies. AI teammates still do not
@@ -104,9 +105,9 @@ The aliases `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`; `ai`, `ai1`, `ai_1_
 still resolve to `ai_1_0_tech` until release replay evidence justifies promotion.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
-promoted `ai_1_0_tech` default. Profiles are still not client-selectable, and older experimental
-profile ids are no longer listed or accepted by developer tooling. AI 1.1 is available only in
-developer tooling at this stage; it is not the live lobby default.
+promoted `ai_1_0_tech` default. The ordinary lobby exposes only AI 1.0 and AI 1.1; older
+experimental profile ids are no longer listed or accepted by developer tooling. AI 1.1 is
+client-selectable but is not the live lobby default.
 
 **Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player

@@ -2,6 +2,10 @@
 // The Lobby controller owns networking/state; this module owns structure.
 
 export const MAX_LOBBY_TEAMS = 4;
+export const AI_PROFILES = Object.freeze([
+  { id: "ai_1_0_tech", label: "AI 1.0" },
+  { id: "ai_1_1_tank_mg", label: "AI 1.1" },
+]);
 
 export function teamSlotsForLobby(players = []) {
   const seatedPlayers = players.filter((player) => !player.isSpectator);
@@ -44,6 +48,7 @@ export class LobbyRosterView {
     onRemoveAi,
     onSetTeam,
     onSetFaction,
+    onSetAiProfile,
   }) {
     if (!this.root) return;
     this.root.innerHTML = "";
@@ -67,6 +72,7 @@ export class LobbyRosterView {
         onRemoveAi,
         onSetTeam,
         onSetFaction,
+        onSetAiProfile,
       }));
     }
 
@@ -90,6 +96,7 @@ export class LobbyRosterView {
     onRemoveAi,
     onSetTeam,
     onSetFaction,
+    onSetAiProfile,
   }) {
     const section = document.createElement("section");
     section.className = "lobby-team-card team-row";
@@ -154,6 +161,7 @@ export class LobbyRosterView {
         betaFactionSelect,
         onRemoveAi,
         onSetFaction,
+        onSetAiProfile,
       }));
     }
     if (players.length === 0) {
@@ -176,6 +184,7 @@ export class LobbyRosterView {
     betaFactionSelect,
     onRemoveAi,
     onSetFaction,
+    onSetAiProfile,
   }) {
     const row = document.createElement("div");
     row.className = "player-row lobby-seat";
@@ -226,7 +235,15 @@ export class LobbyRosterView {
 
     const meta = document.createElement("div");
     meta.className = "lobby-seat-meta";
-    meta.textContent = player.isAi ? "AI 1.0" : "Human player";
+    if (player.isAi && isHost) {
+      meta.appendChild(this._buildAiProfileControl({
+        player,
+        countdownActive,
+        onSetAiProfile,
+      }));
+    } else {
+      meta.textContent = player.isAi ? aiProfileLabel(player.aiProfileId) : "Human player";
+    }
 
     body.append(nameLine, meta);
 
@@ -259,6 +276,24 @@ export class LobbyRosterView {
     select.disabled = countdownActive || player.id !== myId || player.isSpectator;
     select.addEventListener("change", () => {
       if (!select.disabled) onSetFaction?.(select.value);
+    });
+    return select;
+  }
+
+  _buildAiProfileControl({ player, countdownActive, onSetAiProfile }) {
+    const select = document.createElement("select");
+    select.className = "player-ai-profile-select";
+    select.setAttribute("aria-label", `${player.name || "AI"} profile`);
+    for (const entry of AI_PROFILES) {
+      const option = document.createElement("option");
+      option.value = entry.id;
+      option.textContent = entry.label;
+      select.appendChild(option);
+    }
+    select.value = playableAiProfileId(player.aiProfileId);
+    select.disabled = countdownActive;
+    select.addEventListener("change", () => {
+      if (!select.disabled) onSetAiProfile?.(player.id, select.value);
     });
     return select;
   }
@@ -358,6 +393,14 @@ function tag(kind, text) {
   el.className = `tag ${kind}`;
   el.textContent = text;
   return el;
+}
+
+function playableAiProfileId(id) {
+  return AI_PROFILES.some((entry) => entry.id === id) ? id : AI_PROFILES[0].id;
+}
+
+function aiProfileLabel(id) {
+  return AI_PROFILES.find((entry) => entry.id === id)?.label || AI_PROFILES[0].label;
 }
 
 const PLAYABLE_FACTIONS = Object.freeze([

@@ -128,6 +128,13 @@ pub enum RoomEvent {
     AddAi {
         player_id: u32,
         team_id: Option<TeamId>,
+        ai_profile_id: Option<String>,
+    },
+    /// The host selected a live AI profile for one AI opponent.
+    SetAiProfile {
+        player_id: u32,
+        target: u32,
+        ai_profile_id: String,
     },
     /// The host asked to remove an AI opponent by id (lobby phase only; honored only from host).
     RemoveAi { player_id: u32, target: u32 },

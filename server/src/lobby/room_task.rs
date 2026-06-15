@@ -15,7 +15,7 @@ use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus, PREDICTION_PROTOCO
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
-use rts_ai::{AiController, AiThinkContext};
+use rts_ai::{AiController, AiThinkContext, DEFAULT_LIVE_PROFILE_ID};
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
 
@@ -53,6 +53,7 @@ struct AiSlot {
     name: String,
     team_id: TeamId,
     faction_id: String,
+    profile_id: &'static str,
 }
 
 const MAX_LOBBY_TEAMS: TeamId = 4;
@@ -134,13 +135,22 @@ pub(super) fn validate_replay_vision_request(
     }
 }
 
-fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
+fn live_ai_controllers(
+    players: &[PlayerInit],
+    ai_slots: &[AiSlot],
+    seed: u32,
+) -> Vec<AiController> {
     let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
     players
         .iter()
         .filter(|player| player.is_ai)
         .map(|player| {
-            AiController::with_profile_id(player.id, rts_ai::random_live_profile_id(&mut rng))
+            let profile_id = ai_slots
+                .iter()
+                .find(|ai| ai.id == player.id)
+                .map(|ai| ai.profile_id)
+                .unwrap_or_else(|| rts_ai::random_live_profile_id(&mut rng));
+            AiController::with_profile_id(player.id, profile_id)
         })
         .collect()
 }
@@ -907,7 +917,16 @@ impl RoomTask {
                 player_id,
                 faction_id,
             } => self.on_set_faction(player_id, faction_id),
-            RoomEvent::AddAi { player_id, team_id } => self.on_add_ai(player_id, team_id),
+            RoomEvent::AddAi {
+                player_id,
+                team_id,
+                ai_profile_id,
+            } => self.on_add_ai(player_id, team_id, ai_profile_id),
+            RoomEvent::SetAiProfile {
+                player_id,
+                target,
+                ai_profile_id,
+            } => self.on_set_ai_profile(player_id, target, ai_profile_id),
             RoomEvent::RemoveAi { player_id, target } => self.on_remove_ai(player_id, target),
             RoomEvent::SetQuickstart { player_id, enabled } => {
                 self.on_set_quickstart(player_id, enabled)
@@ -1348,7 +1367,12 @@ impl RoomTask {
 
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
     /// the room is full (humans + AI == [`MAX_PLAYERS`]).
-    fn on_add_ai(&mut self, player_id: u32, requested_team_id: Option<TeamId>) {
+    fn on_add_ai(
+        &mut self,
+        player_id: u32,
+        requested_team_id: Option<TeamId>,
+        requested_profile_id: Option<String>,
+    ) {
         if self.is_live_dev_watch() {
             return;
         }
@@ -1378,8 +1402,48 @@ impl RoomTask {
             name,
             team_id,
             faction_id: default_faction_id_for(FactionRequestContext::AiSeat),
+            profile_id: requested_profile_id
+                .as_deref()
+                .and_then(rts_ai::canonical_live_profile_id)
+                .unwrap_or(DEFAULT_LIVE_PROFILE_ID),
         });
         crate::log_debug!(room = %self.room, ai_id = id, "AI opponent added");
+        self.broadcast_lobby();
+    }
+
+    /// Host-only: select which supported live AI profile an AI opponent will use next match.
+    fn on_set_ai_profile(&mut self, player_id: u32, target: u32, requested_profile_id: String) {
+        if self.is_live_dev_watch() {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        let Some(profile_id) = rts_ai::canonical_live_profile_id(&requested_profile_id) else {
+            crate::log_debug!(
+                room = %self.room,
+                target,
+                ai_profile_id = %requested_profile_id,
+                "ignoring invalid AI profile selection"
+            );
+            return;
+        };
+        let Some(ai) = self.ai_players.iter_mut().find(|ai| ai.id == target) else {
+            return;
+        };
+        if ai.profile_id == profile_id {
+            return;
+        }
+        ai.profile_id = profile_id;
+        crate::log_debug!(
+            room = %self.room,
+            ai_id = target,
+            ai_profile_id = %profile_id,
+            "AI profile selected"
+        );
         self.broadcast_lobby();
     }
 
@@ -1989,6 +2053,7 @@ impl RoomTask {
                     ready: p.ready,
                     color: p.color.clone(),
                     is_ai: false,
+                    ai_profile_id: None,
                     is_spectator: p.spectator,
                 })
             })
@@ -2002,6 +2067,7 @@ impl RoomTask {
                 ready: true,
                 color: self.ai_color(seat),
                 is_ai: true,
+                ai_profile_id: Some(ai.profile_id.to_string()),
                 is_spectator: false,
             });
         }
@@ -2168,7 +2234,7 @@ impl RoomTask {
         self.match_map_name = self.selected_map.clone();
         self.match_participants = inits.iter().map(|p| p.name.clone()).collect();
         self.outcome_sent.clear();
-        self.ai_controllers = live_ai_controllers(&inits, seed);
+        self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
         // Each player gets the shared static payload but stamped with their own id.
         for &id in &self.order {
@@ -4903,7 +4969,7 @@ mod tests {
         task.host_id = Some(100);
 
         task.on_ready(100, true);
-        task.on_add_ai(100, None);
+        task.on_add_ai(100, None, None);
         task.on_remove_ai(100, 999);
         task.on_set_quickstart(100, true);
         task.on_set_spectator(100, false);

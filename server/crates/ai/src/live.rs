@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ai_core::decision::{decide_profile, AiDecisionMemory};
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
-    profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID,
+    profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
 };
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -25,9 +25,16 @@ const DECISION_INTERVAL: u32 = 9;
 /// Default live-lobby profile. Live lobby AI uses the promoted AI 1.0 tech behavior.
 pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_0_TECH_ID;
 
-/// Profiles available to ordinary lobby AI opponents. The live pool is intentionally singular
-/// until profile selection is exposed through a real lobby contract.
-const LIVE_PROFILE_IDS: [&str; 1] = [AI_1_0_TECH_ID];
+/// Profiles available to ordinary lobby AI opponents.
+pub const LIVE_PROFILE_IDS: [&str; 2] = [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID];
+
+pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
+    match input {
+        "ai" | "ai1" | "ai_1_0" | "ai_1_0_tech" | "default" => Some(AI_1_0_TECH_ID),
+        "ai_1_1" | "ai11" | "ai_1_1_tank_mg" => Some(AI_1_1_TANK_MG_ID),
+        _ => None,
+    }
+}
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
     LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
@@ -233,8 +240,8 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_pool_has_only_ai_1_0_tech() {
-        assert_eq!(LIVE_PROFILE_IDS, [AI_1_0_TECH_ID]);
+    fn live_profile_pool_exposes_supported_lobby_profiles() {
+        assert_eq!(LIVE_PROFILE_IDS, [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID]);
     }
 
     #[test]
@@ -251,5 +258,15 @@ mod tests {
         let ai = AiController::with_profile_id(2, "missing_profile");
 
         assert_eq!(ai.profile_id(), AI_1_0_TECH_ID);
+    }
+
+    #[test]
+    fn live_profile_aliases_are_bounded_to_supported_profiles() {
+        assert_eq!(canonical_live_profile_id("ai_1_0"), Some(AI_1_0_TECH_ID));
+        assert_eq!(
+            canonical_live_profile_id("ai_1_1"),
+            Some(AI_1_1_TANK_MG_ID)
+        );
+        assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
     }
 }

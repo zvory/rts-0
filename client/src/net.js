@@ -144,8 +144,13 @@ export class Net {
   }
 
   /** Add a computer opponent to the room (host-only; ignored by the server otherwise). */
-  addAi(teamId = undefined) {
-    this._send(msg.addAi(teamId));
+  addAi(teamId = undefined, aiProfileId = undefined) {
+    this._send(msg.addAi(teamId, aiProfileId));
+  }
+
+  /** Select the live AI profile for an existing AI opponent (host-only). */
+  setAiProfile(id, aiProfileId) {
+    this._send(msg.setAiProfile(id, aiProfileId));
   }
 
   /**
