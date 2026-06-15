@@ -182,7 +182,7 @@ authoritative `rules::defs` records.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
   controllable combat units. Ekat has 300 HP, 1 HP/s regeneration while alive, 2.0 px/tick
-  speed, 9-tile sight, a basic 10-damage / 4-tile attack, and no Steel/Oil/Supply cost. Her
+  speed, 9-tile sight, no default attack, and no Steel/Oil/Supply cost. Her
   Dash ability targets up to 5 tiles, has no resource cost, has an 8s cooldown, requires a
   statically standable landing point, and leaves a four-second return marker that can be recast
   after one tick if the marker destination remains standable. Her Line Shot ability targets up to
@@ -262,7 +262,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
-| ekat       | 300 | 10  | 4     | 24 | 2.0   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; regenerates 1 HP/s |
+| ekat       | 300 | 0   | 0     | 0  | 2.0   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; regenerates 1 HP/s |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
