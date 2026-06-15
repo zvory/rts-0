@@ -25,7 +25,8 @@ reported tick.
   - resolve the report's `replay_key` to the persisted replay row when it exists
   - show a clear pending state when the report exists before the final replay artifact has been
     written
-  - show a clear missing state when forced replay upload failed or never produced an artifact
+  - show a clear missing state when expected replay upload failed, was gated off, or never produced
+    an artifact
   - load persisted replay through existing compatibility checks
   - create/join a replay room
   - seek to roughly twenty seconds before `report_tick`, clamped to zero

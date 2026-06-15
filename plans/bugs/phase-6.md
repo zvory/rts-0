@@ -13,8 +13,10 @@ without expanding into a production ticketing system.
 - Add end-to-end coverage for:
   - in-match report submission
   - replay-viewer report submission
-  - human-vs-AI report-backed replay persistence
-  - solo or AI-vs-AI report-backed replay persistence where practical
+  - human-vs-AI and solo report-backed replay resolution through the current deployed replay upload
+    path
+  - AI-only report-backed replay resolution where practical, including hidden-from-Recent-Matches
+    behavior
   - pending-to-available replay resolution through `replay_key`
   - match ending after the report form opens but before submission, if earlier phases support that
     lifecycle directly
