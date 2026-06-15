@@ -315,9 +315,12 @@ payload state and safe caster ids are withheld from enemies.
 
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
-card. `recastAbility` commands are explicit and validate a live owned caster plus matching active
-runtime state; missing state, same-tick/too-early return, stale caster ids, and invalid return
-destinations are ignored rather than overloading world-point `useAbility` commands.
+card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,
+moves Ekat, and creates a four-second return marker at the original position. `recastAbility`
+commands are explicit and validate a live owned caster plus matching active runtime state; missing
+state, same-tick/too-early return, stale caster ids, and invalid return destinations are ignored
+rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
+marker and consumes it.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource

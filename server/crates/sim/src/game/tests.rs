@@ -397,8 +397,67 @@ fn ekat_regenerates_one_hp_per_second_while_alive() {
     assert_eq!(game.entities.get(hero).expect("hero exists").hp, 251);
 }
 
+fn ekat_player() -> PlayerInit {
+    PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: crate::rules::faction::EKAT_FACTION_ID.to_string(),
+        name: "Ekat".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }
+}
+
+fn kriegsia_enemy() -> PlayerInit {
+    PlayerInit {
+        id: 2,
+        team_id: 2,
+        faction_id: crate::rules::faction::DEFAULT_FACTION_ID.to_string(),
+        name: "Enemy".into(),
+        color: "#000".into(),
+        is_ai: false,
+    }
+}
+
+fn enqueue_ekat_dash(game: &mut Game, hero: u32, target: (f32, f32)) {
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::EkatTeleport,
+            units: vec![hero],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+}
+
+fn enqueue_ekat_return(game: &mut Game, hero: u32, target_object_id: Option<u32>) {
+    game.enqueue(
+        1,
+        Command::RecastAbility {
+            ability: ability::AbilityKind::EkatTeleport,
+            units: vec![hero],
+            target_object_id,
+            queued: false,
+        },
+    );
+}
+
+fn active_return_marker_id(game: &Game, hero: u32) -> Option<u32> {
+    game.ability_runtime
+        .active_return_marker(
+            1,
+            hero,
+            ability::AbilityKind::EkatTeleport,
+            None,
+            game.current_tick(),
+        )
+        .map(|marker| marker.id.get())
+}
+
 #[test]
-fn ekat_teleport_moves_up_to_five_tiles_and_starts_cooldown() {
+fn ekat_dash_moves_up_to_five_tiles_leaves_return_marker_and_starts_cooldown() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -415,16 +474,7 @@ fn ekat_teleport_moves_up_to_five_tiles_and_starts_cooldown() {
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
 
-    game.enqueue(
-        1,
-        Command::UseAbility {
-            ability: ability::AbilityKind::EkatTeleport,
-            units: vec![hero],
-            x: Some(target.0),
-            y: Some(target.1),
-            queued: false,
-        },
-    );
+    enqueue_ekat_dash(&mut game, hero, target);
     game.tick();
 
     let hero_entity = game.entities.get(hero).expect("hero exists");
@@ -434,6 +484,182 @@ fn ekat_teleport_moves_up_to_five_tiles_and_starts_cooldown() {
         hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
         config::EKAT_TELEPORT_COOLDOWN_TICKS.saturating_sub(1)
     );
+    let marker = game
+        .ability_runtime
+        .active_return_marker(1, hero, ability::AbilityKind::EkatTeleport, None, 1)
+        .expect("dash should leave a return marker");
+    assert!((marker.x - pos.0).abs() < f32::EPSILON);
+    assert!((marker.y - pos.1).abs() < f32::EPSILON);
+    assert_eq!(
+        marker.expires_in(game.current_tick()),
+        Some(config::EKAT_RETURN_MARKER_DURATION_TICKS as u16)
+    );
+}
+
+#[test]
+fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = game.map.tile_center(15, 10);
+    let blocked_index = game.map.index(15, 10);
+    game.map.terrain[blocked_index] = terrain::ROCK;
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    assert!((hero_entity.pos_x - pos.0).abs() < f32::EPSILON);
+    assert_eq!(
+        hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
+        0
+    );
+    assert!(active_return_marker_id(&game, hero).is_none());
+}
+
+#[test]
+fn ekat_return_cannot_happen_in_same_tick_as_dash() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    enqueue_ekat_return(&mut game, hero, None);
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
+    assert!(active_return_marker_id(&game, hero).is_some());
+}
+
+#[test]
+fn ekat_return_recasts_to_marker_and_consumes_it_after_delay() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    game.tick();
+    let marker_id = active_return_marker_id(&game, hero).expect("return marker exists");
+    enqueue_ekat_return(&mut game, hero, Some(marker_id));
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    assert!((hero_entity.pos_x - pos.0).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_y - pos.1).abs() < f32::EPSILON);
+    assert!(active_return_marker_id(&game, hero).is_none());
+}
+
+#[test]
+fn ekat_return_fails_after_marker_expires() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    game.tick();
+    for _ in 0..config::EKAT_RETURN_MARKER_DURATION_TICKS {
+        game.tick();
+    }
+    enqueue_ekat_return(&mut game, hero, None);
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
+    assert!(active_return_marker_id(&game, hero).is_none());
+}
+
+#[test]
+fn ekat_return_fails_when_marker_destination_is_blocked() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    game.tick();
+    let marker_id = active_return_marker_id(&game, hero).expect("return marker exists");
+    let blocked_index = game.map.index(10, 10);
+    game.map.terrain[blocked_index] = terrain::ROCK;
+    enqueue_ekat_return(&mut game, hero, Some(marker_id));
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
+    assert_eq!(active_return_marker_id(&game, hero), Some(marker_id));
+}
+
+#[test]
+fn ekat_return_with_stale_caster_is_panic_free() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    game.tick();
+    game.entities.remove(hero);
+    enqueue_ekat_return(&mut game, hero, None);
+    game.tick();
+
+    assert!(game.entities.get(hero).is_none());
+}
+
+#[test]
+fn ekat_dash_return_marker_projection_respects_fog() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 5.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+    game.entities
+        .spawn_unit(2, EntityKind::Worker, target.0 + 500.0, target.1 + 500.0)
+        .expect("enemy should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    game.tick();
+    let marker_id = active_return_marker_id(&game, hero).expect("return marker exists");
+
+    assert!(game
+        .snapshot_for(1)
+        .ability_objects
+        .iter()
+        .any(|object| object.id == marker_id));
+    assert!(!game
+        .snapshot_for(2)
+        .ability_objects
+        .iter()
+        .any(|object| object.id == marker_id));
 }
 
 #[test]

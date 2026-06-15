@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
 };
@@ -99,6 +100,7 @@ pub(crate) fn promote_ready_orders(
     fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -144,6 +146,7 @@ pub(crate) fn promote_ready_orders(
                 fog,
                 &teams,
                 smokes,
+                ability_runtime,
                 mortar_shells,
                 events,
                 owner,
@@ -202,6 +205,7 @@ pub(crate) fn promote_ready_orders(
                     &teams,
                     coordinator,
                     smokes,
+                    ability_runtime,
                     mortar_shells,
                     events,
                     owner,
@@ -807,6 +811,7 @@ mod tests {
         let player_ids: Vec<u32> = players.iter().map(|p| p.id).collect();
         fog.recompute(&player_ids, entities, map);
         let mut smokes = SmokeCloudStore::new();
+        let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut events = std::collections::HashMap::new();
         promote_ready_orders(
@@ -816,6 +821,7 @@ mod tests {
             &fog,
             &mut coordinator,
             &mut smokes,
+            &mut ability_runtime,
             &mut mortar_shells,
             &mut events,
             1,

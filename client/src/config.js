@@ -250,10 +250,10 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.EKAT_TELEPORT]: Object.freeze({
     ability: ABILITY.EKAT_TELEPORT,
-    label: "Teleport",
-    icon: "TP",
+    label: "Dash",
+    icon: "DSH",
     hotkey: "D",
-    title: "Teleport up to 5 tiles",
+    title: "Dash up to 5 tiles, then recast to return",
     carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_TELEPORT_RANGE_TILES,

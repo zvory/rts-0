@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
-use crate::game::ability_runtime::{AbilityObjectPayload, AbilityRuntime};
+use crate::game::ability_runtime::{
+    AbilityObjectPayload, AbilityRuntime, AbilityWorldObjectKind, AbilityWorldObjectSpec,
+};
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::hero_abilities;
@@ -34,6 +36,7 @@ pub(crate) fn order_or_launch_world_ability(
     teams: &TeamRelations,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
@@ -80,6 +83,7 @@ pub(crate) fn order_or_launch_world_ability(
             fog,
             teams,
             smokes,
+            ability_runtime,
             mortar_shells,
             events,
             player,
@@ -112,6 +116,7 @@ pub(crate) fn launch_world_ability(
     fog: &Fog,
     teams: &TeamRelations,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
@@ -226,6 +231,10 @@ pub(crate) fn launch_world_ability(
             true
         }
         (AbilityEffectHook::Teleport, AbilityKind::EkatTeleport) => {
+            let Some((origin_x, origin_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
+            else {
+                return false;
+            };
             let Some((blink_x, blink_y)) = hero_abilities::ekat_teleport_destination(
                 map,
                 entities,
@@ -243,13 +252,27 @@ pub(crate) fn launch_world_ability(
                 return false;
             };
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            ability_runtime.clear_return_markers(player, caster, ability);
+            ability_runtime.spawn_world_object(AbilityWorldObjectSpec {
+                owner: player,
+                caster_id: caster,
+                ability,
+                kind: AbilityWorldObjectKind::ReturnMarker,
+                x: origin_x,
+                y: origin_y,
+                created_tick: tick,
+                expires_tick: tick.saturating_add(config::EKAT_RETURN_MARKER_DURATION_TICKS),
+                payload: AbilityObjectPayload::DashReturn {
+                    earliest_return_tick: tick.saturating_add(config::EKAT_RETURN_MIN_DELAY_TICKS),
+                },
+            });
             if !hero_abilities::move_ekat_to(entities, caster, blink_x, blink_y) {
                 return false;
             }
             notice_positioned(
                 events,
                 player,
-                "Teleport",
+                "Dash",
                 crate::protocol::NoticeSeverity::Info,
                 blink_x,
                 blink_y,
@@ -490,7 +513,53 @@ pub(crate) fn tech_requirement_met(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn validate_recast_return(
+pub(crate) fn execute_recast_return(
+    map: &Map,
+    entities: &mut EntityStore,
+    ability_runtime: &mut AbilityRuntime,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    faction_id: &str,
+    ability: AbilityKind,
+    units: Vec<u32>,
+    target_object_id: Option<u32>,
+    tick: u32,
+) -> bool {
+    let Some((caster, marker_id, marker_pos)) = recast_return_candidate(
+        map,
+        entities,
+        ability_runtime,
+        player,
+        faction_id,
+        ability,
+        units,
+        target_object_id,
+        tick,
+    ) else {
+        return false;
+    };
+    if ability_runtime
+        .consume_active_return_marker(player, caster, ability, Some(marker_id), tick)
+        .is_none()
+    {
+        return false;
+    }
+    if !hero_abilities::move_ekat_to(entities, caster, marker_pos.0, marker_pos.1) {
+        return false;
+    }
+    notice_positioned(
+        events,
+        player,
+        "Return",
+        crate::protocol::NoticeSeverity::Info,
+        marker_pos.0,
+        marker_pos.1,
+    );
+    true
+}
+
+#[allow(clippy::too_many_arguments)]
+fn recast_return_candidate(
     map: &Map,
     entities: &EntityStore,
     ability_runtime: &AbilityRuntime,
@@ -500,10 +569,10 @@ pub(crate) fn validate_recast_return(
     units: Vec<u32>,
     target_object_id: Option<u32>,
     tick: u32,
-) -> bool {
+) -> Option<(u32, u32, (f32, f32))> {
     let definition = ability::definition(ability);
     if definition.target_mode != AbilityTargetMode::WorldPoint {
-        return false;
+        return None;
     }
     for caster in units {
         let Some(entity) = entities.get(caster) else {
@@ -535,9 +604,9 @@ pub(crate) fn validate_recast_return(
         {
             continue;
         }
-        return true;
+        return Some((caster, marker.id.get(), (marker.x, marker.y)));
     }
-    false
+    None
 }
 
 pub(crate) fn caster_in_range(

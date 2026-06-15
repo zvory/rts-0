@@ -142,6 +142,23 @@ impl AbilityWorldObjectStore {
     fn get(&self, id: u32) -> Option<&AbilityWorldObject> {
         self.objects.iter().find(|object| object.id.get() == id)
     }
+
+    fn remove(&mut self, id: u32) -> Option<AbilityWorldObject> {
+        let index = self
+            .objects
+            .iter()
+            .position(|object| object.id.get() == id)?;
+        Some(self.objects.remove(index))
+    }
+
+    fn remove_active_return_markers(&mut self, owner: u32, caster_id: u32, ability: AbilityKind) {
+        self.objects.retain(|object| {
+            !(object.owner == owner
+                && object.caster_id == caster_id
+                && object.ability == ability
+                && object.kind == AbilityWorldObjectKind::ReturnMarker)
+        });
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -246,6 +263,31 @@ impl AbilityRuntime {
             Some(id) => self.world_objects.get(id).filter(matches_return_marker),
             None => self.world_objects.iter().find(matches_return_marker),
         }
+    }
+
+    pub(crate) fn consume_active_return_marker(
+        &mut self,
+        owner: u32,
+        caster_id: u32,
+        ability: AbilityKind,
+        target_object_id: Option<u32>,
+        tick: u32,
+    ) -> Option<AbilityWorldObject> {
+        let id = self
+            .active_return_marker(owner, caster_id, ability, target_object_id, tick)?
+            .id
+            .get();
+        self.world_objects.remove(id)
+    }
+
+    pub(crate) fn clear_return_markers(
+        &mut self,
+        owner: u32,
+        caster_id: u32,
+        ability: AbilityKind,
+    ) {
+        self.world_objects
+            .remove_active_return_markers(owner, caster_id, ability);
     }
 
     pub(in crate::game) fn active_anchor_id(

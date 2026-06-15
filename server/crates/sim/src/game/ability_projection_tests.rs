@@ -217,7 +217,7 @@ fn owner_entity_abilities_project_active_return_affordance() {
         .abilities
         .iter()
         .find(|ability| ability.ability == crate::protocol::abilities::EKAT_TELEPORT)
-        .expect("Ekat teleport affordance should project");
+        .expect("Ekat dash affordance should project");
     assert_eq!(affordance.active_object_id, Some(marker_id));
     assert_eq!(affordance.available_tick, Some(8));
     assert_eq!(affordance.expires_in, Some(120));
@@ -231,7 +231,7 @@ fn owner_entity_abilities_project_active_return_affordance() {
 }
 
 #[test]
-fn recast_return_validation_accepts_active_marker() {
+fn recast_return_execution_accepts_active_marker() {
     let players = ekat_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
     let caster = game
@@ -249,10 +249,12 @@ fn recast_return_validation_accepts_active_marker() {
         .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))
         .expect("return marker should spawn");
 
-    assert!(services::ability_orders::validate_recast_return(
+    let mut events = std::collections::HashMap::new();
+    assert!(services::ability_orders::execute_recast_return(
         &game.map,
-        &game.entities,
-        &game.ability_runtime,
+        &mut game.entities,
+        &mut game.ability_runtime,
+        &mut events,
         1,
         "ekat",
         ability::AbilityKind::EkatTeleport,
@@ -263,7 +265,7 @@ fn recast_return_validation_accepts_active_marker() {
 }
 
 #[test]
-fn recast_return_validation_rejects_missing_too_early_and_stale_state() {
+fn recast_return_execution_rejects_missing_too_early_and_stale_state() {
     let players = ekat_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);
     let caster = game
@@ -281,10 +283,12 @@ fn recast_return_validation_rejects_missing_too_early_and_stale_state() {
         .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))
         .expect("return marker should spawn");
 
-    assert!(!services::ability_orders::validate_recast_return(
+    let mut events = std::collections::HashMap::new();
+    assert!(!services::ability_orders::execute_recast_return(
         &game.map,
-        &game.entities,
-        &game.ability_runtime,
+        &mut game.entities,
+        &mut game.ability_runtime,
+        &mut events,
         1,
         "ekat",
         ability::AbilityKind::EkatTeleport,
@@ -292,10 +296,11 @@ fn recast_return_validation_rejects_missing_too_early_and_stale_state() {
         Some(marker_id + 1),
         8,
     ));
-    assert!(!services::ability_orders::validate_recast_return(
+    assert!(!services::ability_orders::execute_recast_return(
         &game.map,
-        &game.entities,
-        &game.ability_runtime,
+        &mut game.entities,
+        &mut game.ability_runtime,
+        &mut events,
         1,
         "ekat",
         ability::AbilityKind::EkatTeleport,
@@ -305,10 +310,11 @@ fn recast_return_validation_rejects_missing_too_early_and_stale_state() {
     ));
 
     game.entities.remove(caster);
-    assert!(!services::ability_orders::validate_recast_return(
+    assert!(!services::ability_orders::execute_recast_return(
         &game.map,
-        &game.entities,
-        &game.ability_runtime,
+        &mut game.entities,
+        &mut game.ability_runtime,
+        &mut events,
         1,
         "ekat",
         ability::AbilityKind::EkatTeleport,

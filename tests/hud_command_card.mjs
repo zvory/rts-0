@@ -213,17 +213,17 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  const teleport = card.slots.find((slot) =>
+  const dash = card.slots.find((slot) =>
     slot?.commandId === ekatCommandId("ability", ABILITY.EKAT_TELEPORT),
   );
-  assert.deepEqual(teleport.intent, {
+  assert.deepEqual(dash.intent, {
     type: "ability",
     ability: ABILITY.EKAT_TELEPORT,
     targetMode: "recast",
     readyIds: [41],
     targetObjectId: 77,
   });
-  assert.equal(teleport.enabled, true);
+  assert.equal(dash.enabled, true);
 }
 
 {
