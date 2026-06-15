@@ -176,7 +176,7 @@ assert(
   "start/player contract must expose the canonical default faction id",
 );
 assert(
-  rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 20") && COMPACT_SNAPSHOT_VERSION === 20,
+  rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 21") && COMPACT_SNAPSHOT_VERSION === 21,
   "compact snapshot version must match Rust",
 );
 assert(

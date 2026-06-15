@@ -535,7 +535,7 @@ pub struct LobbyPlayer {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 20;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 21;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -803,6 +803,9 @@ impl Serialize for CompactEntity<'_> {
         if prod_upgrade.is_some() {
             len = 29;
         }
+        if entity.build_active {
+            len = 30;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -893,6 +896,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 28 {
             seq.serialize_element(&prod_upgrade)?;
+        }
+        if len > 29 {
+            seq.serialize_element(&entity.build_active)?;
         }
         seq.end()
     }
@@ -1526,6 +1532,7 @@ mod tests {
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
         center.build_progress = Some(0.75);
+        center.build_active = true;
         center.rally = Some([256.0, 512.0]);
         center.rally_plan = vec![
             OrderPlanMarker {

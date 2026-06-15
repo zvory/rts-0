@@ -283,6 +283,8 @@ pub struct EntityView {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_progress: Option<f32>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub build_active: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latched_node: Option<u32>,
@@ -351,6 +353,7 @@ impl EntityView {
             prod_progress: None,
             prod_queue: None,
             build_progress: None,
+            build_active: false,
             latched_node: None,
             remaining: None,
             target_id: None,

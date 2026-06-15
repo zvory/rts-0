@@ -180,7 +180,7 @@ export const REPLAY_VISION = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 20;
+export const COMPACT_SNAPSHOT_VERSION = 21;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -464,7 +464,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 29);
+  const fields = readArray(record, `entity ${index}`, 30);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -498,6 +498,7 @@ function decodeCompactEntity(record, index) {
   assignDebugPath(entity, fields, 26);
   assignRallyPlan(entity, fields, 27);
   assignOptionalCode(entity, "prodUpgrade", fields, 28, UPGRADE_BY_CODE);
+  assignOptional(entity, "buildActive", fields, 29, readBool);
   return entity;
 }
 

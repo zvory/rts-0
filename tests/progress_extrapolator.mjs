@@ -54,6 +54,59 @@ function building(extra = {}) {
 
 {
   const ex = new ProgressExtrapolator({ playerId: 1 });
+  const scaffold = building({
+    kind: KIND.BARRACKS,
+    state: STATE.CONSTRUCT,
+    prodKind: undefined,
+    prodQueue: undefined,
+    prodProgress: undefined,
+    buildProgress: 0.25,
+    buildActive: true,
+  });
+  ex.updateFromSnapshot([scaffold], 0);
+  const out = ex.apply(scaffold, 500);
+  assert(out.buildProgress > 0.25, "active construction advances after authoritative baseline");
+  assert(out.buildProgressPredicted === true, "construction is marked as extrapolated separately");
+  assert(out.progressPredicted === true, "construction participates in generic progress diagnostics");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  const scaffold = building({
+    kind: KIND.BARRACKS,
+    state: STATE.CONSTRUCT,
+    prodKind: undefined,
+    prodQueue: undefined,
+    prodProgress: undefined,
+    buildProgress: 0.97,
+    buildActive: true,
+  });
+  ex.updateFromSnapshot([scaffold], 0);
+  const out = ex.apply(scaffold, 60_000);
+  approx(out.buildProgress, PROGRESS_EXTRAPOLATION_MAX, 0.0001, "construction progress clamps below completion");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  const active = building({
+    kind: KIND.BARRACKS,
+    state: STATE.CONSTRUCT,
+    prodKind: undefined,
+    prodQueue: undefined,
+    prodProgress: undefined,
+    buildProgress: 0.4,
+    buildActive: true,
+  });
+  ex.updateFromSnapshot([active], 0);
+  const paused = { ...active, buildActive: false };
+  ex.updateFromSnapshot([paused], 500);
+  const out = ex.apply(paused, 1000);
+  assert(out.buildProgressPredicted !== true, "construction extrapolation stops without active server signal");
+  assert(ex.diagnostics().constructionBars === 0, "paused construction is not active");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
   ex.updateFromSnapshot([building({ prodProgress: 0.5 })], 0);
   const predicted = ex.apply(building({ prodProgress: 0.5 }), 1000).prodProgress;
   ex.updateFromSnapshot([building({ prodProgress: 0.45 })], 1000);
@@ -122,6 +175,44 @@ function building(extra = {}) {
   assert(state.resources.steel === 500 && state.resources.oil === 200, "GameState resources stay authoritative");
   assert(state.resources.supplyUsed === 1 && state.resources.supplyCap === 10, "GameState supply stays authoritative");
   assert(state.upgrades.length === 0, "GameState upgrades stay authoritative");
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0), resources: [] },
+    players: [{ id: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 }],
+  });
+  state.applySnapshot({
+    tick: 1,
+    steel: 500,
+    oil: 200,
+    supplyUsed: 1,
+    supplyCap: 10,
+    entities: [building({
+      id: 20,
+      kind: KIND.BARRACKS,
+      state: STATE.CONSTRUCT,
+      prodKind: undefined,
+      prodQueue: undefined,
+      prodProgress: undefined,
+      buildProgress: 0.3,
+      buildActive: true,
+      x: 96,
+      y: 96,
+      hp: 300,
+      maxHp: 300,
+    })],
+    events: [],
+  });
+  for (const baseline of state.progressExtrapolator.active.values()) baseline.recvTime -= 500;
+  const byId = state.entityById(20);
+  const rendered = state.entitiesInterpolated(1).find((entity) => entity.id === 20);
+  assert(byId.buildProgress > 0.3, "entityById exposes extrapolated construction progress");
+  approx(rendered.buildProgress, byId.buildProgress, 0.02, "entitiesInterpolated sees construction display progress");
+  assert(byId.buildProgressPredicted === true, "construction display prediction is marked");
+  assert(state.resources.supplyCap === 10, "construction extrapolation does not change supply");
 }
 
 console.log("progress_extrapolator: ok");
