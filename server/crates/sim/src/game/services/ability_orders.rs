@@ -60,7 +60,8 @@ pub(crate) fn order_or_launch_world_ability(
     if !tech_requirement_met(entities, player, ability) {
         return AbilityOrderResult::Skipped;
     }
-    if caster_in_range(map, entities, caster, ability, x, y) {
+    if caster_in_range(map, entities, caster, ability, x, y) || ability_clamps_world_target(ability)
+    {
         if !caster_can_attempt(entities, player, caster, ability)
             || !world_ability_current_facing_ready(entities, caster, ability, x, y)
         {
@@ -135,7 +136,8 @@ pub(crate) fn launch_world_ability(
     if !caster_can_attempt(entities, player, caster, ability)
         || !caster_allowed_by_faction(entities, faction_id, caster, ability)
         || !tech_requirement_met(entities, player, ability)
-        || !caster_in_range(map, entities, caster, ability, x, y)
+        || !(caster_in_range(map, entities, caster, ability, x, y)
+            || ability_clamps_world_target(ability))
         || !world_ability_facing_ready(entities, caster, ability, x, y)
     {
         return false;
@@ -279,13 +281,9 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        (AbilityEffectHook::LineDamage, AbilityKind::EkatLineShot) => {
-            if !ps.spend_cost(definition.cost) {
-                return false;
-            }
-            let Some((target_x, target_y)) = hero_abilities::apply_ekat_line_shot(
+        (AbilityEffectHook::LineProjectile, AbilityKind::EkatLineShot) => {
+            let Some(projectile_spec) = hero_abilities::ekat_line_projectile_spec(
                 entities,
-                teams,
                 player,
                 caster,
                 x,
@@ -295,6 +293,14 @@ pub(crate) fn launch_world_ability(
             ) else {
                 return false;
             };
+            let target_x = projectile_spec.endpoint.0;
+            let target_y = projectile_spec.endpoint.1;
+            if !ps.spend_cost(definition.cost) {
+                return false;
+            }
+            if ability_runtime.spawn_projectile(projectile_spec).is_none() {
+                return false;
+            }
             if let Some(e) = entities.get_mut(caster) {
                 e.start_ability_cooldown(ability, definition.cooldown_ticks);
                 if !preserve_active_order {
@@ -313,6 +319,10 @@ pub(crate) fn launch_world_ability(
         }
         _ => false,
     }
+}
+
+fn ability_clamps_world_target(ability: AbilityKind) -> bool {
+    matches!(ability, AbilityKind::EkatLineShot)
 }
 
 pub(crate) fn launch_self_ability(

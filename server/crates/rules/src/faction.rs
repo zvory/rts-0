@@ -295,7 +295,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         label: "Line Shot",
         icon: "LS",
         hotkey: Some("X"),
-        title: "Damage enemies in a line",
+        title: "Send a line projectile out and back",
         carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_LINE_SHOT_RANGE_TILES),

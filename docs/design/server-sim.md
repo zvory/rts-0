@@ -322,6 +322,13 @@ state, same-tick/too-early return, stale caster ids, and invalid return destinat
 rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
 marker and consumes it.
 
+Ekat's `ekatLineShot` world-point activation clamps the endpoint to ability range, spawns an
+ability-runtime line projectile at Ekat's current position, and starts cooldown when the projectile
+is accepted. The projectile travels outbound to the clamped endpoint, then returns toward Ekat's
+current server position each tick, so moving or dashing after firing can bend the return path.
+Enemies intersecting the swept line are damaged once per leg; stale or dead casters remove the
+projectile without resolving further hits.
+
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is

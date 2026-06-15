@@ -444,6 +444,19 @@ fn enqueue_ekat_return(game: &mut Game, hero: u32, target_object_id: Option<u32>
     );
 }
 
+fn enqueue_ekat_line_shot(game: &mut Game, hero: u32, target: (f32, f32)) {
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::EkatLineShot,
+            units: vec![hero],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+}
+
 fn active_return_marker_id(game: &Game, hero: u32) -> Option<u32> {
     game.ability_runtime
         .active_return_marker(
@@ -663,25 +676,8 @@ fn ekat_dash_return_marker_projection_respects_fog() {
 }
 
 #[test]
-fn ekat_line_shot_damages_enemies_in_line_only() {
-    let players = [
-        PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: crate::rules::faction::EKAT_FACTION_ID.to_string(),
-            name: "Ekat".into(),
-            color: "#fff".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            team_id: 2,
-            faction_id: crate::rules::faction::DEFAULT_FACTION_ID.to_string(),
-            name: "Enemy".into(),
-            color: "#000".into(),
-            is_ai: false,
-        },
-    ];
+fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate_damage() {
+    let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
     let pos = game.map.tile_center(10, 10);
     let target = (pos.0 + config::TILE_SIZE as f32 * 6.0, pos.1);
@@ -708,20 +704,169 @@ fn ekat_line_shot_damages_enemies_in_line_only() {
         )
         .expect("ally should spawn");
 
-    game.enqueue(
-        1,
-        Command::UseAbility {
-            ability: ability::AbilityKind::EkatLineShot,
-            units: vec![hero],
-            x: Some(target.0),
-            y: Some(target.1),
-            queued: false,
-        },
-    );
+    enqueue_ekat_line_shot(&mut game, hero, target);
     game.tick();
 
-    assert_eq!(game.entities.get(enemy).expect("enemy exists").hp, 5);
+    let projectile = game
+        .ability_runtime
+        .world_objects()
+        .find(|object| object.ability == ability::AbilityKind::EkatLineShot)
+        .expect("line shot should spawn a projected ability object");
+    assert_eq!(
+        projectile.kind,
+        ability_runtime::AbilityWorldObjectKind::LineProjectile
+    );
+    assert!(
+        projectile.x > pos.0 && projectile.x < target.0,
+        "projectile should move out from Ekat instead of applying instant full-line damage"
+    );
+    assert_eq!(
+        game.entities.get(enemy).expect("enemy exists").hp,
+        game.entities.get(enemy).expect("enemy exists").max_hp
+    );
     assert_eq!(game.entities.get(ally).expect("ally exists").hp, 45);
+    assert_eq!(
+        game.entities
+            .get(hero)
+            .expect("hero exists")
+            .ability_cooldown_ticks(ability::AbilityKind::EkatLineShot),
+        config::EKAT_LINE_SHOT_COOLDOWN_TICKS.saturating_sub(1)
+    );
+}
+
+#[test]
+fn ekat_line_shot_hits_enemies_on_outbound_and_return_legs() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 6.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+    let enemy = game
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::Depot,
+            pos.0 + config::TILE_SIZE as f32 * 5.0,
+            pos.1,
+            true,
+        )
+        .expect("enemy should spawn");
+    let enemy_max_hp = game.entities.get(enemy).expect("enemy exists").max_hp;
+
+    enqueue_ekat_line_shot(&mut game, hero, target);
+    for _ in 0..23 {
+        game.tick();
+    }
+    let after_outbound = game.entities.get(enemy).expect("enemy exists").hp;
+    assert!(
+        after_outbound <= enemy_max_hp.saturating_sub(config::EKAT_LINE_SHOT_DAMAGE),
+        "outbound leg should damage the enemy"
+    );
+    for _ in 0..25 {
+        game.tick();
+    }
+    assert!(
+        game.entities.get(enemy).expect("enemy exists").hp
+            <= after_outbound.saturating_sub(config::EKAT_LINE_SHOT_DAMAGE),
+        "return leg should damage the enemy again"
+    );
+}
+
+#[test]
+fn ekat_line_shot_endpoint_clamps_to_range() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let far_target = (pos.0 + config::TILE_SIZE as f32 * 20.0, pos.1);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+    let inside_range_enemy = game
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::Depot,
+            pos.0 + config::TILE_SIZE as f32 * 5.5,
+            pos.1,
+            true,
+        )
+        .expect("inside range enemy should spawn");
+    let beyond_range_enemy = game
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::Depot,
+            pos.0 + config::TILE_SIZE as f32 * 8.0,
+            pos.1,
+            true,
+        )
+        .expect("beyond range enemy should spawn");
+    let inside_max_hp = game
+        .entities
+        .get(inside_range_enemy)
+        .expect("inside range enemy exists")
+        .max_hp;
+    let beyond_max_hp = game
+        .entities
+        .get(beyond_range_enemy)
+        .expect("beyond range enemy exists")
+        .max_hp;
+
+    enqueue_ekat_line_shot(&mut game, hero, far_target);
+    for _ in 0..23 {
+        game.tick();
+    }
+
+    assert!(
+        game.entities
+            .get(inside_range_enemy)
+            .expect("inside range enemy exists")
+            .hp
+            <= inside_max_hp.saturating_sub(config::EKAT_LINE_SHOT_DAMAGE),
+        "clamped endpoint should allow targets inside range to be hit"
+    );
+    assert_eq!(
+        game.entities
+            .get(beyond_range_enemy)
+            .expect("beyond range enemy exists")
+            .hp,
+        beyond_max_hp
+    );
+}
+
+#[test]
+fn ekat_line_shot_return_tracks_ekats_current_position_after_dash() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = (pos.0 + config::TILE_SIZE as f32 * 6.0, pos.1);
+    let dash_target = (pos.0, pos.1 + config::TILE_SIZE as f32 * 5.0);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_line_shot(&mut game, hero, target);
+    game.tick();
+    enqueue_ekat_dash(&mut game, hero, dash_target);
+    game.tick();
+    for _ in 0..24 {
+        game.tick();
+    }
+
+    let projectile = game
+        .ability_runtime
+        .world_objects()
+        .find(|object| object.ability == ability::AbilityKind::EkatLineShot)
+        .expect("line shot should still be returning");
+    assert!(
+        projectile.y > pos.1,
+        "returning projectile should bend toward Ekat's dashed position"
+    );
 }
 
 #[test]

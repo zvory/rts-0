@@ -60,7 +60,7 @@ pub enum AbilityEffectHook {
     DelayedWorld,
     ArtilleryPointFire,
     Teleport,
-    LineDamage,
+    LineProjectile,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,7 +114,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::PointFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
         AbilityKind::EkatTeleport => AbilityEffectHook::Teleport,
-        AbilityKind::EkatLineShot => AbilityEffectHook::LineDamage,
+        AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
     }
 }
 
@@ -150,7 +150,7 @@ mod tests {
         );
         assert_eq!(
             definition(AbilityKind::EkatLineShot).effect_hook,
-            AbilityEffectHook::LineDamage
+            AbilityEffectHook::LineProjectile
         );
     }
 }

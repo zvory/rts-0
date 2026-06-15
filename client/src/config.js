@@ -105,6 +105,7 @@ export const EKAT_TELEPORT_RANGE_TILES = 5;
 export const EKAT_TELEPORT_COOLDOWN_TICKS = TICK_HZ * 8;
 export const EKAT_LINE_SHOT_RANGE_TILES = 6;
 export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
+export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
@@ -266,13 +267,14 @@ export const ABILITIES = Object.freeze({
     label: "Line Shot",
     icon: "LS",
     hotkey: "X",
-    title: "Damage enemies in a line",
+    title: "Send a line projectile out and back",
     carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_LINE_SHOT_RANGE_TILES,
     cooldownTicks: EKAT_LINE_SHOT_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: EKAT_LINE_SHOT_WIDTH_TILES * 0.5,
+    speedPxPerTick: EKAT_LINE_SHOT_SPEED_PX_PER_TICK,
     damage: EKAT_LINE_SHOT_DAMAGE,
     queued: false,
   }),
