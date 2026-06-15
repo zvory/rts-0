@@ -1,6 +1,6 @@
 # Phase 6 - Moving Projectile Runtime
 
-Status: Not Started.
+Status: Done.
 
 ## Goal
 

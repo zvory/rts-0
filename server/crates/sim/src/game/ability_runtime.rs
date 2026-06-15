@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
 use crate::game::ability::AbilityKind;
+use crate::game::ability_projectile::{AbilityProjectile, AbilityProjectileSpec};
 use crate::game::entity::EntityStore;
+use crate::game::services::spatial::SpatialIndex;
+use crate::game::teams::TeamRelations;
 
 pub(in crate::game) const MAX_ACTIVE_ABILITY_OBJECTS: usize = 512;
 
@@ -111,16 +114,13 @@ pub(in crate::game) struct AbilityWorldObjectStore {
 
 impl AbilityWorldObjectStore {
     fn new() -> Self {
-        AbilityWorldObjectStore {
+        Self {
             objects: Vec::new(),
         }
     }
 
-    fn can_insert(&self, x: f32, y: f32) -> bool {
-        if !x.is_finite() || !y.is_finite() {
-            return false;
-        }
-        if self.objects.len() >= MAX_ACTIVE_ABILITY_OBJECTS {
+    pub(super) fn can_insert(&self, x: f32, y: f32) -> bool {
+        if !x.is_finite() || !y.is_finite() || self.objects.len() >= MAX_ACTIVE_ABILITY_OBJECTS {
             return false;
         }
         true
@@ -143,7 +143,11 @@ impl AbilityWorldObjectStore {
         self.objects.iter().find(|object| object.id.get() == id)
     }
 
-    fn remove(&mut self, id: u32) -> Option<AbilityWorldObject> {
+    pub(super) fn get_mut(&mut self, id: u32) -> Option<&mut AbilityWorldObject> {
+        self.objects.iter_mut().find(|object| object.id.get() == id)
+    }
+
+    pub(super) fn remove(&mut self, id: u32) -> Option<AbilityWorldObject> {
         let index = self
             .objects
             .iter()
@@ -166,6 +170,7 @@ pub(crate) struct AbilityRuntime {
     next_id: u32,
     instances: Vec<ActiveAbilityInstance>,
     world_objects: AbilityWorldObjectStore,
+    projectiles: Vec<AbilityProjectile>,
 }
 
 impl Default for AbilityRuntime {
@@ -180,6 +185,7 @@ impl AbilityRuntime {
             next_id: 1,
             instances: Vec::new(),
             world_objects: AbilityWorldObjectStore::new(),
+            projectiles: Vec::new(),
         }
     }
 
@@ -226,6 +232,17 @@ impl AbilityRuntime {
             payload: spec.payload,
         });
         id.get()
+    }
+
+    pub(in crate::game) fn spawn_projectile(&mut self, spec: AbilityProjectileSpec) -> Option<u32> {
+        if !AbilityProjectile::can_spawn(&self.projectiles, &self.world_objects, &spec) {
+            return None;
+        }
+        let id = self.allocate_id();
+        let projectile = AbilityProjectile::new(id, spec);
+        self.world_objects.insert(projectile.visual_object());
+        self.projectiles.push(projectile);
+        Some(id.get())
     }
 
     pub(in crate::game) fn tick(&mut self, entities: &EntityStore, tick: u32) {
@@ -306,6 +323,26 @@ impl AbilityRuntime {
                     && object.active_at(tick)
             })
             .map(|object| object.id.get())
+    }
+
+    pub(in crate::game) fn tick_projectiles(
+        &mut self,
+        entities: &mut EntityStore,
+        teams: &TeamRelations,
+        spatial: &SpatialIndex,
+        tick: u32,
+    ) {
+        let mut active = Vec::with_capacity(self.projectiles.len());
+        for mut projectile in std::mem::take(&mut self.projectiles) {
+            let keep = projectile.advance(entities, teams, spatial, tick);
+            if keep {
+                projectile.sync_visual_object(&mut self.world_objects);
+                active.push(projectile);
+            } else {
+                self.world_objects.remove(projectile.id.get());
+            }
+        }
+        self.projectiles = active;
     }
 }
 
