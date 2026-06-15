@@ -16,7 +16,7 @@
 //!   12. recompute supply cap
 //!   13. rebuild final spatial index for snapshot interest filtering
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
@@ -115,6 +115,7 @@ pub(crate) fn run_tick(
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
+    active_construction_sites: &mut BTreeSet<u32>,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -241,7 +242,14 @@ pub(crate) fn run_tick(
         services::production::production_system(map, entities, players, &mut coordinator, events);
     });
     crate::perf::timed(perf.as_deref_mut(), "construction", || {
-        services::construction::construction_system(map, entities, players, events, fog);
+        services::construction::construction_system(
+            map,
+            entities,
+            players,
+            events,
+            fog,
+            active_construction_sites,
+        );
     });
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
@@ -341,6 +349,7 @@ mod tests {
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
+        let mut active_construction_sites = BTreeSet::new();
 
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 400.0, 390.0)
@@ -369,6 +378,7 @@ mod tests {
             &mut smokes,
             &mut mortar_shells,
             &mut artillery_shells,
+            &mut active_construction_sites,
             Vec::new(),
             &mut events,
             1,

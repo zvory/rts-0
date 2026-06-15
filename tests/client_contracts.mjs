@@ -2414,6 +2414,22 @@ function fakeAudioContext() {
         0.25,
         2,
         0.75,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        true,
       ],
     ],
     r: [[200, 1498]],
@@ -2492,6 +2508,7 @@ function fakeAudioContext() {
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
   assert(decoded.entities[2].prodProgress === 0.25, "entity prodProgress decodes");
+  assert(decoded.entities[2].buildActive === true, "entity construction activity flag decodes");
   assert(
     decoded.entities[2].orderPlan === undefined,
     "compact snapshot tolerates missing order plan fields",

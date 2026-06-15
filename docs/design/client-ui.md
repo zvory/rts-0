@@ -505,7 +505,9 @@ and unit layer):
   visual intel only.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
-  small progress arc.
+  small progress arc. Owned scaffolds may locally extrapolate `buildProgress` only while the
+  latest authoritative snapshot marks them `buildActive`; the display clamps below completion and
+  never unlocks supply, tech, production, pathing, or command behavior before the server snapshot.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre

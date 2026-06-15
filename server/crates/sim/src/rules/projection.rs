@@ -3,6 +3,8 @@
 //! This module owns what a player is allowed to see. It does not mutate the world; future
 //! last-known-position or partial-reveal rules should grow here.
 
+use std::collections::BTreeSet;
+
 use crate::config;
 use crate::game::ability;
 use crate::game::entity::{
@@ -26,6 +28,7 @@ pub struct EntityProjectionContext<'a> {
     pub entities: &'a EntityStore,
     pub target: Option<&'a Entity>,
     pub include_debug_path: bool,
+    pub active_construction_sites: Option<&'a BTreeSet<u32>>,
     pub teams: Option<&'a TeamRelations>,
     pub owner_faction_id: Option<&'a str>,
 }
@@ -357,6 +360,10 @@ pub fn project_entity(
 
     if let Some(progress) = entity.build_progress_fraction() {
         view.build_progress = Some(progress);
+        view.build_active = entity.owner == viewer
+            && context
+                .active_construction_sites
+                .is_some_and(|sites| sites.contains(&entity.id));
     }
 
     // Current behavior exposes static resource amount even through fog.
@@ -560,6 +567,15 @@ mod tests {
     use crate::game::map::Map;
     use crate::protocol::terrain;
 
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![(4, 4)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
     fn project_for_test(
         viewer: u32,
         entity: &Entity,
@@ -568,6 +584,28 @@ mod tests {
         entities: &EntityStore,
         target: Option<&Entity>,
         include_debug_path: bool,
+    ) -> Option<EntityView> {
+        project_for_test_with_active_sites(
+            viewer,
+            entity,
+            fog,
+            fogged,
+            entities,
+            target,
+            include_debug_path,
+            None,
+        )
+    }
+
+    fn project_for_test_with_active_sites(
+        viewer: u32,
+        entity: &Entity,
+        fog: &Fog,
+        fogged: bool,
+        entities: &EntityStore,
+        target: Option<&Entity>,
+        include_debug_path: bool,
+        active_construction_sites: Option<&BTreeSet<u32>>,
     ) -> Option<EntityView> {
         project_entity(
             viewer,
@@ -581,6 +619,7 @@ mod tests {
                 entities,
                 target,
                 include_debug_path,
+                active_construction_sites,
                 teams: None,
                 owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
             },
@@ -887,5 +926,46 @@ mod tests {
         let enemy_view = project_for_test(2, rifle, &fog, false, &entities, None, false)
             .expect("full view should include rifleman");
         assert_eq!(enemy_view.charge_cooldown_left, None);
+    }
+
+    #[test]
+    fn construction_active_signal_is_owner_only() {
+        let mut entities = EntityStore::new();
+        let scaffold_id = entities
+            .spawn_building(1, EntityKind::Barracks, 160.0, 160.0, false)
+            .expect("scaffold should spawn");
+        let scaffold = entities.get(scaffold_id).expect("scaffold should exist");
+        let mut fog = Fog::new(16);
+        fog.recompute(&[1, 2], &entities, &flat_map(16));
+        let mut active_sites = BTreeSet::new();
+        active_sites.insert(scaffold_id);
+
+        let owner_view = project_for_test_with_active_sites(
+            1,
+            scaffold,
+            &fog,
+            true,
+            &entities,
+            None,
+            false,
+            Some(&active_sites),
+        )
+        .expect("owner should see scaffold");
+        assert_eq!(owner_view.build_progress, Some(0.0));
+        assert!(owner_view.build_active);
+
+        let enemy_view = project_for_test_with_active_sites(
+            2,
+            scaffold,
+            &fog,
+            false,
+            &entities,
+            None,
+            false,
+            Some(&active_sites),
+        )
+        .expect("non-owner visible scaffold should project");
+        assert_eq!(enemy_view.build_progress, Some(0.0));
+        assert!(!enemy_view.build_active);
     }
 }

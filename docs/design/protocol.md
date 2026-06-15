@@ -321,19 +321,20 @@ construction progress, worker latched node, active Breakthrough status, and safe
 Combat `targetId` and `weaponFacing` for allied units are sent only when the target is visible in
 the recipient's team-current actionable fog, so allied units attacking hidden enemies do not reveal
 hidden target ids or target directions. `steel`, `oil`, supply, `upgrades`, rallies, order plans,
-ability controls/autocast toggles, debug paths, and command authority remain exact-owner-only.
+construction activity hints, ability controls/autocast toggles, debug paths, and command authority
+remain exact-owner-only.
 Snapshot-only lingering death sight may make non-owned units/buildings visible as `visionOnly`;
 those views are visual intel only and do not refresh remembered buildings or validate targeted
 commands.
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 20. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 21. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 19,
+  "v": 21,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -341,7 +342,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
-      visionOnly?, debugPath?, rallyPlan?, prodUpgrade?
+      visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -444,6 +445,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   prodQueue?: u32,               // queued count (including the in-progress one)
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
+  buildActive?: bool,            // owner-only; true when server advanced this scaffold this tick
   // workers:
   latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
   // combat feedback:

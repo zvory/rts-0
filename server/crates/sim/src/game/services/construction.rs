@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::config;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
@@ -24,6 +24,7 @@ pub(crate) fn construction_system(
     players: &mut [PlayerState],
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    active_construction_sites: &mut BTreeSet<u32>,
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     // ----- Arrival pass: ToSite workers that have reached their target -----
@@ -169,7 +170,9 @@ pub(crate) fn construction_system(
                     continue;
                 }
             };
-            b.advance_construction().unwrap_or(false)
+            let completed = b.advance_construction().unwrap_or(false);
+            active_construction_sites.insert(site);
+            completed
         };
         if completed {
             let (owner, kind, x, y) = entities
@@ -291,7 +294,15 @@ mod tests {
         let mut events = HashMap::new();
 
         let fog = Fog::new(map.size);
-        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
+        let mut active_sites = BTreeSet::new();
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
 
         assert!(
             entities
@@ -347,7 +358,15 @@ mod tests {
         let mut events = HashMap::new();
 
         let fog = Fog::new(map.size);
-        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
+        let mut active_sites = BTreeSet::new();
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
 
         assert!(
             entities
@@ -441,7 +460,15 @@ mod tests {
         let mut events = HashMap::new();
 
         let fog = Fog::new(map.size);
-        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
+        let mut active_sites = BTreeSet::new();
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
 
         let owned_depots: Vec<_> = entities
             .iter()
@@ -504,7 +531,19 @@ mod tests {
         let mut events = HashMap::new();
 
         let fog = Fog::new(map.size);
-        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
+        let mut active_sites = BTreeSet::new();
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
+        assert!(
+            active_sites.contains(&site),
+            "completed scaffold should still be reported as actively advanced this tick"
+        );
 
         let w = entities.get(worker).expect("worker should survive");
         assert!(
@@ -543,7 +582,15 @@ mod tests {
         let mut events = HashMap::new();
 
         let fog = Fog::new(map.size);
-        construction_system(&map, &mut entities, &mut players, &mut events, &fog);
+        let mut active_sites = BTreeSet::new();
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
 
         let w = entities.get(worker).expect("worker should survive");
         assert!(

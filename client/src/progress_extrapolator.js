@@ -35,7 +35,7 @@ export class ProgressExtrapolator {
 
   progressFor(entity, now) {
     const baseline = this.active.get(entity?.id);
-    if (!baseline || !this._matches(entity, baseline)) return safeProgress(entity?.prodProgress);
+    if (!baseline || !this._matches(entity, baseline)) return safeProgress(currentProgress(entity, baseline));
     const elapsedMs = Math.max(0, now - baseline.recvTime);
     const durationMs = Math.max(1, (baseline.durationTicks / TICK_HZ) * 1000);
     const progress = baseline.progress + elapsedMs / durationMs;
@@ -44,14 +44,26 @@ export class ProgressExtrapolator {
 
   apply(entity, now) {
     if (!entity || !this.active.has(entity.id)) return entity;
+    const baseline = this.active.get(entity.id);
     const progress = this.progressFor(entity, now);
-    if (!Number.isFinite(progress) || progress <= safeProgress(entity.prodProgress)) return entity;
+    if (!Number.isFinite(progress) || progress <= safeProgress(currentProgress(entity, baseline))) return entity;
+    if (baseline.type === "construction") {
+      return { ...entity, buildProgress: progress, progressPredicted: true, buildProgressPredicted: true };
+    }
     return { ...entity, prodProgress: progress, progressPredicted: true };
   }
 
   diagnostics() {
+    let productionBars = 0;
+    let constructionBars = 0;
+    for (const baseline of this.active.values()) {
+      if (baseline.type === "construction") constructionBars += 1;
+      else productionBars += 1;
+    }
     return {
       activeBars: this.active.size,
+      productionBars,
+      constructionBars,
       correctionCount: this.correctionCount,
       lastCorrection: round(this.lastCorrection),
       maxCorrection: round(this.maxCorrection),
@@ -63,6 +75,8 @@ export class ProgressExtrapolator {
 
   _baselineFor(entity, recvTime) {
     if (!entity || entity.owner !== this.playerId || !isBuilding(entity.kind)) return null;
+    const construction = constructionBaseline(entity, recvTime);
+    if (construction) return construction;
     if (entity.state === STATE.CONSTRUCT || entity.buildProgress != null) return null;
     const queue = finitePositiveInt(entity.prodQueue);
     if (queue == null) return null;
@@ -72,10 +86,11 @@ export class ProgressExtrapolator {
     if (!identity) return null;
     const durationTicks = durationTicksFor(identity);
     if (!(durationTicks > 0)) return null;
-    return { id: entity.id, identity, queue, progress, durationTicks, recvTime };
+    return { id: entity.id, type: "production", identity, queue, progress, durationTicks, recvTime };
   }
 
   _matches(entity, baseline) {
+    if (baseline?.type === "construction") return constructionMatches(entity, baseline, this.playerId);
     return !!entity &&
       entity.owner === this.playerId &&
       isBuilding(entity.kind) &&
@@ -85,6 +100,35 @@ export class ProgressExtrapolator {
       safeProgress(entity.prodProgress) < 1 &&
       activeIdentity(entity) === baseline.identity;
   }
+}
+
+function constructionBaseline(entity, recvTime) {
+  if (entity.buildActive !== true) return null;
+  const progress = safeProgress(entity.buildProgress);
+  if (!(progress >= 0 && progress < 1)) return null;
+  const durationTicks = finiteTicks(STATS[entity.kind]?.buildTicks);
+  if (!(durationTicks > 0)) return null;
+  return {
+    id: entity.id,
+    type: "construction",
+    identity: `build:${entity.kind}`,
+    progress,
+    durationTicks,
+    recvTime,
+  };
+}
+
+function constructionMatches(entity, baseline, playerId) {
+  return !!entity &&
+    entity.owner === playerId &&
+    isBuilding(entity.kind) &&
+    entity.buildActive === true &&
+    safeProgress(entity.buildProgress) < 1 &&
+    `build:${entity.kind}` === baseline.identity;
+}
+
+function currentProgress(entity, baseline) {
+  return baseline?.type === "construction" ? entity?.buildProgress : entity?.prodProgress;
 }
 
 function activeIdentity(entity) {

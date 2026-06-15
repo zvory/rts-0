@@ -100,6 +100,7 @@ impl Game {
                     entities: &self.entities,
                     target,
                     include_debug_path: self.debug_path_overlays,
+                    active_construction_sites: Some(&self.active_construction_sites),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
                 },
@@ -216,6 +217,7 @@ impl Game {
                             entities: &self.entities,
                             target: None,
                             include_debug_path: false,
+                            active_construction_sites: Some(&self.active_construction_sites),
                             teams: Some(teams),
                             owner_faction_id: self
                                 .player(entity.owner)

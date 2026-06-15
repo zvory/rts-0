@@ -372,6 +372,7 @@ impl Game {
             starting_loadouts: resolved_starting_loadouts,
             map_metadata,
             debug_path_overlays: starting_loadout == StartingLoadout::DebugHuman,
+            active_construction_sites: BTreeSet::new(),
             starting_loadout,
             rng,
         };

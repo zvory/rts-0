@@ -157,6 +157,8 @@ pub struct Game {
     /// True for lobby "Debug mode" matches; enables owner-only movement path diagnostics in
     /// snapshots even when the server binary is built in release mode.
     debug_path_overlays: bool,
+    /// Under-construction building ids that received authoritative build progress this tick.
+    active_construction_sites: BTreeSet<u32>,
     starting_loadout: StartingLoadout,
     pub(crate) rng: SmallRng,
 }
@@ -205,6 +207,7 @@ impl Game {
         crate::perf::timed(perf.as_deref_mut(), "record_commands", || {
             self.record_commands_for_tick(&pending);
         });
+        self.active_construction_sites.clear();
 
         // Run every per-tick system in order. `run_tick` takes split borrows of the map,
         // entity store, player economy, and the event buckets, so it can mutate resources and
@@ -220,6 +223,7 @@ impl Game {
             &mut self.smokes,
             &mut self.mortar_shells,
             &mut self.artillery_shells,
+            &mut self.active_construction_sites,
             pending,
             &mut events,
             self.tick,
