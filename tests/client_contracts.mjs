@@ -159,6 +159,7 @@ function commandCardCtx({
   selection = [],
   entities = selection,
   resources = { steel: 1000, oil: 1000 },
+  optimisticProduction = [],
   upgrades = [],
   playerId = 1,
   commandCardMode = null,
@@ -172,6 +173,7 @@ function commandCardCtx({
     factionId,
     selection,
     resources,
+    optimisticProduction,
     upgrades,
     commandCardMode,
     commandTarget,
@@ -921,6 +923,29 @@ function hotkeyService() {
   assert(trainCard.slots[1].label === "Machine Gunner", "Barracks second train slot should be Machine Gunner");
   assert(!trainCard.slots[1].enabled, "requirement-gated train button should be disabled");
   assert(trainCard.slots[1].title === "Requires Training Centre", "train locked tooltip should name requirement");
+
+  const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [cityCentre],
+    entities: [cityCentre],
+    resources: { steel: 100, oil: 0, supplyUsed: 9, supplyCap: 10 },
+    optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
+  }));
+  assert(!supplyReservedTrainCard.slots[0].enabled, "pending train optimism should reserve supply for train buttons");
+  assert(supplyReservedTrainCard.slots[0].unaffordable, "supply-blocked train button should stay clickable for feedback");
+  assert(supplyReservedTrainCard.slots[0].title === "Not enough supply", "supply-blocked train tooltip should name supply");
+  assert(
+    supplyReservedTrainCard.slots[0].onUnavailableIntent.supply === STATS[KIND.WORKER].supply,
+    "supply-blocked train button should carry supply for unavailable feedback",
+  );
+
+  const steelReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [cityCentre],
+    entities: [cityCentre],
+    resources: { steel: 75, oil: 0, supplyUsed: 4, supplyCap: 10 },
+    optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
+  }));
+  assert(!steelReservedTrainCard.slots[0].enabled, "pending train optimism should reserve steel for train buttons");
+  assert(steelReservedTrainCard.slots[0].title === "Not enough resources", "resource-blocked train tooltip should name resources");
 
   const scoutCar = {
     id: 30,
@@ -3884,6 +3909,15 @@ function fakeAudioContext() {
     });
     assert(placements === 0, "unaffordable build hotkey should not enter placement");
     assert(playedNotices[1] === "notice_steel", "unaffordable build hotkey plays the missing-steel voice line");
+
+    assert(
+      shortResourceHud._missingResourceSoundId(
+        { steel: 50, oil: 0 },
+        { steel: 50, oil: 0, supplyUsed: 10, supplyCap: 10 },
+        1,
+      ) === "notice_supply",
+      "train unavailable feedback should play the supply voice line when resources are available",
+    );
 
     renderedButtons.length = 0;
     sent.length = 0;

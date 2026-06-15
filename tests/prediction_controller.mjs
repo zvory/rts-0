@@ -431,6 +431,7 @@ function sentSeqs(sent) {
     production: [{ building: 30, unit: "worker", optimisticQueue: 1 }],
     rally: [{ building: 30, plan: [{ kind: "move", x: 220, y: 240 }] }],
   });
+  assert(state.optimisticProduction.length === 1, "state keeps full optimistic production list for reservations");
   const selected = state.selectedEntities()[0];
   assert(selected.optimisticProduction === true && selected.prodQueue === 1, "selected building exposes optimistic production");
   assert(selected.optimisticRally === true && selected.rallyPlan[0].x === 220, "selected building exposes optimistic rally plan");

@@ -604,6 +604,7 @@ export class HUD {
       factionId: this.state.localFactionId,
       selection: this.state.selectedEntities() || [],
       resources: this.state.resources || { steel: 0, oil: 0 },
+      optimisticProduction: this.state.optimisticProduction || [],
       upgrades: this.state.upgrades || [],
       commandCardMode: this.state.commandCardMode,
       commandTarget: this.state.commandTarget,
@@ -690,7 +691,7 @@ export class HUD {
         this.state.endCommandTarget();
         return;
       case "playNotEnough":
-        this._playNotEnoughForCost(intent.cost);
+        this._playNotEnoughForCost(intent.cost, intent.supply);
         return;
       default:
         return;
@@ -866,17 +867,26 @@ export class HUD {
     return steel >= (cost.steel ?? 0) && oil >= (cost.oil ?? 0);
   }
 
-  _missingResourceSoundId(cost, res = this.state.resources || { steel: 0, oil: 0 }) {
+  _missingResourceSoundId(
+    cost,
+    res = this.state.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 },
+    supply = null,
+  ) {
     if (!cost) return null;
     const steelShort = (res.steel ?? 0) < (cost.steel ?? 0);
     const oilShort = (res.oil ?? 0) < (cost.oil ?? 0);
     if (steelShort) return "notice_steel";
     if (oilShort) return "notice_oil";
+    if (Number.isFinite(supply) && supply > 0) {
+      const used = res.supplyUsed ?? 0;
+      const cap = res.supplyCap ?? 0;
+      if (used + supply > cap) return "notice_supply";
+    }
     return null;
   }
 
-  _playNotEnoughForCost(cost) {
-    const soundId = this._missingResourceSoundId(cost);
+  _playNotEnoughForCost(cost, supply = null) {
+    const soundId = this._missingResourceSoundId(cost, undefined, supply);
     if (soundId && this.audio) {
       this.audio.play(soundId, { category: "alert", priority: 4 });
     }

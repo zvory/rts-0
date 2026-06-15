@@ -345,7 +345,7 @@ export function buildUnitCard(ctx, selection) {
 }
 
 export function buildTrainCard(ctx, building) {
-  const resources = resourcesOf(ctx);
+  const resources = trainResourcesOf(ctx);
   const factionId = commandFactionId(ctx);
   const trains = factionTrainsOf(ctx, building.kind);
   const researches = availableResearchesOf(ctx, building.kind);
@@ -382,7 +382,7 @@ export function buildTrainCard(ctx, building) {
       title: trainDisabledReason(ctx, unit, resources),
       tooltipKind: unit,
       repeatable: true,
-      onUnavailableIntent: { type: "playNotEnough", cost: st.cost },
+      onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }
   for (const upgrade of researches) {
@@ -585,7 +585,27 @@ function requirementsOf(definition) {
 }
 
 function resourcesOf(ctx) {
-  return ctx.resources || { steel: 0, oil: 0 };
+  return ctx.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+}
+
+function trainResourcesOf(ctx) {
+  const base = resourcesOf(ctx);
+  const resources = {
+    steel: base.steel ?? 0,
+    oil: base.oil ?? 0,
+    supplyUsed: Number.isFinite(base.supplyUsed) ? base.supplyUsed : 0,
+    supplyCap: Number.isFinite(base.supplyCap) ? base.supplyCap : null,
+  };
+  for (const entry of ctx.optimisticProduction || []) {
+    const st = STATS[entry?.unit];
+    if (!st) continue;
+    const cost = st.cost || {};
+    resources.steel -= cost.steel ?? 0;
+    resources.oil -= cost.oil ?? 0;
+    const supply = st.supply ?? 0;
+    if (Number.isFinite(supply) && supply > 0) resources.supplyUsed += supply;
+  }
+  return resources;
 }
 
 function commandFactionId(ctx) {
@@ -705,7 +725,7 @@ function trainAvailability(ctx, unit, resources) {
   if (!st) return "locked";
   if (requirementsOf(st).some((req) => !playerHasCompleteKind(ctx, req))) return "locked";
   if (st.upgradeRequires && !(ctx.upgrades || []).includes(st.upgradeRequires)) return "locked";
-  return affordable(st.cost, resources) ? "ready" : "unaffordable";
+  return affordable(st.cost, resources) && hasSupplyFor(st, resources) ? "ready" : "unaffordable";
 }
 
 function trainDisabledReason(ctx, unit, resources) {
@@ -718,7 +738,16 @@ function trainDisabledReason(ctx, unit, resources) {
       `Requires ${UPGRADES[st.upgradeRequires]?.label || st.upgradeRequires}`;
   }
   if (!affordable(st.cost, resources)) return "Not enough resources";
+  if (!hasSupplyFor(st, resources)) return "Not enough supply";
   return "";
+}
+
+function hasSupplyFor(st, resources) {
+  const supply = st?.supply ?? 0;
+  if (!Number.isFinite(supply) || supply <= 0) return true;
+  if (!Number.isFinite(resources.supplyCap)) return true;
+  const used = resources.supplyUsed ?? 0;
+  return used + supply <= resources.supplyCap;
 }
 
 function availableResearchesOf(ctx, kind) {

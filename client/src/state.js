@@ -170,6 +170,7 @@ export class GameState {
     this.predictedById = new Map();
     this.predictionCorrectionById = new Map();
     this.predictionDiagnostics = null;
+    this.optimisticProduction = [];
     this.optimisticProductionByBuilding = new Map();
     this.optimisticRallyByBuilding = new Map();
     this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
@@ -656,11 +657,14 @@ export class GameState {
   }
 
   setOptimisticCommandState(state = null) {
+    this.optimisticProduction = [];
     this.optimisticProductionByBuilding.clear();
     this.optimisticRallyByBuilding.clear();
     for (const entry of state?.production || []) {
       if (typeof entry?.building !== "number") continue;
-      this.optimisticProductionByBuilding.set(entry.building, { ...entry, predicted: true });
+      const production = { ...entry, predicted: true };
+      this.optimisticProduction.push(production);
+      this.optimisticProductionByBuilding.set(entry.building, production);
     }
     for (const entry of state?.rally || []) {
       if (typeof entry?.building !== "number" || !Array.isArray(entry.plan)) continue;
