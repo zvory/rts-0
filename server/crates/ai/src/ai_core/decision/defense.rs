@@ -11,6 +11,8 @@ pub(super) const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
 
 pub(super) const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 
+pub(super) const DEFENSIVE_MG_PERIMETER_DISTANCE_TILES: f32 = 3.0;
+
 pub(super) const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 
 pub(super) const DEFENSIVE_PANIC_SUSTAINED_TICKS: u32 = 180;
@@ -288,6 +290,34 @@ pub(super) fn stage_main_steel_defensive_line(
     }
 
     (!staged.is_empty()).then_some(staged)
+}
+
+pub(super) fn defensive_machine_gunner_units(
+    observation: &AiObservation,
+    profile: &AiProfile,
+) -> Vec<u32> {
+    let Some(policy) = profile.defensive_machine_gunners else {
+        return Vec::new();
+    };
+    let mut units =
+        actions::select_ready_combat_units(&observation.owned, &[EntityKind::MachineGunner]);
+    units.truncate(policy.target_count);
+    units
+}
+
+pub(super) fn stage_defensive_machine_gunner_perimeter(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<u32>> {
+    stage_main_steel_defensive_line(
+        actions,
+        observation,
+        ready_units,
+        enemy_base,
+        DEFENSIVE_MG_PERIMETER_DISTANCE_TILES,
+    )
 }
 
 #[derive(Clone, Copy, Debug)]

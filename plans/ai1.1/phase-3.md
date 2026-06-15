@@ -2,7 +2,7 @@
 
 ## Status
 
-Not started.
+Done.
 
 ## Goal
 
@@ -26,6 +26,30 @@ cargo run --release --bin ai-matchup -- ai_1_1_tank_mg ai_1_0_tech --ticks 30000
 ```
 
 If Phase 1 chose a different AI 1.1 id, use that exact id and record the deviation here.
+
+The executed command used the same profile ids with an explicit package because two workspace
+packages expose an `ai-matchup` binary:
+
+```bash
+cargo run --release -p rts-ai --bin ai-matchup -- ai_1_1_tank_mg ai_1_0_tech --ticks 30000 --seed 7 --json --save-replay ai_1_1_vs_ai_1_0_30k
+```
+
+## Result
+
+- Scorecard artifact: `plans/ai1.1/artifacts/phase-3-scorecard.json`.
+- Replay artifact: `/private/tmp/rts-worktrees/ai1.1-phase-3/server/crates/ai/target/selfplay-artifacts/ai_1_1_vs_ai_1_0_30k/replay.json`.
+- Replay verification: passed (`replayVerified: true`).
+- Outcome: AI 1.0 won by elimination at tick 29,350.
+- AI 1.1 Scout Cars: zero train commands, `firstScoutCarTick: null`, and
+  `firstScoutCarHarassCommandTick: null`.
+- AI 1.1 MG/Tank mix: five Machine Gunner train commands and 20 Tank train commands in the replay
+  command log; the first Machine Gunner train command was tick 9,180 and the first Tank train
+  command was tick 9,570.
+- MG perimeter evidence: individual AI 1.1 `attackMove` commands to nearby defensive/perimeter
+  coordinates appear from tick 9,234 through tick 9,936 before the first full Tank-era wave at tick
+  10,320.
+- Promotion decision: this evidence does not support promoting AI 1.1. Phase 4 should leave AI 1.0
+  as the live default and document that AI 1.1 underperformed in the required release comparison.
 
 ## Verification
 

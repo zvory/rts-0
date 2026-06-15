@@ -1,0 +1,229 @@
+{
+  "command": "cargo run --release -p rts-ai --bin ai-matchup -- ai_1_1_tank_mg ai_1_0_tech --ticks 30000 --seed 7 --json --save-replay ai_1_1_vs_ai_1_0_30k",
+  "profileA": "ai_1_1_tank_mg",
+  "profileB": "ai_1_0_tech",
+  "seed": 7,
+  "maxTicks": 30000,
+  "ticks": 29350,
+  "completedByElimination": true,
+  "winner": {
+    "playerId": 2,
+    "profile": "ai_1_0_tech"
+  },
+  "replayVerified": true,
+  "replayArtifact": "/private/tmp/rts-worktrees/ai1.1-phase-3/server/crates/ai/target/selfplay-artifacts/ai_1_1_vs_ai_1_0_30k",
+  "players": [
+    {
+      "playerId": 1,
+      "profile": "ai_1_1_tank_mg",
+      "alive": false,
+      "armyValue": 0,
+      "buildingValue": 1400,
+      "workerCount": 0,
+      "commandCount": 14856,
+      "attackCommandCount": 208,
+      "damageDealtEvents": 3614,
+      "deathCount": 231,
+      "firstAttackCommandTick": 1704,
+      "firstRiflemanAttackCommandTick": 1703,
+      "firstScoutCarTick": null,
+      "firstScoutCarHarassCommandTick": null,
+      "firstExpansionCityCentrePlannedTick": 7661,
+      "firstExpansionCityCentreCompletedTick": 8836,
+      "firstTankTick": 10319,
+      "finalCounts": {
+        "barracks": 1,
+        "city_centre": 1,
+        "depot": 9,
+        "training_centre": 1
+      }
+    },
+    {
+      "playerId": 2,
+      "profile": "ai_1_0_tech",
+      "alive": true,
+      "armyValue": 5600,
+      "buildingValue": 2650,
+      "workerCount": 37,
+      "commandCount": 17296,
+      "attackCommandCount": 304,
+      "damageDealtEvents": 5076,
+      "deathCount": 204,
+      "firstAttackCommandTick": 1667,
+      "firstRiflemanAttackCommandTick": 1666,
+      "firstScoutCarTick": 10234,
+      "firstScoutCarHarassCommandTick": 10234,
+      "firstExpansionCityCentrePlannedTick": 7600,
+      "firstExpansionCityCentreCompletedTick": 8426,
+      "firstTankTick": 9754,
+      "finalCounts": {
+        "barracks": 3,
+        "city_centre": 2,
+        "depot": 12,
+        "factory": 1,
+        "research_complex": 1,
+        "rifleman": 30,
+        "tank": 5,
+        "training_centre": 1,
+        "worker": 37
+      }
+    }
+  ],
+  "firstDamageTick": 3694,
+  "attackEvents": 8814,
+  "deathEvents": 902,
+  "eventCount": 14195,
+  "ai11TrainCounts": [
+    {
+      "unit": "worker",
+      "count": 51
+    },
+    {
+      "unit": "rifleman",
+      "count": 145
+    },
+    {
+      "unit": "machine_gunner",
+      "count": 5
+    },
+    {
+      "unit": "tank",
+      "count": 20
+    },
+    {
+      "unit": "scout_car",
+      "count": 0
+    }
+  ],
+  "ai11MachineGunnerTrainTicks": [
+    9180,
+    9234,
+    10542,
+    11046,
+    27642
+  ],
+  "ai11FirstTankTrainTick": 9570,
+  "ai11EarlyPerimeterAttackMoves": [
+    {
+      "tick": 9234,
+      "units": [
+        249
+      ],
+      "x": 688.0,
+      "y": 400.0
+    },
+    {
+      "tick": 9420,
+      "units": [
+        252
+      ],
+      "x": 688.0,
+      "y": 400.0
+    },
+    {
+      "tick": 9534,
+      "units": [
+        253
+      ],
+      "x": 688.0,
+      "y": 400.0
+    },
+    {
+      "tick": 9822,
+      "units": [
+        255
+      ],
+      "x": 639.933,
+      "y": 510.6758
+    },
+    {
+      "tick": 9936,
+      "units": [
+        256
+      ],
+      "x": 640.8297,
+      "y": 534.65906
+    },
+    {
+      "tick": 10320,
+      "units": [
+        213,
+        215,
+        220,
+        222,
+        225,
+        227,
+        230,
+        232,
+        236,
+        238,
+        239,
+        240,
+        244,
+        245,
+        246,
+        248,
+        249,
+        252,
+        253,
+        264
+      ],
+      "x": 3600.0,
+      "y": 400.0
+    },
+    {
+      "tick": 10440,
+      "units": [
+        213,
+        215,
+        220,
+        222,
+        225,
+        227,
+        230,
+        232,
+        236,
+        238,
+        239,
+        240,
+        244,
+        245,
+        246,
+        248,
+        249,
+        252,
+        253,
+        264
+      ],
+      "x": 3600.0,
+      "y": 400.0
+    },
+    {
+      "tick": 10560,
+      "units": [
+        213,
+        215,
+        220,
+        222,
+        225,
+        227,
+        230,
+        232,
+        236,
+        238,
+        239,
+        240,
+        244,
+        245,
+        246,
+        248,
+        249,
+        252,
+        253,
+        264
+      ],
+      "x": 3600.0,
+      "y": 400.0
+    }
+  ]
+}

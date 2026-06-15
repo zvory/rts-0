@@ -7,6 +7,7 @@ pub(crate) const RIFLE_FLOOD_FULL_SATURATION_ID: &str = "rifle_flood_full_satura
 pub(crate) const TECH_TO_TANKS_ID: &str = "tech_to_tanks";
 pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
 pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
+pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
@@ -19,6 +20,7 @@ pub(crate) struct AiProfile {
     pub(crate) harassment: Option<HarassmentPolicy>,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
+    pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
     pub(crate) recovery_transition: Option<RecoveryTransitionPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
 }
@@ -175,6 +177,11 @@ pub(crate) struct HarassmentPolicy {
     pub(crate) visible_threat_radius_tiles: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct DefensiveMachineGunnerPolicy {
+    pub(crate) target_count: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TechTransitionPolicy {
     pub(crate) supply_used_threshold: u32,
@@ -213,11 +220,8 @@ pub(crate) struct TankResourcePolicy {
 
 const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
 const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
-const TANK_SCOUT_RIFLE: [EntityKind; 3] = [
-    EntityKind::Tank,
-    EntityKind::ScoutCar,
-    EntityKind::Rifleman,
-];
+const TANK_SCOUT_RIFLE: [EntityKind; 3] =
+    [EntityKind::Tank, EntityKind::ScoutCar, EntityKind::Rifleman];
 const TANK_ONLY: [EntityKind; 1] = [EntityKind::Tank];
 const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AntiTankGun];
 const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
@@ -310,6 +314,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         blocks_tech_path: false,
         oil_before_steel_in_expansion: false,
     }),
+    defensive_machine_gunners: None,
     recovery_transition: Some(RecoveryTransitionPolicy {
         completed_building: EntityKind::Barracks,
         delay_unit: EntityKind::Rifleman,
@@ -445,6 +450,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         blocks_tech_path: false,
         oil_before_steel_in_expansion: true,
     }),
+    defensive_machine_gunners: None,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         // Once the rifle flood has put real bodies on the field, pivot to tanks so a stalemated
@@ -528,6 +534,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         blocks_tech_path: false,
         oil_before_steel_in_expansion: false,
     }),
+    defensive_machine_gunners: None,
     recovery_transition: None,
     tech_transition: None,
 };
@@ -591,6 +598,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         blocks_tech_path: true,
         oil_before_steel_in_expansion: false,
     }),
+    defensive_machine_gunners: None,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         supply_used_threshold: 50,
@@ -679,6 +687,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         blocks_tech_path: false,
         oil_before_steel_in_expansion: true,
     }),
+    defensive_machine_gunners: None,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         supply_used_threshold: 30,
@@ -701,8 +710,52 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 1] {
-    [&AI_1_0_TECH]
+pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
+    id: AI_1_1_TANK_MG_ID,
+    workers: AI_1_0_TECH.workers,
+    supply: AI_1_0_TECH.supply,
+    buildings: BuildingPolicy {
+        barracks_curve: BarracksCurve {
+            before_steel_saturation: 1,
+            after_steel_saturation: 2,
+            banked_steel_threshold: 550,
+            banked_steel_step: 350,
+            max: 2,
+        },
+        proxy_barracks: None,
+        required_tech_path: &FULL_TECH_PATH,
+        max_pending_per_kind: 1,
+    },
+    production: AI_1_0_TECH.production,
+    attack: AI_1_0_TECH.attack,
+    harassment: None,
+    resources: AI_1_0_TECH.resources,
+    expansion: AI_1_0_TECH.expansion,
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 4 }),
+    recovery_transition: None,
+    tech_transition: Some(TechTransitionPolicy {
+        supply_used_threshold: 30,
+        required_tech_path: &AI_1_0_TANK_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 2,
+            unit_priorities: &TANK_AND_RIFLE,
+            save_for_first_tech_unit: Some(EntityKind::Tank),
+            balance_unit_priorities: false,
+        },
+        attack: AttackPolicy {
+            first_attack_size: 6,
+            wave_growth: 2,
+            regroup_reset_ticks: 480,
+            reissue_cadence_ticks: 120,
+            stage_distance_tiles: 8.0,
+            unit_kinds: &TANK_AND_RIFLE,
+            required_unit: Some(EntityKind::Tank),
+        },
+    }),
+};
+
+pub(crate) fn required_profiles() -> [&'static AiProfile; 2] {
+    [&AI_1_0_TECH, &AI_1_1_TANK_MG]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
@@ -721,10 +774,54 @@ mod tests {
 
         assert_eq!(
             profiles.map(|profile| profile.id),
-            [AI_1_0_TECH_ID]
+            [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID]
         );
         assert_eq!(profile_by_id(AI_1_0_TECH_ID).unwrap().id, AI_1_0_TECH_ID);
+        assert_eq!(
+            profile_by_id(AI_1_1_TANK_MG_ID).unwrap().id,
+            AI_1_1_TANK_MG_ID
+        );
         assert!(profile_by_id("tech_tree").is_none());
+    }
+
+    #[test]
+    fn ai_1_1_forks_ai_1_0_without_scout_cars_or_extra_barracks() {
+        let transition = AI_1_1_TANK_MG.tech_transition.unwrap();
+
+        assert_eq!(AI_1_1_TANK_MG.workers, AI_1_0_TECH.workers);
+        assert_eq!(AI_1_1_TANK_MG.supply, AI_1_0_TECH.supply);
+        assert_eq!(AI_1_1_TANK_MG.resources, AI_1_0_TECH.resources);
+        assert_eq!(AI_1_1_TANK_MG.expansion, AI_1_0_TECH.expansion);
+        assert_eq!(AI_1_1_TANK_MG.buildings.barracks_curve.max, 2);
+        assert_eq!(
+            AI_1_1_TANK_MG
+                .buildings
+                .barracks_curve
+                .target(2_000, 30, 18),
+            2
+        );
+        assert_eq!(AI_1_1_TANK_MG.harassment, None);
+        assert_eq!(
+            transition.production.unit_priorities,
+            &[EntityKind::Tank, EntityKind::Rifleman]
+        );
+        assert!(!transition
+            .production
+            .unit_priorities
+            .contains(&EntityKind::ScoutCar));
+        assert_eq!(
+            transition.production.save_for_first_tech_unit,
+            Some(EntityKind::Tank)
+        );
+        assert_eq!(transition.attack.required_unit, Some(EntityKind::Tank));
+        assert_eq!(
+            transition.attack.unit_kinds,
+            &[EntityKind::Tank, EntityKind::Rifleman]
+        );
+        assert_eq!(
+            AI_1_1_TANK_MG.defensive_machine_gunners,
+            Some(DefensiveMachineGunnerPolicy { target_count: 4 })
+        );
     }
 
     #[test]
