@@ -431,7 +431,7 @@ fn automated_match_history_participants_are_detected() {
         "Alpha".to_string(),
         "Bravo".to_string(),
     ]));
-    assert!(match_history_participants_are_automated(&[
+    assert!(!match_history_participants_are_automated(&[
         "Player".to_string(),
         "Computer 2".to_string(),
     ]));

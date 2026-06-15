@@ -88,7 +88,7 @@ pub(super) fn match_history_participants_are_automated(participants: &[String]) 
     let mut has_bravo = false;
     for participant in participants {
         let name = participant.trim();
-        if name.starts_with("Computer ") || name.eq_ignore_ascii_case("smoke") {
+        if name.eq_ignore_ascii_case("smoke") {
             return true;
         }
         has_alpha |= name == "Alpha";
@@ -738,8 +738,7 @@ pub(super) struct RoomTask {
     /// sandbox never ends while a 2+ player match (including human-vs-AI) resolves to a winner.
     /// `0` outside a match.
     match_player_count: usize,
-    /// Number of human (non-AI) players the in-progress match started with. Only matches where
-    /// this is >= 2 are written to the DB. `0` outside a match.
+    /// Number of human (non-AI) players the in-progress match started with. `0` outside a match.
     match_human_count: usize,
     /// Connected human players who already received a terminal score screen for the active match.
     outcome_sent: HashSet<u32>,
@@ -882,8 +881,8 @@ impl RoomTask {
         )
     }
 
-    fn should_record_match_history(&self) -> bool {
-        self.match_human_count >= 2
+    fn should_persist_match_history(&self) -> bool {
+        self.match_player_count >= 1
             && !self.is_live_dev_watch()
             && !matches!(self.mode, RoomMode::ReplayBranch { .. })
             && !is_automated_match_history_room(&self.room)
@@ -1823,16 +1822,7 @@ impl RoomTask {
         }
 
         if self.match_player_count < 2 {
-            self.mark_match_finished_for_drain();
-            self.phase = Phase::Lobby;
-            self.match_player_count = 0;
-            self.match_human_count = 0;
-            self.branch_live_seat_by_connection.clear();
-            self.outcome_sent.clear();
-            for player in self.players.values_mut() {
-                player.ready = false;
-            }
-            self.broadcast_lobby();
+            self.end_match(None, scores, Some(&game));
         } else {
             self.phase = Phase::InGame(game);
         }
@@ -3504,7 +3494,7 @@ impl RoomTask {
         });
         let will_record_history = self.db.is_some()
             && self.match_started_at.is_some()
-            && self.should_record_match_history();
+            && self.should_persist_match_history();
         structured_log::log_match_ended(MatchEndedLog {
             room: &self.room,
             match_run_id: self.match_run_id.as_deref(),
@@ -3521,10 +3511,11 @@ impl RoomTask {
             will_record_history,
         });
 
-        // Persist match history only for real public matches. Human-vs-AI, AI-only,
-        // 1-player sandboxes, dev/scenario/replay rooms, and automated test rooms are excluded.
+        // Persist replay-backed history for deploy-recorded matches. The Recent Matches endpoint
+        // filters debug and AI-only rows; persistence keeps their replay artifacts available for
+        // follow-up diagnostics without exposing them on the lobby front page.
         if let (Some(db), Some(started_at)) = (self.db.clone(), self.match_started_at) {
-            if self.should_record_match_history() {
+            if self.should_persist_match_history() {
                 let duration_ms = ended_at
                     .signed_duration_since(started_at)
                     .num_milliseconds()
@@ -3550,6 +3541,8 @@ impl RoomTask {
                     winner_name,
                     participants: self.match_participants.clone(),
                     score_screen: score_json,
+                    human_count: i32::try_from(self.match_human_count).unwrap_or(i32::MAX),
+                    debug_mode: self.quickstart,
                     local_only: self.match_history_local_only,
                     replay,
                 };
@@ -5198,7 +5191,7 @@ mod tests {
         task.phase = Phase::BranchStaging(Box::new(staging));
         task.start_branch_live();
 
-        assert!(!task.should_record_match_history());
+        assert!(!task.should_persist_match_history());
         task.on_give_up(100);
 
         assert!(matches!(task.phase, Phase::ReplayViewer(_)));
@@ -5209,6 +5202,72 @@ mod tests {
             })
         );
         assert!(task.branch_live_seat_by_connection.is_empty());
+    }
+
+    #[test]
+    fn match_history_persistence_allows_solo_and_human_ai_matches() {
+        let mut solo = RoomTask::new(
+            "solo-history-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        solo.match_player_count = 1;
+        solo.match_human_count = 1;
+        solo.match_participants = vec!["Player".to_string()];
+        assert!(solo.should_persist_match_history());
+
+        let mut human_ai = RoomTask::new(
+            "human-ai-history-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        human_ai.match_player_count = 2;
+        human_ai.match_human_count = 1;
+        human_ai.match_participants = vec!["Player".to_string(), "Computer 1".to_string()];
+        assert!(human_ai.should_persist_match_history());
+    }
+
+    #[test]
+    fn match_history_persistence_allows_ai_only_but_skips_test_matches() {
+        let mut ai_only = RoomTask::new(
+            "ai-only-history-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        ai_only.match_player_count = 2;
+        ai_only.match_human_count = 0;
+        ai_only.match_participants = vec!["Computer 1".to_string(), "Computer 2".to_string()];
+        assert!(ai_only.should_persist_match_history());
+
+        let mut smoke = RoomTask::new(
+            "smoke-history-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        smoke.match_player_count = 2;
+        smoke.match_human_count = 1;
+        smoke.match_participants = vec!["smoke".to_string(), "Computer 1".to_string()];
+        assert!(!smoke.should_persist_match_history());
+
+        let mut automated_room = RoomTask::new(
+            "itest-history-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        automated_room.match_player_count = 2;
+        automated_room.match_human_count = 2;
+        automated_room.match_participants = vec!["Player 1".to_string(), "Player 2".to_string()];
+        assert!(!automated_room.should_persist_match_history());
     }
 
     #[test]

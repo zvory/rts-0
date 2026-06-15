@@ -99,16 +99,13 @@ async fn main() {
 
     let db = rts_server::db::try_connect_from_env().await;
 
-    // Public match-history writes are opt-in. When a DB is configured but the public gate is off,
-    // local `cargo run` still writes rows tagged local-only so debugging games can be inspected
-    // from localhost without polluting beta/mainline recent matches.
+    // Match-history writes are opt-in for shared beta/mainline deploys. Local `cargo run` may
+    // connect to the DB for reads, but it must not upload match rows or replay artifacts unless
+    // this public gate is explicitly enabled.
     let record_matches = env_truthy("RTS_RECORD_MATCHES");
-    let match_history_local_only = !record_matches;
-    let lobby_db = db.clone();
-    if db.is_some() && match_history_local_only {
-        rts_server::log_info!(
-            "RTS_RECORD_MATCHES unset; match history writes enabled as localhost-only rows"
-        );
+    let lobby_db = record_matches.then(|| db.clone()).flatten();
+    if db.is_some() && !record_matches {
+        rts_server::log_info!("RTS_RECORD_MATCHES unset; match history writes disabled");
     }
 
     let version = rts_server::build_info::build_id().to_string();
@@ -116,7 +113,7 @@ async fn main() {
     let index_html = build_versioned_index(client_dir, &version);
     let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps").to_string();
     let state = AppState {
-        lobby: Lobby::new().with_match_history(lobby_db, match_history_local_only),
+        lobby: Lobby::new().with_match_history(lobby_db, false),
         index_html,
         version,
         maps_dir: maps_dir.clone(),
@@ -983,6 +980,8 @@ mod tests {
             outcome: "win".to_string(),
             participants: vec!["Alpha".to_string(), "Bravo".to_string()],
             score_screen: serde_json::Value::Array(Vec::new()),
+            human_count: 2,
+            debug_mode: false,
             local_only: false,
             replay_available: meta.is_some(),
             replay_unavailable_reason: None,

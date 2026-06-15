@@ -1,6 +1,7 @@
 # Match history
 
-Persisted record of every resolved multi-player match, displayed on the lobby front page.
+Persisted record and replay artifact for resolved deployed matches, with a filtered Recent Matches
+feed on the lobby front page.
 
 Source of truth for: schema, write path, read path, the recording gate, and failure modes.
 Mirrors of any of these elsewhere (capsules, CLAUDE.md) point here.
@@ -26,6 +27,8 @@ Supabase Postgres. Schema in `server/migrations/`. Match summaries live in `matc
 | `outcome`       | `text`          | `'win'` or `'draw'` (CHECK constraint).         |
 | `participants`  | `text[]`        | Display names in seat order (humans then AI).   |
 | `score_screen`  | `jsonb`         | Whole `Vec<PlayerScore>` blob, opaque to SQL.   |
+| `human_count`   | `integer`       | Non-AI players at match start.                  |
+| `debug_mode`    | `boolean`       | Lobby Debug/quickstart was enabled.             |
 | `local_only`    | `boolean`       | Hide local developer rows from public servers.  |
 
 Indexes: `(started_at desc)` for the front-page query, a partial `(started_at desc)` index for
@@ -62,11 +65,13 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 
 - **Read**: `GET /api/matches?limit=N` — JSON array, newest first, `limit` clamped server-side to
   `[1, 100]`, defaults to 20. Returns `[]` when no DB is configured (so the client never needs
-  to special-case missing-DB). Local-only rows are included only when the request peer address is
-  loopback; public beta/mainline requests filter them out. Each summary includes
-  `replayAvailable` plus `replayUnavailableReason`. Availability is true only when a replay row
-  exists and its artifact schema, build SHA, map schema, and map content hash are compatible with
-  the running server.
+  to special-case missing-DB). The Recent Matches feed includes only rows with at least one
+  human player and `debug_mode = false`; AI-only and lobby Debug/quickstart rows may be persisted
+  with replay artifacts but stay out of the lobby table. Local-only rows are included only when the
+  request peer address is loopback; public beta/mainline requests filter them out. Each summary
+  includes `replayAvailable` plus `replayUnavailableReason`. Availability is true only when a
+  replay row exists and its artifact schema, build SHA, map schema, and map content hash are
+  compatible with the running server.
 - **Replay launch**: `POST /api/matches/{id}/replay` — read-only launch request. The server loads
   the persisted artifact only if the match is visible to the request scope, validates it against
   the running build, map metadata, and the shared replay faction/loadout validator used by replay
@@ -100,18 +105,19 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 A row is written when **all** of these are true:
 
 1. The lobby reached `Phase::InGame` (so `match_started_at` was captured).
-2. `match_human_count >= 2` — at least two human (non-AI) players. Human-vs-AI, AI-only, and
-   1-player sandboxes never record.
+2. At least one active participant was present at match start. Solo, player-vs-AI, and AI-only
+   deployed matches record when they resolve.
 3. `is_dev_watch()` is false — dev self-play, scenario, and replay rooms never record.
 4. The room/participants do not match automated smoke/integration/regression test fingerprints:
-   `itest-*`, `ai-itest-*`, `client-smoke-*`, `reg-*`, `Computer *`, `smoke`, or the
-   `Alpha`/`Bravo` integration pair.
-5. The server was started with a working DB connection.
+   `itest-*`, `ai-itest-*`, `client-smoke-*`, `reg-*`, `smoke`, or the `Alpha`/`Bravo`
+   integration pair. `Computer *` participants are allowed so player-vs-AI matches record.
+5. The server was started with a working DB connection and `RTS_RECORD_MATCHES` is truthy.
 
-Anything else (DB failures, dev rooms, test rooms, missing DB) silently skips the write. The
-simulation and lobby flow are unaffected. Replay artifacts use the same eligibility as match rows:
-if a match row is skipped, no replay row is written. Local-only replay visibility follows the
-owning `matches.local_only` row through the launch query.
+Anything else (local gate off, DB failures, dev rooms, test rooms, missing DB) silently skips the
+write. The simulation and lobby flow are unaffected. Replay artifacts use the same eligibility as
+match rows: if a match row is skipped, no replay row is written. Stored Debug/quickstart and
+AI-only rows are filtered from `/api/matches`, but the replay row remains linked to the owning
+`matches` row.
 
 Public reads also suppress historical bot/test rows that were written before this eligibility
 filter existed, and migration `20260609000002_suppress_automated_match_history.sql` tags those
@@ -119,27 +125,25 @@ rows `local_only` instead of deleting them.
 
 ## Recording gate (`RTS_RECORD_MATCHES`)
 
-The gate controls whether recorded rows are public or local-only. It exists because the developer
-runs many local matches and needs them for debugging without polluting shared beta/mainline recent
-matches.
+The gate controls whether the server writes match rows and replay artifacts. It exists because the
+developer runs many local matches and local dev must not upload replay data into the shared
+beta/mainline database.
 
 | env state                            | reads work?       | writes happen?      | public servers show row? |
 | ------------------------------------ | ----------------- | ------------------- | ------------------------ |
 | no `DATABASE_URL`                    | no (returns `[]`) | no                  | no                       |
-| `DATABASE_URL` set, gate off / unset | yes               | yes, `local_only`   | no                       |
+| `DATABASE_URL` set, gate off / unset | yes               | no                  | no                       |
 | `DATABASE_URL` set, gate on          | yes               | yes, public row     | yes                      |
 
 Truthy values: `1`, `true`, `yes`, `on` (case-insensitive). Anything else, including unset, is
-off. Beta and mainline deploys must set it to `1`. Local `cargo run` with `DATABASE_URL` set writes
-local-only rows, which are visible from `http://localhost:<port>/api/matches` because that connects
-over loopback, and hidden from public beta/mainline recent matches.
+off. Beta and mainline deploys must set it to `1`. Local `cargo run` with `DATABASE_URL` can read
+history, but with the gate off it does not write rows or replay artifacts.
 
 The implementation: `main.rs` connects the pool once, hands the pool to `AppState` for reads, and
-passes it to `Lobby::with_match_history(...)` with a `local_only` flag derived from
-`RTS_RECORD_MATCHES`. The lobby propagates the option and write scope to each room. If a room
+passes it to `Lobby::with_match_history(...)` only when `RTS_RECORD_MATCHES` is truthy. If a room
 receives `None`, the `end_match` write branch never fires. `/api/matches` decides whether to
-include local-only rows from the request peer address. Only loopback peers (`127.0.0.1` / `::1`)
-can see them.
+include historical local-only rows from the request peer address. Only loopback peers
+(`127.0.0.1` / `::1`) can see those rows.
 
 ## Failure modes
 
