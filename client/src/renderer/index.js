@@ -31,6 +31,7 @@ import {
 } from "./entities.js";
 import {
   _drawAbilityTargetPreview,
+  _drawAbilityObjects,
   _drawArtilleryImpacts,
   _drawArtilleryLaunches,
   _drawArtilleryTargets,
@@ -109,6 +110,8 @@ export class Renderer {
     this.layers.feedback.addChild(this._feedbackGfx);
     this._smokeGfx = new PIXI.Graphics();
     this.layers.smokes.addChild(this._smokeGfx);
+    this._abilityObjectGfx = new PIXI.Graphics();
+    this.layers.smokes.addChild(this._abilityObjectGfx);
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
 
@@ -220,6 +223,8 @@ export class Renderer {
     this._sweepTankMotion(liveIds);
 
     // Overlays.
+    this._abilityObjectGfx.clear();
+    this._drawAbilityObjects(state);
     this._smokeGfx.clear();
     this._drawSmokes(state);
     this._drawFog(fog);
@@ -419,6 +424,7 @@ export class Renderer {
     this._fogGfx.destroy();
     this._feedbackGfx.destroy();
     this._smokeGfx.destroy();
+    this._abilityObjectGfx.destroy();
     this._placementGfx.destroy();
     this._dragGfx.destroy();
 
@@ -464,6 +470,7 @@ Object.assign(Renderer.prototype, {
   _drawArtilleryLaunches,
   _drawArtilleryTargets,
   _drawArtilleryImpacts,
+  _drawAbilityObjects,
   _drawAbilityTargetPreview,
   _drawSelectedMortarRanges,
   _drawSmokes,

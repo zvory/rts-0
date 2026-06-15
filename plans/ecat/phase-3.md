@@ -1,6 +1,6 @@
 # Phase 3 - Client Ability Object Surface
 
-Status: Not Started.
+Status: Done.
 
 ## Goal
 

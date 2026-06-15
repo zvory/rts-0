@@ -60,6 +60,8 @@ import {
   PREDICTION_PROTOCOL_VERSION,
   ABILITY,
   ABILITY_CODE,
+  ABILITY_OBJECT_KIND,
+  ABILITY_OBJECT_KIND_CODE,
   EVENT,
   EVENT_CODE,
   KIND,
@@ -92,7 +94,7 @@ import {
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
-import { _drawAbilityTargetPreview } from "../client/src/renderer/feedback.js";
+import { _drawAbilityObjects, _drawAbilityTargetPreview } from "../client/src/renderer/feedback.js";
 import { buildGiveUpAction, buildSettingsTabs } from "../client/src/settings_panels.js";
 import { readPredictionEnabled, writePredictionEnabled } from "../client/src/prediction_settings.js";
 import {
@@ -1220,6 +1222,12 @@ class RecordingGraphics extends FakeGraphics {
   }
   lineTo(x, y) {
     this.calls.push(["lineTo", x, y]);
+  }
+  beginFill(color, alpha) {
+    this.calls.push(["beginFill", color, alpha]);
+  }
+  drawCircle(x, y, radius) {
+    this.calls.push(["drawCircle", x, y, radius]);
   }
 }
 
@@ -2434,6 +2442,19 @@ function fakeAudioContext() {
     ],
     r: [[200, 1498]],
     sm: [[50, 320, 352, 2, 120]],
+    ao: [
+      [
+        60,
+        1,
+        ABILITY_CODE[ABILITY.EKAT_TELEPORT],
+        ABILITY_OBJECT_KIND_CODE[ABILITY_OBJECT_KIND.RETURN_MARKER],
+        384,
+        416,
+        90,
+        7,
+        [45, null, 14, null, null, null],
+      ],
+    ],
     u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
     fg: [1, 2, 3, 1],
     ev: [
@@ -2519,6 +2540,13 @@ function fakeAudioContext() {
       decoded.smokes[0].radiusTiles === 2 &&
       decoded.smokes[0].expiresIn === 120,
     "smoke clouds decode",
+  );
+  assert(
+    decoded.abilityObjects[0].id === 60 &&
+      decoded.abilityObjects[0].kind === ABILITY_OBJECT_KIND.RETURN_MARKER &&
+      decoded.abilityObjects[0].ownerState.earliestReturnTick === 45 &&
+      decoded.abilityObjects[0].ownerState.radius === 14,
+    "ability objects decode",
   );
   assert(
     decoded.visibleTiles.join(",") === "1,1,0,0,0,1",
@@ -5184,6 +5212,87 @@ function fakeAudioContext() {
       calls[i + 1]?.[2] > pointFireInput.state.abilityTargetPreview.mouseY,
   );
   assert(invalidDiagonalStroke, "Point Fire invalid minimum-range cursor draws an X");
+
+  const ekatEntity = { id: 88, owner: 1, kind: KIND.EKAT, x: 200, y: 220 };
+  const ekatInput = Object.create(Input.prototype);
+  ekatInput.mouse = { x: 360, y: 236 };
+  ekatInput.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    commandTarget: { kind: "ability", ability: ABILITY.EKAT_LINE_SHOT },
+    abilityObjects: [
+      {
+        id: 901,
+        owner: 1,
+        ability: ABILITY.EKAT_LINE_SHOT,
+        kind: ABILITY_OBJECT_KIND.MAGIC_ANCHOR,
+        x: 260,
+        y: 260,
+        ownerState: { radius: 12 },
+      },
+      {
+        id: 902,
+        owner: 2,
+        ability: ABILITY.EKAT_LINE_SHOT,
+        kind: ABILITY_OBJECT_KIND.MAGIC_ANCHOR,
+        x: 280,
+        y: 280,
+      },
+    ],
+    selectedEntities: () => [ekatEntity],
+    updateAbilityTargetPreview(preview) {
+      this.abilityTargetPreview = preview;
+    },
+  };
+  ekatInput._worldAt = (x, y) => ({ x, y });
+  ekatInput._refreshAbilityTargetPreview();
+  assert(ekatInput.state.abilityTargetPreview?.pathOrigins.length === 2, "Ekat line preview includes caster plus owned anchor origin");
+  assert(
+    ekatInput.state.abilityTargetPreview.pathOrigins.some((origin) => origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR),
+    "Ekat line preview marks anchor origin kind",
+  );
+
+  const returnInput = Object.create(Input.prototype);
+  returnInput.mouse = { x: 420, y: 260 };
+  returnInput.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    commandTarget: { kind: "ability", ability: ABILITY.EKAT_TELEPORT },
+    abilityObjects: [
+      {
+        id: 903,
+        owner: 1,
+        ability: ABILITY.EKAT_TELEPORT,
+        kind: ABILITY_OBJECT_KIND.RETURN_MARKER,
+        x: 180,
+        y: 190,
+        expiresIn: 70,
+      },
+    ],
+    selectedEntities: () => [ekatEntity],
+    updateAbilityTargetPreview(preview) {
+      this.abilityTargetPreview = preview;
+    },
+  };
+  returnInput._worldAt = (x, y) => ({ x, y });
+  returnInput._refreshAbilityTargetPreview();
+  assert(returnInput.state.abilityTargetPreview?.returnMarkers[0]?.id === 903, "Ekat dash preview exposes owned return marker preview");
+
+  const abilityObjectGfx = new RecordingGraphics();
+  _drawAbilityObjects.call(
+    { _abilityObjectGfx: abilityObjectGfx, _map: { tileSize: 32 } },
+    {
+      abilityObjects: [
+        { id: 904, kind: ABILITY_OBJECT_KIND.RETURN_MARKER, x: 128, y: 144 },
+        { id: 905, kind: ABILITY_OBJECT_KIND.MAGIC_ANCHOR, x: 160, y: 192, ownerState: { hp: 80, radius: 16 } },
+      ],
+    },
+  );
+  assert(
+    abilityObjectGfx.calls.some((call) => call[0] === "drawCircle" && call[1] === 128 && call[2] === 144) &&
+      abilityObjectGfx.calls.some((call) => call[0] === "beginFill"),
+    "ability object renderer draws return marker and anchor placeholders",
+  );
 }
 
 {

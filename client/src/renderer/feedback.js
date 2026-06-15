@@ -15,7 +15,17 @@ import {
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
-import { ABILITY, KIND, ORDER_STAGE, SETUP, STATE, isBuilding, isResource, isUnit } from "../protocol.js";
+import {
+  ABILITY,
+  ABILITY_OBJECT_KIND,
+  KIND,
+  ORDER_STAGE,
+  SETUP,
+  STATE,
+  isBuilding,
+  isResource,
+  isUnit,
+} from "../protocol.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
   SWEEP_EVICT_FRAMES,
@@ -56,6 +66,9 @@ import {
 
 const MORTAR_WARNING_COLOR = 0x9f1f1f;
 const FIELD_OF_FIRE_COLOR = 0x4aa3ff;
+const ABILITY_RETURN_MARKER_COLOR = 0x82d8ff;
+const ABILITY_ANCHOR_COLOR = 0xc7d07a;
+const ABILITY_PROJECTILE_COLOR = 0xd47a5f;
 
 export function _drawPlacement(state, fog) {
   const g = this._placementGfx;
@@ -326,8 +339,9 @@ export function _drawAbilityTargetPreview(state) {
   const g = this._feedbackGfx;
   const rangeColor = FIELD_OF_FIRE_COLOR;
   const minRangeColor = 0x8f2d2a;
+  const rangeOrigins = Array.isArray(preview.rangeOrigins) ? preview.rangeOrigins : preview.carriers;
 
-  for (const carrier of preview.carriers) {
+  for (const carrier of rangeOrigins) {
     if (!finiteNumber(carrier.x) || !finiteNumber(carrier.y)) continue;
     const facing = Math.atan2(preview.mouseY - carrier.y, preview.mouseX - carrier.x);
     if (preview.ability === ABILITY.POINT_FIRE && Number.isFinite(facing)) {
@@ -367,6 +381,29 @@ export function _drawAbilityTargetPreview(state) {
     }
   }
 
+  if (Array.isArray(preview.returnMarkers)) {
+    for (const marker of preview.returnMarkers) {
+      if (!finiteNumber(marker.x) || !finiteNumber(marker.y)) continue;
+      drawReturnMarker(g, marker.x, marker.y, marker.radiusPx || 13, ABILITY_RETURN_MARKER_COLOR, 0.72);
+      g.lineStyle(1.5, ABILITY_RETURN_MARKER_COLOR, 0.45);
+      dashedLine(g, marker.x, marker.y, preview.mouseX, preview.mouseY, 8, 6);
+    }
+  }
+
+  if (Array.isArray(preview.pathOrigins)) {
+    for (const origin of preview.pathOrigins) {
+      if (!finiteNumber(origin.x) || !finiteNumber(origin.y)) continue;
+      const color = origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR
+        ? ABILITY_ANCHOR_COLOR
+        : FIELD_OF_FIRE_COLOR;
+      g.lineStyle(2, color, origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR ? 0.72 : 0.55);
+      dashedLine(g, origin.x, origin.y, preview.mouseX, preview.mouseY, 10, 5);
+      g.beginFill(color, 0.2);
+      g.drawCircle(origin.x, origin.y, origin.radiusPx || 6);
+      g.endFill();
+    }
+  }
+
   const cursorInvalid = preview.hoverInsideMinRange === true;
   const cursorColor = preview.hoverInRange ? COLORS.selectOwn : cursorInvalid ? minRangeColor : COLORS.selectNeutral;
   const radiusPx = preview.radiusPx || 24;
@@ -387,6 +424,56 @@ export function _drawAbilityTargetPreview(state) {
     g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
     g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
   }
+}
+
+export function _drawAbilityObjects(state) {
+  const objects = state?.abilityObjects;
+  if (!Array.isArray(objects) || objects.length === 0) return;
+  const g = this._abilityObjectGfx;
+  if (!g) return;
+  const ts = (this._map && this._map.tileSize) || 32;
+
+  for (const object of objects) {
+    if (!finiteNumber(object?.x) || !finiteNumber(object?.y)) continue;
+    if (object.kind === ABILITY_OBJECT_KIND.RETURN_MARKER) {
+      drawReturnMarker(g, object.x, object.y, 13, ABILITY_RETURN_MARKER_COLOR, 0.82);
+    } else if (object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR) {
+      drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * 0.38));
+    } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE) {
+      const r = Math.max(5, object.ownerState?.radius || ts * 0.18);
+      g.lineStyle(2, ABILITY_PROJECTILE_COLOR, 0.75);
+      g.beginFill(ABILITY_PROJECTILE_COLOR, 0.18);
+      g.drawCircle(object.x, object.y, r);
+      g.endFill();
+    }
+  }
+}
+
+function drawReturnMarker(g, x, y, radius, color, alpha) {
+  g.lineStyle(2, color, alpha);
+  g.beginFill(color, 0.09);
+  g.drawCircle(x, y, radius);
+  g.endFill();
+  g.moveTo(x, y - radius * 0.7);
+  g.lineTo(x + radius * 0.7, y);
+  g.lineTo(x, y + radius * 0.7);
+  g.lineTo(x - radius * 0.7, y);
+  g.lineTo(x, y - radius * 0.7);
+}
+
+function drawMagicAnchor(g, object, radius) {
+  const hp = object.ownerState?.hp;
+  const hpAlpha = typeof hp === "number" ? Math.max(0.35, Math.min(1, hp / 100)) : 0.78;
+  g.lineStyle(2.4, ABILITY_ANCHOR_COLOR, hpAlpha);
+  g.beginFill(ABILITY_ANCHOR_COLOR, 0.16);
+  g.moveTo(object.x, object.y - radius);
+  g.lineTo(object.x + radius * 0.8, object.y);
+  g.lineTo(object.x, object.y + radius);
+  g.lineTo(object.x - radius * 0.8, object.y);
+  g.lineTo(object.x, object.y - radius);
+  g.endFill();
+  g.lineStyle(1.5, 0x11110f, 0.45);
+  g.drawCircle(object.x, object.y, radius * 0.46);
 }
 
 function fieldOfFireProfile(kind, tileSize) {
