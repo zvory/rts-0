@@ -18,6 +18,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::EntityStore;
@@ -113,6 +114,7 @@ pub(crate) fn run_tick(
     rng: &mut SmallRng,
     lingering_sight: &mut Vec<LingeringSightSource>,
     smokes: &mut SmokeCloudStore,
+    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
     active_construction_sites: &mut BTreeSet<u32>,
@@ -259,6 +261,9 @@ pub(crate) fn run_tick(
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         artillery_shells.resolve_due(entities, &teams, fog, events, tick);
     });
+    crate::perf::timed(perf.as_deref_mut(), "ability_runtime", || {
+        ability_runtime.tick(entities, tick);
+    });
     crate::perf::timed(perf.as_deref_mut(), "hero_regeneration", || {
         services::hero::hero_regeneration_system(entities, tick);
     });
@@ -347,6 +352,7 @@ mod tests {
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         let mut lingering_sight = Vec::new();
         let mut smokes = SmokeCloudStore::new();
+        let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         let mut active_construction_sites = BTreeSet::new();
@@ -376,6 +382,7 @@ mod tests {
             &mut SmallRng::seed_from_u64(0),
             &mut lingering_sight,
             &mut smokes,
+            &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,
             &mut active_construction_sites,

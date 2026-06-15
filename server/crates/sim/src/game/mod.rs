@@ -9,6 +9,7 @@
 //! enemy entities on tiles they currently see.
 
 pub(crate) mod ability;
+pub(crate) mod ability_runtime;
 mod analysis;
 mod artillery;
 mod building_memory;
@@ -40,6 +41,7 @@ use crate::protocol::{
     ResourceDelta, ResourceNode, Snapshot, StartPayload, DEFAULT_FACTION_ID,
 };
 use crate::rules::{economy as economy_rules, projection};
+use ability_runtime::AbilityRuntime;
 use serde::{Deserialize, Serialize};
 
 use artillery::ArtilleryShellStore;
@@ -142,6 +144,8 @@ pub struct Game {
     lingering_sight: Vec<LingeringSightSource>,
     /// Neutral smoke clouds that block authoritative fog and combat LOS without being entities.
     smokes: SmokeCloudStore,
+    /// Persistent ability runtime state that is not a normal entity or one-off projectile event.
+    ability_runtime: AbilityRuntime,
     /// Delayed mortar shell impacts waiting to resolve area damage.
     mortar_shells: MortarShellStore,
     /// Delayed artillery shell impacts waiting to resolve area damage.
@@ -221,6 +225,7 @@ impl Game {
             &mut self.rng,
             &mut self.lingering_sight,
             &mut self.smokes,
+            &mut self.ability_runtime,
             &mut self.mortar_shells,
             &mut self.artillery_shells,
             &mut self.active_construction_sites,

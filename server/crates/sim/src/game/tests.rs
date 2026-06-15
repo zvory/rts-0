@@ -211,6 +211,84 @@ fn empty_flat_game(players: &[PlayerInit]) -> Game {
 }
 
 #[test]
+fn replay_keyframe_clone_preserves_ability_runtime_state() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: "kriegsia".to_string(),
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = empty_flat_game(&players);
+    let caster = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, 128.0, 128.0)
+        .expect("caster should spawn");
+    let object_id = game
+        .ability_runtime
+        .spawn_world_object(ability_runtime::AbilityWorldObjectSpec {
+            owner: 1,
+            caster_id: caster,
+            ability: ability::AbilityKind::EkatTeleport,
+            kind: ability_runtime::AbilityWorldObjectKind::ReturnMarker,
+            x: 128.0,
+            y: 128.0,
+            created_tick: 0,
+            expires_tick: 30,
+            payload: ability_runtime::AbilityObjectPayload::DashReturn {
+                earliest_return_tick: 1,
+            },
+        })
+        .expect("ability object should spawn");
+
+    let clone = game.clone_for_replay_keyframe();
+
+    assert_eq!(
+        clone
+            .ability_runtime
+            .world_objects()
+            .map(|object| object.id.get())
+            .collect::<Vec<_>>(),
+        vec![object_id]
+    );
+}
+
+#[test]
+fn game_tick_cleans_up_expired_ability_runtime_state() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: "kriegsia".to_string(),
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = empty_flat_game(&players);
+    let caster = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, 128.0, 128.0)
+        .expect("caster should spawn");
+    game.ability_runtime
+        .spawn_world_object(ability_runtime::AbilityWorldObjectSpec {
+            owner: 1,
+            caster_id: caster,
+            ability: ability::AbilityKind::EkatTeleport,
+            kind: ability_runtime::AbilityWorldObjectKind::ReturnMarker,
+            x: 128.0,
+            y: 128.0,
+            created_tick: 0,
+            expires_tick: 1,
+            payload: ability_runtime::AbilityObjectPayload::None,
+        })
+        .expect("ability object should spawn");
+
+    game.tick();
+
+    assert_eq!(game.ability_runtime.world_objects().count(), 0);
+}
+
+#[test]
 fn snapshot_projects_abilities_from_owner_faction_catalog() {
     let players = [PlayerInit {
         id: 1,
