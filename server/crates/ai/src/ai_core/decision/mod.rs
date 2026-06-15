@@ -461,6 +461,30 @@ where
         });
     }
 
+    if production_uses_building(production_policy, EntityKind::Factory)
+        && facts.building_count(EntityKind::Factory)
+            + planned_in_intents(&intents, EntityKind::Factory)
+            < profile.buildings.factory_target
+        && !expansion_blocks_tech_path
+        && !save_for_unplanned_expansion
+        && planned_in_intents(&intents, EntityKind::Factory) == 0
+        && try_build_kind(
+            observation,
+            &facts,
+            &mut actions,
+            &builder_pools,
+            profile,
+            EntityKind::Factory,
+            build_search,
+            &mut placeable,
+        )
+        .is_some()
+    {
+        intents.push(AiIntent::Build {
+            kind: EntityKind::Factory,
+        });
+    }
+
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
     let save_worker_training_for_tech = defensive_panic.active
         || save_for_unplanned_expansion
