@@ -1,6 +1,6 @@
 # Phase 1 - Local Nextest Runner
 
-Status: Draft.
+Status: Done.
 
 ## Goal
 
@@ -38,14 +38,14 @@ package-by-package timing wrapper as a recommended diagnostic path.
 
 ## Implementation Checklist
 
-- [ ] Inspect the current Rust workspace for doctests.
-- [ ] Add nextest configuration with clear CI/local output defaults.
-- [ ] Replace the Rust `cargo test` call in `tests/run-all.sh` with nextest.
-- [ ] Keep `RTS_FULL_AI_TESTS=1` behavior working through nextest for full AI coverage.
-- [ ] Remove the package-by-package timing environment flag and stale help text.
-- [ ] Delete or clearly retire the package timing script if nothing still calls it.
-- [ ] Update docs to tell developers to install and use nextest.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Inspect the current Rust workspace for doctests.
+- [x] Add nextest configuration with clear CI/local output defaults.
+- [x] Replace the Rust `cargo test` call in `tests/run-all.sh` with nextest.
+- [x] Keep `RTS_FULL_AI_TESTS=1` behavior working through nextest for full AI coverage.
+- [x] Remove the package-by-package timing environment flag and stale help text.
+- [x] Delete or clearly retire the package timing script if nothing still calls it.
+- [x] Update docs to tell developers to install and use nextest.
+- [x] Mark this phase done in the implementation commit.
 
 ## Focused Verification
 

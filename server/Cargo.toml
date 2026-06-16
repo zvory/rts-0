@@ -82,7 +82,7 @@ lto = "thin"
 # the hardening tests rely on (a bad Build coord must panic, not silently wrap)
 # while slashing test wall time. Dependencies get full optimization so the cold
 # compile stays reasonable. Build and test share this profile, so `cargo build`
-# followed by `cargo test` only rebuilds the test harness.
+# followed by `cargo nextest run` only rebuilds the test harness.
 [profile.dev]
 opt-level = 1
 overflow-checks = true

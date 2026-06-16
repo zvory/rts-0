@@ -203,7 +203,7 @@ Read [docs/context/testing.md](context/testing.md) before deciding which suites 
 
 Minimum verification before merge:
 
-- [ ] `cd server && cargo test`
+- [ ] `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default`
 - [ ] `node tests/server_integration.mjs` with a running server, if server/client integration changed.
 - [ ] `node tests/regression.mjs` with a running server, if protocol, hardening, or network behavior
       changed.

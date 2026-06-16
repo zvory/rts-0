@@ -19,8 +19,9 @@ snapshots. Replay and live play use the same typed command application path, so 
 the recorded command artifact and the deterministic simulation ordering. Entity iteration and A*
 tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
 
-**Fast/full AI split.** Plain `cargo test` keeps the self-play harness in the default gate, but only
-runs the fast scripted coverage. Long profile-backed and real-AI self-play tests return early unless
+**Fast/full AI split.** Plain `cargo nextest run --config-file .config/nextest.toml --manifest-path
+server/Cargo.toml --profile default` keeps the self-play harness in the default gate, but only runs
+the fast scripted coverage. Long profile-backed and real-AI self-play tests return early unless
 `RTS_FULL_AI_TESTS=1` is set; `tests/run-all.sh --full-ai` enables that mode for the full
 orchestrator.
 `RTS_SELFPLAY_FULL=1` remains accepted as an alias for manual self-play runs. Use full AI coverage
@@ -28,8 +29,9 @@ when touching AI strategy, profile-backed self-play, replay determinism, or bala
 depends on long matches.
 
 **Profile-backed coverage.** The long profile-backed tests spawn AI-profile players through the
-self-play adapter and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo test`. The profiles
-gather steel and oil, construct supply and tech structures, train Riflemen and Tanks, and launch
+self-play adapter and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo nextest run
+--config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default`. The
+profiles gather steel and oil, construct supply and tech structures, train Riflemen and Tanks, and launch
 attack-move waves at public enemy start tiles. The self-play adapter owns harness-only state such as
 pending build intents, failed build spots, and staging/attack guards needed to interpret
 fog-filtered snapshots without duplicating profile strategy logic. The harness checks per-tick
@@ -69,7 +71,9 @@ cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
-Keep fast invariant-style milestone coverage in `cargo test`; use `RTS_FULL_AI_TESTS=1 cargo test`
+Keep fast invariant-style milestone coverage in `cargo nextest run`; use
+`RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
+server/Cargo.toml --profile default`
 for the long regression gate and the CLI for balance exploration, seed sweeps, and strategy result
 sampling.
 
@@ -95,7 +99,7 @@ suites.
   suites.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
   changed behavior that crosses the room/network boundary.
-- Team-aware authored start assignment is covered by `cargo test map --workspace` for deterministic
+- Team-aware authored start assignment is covered by `cargo nextest run map` for deterministic
   FFA compatibility, current authored map proximity, 1v2/1v3 team layouts, synthetic larger layouts,
   start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
   live lobby/start contract.
@@ -105,7 +109,9 @@ suites.
   no-ops, allied attack rejection, and team victory/game-over semantics. `tests/run-all.sh --no-rust`
   includes this suite in the live Node API pass, so a final local gate already exercises it.
 - `rts-ai`: run AI package tests and `node tests/ai_integration.mjs`. Run
-  `RTS_FULL_AI_TESTS=1 cargo test` or `tests/run-all.sh --full-ai` when strategy profiles,
+  `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
+  server/Cargo.toml --profile default` or
+  `tests/run-all.sh --full-ai` when strategy profiles,
   profile-backed self-play, replay determinism, or long-match balance behavior changed.
   Default AI package coverage includes team-safety assertions for `teamId` observation,
   visible-ally exclusion from `visible_enemies`, allied-start exclusion from public enemy base /
