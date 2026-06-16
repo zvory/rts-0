@@ -19,6 +19,8 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
 - `tests/run-all.sh --full-ai` — local gate plus long AI self-play/simulation coverage
 - `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files
+- `node scripts/check-wiki.mjs` — wiki route hardening, internal links, generated stats table
+  completeness, and faction catalog parity
 - `node scripts/check-crate-boundaries.mjs` — enforce crate dependency direction
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
   enforce `rts-sim::game` internal architecture ratchets

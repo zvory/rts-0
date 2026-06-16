@@ -936,6 +936,40 @@ mod tests {
     }
 
     #[test]
+    fn generated_stats_table_set_is_complete_and_nonempty() {
+        let tables = build_stats_tables();
+        let titles = tables.iter().map(|table| table.title).collect::<Vec<_>>();
+        assert_eq!(
+            titles,
+            vec![
+                "Units",
+                "Buildings",
+                "Resource Nodes",
+                "Faction Catalogs",
+                "Trainables By Faction",
+                "Buildables By Faction",
+                "Upgrades By Faction",
+                "Abilities By Faction",
+            ]
+        );
+        for table in tables {
+            assert!(
+                !table.rows.is_empty(),
+                "{} should expose at least one generated row",
+                table.title
+            );
+            for row in &table.rows {
+                assert_eq!(
+                    row.len(),
+                    table.columns.len(),
+                    "{} row should match column count",
+                    table.title
+                );
+            }
+        }
+    }
+
+    #[test]
     fn generated_stats_table_renderer_escapes_cells() {
         let rendered = render_stats_tables(&[StatsTable {
             title: "Escaping",
@@ -1040,6 +1074,21 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn wiki_unsupported_paths_are_not_found() {
+        for uri in [
+            "/wiki/server/Cargo.toml",
+            "/wiki/docs/context/README.txt",
+            "/wiki/docs/assets/logo.md",
+        ] {
+            let response = wiki_router()
+                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{uri}");
+        }
     }
 
     #[tokio::test]

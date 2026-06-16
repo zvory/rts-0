@@ -15,6 +15,7 @@ then refresh the capsule's section list if structure changed.
 | Costs, supply, sight, unit/building stats           | [balance.md](balance.md)               |
 | Node integration tests, regression, client smoke    | [testing.md](testing.md)               |
 | Hardening limits, server bind, build/run pipeline   | [deployment.md](deployment.md)         |
+| Server wiki route and generated stats reference     | [deployment.md](deployment.md)         |
 | Match history persistence and `/api/matches`        | [match-history.md](match-history.md)   |
 | Multi-phase or phased implementation planning       | [planning.md](planning.md)             |
 
