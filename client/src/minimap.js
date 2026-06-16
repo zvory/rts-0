@@ -49,6 +49,7 @@ export class Minimap {
    * @param {import("./camera.js").Camera} camera the game camera (for the viewport rect + recenter).
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
    * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
+   * @param {import("./client_intent.js").ClientIntent} [options.clientIntent] browser-local command/placement intent facade.
    */
   constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter = null, options = {}) {
     this.canvas = canvasEl;
@@ -57,6 +58,7 @@ export class Minimap {
     this.camera = camera;
     this.fog = fog;
     this.commandIssuer = commandIssuer;
+    this.clientIntent = options.clientIntent || state?.clientIntent || state;
     this.inputRouter = inputRouter;
     this.commandsEnabled = options.commandsEnabled !== false;
     this._unregisterInputZone = null;
@@ -365,6 +367,14 @@ export class Minimap {
     return issueGameplayCommand(this.commandIssuer, command);
   }
 
+  _intent() {
+    return this.clientIntent || this.state?.clientIntent || this.state;
+  }
+
+  _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
+    return this._intent()?.addCommandFeedback?.(kind, x, y, append, radiusTiles, performance.now());
+  }
+
   inputZone() {
     return {
       priority: 100,
@@ -419,13 +429,13 @@ export class Minimap {
     } else if (ev.button === 0) {
       ev.originalEvent?.preventDefault();
       // Left-click while a command target is armed: issue the command instead of panning.
-      if (this.state.commandTarget) {
+      if (this._intent()?.commandTarget) {
         this._issueOrder(w.x, w.y, !!ev.shiftKey);
-        const issued = typeof this.state.issueCommandTarget === "function"
-          ? this.state.issueCommandTarget(ev)
+        const issued = typeof this._intent()?.issueCommandTarget === "function"
+          ? this._intent().issueCommandTarget(ev)
           : { keepArmed: false };
         if (!issued.keepArmed) {
-          this.state.endCommandTarget();
+          this._intent()?.endCommandTarget?.();
         }
         return true;
       }
@@ -471,6 +481,7 @@ export class Minimap {
 
   /** Issue the minimap's current command to the world point for any selected own units. */
   _issueOrder(wx, wy, queued = false) {
+    const commandTarget = this._intent()?.commandTarget;
     const sel = this.state.selectedEntities() || [];
     const unitIds = [];
     for (const e of sel) {
@@ -484,20 +495,20 @@ export class Minimap {
         .filter((e) => ownOwner(this.state, e.owner) && isProducerBuilding(e.kind))
         .map((e) => e.id);
       if (producers.length === 0) return;
-      const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
+      const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
       for (const building of producers) {
         this._issueCommand(cmd.setRally(building, wx, wy, queued, kind));
       }
-      this.state.addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
+      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
       return;
     }
-    if (this.state.commandTarget === "attack") {
+    if (commandTarget === "attack") {
       this._issueCommand(cmd.attackMove(unitIds, wx, wy, queued));
-      this.state.addCommandFeedback("attack", wx, wy, queued);
+      this._addCommandFeedback("attack", wx, wy, queued);
       return;
     }
-    if (this.state.commandTarget?.kind === "ability") {
-      const ability = this.state.commandTarget.ability;
+    if (commandTarget?.kind === "ability") {
+      const ability = commandTarget.ability;
       const definition = ABILITIES[ability];
       const carriers = definition?.carriers;
       const abilityUnits = Array.isArray(carriers)
@@ -507,11 +518,11 @@ export class Minimap {
         : unitIds;
       if (abilityUnits.length === 0) return;
       this._issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
-      this.state.addCommandFeedback("attack", wx, wy, queued);
+      this._addCommandFeedback("attack", wx, wy, queued);
       return;
     }
     this._issueCommand(cmd.move(unitIds, wx, wy, queued));
-    this.state.addCommandFeedback("move", wx, wy, queued);
+    this._addCommandFeedback("move", wx, wy, queued);
   }
 }
 

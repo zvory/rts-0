@@ -14,14 +14,15 @@ import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_
 import { commandHotkeyFromEvent } from "./placement.js";
 
 export function _onRightClick(p, ev = {}) {
+  const intent = clientIntent(this);
   // During placement, right-click cancels.
-  if (this.state.placement) {
-    this.state.endPlacement();
+  if (intent?.placement) {
+    intent.endPlacement?.();
     return;
   }
   // Right-click also cancels a pending command-card target (consistent with Esc).
-  if (this.state.commandTarget) {
-    this.state.endCommandTarget();
+  if (intent?.commandTarget) {
+    intent.endCommandTarget?.();
     return;
   }
 
@@ -37,7 +38,7 @@ export function _onRightClick(p, ev = {}) {
       for (const building of producers) {
         this._issueCommand(cmd.setRally(building, world.x, world.y, queued, ORDER_STAGE.MOVE));
       }
-      this.state.addCommandFeedback("move", world.x, world.y, queued);
+      this._addCommandFeedback("move", world.x, world.y, queued);
     }
     return;
   }
@@ -48,7 +49,7 @@ export function _onRightClick(p, ev = {}) {
     const resource = this._resourceAtWorld(world.x, world.y);
     if (resource && resource.remaining !== 0) {
       this._issueCommand(cmd.gather(workers, resource.id, queued));
-      this.state.addCommandFeedback("move", world.x, world.y, queued);
+      this._addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
   }
@@ -58,57 +59,59 @@ export function _onRightClick(p, ev = {}) {
     const resume = _resumeConstructionIntent(target, this.state.map);
     if (resume && workers.length > 0) {
       this._issueCommand(cmd.build(workers, resume.building, resume.tileX, resume.tileY, queued));
-      this.state.addCommandFeedback("move", target.x, target.y, queued);
+      this._addCommandFeedback("move", target.x, target.y, queued);
       return;
     }
   }
   if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
     // Enemy entity -> attack.
     this._issueCommand(cmd.attack(ownUnits, target.id, queued));
-    this.state.addCommandFeedback("attack", target.x, target.y, queued);
+    this._addCommandFeedback("attack", target.x, target.y, queued);
     return;
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
     // Resource node -> gather, but only with the workers in the selection.
     if (workers.length > 0) {
       this._issueCommand(cmd.gather(workers, target.id, queued));
-      this.state.addCommandFeedback("move", world.x, world.y, queued);
+      this._addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
     // Selection has no workers: fall through to a move onto the node's position.
   }
   // Default -> move to the world point.
   this._issueCommand(cmd.move(ownUnits, world.x, world.y, queued));
-  this.state.addCommandFeedback("move", world.x, world.y, queued);
+  this._addCommandFeedback("move", world.x, world.y, queued);
 }
 
 export function _issueTargetedCommand(p, ev = {}) {
+  const intent = clientIntent(this);
+  const commandTarget = intent?.commandTarget;
   const ownUnits = this._selectedOwnUnitIds();
   const producers = ownUnits.length === 0 ? this._selectedProducerBuildingIds() : [];
   const world = this._worldAt(p.x, p.y);
   if (ownUnits.length === 0) {
     if (producers.length === 0) return;
     const queued = !!ev.shiftKey;
-    if (this.state.commandTarget === "move" || this.state.commandTarget === "attack") {
-      const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
+    if (commandTarget === "move" || commandTarget === "attack") {
+      const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
       for (const building of producers) {
         this._issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
       }
-      this.state.addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
+      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
     }
     return;
   }
-  if (this.state.commandTarget === "setupAntiTankGuns") {
+  if (commandTarget === "setupAntiTankGuns") {
     const antiTankGuns = this._selectedOwnAntiTankGunIds();
     if (antiTankGuns.length > 0) {
       const queued = !!ev.shiftKey;
       this._issueCommand(cmd.setupAntiTankGuns(antiTankGuns, world.x, world.y, queued));
-      this.state.addCommandFeedback("move", world.x, world.y, queued);
+      this._addCommandFeedback("move", world.x, world.y, queued);
     }
     return;
   }
-  if (this.state.commandTarget?.kind === "ability") {
-    const ability = this.state.commandTarget.ability;
+  if (commandTarget?.kind === "ability") {
+    const ability = commandTarget.ability;
     const definition = ABILITIES[ability];
     const carriers = definition?.carriers;
     const units = Array.isArray(carriers)
@@ -122,7 +125,7 @@ export function _issueTargetedCommand(p, ev = {}) {
       ? cmd.pointFire(units, world.x, world.y, !!ev.shiftKey)
       : cmd.useAbility(ability, units, world.x, world.y, !!ev.shiftKey);
     this._issueCommand(command);
-    this.state.addCommandFeedback(
+    this._addCommandFeedback(
       ability === ABILITY.MORTAR_FIRE ? "mortar" : ability === ABILITY.POINT_FIRE ? "artillery" : "attack",
       world.x,
       world.y,
@@ -131,21 +134,21 @@ export function _issueTargetedCommand(p, ev = {}) {
     );
     return;
   }
-  if (this.state.commandTarget === "move") {
+  if (commandTarget === "move") {
     this._issueCommand(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
-    this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
+    this._addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
     return;
   }
 
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
   if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
     this._issueCommand(cmd.attack(ownUnits, target.id, !!ev.shiftKey));
-    this.state.addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
+    this._addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     return;
   }
 
   this._issueCommand(cmd.attackMove(ownUnits, world.x, world.y, !!ev.shiftKey));
-  this.state.addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
+  this._addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
 }
 
 export function _selectedOwnUnitIds() {
@@ -196,21 +199,22 @@ function _resumeConstructionIntent(target, map) {
 }
 
 export function _refreshAbilityTargetPreview() {
-  const target = this.state.commandTarget;
+  const intent = clientIntent(this);
+  const target = intent?.commandTarget;
   if (!target || target.kind !== "ability" || !this.mouse) {
-    this.state.updateAbilityTargetPreview(null);
+    intent?.updateAbilityTargetPreview?.(null);
     return;
   }
   const definition = ABILITIES[target.ability];
   if (!definition || !Array.isArray(definition.carriers) || !definition.rangeTiles) {
-    this.state.updateAbilityTargetPreview(null);
+    intent?.updateAbilityTargetPreview?.(null);
     return;
   }
   const carriers = this.state
     .selectedEntities()
     .filter((e) => ownOwner(this.state, e.owner) && definition.carriers.includes(e.kind));
   if (carriers.length === 0) {
-    this.state.updateAbilityTargetPreview(null);
+    intent?.updateAbilityTargetPreview?.(null);
     return;
   }
   const tileSize = this.state.map?.tileSize || 32;
@@ -268,7 +272,7 @@ export function _refreshAbilityTargetPreview() {
     y: carrier.y,
     radiusPx: Math.max(5, (STATS[carrier.kind]?.size || 8) * 0.45),
   }));
-  this.state.updateAbilityTargetPreview({
+  intent?.updateAbilityTargetPreview?.({
     ability: target.ability,
     mouseX: world.x,
     mouseY: world.y,
@@ -287,42 +291,44 @@ export function _refreshAbilityTargetPreview() {
 }
 
 export function _refreshAntiTankGunSetupPreview() {
-  if (!this.mouse || this.state.commandTarget !== "setupAntiTankGuns") {
-    this.state.updateAntiTankGunSetupPreview(null);
+  const intent = clientIntent(this);
+  if (!this.mouse || intent?.commandTarget !== "setupAntiTankGuns") {
+    intent?.updateAntiTankGunSetupPreview?.(null);
     return;
   }
   const guns = this.state
     .selectedEntities()
     .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY));
   if (guns.length === 0) {
-    this.state.updateAntiTankGunSetupPreview(null);
+    intent?.updateAntiTankGunSetupPreview?.(null);
     return;
   }
   const world = this._worldAt(this.mouse.x, this.mouse.y);
-  this.state.updateAntiTankGunSetupPreview({ mouseX: world.x, mouseY: world.y, guns });
+  intent?.updateAntiTankGunSetupPreview?.({ mouseX: world.x, mouseY: world.y, guns });
 }
 
 export function _refreshResourceMiningPreview() {
-  if (this._drag || this.state.commandTarget || !this.mouse || this._selectedWorkerIds().length === 0) {
-    this.state.updateResourceMiningPreview(null);
+  const intent = clientIntent(this);
+  if (this._drag || intent?.commandTarget || !this.mouse || this._selectedWorkerIds().length === 0) {
+    intent?.updateResourceMiningPreview?.(null);
     return;
   }
 
   const world = this._worldAt(this.mouse.x, this.mouse.y);
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
   if (!target || !isResource(target.kind) || target.remaining === 0) {
-    this.state.updateResourceMiningPreview(null);
+    intent?.updateResourceMiningPreview?.(null);
     return;
   }
 
   const nearest = this._nearestOwnCompletedCityCentre(target.x, target.y);
   if (!nearest) {
-    this.state.updateResourceMiningPreview(null);
+    intent?.updateResourceMiningPreview?.(null);
     return;
   }
 
   const rangePx = MINING_CC_RANGE_TILES * (this.state.map?.tileSize || DEFAULT_TILE_SIZE);
-  this.state.updateResourceMiningPreview({
+  intent?.updateResourceMiningPreview?.({
     resourceId: target.id,
     resourceX: target.x,
     resourceY: target.y,
@@ -391,35 +397,41 @@ export function _activateCommandHotkey(ev) {
       commandId: btn.dataset.commandId || null,
       hotkey: btn.dataset.hotkey || null,
       slotIndex: btn.dataset.slotIndex != null ? Number(btn.dataset.slotIndex) : null,
-      armed: this.state?.lastCommandTargetArm || null,
+      armed: clientIntent(this)?.lastCommandTargetArm || null,
     };
   }
   return false;
 }
 
 export function _quickCastCommandTarget(ev = {}) {
-  if (!this.state.commandTarget || !this.mouse) return false;
+  const intent = clientIntent(this);
+  if (!intent?.commandTarget || !this.mouse) return false;
   this._issueTargetedCommand(this.mouse, ev);
-  const issued = typeof this.state.issueCommandTarget === "function"
-    ? this.state.issueCommandTarget(ev)
+  const issued = typeof intent.issueCommandTarget === "function"
+    ? intent.issueCommandTarget(ev)
     : { keepArmed: false };
   if (!issued.keepArmed) {
-    this.state.endCommandTarget();
+    intent.endCommandTarget?.();
   }
   return true;
 }
 
 export function _cancel() {
-  if (typeof this.state.closeCommandCardMenu === "function" && this.state.closeCommandCardMenu()) {
+  const intent = clientIntent(this);
+  if (typeof intent?.closeCommandCardMenu === "function" && intent.closeCommandCardMenu()) {
     return;
   }
-  if (this.state.placement) {
-    this.state.endPlacement();
+  if (intent?.placement) {
+    intent.endPlacement?.();
     return;
   }
-  if (this.state.commandTarget) {
-    this.state.endCommandTarget();
+  if (intent?.commandTarget) {
+    intent.endCommandTarget?.();
     return;
   }
   this.state.clearSelection();
+}
+
+function clientIntent(input) {
+  return input?.clientIntent || input?.state?.clientIntent || input?.state;
 }

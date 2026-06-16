@@ -39,12 +39,13 @@ export function _handleKeyDown(ev) {
     if (commandHotkey.armed?.quickCast) {
       this._quickCastCommandTarget(ev);
     }
+    const intent = clientIntent(this);
     if (
-      this.state?.commandTarget &&
-      typeof this.state.holdCommandTarget === "function" &&
-      (ev.shiftKey || repeatedWorldAbilityHotkeyTarget(this.state.commandTarget))
+      intent?.commandTarget &&
+      typeof intent.holdCommandTarget === "function" &&
+      (ev.shiftKey || repeatedWorldAbilityHotkeyTarget(intent.commandTarget))
     ) {
-      this.state.holdCommandTarget(this.state.commandTarget, ev.code, ev.shiftKey);
+      intent.holdCommandTarget(intent.commandTarget, ev.code, ev.shiftKey);
     }
     return;
   }
@@ -76,17 +77,17 @@ export function _handleKeyUp(ev) {
       return;
     case "ShiftLeft":
     case "ShiftRight":
-      if (typeof this.state.releaseCommandTargetShift === "function") {
-        this.state.releaseCommandTargetShift();
+      if (typeof clientIntent(this)?.releaseCommandTargetShift === "function") {
+        clientIntent(this).releaseCommandTargetShift();
       }
-      if (this.state.placement && typeof this.state.endPlacement === "function") {
-        this.state.endPlacement();
+      if (clientIntent(this)?.placement && typeof clientIntent(this).endPlacement === "function") {
+        clientIntent(this).endPlacement();
       }
       ev.preventDefault();
       return;
     default:
-      if (this.state.commandTarget && typeof this.state.releaseCommandTargetKey === "function") {
-        this.state.releaseCommandTargetKey(ev.code, ev.shiftKey);
+      if (clientIntent(this)?.commandTarget && typeof clientIntent(this).releaseCommandTargetKey === "function") {
+        clientIntent(this).releaseCommandTargetKey(ev.code, ev.shiftKey);
       }
       return;
   }
@@ -102,13 +103,19 @@ export function _handleBlur() {
     this._spacePan = false;
     this._panDrag = null;
   }
-  if (typeof this.state.endCommandTarget === "function") this.state.endCommandTarget();
-  if (this.state.placement && typeof this.state.endPlacement === "function") this.state.endPlacement();
+  if (typeof clientIntent(this)?.endCommandTarget === "function") clientIntent(this).endCommandTarget();
+  if (clientIntent(this)?.placement && typeof clientIntent(this).endPlacement === "function") {
+    clientIntent(this).endPlacement();
+  }
   if (this._drag) {
     this._drag = null;
     this._dragging = false;
     this.renderer.drawSelectionBox(null);
   }
+}
+
+function clientIntent(input) {
+  return input?.clientIntent || input?.state?.clientIntent || input?.state;
 }
 
 export function _handleWheel(ev) {

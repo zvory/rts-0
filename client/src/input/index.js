@@ -8,9 +8,9 @@
 //       enemy entity   -> cmd.attack
 //       resource node (+ workers in selection) -> cmd.gather
 //       otherwise      -> cmd.move (to a world point)
-//   - Build placement mode (started by the HUD via state.beginPlacement): track the
+//   - Build placement mode (started by the HUD via ClientIntent): track the
 //     hovered tile, validate the footprint, drive the renderer ghost via
-//     state.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
+//     ClientIntent.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
 //   - Keyboard: rendered command-card hotkeys activate buttons directly; custom
 //     profiles change the key labels and matching. Production train/cancel buttons
 //     honor native key repeat; Esc cancels placement/targeting.
@@ -97,15 +97,27 @@ export class Input {
   /**
    * @param {HTMLElement} domElement the #viewport element that receives listeners
    * @param {import("../camera.js").Camera} camera world<->screen transforms & zoom
-   * @param {import("../state.js").GameState} state selection + placement + entities
+   * @param {import("../state.js").GameState} state selection + entities
    * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam
    * @param {import("../renderer/index.js").Renderer} renderer for drawSelectionBox
    * @param {import("../fog.js").Fog} fog kept for parity / future hit-test filtering
    * @param {import("../audio.js").Audio} [audio] optional audio engine for local cues
    * @param {import("./router.js").MatchInputRouter} [inputRouter] optional UI input router
    * @param {import("../hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey profile service.
+   * @param {import("../client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    */
-  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio, inputRouter = null, hotkeyProfiles = null) {
+  constructor(
+    domElement,
+    camera,
+    state,
+    commandIssuer,
+    renderer,
+    fog,
+    audio,
+    inputRouter = null,
+    hotkeyProfiles = null,
+    clientIntent = null,
+  ) {
     this.dom = domElement;
     this.camera = camera;
     this.state = state;
@@ -115,6 +127,7 @@ export class Input {
     this.audio = audio || null;
     this.inputRouter = inputRouter;
     this.hotkeyProfiles = hotkeyProfiles;
+    this.clientIntent = clientIntent || state?.clientIntent || state;
 
     this.cameraNavigation = new CameraNavigationInput(domElement, camera);
     this.keys = this.cameraNavigation.keys;
@@ -226,6 +239,29 @@ export class Input {
     return issueGameplayCommand(this.commandIssuer, command);
   }
 
+  _intent() {
+    return this.clientIntent || this.state?.clientIntent || this.state;
+  }
+
+  _commandTarget() {
+    return this._intent()?.commandTarget;
+  }
+
+  _placement() {
+    return this._intent()?.placement;
+  }
+
+  _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
+    const now = performance.now();
+    if (kind === "mortar" && Number.isFinite(x) && Number.isFinite(y) && Array.isArray(this.state?.pendingMortarTargets)) {
+      this.state.pendingMortarTargets.push({ x, y, createdAt: now });
+      this.state.pendingMortarTargets = this.state.pendingMortarTargets.filter(
+        (p) => now - p.createdAt <= 700,
+      );
+    }
+    return this._intent()?.addCommandFeedback?.(kind, x, y, append, radiusTiles, now);
+  }
+
   /**
    * Per-frame continuous work. Pan-key handling lives on the camera (it reads
    * `this.keys`); placement hover is refreshed here so the ghost tracks the cursor
@@ -235,26 +271,26 @@ export class Input {
   update(dt) {
     void dt;
     this._flushPointerLockCursor();
-    if (this.state.placement) {
-      this.state.updateResourceMiningPreview(null);
-      this.state.updateAntiTankGunSetupPreview(null);
+    if (this._placement()) {
+      this._intent()?.updateResourceMiningPreview?.(null);
+      this._intent()?.updateAntiTankGunSetupPreview?.(null);
       this._refreshPlacement();
       return;
     }
-    if (this.state.commandTarget === "setupAntiTankGuns") {
-      this.state.updateResourceMiningPreview(null);
-      this.state.updateAbilityTargetPreview(null);
+    if (this._commandTarget() === "setupAntiTankGuns") {
+      this._intent()?.updateResourceMiningPreview?.(null);
+      this._intent()?.updateAbilityTargetPreview?.(null);
       this._refreshAntiTankGunSetupPreview();
       return;
     }
-    if (this.state.commandTarget?.kind === "ability") {
-      this.state.updateResourceMiningPreview(null);
-      this.state.updateAntiTankGunSetupPreview(null);
+    if (this._commandTarget()?.kind === "ability") {
+      this._intent()?.updateResourceMiningPreview?.(null);
+      this._intent()?.updateAntiTankGunSetupPreview?.(null);
       this._refreshAbilityTargetPreview();
       return;
     }
-    this.state.updateAbilityTargetPreview(null);
-    this.state.updateAntiTankGunSetupPreview(null);
+    this._intent()?.updateAbilityTargetPreview?.(null);
+    this._intent()?.updateAntiTankGunSetupPreview?.(null);
     this._refreshResourceMiningPreview();
   }
 
@@ -812,18 +848,18 @@ export class Input {
 
   _onLeftDown(p, ev) {
     // Build placement: a valid left-click confirms the build with a selected worker.
-    if (this.state.placement) {
+    if (this._placement()) {
       this._confirmPlacement(ev);
       return;
     }
     // Command-card targeting: the next left-click issues the armed command.
-    if (this.state.commandTarget) {
+    if (this._commandTarget()) {
       this._issueTargetedCommand(p, ev);
-      const issued = typeof this.state.issueCommandTarget === "function"
-        ? this.state.issueCommandTarget(ev)
+      const issued = typeof this._intent()?.issueCommandTarget === "function"
+        ? this._intent().issueCommandTarget(ev)
         : { keepArmed: false };
       if (!issued.keepArmed) {
-        this.state.endCommandTarget();
+        this._intent()?.endCommandTarget?.();
       }
       return;
     }
@@ -835,7 +871,7 @@ export class Input {
 
   _handleMacControlClickSelection(p, ev) {
     if (!ev.ctrlKey || ev.metaKey || !isMacPlatform()) return false;
-    if (this.state.placement || this.state.commandTarget) return false;
+    if (this._placement() || this._commandTarget()) return false;
 
     const world = this._worldAt(p.x, p.y);
     const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
@@ -926,7 +962,7 @@ export class Input {
 
   /**
    * Recompute the hovered tile + validity from the current cursor and push it to
-   * the renderer ghost via state.updatePlacement. Called on every move and each
+   * the renderer ghost via ClientIntent.updatePlacement. Called on every move and each
    * frame while placement is active.
    */
   /**

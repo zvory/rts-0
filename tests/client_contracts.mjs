@@ -1385,6 +1385,42 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(state.abilityTargetPreview === null, "changing command targets clears ability preview state");
   assert(state.issueCommandTarget({}).keepArmed === false, "plain target clicks clear the armed target");
   assert(state.commandTarget === null, "plain target clicks clear the GameState commandTarget shim");
+
+  const explicitHudIntent = new ClientIntent();
+  const facadeHud = Object.create(HUD.prototype);
+  facadeHud.state = {
+    beginPlacement() {
+      throw new Error("HUD must use injected ClientIntent for placement");
+    },
+    beginCommandTarget() {
+      throw new Error("HUD must use injected ClientIntent for command targeting");
+    },
+  };
+  facadeHud.clientIntent = explicitHudIntent;
+  facadeHud.commandIssuer = { issueCommand() {} };
+  facadeHud._dispatchCommandIntent({ type: "openWorkerBuildMenu" });
+  assert(explicitHudIntent.commandCardMode === "workerBuild", "HUD dispatch opens build menu through injected ClientIntent");
+  facadeHud._dispatchCommandIntent({ type: "beginPlacement", building: KIND.DEPOT });
+  assert(explicitHudIntent.placement?.building === KIND.DEPOT, "HUD dispatch starts placement through injected ClientIntent");
+  facadeHud._dispatchCommandIntent({ type: "beginCommandTarget", target: "attack" });
+  assert(explicitHudIntent.commandTarget === "attack", "HUD dispatch arms command targets through injected ClientIntent");
+
+  const explicitInputIntent = new ClientIntent();
+  explicitInputIntent.beginPlacement(KIND.BARRACKS);
+  const facadeInput = Object.create(Input.prototype);
+  let facadeSelectionCleared = 0;
+  facadeInput.state = {
+    endPlacement() {
+      throw new Error("Input must use injected ClientIntent for placement cancellation");
+    },
+    clearSelection() {
+      facadeSelectionCleared += 1;
+    },
+  };
+  facadeInput.clientIntent = explicitInputIntent;
+  facadeInput._cancel();
+  assert(explicitInputIntent.placement === null, "Input cancellation clears placement through injected ClientIntent");
+  assert(facadeSelectionCleared === 0, "Input placement cancellation does not fall through to selection clear");
 }
 
 {

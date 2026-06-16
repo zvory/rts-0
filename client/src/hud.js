@@ -6,8 +6,7 @@
 // The HUD is plain DOM (not Pixi). It is rebuilt cheaply each frame from `state`; the
 // only stateful trick is reusing command-card buttons between frames so that holding a
 // stable selection does not thrash the DOM (and so hotkeys keep working). All gameplay
-// effects go through `commandIssuer.issueCommand(...)` or `state.beginPlacement(...)` — the HUD never
-// mutates game state directly.
+// effects go through `commandIssuer.issueCommand(...)` or the injected client intent facade.
 
 import { cmd } from "./protocol.js";
 import { ABILITY, KIND, STATE, isBuilding } from "./protocol.js";
@@ -192,13 +191,15 @@ export class HUD {
    * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
    * @param {import("./audio.js").Audio} [audio] optional audio engine for local UI notices.
    * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
+   * @param {import("./client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    */
-  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null) {
+  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null) {
     this.root = rootEl;
     this.state = state;
     this.commandIssuer = commandIssuer;
     this.audio = audio;
     this.hotkeyProfiles = hotkeyProfiles;
+    this.clientIntent = clientIntent || state?.clientIntent || state;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -263,6 +264,10 @@ export class HUD {
 
   _issueCommand(command, options = {}) {
     return issueGameplayCommand(this.commandIssuer, command, options);
+  }
+
+  _intent() {
+    return this.clientIntent || this.state?.clientIntent || this.state;
   }
 
   // --- Resource / supply bar -------------------------------------------------
@@ -608,8 +613,8 @@ export class HUD {
       resources: this.state.resources || { steel: 0, oil: 0 },
       optimisticProduction: this.state.optimisticProduction || [],
       upgrades: this.state.upgrades || [],
-      commandCardMode: this.state.commandCardMode,
-      commandTarget: this.state.commandTarget,
+      commandCardMode: this._intent()?.commandCardMode,
+      commandTarget: this._intent()?.commandTarget,
       groupCooldownClocks,
       playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind),
     };
@@ -668,20 +673,20 @@ export class HUD {
     if (!intent || typeof intent !== "object") return;
     switch (intent.type) {
       case "beginCommandTarget":
-        this.state.beginCommandTarget(intent.target);
+        this._intent()?.beginCommandTarget?.(intent.target);
         return;
       case "openWorkerBuildMenu":
-        this.state.openWorkerBuildMenu();
+        this._intent()?.openWorkerBuildMenu?.();
         return;
       case "closeCommandCardMenu":
-        this.state.closeCommandCardMenu();
+        this._intent()?.closeCommandCardMenu?.();
         return;
       case "beginPlacement":
-        this.state.beginPlacement(intent.building);
+        this._intent()?.beginPlacement?.(intent.building);
         return;
       case "stop":
         this._issueCommand(cmd.stop(intent.unitIds || []));
-        this.state.endCommandTarget();
+        this._intent()?.endCommandTarget?.();
         return;
       case "train":
         this._issueTrain(intent.unit);
@@ -697,7 +702,7 @@ export class HUD {
         return;
       case "setAutocast":
         this._issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
-        this.state.endCommandTarget();
+        this._intent()?.endCommandTarget?.();
         return;
       case "playNotEnough":
         this._playNotEnoughForCost(intent.cost, intent.supply);
@@ -715,11 +720,11 @@ export class HUD {
         intent.targetObjectId ?? null,
         !!ev.shiftKey,
       ));
-      this.state.endCommandTarget();
+      this._intent()?.endCommandTarget?.();
       return;
     }
     if (intent.targetMode === "worldPoint") {
-      this.state.beginCommandTarget({ kind: "ability", ability: intent.ability });
+      this._intent()?.beginCommandTarget?.({ kind: "ability", ability: intent.ability });
     } else {
       this._issueCommand(cmd.useAbility(
         intent.ability,
@@ -732,20 +737,20 @@ export class HUD {
         const id = this.audio.pickVariant(BREAKTHROUGH_VOICE_IDS);
         if (id) this.audio.play(id, { category: "unit_voice", priority: 3 });
       }
-      this.state.endCommandTarget();
+      this._intent()?.endCommandTarget?.();
     }
   }
 
   _showAbilityHoverPreview(ability, unitIds = []) {
     const definition = ABILITIES[ability];
     if (!definition || definition.targetMode !== "self" || !definition.radiusTiles) return;
-    if (this.state.commandTarget) return;
+    if (this._intent()?.commandTarget) return;
     const ready = new Set((unitIds || []).map((id) => Number(id)));
     const origins = this._abilityAreaOrigins(definition)
       .filter((origin) => ready.size === 0 || ready.has(origin.id));
     if (origins.length === 0) return;
     const tileSize = this.state.map?.tileSize || 32;
-    this.state.updateAbilityTargetPreview({
+    this._intent()?.updateAbilityTargetPreview?.({
       ability,
       source: "commandCardHover",
       carriers: origins,
@@ -756,8 +761,8 @@ export class HUD {
   }
 
   _clearAbilityHoverPreview() {
-    if (this.state.abilityTargetPreview?.source === "commandCardHover") {
-      this.state.updateAbilityTargetPreview(null);
+    if (this._intent()?.abilityTargetPreview?.source === "commandCardHover") {
+      this._intent()?.updateAbilityTargetPreview?.(null);
     }
   }
 

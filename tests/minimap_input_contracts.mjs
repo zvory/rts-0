@@ -3,6 +3,7 @@
 
 import { MatchInputRouter } from "../client/src/input/router.js";
 import { CommandComposer } from "../client/src/command_composer.js";
+import { ClientIntent } from "../client/src/client_intent.js";
 import { Minimap } from "../client/src/minimap.js";
 import { KIND } from "../client/src/protocol.js";
 
@@ -57,7 +58,13 @@ function fakeCanvas(rect = { left: 100, top: 200, width: 242, height: 242 }) {
   };
 }
 
-function minimapHarness({ selected = [], commandTarget = null, commandsEnabled = true, legacySender = false } = {}) {
+function minimapHarness({
+  selected = [],
+  commandTarget = null,
+  commandsEnabled = true,
+  legacySender = false,
+  explicitClientIntent = false,
+} = {}) {
   installWindowStub();
   const viewport = {
     getBoundingClientRect() {
@@ -69,6 +76,7 @@ function minimapHarness({ selected = [], commandTarget = null, commandsEnabled =
   const centers = [];
   const commands = [];
   const endedTargets = [];
+  const clientIntent = explicitClientIntent ? new ClientIntent() : null;
   const state = {
     playerId: 1,
     commandTarget,
@@ -84,16 +92,19 @@ function minimapHarness({ selected = [], commandTarget = null, commandsEnabled =
       return selected;
     },
     endCommandTarget() {
+      if (clientIntent) throw new Error("Minimap must use injected ClientIntent to end targeting");
       endedTargets.push(this.commandTarget);
       this.commandComposer.cancel();
       this.commandTarget = null;
     },
     issueCommandTarget(ev = {}) {
+      if (clientIntent) throw new Error("Minimap must use injected ClientIntent to issue targeting");
       const issued = this.commandComposer.issue(ev);
       this.commandTarget = this.commandComposer.target;
       return issued;
     },
     addCommandFeedback(type, x, y) {
+      if (clientIntent) throw new Error("Minimap must use injected ClientIntent for command feedback");
       commands.push({ feedback: type, x, y });
     },
     entitiesInterpolated() {
@@ -102,6 +113,7 @@ function minimapHarness({ selected = [], commandTarget = null, commandsEnabled =
     players: [],
   };
   if (commandTarget) state.commandComposer.arm(commandTarget);
+  if (commandTarget && clientIntent) clientIntent.beginCommandTarget(commandTarget);
   const camera = {
     centerOn(x, y) {
       centers.push({ x, y });
@@ -120,8 +132,23 @@ function minimapHarness({ selected = [], commandTarget = null, commandsEnabled =
           this.sent.push(command);
         },
       };
-  const minimap = new Minimap(canvas, state, camera, null, commandIssuer, router, { commandsEnabled });
-  return { router, canvas, state, camera, net: commandIssuer, commandIssuer, minimap, centers, commands, endedTargets };
+  const minimap = new Minimap(canvas, state, camera, null, commandIssuer, router, {
+    commandsEnabled,
+    clientIntent: clientIntent || undefined,
+  });
+  return {
+    router,
+    canvas,
+    state,
+    camera,
+    net: commandIssuer,
+    commandIssuer,
+    minimap,
+    centers,
+    commands,
+    endedTargets,
+    clientIntent: clientIntent || state,
+  };
 }
 
 function lockedEvent(clientX, clientY, button = 0, extra = {}) {
@@ -203,6 +230,16 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(h.net.sent[0].queued !== true, "plain minimap attack target does not queue attack-move");
   assert(h.state.commandTarget === null, "attack command-target exits after minimap click");
   assert(h.endedTargets.length === 1, "endCommandTarget is called");
+  h.minimap.destroy();
+}
+
+// Injected ClientIntent owns minimap target issuing without touching GameState shims.
+{
+  const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
+  const h = minimapHarness({ selected, commandTarget: "attack", explicitClientIntent: true });
+  assert(h.router.pointerDown(lockedEvent(150, 250, 0)), "facade attack-move minimap click is consumed");
+  assert(h.net.sent.length === 1 && h.net.sent[0].c === "attackMove", "facade minimap targeting sends attack-move");
+  assert(h.clientIntent.commandTarget === null, "facade minimap targeting exits through ClientIntent");
   h.minimap.destroy();
 }
 

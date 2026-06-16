@@ -54,7 +54,8 @@ export function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
 }
 
 export function _refreshPlacement() {
-  const place = this.state.placement;
+  const intent = clientIntent(this);
+  const place = intent?.placement;
   if (!place) return;
   const map = this.state.map;
   if (!map) return;
@@ -69,7 +70,7 @@ export function _refreshPlacement() {
   const tileX = Math.floor(world.x / map.tileSize - footW / 2 + 0.5);
   const tileY = Math.floor(world.y / map.tileSize - footH / 2 + 0.5);
   const valid = this._footprintValid(tileX, tileY, footW, footH, map);
-  this.state.updatePlacement(tileX, tileY, valid);
+  intent?.updatePlacement?.(tileX, tileY, valid);
 }
 
 export function _footprintValid(tileX, tileY, footW, footH, map) {
@@ -87,12 +88,13 @@ export function _footprintValid(tileX, tileY, footW, footH, map) {
 }
 
 export function _confirmPlacement(ev = {}) {
-  const place = this.state.placement;
+  const intent = clientIntent(this);
+  const place = intent?.placement;
   if (!place || !place.valid) return;
   const workers = this._selectedWorkerIds();
   if (workers.length === 0) {
     // No worker to build with; abandon placement rather than send a dead command.
-    this.state.endPlacement();
+    intent?.endPlacement?.();
     return;
   }
   const queued = !!ev.shiftKey;
@@ -101,7 +103,7 @@ export function _confirmPlacement(ev = {}) {
   // Shift-confirm keeps placement mode active so the player can chain
   // several queued buildings; Shift keyup owns the eventual de-arm.
   if (queued) return;
-  this.state.endPlacement();
+  intent?.endPlacement?.();
 }
 
 // Shared input helpers.
@@ -198,4 +200,8 @@ export function isTextEntry(el) {
 export function commandHotkeyFromEvent(ev) {
   if (!ev || typeof ev.code !== "string" || !ev.code.startsWith("Key")) return "";
   return ev.code.slice(3).toUpperCase();
+}
+
+function clientIntent(input) {
+  return input?.clientIntent || input?.state?.clientIntent || input?.state;
 }
