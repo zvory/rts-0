@@ -113,6 +113,43 @@ fn unfinished_buildings_add_construction_state_only() {
 }
 
 #[test]
+fn unfinished_buildings_start_at_ten_percent_hp() {
+    let cases = [
+        (EntityKind::Depot, 11),
+        (EntityKind::Barracks, 17),
+        (EntityKind::CityCentre, 60),
+    ];
+
+    for (kind, expected_start_hp) in cases {
+        let entity =
+            Entity::new_building(1, kind, 10.0, 20.0, false).expect("building kind should spawn");
+        assert_eq!(entity.hp, expected_start_hp, "{kind:?}");
+        assert!(entity.hp < entity.max_hp, "{kind:?}");
+        assert!(entity.under_construction(), "{kind:?}");
+    }
+}
+
+#[test]
+fn construction_hp_scales_linearly_to_full_completion() {
+    let mut entity =
+        Entity::new_building(1, EntityKind::Depot, 10.0, 20.0, false).expect("depot should spawn");
+    let total = entity
+        .construction
+        .as_ref()
+        .expect("depot should be under construction")
+        .total;
+
+    assert_eq!(entity.hp, 11);
+    assert!(entity.set_construction_progress(total / 2));
+    assert_eq!(entity.hp, 60);
+    assert!(entity.set_construction_progress(total.saturating_sub(1)));
+    assert_eq!(entity.hp, 109);
+    assert_eq!(entity.advance_construction(), Some(true));
+    assert_eq!(entity.hp, entity.max_hp);
+    assert!(!entity.under_construction());
+}
+
+#[test]
 fn resource_node_kinds_have_exact_state_groups() {
     for kind in [EntityKind::Steel, EntityKind::Oil] {
         let entity = Entity::new_node(kind, 10.0, 20.0).expect("node kind should spawn");
