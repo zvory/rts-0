@@ -5,4 +5,9 @@ node_modules
 tests/node_modules
 .DS_Store
 docs
+!docs/
+!docs/context/
+!docs/context/**
+!docs/design/
+!docs/design/**
 TODO.md

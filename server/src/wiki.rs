@@ -979,29 +979,31 @@ mod tests {
 
     #[tokio::test]
     async fn wiki_index_route_renders_docs_readme() {
-        let response = wiki_router()
-            .oneshot(Request::builder().uri("/wiki").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(
-            response.headers().get(header::CONTENT_TYPE).unwrap(),
-            "text/html; charset=utf-8"
-        );
-        assert_eq!(
-            response.headers().get(header::CACHE_CONTROL).unwrap(),
-            "no-cache"
-        );
+        for uri in ["/wiki", "/wiki/"] {
+            let response = wiki_router()
+                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{uri}");
+            assert_eq!(
+                response.headers().get(header::CONTENT_TYPE).unwrap(),
+                "text/html; charset=utf-8"
+            );
+            assert_eq!(
+                response.headers().get(header::CACHE_CONTROL).unwrap(),
+                "no-cache"
+            );
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body = String::from_utf8(body.to_vec()).unwrap();
-        assert!(body.contains("<title>Bewegungskrieg Wiki - Bewegungskrieg Wiki</title>"));
-        assert!(body.contains(r#"href="/wiki/docs/context/balance.md""#));
-        assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
-        assert!(body.contains(r#"href="/wiki/stats""#));
-        assert!(body.contains("<main>"));
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body = String::from_utf8(body.to_vec()).unwrap();
+            assert!(body.contains("<title>Bewegungskrieg Wiki - Bewegungskrieg Wiki</title>"));
+            assert!(body.contains(r#"href="/wiki/docs/context/balance.md""#));
+            assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
+            assert!(body.contains(r#"href="/wiki/stats""#));
+            assert!(body.contains("<main>"));
+        }
     }
 
     #[tokio::test]
@@ -1168,6 +1170,7 @@ mod tests {
     fn wiki_router() -> Router {
         Router::new()
             .route("/wiki", get(wiki_index_handler))
+            .route("/wiki/", get(wiki_index_handler))
             .route("/wiki/{*path}", get(wiki_page_handler))
     }
 

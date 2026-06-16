@@ -26,6 +26,8 @@ RUN apt-get update \
 COPY --from=builder /app/server/target/release/rts-server /usr/local/bin/rts-server
 COPY --from=builder /app/server/assets ./server/assets
 COPY --from=builder /app/client ./client
+COPY docs/context ./docs/context
+COPY docs/design ./docs/design
 
 ENV RTS_ADDR=0.0.0.0:8080
 ENV RUST_LOG=info
