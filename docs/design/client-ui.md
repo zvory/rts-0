@@ -12,7 +12,7 @@ src/
   config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
-  state.js        # GameState: holds prev+current snapshot, selection, camera, placement
+  state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   client_intent.js # ClientIntent: browser-local placement, command targeting, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
@@ -404,7 +404,7 @@ the budget are blocked before `Net.command`.
 `input/index.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?)
+  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?)
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
@@ -412,7 +412,7 @@ export class Input {
   // optional pointer-lock mode traps the browser cursor and drives a visible
   // virtual cursor for edge pan on multi-monitor setups.
   update(dt)                             // continuous handling (edge scroll handled by camera)
-  // emits nothing to return; mutates state.selection / state.placement and calls commandIssuer.issueCommand
+  // emits nothing to return; mutates state.selection / clientIntent and calls commandIssuer.issueCommand
 }
 ```
 `input/camera_navigation.js`
@@ -451,9 +451,10 @@ execution remain strict local-owner checks.
 Shift-confirmed build placement keeps placement mode armed while Shift is physically held, allowing
 multiple queued building placements; releasing Shift or losing window focus clears placement mode.
 
-`command_composer.js` owns command-target arming lifetime for command-card targets. Input and
-minimap clicks call `GameState.issueCommandTarget`, so held keys, Shift preservation, and repeated
-queued target clicks use one composer path instead of command-specific sticky flags. A plain
+`command_composer.js` owns command-target arming lifetime for command-card targets. HUD, input, and
+minimap receive `ClientIntent` from `Match`; input and minimap clicks call
+`ClientIntent.issueCommandTarget`, so held keys, Shift preservation, and repeated queued target
+clicks use one composer path instead of command-specific sticky flags. A plain
 targeted-order command-card hotkey tap arms the target after keyup; pressing the same resolved
 hotkey again inside the quick-cast window issues it at the current cursor world point. Shift does
 the same with `queued: true` and keeps the target armed until Shift is released.
@@ -498,9 +499,9 @@ export function noticeSoundId(msg)
 `hud.js`
 ```js
 export class HUD {
-  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?)
+  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?)
   update()                               // refresh resources/supply, selected panel, command card
-  // command card buttons call commandIssuer.issueCommand(...) or state.beginPlacement(...)
+  // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
 ```
 The train command card is driven by the first selected production building type, but train clicks
@@ -526,7 +527,7 @@ first real faction catalog slice.
 `minimap.js`
 ```js
 export class Minimap {
-  constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?)
+  constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?, {clientIntent?, commandsEnabled?})
   render()                               // draw terrain + fog + entity blips + viewport rect
   inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)
@@ -548,7 +549,8 @@ export class Lobby {
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
 `window.location`, and shows `Lobby`; on `start` it creates `Match`. `match.js` builds
-`GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`, `Input`, starts the rAF loop
+`GameState`, `ClientIntent`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`,
+`Input`, starts the rAF loop
 (compute `alpha` from snapshot timing, `camera.update`,
 `audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
 `minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
@@ -562,11 +564,11 @@ with `playerResources`.
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
 
 `input/commands.js` exposes `_onAbilityTarget` and `_refreshAbilityTargetPreview` for world-point
-abilities. When the HUD command card calls `state.commandTarget = { kind: "ability", ability }`,
+abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ kind: "ability", ability })`,
 the input module enters targeted cursor mode:
 - Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
   carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor,
-  update `state.abilityTargetPreview` for the renderer.
+  update `ClientIntent.abilityTargetPreview` for the renderer shim.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
   hotkey is still held for repeated world-point targeting.

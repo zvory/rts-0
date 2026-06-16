@@ -138,6 +138,7 @@ export class Match {
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
+    this.clientIntent = this.state.clientIntent;
     this.state.debugPathOverlaysAvailable =
       this.state.debugPathOverlaysAvailable || this.devWatch?.kind === "scenario";
     this.state.debugPathOverlaysEnabled = this.state.debugPathOverlaysAvailable;
@@ -151,7 +152,7 @@ export class Match {
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = this._timeInit(
       "match.hud",
-      () => new HUD(dom.gameScreen, this.state, this.commandIssuer, this.audio, this.hotkeyProfiles),
+      () => new HUD(dom.gameScreen, this.state, this.commandIssuer, this.audio, this.hotkeyProfiles, this.clientIntent),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.hudInputZone = this._timeInit(
@@ -163,6 +164,7 @@ export class Match {
       "match.minimap",
       () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandIssuer, this.inputRouter, {
         commandsEnabled: !this.replayViewer,
+        clientIntent: this.clientIntent,
       }),
     );
     this.input = this._timeInit(
@@ -179,6 +181,7 @@ export class Match {
           this.audio,
           this.inputRouter,
           this.hotkeyProfiles,
+          this.clientIntent,
         ),
     );
 

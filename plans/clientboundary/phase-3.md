@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -27,11 +27,11 @@ Route HUD, input, and minimap intent mutations through the explicit client inten
 
 ## Implementation Checklist
 
-- [ ] Add facade dependency injection from `Match`.
-- [ ] Convert HUD intent writes.
-- [ ] Convert input and minimap intent writes.
-- [ ] Preserve command issuer and command-budget behavior.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Add facade dependency injection from `Match`.
+- [x] Convert HUD intent writes.
+- [x] Convert input and minimap intent writes.
+- [x] Preserve command issuer and command-budget behavior.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
