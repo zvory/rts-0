@@ -32,6 +32,7 @@ import {
 import {
   _drawAbilityTargetPreview,
   _drawAbilityObjects,
+  _drawBreakthroughAuras,
   _drawArtilleryImpacts,
   _drawArtilleryLaunches,
   _drawArtilleryTargets,
@@ -239,6 +240,7 @@ export class Renderer {
     this._drawArtilleryTargets(state);
     this._drawArtilleryImpacts(state);
     this._drawSelectedMortarRanges(state);
+    this._drawBreakthroughAuras(state, regularEntities);
     this._drawAbilityTargetPreview(state);
     this._drawAntiTankGunSetupPreview(state);
     this._drawOrderPlan(state);
@@ -474,6 +476,7 @@ Object.assign(Renderer.prototype, {
   _drawArtilleryImpacts,
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
+  _drawBreakthroughAuras,
   _drawSelectedMortarRanges,
   _drawSmokes,
   _drawAntiTankGunSetupPreview,

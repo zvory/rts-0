@@ -208,7 +208,7 @@ authoritative `rules::defs` records.
   Cooldown duration (20s) exceeds cloud duration (5s), so each scout car has at most one active
   cloud at a time.
 - **Command Car Breakthrough!** (hotkey `E`): Command Cars have a self-targeted instant area speed
-  boost. It affects owned units within 7 tiles of the Command Car, lasts 180 ticks (~6s), has a
+  boost. It affects owned units within 9 tiles of the Command Car, lasts 180 ticks (~6s), has a
   750-tick (~25s) per-caster cooldown, has no resource cost, can be queued, and can be cast while
   the Command Car is moving. Affected units move at 1.4x speed, or 1.8x speed while inside smoke or
   during the 60-tick (~2s) recent-smoke grace window after leaving smoke. Multiple Breakthrough

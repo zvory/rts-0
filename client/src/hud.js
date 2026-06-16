@@ -12,6 +12,7 @@
 import { cmd } from "./protocol.js";
 import { ABILITY, KIND, STATE, isBuilding } from "./protocol.js";
 import {
+  ABILITIES,
   BASE_COMMAND_SUPPLY_CAP,
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   PLAYER_PALETTE,
@@ -615,6 +616,7 @@ export class HUD {
   }
 
   _renderDescriptorCard(card, descriptorCard) {
+    this._clearAbilityHoverPreview();
     const frag = document.createDocumentFragment();
     const slots = Array.isArray(descriptorCard.slots) ? descriptorCard.slots : [];
     for (let i = 0; i < 9; i++) {
@@ -646,6 +648,12 @@ export class HUD {
       countBadge: descriptor.countBadge,
       cooldownClocks: descriptor.cooldownClocks,
       repeatable: descriptor.repeatable,
+      onMouseEnter: descriptor.intent?.type === "ability"
+        ? () => this._showAbilityHoverPreview(descriptor.intent.ability)
+        : null,
+      onMouseLeave: descriptor.intent?.type === "ability"
+        ? () => this._clearAbilityHoverPreview()
+        : null,
       onUnavailable: descriptor.onUnavailableIntent
         ? () => this._dispatchCommandIntent(descriptor.onUnavailableIntent)
         : null,
@@ -724,7 +732,54 @@ export class HUD {
         const id = this.audio.pickVariant(BREAKTHROUGH_VOICE_IDS);
         if (id) this.audio.play(id, { category: "unit_voice", priority: 3 });
       }
+      if (intent.ability === ABILITY.BREAKTHROUGH) {
+        this._addBreakthroughActivationFeedback(intent.readyIds || []);
+      }
       this.state.endCommandTarget();
+    }
+  }
+
+  _showAbilityHoverPreview(ability) {
+    const definition = ABILITIES[ability];
+    if (!definition || definition.targetMode !== "self" || !definition.radiusTiles) return;
+    if (this.state.commandTarget) return;
+    const origins = this._abilityAreaOrigins(definition);
+    if (origins.length === 0) return;
+    const tileSize = this.state.map?.tileSize || 32;
+    this.state.updateAbilityTargetPreview({
+      ability,
+      source: "commandCardHover",
+      carriers: origins,
+      areaOrigins: origins,
+      radiusPx: definition.radiusTiles * tileSize,
+      hoverInRange: true,
+    });
+  }
+
+  _clearAbilityHoverPreview() {
+    if (this.state.abilityTargetPreview?.source === "commandCardHover") {
+      this.state.updateAbilityTargetPreview(null);
+    }
+  }
+
+  _abilityAreaOrigins(definition) {
+    const carriers = Array.isArray(definition?.carriers) ? definition.carriers : [];
+    return (this.state.selectedEntities() || [])
+      .filter((e) =>
+        e.owner === this.state.playerId &&
+        carriers.includes(e.kind) &&
+        e.buildProgress == null)
+      .map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y }));
+  }
+
+  _addBreakthroughActivationFeedback(unitIds) {
+    if (typeof this.state.addCommandFeedback !== "function") return;
+    const definition = ABILITIES[ABILITY.BREAKTHROUGH];
+    const ready = new Set((unitIds || []).map((id) => Number(id)));
+    const origins = this._abilityAreaOrigins(definition)
+      .filter((origin) => ready.size === 0 || ready.has(origin.id));
+    for (const origin of origins) {
+      this.state.addCommandFeedback("breakthrough", origin.x, origin.y, false, definition.radiusTiles);
     }
   }
 
@@ -1009,6 +1064,8 @@ export class HUD {
    * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
    * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
    * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
+   * @param {() => void} [opts.onMouseEnter] hover handler.
+   * @param {() => void} [opts.onMouseLeave] hover-exit handler.
    * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
    * @param {(ev: MouseEvent) => void} [opts.onContextMenu] right-click handler.
    * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
@@ -1031,6 +1088,14 @@ export class HUD {
     if (Number.isInteger(opts.slotIndex)) btn.dataset.slotIndex = String(opts.slotIndex);
     if (opts.ability) btn.dataset.ability = opts.ability;
     if (opts.repeatable) btn.dataset.repeatable = "true";
+    if (typeof opts.onMouseEnter === "function") {
+      btn.addEventListener("mouseenter", opts.onMouseEnter);
+      btn.addEventListener("focus", opts.onMouseEnter);
+    }
+    if (typeof opts.onMouseLeave === "function") {
+      btn.addEventListener("mouseleave", opts.onMouseLeave);
+      btn.addEventListener("blur", opts.onMouseLeave);
+    }
     if (typeof opts.onContextMenu === "function") {
       btn.addEventListener("contextmenu", (ev) => {
         ev.preventDefault();
