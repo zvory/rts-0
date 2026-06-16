@@ -56,7 +56,7 @@ missing=0
 require_pattern() {
   local description="$1"
   local pattern="$2"
-  if ! rg -q "$pattern" <<<"$BODY_TEXT"; then
+  if ! grep -Eq "$pattern" <<<"$BODY_TEXT"; then
     echo "check-pr-ownership: missing $description" >&2
     missing=1
   fi

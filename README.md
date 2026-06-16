@@ -160,6 +160,9 @@ armed, what focused verification ran, and whether a human decision is needed.
 The full test runner uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
 parallel agents do not share final binaries or test artifacts.
 
+For CI failure, stale branch, missing auto-merge, closed PR, GitHub API outage, cleanup, canary, and
+alternate-runner recovery, see [docs/pr-first-workflow.md](docs/pr-first-workflow.md).
+
 To preview or force cleanup manually:
 
 ```bash

@@ -14,8 +14,11 @@ usage() {
 Usage: scripts/cleanup-worktrees.sh [--auto] [--dry-run]
 
 Removes clean, already-merged zvorygin/* worktrees under /tmp/rts-worktrees
-and their Cargo target dirs. Also removes a bounded number of stale target dirs
-under /tmp/rts-cargo-target that do not belong to any active worktree.
+and their Cargo target dirs. A worktree is removable when its local branch head
+is already reachable from local main or origin/main; the matching remote branch
+may already have been auto-deleted by GitHub. Also removes a bounded number of
+stale target dirs under /tmp/rts-cargo-target that do not belong to any active
+worktree.
 
 Options:
   --auto       Non-intrusive hook mode: only runs from main and limits target cleanup.
@@ -120,13 +123,41 @@ is_within_worktree_root() {
 }
 
 path_mtime_epoch() {
-  stat -f '%m' "$1"
+  stat -f '%m' "$1" 2>/dev/null || stat -c '%Y' "$1"
 }
 
 path_age_hours() {
   local mtime
   mtime="$(path_mtime_epoch "$1")"
   echo $(( (now_epoch - mtime) / 3600 ))
+}
+
+branch_head() {
+  local branch="$1"
+  git rev-parse --verify --quiet "$branch^{commit}"
+}
+
+ref_exists() {
+  local ref="$1"
+  git rev-parse --verify --quiet "$ref^{commit}" >/dev/null
+}
+
+branch_head_is_merged() {
+  local branch="$1"
+  local head
+  head="$(branch_head "$branch" || true)"
+  if [ -z "$head" ]; then
+    return 1
+  fi
+
+  local ref
+  for ref in main origin/main; do
+    if ref_exists "$ref" && git merge-base --is-ancestor "$head" "$ref" 2>/dev/null; then
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 declare -a removable_worktrees=()
@@ -159,7 +190,7 @@ while IFS= read -r worktree_path; do
     continue
   fi
 
-  if git merge-base --is-ancestor "$branch" main 2>/dev/null; then
+  if branch_head_is_merged "$branch"; then
     removable_worktrees+=("$worktree_path")
   fi
 done < <(git worktree list --porcelain | awk '/^worktree / { sub(/^worktree /, ""); print }')
@@ -180,7 +211,7 @@ if [ "${#removable_worktrees[@]}" -gt 0 ]; then
       echo "would delete branch $branch"
     else
       git worktree remove "$worktree_path"
-      git branch -d "$branch" >/dev/null 2>&1 || true
+      git branch -D "$branch" >/dev/null 2>&1 || true
     fi
   done
 fi

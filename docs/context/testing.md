@@ -41,7 +41,9 @@ Use when writing or debugging tests, or before claiming a change is done.
 - Installed hooks run cheap staged-diff checks before commits and merges. They do not run
   `tests/run-all.sh` by default; GitHub Actions owns the full-suite gate for normal PR work.
 - Installed hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main` to
-  remove clean merged `zvorygin/*` worktrees and amortize stale Cargo target cleanup.
+  remove clean merged `zvorygin/*` worktrees and amortize stale Cargo target cleanup. Cleanup treats
+  local `main` and `origin/main` as proof refs and does not require the merged PR branch to still
+  exist on `origin`.
 - Browser smoke dependencies are shared across worktrees under
   `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}` and keyed by the SHA-256 hash of
   `tests/package-lock.json`. `tests/run-all.sh` links each worktree's ignored
@@ -62,6 +64,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   `RTS_FULL_AI_TESTS=1 cargo test` when touching AI strategy, profile-backed self-play, replay
   determinism, or balance behavior that depends on long AI matches. The PR full gate is required
   for merge; do not rely on cheap local hooks as test coverage.
+- For CI failure recovery, workflow canaries, and moving the full gate to another runner, see
+  [docs/pr-first-workflow.md](../pr-first-workflow.md).
 - A suite can be skipped only when `tests/select-suites.mjs` maps the changed files away from that
   behavior and both architecture checks still pass:
   `scripts/check-crate-boundaries.mjs` and `rts-archcheck check-sim-architecture`.
