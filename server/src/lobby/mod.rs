@@ -45,6 +45,7 @@ mod faction_validation;
 mod replay_session;
 mod replay_validation;
 mod room_task;
+mod snapshot_fanout;
 mod snapshots;
 
 pub use connection::{ConnectionSink, ConnectionWriter};

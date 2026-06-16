@@ -1,16 +1,18 @@
 use super::connection::send_or_log;
-use super::connection::SnapshotSendStatus;
 use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
-use super::snapshots::{compact_snapshot_for_wire, union_events};
+use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
+use super::snapshots::union_events;
 use super::*;
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::replay::ReplayArtifactV1;
-use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION};
+#[cfg(test)]
+use crate::protocol::SnapshotNetStatus;
+use crate::protocol::{ReplayPlaybackState, PREDICTION_PROTOCOL_VERSION};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -23,12 +25,12 @@ pub(super) struct RoomPlayer {
     name: String,
     pub(super) color: String,
     ready: bool,
-    spectator: bool,
-    msg_tx: ConnectionSink,
-    head_of_line_count: u32,
+    pub(super) spectator: bool,
+    pub(super) msg_tx: ConnectionSink,
+    pub(super) head_of_line_count: u32,
     last_received_client_seq: u32,
-    last_sim_consumed_client_seq: u32,
-    last_sim_consumed_client_tick: Option<u32>,
+    pub(super) last_sim_consumed_client_seq: u32,
+    pub(super) last_sim_consumed_client_tick: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2179,13 +2181,8 @@ impl RoomTask {
         let Phase::ReplayViewer(session) = &self.phase else {
             return;
         };
-        let Some(player) = self.players.get(&watcher_id) else {
-            return;
-        };
-        send_or_log(
-            &self.room,
-            watcher_id,
-            &player.msg_tx,
+        self.send_observer_analysis_to_ids(
+            [watcher_id],
             ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
         );
     }
@@ -2196,8 +2193,10 @@ impl RoomTask {
     }
 
     fn broadcast_observer_analysis_for(&self, session: &ReplaySession) {
-        let msg = ServerMessage::ObserverAnalysis(session.game().observer_analysis());
-        self.broadcast(&msg);
+        self.send_observer_analysis_to_ids(
+            self.order.clone(),
+            ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
+        );
     }
 
     fn broadcast_live_observer_analysis_to_spectators(&self, game: &Game) {
@@ -2211,8 +2210,18 @@ impl RoomTask {
             return;
         }
 
-        let msg = ServerMessage::ObserverAnalysis(game.observer_analysis());
-        for id in spectator_ids {
+        self.send_observer_analysis_to_ids(
+            spectator_ids,
+            ServerMessage::ObserverAnalysis(game.observer_analysis()),
+        );
+    }
+
+    fn send_observer_analysis_to_ids(
+        &self,
+        recipient_ids: impl IntoIterator<Item = u32>,
+        msg: ServerMessage,
+    ) {
+        for id in recipient_ids {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
@@ -2248,68 +2257,28 @@ impl RoomTask {
         per_player_events: HashMap<u32, Vec<Event>>,
         scheduler_lag: Duration,
         tick_start: StdInstant,
-        mut perf: Option<&mut crate::perf::TickPerf>,
+        perf: Option<&mut crate::perf::TickPerf>,
     ) {
         let tick_budget = self.current_tick_interval();
-        let mut slow_tick_counted = false;
-        let fanout_start = StdInstant::now();
         let recipients = self.order.clone();
-        for id in recipients {
-            let Some(player) = self.players.get(&id) else {
-                continue;
-            };
+        SnapshotFanout::new(
+            &self.room,
+            scheduler_lag,
+            tick_budget,
+            tick_start,
+            &mut self.slow_tick_count,
+            perf,
+        )
+        .send_to_recipients(&mut self.players, recipients, |id, _player| {
             let visible_players = session.vision_player_ids_for(id);
-            let snapshot_start = StdInstant::now();
             let mut snapshot = session.game().snapshot_for_spectator(&visible_players);
             snapshot.events.extend(union_events(
                 visible_players
                     .iter()
                     .filter_map(|player_id| per_player_events.get(player_id)),
             ));
-            let snapshot_duration = snapshot_start.elapsed();
-            let entity_count = snapshot.entities.len();
-            let resource_delta_count = snapshot.resource_deltas.len();
-            let event_count = snapshot.events.len();
-            let tick_elapsed = tick_start.elapsed();
-            let slow_tick = scheduler_lag >= tick_budget || tick_elapsed >= tick_budget;
-            if slow_tick && !slow_tick_counted {
-                self.slow_tick_count = self.slow_tick_count.saturating_add(1);
-                slow_tick_counted = true;
-            }
-            snapshot.net_status =
-                self.snapshot_net_status(player, scheduler_lag, tick_elapsed, slow_tick);
-            let compact_start = StdInstant::now();
-            compact_snapshot_for_wire(&mut snapshot);
-            let compact_duration = compact_start.elapsed();
-            if let Some(perf) = perf.as_mut() {
-                perf.record_snapshot(crate::perf::SnapshotRecord {
-                    player_id: id,
-                    spectator: true,
-                    snapshot: snapshot_duration,
-                    compact: compact_duration,
-                    entities: entity_count,
-                    resource_deltas: resource_delta_count,
-                    events: event_count,
-                });
-            }
-            let enqueue_status = send_or_log(
-                &self.room,
-                id,
-                &player.msg_tx,
-                ServerMessage::Snapshot(snapshot),
-            );
-            if matches!(enqueue_status, Some(SnapshotSendStatus::Replaced)) {
-                if let Some(player) = self.players.get_mut(&id) {
-                    player.head_of_line_count = player.head_of_line_count.saturating_add(1);
-                }
-            }
-            if let (Some(perf), Some(status)) = (perf.as_mut(), enqueue_status) {
-                perf.record_enqueue(snapshot_enqueue_status(status));
-            }
-        }
-        if let Some(perf) = perf.as_mut() {
-            perf.record_phase("snapshot_fanout", fanout_start.elapsed());
-        }
+            Some(SnapshotFanoutPayload::new(snapshot, true))
+        });
     }
 
     fn send_dev_error(&self, msg: &str) {
@@ -2397,73 +2366,39 @@ impl RoomTask {
         // Fan out fog-filtered snapshots to active players and union-fog snapshots to lobby-time
         // spectators, merging in the events each recipient is allowed to observe.
         let tick_budget = self.current_tick_interval();
-        let mut slow_tick_counted = false;
-        let fanout_start = StdInstant::now();
         let recipients: Vec<u32> = self.order.clone();
         let spectator_visible_players = self.spectator_visible_player_ids();
-        for id in &recipients {
-            if self.outcome_sent.contains(id) {
-                continue;
-            }
-            let Some(player) = self.players.get(id) else {
-                continue;
-            };
-            let mapped_seat = self.branch_live_seat_by_connection.get(id).copied();
-            let snapshot_start = StdInstant::now();
-            let mut snapshot = if player.spectator {
-                game.snapshot_for_spectator(&spectator_visible_players)
-            } else {
-                game.snapshot_for(mapped_seat.unwrap_or(*id))
-            };
-            if player.spectator {
-                snapshot.events.extend(full_vision_events.clone());
-            } else if let Some(mut events) = per_player_events.remove(&mapped_seat.unwrap_or(*id)) {
-                snapshot.events.append(&mut events);
-            }
-            let snapshot_duration = snapshot_start.elapsed();
-            let entity_count = snapshot.entities.len();
-            let resource_delta_count = snapshot.resource_deltas.len();
-            let event_count = snapshot.events.len();
-            let tick_elapsed = tick_start.elapsed();
-            let slow_tick = scheduler_lag >= tick_budget || tick_elapsed >= tick_budget;
-            if slow_tick && !slow_tick_counted {
-                self.slow_tick_count = self.slow_tick_count.saturating_add(1);
-                slow_tick_counted = true;
-            }
-            snapshot.net_status =
-                self.snapshot_net_status(player, scheduler_lag, tick_elapsed, slow_tick);
-            let compact_start = StdInstant::now();
-            compact_snapshot_for_wire(&mut snapshot);
-            let compact_duration = compact_start.elapsed();
-            if let Some(perf) = perf.as_mut() {
-                perf.record_snapshot(crate::perf::SnapshotRecord {
-                    player_id: *id,
-                    spectator: player.spectator,
-                    snapshot: snapshot_duration,
-                    compact: compact_duration,
-                    entities: entity_count,
-                    resource_deltas: resource_delta_count,
-                    events: event_count,
-                });
-            }
-            let enqueue_status = send_or_log(
-                &self.room,
-                *id,
-                &player.msg_tx,
-                ServerMessage::Snapshot(snapshot),
-            );
-            if matches!(enqueue_status, Some(SnapshotSendStatus::Replaced)) {
-                if let Some(player) = self.players.get_mut(id) {
-                    player.head_of_line_count = player.head_of_line_count.saturating_add(1);
+        let active_snapshot_recipients = recipients
+            .into_iter()
+            .filter(|id| !self.outcome_sent.contains(id));
+        SnapshotFanout::new(
+            &self.room,
+            scheduler_lag,
+            tick_budget,
+            tick_start,
+            &mut self.slow_tick_count,
+            perf.as_mut(),
+        )
+        .send_to_recipients(
+            &mut self.players,
+            active_snapshot_recipients,
+            |id, player| {
+                let mapped_seat = self.branch_live_seat_by_connection.get(&id).copied();
+                let mut snapshot = if player.spectator {
+                    game.snapshot_for_spectator(&spectator_visible_players)
+                } else {
+                    game.snapshot_for(mapped_seat.unwrap_or(id))
+                };
+                if player.spectator {
+                    snapshot.events.extend(full_vision_events.clone());
+                } else if let Some(mut events) =
+                    per_player_events.remove(&mapped_seat.unwrap_or(id))
+                {
+                    snapshot.events.append(&mut events);
                 }
-            }
-            if let (Some(perf), Some(status)) = (perf.as_mut(), enqueue_status) {
-                perf.record_enqueue(snapshot_enqueue_status(status));
-            }
-        }
-        if let Some(perf) = perf.as_mut() {
-            perf.record_phase("snapshot_fanout", fanout_start.elapsed());
-        }
+                Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
+            },
+        );
         self.broadcast_live_observer_analysis_to_spectators(&game);
 
         // Check for game over. A 1-player match never ends (sandbox/exploration mode).
@@ -2574,63 +2509,23 @@ impl RoomTask {
         };
 
         let tick_budget = self.current_tick_interval();
-        let mut slow_tick_counted = false;
-        let fanout_start = StdInstant::now();
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
-        for id in recipients {
-            let Some(player) = self.players.get(&id) else {
-                continue;
-            };
-            let snapshot_start = StdInstant::now();
+        SnapshotFanout::new(
+            &self.room,
+            scheduler_lag,
+            tick_budget,
+            tick_start,
+            &mut self.slow_tick_count,
+            perf.as_mut(),
+        )
+        .send_to_recipients(&mut self.players, recipients, |_id, player| {
             let mut snapshot = game.snapshot_full_for(view_player_id);
             if let Some(mut events) = per_player_events.remove(&view_player_id) {
                 snapshot.events.append(&mut events);
             }
-            let snapshot_duration = snapshot_start.elapsed();
-            let entity_count = snapshot.entities.len();
-            let resource_delta_count = snapshot.resource_deltas.len();
-            let event_count = snapshot.events.len();
-            let tick_elapsed = tick_start.elapsed();
-            let slow_tick = scheduler_lag >= tick_budget || tick_elapsed >= tick_budget;
-            if slow_tick && !slow_tick_counted {
-                self.slow_tick_count = self.slow_tick_count.saturating_add(1);
-                slow_tick_counted = true;
-            }
-            snapshot.net_status =
-                self.snapshot_net_status(player, scheduler_lag, tick_elapsed, slow_tick);
-            let compact_start = StdInstant::now();
-            compact_snapshot_for_wire(&mut snapshot);
-            let compact_duration = compact_start.elapsed();
-            if let Some(perf) = perf.as_mut() {
-                perf.record_snapshot(crate::perf::SnapshotRecord {
-                    player_id: id,
-                    spectator: player.spectator,
-                    snapshot: snapshot_duration,
-                    compact: compact_duration,
-                    entities: entity_count,
-                    resource_deltas: resource_delta_count,
-                    events: event_count,
-                });
-            }
-            let enqueue_status = send_or_log(
-                &self.room,
-                id,
-                &player.msg_tx,
-                ServerMessage::Snapshot(snapshot),
-            );
-            if matches!(enqueue_status, Some(SnapshotSendStatus::Replaced)) {
-                if let Some(player) = self.players.get_mut(&id) {
-                    player.head_of_line_count = player.head_of_line_count.saturating_add(1);
-                }
-            }
-            if let (Some(perf), Some(status)) = (perf.as_mut(), enqueue_status) {
-                perf.record_enqueue(snapshot_enqueue_status(status));
-            }
-        }
-        if let Some(perf) = perf.as_mut() {
-            perf.record_phase("snapshot_fanout", fanout_start.elapsed());
-        }
+            Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
+        });
 
         let outcome_start = StdInstant::now();
         let scenario_keeps_running = matches!(self.mode, RoomMode::DevScenario(_));
@@ -3321,42 +3216,6 @@ impl RoomTask {
             }
         }
     }
-
-    fn snapshot_net_status(
-        &self,
-        player: &RoomPlayer,
-        scheduler_lag: Duration,
-        tick_elapsed: Duration,
-        slow_tick: bool,
-    ) -> SnapshotNetStatus {
-        let head_of_line = player.msg_tx.has_pending_snapshot();
-        let include_prediction_ack = !player.spectator;
-        SnapshotNetStatus {
-            server_lag_ms: saturating_duration_ms_u16(scheduler_lag),
-            tick_ms: saturating_duration_ms_u16(tick_elapsed),
-            slow_tick,
-            slow_tick_count: self.slow_tick_count,
-            head_of_line,
-            head_of_line_count: player
-                .head_of_line_count
-                .saturating_add(u32::from(head_of_line)),
-            prediction_version: if include_prediction_ack {
-                PREDICTION_PROTOCOL_VERSION
-            } else {
-                0
-            },
-            last_sim_consumed_client_seq: if include_prediction_ack {
-                player.last_sim_consumed_client_seq
-            } else {
-                0
-            },
-            last_sim_consumed_client_tick: if include_prediction_ack {
-                player.last_sim_consumed_client_tick
-            } else {
-                None
-            },
-        }
-    }
 }
 
 fn test_tick_interval_override() -> Option<Duration> {
@@ -3372,18 +3231,6 @@ fn test_tick_interval_override() -> Option<Duration> {
             .filter(|&millis| millis > 0)
             .map(Duration::from_millis)
     }
-}
-
-fn snapshot_enqueue_status(status: SnapshotSendStatus) -> crate::perf::SnapshotEnqueue {
-    match status {
-        SnapshotSendStatus::Stored => crate::perf::SnapshotEnqueue::Stored,
-        SnapshotSendStatus::Replaced => crate::perf::SnapshotEnqueue::Replaced,
-        SnapshotSendStatus::Closed => crate::perf::SnapshotEnqueue::Closed,
-    }
-}
-
-fn saturating_duration_ms_u16(duration: Duration) -> u16 {
-    duration.as_millis().min(u16::MAX as u128) as u16
 }
 
 #[cfg(test)]
@@ -4566,6 +4413,13 @@ mod tests {
 
         task.on_step_dev_tick(99);
         assert_eq!(in_game_tick(&task), 1);
+        let snapshot = writer.snapshots.take().expect("dev watch snapshot");
+        let Phase::InGame(game) = &task.phase else {
+            panic!("dev scenario should remain live");
+        };
+        let expected = game.snapshot_full_for(task.dev_view_player_id.unwrap());
+        assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
+        assert_eq!(snapshot.net_status.prediction_version, 0);
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
             ServerMessage::ReplayState(state)
