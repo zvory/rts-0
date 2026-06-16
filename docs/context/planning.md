@@ -21,7 +21,9 @@ name is short, lowercase, and descriptive.
   `origin/main` before the next phase begins.
 - When a phase is complete, mark that phase document as done in the implementation commit for that
   phase.
-- For executor-only automation, `scripts/phase-runner.sh` can run existing phase files in isolated
-  worktrees. Planning and final review remain manual.
+- For executor-only automation, `scripts/phase-runner.sh --pr` can run existing phase files in
+  isolated worktrees, push owned PRs, and arm auto-merge. Use `--pr --wait` for serial phase ranges
+  that must wait for each PR to merge before starting the next phase. Planning and final review
+  remain manual.
 
 See [plans/README.md](../../plans/README.md) for the full convention.

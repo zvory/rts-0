@@ -104,6 +104,9 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 - For serial phase work, do not start the next phase from an assumed merge. Use
   `scripts/wait-pr.sh <pr>` after opening the PR; it exits successfully only after GitHub reports
   the PR merged and the phase head SHA is reachable from `origin/main`.
+- For unattended serial phase execution, use `scripts/phase-runner.sh --pr --wait`. Use
+  `scripts/phase-runner.sh --pr` for one phase or for intentionally stopping after the first owned
+  PR is opened and auto-merge is armed.
 - To audit outstanding agent PRs, run `scripts/pr-sweep.sh`. It lists open `agent-owned` and
   `zvorygin/*` PRs with owner, age, head SHA, auto-merge state, checks, and flags for stale,
   failed, conflicted, missing-owner, or needs-human states.

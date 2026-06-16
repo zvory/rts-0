@@ -28,10 +28,18 @@ phase document as done in the implementation commit for that phase.
 
 For unattended executor passes, use `scripts/phase-runner.sh` from a clean checkout. The runner
 creates one `/tmp/rts-worktrees` worktree and one `zvorygin/` branch per phase, invokes Codex with
-the repo-local `$phase-runner` skill, saves a compact JSON handoff under the plan directory, and
-commits completed phase work.
+the repo-local `$phase-runner` skill, saves a compact JSON handoff under the runner log directory,
+and commits completed phase work. Pass `--pr` to push the phase branch, open or update an owned PR
+with `scripts/agent-pr.sh`, and arm auto-merge. Add `--wait` when running serial phases; the runner
+will wait through `scripts/wait-pr.sh`, fetch `origin/main`, and verify the phase head is reachable
+there before discovering or starting the next phase.
 
 The runner is only for implementation phases that already have approved phase files. It does not
-create plans or perform final review. Until the runner is converted to the PR-first lifecycle, the
-caller owns pushing the phase branch, opening an owned PR, arming auto-merge, and waiting for a
-definite merge before starting serial follow-up work.
+create plans or perform final review. Without `--wait`, the runner stops after the first PR is
+armed so the caller can decide when to resume serial follow-up work. Examples:
+
+```bash
+scripts/phase-runner.sh --plan ci 5 --pr
+scripts/phase-runner.sh --plan ci --from 4 --to 6 --pr
+scripts/phase-runner.sh --plan ci --from 4 --to 6 --pr --wait
+```
