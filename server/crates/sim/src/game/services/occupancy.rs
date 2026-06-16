@@ -1,7 +1,10 @@
 use std::collections::VecDeque;
 
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entity::{
+    movement_body_class, static_blocker_class, Entity, EntityKind, EntityStore, MovementBodyClass,
+    StaticBlockerClass,
+};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 
@@ -12,40 +15,61 @@ const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 /// never block (soft overlap is allowed), so only static structures appear here.
 pub(crate) struct Occupancy<'a> {
     map: &'a Map,
-    blocked: Vec<bool>,
-    clearance_tiles: Vec<u16>,
-    static_fingerprint: u64,
+    all_ground_blocked: Vec<bool>,
+    vehicle_body_blocked: Vec<bool>,
+    all_ground_clearance_tiles: Vec<u16>,
+    vehicle_body_clearance_tiles: Vec<u16>,
+    all_ground_static_fingerprint: u64,
+    vehicle_body_static_fingerprint: u64,
 }
 
 impl<'a> Occupancy<'a> {
     pub(crate) fn build(map: &'a Map, entities: &EntityStore) -> Self {
         let size = map.size;
-        let mut blocked = vec![false; (size * size) as usize];
+        let mut all_ground_blocked = vec![false; (size * size) as usize];
+        let mut vehicle_body_blocked = vec![false; (size * size) as usize];
         for e in entities.iter() {
             if !e.is_building() {
                 continue;
             }
             for (tx, ty) in building_footprint(map, e) {
                 if tx < size && ty < size {
-                    blocked[(ty * size + tx) as usize] = true;
+                    let idx = (ty * size + tx) as usize;
+                    match static_blocker_class(e.kind) {
+                        StaticBlockerClass::AllGround => all_ground_blocked[idx] = true,
+                        StaticBlockerClass::VehicleBodyOnly => vehicle_body_blocked[idx] = true,
+                        StaticBlockerClass::None => {}
+                    }
                 }
             }
         }
-        let mut static_blocked = vec![false; (size * size) as usize];
+        let mut all_ground_static_blocked = vec![false; (size * size) as usize];
+        let mut vehicle_body_static_blocked = vec![false; (size * size) as usize];
         for ty in 0..size {
             for tx in 0..size {
                 let idx = (ty * size + tx) as usize;
-                static_blocked[idx] = blocked[idx] || !map.is_passable(tx as i32, ty as i32);
+                let terrain_blocked = !map.is_passable(tx as i32, ty as i32);
+                all_ground_static_blocked[idx] = all_ground_blocked[idx] || terrain_blocked;
+                vehicle_body_static_blocked[idx] = all_ground_blocked[idx]
+                    || vehicle_body_blocked[idx]
+                    || terrain_blocked;
             }
         }
-        let clearance_tiles = build_clearance_field(map, &static_blocked);
-        let static_fingerprint = static_blocked_fingerprint(size, &static_blocked);
+        let all_ground_clearance_tiles = build_clearance_field(map, &all_ground_static_blocked);
+        let vehicle_body_clearance_tiles = build_clearance_field(map, &vehicle_body_static_blocked);
+        let all_ground_static_fingerprint =
+            static_blocked_fingerprint(size, &all_ground_static_blocked);
+        let vehicle_body_static_fingerprint =
+            static_blocked_fingerprint(size, &vehicle_body_static_blocked);
 
         Occupancy {
             map,
-            blocked,
-            clearance_tiles,
-            static_fingerprint,
+            all_ground_blocked,
+            vehicle_body_blocked,
+            all_ground_clearance_tiles,
+            vehicle_body_clearance_tiles,
+            all_ground_static_fingerprint,
+            vehicle_body_static_fingerprint,
         }
     }
 
@@ -53,10 +77,27 @@ impl<'a> Occupancy<'a> {
     /// tiles report zero. Map edges count as static bounds, so edge-adjacent tiles have low
     /// clearance even on otherwise empty maps.
     pub(crate) fn clearance_at_tile(&self, tx: i32, ty: i32) -> u16 {
+        self.clearance_at_tile_for_movement_body(tx, ty, MovementBodyClass::InfantryLike)
+    }
+
+    pub(crate) fn clearance_at_tile_for_kind(&self, tx: i32, ty: i32, kind: EntityKind) -> u16 {
+        self.clearance_at_tile_for_movement_body(tx, ty, movement_body_class(kind))
+    }
+
+    pub(crate) fn clearance_at_tile_for_movement_body(
+        &self,
+        tx: i32,
+        ty: i32,
+        movement_body_class: MovementBodyClass,
+    ) -> u16 {
         if !self.map.in_bounds(tx, ty) {
             return 0;
         }
-        self.clearance_tiles[(ty as u32 * self.map.size + tx as u32) as usize]
+        let idx = (ty as u32 * self.map.size + tx as u32) as usize;
+        match movement_body_class {
+            MovementBodyClass::InfantryLike => self.all_ground_clearance_tiles[idx],
+            MovementBodyClass::VehicleBody => self.vehicle_body_clearance_tiles[idx],
+        }
     }
 
     /// Clearance at the tile containing a world-pixel point.
@@ -105,8 +146,23 @@ impl<'a> Occupancy<'a> {
 
     /// Fingerprint of the static blocker layer used to keep path-cache entries scoped to the
     /// terrain/building clearance field that produced them.
+    #[cfg(test)]
     pub(crate) fn static_fingerprint(&self) -> u64 {
-        self.static_fingerprint
+        self.static_fingerprint_for_movement_body(MovementBodyClass::InfantryLike)
+    }
+
+    pub(crate) fn static_fingerprint_for_kind(&self, kind: EntityKind) -> u64 {
+        self.static_fingerprint_for_movement_body(movement_body_class(kind))
+    }
+
+    pub(crate) fn static_fingerprint_for_movement_body(
+        &self,
+        movement_body_class: MovementBodyClass,
+    ) -> u64 {
+        match movement_body_class {
+            MovementBodyClass::InfantryLike => self.all_ground_static_fingerprint,
+            MovementBodyClass::VehicleBody => self.vehicle_body_static_fingerprint,
+        }
     }
 
     pub(crate) fn building_blocked_at_tile(&self, tx: i32, ty: i32) -> bool {
@@ -114,19 +170,40 @@ impl<'a> Occupancy<'a> {
         if tx < 0 || ty < 0 || tx >= size || ty >= size {
             return false;
         }
-        self.blocked[(ty * self.map.size as i32 + tx) as usize]
+        let idx = (ty * self.map.size as i32 + tx) as usize;
+        self.all_ground_blocked[idx] || self.vehicle_body_blocked[idx]
     }
-}
 
-impl Passability for Occupancy<'_> {
-    /// Building footprints only — terrain passability is checked separately by callers
-    /// so that movement classes (infantry vs vehicle) can be applied.
-    fn passable(&self, tx: i32, ty: i32) -> bool {
+    pub(crate) fn passable_for_kind(&self, tx: i32, ty: i32, kind: EntityKind) -> bool {
+        self.passable_for_movement_body(tx, ty, movement_body_class(kind))
+    }
+
+    pub(crate) fn passable_for_movement_body(
+        &self,
+        tx: i32,
+        ty: i32,
+        movement_body_class: MovementBodyClass,
+    ) -> bool {
         let size = self.map.size as i32;
         if tx < 0 || ty < 0 || tx >= size || ty >= size {
             return false;
         }
-        !self.blocked[(ty * self.map.size as i32 + tx) as usize]
+        let idx = (ty * self.map.size as i32 + tx) as usize;
+        if self.all_ground_blocked[idx] {
+            return false;
+        }
+        match movement_body_class {
+            MovementBodyClass::InfantryLike => true,
+            MovementBodyClass::VehicleBody => !self.vehicle_body_blocked[idx],
+        }
+    }
+}
+
+impl Passability for Occupancy<'_> {
+    /// All-ground static blockers only. Movement code should prefer `passable_for_kind` so
+    /// vehicle-body requests include vehicle-only blockers.
+    fn passable(&self, tx: i32, ty: i32) -> bool {
+        self.passable_for_movement_body(tx, ty, MovementBodyClass::InfantryLike)
     }
 }
 
@@ -256,6 +333,56 @@ mod tests {
             "adjacent clearance should shrink after building placement"
         );
         assert_ne!(after.static_fingerprint(), fingerprint_before);
+    }
+
+    #[test]
+    fn tank_trap_occupancy_blocks_vehicle_body_only() {
+        let map = flat_test_map(12);
+        let empty = EntityStore::new();
+        let before = Occupancy::build(&map, &empty);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::TankTrap, 5, 5);
+        entities
+            .spawn_building(1, EntityKind::TankTrap, bx, by, true)
+            .expect("tank trap should spawn");
+        let after = Occupancy::build(&map, &entities);
+
+        assert!(after.passable_for_kind(5, 5, EntityKind::Worker));
+        assert!(after.passable_for_kind(5, 5, EntityKind::Rifleman));
+        for kind in [
+            EntityKind::AntiTankGun,
+            EntityKind::MortarTeam,
+            EntityKind::Artillery,
+            EntityKind::ScoutCar,
+            EntityKind::Tank,
+            EntityKind::CommandCar,
+        ] {
+            assert!(!after.passable_for_kind(5, 5, kind), "{kind:?}");
+        }
+        assert_eq!(
+            before.static_fingerprint(),
+            after.static_fingerprint(),
+            "infantry/all-ground fingerprint should ignore vehicle-only blockers"
+        );
+        assert_ne!(
+            before.static_fingerprint_for_kind(EntityKind::Tank),
+            after.static_fingerprint_for_kind(EntityKind::Tank),
+            "vehicle-body fingerprint should include Tank Trap blockers"
+        );
+    }
+
+    #[test]
+    fn under_construction_tank_trap_blocks_vehicle_body_occupancy() {
+        let map = flat_test_map(12);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::TankTrap, 5, 5);
+        entities
+            .spawn_building(1, EntityKind::TankTrap, bx, by, false)
+            .expect("tank trap scaffold should spawn");
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(occ.passable_for_kind(5, 5, EntityKind::Worker));
+        assert!(!occ.passable_for_kind(5, 5, EntityKind::Tank));
     }
 
     #[test]

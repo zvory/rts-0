@@ -20,7 +20,7 @@ use crate::game::entity::{
     Order, WeaponSetup,
 };
 use crate::game::map::Map;
-use crate::game::pathfinding::{self, Passability};
+use crate::game::pathfinding;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body, unit_body_for_entity,
     unit_body_with_facing, RectBody, UnitBody,
@@ -870,7 +870,7 @@ fn is_free_goal(
     if !map.is_passable(tile.0 as i32, tile.1 as i32) {
         return false;
     }
-    if !occ.passable(tile.0 as i32, tile.1 as i32) {
+    if !occ.passable_for_kind(tile.0 as i32, tile.1 as i32, unit.kind) {
         return false;
     }
     if assigned.iter().any(|assignment| assignment.tile == tile) {
@@ -993,7 +993,7 @@ fn build_staging_goals(
                 if !map.is_passable(tx, ty) {
                     continue;
                 }
-                if !occ.passable(tx, ty) {
+                if !occ.passable_for_kind(tx, ty, worker.kind) {
                     continue;
                 }
                 let center = map.tile_center(tile.0, tile.1);
@@ -1026,6 +1026,7 @@ mod tests {
     use super::*;
     use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order};
     use crate::game::map::Map;
+    use crate::game::pathfinding::Passability;
     use crate::game::services::occupancy::Occupancy;
     use crate::protocol::terrain;
 

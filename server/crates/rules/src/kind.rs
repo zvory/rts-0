@@ -139,6 +139,37 @@ pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
     )
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MovementBodyClass {
+    InfantryLike,
+    VehicleBody,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum StaticBlockerClass {
+    None,
+    AllGround,
+    VehicleBodyOnly,
+}
+
+pub fn movement_body_class(kind: EntityKind) -> MovementBodyClass {
+    if uses_oriented_vehicle_body(kind) {
+        MovementBodyClass::VehicleBody
+    } else {
+        MovementBodyClass::InfantryLike
+    }
+}
+
+pub fn static_blocker_class(kind: EntityKind) -> StaticBlockerClass {
+    if kind == EntityKind::TankTrap {
+        StaticBlockerClass::VehicleBodyOnly
+    } else if kind.is_building() {
+        StaticBlockerClass::AllGround
+    } else {
+        StaticBlockerClass::None
+    }
+}
+
 pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
     matches!(
         kind,
@@ -164,5 +195,41 @@ mod tests {
             assert_eq!(kind.stable_id().parse::<EntityKind>(), Ok(kind));
             assert_eq!(kind.to_string(), kind.stable_id());
         }
+    }
+
+    #[test]
+    fn movement_body_class_names_vehicle_body_units() {
+        let vehicle_body_kinds = [
+            EntityKind::AntiTankGun,
+            EntityKind::MortarTeam,
+            EntityKind::Artillery,
+            EntityKind::ScoutCar,
+            EntityKind::Tank,
+            EntityKind::CommandCar,
+        ];
+        for kind in EntityKind::ALL {
+            let expected = if vehicle_body_kinds.contains(&kind) {
+                MovementBodyClass::VehicleBody
+            } else {
+                MovementBodyClass::InfantryLike
+            };
+            assert_eq!(movement_body_class(kind), expected, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn tank_trap_is_vehicle_only_static_blocker() {
+        assert_eq!(
+            static_blocker_class(EntityKind::TankTrap),
+            StaticBlockerClass::VehicleBodyOnly
+        );
+        assert_eq!(
+            static_blocker_class(EntityKind::Depot),
+            StaticBlockerClass::AllGround
+        );
+        assert_eq!(
+            static_blocker_class(EntityKind::Worker),
+            StaticBlockerClass::None
+        );
     }
 }

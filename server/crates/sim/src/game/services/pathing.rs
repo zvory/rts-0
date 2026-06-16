@@ -84,7 +84,7 @@ impl TerrainPassability<'_> {
         if !terrain::movement_allowed(self.kind, terrain_kind) {
             return false;
         }
-        if !self.occupancy.passable(tx, ty) {
+        if !self.occupancy.passable_for_kind(tx, ty, self.kind) {
             return false;
         }
         true
@@ -119,7 +119,7 @@ impl Passability for TerrainPassability<'_> {
         {
             return 0;
         }
-        vehicle_clearance_cost(self.occupancy.clearance_at_tile(tx, ty))
+        vehicle_clearance_cost(self.occupancy.clearance_at_tile_for_kind(tx, ty, self.kind))
             .saturating_add(self.vehicle_corner_cost(tx, ty))
     }
 }
@@ -229,7 +229,8 @@ impl PathingService {
             avoid_diagonal_pinch: uses_oriented_vehicle_body(req.kind),
         };
 
-        if let Some(tile_path) = self.cache_lookup(&req, &pass, occupancy.static_fingerprint()) {
+        let static_fingerprint = occupancy.static_fingerprint_for_kind(req.kind);
+        if let Some(tile_path) = self.cache_lookup(&req, &pass, static_fingerprint) {
             return tile_path;
         }
 
@@ -245,7 +246,7 @@ impl PathingService {
         );
 
         if !tile_path.is_empty() {
-            self.cache_insert(&req, occupancy.static_fingerprint(), tile_path.clone());
+            self.cache_insert(&req, static_fingerprint, tile_path.clone());
         }
         tile_path
     }
@@ -1093,6 +1094,171 @@ mod tests {
             2,
             "same request should cache separately when static clearance changes"
         );
+    }
+
+    #[test]
+    fn tank_trap_pathing_blocks_vehicle_body_but_not_infantry() {
+        let map = flat_test_map(12);
+        let mut entities = EntityStore::new();
+        let (tx, ty) =
+            crate::game::services::occupancy::footprint_center(&map, EntityKind::TankTrap, 5, 5);
+        entities
+            .spawn_building(1, EntityKind::TankTrap, tx, ty, true)
+            .expect("tank trap should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        let start = (2, 5);
+        let goal = (8, 5);
+
+        let infantry_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Rifleman,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+        assert_eq!(infantry_path.last().copied(), Some(goal));
+        assert!(
+            infantry_path.contains(&(5, 5)),
+            "infantry should be able to path through the Tank Trap tile: {infantry_path:?}"
+        );
+
+        let tank_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Tank,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+        assert_eq!(tank_path.last().copied(), Some(goal));
+        assert!(
+            !tank_path.contains(&(5, 5)),
+            "vehicle-body path should route around the Tank Trap tile: {tank_path:?}"
+        );
+    }
+
+    #[test]
+    fn tank_trap_vehicle_fingerprint_does_not_invalidate_infantry_cache() {
+        let map = flat_test_map(12);
+        let start = (2, 5);
+        let goal = (8, 5);
+        let empty_entities = EntityStore::new();
+        let empty_occ = Occupancy::build(&map, &empty_entities);
+        let mut service = PathingService::new(8_192, 256);
+        let infantry_req = PathRequest {
+            kind: EntityKind::Worker,
+            start,
+            goal,
+            radius_tiles: config::unit_radius_tiles(EntityKind::Worker),
+            route_shape: RouteShape::Normal,
+            budget: None,
+        };
+        let vehicle_req = PathRequest {
+            kind: EntityKind::Tank,
+            start,
+            goal,
+            radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+            route_shape: RouteShape::Normal,
+            budget: None,
+        };
+
+        assert_eq!(
+            service
+                .request_tile_path(&map, &empty_occ, infantry_req.clone())
+                .last()
+                .copied(),
+            Some(goal)
+        );
+        assert_eq!(
+            service
+                .request_tile_path(&map, &empty_occ, vehicle_req.clone())
+                .last()
+                .copied(),
+            Some(goal)
+        );
+        assert_eq!(service.cache_len(), 2);
+
+        let mut trap_entities = EntityStore::new();
+        let (tx, ty) =
+            crate::game::services::occupancy::footprint_center(&map, EntityKind::TankTrap, 5, 5);
+        trap_entities
+            .spawn_building(1, EntityKind::TankTrap, tx, ty, true)
+            .expect("tank trap should spawn");
+        let trap_occ = Occupancy::build(&map, &trap_entities);
+
+        assert_eq!(
+            service
+                .request_tile_path(&map, &trap_occ, infantry_req)
+                .last()
+                .copied(),
+            Some(goal)
+        );
+        assert_eq!(
+            service
+                .request_tile_path(&map, &trap_occ, vehicle_req)
+                .last()
+                .copied(),
+            Some(goal)
+        );
+        assert_eq!(
+            service.cache_len(),
+            3,
+            "Tank Trap should add a new vehicle-body cache entry without duplicating infantry"
+        );
+    }
+
+    #[test]
+    fn vehicle_path_does_not_cut_between_diagonal_touching_tank_traps() {
+        let map = flat_test_map(12);
+        let mut entities = EntityStore::new();
+        for (tile_x, tile_y) in [(5, 4), (6, 5)] {
+            let (x, y) = crate::game::services::occupancy::footprint_center(
+                &map,
+                EntityKind::TankTrap,
+                tile_x,
+                tile_y,
+            );
+            entities
+                .spawn_building(1, EntityKind::TankTrap, x, y, true)
+                .expect("tank trap should spawn");
+        }
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        let start = (4, 5);
+        let goal = (7, 4);
+        let tank_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Tank,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+
+        assert_eq!(tank_path.last().copied(), Some(goal));
+        let mut prev = start;
+        for next in tank_path {
+            assert_ne!(
+                (prev, next),
+                ((5, 5), (6, 4)),
+                "vehicle path should not cut the diagonal corner between touching Tank Traps"
+            );
+            prev = next;
+        }
     }
 
     #[test]

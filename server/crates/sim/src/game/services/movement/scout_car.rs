@@ -3,7 +3,6 @@ use crate::game::entity::{
     uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity, EntityKind, EntityStore,
 };
 use crate::game::map::Map;
-use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
     tile_rect, unit_body_for_entity, unit_body_intersects_rect, unit_body_with_facing, CircleBody,
     OrientedBoxBody, OrientedCapsuleBody, UnitBody,
@@ -874,14 +873,14 @@ fn static_clearance_px(
     let Some(body) = unit_body_with_facing(kind, pos.0, pos.1, facing) else {
         return -1.0;
     };
-    if body_hits_static_blocker(map, occ, body) {
+    if body_hits_static_blocker(map, occ, kind, body) {
         return -1.0;
     }
 
     let mut clearance = 0.0;
     while clearance <= SCOUT_CAR_CLEARANCE_SCORE_MAX_PX {
         let expanded = expanded_body(body, clearance + 2.0);
-        if body_hits_static_blocker(map, occ, expanded) {
+        if body_hits_static_blocker(map, occ, kind, expanded) {
             return clearance;
         }
         clearance += 2.0;
@@ -913,7 +912,12 @@ fn expanded_body(body: UnitBody, extra_px: f32) -> UnitBody {
     }
 }
 
-fn body_hits_static_blocker(map: &Map, occ: &Occupancy, body: UnitBody) -> bool {
+fn body_hits_static_blocker(
+    map: &Map,
+    occ: &Occupancy,
+    kind: EntityKind,
+    body: UnitBody,
+) -> bool {
     let aabb = body.aabb();
     let world_size = map.world_size_px();
     if aabb.min_x < 0.0 || aabb.min_y < 0.0 || aabb.max_x > world_size || aabb.max_y > world_size {
@@ -924,7 +928,7 @@ fn body_hits_static_blocker(map: &Map, occ: &Occupancy, body: UnitBody) -> bool 
         if !map.in_bounds(tx, ty) {
             return true;
         }
-        if (!map.is_passable(tx, ty) || !occ.passable(tx, ty))
+        if (!map.is_passable(tx, ty) || !occ.passable_for_kind(tx, ty, kind))
             && unit_body_intersects_rect(body, tile_rect(tx, ty))
         {
             return true;

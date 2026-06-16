@@ -1,7 +1,6 @@
 use crate::config;
 use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
-use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
     building_rect_for_entity, building_rect_for_footprint, circle_intersects_rect, rects_intersect,
     tile_rect, unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_intersects_rect,
@@ -47,7 +46,7 @@ pub(crate) fn unit_static_standable_with_facing(
         if !map.is_passable(tx, ty) && unit_body_intersects_rect(body, tile) {
             return false;
         }
-        if !occ.passable(tx, ty) && unit_body_intersects_rect(body, tile) {
+        if !occ.passable_for_kind(tx, ty, kind) && unit_body_intersects_rect(body, tile) {
             return false;
         }
     }
@@ -339,6 +338,71 @@ mod tests {
             EntityKind::Rifleman,
             rect.min_x + 32.0,
             rect.max_y + radius,
+        ));
+    }
+
+    #[test]
+    fn infantry_can_stand_on_tank_trap_but_vehicle_bodies_cannot() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, EntityKind::TankTrap, 5, 5);
+        entities
+            .spawn_building(1, EntityKind::TankTrap, x, y, true)
+            .expect("tank trap should spawn");
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Worker,
+            x,
+            y,
+        ));
+        assert!(unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            x,
+            y,
+        ));
+        for kind in [
+            EntityKind::AntiTankGun,
+            EntityKind::MortarTeam,
+            EntityKind::Artillery,
+            EntityKind::ScoutCar,
+            EntityKind::Tank,
+            EntityKind::CommandCar,
+        ] {
+            assert!(
+                !unit_static_standable(&map, &occ, kind, x, y),
+                "{kind:?} should reject Tank Trap footprint"
+            );
+        }
+    }
+
+    #[test]
+    fn tank_trap_scaffold_blocks_vehicle_body_standability() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, EntityKind::TankTrap, 5, 5);
+        entities
+            .spawn_building(1, EntityKind::TankTrap, x, y, false)
+            .expect("tank trap scaffold should spawn");
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Worker,
+            x,
+            y,
+        ));
+        assert!(!unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            x,
+            y,
         ));
     }
 

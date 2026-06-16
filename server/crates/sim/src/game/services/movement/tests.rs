@@ -481,7 +481,7 @@ fn body_hits_static_blocker(map: &Map, occ: &Occupancy, body: UnitBody) -> bool 
         if !map.in_bounds(tx, ty) {
             return true;
         }
-        if (!map.is_passable(tx, ty) || !occ.passable(tx, ty))
+        if (!map.is_passable(tx, ty) || !occ.passable_for_kind(tx, ty, EntityKind::ScoutCar))
             && unit_body_intersects_rect(body, tile_rect(tx, ty))
         {
             return true;
