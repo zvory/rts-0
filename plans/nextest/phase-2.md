@@ -1,6 +1,6 @@
 # Phase 2 - CI Nextest Enforcement
 
-Status: Draft.
+Status: Done.
 
 ## Goal
 
@@ -41,13 +41,23 @@ nextest-backed command developers run locally.
 
 ## Implementation Checklist
 
-- [ ] Install nextest in the Rust CI job.
-- [ ] Confirm the Rust CI job uses the local nextest-backed runner, not a separate command.
-- [ ] Preserve the aggregate `./tests/run-all.sh` job and its dependency list.
-- [ ] Remove redundant Rust/Integration workflows if still present.
-- [ ] Ensure docs-only PRs still get a green aggregate check without running long suites.
-- [ ] Record the first post-merge `Main test gate` run id and Rust job duration.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Install nextest in the Rust CI job.
+- [x] Confirm the Rust CI job uses the local nextest-backed runner, not a separate command.
+- [x] Preserve the aggregate `./tests/run-all.sh` job and its dependency list.
+- [x] Remove redundant Rust/Integration workflows if still present.
+- [x] Ensure docs-only PRs still get a green aggregate check without running long suites.
+- [x] Document that the outer runner must record the first post-merge `Main test gate` run id and
+  Rust job duration.
+- [x] Mark this phase done in the implementation commit.
+
+## Implementation Notes
+
+- `CI / rust and architecture` installs `cargo-nextest` and invokes
+  `./tests/run-all.sh --only-rust`.
+- The retired `.github/workflows/rust.yml` and `.github/workflows/integration.yml` workflows were
+  already absent in this phase worktree.
+- Post-merge `Main test gate` timing must be collected by the outer runner after the phase PR
+  merges; this executor cannot open or wait on a PR.
 
 ## Focused Verification
 
