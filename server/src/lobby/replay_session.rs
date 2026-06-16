@@ -1,12 +1,12 @@
 use super::replay_validation;
 use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
-use crate::game::command::SimCommand;
-use crate::game::map::Map;
-use crate::game::replay::{ReplayArtifactV1, ReplayValidationError};
-use crate::game::Game;
 use crate::protocol::{
     Event, ReplayBranchSeat, ReplayPlaybackState, ReplayVisionRequest, StartPayload,
 };
+use rts_sim::game::command::SimCommand;
+use rts_sim::game::map::Map;
+use rts_sim::game::replay::{ReplayArtifactV1, ReplayValidationError};
+use rts_sim::game::Game;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant as StdInstant};
 
@@ -354,7 +354,7 @@ impl ReplaySession {
 
     pub(super) fn tick(
         &mut self,
-        perf: Option<&mut crate::perf::TickPerf>,
+        perf: Option<&mut rts_sim::perf::TickPerf>,
     ) -> HashMap<u32, Vec<Event>> {
         self.game.tick_with_perf(perf).into_iter().collect()
     }
@@ -457,9 +457,9 @@ impl ReplaySession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::PlayerInit;
     use crate::protocol::Command;
     use rts_rules::faction::EMPTY_FIXTURE_FACTION_ID;
+    use rts_sim::game::PlayerInit;
 
     fn replay_test_players(count: usize) -> Vec<PlayerInit> {
         (1..=count as u32)
@@ -751,7 +751,7 @@ mod tests {
         let (_live, mut artifact) = replay_test_artifact(&players, 2);
         artifact
             .command_log
-            .push(crate::game::replay::CommandLogEntry {
+            .push(rts_sim::game::replay::CommandLogEntry {
                 tick: artifact.duration_ticks + 1,
                 player_id: players[0].id,
                 command: Command::Stop { units: vec![1] },

@@ -3,9 +3,9 @@ use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
-use crate::game::Game;
 use crate::protocol::{Event, PlayerScore, ServerMessage};
 use rts_ai::{AiController, AiThinkContext};
+use rts_sim::game::Game;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant as StdInstant};
 use tokio::time::Instant as TokioInstant;
@@ -43,7 +43,7 @@ impl LiveTickDriver<'_> {
     pub(super) fn run(mut self, mut game: Box<Game>) -> LiveTickResult {
         let scheduler_lag = self.scheduled.elapsed();
         let tick_start = StdInstant::now();
-        let mut perf = crate::perf::TickPerf::maybe_new();
+        let mut perf = rts_sim::perf::TickPerf::maybe_new();
 
         let tick_result = self.tick_game(&mut game, perf.as_mut());
         let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
@@ -100,7 +100,7 @@ impl LiveTickDriver<'_> {
     fn tick_game(
         &mut self,
         game: &mut Game,
-        perf: Option<&mut crate::perf::TickPerf>,
+        perf: Option<&mut rts_sim::perf::TickPerf>,
     ) -> std::thread::Result<Vec<(u32, Vec<Event>)>> {
         let mut perf = perf;
         let game_tick_start = StdInstant::now();
@@ -114,8 +114,8 @@ impl LiveTickDriver<'_> {
         result
     }
 
-    fn enqueue_ai_commands(&mut self, game: &mut Game, perf: Option<&mut crate::perf::TickPerf>) {
-        crate::perf::timed(perf, "ai_think", || {
+    fn enqueue_ai_commands(&mut self, game: &mut Game, perf: Option<&mut rts_sim::perf::TickPerf>) {
+        rts_sim::perf::timed(perf, "ai_think", || {
             if self.ai_controllers.is_empty() {
                 return;
             }
@@ -152,13 +152,13 @@ impl LiveTickDriver<'_> {
         per_player_events: &mut HashMap<u32, Vec<Event>>,
         scheduler_lag: Duration,
         tick_start: StdInstant,
-        mut perf: Option<&mut crate::perf::TickPerf>,
+        mut perf: Option<&mut rts_sim::perf::TickPerf>,
     ) {
         let full_vision_events = match perf.as_mut() {
-            Some(perf) => crate::perf::timed(Some(&mut **perf), "event_union", || {
+            Some(perf) => rts_sim::perf::timed(Some(&mut **perf), "event_union", || {
                 union_events(per_player_events.values())
             }),
-            None => crate::perf::timed(None, "event_union", || {
+            None => rts_sim::perf::timed(None, "event_union", || {
                 union_events(per_player_events.values())
             }),
         };
@@ -293,7 +293,7 @@ impl LiveTickDriver<'_> {
 
     fn finish_perf_tick(
         &self,
-        perf: Option<&crate::perf::TickPerf>,
+        perf: Option<&rts_sim::perf::TickPerf>,
         game: &Game,
         scheduler_lag: Duration,
         tick_start: StdInstant,
@@ -301,7 +301,7 @@ impl LiveTickDriver<'_> {
         let Some(perf) = perf else {
             return;
         };
-        perf.finish(crate::perf::TickContext {
+        perf.finish(rts_sim::perf::TickContext {
             room: self.room,
             match_run_id: self.match_run_id.unwrap_or(""),
             tick: game.current_tick(),

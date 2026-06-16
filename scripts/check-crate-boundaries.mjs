@@ -18,6 +18,18 @@ const allowedWorkspaceDeps = new Map([
 
 const serverOnlyDeps = new Set(["axum", "tokio", "tower-http", "tracing-subscriber"]);
 const serverOnlyImportPattern = /\b(axum|tokio|tower_http|tracing_subscriber|rts_server)::/;
+const forbiddenPublicFacades = [
+  {
+    file: "server/src/lib.rs",
+    pattern: /^\s*pub\s+use\s+rts_(?:ai|sim)\b/m,
+    message: "server/src/lib.rs must not publicly re-export whole lower crates; import the needed crate directly",
+  },
+  {
+    file: "server/src/lobby/mod.rs",
+    pattern: /^\s*pub\s+use\s+snapshots::compact_snapshot_for_wire\b/m,
+    message: "server/src/lobby/mod.rs must not publicly re-export snapshot compaction; keep it lobby/crate local",
+  },
+];
 
 function cargoMetadata() {
   return JSON.parse(
@@ -97,6 +109,13 @@ for (const pkg of metadata.packages) {
     if (match) {
       failures.push(`${pkg.name} imports server-only API ${match[1]} in ${path.relative(repoRoot, file)}`);
     }
+  }
+}
+
+for (const facade of forbiddenPublicFacades) {
+  const file = path.join(repoRoot, facade.file);
+  if (existsSync(file) && facade.pattern.test(readFileSync(file, "utf8"))) {
+    failures.push(facade.message);
   }
 }
 

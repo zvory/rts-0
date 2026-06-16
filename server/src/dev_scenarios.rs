@@ -1,4 +1,4 @@
-use crate::game::entity::EntityKind;
+use rts_sim::game::entity::EntityKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DevScenarioLaunch {

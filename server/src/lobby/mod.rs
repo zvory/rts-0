@@ -31,14 +31,14 @@ use tokio::time::{interval, MissedTickBehavior};
 
 use crate::config;
 use crate::db::Db;
-use crate::game::command::SimCommand;
-use crate::game::replay::ReplayArtifactV1;
-use crate::game::{Game, PlayerInit};
 use crate::protocol::{
     BranchStagingOccupant, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata,
     ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload, TeamId,
 };
 use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
+use rts_sim::game::command::SimCommand;
+use rts_sim::game::replay::ReplayArtifactV1;
+use rts_sim::game::{Game, PlayerInit};
 
 mod connection;
 mod crash_replay;
@@ -57,7 +57,7 @@ use dev_replay::room_mode_for;
 use replay_session::{validate_replay_vision_request, ReplaySession};
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
 use room_task::{RoomMode, RoomTask};
-pub use snapshots::compact_snapshot_for_wire;
+pub(crate) use snapshots::compact_snapshot_for_wire;
 
 /// Player colors, assigned in colorblind-safer order. MUST match `client/src/config.js`
 /// `PLAYER_PALETTE`.

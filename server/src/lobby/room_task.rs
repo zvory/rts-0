@@ -9,9 +9,6 @@ use super::replay_branch::{BranchLaunchError, BranchStagingState};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
 use super::*;
-use crate::game::entity::EntityKind;
-use crate::game::map::Map;
-use crate::game::replay::ReplayArtifactV1;
 #[cfg(test)]
 use crate::protocol::SnapshotNetStatus;
 use crate::protocol::{ReplayPlaybackState, PREDICTION_PROTOCOL_VERSION};
@@ -19,6 +16,9 @@ use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rts_ai::{AiController, DEFAULT_LIVE_PROFILE_ID};
+use rts_sim::game::entity::EntityKind;
+use rts_sim::game::map::Map;
+use rts_sim::game::replay::ReplayArtifactV1;
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
 
@@ -2114,7 +2114,7 @@ impl RoomTask {
         per_player_events: HashMap<u32, Vec<Event>>,
         scheduler_lag: Duration,
         tick_start: StdInstant,
-        perf: Option<&mut crate::perf::TickPerf>,
+        perf: Option<&mut rts_sim::perf::TickPerf>,
     ) {
         let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
@@ -2244,12 +2244,12 @@ impl RoomTask {
         };
         let scheduler_lag = scheduled.elapsed();
         let tick_start = StdInstant::now();
-        let mut perf = crate::perf::TickPerf::maybe_new();
+        let mut perf = rts_sim::perf::TickPerf::maybe_new();
         let Some(mut driver) = self.dev_driver.take() else {
             self.phase = Phase::InGame(game);
             return;
         };
-        crate::perf::timed(perf.as_mut(), "dev_driver_enqueue", || match &mut driver {
+        rts_sim::perf::timed(perf.as_mut(), "dev_driver_enqueue", || match &mut driver {
             DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
             DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(&mut game),
         });
@@ -2325,7 +2325,7 @@ impl RoomTask {
         };
         let scheduler_lag = scheduled.elapsed();
         let tick_start = StdInstant::now();
-        let mut perf = crate::perf::TickPerf::maybe_new();
+        let mut perf = rts_sim::perf::TickPerf::maybe_new();
 
         if session.has_remaining_ticks() {
             if let Err(err) = session.enqueue_for_current_tick() {
@@ -2953,7 +2953,7 @@ impl RoomTask {
 
     fn finish_perf_tick(
         &self,
-        perf: Option<&crate::perf::TickPerf>,
+        perf: Option<&rts_sim::perf::TickPerf>,
         game: &Game,
         scheduler_lag: Duration,
         tick_start: StdInstant,
@@ -2961,7 +2961,7 @@ impl RoomTask {
         let Some(perf) = perf else {
             return;
         };
-        perf.finish(crate::perf::TickContext {
+        perf.finish(rts_sim::perf::TickContext {
             room: &self.room,
             match_run_id: self.match_run_id.as_deref().unwrap_or(""),
             tick: game.current_tick(),
