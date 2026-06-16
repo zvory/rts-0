@@ -32,15 +32,17 @@ instead of reaching into entity stores from the server layer.
 **Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
-`ai_1_1_tank_mg` profile by default and keep that profile for the whole match. Hosts can select
-`ai_1_0_tech` or `ai_1_1_tank_mg` per AI seat from the lobby before countdown/start; unsupported
-profile ids are ignored or defaulted to the highest supported live AI version. Team relationships are observation-only safety
+`ai_1_2_tank_mg_micro` profile by default and keep that profile for the whole match. Hosts can
+select `ai_1_0_tech`, `ai_1_1_tank_mg`, or `ai_1_2_tank_mg_micro` per AI seat from the lobby before
+countdown/start; unsupported profile ids are ignored or defaulted to the highest supported live AI version. Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
 current living player set so attack waves keep choosing living enemies. AI teammates still do not
 share economy, production, command authority, build orders, attack plans, or a team controller.
-It does not micro, scout, or choose hidden enemy unit positions. A local per-think budget in the
-shared action layer prevents it from over-committing resources/supply it does not have.
+It does not scout or choose hidden enemy unit positions. AI 1.2 has a narrow snapshot-driven combat
+micro pass: badly wounded Tanks can receive ordinary `Move` commands back toward their own start
+position before frontal-wave orders are calculated. A local per-think budget in the shared action
+layer prevents it from over-committing resources/supply it does not have.
 
 **Shared AI core.** `rts_ai::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.
@@ -110,13 +112,19 @@ stage orders roughly 20 tiles past the main steel line toward the nearest living
 using public resource geometry rather than hidden enemy positions. This pushes the defensive group
 out far enough to contest approaches before attackers reach the expansion. Visible threats near the
 base, home resource line, or workers still take priority over passive perimeter staging.
-The aliases `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`; `ai_1_0`, `ai_1_0_tech`, and `ai1`
-resolve to `ai_1_0_tech`; `ai` and `default` resolve to the live default.
+AI 1.2 (`ai_1_2_tank_mg_micro`) forks AI 1.1 without adding new unit types: it keeps the two-Factory
+Tank/MG plan, asks for a fifth defensive Machine Gunner, expands a little earlier, pushes toward
+deeper two-base steel saturation, carries more oil workers for Tank production, launches its first
+Tank-only wave at four Tanks instead of six, reissues waves more often, and pulls badly wounded
+Tanks back toward home using only snapshot-visible HP.
+The aliases `ai_1_2` and `ai12` resolve to `ai_1_2_tank_mg_micro`; `ai_1_1` and `ai11` resolve to
+`ai_1_1_tank_mg`; `ai_1_0`, `ai_1_0_tech`, and `ai1` resolve to `ai_1_0_tech`; `ai` and `default`
+resolve to the live default.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
-highest supported live AI version, currently `ai_1_1_tank_mg`. The ordinary lobby exposes only
-AI 1.0 and AI 1.1; older experimental profile ids are no longer listed or accepted by developer
-tooling. AI 1.1 is the live lobby default.
+highest supported live AI version, currently `ai_1_2_tank_mg_micro`. The ordinary lobby exposes
+AI 1.0, AI 1.1, and AI 1.2; older experimental profile ids are no longer listed or accepted by
+developer tooling. AI 1.2 is the live lobby default.
 
 **Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player

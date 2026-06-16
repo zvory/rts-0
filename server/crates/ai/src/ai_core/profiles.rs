@@ -8,6 +8,7 @@ pub(crate) const TECH_TO_TANKS_ID: &str = "tech_to_tanks";
 pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
 pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
+pub(crate) const AI_1_2_TANK_MG_MICRO_ID: &str = "ai_1_2_tank_mg_micro";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
@@ -755,8 +756,65 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 2] {
-    [&AI_1_0_TECH, &AI_1_1_TANK_MG]
+pub(crate) static AI_1_2_TANK_MG_MICRO: AiProfile = AiProfile {
+    id: AI_1_2_TANK_MG_MICRO_ID,
+    workers: WorkerPolicy {
+        steel_saturation_fraction: Ratio::new(1, 1),
+        steel_worker_cap: None,
+        extra_oil_workers: 8,
+        pressure_worker_cap: None,
+        pressure_until_complete: None,
+    },
+    supply: SupplyPolicy {
+        free_supply_buffer: 8,
+        emergency_depot_threshold: 2,
+    },
+    buildings: AI_1_1_TANK_MG.buildings,
+    production: AI_1_1_TANK_MG.production,
+    attack: AI_1_1_TANK_MG.attack,
+    resources: ResourcePolicy {
+        oil_after_steel_workers: 8,
+        oil_after_full_steel_saturation: false,
+        tank_adaptive: None,
+    },
+    expansion: Some(ExpansionPolicy {
+        target_city_centres: 2,
+        required_complete_building: EntityKind::TrainingCentre,
+        defensive_unit: EntityKind::Rifleman,
+        defensive_unit_count: 3,
+        pre_expansion_steel_worker_cap: 16,
+        post_expansion_steel_worker_cap: Some(40),
+        search_radius_tiles: 6,
+        trigger_steel: 300,
+        trigger_supply_used: 26,
+        blocks_tech_path: false,
+        oil_before_steel_in_expansion: true,
+    }),
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 5 }),
+    recovery_transition: None,
+    tech_transition: Some(TechTransitionPolicy {
+        supply_used_threshold: 28,
+        required_tech_path: &AI_1_0_TANK_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 3,
+            unit_priorities: &TANK_ONLY,
+            save_for_first_tech_unit: Some(EntityKind::Tank),
+            balance_unit_priorities: false,
+        },
+        attack: AttackPolicy {
+            first_attack_size: 4,
+            wave_growth: 1,
+            regroup_reset_ticks: 360,
+            reissue_cadence_ticks: 90,
+            stage_distance_tiles: 7.0,
+            unit_kinds: &TANK_ONLY,
+            required_unit: Some(EntityKind::Tank),
+        },
+    }),
+};
+
+pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
+    [&AI_1_0_TECH, &AI_1_1_TANK_MG, &AI_1_2_TANK_MG_MICRO]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
@@ -775,12 +833,16 @@ mod tests {
 
         assert_eq!(
             profiles.map(|profile| profile.id),
-            [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID]
+            [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID, AI_1_2_TANK_MG_MICRO_ID]
         );
         assert_eq!(profile_by_id(AI_1_0_TECH_ID).unwrap().id, AI_1_0_TECH_ID);
         assert_eq!(
             profile_by_id(AI_1_1_TANK_MG_ID).unwrap().id,
             AI_1_1_TANK_MG_ID
+        );
+        assert_eq!(
+            profile_by_id(AI_1_2_TANK_MG_MICRO_ID).unwrap().id,
+            AI_1_2_TANK_MG_MICRO_ID
         );
         assert!(profile_by_id("tech_tree").is_none());
     }
@@ -819,6 +881,39 @@ mod tests {
             AI_1_1_TANK_MG.defensive_machine_gunners,
             Some(DefensiveMachineGunnerPolicy { target_count: 4 })
         );
+    }
+
+    #[test]
+    fn ai_1_2_forks_ai_1_1_with_faster_tank_pressure_and_micro() {
+        let transition = AI_1_2_TANK_MG_MICRO.tech_transition.unwrap();
+        let expansion = AI_1_2_TANK_MG_MICRO.expansion.unwrap();
+
+        assert_eq!(
+            AI_1_2_TANK_MG_MICRO.workers.steel_saturation_fraction,
+            AI_1_1_TANK_MG.workers.steel_saturation_fraction
+        );
+        assert_eq!(AI_1_2_TANK_MG_MICRO.workers.steel_worker_cap, None);
+        assert_eq!(AI_1_2_TANK_MG_MICRO.workers.extra_oil_workers, 8);
+        assert_eq!(
+            AI_1_2_TANK_MG_MICRO.buildings,
+            AI_1_1_TANK_MG.buildings
+        );
+        assert_eq!(AI_1_2_TANK_MG_MICRO.buildings.factory_target, 2);
+        assert_eq!(expansion.pre_expansion_steel_worker_cap, 16);
+        assert_eq!(expansion.post_expansion_steel_worker_cap, Some(40));
+        assert_eq!(
+            AI_1_2_TANK_MG_MICRO.defensive_machine_gunners,
+            Some(DefensiveMachineGunnerPolicy { target_count: 5 })
+        );
+        assert_eq!(transition.production.unit_priorities, &[EntityKind::Tank]);
+        assert_eq!(transition.production.queue_depth, 3);
+        assert!(!transition
+            .production
+            .unit_priorities
+            .contains(&EntityKind::ScoutCar));
+        assert_eq!(transition.attack.first_attack_size, 4);
+        assert_eq!(transition.attack.wave_growth, 1);
+        assert!(transition.attack.reissue_cadence_ticks < 120);
     }
 
     #[test]
