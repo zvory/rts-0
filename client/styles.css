@@ -1930,12 +1930,13 @@ input[type="text"]:focus {
   bottom: 12px;
   transform: translateX(-50%);
   width: clamp(280px, 36vw, 520px);
-  height: var(--bottom-hud-height);
+  max-height: var(--bottom-hud-height);
   max-width: calc(100vw - 24px);
   pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  justify-content: flex-end;
 }
 #control-group-tabs {
   display: grid;
@@ -2010,7 +2011,7 @@ input[type="text"]:focus {
   min-width: 280px;
   width: 100%;
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   padding: 10px 14px;
   border-radius: var(--radius);
   pointer-events: auto;
