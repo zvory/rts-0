@@ -113,6 +113,20 @@ function buttonSlots(card) {
   assert.equal(buildCard.slots[0].hotkey, "Q");
   assert.equal(buildCard.slots[8].commandId, "worker.return");
   assert.equal(buildCard.slots[8].hotkey, "C");
+  assert.deepEqual(commandCardActivationCandidates(workerCard, "worker.buildMenu"), [{
+    commandId: "worker.buildMenu",
+    slotIndex: 6,
+    hotkey: "Z",
+    label: "Build",
+    enabled: true,
+  }], "worker build menu dispatch stays descriptor-driven");
+  assert.deepEqual(buildCard.slots[0].intent, {
+    type: "beginPlacement",
+    building: KIND.CITY_CENTRE,
+  }, "worker build dispatch keeps placement intent in the descriptor");
+  assert.deepEqual(buildCard.slots[8].intent, {
+    type: "closeCommandCardMenu",
+  }, "worker return dispatch keeps submenu-close intent in the descriptor");
 }
 
 {
