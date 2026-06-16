@@ -129,6 +129,16 @@ current workflow. PR pushes cancel superseded runs for the same PR without cance
 branches, and beta deploys are tied only to successful tested `main` push runs, not unmerged PR
 heads.
 
+Current GitHub repository settings for `zvory/rts-0`:
+
+- repository auto-merge is enabled;
+- delete-branch-on-merge is enabled;
+- `main` is protected and requires pull requests before normal merges;
+- `main` requires branches to be up to date and requires
+  `Main test gate / ./tests/run-all.sh`;
+- force pushes and branch deletion are disabled;
+- admins may bypass protection only for emergency repair and the active CI migration phases.
+
 The local gate uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
 parallel agents do not share final binaries or test artifacts.
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Pending.
+Done.
 
 ## Goal
 
@@ -49,3 +49,15 @@ auto-merge availability on a PR and that the required checks match Phase 1's nam
 Include the exact settings evidence and any admin-bypass decision. If branch protection cannot
 express a needed rule, document the gap and the compensating script or workflow check planned for
 Phase 4.
+
+## Implementation notes
+
+- Repository auto-merge is enabled.
+- Delete-branch-on-merge is enabled.
+- `main` branch protection is enabled through the branch protection API.
+- Required status check: `Main test gate / ./tests/run-all.sh`.
+- Branches must be up to date before merge (`required_status_checks.strict: true`).
+- Pull requests are required for normal merges with zero required approving reviews.
+- Force pushes and branch deletion are disabled.
+- Admin enforcement is disabled so admin bypass remains available only for emergency repair and
+  the active CI migration phases that still run before Phase 5 replaces the runner.
