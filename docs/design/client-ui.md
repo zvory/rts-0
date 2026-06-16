@@ -12,9 +12,13 @@ src/
   config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
+  prediction_compatibility.js # server/client prediction-build compatibility guard
+  prediction_settings.js # localStorage-backed prediction toggle
+  sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   client_intent.js # ClientIntent: browser-local placement, command targeting, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
+  progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
@@ -26,6 +30,10 @@ src/
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen controller: name/room, ready/start, host controls
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
+  scoreboard.js   # Shared score/result formatting helpers
+  observer_analysis_overlay.js # replay/live spectator analysis overlay
+  match_health.js # match network/render health reporter
+  branch_staging.js # replay branch staging panel
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
@@ -45,23 +53,34 @@ export class Net {
   connect(): Promise<void>
   on(type, handler)                      // type ∈ ServerMessage tags + "open"/"close"
   off(type, handler)
-  join(name, room)
+  join(name, room, spectator?, replayOk?)
   ready(isReady)
   start()
-  setTeamPreset(preset)                  // host-only scripted lobby preset: solo, ffa, 1v2, 1v3, 2v2
+  setTeamPreset(preset)                  // deprecated compatibility command; server ignores it
   setTeam(id, teamId)                    // host-only scripted lobby team assignment
+  setFaction(factionId)
   addAi(teamId?, aiProfileId?)
+  setAiProfile(id, aiProfileId)
   removeAi(id)
   setQuickstart(enabled)
+  setSpectator(spectator, id?)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
+  giveUp()
+  returnToLobby()
   ping()
+  netReport(report)
   setReplaySpeed(speed)                  // replay rooms and dev-watch scenarios
+  stepDevTick()                          // paused dev scenarios
   seekReplay(ticksBack)                  // replay rooms; pass huge N for full reset
+  seekReplayTo(tick)
+  setReplayVision(vision)
   requestReplayBranch()
   claimBranchSeat(playerId)
   releaseBranchSeat(playerId)
   startBranch()
+  selectMap(map)
   get playerId()
+  get bufferedAmount()
 }
 ```
 
@@ -242,13 +261,14 @@ Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`
 `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Faction catalog
 actions are stored under `factionBindings[factionId]` with namespaced command ids shaped as
 `kriegsia.build.<kind>`, `kriegsia.train.<kind>`, `kriegsia.research.<upgrade>`, and
-`kriegsia.ability.<ability>`; Ekat reserves the same `ekat.*` namespace but has no
-command cards yet. Imports migrate old flat Kriegsia ids like `build.city_centre` into the
-Kriegsia binding set, preserve structurally valid unavailable faction commands with warnings,
-ignore unknown non-faction commands with warnings, reject invalid keys and same-context duplicates,
-and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to avoid local
-collisions; targeted imports replace the whole target profile payload instead of merging individual
-bindings.
+`kriegsia.ability.<ability>`. Ekat uses the same `ekat.*` namespace for its exposed ability
+commands, currently `ekat.ability.ekatTeleport`, `ekat.ability.ekatLineShot`, and
+`ekat.ability.ekatMagicAnchor`. Imports migrate old flat Kriegsia ids like `build.city_centre`
+into the Kriegsia binding set, preserve structurally valid unavailable faction commands with
+warnings, ignore unknown non-faction commands with warnings, reject invalid keys and same-context
+duplicates, and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to
+avoid local collisions; targeted imports replace the whole target profile payload instead of
+merging individual bindings.
 
 The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
@@ -695,15 +715,19 @@ baseline, rejects unclassified files, and rejects cross-area imports that are no
 by an explicit allowlist reason in the script.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, match health, replay viewer/control/analysis wiring.
-- `model`: `state.js`, `command_composer.js`.
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
+  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`.
+- `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
+  `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
+  `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`.
 - `rules-mirror`: `config.js`.
-- `ui`: HUD, command card, lobby controller/view, match history, minimap, status badge, branch staging, settings.
+- `ui`: HUD, command card, lobby controller/view, match history, minimap, resource icons,
+  scoreboard, status badge, branch staging, settings.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, audio, combat audio, alerts, fog, camera.
+- `platform`: bootstrap, audio, combat audio, alerts, fog, camera, prediction settings.
 
 Import rules:
 - `protocol.js` and `config.js` are shared mirrors and may be imported where needed.

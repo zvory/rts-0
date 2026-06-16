@@ -10,20 +10,24 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - §4.2 Rendering & look (PixiJS, procedural art)
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`, `replay_controls.js`,
-  `replay_viewer.js` — app lifecycle, dependency injection, replay shell.
-- `model`: `state.js`, `command_composer.js`, `prediction_controller.js` — client snapshot state,
-  command-target lifetime, and local command prediction bookkeeping.
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
+  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js` — app lifecycle,
+  dependency injection, replay/spectator analysis shell.
+- `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
+  `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
+  `sim_wasm_adapter.js` — client snapshot state, browser-local intent, command-budget admission,
+  progress display extrapolation, and prediction bookkeeping/adapters.
 - `transport`: `net.js`, `protocol.js` — WebSocket wrapper and wire mirror.
 - `rules-mirror`: `config.js` — UI/render/fog subset of mirrored balance.
 - `ui`: `hud.js`, `hud_command_card.js`, `hotkey_editor.js`, `hotkey_profiles.js`, `lobby.js`,
-  `match_history.js`, `status_badge.js`, `minimap.js`, `branch_staging.js`,
-  `settings_container.js`, `settings_panels.js` — DOM/HUD/lobby/minimap/settings surfaces.
+  `lobby_view.js`, `match_history.js`, `resource_icons.js`, `scoreboard.js`, `status_badge.js`,
+  `minimap.js`, `branch_staging.js`, `settings_container.js`, `settings_panels.js` —
+  DOM/HUD/lobby/minimap/settings and shared display helpers.
 - `input`: `input/` plus `replay_camera_input.js` — input facade, shared camera navigation, and
   area-local collaborators.
 - `renderer`: `renderer/` — Pixi facade, layers, terrain, entity, fog, feedback, art helpers.
-- `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`
-  — browser/platform services and camera/fog helpers.
+- `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`,
+  `prediction_settings.js` — browser/platform services and camera/fog/persistent-setting helpers.
 
 ## Invariants
 - **No framework, no JS build step.** Plain ES2020 modules. PixiJS v7 is the global `PIXI` — do

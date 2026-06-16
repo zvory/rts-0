@@ -20,7 +20,7 @@ crate.
 
 | `t`        | Fields | Meaning |
 |------------|--------|---------|
-| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player. `room` defaults to `"main"`. The normal lobby UI does not expose role selection; `spectator` remains for replay/dev/legacy observer joins. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
+| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as a lobby observer. `room` defaults to `"main"`. Spectator joins and lobby role switches are observer-only and must happen before match start. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). |
 | `setTeamPreset` | `preset: string` | Deprecated compatibility command. The server ignores it; lobby teams are host-managed slots. |
@@ -45,6 +45,7 @@ crate.
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
 | `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server rejects launch until every original active seat is claimed; live promotion is handled by the branch promotion phase. |
+| `selectMap` | `map: string` | Host selects the lobby map by its stable map name. Ignored outside the lobby, from non-hosts, during match countdown, or in dev-watch rooms. The server broadcasts the selected value as lobby `map` and the available catalog as `maps[]`. |
 
 Live player `command` messages MUST include `clientSeq`; unsequenced live commands are
 protocol-invalid and are not executed. The browser resets allocation to `1` on every `start`
@@ -136,7 +137,7 @@ authority.
 | `t`        | Fields |
 |------------|--------|
 | `welcome`  | `playerId: u32` — assigned on connect. |
-| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool`, `teamPreset: string` |
+| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
 | `matchCountdown` | `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, rejects new joins, and sends `start` only after the countdown duration elapses. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
@@ -156,6 +157,10 @@ profile selector, and a host-only remove control instead of a ready toggle). `ai
 present only for computer opponents and identifies the live AI profile that seat will use when the
 match starts. `isSpectator` is true for human observers; they do not consume active map starts,
 block readiness, or count toward win/loss.
+
+`AvailableMap`: `{ name: string, description: string }`. `name` is the stable value sent back in
+`selectMap`; `description` is display text for the lobby selector. Lobby `map` is the current
+selected map name and is distinct from replay start metadata `mapName`.
 
 `teamId` is nonzero for active match players and AI seats. New active players and default-added AI
 opponents are assigned to the next empty team after the currently occupied teams when possible,
@@ -239,10 +244,10 @@ simulation/replay/test-helper boundaries default to singleton FFA: the player's 
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
 The canonical default faction id is `kriegsia`; `ekat` is also a playable catalog id. Start payloads emit `factionId` for every active
 start player, lobby seat, and replay branch seat, and replay artifacts store `faction_id` for every
-player. Normal lobby, AI, quickstart, self-play, and dev starts all default to `kriegsia` through
-server-side faction policy validation. Other ids are rejected unless a lifecycle path explicitly
-accepts recorded replay data or a test fixture; the reserved future `ekat` id has no protocol
-or catalog payload yet.
+player. Missing faction requests default to `kriegsia` in normal lobby, AI, quickstart, self-play,
+and dev-start contexts, while explicit `kriegsia` and `ekat` requests are accepted by the current
+playable faction policy. Other ids are rejected unless a lifecycle path explicitly accepts recorded
+replay data or the `phase2_empty_fixture` test fixture.
 
 Prediction start compatibility metadata is present only for live active players. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version
@@ -368,7 +373,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
@@ -382,8 +387,8 @@ trailing missing optional fields are omitted; interior missing optional fields a
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
 stage first, followed by queued unit stages in execution order. Each compact stage is
 `[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`,
-6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, or
-11 `breakthrough`.
+6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`,
+11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, or 14 `ekatMagicAnchor`.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
@@ -454,7 +459,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","tank","command_car","city_centre","depot","barracks","training_centre","research_complex","factory","steelworks"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","anti_tank_gun","mortar_team","artillery","scout_car","tank","command_car","ekat","city_centre","zamok","depot","barracks","training_centre","research_complex","factory","steelworks"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"

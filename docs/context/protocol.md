@@ -17,6 +17,13 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
 - `client/src/protocol.js` — mirror; must agree on every tag, field name, and shape
 
+## Current lobby fields to remember
+- `selectMap { map }` is the host-only map selector command.
+- `lobby` carries `map` (selected stable map name) and `maps[]` (`{name, description}` catalog
+  rows). Replay start metadata separately uses `mapName`.
+- `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?`, and `isSpectator`; spectators are
+  lobby members but not active match players.
+
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**
   [docs/design/protocol.md](../design/protocol.md) in the same commit.
