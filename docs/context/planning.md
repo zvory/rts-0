@@ -15,8 +15,10 @@ name is short, lowercase, and descriptive.
 - In `plan.md`, state that after implementing each phase, the implementing agent must provide a
   handoff message describing what the next agent should do and what should be manually tested.
   Manual testing notes should cover core features, not an exhaustive test matrix.
-- Each phase should be implemented, committed, merged to `main`, and pushed before the next phase
-  begins.
+- Each phase should be implemented and committed on its own branch, then pushed as an owned PR with
+  auto-merge armed.
+- Serial phase work must wait for a definite PR merge and verify the phase head is reachable from
+  `origin/main` before the next phase begins.
 - When a phase is complete, mark that phase document as done in the implementation commit for that
   phase.
 - For executor-only automation, `scripts/phase-runner.sh` can run existing phase files in isolated

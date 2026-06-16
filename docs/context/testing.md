@@ -17,7 +17,7 @@ Use when writing or debugging tests, or before claiming a change is done.
   tri-state lag scenarios locally; CI includes them automatically
 - `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
 - `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
-- `tests/run-all.sh --full-ai` — local gate plus long AI self-play/simulation coverage
+- `tests/run-all.sh --full-ai` — full orchestrator plus long AI self-play/simulation coverage
 - `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files
 - `node scripts/check-wiki.mjs` — wiki route hardening, internal links, generated stats table
   completeness, and faction catalog parity
@@ -26,9 +26,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   enforce `rts-sim::game` internal architecture ratchets
 
 ## Invariants
-- The stable required PR gate is `Main test gate / ./tests/run-all.sh`. It runs the same
-  `tests/run-all.sh` command used by the local hook on pull requests targeting `main` and on
-  pushes to `main`.
+- The stable required PR gate is `Main test gate / ./tests/run-all.sh`. It runs the portable
+  repo-root `tests/run-all.sh` command on pull requests targeting `main` and on pushes to `main`.
 - `Rust / test` and `Integration / integration` are auxiliary PR checks with stable names. They
   give faster package and live-integration signal, but branch protection should treat the full gate
   as the canonical required check unless a later plan phase changes that contract.
@@ -36,9 +35,11 @@ Use when writing or debugging tests, or before claiming a change is done.
   unrelated branches should not cancel each other.
 - Beta deploys are triggered only from successful `Main test gate` workflow runs whose original
   event was a push to `main`; PR-head workflow runs must not deploy.
-- Local gate scripts use a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
+- `tests/run-all.sh` uses a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
   parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
   with `CARGO_TARGET_DIR` if a task needs a specific target location.
+- Installed hooks run cheap staged-diff checks before commits and merges. They do not run
+  `tests/run-all.sh` by default; GitHub Actions owns the full-suite gate for normal PR work.
 - Installed hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main` to
   remove clean merged `zvorygin/*` worktrees and amortize stale Cargo target cleanup.
 - Browser smoke dependencies are shared across worktrees under
@@ -57,10 +58,10 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `node tests/team_integration.mjs` is the canonical live multi-client team suite. It covers
   singleton FFA, solo, `1v2`, `1v3`, `2v2`, shared team snapshots, malicious lobby/team/combat
   inputs, and team victory. `tests/run-all.sh --no-rust` includes it in the live Node API pass.
-- After any change, run all relevant Node suites + `cargo test` and confirm green. Use
+- After any change, run the focused local suites that match the changed files or contracts. Use
   `RTS_FULL_AI_TESTS=1 cargo test` when touching AI strategy, profile-backed self-play, replay
-  determinism, or balance behavior that depends on long AI matches. The commit hook silently runs
-  the full local gate; don't rely on it as your only check for changes that need `--full-ai`.
+  determinism, or balance behavior that depends on long AI matches. The PR full gate is required
+  for merge; do not rely on cheap local hooks as test coverage.
 - A suite can be skipped only when `tests/select-suites.mjs` maps the changed files away from that
   behavior and both architecture checks still pass:
   `scripts/check-crate-boundaries.mjs` and `rts-archcheck check-sim-architecture`.

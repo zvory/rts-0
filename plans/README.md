@@ -16,7 +16,9 @@ clearer.
   next agent.
 - A requirement that each handoff message names the core features that should be manually tested.
   This should not be a comprehensive test matrix.
-- A requirement to merge to `main` after each phase before starting the next phase.
+- A requirement to push each phase branch as an owned PR with auto-merge armed.
+- A requirement that serial phase work waits for a definite PR merge and verifies the phase head is
+  reachable from `origin/main` before starting the next phase.
 
 Each phase document should describe its scope, expected code or documentation touch points,
 verification, manual testing focus, and handoff expectations. When a phase is complete, mark that
@@ -30,4 +32,6 @@ the repo-local `$phase-runner` skill, saves a compact JSON handoff under the pla
 commits completed phase work.
 
 The runner is only for implementation phases that already have approved phase files. It does not
-create plans, perform final review, merge to `main`, push, or open PRs.
+create plans or perform final review. Until the runner is converted to the PR-first lifecycle, the
+caller owns pushing the phase branch, opening an owned PR, arming auto-merge, and waiting for a
+definite merge before starting serial follow-up work.

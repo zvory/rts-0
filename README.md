@@ -87,7 +87,7 @@ Common commands:
 # Build, lint, and format the Rust crate.
 cd server && cargo build && cargo clippy && cargo fmt
 
-# Run the full local test orchestrator from the repo root.
+# Run the full test orchestrator from the repo root.
 tests/run-all.sh
 ```
 
@@ -96,9 +96,10 @@ WebSocket/API suites, and runs the headless client smoke test when Chrome is ava
 
 For focused test runs, see [tests/README.md](tests/README.md).
 
-## CI And Local Commit Gates
+## CI And Local Hooks
 
-Every local commit must pass the canonical local CI command:
+GitHub Actions is the authoritative full-suite gate. The stable required PR check is
+`Main test gate / ./tests/run-all.sh`, which runs the portable repo-root command:
 
 ```bash
 ./tests/run-all.sh
@@ -110,18 +111,17 @@ Install the tracked Git hooks in each checkout:
 ./scripts/install-hooks.sh
 ```
 
-The hooks run `./tests/run-all.sh` before ordinary local commits. Merge commits intentionally
-bypass the local hook gate, including non-fast-forward merge commits and conflict-resolution
-commits. After commits and merges on `main`, the hooks also run
+The local hooks run cheap staged-diff checks before ordinary commits and merge commits. They do not
+run `./tests/run-all.sh` by default. Agents and developers should run focused local verification for
+the files or contracts they changed, then rely on the PR `Main test gate / ./tests/run-all.sh` check
+for full-suite coverage. After commits and merges on `main`, the hooks also run
 `scripts/cleanup-worktrees.sh --auto` to remove clean, already-merged `zvorygin/*` worktrees and a
 small bounded batch of stale per-worktree Cargo target dirs.
 
 Git does not distribute active local hook configuration through clones. Each checkout needs to run
-the installer once. GitHub Actions runs the same full gate as the stable PR check
-`Main test gate / ./tests/run-all.sh` on pull requests targeting `main` and after pushes to `main`.
-That check is the intended required branch-protection signal once PR-only `main` updates are
-enabled. The `Rust / test` and `Integration / integration` workflows remain useful auxiliary
-signals, but they are not the canonical merge gate.
+the installer once. GitHub Actions runs the full gate on pull requests targeting `main` and after
+pushes to `main`. The `Rust / test` and `Integration / integration` workflows remain useful
+auxiliary signals, but they are not the canonical merge gate.
 
 The CI workflow uses standard `ubuntu-latest` GitHub-hosted runners and keeps `./tests/run-all.sh`
 portable for local or alternate runners. Larger paid runner classes are out of scope for the
@@ -139,7 +139,7 @@ Current GitHub repository settings for `zvory/rts-0`:
 - force pushes and branch deletion are disabled;
 - admins may bypass protection only for emergency repair and the active CI migration phases.
 
-The local gate uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
+The full test runner uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
 parallel agents do not share final binaries or test artifacts.
 
 To preview or force cleanup manually:
