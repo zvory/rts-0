@@ -285,6 +285,8 @@ for raw_phase in "${PHASES[@]}"; do
   handoff_file="$handoff_dir/$phase_id.json"
   codex_log="$log_dir/$phase_id.codex.log"
   timing_file="$log_dir/$phase_id.timing.json"
+  active_marker_dir="$WORKTREE_ROOT/phase-runner-active"
+  active_marker="$active_marker_dir/${branch//\//__}"
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
     echo "error: branch already exists: $branch" >&2
@@ -346,6 +348,8 @@ EOF
   echo "phase-runner: creating $worktree_path from $phase_base_ref ($phase_base_commit) on $branch"
   if [ "$DRY_RUN" = "0" ]; then
     git worktree add "$worktree_path" -b "$branch" "$phase_base_ref"
+    mkdir -p "$active_marker_dir"
+    printf 'plan=%s\nphase=%s\nbranch=%s\nworktree=%s\n' "$PLAN_NAME" "$phase_id" "$branch" "$worktree_path" >"$active_marker"
     mkdir -p "$handoff_dir"
     mkdir -p "$log_dir"
   fi
@@ -387,6 +391,7 @@ EOF
     tail -80 "$codex_log" >&2 || true
     exit 1
   fi
+  rm -f "$active_marker"
 
   if [ -n "$(git -C "$worktree_path" status --porcelain=v1)" ]; then
     echo "phase-runner: $phase_id reported completed but left uncommitted changes; leaving worktree for inspection: $worktree_path" >&2

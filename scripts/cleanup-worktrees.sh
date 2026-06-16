@@ -106,6 +106,11 @@ target_dirs_for_root() {
   done
 }
 
+phase_runner_marker_for_branch() {
+  local branch="$1"
+  printf '%s/phase-runner-active/%s\n' "$WORKTREE_ROOT" "${branch//\//__}"
+}
+
 is_within_worktree_root() {
   local path="$1"
   case "$path" in
@@ -147,6 +152,10 @@ while IFS= read -r worktree_path; do
   esac
 
   if [ -n "$(git -C "$worktree_path" status --porcelain=v1 2>/dev/null)" ]; then
+    continue
+  fi
+
+  if [ -e "$(phase_runner_marker_for_branch "$branch")" ]; then
     continue
   fi
 
