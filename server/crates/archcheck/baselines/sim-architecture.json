@@ -1,5 +1,5 @@
 {
-  "reason": "Phase 8 Magic Anchor lifecycle adds anchor runtime, combat targetability, projection, and focused lifecycle tests",
+  "reason": "Phase 2 order boundary helper extraction adds narrow Entity order mutation APIs",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1310,7 +1310,7 @@
     },
     {
       "path": "entity/entity.rs",
-      "count": 118
+      "count": 122
     },
     {
       "path": "entity/mod.rs",

@@ -5072,7 +5072,7 @@ mod tests {
         let map = flat_map(64);
 
         let mut one_car_entities = EntityStore::new();
-        let mut one_car_units = spawn_units(&mut one_car_entities, 1, EntityKind::Tank, 6);
+        let mut one_car_units = spawn_units(&mut one_car_entities, 1, EntityKind::Tank, 3);
         one_car_units.extend(spawn_units(
             &mut one_car_entities,
             1,
@@ -5095,11 +5095,11 @@ mod tests {
                 one_car_entities.get(*id).map(|entity| entity.order()),
                 Some(Order::Idle)
             )),
-            "one Command Car should make six tanks legal: 40 used / 40 cap"
+            "one Command Car should make three tanks legal: 40 used / 40 cap"
         );
 
         let mut two_car_entities = EntityStore::new();
-        let mut two_car_units = spawn_units(&mut two_car_entities, 1, EntityKind::Tank, 8);
+        let mut two_car_units = spawn_units(&mut two_car_entities, 1, EntityKind::Tank, 4);
         two_car_units.extend(spawn_units(
             &mut two_car_entities,
             1,
