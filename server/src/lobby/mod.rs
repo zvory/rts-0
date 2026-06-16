@@ -15,6 +15,9 @@
 //!    snapshot to each connected player, and detects game-over. When a real match resolves the
 //!    room sends `gameOver`, transitions connected humans into post-match replay playback, and
 //!    returns to `Lobby` only after every replay viewer has left.
+//!
+//! `room_task` owns lifecycle and phase changes; `live_tick`, `replay_session`, `replay_branch`,
+//! and `snapshot_fanout` hold the extracted tick, replay, branch, and delivery plumbing.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;

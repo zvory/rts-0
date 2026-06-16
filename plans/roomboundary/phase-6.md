@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -25,10 +25,10 @@ Consolidate room lifecycle bookkeeping after replay, fanout, live tick, and bran
 
 ## Implementation Checklist
 
-- [ ] Extract or rename lifecycle helpers after earlier modules are stable.
-- [ ] Preserve match-history and drain-start behavior.
-- [ ] Update docs with final lobby module boundaries.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Extract or rename lifecycle helpers after earlier modules are stable.
+- [x] Preserve match-history and drain-start behavior.
+- [x] Update docs with final lobby module boundaries.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

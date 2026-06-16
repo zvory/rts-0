@@ -637,23 +637,7 @@ impl RoomTask {
         // for the next person who joins under the same name). The idle room task lives on cheaply.
         if self.players.is_empty() {
             self.mark_match_finished_for_drain();
-            self.phase = Phase::Lobby;
-            self.match_countdown_deadline = None;
-            self.match_player_count = 0;
-            self.match_human_count = 0;
-            self.outcome_sent.clear();
-            self.branch_live_seat_by_connection.clear();
-            self.host_id = None;
-            // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
-            // joiner under this room name should start from a clean lobby.
-            self.ai_players.clear();
-            self.human_team_assignments.clear();
-            self.human_faction_assignments.clear();
-            self.dev_driver = None;
-            self.dev_view_player_id = None;
-            if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
-                self.mode = RoomMode::Normal;
-            }
+            self.reset_empty_room_state();
             crate::log_debug!(room = %self.room, "room emptied; reset to lobby");
             return;
         }
@@ -1616,8 +1600,7 @@ impl RoomTask {
     /// Transition from `Lobby` to `InGame`: create the simulation and send each player their
     /// own `start` payload. Only called from `on_start_request` once preconditions hold.
     fn start_match(&mut self) {
-        self.match_countdown_deadline = None;
-        self.reset_match_net_status();
+        self.prepare_live_match_launch();
         let mut inits: Vec<PlayerInit> = self
             .active_human_ids()
             .filter_map(|id| {
@@ -1711,14 +1694,16 @@ impl RoomTask {
             Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata)
         };
         let payload = game.start_payload();
-        self.match_player_count = inits.len();
-        self.match_human_count = inits.iter().filter(|p| !p.is_ai).count();
-        self.match_started_at = Some(chrono::Utc::now());
-        let match_run_id = structured_log::new_match_run_id(&self.room);
-        self.match_run_id = Some(match_run_id);
-        self.match_map_name = self.selected_map.clone();
-        self.match_participants = inits.iter().map(|p| p.name.clone()).collect();
-        self.outcome_sent.clear();
+        let match_player_count = inits.len();
+        let match_human_count = inits.iter().filter(|p| !p.is_ai).count();
+        let match_map_name = self.selected_map.clone();
+        let match_participants = inits.iter().map(|p| p.name.clone()).collect();
+        self.record_live_match_started(
+            match_player_count,
+            match_human_count,
+            match_map_name,
+            match_participants,
+        );
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
         // Each player gets the shared static payload but stamped with their own id.
@@ -1762,8 +1747,7 @@ impl RoomTask {
     }
 
     fn start_branch_live(&mut self) {
-        self.match_countdown_deadline = None;
-        self.reset_match_net_status();
+        self.prepare_live_match_launch();
         let staging = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::BranchStaging(staging) => staging,
             other => {
@@ -1801,14 +1785,12 @@ impl RoomTask {
         let game = launch.game;
         let payload = game.start_payload();
         self.branch_live_seat_by_connection = launch.seat_by_connection;
-        self.match_player_count = launch.match_player_count;
-        self.match_human_count = launch.match_player_count;
-        self.match_started_at = Some(chrono::Utc::now());
-        let match_run_id = structured_log::new_match_run_id(&self.room);
-        self.match_run_id = Some(match_run_id);
-        self.match_map_name = launch.map_name;
-        self.match_participants = launch.participants;
-        self.outcome_sent.clear();
+        self.record_live_match_started(
+            launch.match_player_count,
+            launch.match_player_count,
+            launch.map_name,
+            launch.participants,
+        );
         self.ai_controllers.clear();
         self.dev_driver = None;
         self.dev_view_player_id = None;
@@ -1861,7 +1843,7 @@ impl RoomTask {
     }
 
     fn start_dev_session(&mut self) {
-        self.reset_match_net_status();
+        self.prepare_live_match_launch();
         let (game, driver, view_player_id) = match self.build_dev_session() {
             Ok(session) => session,
             Err(err) => {
@@ -2804,10 +2786,7 @@ impl RoomTask {
                 tokio::spawn(async move { db.record_match(rec).await });
             }
         }
-        self.match_started_at = None;
-        self.match_run_id = None;
-        self.match_map_name.clear();
-        self.match_participants.clear();
+        self.clear_finished_match_identity();
 
         let recipients: Vec<u32> = self.order.clone();
         for id in &recipients {
@@ -2865,14 +2844,7 @@ impl RoomTask {
 
     fn transition_to_replay_viewer(&mut self, session: ReplaySession) {
         self.phase = Phase::ReplayViewer(Box::new(session));
-        self.match_player_count = 0;
-        self.match_human_count = 0;
-        self.outcome_sent.clear();
-        self.branch_live_seat_by_connection.clear();
-        for player in self.players.values_mut() {
-            player.ready = false;
-            player.msg_tx.clear_pending_snapshot();
-        }
+        self.reset_after_live_match_for_room_phase();
         let recipients = self.order.clone();
         for id in recipients {
             self.send_replay_start_to(id);
@@ -2897,16 +2869,70 @@ impl RoomTask {
         // Reset for the next match: drop the game/replay, clear ready flags, and re-advertise
         // the lobby. AI slots, map selection, and quickstart persist for rematches.
         self.phase = Phase::Lobby;
+        self.reset_after_live_match_for_room_phase();
+        self.broadcast_lobby();
+    }
+
+    fn prepare_live_match_launch(&mut self) {
+        self.match_countdown_deadline = None;
+        self.reset_match_net_status();
+    }
+
+    fn record_live_match_started(
+        &mut self,
+        player_count: usize,
+        human_count: usize,
+        map_name: String,
+        participants: Vec<String>,
+    ) {
+        self.match_player_count = player_count;
+        self.match_human_count = human_count;
+        self.match_started_at = Some(chrono::Utc::now());
+        self.match_run_id = Some(structured_log::new_match_run_id(&self.room));
+        self.match_map_name = map_name;
+        self.match_participants = participants;
+        self.outcome_sent.clear();
+    }
+
+    fn reset_after_live_match_for_room_phase(&mut self) {
         self.match_player_count = 0;
         self.match_human_count = 0;
-        self.match_run_id = None;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
         for player in self.players.values_mut() {
             player.ready = false;
             player.msg_tx.clear_pending_snapshot();
         }
-        self.broadcast_lobby();
+    }
+
+    fn clear_finished_match_identity(&mut self) {
+        self.match_started_at = None;
+        self.match_run_id = None;
+        self.match_map_name.clear();
+        self.match_participants.clear();
+    }
+
+    fn reset_empty_room_state(&mut self) {
+        self.phase = Phase::Lobby;
+        self.match_countdown_deadline = None;
+        self.match_player_count = 0;
+        self.match_human_count = 0;
+        self.outcome_sent.clear();
+        self.branch_live_seat_by_connection.clear();
+        self.host_id = None;
+        // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
+        // joiner under this room name should start from a clean lobby.
+        self.ai_players.clear();
+        self.human_team_assignments.clear();
+        self.human_faction_assignments.clear();
+        self.dev_driver = None;
+        self.dev_view_player_id = None;
+        self.ai_controllers.clear();
+        self.pending_client_command_acks.clear();
+        self.clear_finished_match_identity();
+        if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
+            self.mode = RoomMode::Normal;
+        }
     }
 
     fn mark_match_started_for_drain(&mut self) {
@@ -4161,6 +4187,48 @@ mod tests {
         assert!(matches!(task.mode, RoomMode::Normal));
         assert!(task.players.is_empty());
         assert_eq!(task.host_id, None);
+    }
+
+    #[test]
+    fn empty_live_room_clears_lifecycle_bookkeeping_and_drain_tracking() {
+        let drain = DrainHandle::default();
+        let mut task = RoomTask::new(
+            "live-empty-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            drain.clone(),
+        );
+        let (msg_tx, _writer) = ConnectionSink::new();
+        let (ack_tx, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(1, "Player 1".to_string(), false, false, msg_tx, ack_tx);
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        task.on_ready(1, true);
+        task.on_start_request(1);
+
+        assert!(matches!(task.phase, Phase::InGame(_)));
+        assert_eq!(drain.active_matches(), 1);
+        assert!(task.match_started_at.is_some());
+        assert!(task.match_run_id.is_some());
+        assert_eq!(task.match_player_count, 1);
+        assert_eq!(task.match_human_count, 1);
+        assert!(!task.match_map_name.is_empty());
+        assert_eq!(task.match_participants, vec!["Player 1".to_string()]);
+
+        task.on_leave(1);
+
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert_eq!(drain.active_matches(), 0);
+        assert!(!task.match_tracked_for_drain);
+        assert!(task.players.is_empty());
+        assert_eq!(task.host_id, None);
+        assert_eq!(task.match_player_count, 0);
+        assert_eq!(task.match_human_count, 0);
+        assert!(task.match_started_at.is_none());
+        assert!(task.match_run_id.is_none());
+        assert!(task.match_map_name.is_empty());
+        assert!(task.match_participants.is_empty());
     }
 
     #[test]
