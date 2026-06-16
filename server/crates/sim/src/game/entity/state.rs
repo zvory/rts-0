@@ -81,6 +81,8 @@ pub struct MovementState {
     pub charge_ticks: u16,
     /// Ticks remaining for Command Car Breakthrough movement boost.
     pub breakthrough_ticks: u16,
+    /// Ticks remaining for this Command Car's active Breakthrough aura origin.
+    pub breakthrough_aura_ticks: u16,
     /// Ticks remaining after this unit last stood in smoke. Breakthrough uses this for synergy.
     pub recent_smoke_ticks: u16,
 }
@@ -106,6 +108,7 @@ impl Default for MovementState {
             oil_starved_pause_ticks: 0,
             charge_ticks: 0,
             breakthrough_ticks: 0,
+            breakthrough_aura_ticks: 0,
             recent_smoke_ticks: 0,
         }
     }

@@ -3148,6 +3148,10 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, nearby_pos.0, nearby_pos.1)
         .expect("nearby rifle should spawn");
+    let nearby_command_car = game
+        .entities
+        .spawn_unit(1, EntityKind::CommandCar, nearby_pos.0 + 16.0, nearby_pos.1)
+        .expect("nearby command car should spawn");
     let far = game
         .entities
         .spawn_unit(1, EntityKind::Rifleman, far_pos.0, far_pos.1)
@@ -3167,6 +3171,7 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
     let car = game.entities.get(command_car).expect("command car");
     assert!(car.ability_cooldown_ticks(ability::AbilityKind::Breakthrough) > 0);
     assert!(car.breakthrough_ticks() > 0);
+    assert!(car.breakthrough_aura_ticks() > 0);
     assert!(
         game.entities
             .get(nearby)
@@ -3174,12 +3179,52 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
             .breakthrough_ticks()
             > 0
     );
+    let nearby_car = game
+        .entities
+        .get(nearby_command_car)
+        .expect("nearby command car");
+    assert!(nearby_car.breakthrough_ticks() > 0);
+    assert_eq!(
+        nearby_car.breakthrough_aura_ticks(),
+        0,
+        "nearby buffed Command Cars should not become aura origins"
+    );
     assert_eq!(
         game.entities
             .get(far)
             .expect("far unit")
             .breakthrough_ticks(),
         0
+    );
+
+    let owner_snapshot = game.snapshot_for(1);
+    let caster_view = owner_snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == command_car)
+        .expect("owner should see caster");
+    let breakthrough_affordance = caster_view
+        .abilities
+        .iter()
+        .find(|ability| ability.ability == crate::protocol::abilities::BREAKTHROUGH)
+        .expect("caster should project Breakthrough affordance");
+    assert_eq!(
+        breakthrough_affordance.expires_in,
+        Some(car.breakthrough_aura_ticks()),
+        "caster affordance should expose active aura duration"
+    );
+    let nearby_car_view = owner_snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == nearby_command_car)
+        .expect("owner should see nearby command car");
+    assert!(
+        nearby_car_view
+            .abilities
+            .iter()
+            .find(|ability| ability.ability == crate::protocol::abilities::BREAKTHROUGH)
+            .is_none_or(|ability| ability.expires_in.is_none()),
+        "buffed non-caster Command Cars should not project aura duration"
     );
 
     let remaining = game

@@ -649,7 +649,7 @@ export class HUD {
       cooldownClocks: descriptor.cooldownClocks,
       repeatable: descriptor.repeatable,
       onMouseEnter: descriptor.intent?.type === "ability"
-        ? () => this._showAbilityHoverPreview(descriptor.intent.ability)
+        ? () => this._showAbilityHoverPreview(descriptor.intent.ability, descriptor.intent.readyIds || [])
         : null,
       onMouseLeave: descriptor.intent?.type === "ability"
         ? () => this._clearAbilityHoverPreview()
@@ -732,18 +732,17 @@ export class HUD {
         const id = this.audio.pickVariant(BREAKTHROUGH_VOICE_IDS);
         if (id) this.audio.play(id, { category: "unit_voice", priority: 3 });
       }
-      if (intent.ability === ABILITY.BREAKTHROUGH) {
-        this._addBreakthroughActivationFeedback(intent.readyIds || []);
-      }
       this.state.endCommandTarget();
     }
   }
 
-  _showAbilityHoverPreview(ability) {
+  _showAbilityHoverPreview(ability, unitIds = []) {
     const definition = ABILITIES[ability];
     if (!definition || definition.targetMode !== "self" || !definition.radiusTiles) return;
     if (this.state.commandTarget) return;
-    const origins = this._abilityAreaOrigins(definition);
+    const ready = new Set((unitIds || []).map((id) => Number(id)));
+    const origins = this._abilityAreaOrigins(definition)
+      .filter((origin) => ready.size === 0 || ready.has(origin.id));
     if (origins.length === 0) return;
     const tileSize = this.state.map?.tileSize || 32;
     this.state.updateAbilityTargetPreview({
@@ -770,17 +769,6 @@ export class HUD {
         carriers.includes(e.kind) &&
         e.buildProgress == null)
       .map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y }));
-  }
-
-  _addBreakthroughActivationFeedback(unitIds) {
-    if (typeof this.state.addCommandFeedback !== "function") return;
-    const definition = ABILITIES[ABILITY.BREAKTHROUGH];
-    const ready = new Set((unitIds || []).map((id) => Number(id)));
-    const origins = this._abilityAreaOrigins(definition)
-      .filter((origin) => ready.size === 0 || ready.has(origin.id));
-    for (const origin of origins) {
-      this.state.addCommandFeedback("breakthrough", origin.x, origin.y, false, definition.radiusTiles);
-    }
   }
 
   /** Render a stable, inert command-card grid when no actionable selection exists. */

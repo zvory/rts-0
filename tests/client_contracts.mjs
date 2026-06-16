@@ -3661,9 +3661,13 @@ function fakeAudioContext() {
     commandCarHud.state = {
       playerId,
       resources: { steel: 100, oil: 100 },
+      map: { tileSize: 32 },
       commandTarget: null,
       selectedEntities: () => [selectedCommandCar],
       entitiesInterpolated: () => [selectedCommandCar],
+      updateAbilityTargetPreview(preview) {
+        this.abilityTargetPreview = preview;
+      },
       endCommandTarget() {
         this.commandTarget = null;
       },
@@ -3725,6 +3729,12 @@ function fakeAudioContext() {
     renderedButtons.length = 0;
     renderCommandCard(commandCarHud);
     const multiBreakthroughButton = renderedButtons.find((button) => button.innerHTML.includes("Breakthrough"));
+    multiBreakthroughButton.dispatchEvent({ type: "mouseenter" });
+    assert(
+      commandCarHud.state.abilityTargetPreview?.areaOrigins.length === 1 &&
+        commandCarHud.state.abilityTargetPreview.areaOrigins[0].id === centralCommandCar.id,
+      "Breakthrough hover preview should show only the Command Car that would activate",
+    );
     multiBreakthroughButton.click({});
     const multiBreakthroughCommand = sent[sent.length - 1];
     assert(
