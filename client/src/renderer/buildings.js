@@ -68,37 +68,41 @@ export function _drawBuilding(e, colorByOwner, state) {
 
   const g = this._slot("buildings", e.id);
   g.position.set(0, 0);
-  g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
-  g.beginFill(0x2b2a23, bodyAlpha);
-  g.drawRect(x0, y0, w, h);
-  g.endFill();
-
-  // Player-tinted roof/yard slabs, all neutral geometry.
-  g.lineStyle(0);
-  g.beginFill(tint, bodyAlpha * 0.82);
-  if (e.kind === KIND.CITY_CENTRE) {
-    g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
-    g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
-    g.beginFill(0x1a1712, bodyAlpha * 0.7);
-    g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
-  } else if (e.kind === KIND.FACTORY) {
-    g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
-    g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
-    g.beginFill(0x1a1712, bodyAlpha * 0.55);
-    for (let i = 0; i < 3; i++) g.drawRect(x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
-  } else if (e.kind === KIND.DEPOT) {
-    g.drawRect(x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
-    g.drawRect(x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
+  if (e.kind === KIND.TANK_TRAP) {
+    drawTankTrap(g, e.x, e.y, ts, tint, bodyAlpha);
   } else {
-    g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
-    g.beginFill(0x1a1712, bodyAlpha * 0.42);
-    g.drawRect(x0 + w * 0.22, y0 + h * 0.26, w * 0.56, h * 0.12);
-    g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
-  }
-  g.endFill();
+    g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
+    g.beginFill(0x2b2a23, bodyAlpha);
+    g.drawRect(x0, y0, w, h);
+    g.endFill();
 
-  // Stencil label — pooled Text reused per building id (see _icon).
-  this._icon(e, e.x, e.y, Math.min(w, h) * 0.5, bodyAlpha);
+    // Player-tinted roof/yard slabs, all neutral geometry.
+    g.lineStyle(0);
+    g.beginFill(tint, bodyAlpha * 0.82);
+    if (e.kind === KIND.CITY_CENTRE) {
+      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
+      g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
+      g.beginFill(0x1a1712, bodyAlpha * 0.7);
+      g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
+    } else if (e.kind === KIND.FACTORY) {
+      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
+      g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
+      g.beginFill(0x1a1712, bodyAlpha * 0.55);
+      for (let i = 0; i < 3; i++) g.drawRect(x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
+    } else if (e.kind === KIND.DEPOT) {
+      g.drawRect(x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
+      g.drawRect(x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
+    } else {
+      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
+      g.beginFill(0x1a1712, bodyAlpha * 0.42);
+      g.drawRect(x0 + w * 0.22, y0 + h * 0.26, w * 0.56, h * 0.12);
+      g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
+    }
+    g.endFill();
+
+    // Stencil label — pooled Text reused per building id (see _icon).
+    this._icon(e, e.x, e.y, Math.min(w, h) * 0.5, bodyAlpha);
+  }
 
   if (underConstruction) {
     // Construction progress bar across the footprint base.
@@ -127,4 +131,28 @@ export function _drawBuilding(e, colorByOwner, state) {
   // Queue depth label: show items waiting behind the active production slot.
   const queueDepth = (e.prodQueue ?? 0) - 1;
   this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
+}
+
+function drawTankTrap(g, cx, cy, tileSize, tint, bodyAlpha) {
+  const r = tileSize * 0.36;
+  g.lineStyle(3, 0x17140f, bodyAlpha * 0.92);
+  drawBeam(g, cx, cy, -Math.PI / 4, r);
+  drawBeam(g, cx, cy, Math.PI / 4, r);
+  drawBeam(g, cx, cy, 0, r * 0.92);
+
+  g.lineStyle(1.5, 0xd8d0b0, bodyAlpha * 0.75);
+  drawBeam(g, cx, cy, -Math.PI / 4, r * 0.82);
+  drawBeam(g, cx, cy, Math.PI / 4, r * 0.82);
+  drawBeam(g, cx, cy, 0, r * 0.72);
+
+  g.beginFill(tint, bodyAlpha * 0.85);
+  g.drawCircle(cx, cy, 3.5);
+  g.endFill();
+}
+
+function drawBeam(g, cx, cy, angle, halfLen) {
+  const dx = Math.cos(angle) * halfLen;
+  const dy = Math.sin(angle) * halfLen;
+  g.moveTo(cx - dx, cy - dy);
+  g.lineTo(cx + dx, cy + dy);
 }

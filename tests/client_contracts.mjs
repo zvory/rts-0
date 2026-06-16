@@ -87,6 +87,10 @@ import {
   msg,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
+import {
+  movementBodyClass,
+  placementPolicyForBuilding,
+} from "../client/src/input/placement.js";
 import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
@@ -101,6 +105,7 @@ import {
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
+import { _drawBuilding } from "../client/src/renderer/buildings.js";
 import { buildRendererFeedbackView } from "../client/src/renderer/feedback_view_model.js";
 import {
   _drawAbilityObjects,
@@ -4967,10 +4972,53 @@ function fakeAudioContext() {
     footprintValidAgainstEntities([other], new Set([7]), 1, 1, 2, 2, map) === false,
     "client_preview_rejects_other_unit_body_inside_footprint",
   );
+  assert(
+    movementBodyClass(KIND.WORKER) === "infantryLike" &&
+      movementBodyClass(KIND.RIFLEMAN) === "infantryLike" &&
+      movementBodyClass(KIND.MORTAR_TEAM) === "vehicleBody" &&
+      movementBodyClass(KIND.ANTI_TANK_GUN) === "vehicleBody" &&
+      movementBodyClass(KIND.ARTILLERY) === "vehicleBody" &&
+      movementBodyClass(KIND.SCOUT_CAR) === "vehicleBody" &&
+      movementBodyClass(KIND.TANK) === "vehicleBody" &&
+      movementBodyClass(KIND.COMMAND_CAR) === "vehicleBody",
+    "client placement movement-body classes mirror server vehicle-body blockers",
+  );
+  assert(
+    placementPolicyForBuilding(KIND.TANK_TRAP).unitOverlap === "infantryAllowed" &&
+      placementPolicyForBuilding(KIND.DEPOT).unitOverlap === "none",
+    "Tank Trap placement policy allows infantry overlap without changing ordinary buildings",
+  );
+  assert(
+    footprintValidAgainstEntities(
+      [other],
+      new Set(),
+      1,
+      1,
+      1,
+      1,
+      map,
+      placementPolicyForBuilding(KIND.TANK_TRAP),
+    ) === true,
+    "Tank Trap advisory preview allows infantry bodies inside the footprint",
+  );
   const tank = { id: 9, owner: 1, kind: KIND.TANK, x: 116, y: 64 };
   assert(
     footprintValidAgainstEntities([tank], new Set(), 1, 1, 2, 2, map) === false,
     "client preview should reject a tank body touching a footprint edge",
+  );
+  const trapTank = { id: 91, owner: 1, kind: KIND.TANK, x: 58, y: 48 };
+  assert(
+    footprintValidAgainstEntities(
+      [trapTank],
+      new Set(),
+      1,
+      1,
+      1,
+      1,
+      map,
+      placementPolicyForBuilding(KIND.TANK_TRAP),
+    ) === false,
+    "Tank Trap advisory preview still rejects vehicle-body overlap",
   );
   assert(STATS[KIND.TANK].body.length === 50.4, "tank client body length mirrors server");
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
@@ -4996,6 +5044,16 @@ function fakeAudioContext() {
   assert(
     input._footprintValid(1, 1, 2, 2, map) === true,
     "preview should ignore one selected worker body as an advisory build-placement allowance",
+  );
+  input.state.entitiesInterpolated = () => [other];
+  assert(
+    input._footprintValid(1, 1, 1, 1, map, KIND.TANK_TRAP) === true,
+    "Tank Trap input preview allows non-builder infantry overlap",
+  );
+  input.state.entitiesInterpolated = () => [trapTank];
+  assert(
+    input._footprintValid(1, 1, 1, 1, map, KIND.TANK_TRAP) === false,
+    "Tank Trap input preview rejects vehicle-body units",
   );
 
   const clickableTank = { id: 10, owner: 1, kind: KIND.TANK, x: 0, y: 0, facing: 0 };
@@ -5666,6 +5724,39 @@ function fakeAudioContext() {
     resources: { oil: 10 },
   });
   assert(fakePools.has("units:700"), "Artillery renderer draws without a null vehicle body");
+}
+
+{
+  const tankTrapEntity = {
+    id: 720,
+    owner: 1,
+    kind: KIND.TANK_TRAP,
+    x: 64,
+    y: 96,
+    buildProgress: 0.5,
+  };
+  const fakePools = new Map();
+  let iconCalls = 0;
+  const fakeRenderer = {
+    _map: { tileSize: 32 },
+    _slot(pool, id) {
+      const key = `${pool}:${id}`;
+      if (!fakePools.has(key)) fakePools.set(key, new RecordingGraphics());
+      return fakePools.get(key);
+    },
+    _tintFor() {
+      return 0x4878c8;
+    },
+    _icon() {
+      iconCalls += 1;
+    },
+    _queueLabel() {},
+  };
+  _drawBuilding.call(fakeRenderer, tankTrapEntity, new Map([[1, 0x4878c8]]), {});
+  const trapGraphics = fakePools.get("buildings:720");
+  const trapStrokes = trapGraphics.calls.filter((call) => call[0] === "moveTo").length;
+  assert(trapStrokes >= 6, "Tank Trap renderer draws crossed hedgehog beams");
+  assert(iconCalls === 0, "Tank Trap renderer uses geometry instead of the generic building stencil");
 }
 
 {
