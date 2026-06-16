@@ -54,6 +54,12 @@ Pick one shape during implementation and document why. The important boundary is
 read by the room task and represented as a narrow value object, not reached through shared mutable
 state.
 
+Prefer a short-lived report context token captured when the report form opens. That token should
+contain the server-stamped `RoomReportContext`, not mutable room references. This preserves the
+product requirement that a report can still submit if the match ends after the tester opened the
+form but before they pressed submit. Define token TTL, whether tokens are one-shot or reusable for
+retry, payload size, and behavior when the room resets before submission.
+
 ## Touch Points
 
 - `server/src/main.rs`
@@ -68,7 +74,11 @@ state.
 ## Payload Bounds
 
 - Bound description length.
-- Bound JSON object sizes for client, network, and server-ish context supplied by the browser.
+- Bound JSON object sizes for client and network context supplied by the browser.
+- Define exact limits before exposing the endpoint: description length, total JSON byte cap,
+  per-string cap, array length, object depth, key count, and whether oversize fields are rejected or
+  truncated.
+- Do not accept browser-supplied `server_context`; stamp it from `RoomReportContext`.
 - Treat client-supplied tick/player/match/replay fields as hints unless they can be validated.
 - Bound context-token lifetime and payload size if the WebSocket-token shape is chosen.
 - Never let a malformed report payload panic the network path.

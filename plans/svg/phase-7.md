@@ -20,6 +20,8 @@ kind.
   vehicle shadow shape, selection bounds, and hp bar position.
 - Add equivalence samples for multiple facings, weapon-facing offsets, movement phase deltas,
   recoil values, low/oil-starved states, breakthrough ticks, and shot-reveal alpha.
+- Require both semantic anchor/bounds comparison and bounded pixel or command comparison for each
+  migrated vehicle kind.
 - Confirm there are no remaining live unit kinds routed through legacy procedural drawing.
 
 ## Expected Touch Points

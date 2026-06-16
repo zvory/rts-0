@@ -27,6 +27,10 @@ match-end replay path capable of registering and resolving replay evidence for t
   later review.
 - Ensure the registry call is reliable and returns an error to its caller; do not route it through
   the existing best-effort match-history `record_match` behavior.
+- Introduce required-write drain tracking for report-backed replay persistence before public report
+  submission exists. Existing active-match drain tests should gain a required-write case so deploy
+  shutdown waits for submitted-report evidence until it completes or reaches the existing drain
+  deadline policy.
 - Write the final replay artifact under the same `replay_key` at match end. If a matching report
   already exists, the review dashboard should transition from pending to available once this write
   succeeds.
@@ -68,6 +72,8 @@ match-end replay path capable of registering and resolving replay evidence for t
 - Do not block normal match-end transitions on ordinary match-history writes.
 - Do not make `Db::record_match` carry both best-effort and required-write semantics. Add a
   narrower helper that returns inserted ids / replay ids when the report-backed path needs them.
+  A shape like `record_match_required(...) -> Result<RecordMatchOutcome, sqlx::Error>` or a
+  lower-level transaction helper is acceptable if ordinary match history remains best effort.
 - Do not silently drop report-backed replay persistence failures. The eventual report API must show
   whether the replay expectation was registered, and the dashboard must show pending or missing
   replay state instead of a false available replay.

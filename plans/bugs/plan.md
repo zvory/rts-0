@@ -62,6 +62,27 @@ modules, or overloading match-history helpers with incompatible reliability rule
   an initial seek tick, replay availability state, and report context for display alongside
   playback.
 
+## Boundary Invariants
+
+- Report creation is a server-stamped evidence write. Browser-supplied ids, ticks, replay ids,
+  room names, and server-ish context are hints only unless validated through `RoomReportContext`;
+  the browser must not populate `server_context`.
+- Clients may submit only bounded report text, client diagnostics, and network diagnostics. The
+  server stamps authoritative room, match, replay, player, faction, tick, build, receipt-time, and
+  replay-evidence fields from `RoomReportContext` and request metadata.
+- `ReportStore` and `ReplayEvidenceRegistry` are required-write APIs. They may share lower-level
+  SQL helpers with match history, but they must not call a log-and-drop `record_match` style API or
+  hide persistence errors from the report API.
+- Replay evidence is a state machine keyed by `replay_key`: `pending` means no replay row is known,
+  `available` requires a replay row, and `missing` requires a recorded reason. Transitions must be
+  idempotent for repeated reports against the same key and must not regress `available` evidence to
+  `pending`.
+- Public report handlers should live behind a small reporting route/module such as
+  `server/src/reporting.rs` or `server/src/routes/bug_reports.rs`; `main.rs` wires routes and shared
+  state only.
+- Client reporting UI is injected through app/match/replay seams. UI modules must not import
+  `Match`, `ReplayViewer`, or `Net` directly to scrape state.
+
 ## Phase Summaries
 
 Phase 1 establishes the persistence contract and durable DB primitives for bug reports and
@@ -118,8 +139,8 @@ nullable-replay path.
 - Preserve the server-authoritative architecture. The server owns report ids, authoritative match
   metadata, `replay_key` allocation, replay persistence, and database writes.
 - Treat clients as untrusted. Bound text length and JSON diagnostics, validate report context, and
-  never trust client-supplied player ids, room state, replay ids, or ticks without checking server
-  state where possible.
+  never trust client-supplied player ids, room state, replay ids, ticks, or `server_context`
+  without checking server state where possible.
 - Keep wire protocol mirrors synchronized whenever a WebSocket message changes:
   `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`, `client/src/protocol.js`, and
   `docs/design/protocol.md`.

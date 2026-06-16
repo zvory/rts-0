@@ -14,6 +14,11 @@ Make catalog parity fail on partial or accidental faction exposure.
 - Compare every Rust catalog dump intended for client exposure against `client/src/config.js`.
 - Include ids, loadouts, units, buildings, buildables, trainables, research, abilities, costs,
   compact codes, and command-card metadata where available.
+- Check full ability and command-card descriptor metadata for every client-exposed catalog, not
+  just the default catalog: labels, icons, hotkeys, titles, carriers, target modes, ranges,
+  cooldowns, charges, costs, queue/autocast flags, protocol codes, and order-stage codes.
+- Check `loadoutId`, forbid extra client catalog ids, and dump/check builder, gatherer, and
+  production-anchor fields when they affect UI or command legality.
 - Preserve fixture handling as explicit test-only behavior.
 
 ## Expected Touch Points
@@ -30,6 +35,7 @@ Make catalog parity fail on partial or accidental faction exposure.
 - [ ] Extend Rust dump or parity assertions as needed.
 - [ ] Fail loudly on missing, extra, or mismatched client entries.
 - [ ] Update command-card metadata checks where practical.
+- [ ] Confirm fixture-only ids cannot appear as playable client catalog options.
 - [ ] Run verification and record exact results in the handoff.
 
 ## Verification

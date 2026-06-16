@@ -14,7 +14,14 @@ Remove temporary compatibility shims and enforce the new client boundaries.
   and tests use explicit facades.
 - Update `scripts/check-client-architecture.mjs` classifications, allowlists, and large-file
   baseline expectations.
+- Extend the checker with forbidden direct intent shim reads/writes outside allowlisted
+  compatibility tests. At minimum, flag production references to `state.commandTarget`,
+  `state.placement`, `state.commandCardMode`, `state.resourceMiningPreview`,
+  `state.antiTankGunSetupPreview`, `state.abilityTargetPreview`, `state.liveCommandFeedback(...)`,
+  and GameState intent shim methods from HUD/input/minimap/renderer.
 - Update `docs/design/client-ui.md` and context docs with the final module map.
+  Ensure `client_intent.js` is documented in the model area and stale `GameState` intent-shim
+  language is removed.
 - Keep this phase cleanup-only.
 
 ## Expected Touch Points

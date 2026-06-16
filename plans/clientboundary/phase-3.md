@@ -11,6 +11,12 @@ Route HUD, input, and minimap intent mutations through the explicit client inten
 ## Work
 
 - Pass the client intent facade from `Match` into HUD, input, and minimap collaborators.
+- Prefer role-shaped facade surfaces over broad state shims:
+  - HUD intent: command-card mode/target reads, open/close submenu, begin placement, begin/end
+    command target, and ability hover preview updates.
+  - Input intent: placement/target reads, placement updates/end, target issue/hold/release, preview
+    updates, and command feedback.
+  - Minimap intent: command target read, target issue/end, and command feedback.
 - Convert HUD command intent dispatch and input command-target refreshes to call the facade rather
   than mutating `GameState` directly.
 - Preserve command issuing through `commandIssuer.issueCommand`.
@@ -47,3 +53,10 @@ Escape cancellation, and right-click cancellation.
 ## Handoff Expectations
 
 Note any compatibility fields still read by renderer, tests, or other modules.
+
+## Post-Phase Boundary Notes
+
+This phase is complete on `main`. Remaining phases should treat HUD/input/minimap intent routing as
+the completed precondition and should preserve the rule that `commandIssuer.issueCommand` remains
+the only gameplay command emission seam. Any lingering direct `GameState` intent reads should be
+limited to renderer compatibility work scheduled for Phase 4 and removed in Phase 6.

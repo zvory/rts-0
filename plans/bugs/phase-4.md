@@ -15,6 +15,9 @@ match, replay, network, or diagnostics internals.
 - Add `Report bug` to the existing gear/settings menu for live matches and replay viewer.
 - Implement a `ClientReportService` that owns bounded payload construction, calls the Phase 3 API,
   handles success/failure state, and exposes a small submit API to UI components.
+- Classify new client files deliberately in `scripts/check-client-architecture.mjs`. Prefer a split
+  where report form/dashboard modules are UI, the report service is an injected app-shell facade,
+  and neither UI code nor report diagnostics import `Match`, `ReplayViewer`, or `Net` directly.
 - Add a settings-menu action builder such as `buildReportBugAction` rather than putting
   bug-report-specific behavior into generic settings tab rendering.
 - Build a compact modal/panel for optional description text.

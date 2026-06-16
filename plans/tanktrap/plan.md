@@ -111,6 +111,13 @@ repair/cancel mechanics.
   needed, stop and update the plan rather than folding the redesign into that phase.
 - Prefer shared systems over special casing. The vehicle-only blocking behavior should come from a
   static blocker/movement class contract, not from scattered `if kind == TankTrap` checks.
+- Treat `is_building()` inheritance as explicit. Each implementation phase must name which generic
+  building behaviors Tank Trap intentionally uses, such as attackability, snapshots, remembered
+  projection, cleanup, and generic UI, and which behaviors it opts out of, such as elimination
+  survival, production anchors, supply, sight, rally, research, and training.
+- Use a single authoritative server placement policy selected by building kind. Tank Trap placement
+  may allow infantry overlap, but must still reject terrain, resources, ordinary buildings,
+  vehicle-body units, invalid/out-of-bounds footprints, and arrival-time affordability failures.
 - Use the existing vehicle-body classification where it is already canonical. If it is not precise
   enough, introduce one narrow rules-level movement/body classification and map Tank, Scout Car,
   Command Car, Anti-Tank Gun, Mortar Team, and Artillery through it.
@@ -130,6 +137,8 @@ repair/cancel mechanics.
   normal scouted/remembered building projection without leaking unseen positions.
 - Client placement previews are advisory only. Server arrival-time validation remains authoritative
   for terrain, blockers, tech, ownership, and resources.
+- Client and server preview/placement policy names should match even though the client remains
+  advisory, so any divergence is bounded and intentional.
 - Avoid broad test bundles during development. Each phase should run targeted Rust, Node, parity, or
   architecture checks matching its changed files; rely on the commit hook only when making
   merge-ready implementation commits.

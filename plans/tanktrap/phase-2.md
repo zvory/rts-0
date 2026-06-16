@@ -13,6 +13,11 @@ pathing and standability instead of scattered Tank Trap checks.
 - Add or confirm a rules-level movement/body classification that includes:
   - infantry/small ground units that ignore Tank Trap blockers
   - vehicle-body units that are blocked by Tank Trap blockers
+- Prefer explicit paired classifications:
+  - `StaticBlockerClass`: `AllGround`, `VehicleBodyOnly`, and possibly `None`
+  - `MovementBodyClass`: `InfantryLike` and `VehicleBody`
+  If Phase 0 proves an existing helper is canonical enough, record that choice instead of adding a
+  parallel concept.
 - Ensure Tank, Scout Car, Command Car, Anti-Tank Gun, Mortar Team, and Artillery use the
   vehicle-body blocker class.
 - Refactor static occupancy so it can answer at least:
@@ -42,6 +47,8 @@ pathing and standability instead of scattered Tank Trap checks.
 - Vehicle-only blocking works through shared pathing/standability semantics.
 - Existing vehicle path smoothing and static-fingerprint caching remain deterministic and scoped to
   the blocker class that produced a path.
+- Path cache fingerprints are scoped per movement/body class. A Worker and Tank path request against
+  the same start/goal must not reuse an incompatible Tank Trap blocker result.
 - `Game::tick()` stays panic-free for stale ids and malformed coordinates.
 
 ## Out of Scope

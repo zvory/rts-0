@@ -12,6 +12,9 @@ workflow.
 - Add Tank Trap to the default worker build-card sequence in the next open slot.
 - Add a focused client line-placement helper/collaborator rather than embedding all line math in
   the main input class.
+- Keep placement drag distinct from box selection and camera drag paths. Starting a Tank Trap
+  placement drag must not accidentally trigger selection drag, and cancel/blur paths should cleanly
+  return ownership to the existing input modes.
 - Implement Bresenham-style tile line generation with no diagonal vehicle gaps:
   - start tile included
   - same-row or same-column trap sites may have one empty tile between them
@@ -33,6 +36,8 @@ workflow.
   - with Shift, send additional queued build commands for remaining valid sites using the existing
     queued worker-distribution semantics
   - keep current affordability-on-arrival semantics; do not reserve steel for the whole line
+  - accept that later queued sites may fail independently for resources, blockers, queue limits, or
+    arrival-time validation; surface feedback through existing command notices
 - Ensure right-click/Escape/blur/Shift-release interactions cleanly cancel or preserve placement in
   the same style as current placement targeting.
 - Add focused client tests for:
@@ -40,6 +45,8 @@ workflow.
     that must avoid knight-move spacing
   - invalid-site skipping
   - non-Shift command count and worker/site assignment
+  - non-Shift dispatch emits one single-worker `build` command per selected worker/site rather than
+    one multi-worker command that the ordinary planner could collapse to one closest builder
   - Shift extra-site queued command behavior
   - build-card descriptor slot, hotkey, affordability, and requirement disabled states
 

@@ -35,6 +35,10 @@ as dashboard-only glue that bypasses existing replay compatibility paths.
   - seek to roughly twenty seconds before `report_tick`, clamped to zero, using existing replay
     seek plumbing after the viewer joins
   - display report context alongside playback through an app/replay-viewer injected context value
+- Use a report-specific replay lookup such as `replay_artifact_for_report(replay_key/report_id)`.
+  It may reuse existing replay compatibility validation, but it must not inherit Recent Matches
+  visibility filtering; hidden AI/debug rows with persisted artifacts remain reviewable when the
+  evidence registry says they are available.
 - Keep the dashboard public and simple. This is an internal pre-alpha utility, not a multi-user
   triage app.
 

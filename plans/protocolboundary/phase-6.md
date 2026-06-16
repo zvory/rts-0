@@ -12,6 +12,8 @@ Finalize documentation and lightweight checks for the protocol/config mirror bou
 
 - Update `docs/design/protocol.md`, `docs/design/balance.md`, and context capsules with the final
   source-of-truth map and parity commands.
+- Document intentional cross-surface guards, including palette parity if it remains in
+  `tests/protocol_parity.mjs` even though ownership is lobby/config rather than the wire protocol.
 - Add or adjust lightweight checks only if earlier phases reveal repeatable dependency or mirror
   mistakes.
 - Keep this phase behavior-neutral.

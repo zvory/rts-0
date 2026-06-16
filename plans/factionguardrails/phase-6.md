@@ -14,6 +14,11 @@ Run faction guardrails through normal local gates and targeted suite selection.
   architecture/contract layer.
 - Teach `tests/select-suites.mjs` that faction catalog, protocol/config mirror, faction docs, and
   checker script changes select the right focused suites.
+- Add selector cases for `server/crates/rules/src/faction.rs`, `client/src/config.js`,
+  `client/src/lobby_view.js`, `server/src/lobby/faction_validation.rs`, faction design docs,
+  checker scripts, and `plans/factionguardrails/*`.
+- Docs-only faction changes should still select the assumption checker, not fall through to plain
+  docs-only behavior.
 - Keep live-server test selection out of docs-only changes unless required by touched files.
 
 ## Expected Touch Points
@@ -26,6 +31,8 @@ Run faction guardrails through normal local gates and targeted suite selection.
 
 - [ ] Wire checker scripts into the full local gate.
 - [ ] Add selector cases for faction-sensitive files.
+- [ ] Add selector cases so faction docs/checker changes run faction guardrails without requiring
+      live-server tests.
 - [ ] Verify selector examples.
 - [ ] Confirm failure output is readable.
 - [ ] Run verification and record exact results in the handoff.

@@ -18,6 +18,20 @@ catalog, protocol, config, client UI, replay, AI, and prediction surfaces cannot
   faction/lobby behavior that should be tested.
 - Implement, commit, merge to `main`, and push each phase before starting the next phase.
 
+## Faction Status Taxonomy
+
+Active docs and checks must classify every faction id as one of: playable,
+playable-human-only, test-fixture-only, reserved/future, or historical-only. Catalog existence is
+not sufficient for lifecycle admission. Catalog facts are owned by
+`server/crates/rules/src/faction.rs`; lifecycle admission is owned by
+`server/src/lobby/faction_validation.rs`; wire vocabulary is owned by
+`server/crates/protocol/src/lib.rs`; client mirrors are checked projections.
+
+Phase 1 must publish the current status table before later checker ratchets land. At minimum it
+must decide `kriegsia`, `ekat`, `phase2_empty_fixture`, and `plans/archive/faction/*`, including
+whether `ekat` is playable in human lobby flows only or also supported for AI, prediction,
+quickstart, self-play, and dev scenarios.
+
 ## Phase Summaries
 
 ### [Phase 1 - Checker Recovery And Source Of Truth](phase-1.md)
@@ -78,3 +92,5 @@ for future faction work.
 
 Each phase handoff must state the decided status of each catalog id touched, whether compact snapshot
 version changed, where guard scripts run, and any remaining known drift.
+Known drift must be reported as `none` or linked to a follow-up phase with an owner; handoffs should
+also name lifecycle matrix row changes and the exact checker/gate commands run.

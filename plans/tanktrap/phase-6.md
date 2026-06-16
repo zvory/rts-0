@@ -13,6 +13,9 @@ feature is playable.
   - infantry pass-through and same-tile standability
   - vehicle-body blocking for Tank, Scout Car, Command Car, Anti-Tank Gun, Mortar Team, and
     Artillery
+  - different blocker layers and fingerprints for infantry-like and vehicle-body movement requests
+  - a path-cache case proving Worker and Tank requests against the same start/goal cannot reuse an
+    incompatible Tank Trap blocker result
   - two-tile gap behavior emerging from body/clearance rules
   - no vehicle path through diagonal-touching Tank Trap lines; if ordinary A* clearance still
     admits that path, vehicle pathing should use the Phase 2 0.5-tile Tank Trap blocker inflation
@@ -24,6 +27,8 @@ feature is playable.
 - Add or consolidate focused client tests for:
   - worker build-card visibility after Training Centre
   - advisory placement policy
+  - Tank Trap preview allowing infantry overlap but rejecting vehicle-body overlap, including
+    Anti-Tank Gun, Mortar Team, and Artillery
   - line preview and command dispatch
   - shallow and steep line drags that use diagonal-touching bridge sites instead of knight-move
     spacing
