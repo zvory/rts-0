@@ -1,6 +1,6 @@
 # Phase 1 - Dormant Kind and Mirrored Metadata
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 

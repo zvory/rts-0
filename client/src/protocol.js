@@ -93,6 +93,7 @@ export const KIND = Object.freeze({
   RESEARCH_COMPLEX: "research_complex",
   FACTORY: "factory",
   STEELWORKS: "steelworks",
+  TANK_TRAP: "tank_trap",
   STEEL: "steel",
   OIL: "oil",
 });
@@ -117,6 +118,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.RESEARCH_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
+  KIND.TANK_TRAP,
 ]);
 export const RESOURCE_KINDS = Object.freeze([KIND.STEEL, KIND.OIL]);
 
@@ -207,6 +209,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.COMMAND_CAR]: 18,
   [KIND.EKAT]: 19,
   [KIND.ZAMOK]: 20,
+  [KIND.TANK_TRAP]: 21,
   [KIND.FACTORY]: 10,
   [KIND.STEEL]: 11,
   [KIND.OIL]: 12,

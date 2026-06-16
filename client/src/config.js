@@ -187,6 +187,10 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 100 }, buildTicks: 599,
     trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
+  [KIND.TANK_TRAP]: { label: "Tank Trap", icon: "TT", footW: 1, footH: 1, sight: 0,
+    cost: { steel: 15, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
+    requires: KIND.TRAINING_CENTRE,
+    requiresText: "Requires Training Centre" },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -429,6 +433,7 @@ export const FACTION_CATALOGS = Object.freeze({
       KIND.FACTORY,
       KIND.RESEARCH_COMPLEX,
       KIND.STEELWORKS,
+      KIND.TANK_TRAP,
     ],
     buildables: WORKER_BUILDABLE,
     trainables: {

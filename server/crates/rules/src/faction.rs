@@ -122,6 +122,7 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
     EntityKind::Factory,
     EntityKind::ResearchComplex,
     EntityKind::Steelworks,
+    EntityKind::TankTrap,
 ];
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
@@ -600,6 +601,9 @@ mod tests {
         assert!(catalog.allows_research(METHAMPHETAMINES_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::ResearchComplex));
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
+        assert!(catalog.allows_building(EntityKind::TankTrap));
+        assert!(!catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
+        assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
         assert!(catalog.allows_ability(POINT_FIRE_ABILITY, EntityKind::Artillery));
         assert!(!catalog.allows_ability(CHARGE_ABILITY, EntityKind::Rifleman));

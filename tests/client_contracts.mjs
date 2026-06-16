@@ -36,7 +36,9 @@ import {
   BASE_COMMAND_SUPPLY_CAP,
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
+  TICK_HZ,
   UPGRADES,
+  WORKER_BUILDABLE,
 } from "../client/src/config.js";
 import { commandWithinBudget } from "../client/src/command_budget.js";
 import {
@@ -3506,6 +3508,7 @@ function fakeAudioContext() {
   assert(KIND_CODE[KIND.COMMAND_CAR] === 18, "Command Car compact kind code should be reserved");
   assert(KIND_CODE[KIND.EKAT] === 19, "Ekat compact kind code should be reserved");
   assert(KIND_CODE[KIND.ZAMOK] === 20, "Zamok compact kind code should be reserved");
+  assert(KIND_CODE[KIND.TANK_TRAP] === 21, "Tank Trap compact kind code should be reserved");
   assert(ABILITY_CODE[ABILITY.POINT_FIRE] === 4, "Point Fire compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.BREAKTHROUGH] === 5, "Breakthrough compact ability code should be reserved");
   assert(ABILITY_CODE[ABILITY.EKAT_TELEPORT] === 6, "Ekat Teleport compact ability code should be reserved");
@@ -3629,6 +3632,21 @@ function fakeAudioContext() {
   assert(
     STATS[KIND.TANK].upgradeRequiresText === "Requires research in R&D Complex",
     "Tank training should explain the R&D Complex research requirement",
+  );
+  assert(
+    STATS[KIND.TANK_TRAP].label === "Tank Trap" &&
+      STATS[KIND.TANK_TRAP].footW === 1 &&
+      STATS[KIND.TANK_TRAP].footH === 1 &&
+      STATS[KIND.TANK_TRAP].sight === 0 &&
+      STATS[KIND.TANK_TRAP].cost.steel === 15 &&
+      STATS[KIND.TANK_TRAP].cost.oil === 0 &&
+      STATS[KIND.TANK_TRAP].buildTicks === TICK_HZ * 10 &&
+      STATS[KIND.TANK_TRAP].requires === KIND.TRAINING_CENTRE,
+    "Tank Trap dormant metadata mirrors Phase 1 server rules",
+  );
+  assert(
+    !WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
+    "Tank Trap remains hidden from the worker build menu until the placement phase",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
