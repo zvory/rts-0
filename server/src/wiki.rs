@@ -527,10 +527,6 @@ fn resolve_wiki_doc(route_path: &str) -> Result<WikiDoc, WikiPathError> {
     })
 }
 
-fn resolve_doc_path(route_path: &str) -> Result<PathBuf, WikiPathError> {
-    resolve_wiki_doc(route_path).map(|doc| doc.path)
-}
-
 fn normalize_wiki_route_path(route_path: &str) -> Result<PathBuf, WikiPathError> {
     let clean = route_path.trim_start_matches('/');
     if clean.is_empty() {
@@ -756,9 +752,9 @@ mod tests {
 
     #[test]
     fn wiki_resolver_allows_context_doc() {
-        let path =
-            resolve_doc_path("docs/context/README.md").expect("context readme should resolve");
-        assert!(path.ends_with("docs/context/README.md"));
+        let doc =
+            resolve_wiki_doc("docs/context/README.md").expect("context readme should resolve");
+        assert!(doc.path.ends_with("docs/context/README.md"));
     }
 
     #[test]
@@ -771,11 +767,11 @@ mod tests {
     #[test]
     fn wiki_resolver_blocks_traversal() {
         assert_eq!(
-            resolve_doc_path("../server/Cargo.toml"),
+            resolve_wiki_doc("../server/Cargo.toml"),
             Err(WikiPathError::Traversal)
         );
         assert_eq!(
-            resolve_doc_path("context/../../server/Cargo.toml"),
+            resolve_wiki_doc("context/../../server/Cargo.toml"),
             Err(WikiPathError::Traversal)
         );
     }
@@ -1132,9 +1128,11 @@ mod tests {
                     .split_once('#')
                     .map(|(path, _)| path)
                     .unwrap_or_else(|| href.trim_start_matches("/wiki/"));
-                let resolved = resolve_doc_path(path_without_anchor).unwrap_or_else(|error| {
-                    panic!("{href} from {} failed: {error:?}", doc.display())
-                });
+                let resolved = resolve_wiki_doc(path_without_anchor)
+                    .map(|doc| doc.path)
+                    .unwrap_or_else(|error| {
+                        panic!("{href} from {} failed: {error:?}", doc.display())
+                    });
                 assert!(
                     resolved.exists(),
                     "{href} from {} resolved to missing file {}",
