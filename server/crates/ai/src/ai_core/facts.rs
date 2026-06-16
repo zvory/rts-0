@@ -376,8 +376,6 @@ mod tests {
             kind,
             x: 0.0,
             y: 0.0,
-            hp: 100,
-            max_hp: 100,
             state,
             is_complete: true,
             production_queue_len: None,
