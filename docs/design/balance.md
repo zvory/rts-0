@@ -274,8 +274,8 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
 | research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
-| factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 620       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
+| factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 300 | 6     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a
