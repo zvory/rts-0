@@ -21,13 +21,20 @@ tests/run-all.sh --full-ai       # local gate plus long AI self-play/simulation 
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
 tests/run-all.sh --with-tri-state-browser  # include latency-sensitive tri-state browser scenarios locally
-tests/run-all.sh -v              # print suite timings and pass/fail lines
+tests/run-all.sh -v              # also print headers and pass/fail lines; timing summary is always printed
+tests/cargo-test-timed.sh        # run Cargo tests package-by-package with per-package timings
 PORT=8090 tests/run-all.sh       # use a different port
 CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the per-worktree Cargo target dir
 RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh  # override shared Node deps cache
 RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 CHROME=/path/to/chrome tests/run-all.sh
 ```
+
+`run-all.sh` prints a final timing summary even in the default quiet mode, including server
+build/boot, each background suite, browser scenario groups, and client dependency hydration when it
+runs. Rust tests inside `run-all.sh` are delegated to `tests/cargo-test-timed.sh`, which discovers
+the Cargo workspace default members and runs `cargo test -p <package>` for each one. That gives CI
+logs a per-package Rust breakdown instead of only one workspace-level `cargo test` duration.
 
 The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
 is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the

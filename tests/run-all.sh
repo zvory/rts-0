@@ -5,7 +5,7 @@
 # What it runs, in order:
 #   1. Architecture policy          (crate boundaries + sim/client architecture + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
-#   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
+#   3. Rust fast scripted tests     (timed cargo test by package — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
 #   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration, faction_integration, team_integration)
 #   6. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
@@ -19,7 +19,7 @@
 # Usage:
 #   tests/run-all.sh                 # local gate (silent unless failing)
 #   tests/run-all.sh --full-ai       # also run long AI self-play/simulation coverage
-#   tests/run-all.sh -v              # verbose: print headers and passes
+#   tests/run-all.sh -v              # verbose: print headers and pass lines; timings are always summarized
 #   tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
 #   tests/run-all.sh --with-tri-state-browser  # run latency-sensitive browser tri-state scenarios locally
@@ -116,8 +116,27 @@ fi
 info "Cargo target dir: $CARGO_TARGET_DIR"
 RTS_NODE_DEPS_CACHE_DIR="${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}"
 
-FAILED=()   # human-readable names of suites that failed
-SKIPPED=()  # suites we deliberately did not run
+TOTAL_START=$SECONDS
+FAILED=()        # human-readable names of suites that failed
+SKIPPED=()       # suites we deliberately did not run
+TIMING_NAMES=()  # suite or phase names with measured durations
+TIMING_SECONDS=()
+TIMING_STATUS=()
+
+record_timing() {
+  TIMING_NAMES+=("$1")
+  TIMING_SECONDS+=("$2")
+  TIMING_STATUS+=("$3")
+}
+
+print_timing_summary() {
+  printf '\nCI timing summary:\n'
+  local i
+  for i in "${!TIMING_NAMES[@]}"; do
+    printf '  %-7s %5ss  %s\n' "${TIMING_STATUS[$i]}" "${TIMING_SECONDS[$i]}" "${TIMING_NAMES[$i]}"
+  done
+  printf '  %-7s %5ss  %s\n' "TOTAL" "$((SECONDS - TOTAL_START))" "tests/run-all.sh"
+}
 
 # Run a suite, record pass/fail. Args: <name> <command...>
 run_suite() {
@@ -127,13 +146,17 @@ run_suite() {
   logf="$(mktemp -t rts-suite.XXXXXX)"
   [ "$VERBOSE" = "1" ] && hdr "$name"
   if "$@" >"$logf" 2>&1; then
+    local elapsed=$((SECONDS - start))
+    record_timing "$name" "$elapsed" "PASS"
     rm -f "$logf"
     if [ "$VERBOSE" = "1" ]; then
-      info "${GRN}PASS${RST} $name ($(elapsed_since "$start"))"
+      info "${GRN}PASS${RST} $name (${elapsed}s)"
     fi
   else
     local rc=$?
-    warn "FAIL $name (exit $rc, $(elapsed_since "$start"))"
+    local elapsed=$((SECONDS - start))
+    record_timing "$name" "$elapsed" "FAIL"
+    warn "FAIL $name (exit $rc, ${elapsed}s)"
     cat "$logf"
     rm -f "$logf"
     FAILED+=("$name")
@@ -165,12 +188,14 @@ boot_server() {
   local build_start=$SECONDS
   build_log="$(mktemp -t rts-build.XXXXXX)"
   if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml" >"$build_log" 2>&1; then
+    record_timing "Server build (debug)" "$((SECONDS - build_start))" "FAIL"
     warn "server build failed ($(elapsed_since "$build_start"))"
     cat "$build_log"
     rm -f "$build_log"
     FAILED+=("server build")
     return 1
   fi
+  record_timing "Server build (debug)" "$((SECONDS - build_start))" "PASS"
   info "${GRN}PASS${RST} server build ($(elapsed_since "$build_start"))"
   rm -f "$build_log"
   if [ ! -x "$SERVER_BIN" ]; then
@@ -192,11 +217,13 @@ boot_server() {
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
       warn "server exited during startup; log:"; sed 's/^/  /' "$SERVER_LOG" >&2
       FAILED+=("server boot")
+      record_timing "Server boot" "$((SECONDS - boot_start))" "FAIL"
       return 1
     fi
     if [ "$SECONDS" -ge "$deadline" ]; then
       warn "server did not become healthy within 30s; log:"; sed 's/^/  /' "$SERVER_LOG" >&2
       FAILED+=("server boot")
+      record_timing "Server boot" "$((SECONDS - boot_start))" "FAIL"
       return 1
     fi
     sleep 0.3
@@ -204,6 +231,7 @@ boot_server() {
   if [ "$VERBOSE" = "1" ]; then
     info "server healthy (pid $SERVER_PID) at $HEALTH_URL ($(elapsed_since "$boot_start"))"
   fi
+  record_timing "Server boot" "$((SECONDS - boot_start))" "PASS"
 }
 
 # Parallel background runner — writes pass/fail result to a temp file.
@@ -246,10 +274,17 @@ collect_bg_results() {
     elapsed="$(sed -n '3p' "$resultf" 2>/dev/null)"
     [ -n "$elapsed" ] || elapsed=0
     if [ "$status" = "ok" ]; then
+      record_timing "$name" "$elapsed" "PASS"
+      case "$name" in
+        "Rust fast scripted tests (cargo test)"|"Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test)")
+          [ -n "$logf" ] && cat "$logf"
+          ;;
+      esac
       [ -n "$logf" ] && rm -f "$logf"
       rm -f "$resultf"
       [ "$VERBOSE" = "1" ] && info "${GRN}PASS${RST} $name (${elapsed}s)"
     else
+      record_timing "$name" "$elapsed" "FAIL"
       warn "FAIL $name (${elapsed}s)"
       [ -n "$logf" ] && { cat "$logf"; rm -f "$logf"; }
       rm -f "$resultf"
@@ -409,10 +444,10 @@ run_rust_suites_bg() {
       cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
     if [ "$RUN_FULL_AI" = "1" ]; then
       run_suite_bg "Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test)" \
-        env RTS_FULL_AI_TESTS=1 cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+        env RTS_FULL_AI_TESTS=1 "$SCRIPT_DIR/cargo-test-timed.sh"
     else
       run_suite_bg "Rust fast scripted tests (cargo test)" \
-        cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+        "$SCRIPT_DIR/cargo-test-timed.sh"
       SKIPPED+=("Rust full AI coverage (--full-ai not set)")
     fi
     run_suite_bg "Rust lint (cargo clippy)" \
@@ -487,7 +522,21 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       info "skipping browser suites: no Chrome found (set CHROME=/path/to/chrome to override)"
       SKIPPED+=("Client smoke (no Chrome)")
       SKIPPED+=("Tri-state lag scenarios (no Chrome)")
-    elif hydrate_client_deps; then
+    else
+      deps_start=$SECONDS
+      if hydrate_client_deps; then
+        record_timing "Client dependency hydration" "$((SECONDS - deps_start))" "PASS"
+      else
+        record_timing "Client dependency hydration" "$((SECONDS - deps_start))" "FAIL"
+        FAILED+=("Client smoke dependency hydration")
+        FAILED+=("Tri-state scenario dependency hydration")
+        collect_bg_results
+        hdr "Summary"
+        for s in "${SKIPPED[@]:-}"; do [ -n "$s" ] && info "  ${YEL}SKIP${RST} $s"; done
+        print_timing_summary
+        info "${RED}${#FAILED[@]} suite(s) failed ❌${RST}"
+        exit 1
+      fi
       CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
       if [ "$RUN_TRI_STATE_BROWSER" = "1" ]; then
         CHROME="$CHROME" run_suite "Tri-state scenarios: phase 0.5" \
@@ -513,9 +562,6 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
         info "skipping tri-state browser scenarios locally; use --with-tri-state-browser or RTS_RUN_TRI_STATE_BROWSER=1 to include them"
         SKIPPED+=("Tri-state lag scenarios (local opt-in)")
       fi
-    else
-      FAILED+=("Client smoke dependency hydration")
-      FAILED+=("Tri-state scenario dependency hydration")
     fi
   else
     SKIPPED+=("Client smoke (--no-client)")
@@ -531,6 +577,7 @@ collect_bg_results
 # --- Summary --------------------------------------------------------------------------------
 hdr "Summary"
 for s in "${SKIPPED[@]:-}"; do [ -n "$s" ] && info "  ${YEL}SKIP${RST} $s"; done
+print_timing_summary
 if [ "${#FAILED[@]}" -eq 0 ]; then
   info "  ${GRN}ALL SUITES PASSED ✅${RST}"
   exit 0
