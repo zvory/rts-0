@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -35,11 +35,11 @@ values.
 
 ## Implementation Checklist
 
-- [ ] Inventory protocol constants and compact codes.
-- [ ] Inventory mirrored balance/config values.
-- [ ] Mark UI-only client data explicitly.
-- [ ] Record ambiguous ownership decisions.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Inventory protocol constants and compact codes.
+- [x] Inventory mirrored balance/config values.
+- [x] Mark UI-only client data explicitly.
+- [x] Record ambiguous ownership decisions.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

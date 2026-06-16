@@ -4,6 +4,7 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
 
 ## Read first
 - [docs/design/balance.md](../design/balance.md) — balance definitions & constants
+  - Client mirror boundary inventory
   - §5.1 Target theme and MVP combat loop
   - §5.2 Current implementation constants
 
