@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -28,11 +28,11 @@ Separate prediction bookkeeping from `GameState` display mutation.
 
 ## Implementation Checklist
 
-- [ ] Identify current prediction display mutations.
-- [ ] Add explicit prediction view/update seam.
-- [ ] Route `GameState` updates through a named overlay method.
-- [ ] Preserve prediction-disabled paths.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Identify current prediction display mutations.
+- [x] Add explicit prediction view/update seam.
+- [x] Route `GameState` updates through a named overlay method.
+- [x] Preserve prediction-disabled paths.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

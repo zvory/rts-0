@@ -371,6 +371,12 @@ export class PredictionController {
     return { production, rally };
   }
 
+  predictionDisplayOverlay() {
+    return {
+      optimisticCommands: this.optimisticUiState(),
+    };
+  }
+
   get pendingCommandCount() {
     return this.pending.length;
   }

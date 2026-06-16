@@ -130,7 +130,7 @@ export class Match {
           return { clientSeq: null, sent: false, predicted: false, blocked: "commandBudget", budget };
         }
         const issued = this.prediction.issueCommand(command, options);
-        this.state?.setOptimisticCommandState(this.prediction.optimisticUiState());
+        this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
         return issued;
       },
     };
@@ -207,7 +207,7 @@ export class Match {
       this.health.noteSnapshotArrival(now, document.hidden);
       this.prediction.applyAuthoritativeSnapshot(m);
       this.state.applySnapshot(m);
-      this.state.setOptimisticCommandState(this.prediction.optimisticUiState());
+      this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
       this.applyPredictedSnapshot();
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.replayControls?.noteSnapshotTick(m?.tick);
@@ -341,13 +341,17 @@ export class Match {
     this.health.resetReportStats();
   }
 
+  applyPredictionDisplayOverlay(overlay = null) {
+    this.state?.applyPredictionDisplayOverlay?.(overlay);
+  }
+
   applyPredictedSnapshot() {
     if (!this.predictionStateCompatible()) {
       this.disablePredictionForStateMismatch();
       return;
     }
     if (!this.prediction.enabled || !this.predictionAdapter.ready) {
-      this.state.clearPredictedSnapshot?.();
+      this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
       this.publishPredictionDebug();
       return;
     }
@@ -355,7 +359,9 @@ export class Match {
     if (!snapshot) return;
     const diagnostics = this.predictionAdapter.diagnostics();
     if (this.disablePredictionForReplayBudget(diagnostics)) return;
-    this.state.setPredictedSnapshot(snapshot, diagnostics, {
+    this.applyPredictionDisplayOverlay({
+      predictedSnapshot: snapshot,
+      diagnostics,
       smoothCorrections: true,
     });
     this.publishPredictionDebug();
@@ -371,7 +377,7 @@ export class Match {
     if (snapshot) {
       const diagnostics = this.predictionAdapter.diagnostics();
       if (this.disablePredictionForReplayBudget(diagnostics)) return;
-      this.state.setPredictedSnapshot(snapshot, diagnostics);
+      this.applyPredictionDisplayOverlay({ predictedSnapshot: snapshot, diagnostics });
       this.publishPredictionDebug();
     }
   }
@@ -380,7 +386,7 @@ export class Match {
     if (!this.prediction.enabled || !(diagnostics?.budgetExceededCount > 0)) return false;
     this.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
     this.resetPredictionAdapter();
-    this.state?.clearPredictedSnapshot?.();
+    this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
     this.publishPredictionDebug();
     this.logPredictionStatus("tracking-replay-budget-exceeded");
     return true;
@@ -407,13 +413,13 @@ export class Match {
   }
 
   predictionStateCompatible() {
-    return typeof this.state?.setPredictedSnapshot === "function";
+    return typeof this.state?.applyPredictionDisplayOverlay === "function";
   }
 
   disablePredictionForStateMismatch() {
     if (!this.prediction.enabled) return;
     this.prediction.reset({ enabled: false, preserveClientSeq: true, reason: "state-mismatch" });
-    this.state?.setOptimisticCommandState?.(null);
+    this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictedSnapshot: null });
     if (!this.predictionStateMismatchLogged) {
       this.predictionStateMismatchLogged = true;
       this.logPredictionStatus("disabled-state-mismatch");
@@ -432,8 +438,7 @@ export class Match {
     if (!allowed) {
       this.predictionInitToken += 1;
       this.resetPredictionAdapter();
-      this.state?.clearPredictedSnapshot?.();
-      this.state?.setOptimisticCommandState?.(null);
+      this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictedSnapshot: null });
       this.publishPredictionDebug();
       this.mountSettings({ keepOpen: true });
       return;
