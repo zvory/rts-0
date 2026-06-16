@@ -24,13 +24,16 @@ Examples:
   scripts/phase-runner.sh --plan ai 2 --model gpt-5.4-mini
 
 Runs executor passes only. Each phase gets a separate worktree and branch under
-/tmp/rts-worktrees. When multiple phases are provided, each later phase starts
-from the previous phase branch so the final branch contains the accumulated work.
+/tmp/rts-worktrees. Each phase starts from the current local main, then the
+runner merges the completed phase branch back to local main and pushes main
+before starting the next phase.
 Phase ids may be numeric, decimal interstitials such as 5.5, or suffixed ids
 such as 3a. Use --from/--to to discover all phase files in that interval; for
 example --from 5 --to 6 runs phase-5.5 before phase-6 if both files exist.
 
-The runner never merges, pushes, creates plans, or performs final review.
+The runner never creates plans or performs final review. It does merge each
+completed phase branch to main and push main, then verifies the phase commit is
+reachable from local main before considering that phase done.
 Calling agents should treat the inner Codex executor as a long-running job:
 wait for the command to finish, and if polling is unavoidable, poll no more than
 once every 5 minutes. Do not tail the executor log during normal progress; the
@@ -38,7 +41,7 @@ runner prints the relevant tail on failure.
 
 Options:
   --plan NAME       Plan directory name under plans/. Required.
-  --base BRANCH     Starting branch for the first phase. Defaults to main.
+  --base BRANCH     Must be main. Kept for compatibility with existing calls.
   --model MODEL     Optional Codex model override for executor passes.
   --from PHASE      Discover phases after PHASE, up to --to. Example: --from 5.
   --to PHASE        Discover phases through PHASE. Requires --from.
@@ -232,8 +235,6 @@ phase_marked_done() {
   ' "$phase_file"
 }
 
-previous_ref="$BASE_BRANCH"
-
 if [ -n "$FROM_PHASE" ]; then
   while IFS= read -r discovered_phase; do
     [ -n "$discovered_phase" ] && PHASES+=("$discovered_phase")
@@ -245,6 +246,26 @@ if [ "${#PHASES[@]}" -eq 0 ]; then
   usage >&2
   exit 2
 fi
+
+if [ "$BASE_BRANCH" != "main" ]; then
+  echo "error: phase-runner now integrates each phase into local main; --base must be main" >&2
+  exit 2
+fi
+
+if [ "$DRY_RUN" = "0" ] && [ "$(git branch --show-current)" != "$BASE_BRANCH" ]; then
+  echo "error: start phase-runner from the local $BASE_BRANCH checkout so it can merge and push phases" >&2
+  exit 2
+fi
+
+if [ "$DRY_RUN" = "0" ] && ! git remote get-url origin >/dev/null 2>&1; then
+  echo "error: origin remote is required because phase-runner must push $BASE_BRANCH after each phase" >&2
+  exit 2
+fi
+
+sync_main() {
+  git fetch origin "$BASE_BRANCH"
+  git merge --ff-only "origin/$BASE_BRANCH"
+}
 
 for raw_phase in "${PHASES[@]}"; do
   phase_id="$(normalize_phase "$raw_phase")"
@@ -273,6 +294,13 @@ for raw_phase in "${PHASES[@]}"; do
     exit 2
   fi
 
+  if [ "$DRY_RUN" = "0" ]; then
+    echo "phase-runner: syncing local $BASE_BRANCH from origin/$BASE_BRANCH before $phase_id"
+    sync_main
+  fi
+  phase_base_ref="$BASE_BRANCH"
+  phase_base_commit="$(git rev-parse "$phase_base_ref")"
+
   prompt="$(
     cat <<EOF
 \$phase-runner
@@ -286,7 +314,7 @@ Current branch: $branch
 This is an executor pass only:
 - Do not create or revise the overall plan.
 - Do not run a final review pass.
-- Do not merge, push, or open a PR.
+- Do not merge, push, or open a PR; the outer phase runner handles merge and push after you commit.
 - Implement only this phase.
 - Stage and commit only files belonging to this phase.
 - The phase is not completed until your task changes are committed successfully on $branch.
@@ -311,9 +339,9 @@ EOF
   )"
 
   phase_start=$SECONDS
-  echo "phase-runner: creating $worktree_path from $previous_ref on $branch"
+  echo "phase-runner: creating $worktree_path from $phase_base_ref ($phase_base_commit) on $branch"
   if [ "$DRY_RUN" = "0" ]; then
-    git worktree add "$worktree_path" -b "$branch" "$previous_ref"
+    git worktree add "$worktree_path" -b "$branch" "$phase_base_ref"
     mkdir -p "$handoff_dir"
     mkdir -p "$log_dir"
   fi
@@ -321,7 +349,6 @@ EOF
   if [ "$DRY_RUN" = "1" ]; then
     echo "phase-runner: would run Codex in $worktree_path"
     printf '%s\n' "$prompt"
-    previous_ref="$branch"
     continue
   fi
 
@@ -356,14 +383,6 @@ EOF
     exit 1
   fi
 
-  status="$(json_get_status "$handoff_file")"
-  if [ "$status" != "completed" ]; then
-    echo "phase-runner: $phase_id reported status '$status'; leaving worktree for inspection: $worktree_path" >&2
-    echo "phase-runner: last 80 log lines from $codex_log" >&2
-    tail -80 "$codex_log" >&2 || true
-    exit 1
-  fi
-
   if [ -n "$(git -C "$worktree_path" status --porcelain=v1)" ]; then
     echo "phase-runner: $phase_id reported completed but left uncommitted changes; leaving worktree for inspection: $worktree_path" >&2
     git -C "$worktree_path" status --short >&2
@@ -372,8 +391,8 @@ EOF
     exit 1
   fi
 
-  if [ "$(git -C "$worktree_path" rev-list --count "$previous_ref..HEAD")" -eq 0 ]; then
-    echo "phase-runner: $phase_id reported completed but created no commit over $previous_ref; leaving worktree for inspection: $worktree_path" >&2
+  if [ "$(git -C "$worktree_path" rev-list --count "$phase_base_commit..HEAD")" -eq 0 ]; then
+    echo "phase-runner: $phase_id reported completed but created no commit over $phase_base_commit; leaving worktree for inspection: $worktree_path" >&2
     echo "phase-runner: last 80 log lines from $codex_log" >&2
     tail -80 "$codex_log" >&2 || true
     exit 1
@@ -384,12 +403,35 @@ EOF
     exit 1
   fi
 
-  echo "phase-runner: executor committed $branch"
+  phase_head="$(git -C "$worktree_path" rev-parse HEAD)"
+  echo "phase-runner: executor committed $branch at $phase_head"
+  echo "phase-runner: merging $branch into local $BASE_BRANCH"
+  sync_main
+  if ! git merge --no-ff --no-edit "$branch"; then
+    echo "phase-runner: merge failed for $phase_id; resolve local $BASE_BRANCH and $worktree_path manually" >&2
+    exit 1
+  fi
+
+  if ! git merge-base --is-ancestor "$phase_head" "$BASE_BRANCH"; then
+    echo "phase-runner: merge completed but $phase_head is not reachable from local $BASE_BRANCH" >&2
+    exit 1
+  fi
+
+  echo "phase-runner: pushing local $BASE_BRANCH to origin/$BASE_BRANCH"
+  git push origin "$BASE_BRANCH"
+
+  if ! git merge-base --is-ancestor "$phase_head" "$BASE_BRANCH"; then
+    echo "phase-runner: $phase_id is not done because $phase_head is not on local $BASE_BRANCH after push" >&2
+    exit 1
+  fi
+
+  echo "phase-runner: $phase_id merged to local $BASE_BRANCH and pushed"
   total_seconds=$((SECONDS - phase_start))
   PLAN_NAME="$PLAN_NAME" \
   PHASE_ID="$phase_id" \
   BRANCH="$branch" \
-  BASE_REF="$previous_ref" \
+  BASE_REF="$phase_base_commit" \
+  PHASE_HEAD="$phase_head" \
   WORKTREE="$worktree_path" \
   CODEX_LOG="$codex_log" \
   EXECUTOR_SECONDS="$executor_seconds" \
@@ -402,6 +444,7 @@ EOF
       phase: process.env.PHASE_ID,
       branch: process.env.BRANCH,
       baseRef: process.env.BASE_REF,
+      phaseHead: process.env.PHASE_HEAD,
       worktree: process.env.WORKTREE,
       codexLog: process.env.CODEX_LOG,
       timingsSeconds: {
@@ -413,8 +456,10 @@ EOF
   '
   echo "phase-runner: timing saved to $timing_file (${total_seconds}s total)"
 
-  previous_ref="$branch"
 done
 
-echo "phase-runner: finished executor passes. Final branch: $previous_ref"
-echo "phase-runner: review manually, then merge and push according to repo policy."
+if [ "$DRY_RUN" = "1" ]; then
+  echo "phase-runner: dry run finished. No worktrees were created and no phases were merged."
+else
+  echo "phase-runner: finished executor passes. Local $BASE_BRANCH contains all completed phase commits."
+fi
