@@ -1,6 +1,6 @@
 # Phase 1 - Align CI Cargo Cache With Actual Target Dir
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 
