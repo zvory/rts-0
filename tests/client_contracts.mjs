@@ -661,9 +661,10 @@ function hotkeyService() {
     "HUD Tank blocks occupy a two-row by three-column shape");
 
   const commandCarModel = selectionBudgetGridModel(tanks.concat(commandCar));
-  assert(commandCarModel.used === 28 && commandCarModel.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
-    "HUD budget grid includes Command Car cap expansion");
-  assert(commandCarModel.cols === 18, "HUD budget grid grows visible columns for Command Car cap");
+  assert(commandCarModel.used === 28 &&
+    commandCarModel.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS + STATS[KIND.COMMAND_CAR].supply,
+    "HUD budget grid includes Command Car net-zero cap expansion");
+  assert(commandCarModel.cols === 20, "HUD budget grid grows visible columns for Command Car cap");
 
   const artilleryShape = selectionBudgetBlockShape(STATS[KIND.ARTILLERY].supply);
   assert(artilleryShape.cols === 3 && artilleryShape.rows === 2 && artilleryShape.reservedCells === 1,
@@ -2979,15 +2980,16 @@ function fakeAudioContext() {
   assert(overBudget.used === 30 && overBudget.cap === BASE_COMMAND_SUPPLY_CAP, "client reports base command budget usage");
 
   const commandCar = { id: 99, owner: 1, kind: KIND.COMMAND_CAR, state: STATE.IDLE };
+  const sixTanks = tanks.concat({ id: 6, owner: 1, kind: KIND.TANK, state: STATE.IDLE });
   const legalWithCar = commandWithinBudget(
-    budgetState(tanks.concat(commandCar)),
-    cmd.attackMove(tanks.map((tank) => tank.id).concat(commandCar.id), 100, 100),
+    budgetState(sixTanks.concat(commandCar)),
+    cmd.attackMove(sixTanks.map((tank) => tank.id).concat(commandCar.id), 100, 100),
   );
-  assert(legalWithCar.ok, "client command guard allows five tanks with one Command Car");
+  assert(legalWithCar.ok, "client command guard allows six tanks with one Command Car");
   assert(
-    legalWithCar.used === 34 &&
-      legalWithCar.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
-    "client command guard counts Command Car supply and bonus",
+    legalWithCar.used === 40 &&
+      legalWithCar.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS + STATS[KIND.COMMAND_CAR].supply,
+    "client command guard offsets Command Car supply before adding bonus",
   );
 
   const legalInfantry = Array.from({ length: 24 }, (_, index) => ({
@@ -4304,6 +4306,16 @@ function fakeAudioContext() {
     maxHp: 100,
     state: STATE.IDLE,
   }));
+  const budgetExtraTank = {
+    id: 455,
+    owner: 1,
+    kind: KIND.TANK,
+    x: 100,
+    y: 20,
+    hp: 100,
+    maxHp: 100,
+    state: STATE.IDLE,
+  };
   const budgetCommandCar = {
     id: 450,
     owner: 1,
@@ -4320,7 +4332,7 @@ function fakeAudioContext() {
     oil: 0,
     supplyUsed: 0,
     supplyCap: 80,
-    entities: budgetRiflemen.concat(budgetTanks, budgetCommandCar),
+    entities: budgetRiflemen.concat(budgetTanks, budgetExtraTank, budgetCommandCar),
     events: [],
   });
   budgetSelectionState.setSelection(budgetRiflemen.map((entity) => entity.id));
@@ -4337,10 +4349,10 @@ function fakeAudioContext() {
     Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
     "selection budget admits four six-supply tanks without a Command Car",
   );
-  budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id));
+  budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id).concat([budgetExtraTank.id, budgetCommandCar.id]));
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "450,400,401,402,403,404",
-    "selection budget pre-admits Command Cars before filling normal candidates",
+    Array.from(budgetSelectionState.selection).join(",") === "450,400,401,402,403,404,455",
+    "selection budget offsets Command Car supply before filling normal candidates",
   );
   budgetSelectionState.setSelection(budgetTanks.slice(0, 4).map((entity) => entity.id));
   budgetSelectionState.addToSelection([budgetRiflemen[0].id]);
@@ -4393,7 +4405,7 @@ function fakeAudioContext() {
     oil: 0,
     supplyUsed: 0,
     supplyCap: 80,
-    entities: budgetRiflemen.concat(budgetTanks, budgetCommandCar, secondBudgetCommandCar),
+    entities: budgetRiflemen.concat(budgetTanks, budgetExtraTank, budgetCommandCar, secondBudgetCommandCar),
     events: [],
   });
   budgetSelectionState.setControlGroup(2, budgetTanks.map((entity) => entity.id).concat([budgetCommandCar.id, secondBudgetCommandCar.id]));

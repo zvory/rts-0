@@ -150,9 +150,10 @@ authoritative `rules::defs` records.
   half the previous tank movement rate. Command Cars use this same movement-oil cost. Tanks, scout
   cars, and command cars cannot advance while their owner has zero oil.
 - Human selection and command bandwidth is supply-based: `BASE_COMMAND_SUPPLY_CAP = 24` command
-  supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 12` for each selected/commanded Command Car. Units
-  use their mirrored supply as command weight, so current Tanks consume 6 command supply and four
-  Tanks fill the base budget; Command Cars consume their own 4 supply while adding capacity.
+  supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 12` and the Command Car's own command weight for each
+  selected/commanded Command Car. Units use their mirrored supply as command weight, so current Tanks
+  consume 6 command supply and four Tanks fill the base budget; Command Cars still appear as weighted
+  selections but their own weight is offset before their bonus is added.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future riflemen for that player are permanently charging:
   1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra

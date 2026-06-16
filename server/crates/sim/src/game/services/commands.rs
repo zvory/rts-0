@@ -582,9 +582,10 @@ fn command_budget_exceeded(entities: &EntityStore, player: u32, units: &[u32]) -
         if entity.owner != player || !entity.is_unit() || entity.under_construction() {
             continue;
         }
-        used = used.saturating_add(command_weight(entity.kind));
+        let weight = command_weight(entity.kind);
+        used = used.saturating_add(weight);
         if entity.kind == EntityKind::CommandCar {
-            cap = cap.saturating_add(COMMAND_CAR_SUPPLY_CAP_BONUS);
+            cap = cap.saturating_add(COMMAND_CAR_SUPPLY_CAP_BONUS.saturating_add(weight));
         }
     }
     used > cap
@@ -4914,11 +4915,11 @@ mod tests {
     }
 
     #[test]
-    fn command_car_bonus_stacks_while_consuming_supply() {
+    fn command_car_bonus_offsets_own_supply_and_stacks() {
         let map = flat_map(64);
 
         let mut one_car_entities = EntityStore::new();
-        let mut one_car_units = spawn_units(&mut one_car_entities, 1, EntityKind::Tank, 5);
+        let mut one_car_units = spawn_units(&mut one_car_entities, 1, EntityKind::Tank, 6);
         one_car_units.extend(spawn_units(
             &mut one_car_entities,
             1,
@@ -4941,11 +4942,11 @@ mod tests {
                 one_car_entities.get(*id).map(|entity| entity.order()),
                 Some(Order::Idle)
             )),
-            "one Command Car should make five tanks legal: 34 used / 36 cap"
+            "one Command Car should make six tanks legal: 40 used / 40 cap"
         );
 
         let mut two_car_entities = EntityStore::new();
-        let mut two_car_units = spawn_units(&mut two_car_entities, 1, EntityKind::Tank, 6);
+        let mut two_car_units = spawn_units(&mut two_car_entities, 1, EntityKind::Tank, 8);
         two_car_units.extend(spawn_units(
             &mut two_car_entities,
             1,
@@ -4968,7 +4969,7 @@ mod tests {
                 two_car_entities.get(*id).map(|entity| entity.order()),
                 Some(Order::Idle)
             )),
-            "two Command Cars should stack: 44 used / 48 cap"
+            "two Command Cars should stack: 56 used / 56 cap"
         );
     }
 

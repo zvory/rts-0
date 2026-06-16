@@ -12,8 +12,9 @@ export function commandBudgetForEntities(entities) {
   let cap = BASE_COMMAND_SUPPLY_CAP;
   for (const entity of entities || []) {
     if (!selectableCountsForCommandBudget(entity)) continue;
-    used += commandWeight(entity.kind);
-    if (entity.kind === KIND.COMMAND_CAR) cap += COMMAND_CAR_SUPPLY_CAP_BONUS;
+    const weight = commandWeight(entity.kind);
+    used += weight;
+    if (entity.kind === KIND.COMMAND_CAR) cap += commandCarCapBonus(weight);
   }
   return { used, cap, over: used > cap };
 }
@@ -41,8 +42,9 @@ export function admitSelectionIds(state, ids, { baseIds = [] } = {}) {
 
   for (const entity of orderedCandidates) {
     if (admittedIds.has(entity.id)) continue;
-    const nextCap = budget.cap + (entity.kind === KIND.COMMAND_CAR ? COMMAND_CAR_SUPPLY_CAP_BONUS : 0);
-    const nextUsed = budget.used + commandWeight(entity.kind);
+    const weight = commandWeight(entity.kind);
+    const nextCap = budget.cap + (entity.kind === KIND.COMMAND_CAR ? commandCarCapBonus(weight) : 0);
+    const nextUsed = budget.used + weight;
     if (nextUsed <= nextCap) {
       admitted.push(entity);
       admittedIds.add(entity.id);
@@ -78,6 +80,10 @@ export function commandWithinBudget(state, command) {
 export function commandWeight(kind) {
   const supply = STATS[kind]?.supply;
   return Number.isFinite(supply) && supply > 0 ? supply : 1;
+}
+
+function commandCarCapBonus(weight) {
+  return COMMAND_CAR_SUPPLY_CAP_BONUS + weight;
 }
 
 function selectableCountsForCommandBudget(entity) {

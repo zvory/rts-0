@@ -388,8 +388,9 @@ simulation contract begins when a `SimCommand` reaches `services::commands`: the
 dedupes and caps unit-id lists, rejects over-budget human unit-list commands, builds issue-time
 facts for the referenced units/targets, and must produce unit-local actions that match the policy
 below. Human command budget is supply-based: 24 base command supply plus 12 per submitted owned
-Command Car, with Command Cars also consuming their mirrored supply weight. AI-owned players are
-exempt from this budget because live AI still issues ordinary `SimCommand`s through
+Command Car plus that Command Car's own mirrored supply weight, so Command Cars offset their own
+weight before adding bonus capacity. AI-owned players are exempt from this budget because live AI
+still issues ordinary `SimCommand`s through
 `Game::enqueue`. `services::order_planner` is the pure
 reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
 economy, or cooldown mutation dependency; it accepts plain facts and emits one of three effects:

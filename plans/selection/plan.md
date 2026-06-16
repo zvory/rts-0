@@ -11,11 +11,12 @@ for hardening, because oversized command unit lists should be impossible for hon
 rejected when sent by malformed or hostile clients.
 
 The initial base command budget is 24 supply. For local selection and control-group admission, each
-selected Command Car increases the budget by 12. For server command validation and client command-send
-guards, each Command Car included in the submitted command unit list increases that command's budget
-by 12. Multiple Command Cars stack in both cases. Units use their mirrored supply value as command
-weight; selectable entities without supply, including buildings, workers if the mirror is missing,
-and other non-combat selectable entities, count as 1.
+selected Command Car increases the budget by 12 plus its own command weight. For server command
+validation and client command-send guards, each Command Car included in the submitted command unit
+list increases that command's budget by 12 plus its own command weight. Multiple Command Cars stack
+in both cases. Units use their mirrored supply value as command weight; selectable entities without
+supply, including buildings, workers if the mirror is missing, and other non-combat selectable
+entities, count as 1.
 
 ## Phase Summaries
 
@@ -75,9 +76,10 @@ highest-risk seams are covered by targeted tests.
 - Keep selection ordering dumb and predictable. Do not optimize mixed selections to maximize power,
   value, or filled supply; preserve the existing candidate order except for Command Car pre-admit
   logic needed to make their bonus reliable.
-- Command Cars always count as selected/commanded entities and consume their own supply weight. Each
-  admitted selected Command Car adds 12 to local selection/control-group budget; each submitted
-  commanded Command Car adds 12 to server/client command-send budget. Multiple Command Cars stack.
+- Command Cars always count as selected/commanded entities and remain visible in the budget UI. Each
+  admitted selected Command Car adds 12 plus its own command weight to local selection/control-group
+  budget; each submitted commanded Command Car adds 12 plus its own command weight to server/client
+  command-send budget. Multiple Command Cars stack.
 - For candidate selection passes, Command Cars present in the candidate set should be admitted even
   if they would not fit at that point in ordinary order, so their bonus does not depend on drag-box
   or same-kind ordering quirks.
@@ -111,8 +113,8 @@ highest-risk seams are covered by targeted tests.
   already practical. Generated JS/JSON config is allowed only if it reduces total risk for this
   rollout rather than becoming a parallel infrastructure project.
 - Balance/gameplay patch notes should call out that command bandwidth is now supply-based, Tanks
-  consume more selection budget than infantry, and Command Cars increase the command budget by 12
-  each.
+  consume more selection budget than infantry, and Command Cars offset their own weight before
+  increasing the command budget by 12 each.
 
 ## Implementation and Handoff Rules
 

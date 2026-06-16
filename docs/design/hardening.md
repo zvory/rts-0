@@ -4,8 +4,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   frames are rejected and the connection closed before they reach serde.
 - **Command unit cap and budget** (`services/commands.rs`): unit-list commands inspect at most
   `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject over-budget
-  human commands before planning. The human command budget is 24 supply plus 12 for each submitted
-  owned Command Car, with mirrored unit supply as command weight and a fallback weight of 1.
+  human commands before planning. The human command budget is 24 supply plus 12 and the Command
+  Car's own command weight for each submitted owned Command Car, with mirrored unit supply as command
+  weight and a fallback weight of 1.
   AI-owned players are exempt from the command-budget gameplay limit because live AI still enqueues
   ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Rejection drops the whole
   malformed human command and emits a private "Command supply exceeded" notice; the server does not

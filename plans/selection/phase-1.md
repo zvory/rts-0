@@ -81,7 +81,7 @@ current count-capped client should avoid sending commands this phase makes illeg
 - Add or update tests proving:
   - 24 one-supply units are legal
   - a fifth 6-supply Tank is rejected without a Command Car
-  - one Command Car increases the legal cap by 12 while consuming its own supply
+  - one Command Car offsets its own supply before increasing the legal cap by 12
   - multiple Command Cars stack
   - huge duplicate id lists remain bounded
 - Add or update focused client tests proving the interim command-send guard blocks an over-budget
