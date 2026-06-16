@@ -219,6 +219,26 @@ alive.
   per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, never full-world state.
 
+Lobby-owned runtime boundaries stay in `server/src/lobby/`; none of these helpers move transport,
+AI controllers, or Tokio coordination into `rts-sim`:
+
+- `room_task.rs` remains the room lifecycle owner: membership, lobby/ingame/replay/branch phase
+  transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
+  `Game`.
+- `live_tick.rs` runs one live simulation tick around the existing `Game` seam: AI command enqueue,
+  `Game::tick`, snapshot fanout, observer analysis, defeat/game-over checks, and panic replay
+  capture.
+- `replay_session.rs` owns replay playback state, seek/keyframe policy, per-viewer replay vision,
+  and post-match/dedicated replay start payloads.
+- `replay_branch.rs` owns branch staging state, original replay-seat claim/release policy, and
+  branch live-launch preparation while `room_task.rs` still owns connected members and final phase
+  changes.
+- `snapshot_fanout.rs` and `snapshots.rs` centralize compacting, replace-latest snapshot delivery,
+  net-status metadata, and union-event helpers for live, spectator, replay, branch, and dev views.
+- `connection.rs`, `dev_replay.rs`, `crash_replay.rs`, `faction_validation.rs`, and
+  `replay_validation.rs` are lobby-local support modules for connection sinks, dev artifact
+  loading, panic artifacts, and server-side lifecycle validation.
+
 ### 3.3 Rules layer (`rules/`)
 
 `server/crates/rules/src/` contains classification, formula, terrain, and economy functions with

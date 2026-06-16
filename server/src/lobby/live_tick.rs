@@ -154,9 +154,14 @@ impl LiveTickDriver<'_> {
         tick_start: StdInstant,
         mut perf: Option<&mut crate::perf::TickPerf>,
     ) {
-        let full_vision_events = crate::perf::timed(perf.as_deref_mut(), "event_union", || {
-            union_events(per_player_events.values())
-        });
+        let full_vision_events = match perf.as_mut() {
+            Some(perf) => crate::perf::timed(Some(&mut **perf), "event_union", || {
+                union_events(per_player_events.values())
+            }),
+            None => crate::perf::timed(None, "event_union", || {
+                union_events(per_player_events.values())
+            }),
+        };
         let recipients: Vec<u32> = self
             .order
             .iter()
@@ -172,7 +177,7 @@ impl LiveTickDriver<'_> {
             self.tick_budget,
             tick_start,
             self.slow_tick_count,
-            perf.as_deref_mut(),
+            perf,
         )
         .send_to_recipients(self.players, recipients, |id, player| {
             let mapped_seat = branch_live_seat_by_connection.get(&id).copied();

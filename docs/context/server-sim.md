@@ -21,7 +21,15 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   issue-time command application and queued promotion
 - `server/crates/rules/src/` plus `server/crates/sim/src/rules/projection.rs` — declarative rules
 - `server/crates/ai/src/` — AI opponents and self-play harnesses
-- `server/src/lobby/`, `server/src/main.rs` — only touch sim via `game::Game`
+- `server/src/lobby/room_task.rs` — room-owned lifecycle, membership, phase transitions, and
+  `Game` ownership
+- `server/src/lobby/live_tick.rs` — live-match tick driver for AI enqueue, `Game::tick`,
+  snapshot fanout, and outcome detection
+- `server/src/lobby/replay_session.rs` and `server/src/lobby/replay_branch.rs` — replay playback
+  runtime and replay-branch staging/launch state
+- `server/src/lobby/snapshot_fanout.rs`, `snapshots.rs`, `connection.rs`, `dev_replay.rs`, and
+  `crash_replay.rs` — lobby-local delivery, compacting, dev replay loading, and panic artifacts
+- `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deployment drain coordination
 - `scripts/check-crate-boundaries.mjs` — enforces Cargo package dependency direction
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
   ratchets `rts-sim::game` internals against
