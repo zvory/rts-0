@@ -16,7 +16,7 @@ src/
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
-                  # resources, fog overlay, feedback, rig schema, and renderer-local palette helpers
+                  # resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
@@ -107,11 +107,29 @@ export function validateRigDefinition(definition, options?)
 ```
 Normalized rig definitions are plain objects with `id`, `kind`, `schemaVersion`, ordered `parts`,
 semantic `anchors`, semantic `bounds`, optional `animations`, and `requiredRuntimeInputs`. Parts
-use stable ids, integer `drawOrder`, normalized primitive geometry, local `transform`, `pivot`, and
-one tint slot. The validator is independent of Pixi and SVG DOM APIs; it fails closed with
+use stable ids, integer `drawOrder`, normalized primitive geometry, local `transform`, `pivot`, one
+tint slot, and optional normalized paint `{fill, stroke, strokeWidth, opacity}` for SVG-authored
+literal colors. The validator is independent of Pixi and SVG DOM APIs; it fails closed with
 path-addressed structured errors for missing required anchors, duplicate part ids, unsupported
-geometry or transforms, non-finite coordinates, invalid tint slots, invalid animation bindings, and
-unit-kind mismatches.
+geometry or transforms, non-finite coordinates, invalid tint slots or paint, invalid animation
+bindings, and unit-kind mismatches.
+
+`renderer/rigs/svg_importer.js`
+```js
+export function compileSvgRig(svgText, metadata?)
+  // Pure SVG authoring importer. Returns validated normalized rig data or structured errors.
+  // metadata.id/kind may override the authored id/kind; metadata.expectedKind enforces callers.
+```
+The SVG importer accepts only the Phase 3 authored rig subset: root `<svg>` with `viewBox`,
+`data-rts-rig-kind`, `data-rts-rig-version="1"`, and `data-rts-origin="center"`; geometry elements
+`g`, `path`, `polygon`, `polyline`, `rect`, `circle`, `ellipse`, `line`, and `metadata`; direct
+hex `fill`/`stroke`, numeric `stroke-width`/`opacity`, `data-rts-tint`, `data-rts-pivot`, and
+semicolon-separated `data-rts-animation` bindings. Part ids use `part.*`, anchors use `anchor.*`,
+and bounds use `bounds.*`; required anchors remain `origin`, `selection`, and `hp`, with weapon
+fixtures adding semantic anchors such as `muzzle`, `bipod`, or `turret`. The importer rejects
+scripts, foreign objects, images/use/external hrefs, filters, masks, clip paths, gradients,
+patterns, CSS classes or style attributes, percentage units, duplicate ids, lowercase or unsupported
+path commands, non-finite values, and transforms that cannot decompose into translate/rotate/scale.
 
 `branch_staging.js`
 ```js

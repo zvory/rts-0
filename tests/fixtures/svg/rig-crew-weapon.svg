@@ -1,0 +1,14 @@
+<svg viewBox="-36 -28 72 56" data-rts-rig-kind="machine_gunner" data-rts-rig-version="1" data-rts-origin="center" id="machine-gunner.authored">
+  <ellipse id="part.shadow" cx="0" cy="4" rx="16" ry="9" fill="#000000" opacity="0.34" />
+  <polygon id="part.body" points="7,0 -8,-8 -10,0 -8,8" fill="#7188b4" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.mg.receiver" x="-2" y="-4" width="10" height="8" fill="#3c4148" data-rts-animation="weaponFacing:transform.rotation:1:0" />
+  <line id="part.mg.shroud" x1="7" y1="0" x2="28" y2="0" stroke="#282d32" stroke-width="4" data-rts-animation="weaponFacing:transform.rotation:1:0" />
+  <polyline id="part.bipod.left" points="13,1 20,9 25,10" stroke="#3a3a32" stroke-width="2" fill="none" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.hp" cx="0" cy="-20" r="1" fill="#ffffff" />
+  <circle id="anchor.muzzle" cx="29" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.bipod" cx="20" cy="9" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-18" y="-15" width="36" height="30" fill="none" />
+  <rect id="bounds.hp" x="-12" y="-25" width="24" height="4" fill="none" />
+</svg>
