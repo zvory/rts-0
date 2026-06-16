@@ -424,11 +424,14 @@ Allocation rules:
 
 - Point orders (`move`, `attackMove`) apply to every selected owned unit that can receive orders.
 - Target/resource orders apply to every selected compatible owned unit after the target has passed
-  issue-time validation. Build orders allocate one compatible selected worker per click after the
-  placement has passed issue-time validation: immediate builds prefer idle workers and then closest
-  worker to the footprint center; queued builds prefer the lowest build assignment load, then closest
-  worker. Build assignment load is the worker's current queued-order count plus one when its active
-  order is already a build intent.
+  issue-time validation. Occupied resource nodes are still valid gather targets; when a worker
+  arrives and the patch is already occupied, the economy service redirects it to the nearest
+  unoccupied same-resource node within ten tiles, or moves it to nearby open grass if none exists.
+  Build orders allocate one compatible selected worker per click after the placement has passed
+  issue-time validation: immediate builds prefer idle workers and then closest worker to the
+  footprint center; queued builds prefer the lowest build assignment load, then closest worker. Build
+  assignment load is the worker's current queued-order count plus one when its active order is
+  already a build intent.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
   decodable for old command logs but does not create queued or immediate ability work.
 - World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued

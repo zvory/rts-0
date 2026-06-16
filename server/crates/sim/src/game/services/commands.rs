@@ -1064,7 +1064,6 @@ fn gather_unit_can_use_node(
     owns_unit(entities, player, unit)
         && matches!(entities.get(unit), Some(e) if rules::economy::can_gather_for_faction(&faction_id, e.kind))
         && gather_node_valid(entities, player, node)
-        && !matches!(entities.node_slot_holder(node), Some(holder) if holder != unit)
 }
 
 fn entity_order_intent_from_planner(intent: planner::OrderIntent) -> Option<OrderIntent> {
@@ -2053,7 +2052,7 @@ pub(crate) fn notice_positioned(
 mod tests {
     use super::*;
     use crate::game::entity::{
-        EntityKind, EntityStore, Order, OrderIntent, RallyKind, WeaponSetup,
+        EntityKind, EntityStore, GatherPhase, Order, OrderIntent, RallyKind, WeaponSetup,
     };
     use crate::game::map::Map;
     use crate::game::services::move_coordinator::MoveCoordinator;
@@ -3029,6 +3028,54 @@ mod tests {
             entities.get(worker).unwrap().queued_orders().last(),
             Some(OrderIntent::Build(_))
         ));
+    }
+
+    #[test]
+    fn gather_command_accepts_occupied_but_mineable_resource_node() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y)
+            .expect("node should spawn");
+        let holder = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 64.0, cc_y)
+            .expect("holder should spawn");
+        {
+            let h = entities.get_mut(holder).expect("holder should exist");
+            h.set_order(Order::gather(node));
+            h.mark_gather_phase(GatherPhase::Harvesting);
+        }
+        assert!(entities.claim_miner(node, holder));
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 32.0, cc_y)
+            .expect("worker should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Gather {
+                    units: vec![worker],
+                    node,
+                    queued: false,
+                },
+            )],
+        );
+
+        assert_eq!(
+            entities
+                .get(worker)
+                .expect("worker should exist")
+                .order()
+                .gather_node(),
+            Some(node),
+            "occupied mineable resources should remain valid gather targets; scatter happens on arrival"
+        );
     }
 
     #[test]

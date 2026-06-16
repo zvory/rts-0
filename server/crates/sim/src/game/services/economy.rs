@@ -7,6 +7,9 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
+use crate::protocol::terrain;
+
+const SCATTER_RESOURCE_RANGE_TILES: f32 = 10.0;
 
 /// Worker harvest loop: walk to node -> latch onto one free patch -> mine in place.
 /// Depletes the node; when empty, the worker goes idle.
@@ -43,9 +46,9 @@ pub(crate) fn gather_system(
 }
 
 fn gather_to_node(
-    _map: &Map,
+    map: &Map,
     entities: &mut EntityStore,
-    _occ: &Occupancy,
+    occ: &Occupancy,
     coordinator: &mut MoveCoordinator<'_>,
     id: u32,
     node: u32,
@@ -88,9 +91,11 @@ fn gather_to_node(
                 // handoff orders so the worker stays on the node.
                 e.clear_queued_orders();
                 e.mark_gather_phase(GatherPhase::Harvesting);
-            } else {
-                e.clear_active_order();
             }
+        }
+        if !can_mine {
+            redirect_gatherer_from_occupied_node(map, entities, occ, coordinator, id, node);
+            return;
         }
         if can_mine && !entities.claim_miner(node, id) {
             idle_gatherer(entities, id);
@@ -98,6 +103,134 @@ fn gather_to_node(
     } else if entities.get(id).map(|e| e.path_is_empty()).unwrap_or(true) {
         coordinator.request_gather_path(entities, id, (node_pos.0, node_pos.1));
     }
+}
+
+fn redirect_gatherer_from_occupied_node(
+    map: &Map,
+    entities: &mut EntityStore,
+    occ: &Occupancy,
+    coordinator: &mut MoveCoordinator<'_>,
+    id: u32,
+    node: u32,
+) {
+    entities.release_miner(id);
+    let Some(next_node) = closest_unoccupied_same_resource_node(entities, id, node) else {
+        move_gatherer_to_nearby_open_grass(map, entities, occ, coordinator, id, node);
+        return;
+    };
+    coordinator.order_gather(entities, id, next_node);
+}
+
+fn closest_unoccupied_same_resource_node(
+    entities: &EntityStore,
+    worker: u32,
+    node: u32,
+) -> Option<u32> {
+    let (owner, target_kind, nx, ny) = match (entities.get(worker), entities.get(node)) {
+        (Some(worker), Some(target)) if target.is_node() => {
+            (worker.owner, target.kind, target.pos_x, target.pos_y)
+        }
+        _ => return None,
+    };
+    let range = SCATTER_RESOURCE_RANGE_TILES * config::TILE_SIZE as f32;
+    let range2 = range * range + 0.01;
+
+    let mut candidates: Vec<(u32, f32)> = entities
+        .iter()
+        .filter(|candidate| {
+            candidate.id != node
+                && candidate.kind == target_kind
+                && candidate.is_node()
+                && candidate.remaining().unwrap_or(0) > 0
+                && world_query::resource_has_completed_mining_cc(entities, owner, candidate.id)
+                && entities.node_slot_holder(candidate.id).is_none()
+        })
+        .filter_map(|candidate| {
+            let d2 = dist2(nx, ny, candidate.pos_x, candidate.pos_y);
+            (d2 <= range2).then_some((candidate.id, d2))
+        })
+        .collect();
+    candidates.sort_by(|(a_id, a_d2), (b_id, b_d2)| {
+        a_d2
+            .total_cmp(b_d2)
+            .then_with(|| a_id.cmp(b_id))
+    });
+    candidates.first().map(|(id, _)| *id)
+}
+
+fn move_gatherer_to_nearby_open_grass(
+    map: &Map,
+    entities: &mut EntityStore,
+    occ: &Occupancy,
+    coordinator: &mut MoveCoordinator<'_>,
+    id: u32,
+    node: u32,
+) {
+    let Some((owner, wx, wy)) = entities.get(id).map(|e| (e.owner, e.pos_x, e.pos_y)) else {
+        return;
+    };
+    let anchor = entities
+        .get(node)
+        .map(|e| (e.pos_x, e.pos_y))
+        .unwrap_or((wx, wy));
+    let Some(goal) = nearest_open_non_resource_grass_tile(map, entities, occ, anchor) else {
+        idle_gatherer(entities, id);
+        return;
+    };
+    if let Some(e) = entities.get_mut(id) {
+        e.clear_queued_orders();
+    }
+    coordinator.order_group_move(entities, owner, &[id], goal, false);
+}
+
+fn nearest_open_non_resource_grass_tile(
+    map: &Map,
+    entities: &EntityStore,
+    occ: &Occupancy,
+    anchor: (f32, f32),
+) -> Option<(f32, f32)> {
+    let (ax, ay) = map.tile_of(anchor.0, anchor.1);
+    let max_radius = SCATTER_RESOURCE_RANGE_TILES as i32;
+    let resource_tiles: Vec<(u32, u32)> = entities
+        .iter()
+        .filter(|e| e.is_node() && e.remaining().unwrap_or(0) > 0)
+        .map(|e| map.tile_of(e.pos_x, e.pos_y))
+        .collect();
+
+    let mut best: Option<((f32, f32), i32, f32)> = None;
+    for radius in 1..=max_radius {
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if dx.abs().max(dy.abs()) != radius {
+                    continue;
+                }
+                let tx = ax as i32 + dx;
+                let ty = ay as i32 + dy;
+                if !map.in_bounds(tx, ty)
+                    || map.terrain_at(tx as u32, ty as u32) != terrain::GRASS
+                    || occ.building_blocked_at_tile(tx, ty)
+                    || resource_tiles.contains(&(tx as u32, ty as u32))
+                {
+                    continue;
+                }
+                let goal = map.tile_center(tx as u32, ty as u32);
+                let d2 = dist2(anchor.0, anchor.1, goal.0, goal.1);
+                let replace = best
+                    .as_ref()
+                    .map(|(_, best_radius, best_d2)| {
+                        radius < *best_radius || (radius == *best_radius && d2 < *best_d2)
+                    })
+                    .unwrap_or(true);
+                if replace {
+                    best = Some((goal, radius, d2));
+                }
+            }
+        }
+        if best.is_some() {
+            break;
+        }
+    }
+    best.map(|(goal, _, _)| goal)
 }
 
 fn gather_harvesting(
@@ -223,94 +356,4 @@ fn scatter_gatherer_from_node(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, GatherPhase, Order, OrderIntent};
-    use crate::game::map::Map;
-    use crate::game::services::move_coordinator::MoveCoordinator;
-    use crate::game::services::occupancy::{footprint_center, Occupancy};
-    use crate::game::services::pathing::PathingService;
-    use crate::game::services::spatial::SpatialIndex;
-    use crate::game::ScoreState;
-    use crate::protocol::terrain;
-
-    fn flat_map(size: u32) -> Map {
-        Map {
-            size,
-            terrain: vec![terrain::GRASS; (size * size) as usize],
-            starts: vec![(4, 4)],
-            expansion_sites: Vec::new(),
-        }
-    }
-
-    fn player_state(id: u32) -> PlayerState {
-        PlayerState {
-            id,
-            team_id: id,
-            faction_id: "kriegsia".to_string(),
-            name: format!("Player {id}"),
-            color: "#fff".to_string(),
-            start_tile: (0, 0),
-            steel: 0,
-            oil: 0,
-            supply_used: 0,
-            supply_cap: 20,
-            is_ai: false,
-            score: ScoreState::default(),
-            upgrades: Default::default(),
-        }
-    }
-
-    #[test]
-    fn entering_harvesting_clears_pending_queued_orders() {
-        let map = flat_map(24);
-        let mut entities = EntityStore::new();
-        let (ccx, ccy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
-        entities
-            .spawn_building(1, EntityKind::CityCentre, ccx, ccy, true)
-            .expect("city centre should spawn");
-        let node = entities
-            .spawn_node(EntityKind::Steel, ccx + 48.0, ccy)
-            .expect("steel node should spawn");
-        let (nx, ny) = entities
-            .get(node)
-            .map(|n| (n.pos_x, n.pos_y))
-            .expect("node pos");
-        let worker = entities
-            .spawn_unit(1, EntityKind::Worker, nx, ny)
-            .expect("worker should spawn");
-        {
-            let w = entities.get_mut(worker).expect("worker should exist");
-            w.set_order(Order::gather(node));
-            w.set_target_id(Some(node));
-            w.append_queued_order(OrderIntent::move_to(nx + 96.0, ny));
-        }
-
-        let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        let mut pathing = PathingService::new(1024, 32);
-        pathing.advance_tick(1);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-        let mut players = vec![player_state(1)];
-
-        gather_system(
-            &map,
-            &mut entities,
-            &mut players,
-            &occ,
-            &spatial,
-            &mut coordinator,
-        );
-
-        let w = entities.get(worker).expect("worker should exist");
-        assert_eq!(
-            w.gather_phase(),
-            Some(GatherPhase::Harvesting),
-            "worker in interact range should transition to harvesting"
-        );
-        assert!(
-            w.queued_orders().is_empty(),
-            "harvesting transition is terminal; queued handoff orders should be dropped"
-        );
-    }
-}
+mod tests;
