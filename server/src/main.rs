@@ -132,6 +132,7 @@ async fn main() {
         .route("/beta/", get(beta_redirect_handler))
         .route("/version", get(version_handler))
         .route("/wiki", get(wiki::wiki_index_handler))
+        .route("/wiki/", get(wiki::wiki_index_handler))
         .route("/wiki/{*path}", get(wiki::wiki_page_handler))
         .route("/ws", get(ws_handler))
         .route("/dev/unit-lab", get(unit_design_lab_handler))
