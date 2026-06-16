@@ -1,5 +1,8 @@
 use crate::config;
-use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, EntityStore};
+use crate::game::entity::{
+    movement_body_class, uses_oriented_vehicle_body, Entity, EntityKind, EntityStore,
+    MovementBodyClass,
+};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, building_rect_for_footprint, circle_intersects_rect, rects_intersect,
@@ -151,7 +154,15 @@ pub(crate) fn building_site_clear_spatial(
         .all(|id| {
             entities
                 .get(id)
-                .is_none_or(|e| entity_clear_of_building_rect(map, e, rect, None))
+                .is_none_or(|e| {
+                    entity_clear_of_building_rect(
+                        map,
+                        e,
+                        rect,
+                        None,
+                        build_placement_policy(building),
+                    )
+                })
         })
 }
 
@@ -164,6 +175,20 @@ pub(crate) fn building_site_clear_for_build_intent(
     builder_id: u32,
 ) -> bool {
     building_site_clear_with_ignored_unit(map, entities, building, tile_x, tile_y, Some(builder_id))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BuildPlacementPolicy {
+    AllGround,
+    VehicleBodyOnly,
+}
+
+pub(crate) fn build_placement_policy(building: EntityKind) -> BuildPlacementPolicy {
+    if building == EntityKind::TankTrap {
+        BuildPlacementPolicy::VehicleBodyOnly
+    } else {
+        BuildPlacementPolicy::AllGround
+    }
 }
 
 fn building_site_clear_with_ignored_unit(
@@ -183,7 +208,9 @@ fn building_site_clear_with_ignored_unit(
 
     entities
         .iter()
-        .all(|e| entity_clear_of_building_rect(map, e, rect, ignored_unit))
+        .all(|e| {
+            entity_clear_of_building_rect(map, e, rect, ignored_unit, build_placement_policy(building))
+        })
 }
 
 fn entity_clear_of_building_rect(
@@ -191,6 +218,7 @@ fn entity_clear_of_building_rect(
     e: &Entity,
     rect: RectBody,
     ignored_unit: Option<u32>,
+    policy: BuildPlacementPolicy,
 ) -> bool {
     if e.hp == 0 {
         return true;
@@ -205,6 +233,11 @@ fn entity_clear_of_building_rect(
         return !circle_intersects_rect(entity_circle_body(e), rect);
     }
     if e.is_unit() {
+        if policy == BuildPlacementPolicy::VehicleBodyOnly
+            && movement_body_class(e.kind) == MovementBodyClass::InfantryLike
+        {
+            return true;
+        }
         return unit_body_for_entity(e).is_none_or(|body| !unit_body_intersects_rect(body, rect));
     }
     true
@@ -448,6 +481,46 @@ mod tests {
             EntityKind::Depot,
             4,
             4,
+        ));
+    }
+
+    #[test]
+    fn tank_trap_build_policy_allows_infantry_overlap_but_rejects_vehicle_body() {
+        let map = flat_map(12);
+        let mut infantry_entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, EntityKind::TankTrap, 4, 4);
+        let worker = infantry_entities
+            .spawn_unit(1, EntityKind::Worker, x, y)
+            .expect("worker should spawn");
+
+        assert!(building_site_clear_for_build_intent(
+            &map,
+            &infantry_entities,
+            EntityKind::TankTrap,
+            4,
+            4,
+            worker,
+        ));
+        assert!(
+            !building_site_clear(&map, &infantry_entities, EntityKind::Depot, 4, 4),
+            "ordinary buildings still reject infantry body overlap"
+        );
+
+        let mut vehicle_entities = EntityStore::new();
+        let builder = vehicle_entities
+            .spawn_unit(1, EntityKind::Worker, x - config::TILE_SIZE as f32 * 2.0, y)
+            .expect("worker should spawn");
+        vehicle_entities
+            .spawn_unit(1, EntityKind::Tank, x, y)
+            .expect("tank should spawn");
+
+        assert!(!building_site_clear_for_build_intent(
+            &map,
+            &vehicle_entities,
+            EntityKind::TankTrap,
+            4,
+            4,
+            builder,
         ));
     }
 

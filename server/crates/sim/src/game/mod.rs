@@ -328,9 +328,10 @@ impl Game {
         self.players
             .iter()
             .filter(|p| {
-                let has_building = services::world_query::owned_buildings(&self.entities, p.id)
-                    .next()
-                    .is_some();
+                let has_building =
+                    services::world_query::owned_survival_buildings(&self.entities, p.id)
+                        .next()
+                        .is_some();
                 if !has_building {
                     return false;
                 }

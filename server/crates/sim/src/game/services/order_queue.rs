@@ -622,8 +622,13 @@ fn build_intent_promotion_error(
     if config::building_stats(kind).is_none() {
         return Some("Unknown building".to_string());
     }
+    let owner_faction = players
+        .iter()
+        .find(|p| p.id == owner)
+        .map(|p| p.faction_id.as_str())
+        .unwrap_or(rules::faction::DEFAULT_FACTION_ID);
     let owned = world_query::completed_building_kinds(entities, owner);
-    if !rules::economy::build_requirement_met(kind, &owned) {
+    if !rules::economy::build_requirement_met_for_faction(owner_faction, kind, &owned) {
         return Some("Requirement not met".to_string());
     }
     if tile_x >= map.size || tile_y >= map.size {
