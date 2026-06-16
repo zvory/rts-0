@@ -3247,6 +3247,7 @@ function fakeAudioContext() {
     STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
     "Vehicle Works should require a Training Centre in the command card",
   );
+  assert(STATS[KIND.FACTORY].buildTicks === 749, "Vehicle Works build time mirrors server");
   assert(
     STATS[KIND.FACTORY].trains[0] === KIND.SCOUT_CAR,
     "Vehicle Works should put Scout Car in the leftmost train slot",
@@ -3325,10 +3326,10 @@ function fakeAudioContext() {
     "Gun Works should be a 3x3 building",
   );
   assert(
-    STATS[KIND.STEELWORKS].cost.steel === 125 && STATS[KIND.STEELWORKS].cost.oil === 125,
+    STATS[KIND.STEELWORKS].cost.steel === 150 && STATS[KIND.STEELWORKS].cost.oil === 100,
     "Gun Works cost mirrors server",
   );
-  assert(STATS[KIND.STEELWORKS].buildTicks === 620, "Gun Works build time mirrors server");
+  assert(STATS[KIND.STEELWORKS].buildTicks === 599, "Gun Works build time mirrors server");
   assert(
     STATS[KIND.STEELWORKS].trains.includes(KIND.ANTI_TANK_GUN),
     "Gun Works should train Anti-Tank Guns after the unlock",

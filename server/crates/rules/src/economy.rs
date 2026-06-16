@@ -316,7 +316,7 @@ mod tests {
             "artillery body width should match tanks"
         );
         assert_eq!(supply_cost(EntityKind::ScoutCar), 3);
-        assert_eq!(cost(EntityKind::Steelworks), (125, 125));
+        assert_eq!(cost(EntityKind::Steelworks), (150, 100));
         assert_eq!(supply_cost(EntityKind::Tank), 6);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
         assert_eq!(
