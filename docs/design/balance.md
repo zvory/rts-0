@@ -10,6 +10,10 @@ mining amounts, and other scalar simulation constants; its `unit_stats(kind)` an
 colors, and command-card descriptors). Keep both in sync; run
 `node scripts/check-faction-catalog-parity.mjs` to mechanically compare the Rust-authoritative
 default faction catalog to the client descriptors.
+The server wiki's `/wiki/stats` page is generated from the same Rust definitions and faction
+catalogs. For changes that affect visible stats, faction availability, upgrades, or ability
+metadata, run `node scripts/check-wiki.mjs`; it includes the wiki route/table checks and the client
+catalog parity check.
 
 ### 5.0 Faction economy contract
 

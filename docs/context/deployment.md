@@ -10,6 +10,7 @@ Use when changing server bind/config, the build pipeline, or the input-hardening
 cd server && cargo run            # serves client + /ws on RTS_ADDR; open the printed URL
 cd server && cargo run --release  # fast build
 cd server && cargo build && cargo clippy && cargo fmt
+node scripts/check-wiki.mjs       # wiki routes, links, generated stats, and catalog parity
 node scripts/check-crate-boundaries.mjs
 ```
 
@@ -27,6 +28,9 @@ relative to the server crate, so `cargo run` from `server/` is the whole dev loo
   `checked_*`.
 - Keep the room task alive: handle errors, don't propagate panics out of message handlers.
 - `rts-server` is the only crate that may own Axum/Tokio WebSocket/static-file serving.
+- `/wiki` is server-rendered and read-only. It may serve only allowlisted Markdown from
+  `docs/context` and `docs/design`; `/wiki/stats` must be generated from `rts-rules` definitions
+  and faction catalogs, not scraped from client config or rendered docs.
 
 ## Cross-capsule triggers
 - Touching the wire surface → [protocol.md](protocol.md).

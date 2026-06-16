@@ -30,6 +30,10 @@
 - Local development also exposes a dev-only watch entry at `/dev/selfplay` that auto-runs
   scripted self-play and streams **full-world** snapshots (no fog) to the ordinary match
   renderer. This path is isolated from normal lobby play and is only for debugging.
+- The same server exposes a lightweight documentation wiki at `/wiki`. It renders only allowlisted
+  Markdown under `docs/context` and `docs/design`, rewrites relative Markdown doc links into
+  `/wiki/...` links, rejects traversal or unsupported paths, and serves `/wiki/stats` from
+  Rust-authoritative rules and faction catalog data instead of client mirrors.
 - The same Rust process serves the static client files, so development is a single
   `cargo run` and then open the printed local URL.
 
@@ -61,6 +65,13 @@ self-play harnesses and drives the sim only by observing snapshots and enqueuein
 `SimCommand`s. `rts-rules` owns pure vocabulary, balance data, terrain, economy, and combat
 formulas. `rts-protocol` owns serde wire DTOs and compact snapshot transport. `rts-contract` owns
 shared semantic DTOs that are below the wire and sim layers.
+
+The server wiki belongs to `rts-server` because it is an Axum route and because generated reference
+HTML is a presentation of lower-crate data. Wiki prose comes from repository Markdown files; wiki
+stats rows come from `rts-rules` definitions and faction catalogs. After changing docs links,
+allowlisted docs, rules definitions, faction catalogs, upgrades, or ability metadata, run
+`node scripts/check-wiki.mjs` to cover route safety, link integrity, generated table completeness,
+and client catalog parity.
 
 `scripts/check-crate-boundaries.mjs` enforces the implemented Cargo package graph and rejects
 server-only imports in lower crates. Any intentional graph change must update this section, the

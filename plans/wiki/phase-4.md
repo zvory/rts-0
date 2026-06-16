@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -30,12 +30,12 @@ unsafe rendering, and stale generated tables without relying on manual browsing.
 
 ## Implementation Checklist
 
-- [ ] Document the wiki route and generated-stats authority.
-- [ ] Add a single regression command for future wiki verification.
-- [ ] Cover unsafe path, missing page, escaped content, and broken internal-link cases.
-- [ ] Cover completeness of generated unit/building/faction/ability tables.
-- [ ] Remove any temporary fixtures or debug routes from earlier phases.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Document the wiki route and generated-stats authority.
+- [x] Add a single regression command for future wiki verification.
+- [x] Cover unsafe path, missing page, escaped content, and broken internal-link cases.
+- [x] Cover completeness of generated unit/building/faction/ability tables.
+- [x] Remove any temporary fixtures or debug routes from earlier phases.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
