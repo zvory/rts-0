@@ -231,7 +231,8 @@ phase_marked_done() {
     const text = fs.readFileSync(process.argv[1], "utf8");
     const singleLineStatus = /^Status:\s*Done\.?\s*$/im.test(text);
     const headingStatus = /^##\s+Status\s*\n+\s*Done\.?\s*$/im.test(text);
-    process.exit(singleLineStatus || headingStatus ? 0 : 1);
+    const checklistStatus = /^##\s+Phase Status\s*\n+(?:[ \t]*\n)*\s*-\s*\[x\]\s*Done\.?\s*$/im.test(text);
+    process.exit(singleLineStatus || headingStatus || checklistStatus ? 0 : 1);
   ' "$phase_file"
 }
 
