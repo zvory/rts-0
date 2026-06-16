@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -28,11 +28,11 @@ Lock down current command and queued-order behavior before refactoring productio
 
 ## Implementation Checklist
 
-- [ ] Inventory existing command/order tests and name missing high-risk behaviors.
-- [ ] Add characterization tests for immediate command admission and rejection.
-- [ ] Add characterization tests for queued promotion and stale-stage behavior.
-- [ ] Add characterization tests for ability issue-time versus promotion-time semantics.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Inventory existing command/order tests and name missing high-risk behaviors.
+- [x] Add characterization tests for immediate command admission and rejection.
+- [x] Add characterization tests for queued promotion and stale-stage behavior.
+- [x] Add characterization tests for ability issue-time versus promotion-time semantics.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
