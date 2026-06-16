@@ -131,6 +131,7 @@ jobs:
 
       - name: Cache Cargo registry and target
         if: needs.changed-files.outputs.docs_only != 'true'
+        id: rust-cargo-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -144,6 +145,19 @@ jobs:
       - name: Install cargo-nextest
         if: needs.changed-files.outputs.docs_only != 'true'
         run: cargo install cargo-nextest --locked
+
+      - name: Print Rust test context
+        if: needs.changed-files.outputs.docs_only != 'true'
+        shell: bash
+        env:
+          CARGO_CACHE_HIT: ${{ steps.rust-cargo-cache.outputs.cache-hit }}
+        run: |
+          printf 'Rust test context:\n'
+          printf '  CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
+          printf '  rustc: %s\n' "$(rustc --version)"
+          printf '  cargo: %s\n' "$(cargo --version)"
+          printf '  cargo-nextest: %s\n' "$(cargo nextest --version)"
+          printf '  cargo cache exact hit: %s\n' "${CARGO_CACHE_HIT:-false}"
 
       - name: Run Rust and architecture suites
         if: needs.changed-files.outputs.docs_only != 'true'

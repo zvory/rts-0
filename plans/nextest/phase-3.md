@@ -1,6 +1,6 @@
 # Phase 3 - Diagnostic Cleanup
 
-Status: Draft.
+Status: Done.
 
 ## Goal
 
@@ -40,13 +40,13 @@ developers to know about stale opt-in profiling modes.
 
 ## Implementation Checklist
 
-- [ ] Remove old package-timing docs and environment variables.
-- [ ] Remove or archive obsolete timing scripts.
-- [ ] Make the Rust timing summary say nextest by name.
-- [ ] Add version and target-dir context where it is useful.
-- [ ] Ensure failure output remains visible and successful output stays concise.
-- [ ] Update docs with the new slow-Rust investigation workflow.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Remove old package-timing docs and environment variables.
+- [x] Remove or archive obsolete timing scripts.
+- [x] Make the Rust timing summary say nextest by name.
+- [x] Add version and target-dir context where it is useful.
+- [x] Ensure failure output remains visible and successful output stays concise.
+- [x] Update docs with the new slow-Rust investigation workflow.
+- [x] Mark this phase done in the implementation commit.
 
 ## Focused Verification
 

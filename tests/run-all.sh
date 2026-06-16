@@ -5,7 +5,7 @@
 # What it runs, in order:
 #   1. Architecture/contract policy (crate boundaries + sim/client architecture + faction guardrails + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
-#   3. Rust fast scripted tests     (cargo nextest — deterministic, in-process, no server)
+#   3. Rust nextest fast scripted tests (deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
 #   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration, faction_integration, team_integration)
 #   6. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
@@ -122,8 +122,31 @@ if [ "$NODE_MAJOR" -lt 22 ]; then
   warn "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
 fi
 
-info "Cargo target dir: $CARGO_TARGET_DIR"
 RTS_NODE_DEPS_CACHE_DIR="${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}"
+
+rust_tool_version() {
+  local tool="$1"; shift
+  if command -v "$tool" >/dev/null 2>&1; then
+    "$@" 2>&1 | sed -n '1p'
+  else
+    printf '%s not found on PATH\n' "$tool"
+  fi
+}
+
+print_rust_test_context() {
+  [ "$RUN_RUST" = "1" ] || return 0
+  printf '\nRust test context:\n'
+  printf '  CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
+  printf '  rustc: %s\n' "$(rust_tool_version rustc rustc --version)"
+  printf '  cargo: %s\n' "$(rust_tool_version cargo cargo --version)"
+  if command -v cargo-nextest >/dev/null 2>&1; then
+    printf '  cargo-nextest: %s\n' "$(cargo nextest --version 2>&1 | sed -n '1p')"
+  else
+    printf '  cargo-nextest: not found on PATH\n'
+  fi
+}
+
+print_rust_test_context
 
 TOTAL_START=$SECONDS
 FAILED=()        # human-readable names of suites that failed
@@ -461,12 +484,12 @@ run_nextest_tests_full_ai() {
   RTS_FULL_AI_TESTS=1 run_nextest_tests
 }
 
-run_cargo_tests_bg() {
+run_nextest_tests_bg() {
   local name
   if [ "$RUN_FULL_AI" = "1" ]; then
-    name="Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo nextest)"
+    name="Rust nextest full AI-enabled tests (RTS_FULL_AI_TESTS=1)"
   else
-    name="Rust fast scripted tests (cargo nextest)"
+    name="Rust nextest fast scripted tests"
   fi
 
   if [ "$RUN_FULL_AI" = "1" ]; then
@@ -496,18 +519,18 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/select-suites.mjs" --verify
     run_suite_bg "Rust format (cargo fmt --check)" \
       cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
-    run_cargo_tests_bg
+    run_nextest_tests_bg
     if [ "$RUN_FULL_AI" != "1" ]; then
-      SKIPPED+=("Rust full AI coverage (--full-ai not set)")
+      SKIPPED+=("Rust nextest full AI coverage (--full-ai not set)")
     fi
     run_suite_bg "Rust lint (cargo clippy)" \
       cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
     SKIPPED+=("Architecture policy checks (--no-rust)")
     SKIPPED+=("Rust format (--no-rust)")
-    SKIPPED+=("Rust fast scripted tests (--no-rust)")
+    SKIPPED+=("Rust nextest fast scripted tests (--no-rust)")
     SKIPPED+=("Rust lint (--no-rust)")
-    SKIPPED+=("Rust full AI coverage (--no-rust)")
+    SKIPPED+=("Rust nextest full AI coverage (--no-rust)")
   fi
 }
 

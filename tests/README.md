@@ -48,6 +48,12 @@ install hint instead of falling back to `cargo test`.
 The workspace currently has no Rust doctests, so `run-all.sh` does not run a separate
 `cargo test --doc` step.
 
+For slow Rust runs, start with the context and timing already printed by the runner. The Rust-only
+path prints the Cargo target dir, Rust version, cargo version, cargo-nextest version, nextest
+per-test status/slow-test output, and the final command-level timing summary. In CI, the Rust job
+also prints the Cargo cache exact-hit result from Actions; use that plus the target dir to decide
+whether time is going into rebuilds, then use nextest's slow-test output to narrow test runtime.
+
 The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
 is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the
 SHA-256 hash of `tests/package-lock.json`, then links this worktree's ignored `tests/node_modules`
