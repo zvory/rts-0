@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -26,11 +26,11 @@ Separate planned order mutation from command validation and decoding.
 
 ## Implementation Checklist
 
-- [ ] Name the planned effect types that currently cause direct mutation.
-- [ ] Create a narrow executor or private helper for planned effects.
-- [ ] Route immediate command application through the executor.
-- [ ] Preserve ability launch and preserve-movement semantics.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Name the planned effect types that currently cause direct mutation.
+- [x] Create a narrow executor or private helper for planned effects.
+- [x] Route immediate command application through the executor.
+- [x] Preserve ability launch and preserve-movement semantics.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
