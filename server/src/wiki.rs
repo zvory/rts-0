@@ -3,10 +3,9 @@ use std::path::{Component, Path, PathBuf};
 use axum::extract::Path as AxumPath;
 use axum::http::{header, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
-use pulldown_cmark::{html, CowStr, Event, Options, Parser};
+use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag};
 
-const WIKI_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs");
-const INDEX_DOC: &str = "context/README.md";
+const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WikiPathError {
@@ -15,7 +14,10 @@ enum WikiPathError {
 }
 
 pub async fn wiki_index_handler() -> Response {
-    wiki_response_for(INDEX_DOC)
+    match wiki_index_markdown() {
+        Ok(markdown) => wiki_html("docs/context/README.md", &markdown).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "wiki index unavailable").into_response(),
+    }
 }
 
 pub async fn wiki_page_handler(AxumPath(path): AxumPath<String>) -> Response {
@@ -23,9 +25,9 @@ pub async fn wiki_page_handler(AxumPath(path): AxumPath<String>) -> Response {
 }
 
 fn wiki_response_for(route_path: &str) -> Response {
-    match resolve_doc_path(route_path) {
-        Ok(doc_path) => match std::fs::read_to_string(&doc_path) {
-            Ok(markdown) => wiki_html(route_path, &markdown).into_response(),
+    match resolve_wiki_doc(route_path) {
+        Ok(doc) => match std::fs::read_to_string(&doc.path) {
+            Ok(markdown) => wiki_html(&doc.route_path, &markdown).into_response(),
             Err(_) => (StatusCode::NOT_FOUND, "wiki page not found").into_response(),
         },
         Err(WikiPathError::Traversal) => {
@@ -39,7 +41,7 @@ fn wiki_response_for(route_path: &str) -> Response {
 
 fn wiki_html(route_path: &str, markdown: &str) -> impl IntoResponse {
     let title = page_title(route_path, markdown);
-    let body = render_markdown(markdown);
+    let body = render_markdown(route_path, markdown);
     let html = format!(
         r#"<!doctype html>
 <html lang="en">
@@ -58,6 +60,7 @@ th, td {{ border: 1px solid #d8d2c7; padding: 4px 8px; }}
 </style>
 </head>
 <body>
+<nav><a href="/wiki">Wiki index</a></nav>
 <main>
 {body}
 </main>
@@ -73,10 +76,29 @@ th, td {{ border: 1px solid #d8d2c7; padding: 4px 8px; }}
     )
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WikiDoc {
+    route_path: String,
+    path: PathBuf,
+}
+
+fn resolve_wiki_doc(route_path: &str) -> Result<WikiDoc, WikiPathError> {
+    let normalized = normalize_wiki_route_path(route_path)?;
+    let path = Path::new(REPO_ROOT).join(&normalized);
+    Ok(WikiDoc {
+        route_path: normalized.to_string_lossy().into_owned(),
+        path,
+    })
+}
+
 fn resolve_doc_path(route_path: &str) -> Result<PathBuf, WikiPathError> {
+    resolve_wiki_doc(route_path).map(|doc| doc.path)
+}
+
+fn normalize_wiki_route_path(route_path: &str) -> Result<PathBuf, WikiPathError> {
     let clean = route_path.trim_start_matches('/');
     if clean.is_empty() {
-        return resolve_doc_path(INDEX_DOC);
+        return normalize_wiki_route_path("docs/context/README.md");
     }
     let relative = Path::new(clean);
     let mut normalized = PathBuf::new();
@@ -89,6 +111,7 @@ fn resolve_doc_path(route_path: &str) -> Result<PathBuf, WikiPathError> {
             }
         }
     }
+    normalized = canonicalize_legacy_docs_route(normalized);
     if normalized
         .extension()
         .and_then(|extension| extension.to_str())
@@ -97,26 +120,58 @@ fn resolve_doc_path(route_path: &str) -> Result<PathBuf, WikiPathError> {
         return Err(WikiPathError::Missing);
     }
 
+    if !is_allowlisted_doc_route(&normalized) {
+        return Err(WikiPathError::Missing);
+    }
+
+    Ok(normalized)
+}
+
+fn canonicalize_legacy_docs_route(mut normalized: PathBuf) -> PathBuf {
     let first = normalized
         .components()
         .next()
         .and_then(|component| match component {
             Component::Normal(part) => part.to_str(),
             _ => None,
-        })
-        .ok_or(WikiPathError::Missing)?;
-    if !matches!(first, "context" | "design") {
-        return Err(WikiPathError::Missing);
+        });
+    if matches!(first, Some("context" | "design")) {
+        let mut canonical = PathBuf::from("docs");
+        canonical.push(normalized);
+        normalized = canonical;
     }
-
-    Ok(Path::new(WIKI_ROOT).join(normalized))
+    normalized
 }
 
-fn render_markdown(markdown: &str) -> String {
+fn is_allowlisted_doc_route(path: &Path) -> bool {
+    let mut components = path.components().filter_map(|component| match component {
+        Component::Normal(part) => part.to_str(),
+        _ => None,
+    });
+    matches!(
+        (components.next(), components.next(), components.next()),
+        (Some("docs"), Some("context" | "design"), Some(_))
+    )
+}
+
+fn render_markdown(route_path: &str, markdown: &str) -> String {
     let parser = Parser::new_ext(markdown, Options::all()).map(|event| match event {
         Event::Html(raw) | Event::InlineHtml(raw) => {
             Event::Text(CowStr::Boxed(raw.into_string().into_boxed_str()))
         }
+        Event::Start(Tag::Link {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => Event::Start(Tag::Link {
+            link_type,
+            dest_url: rewrite_markdown_link(route_path, &dest_url)
+                .map(CowStr::Boxed)
+                .unwrap_or(dest_url),
+            title,
+            id,
+        }),
         other => other,
     });
     let mut out = String::new();
@@ -124,12 +179,118 @@ fn render_markdown(markdown: &str) -> String {
     out
 }
 
+fn rewrite_markdown_link(route_path: &str, dest_url: &str) -> Option<Box<str>> {
+    if dest_url.starts_with('#') || is_external_or_absolute_url(dest_url) {
+        return None;
+    }
+    let (path_part, anchor) = dest_url
+        .split_once('#')
+        .map(|(path, anchor)| (path, Some(anchor)))
+        .unwrap_or((dest_url, None));
+    if Path::new(path_part)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        != Some("md")
+    {
+        return None;
+    }
+
+    let base = normalize_wiki_route_path(route_path).ok()?;
+    let base_dir = base.parent()?;
+    let target = base_dir.join(path_part);
+    let target = normalize_path_components(&target)?;
+    if !is_allowlisted_doc_route(&target) {
+        return None;
+    }
+
+    let mut rewritten = format!("/wiki/{}", target.to_string_lossy());
+    if let Some(anchor) = anchor {
+        rewritten.push('#');
+        rewritten.push_str(anchor);
+    }
+    Some(rewritten.into_boxed_str())
+}
+
+fn is_external_or_absolute_url(url: &str) -> bool {
+    url.starts_with('/')
+        || url.starts_with("http://")
+        || url.starts_with("https://")
+        || url.starts_with("mailto:")
+        || url.starts_with("tel:")
+}
+
+fn normalize_path_components(path: &Path) -> Option<PathBuf> {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => normalized.push(part),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    return None;
+                }
+            }
+            Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+    Some(normalized)
+}
+
+fn wiki_index_markdown() -> std::io::Result<String> {
+    let mut markdown = String::from("# Bewegungskrieg Wiki\n\n## Context Capsules\n\n");
+    for doc in docs_in_root("docs/context")? {
+        markdown.push_str(&format_doc_link(&doc)?);
+    }
+    markdown.push_str("\n## Design Docs\n\n");
+    for doc in docs_in_root("docs/design")? {
+        markdown.push_str(&format_doc_link(&doc)?);
+    }
+    Ok(markdown)
+}
+
+fn docs_in_root(root: &str) -> std::io::Result<Vec<PathBuf>> {
+    let mut docs = Vec::new();
+    for entry in std::fs::read_dir(Path::new(REPO_ROOT).join(root))? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("md") {
+            let relative = path
+                .strip_prefix(REPO_ROOT)
+                .expect("wiki docs should be inside repo root")
+                .to_path_buf();
+            docs.push(relative);
+        }
+    }
+    docs.sort();
+    Ok(docs)
+}
+
+fn format_doc_link(route_path: &Path) -> std::io::Result<String> {
+    let path = Path::new(REPO_ROOT).join(route_path);
+    let markdown = std::fs::read_to_string(path)?;
+    let route_path = route_path.to_string_lossy();
+    let title = raw_page_title(&route_path, &markdown);
+    Ok(format!(
+        "- [{}](/wiki/{})\n",
+        escape_markdown_link_text(&title),
+        route_path
+    ))
+}
+
 fn page_title(route_path: &str, markdown: &str) -> String {
+    escape_text(&raw_page_title(route_path, markdown))
+}
+
+fn raw_page_title(route_path: &str, markdown: &str) -> String {
     markdown
         .lines()
         .find_map(|line| line.strip_prefix("# "))
-        .map(escape_text)
-        .unwrap_or_else(|| escape_text(route_path))
+        .map(str::to_owned)
+        .unwrap_or_else(|| route_path.to_owned())
+}
+
+fn escape_markdown_link_text(text: &str) -> String {
+    text.replace('[', r"\[").replace(']', r"\]")
 }
 
 fn escape_text(text: &str) -> String {
@@ -158,8 +319,16 @@ mod tests {
 
     #[test]
     fn wiki_resolver_allows_context_doc() {
-        let path = resolve_doc_path("context/README.md").expect("context readme should resolve");
+        let path =
+            resolve_doc_path("docs/context/README.md").expect("context readme should resolve");
         assert!(path.ends_with("docs/context/README.md"));
+    }
+
+    #[test]
+    fn wiki_resolver_keeps_legacy_context_route_working() {
+        let doc = resolve_wiki_doc("context/README.md").expect("context readme should resolve");
+        assert_eq!(doc.route_path, "docs/context/README.md");
+        assert!(doc.path.ends_with("docs/context/README.md"));
     }
 
     #[test]
@@ -176,10 +345,34 @@ mod tests {
 
     #[test]
     fn wiki_renderer_escapes_inline_html() {
-        let rendered = render_markdown("# Hello\n\n<script>alert(1)</script>\n");
+        let rendered = render_markdown(
+            "docs/context/README.md",
+            "# Hello\n\n<script>alert(1)</script>\n",
+        );
         assert!(rendered.contains("<h1>Hello</h1>"));
         assert!(rendered.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
         assert!(!rendered.contains("<script>"));
+    }
+
+    #[test]
+    fn wiki_renderer_rewrites_relative_doc_links() {
+        let rendered = render_markdown(
+            "docs/context/protocol.md",
+            "[design](../design/protocol.md#snapshot) [local](client-ui.md)",
+        );
+        assert!(rendered.contains(r#"href="/wiki/docs/design/protocol.md#snapshot""#));
+        assert!(rendered.contains(r#"href="/wiki/docs/context/client-ui.md""#));
+    }
+
+    #[test]
+    fn wiki_renderer_preserves_external_same_page_and_non_doc_links() {
+        let rendered = render_markdown(
+            "docs/context/testing.md",
+            "[anchor](#manual) [site](https://example.com) [asset](../image.png)",
+        );
+        assert!(rendered.contains(r##"href="#manual""##));
+        assert!(rendered.contains(r#"href="https://example.com""#));
+        assert!(rendered.contains(r#"href="../image.png""#));
     }
 
     #[tokio::test]
@@ -202,7 +395,9 @@ mod tests {
             .await
             .unwrap();
         let body = String::from_utf8(body.to_vec()).unwrap();
-        assert!(body.contains("<title>Context capsules - Bewegungskrieg Wiki</title>"));
+        assert!(body.contains("<title>Bewegungskrieg Wiki - Bewegungskrieg Wiki</title>"));
+        assert!(body.contains(r#"href="/wiki/docs/context/balance.md""#));
+        assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
         assert!(body.contains("<main>"));
     }
 
@@ -223,6 +418,27 @@ mod tests {
             .unwrap();
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(body.contains("Capsule: server simulation"));
+        assert!(body.contains(r#"href="/wiki/docs/design/server-sim.md""#));
+    }
+
+    #[tokio::test]
+    async fn wiki_doc_route_renders_canonical_docs_path() {
+        let response = wiki_router()
+            .oneshot(
+                Request::builder()
+                    .uri("/wiki/docs/context/balance.md")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("Capsule: balance"));
+        assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
     }
 
     #[tokio::test]
@@ -251,6 +467,53 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn rewritten_internal_wiki_links_resolve() {
+        for doc in allowlisted_docs().expect("allowlisted docs should enumerate") {
+            let markdown = std::fs::read_to_string(Path::new(REPO_ROOT).join(&doc))
+                .expect("allowlisted doc should read");
+            let rendered = render_markdown(&doc.to_string_lossy(), &markdown);
+            for href in wiki_hrefs(&rendered) {
+                let path_without_anchor = href
+                    .trim_start_matches("/wiki/")
+                    .split_once('#')
+                    .map(|(path, _)| path)
+                    .unwrap_or_else(|| href.trim_start_matches("/wiki/"));
+                let resolved = resolve_doc_path(path_without_anchor).unwrap_or_else(|error| {
+                    panic!("{href} from {} failed: {error:?}", doc.display())
+                });
+                assert!(
+                    resolved.exists(),
+                    "{href} from {} resolved to missing file {}",
+                    doc.display(),
+                    resolved.display()
+                );
+            }
+        }
+    }
+
+    fn allowlisted_docs() -> std::io::Result<Vec<PathBuf>> {
+        let mut docs = docs_in_root("docs/context")?;
+        docs.extend(docs_in_root("docs/design")?);
+        docs.sort();
+        Ok(docs)
+    }
+
+    fn wiki_hrefs(rendered: &str) -> Vec<&str> {
+        let mut hrefs = Vec::new();
+        let mut rest = rendered;
+        while let Some(start) = rest.find(r#"href="/wiki/"#) {
+            rest = &rest[start + r#"href=""#.len()..];
+            if let Some(end) = rest.find('"') {
+                hrefs.push(&rest[..end]);
+                rest = &rest[end + 1..];
+            } else {
+                break;
+            }
+        }
+        hrefs
     }
 
     fn wiki_router() -> Router {
