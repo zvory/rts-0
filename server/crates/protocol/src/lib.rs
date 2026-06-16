@@ -8,6 +8,7 @@
 
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
@@ -559,6 +560,700 @@ pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
 pub const COMPACT_SNAPSHOT_VERSION: u8 = 22;
 
+pub const COMPACT_UNKNOWN_CODE: u8 = 255;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtocolContract {
+    schema_version: u8,
+    compact_snapshot_version: u8,
+    prediction_protocol_version: u32,
+    default_faction_id: &'static str,
+    unknown_code_sentinel: u8,
+    message_tags: ProtocolMessageTags,
+    command_tags: BTreeMap<&'static str, &'static str>,
+    vocabularies: ProtocolVocabularies,
+    compact_codes: ProtocolCompactCodes,
+    compact_slot_schemas: CompactSlotSchemas,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProtocolMessageTags {
+    client: BTreeMap<&'static str, &'static str>,
+    server: BTreeMap<&'static str, &'static str>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtocolVocabularies {
+    terrain: BTreeMap<&'static str, u8>,
+    kinds: BTreeMap<&'static str, &'static str>,
+    states: BTreeMap<&'static str, &'static str>,
+    setup_states: BTreeMap<&'static str, &'static str>,
+    events: BTreeMap<&'static str, &'static str>,
+    abilities: BTreeMap<&'static str, &'static str>,
+    ability_object_kinds: BTreeMap<&'static str, &'static str>,
+    upgrades: BTreeMap<&'static str, &'static str>,
+    notice_severities: BTreeMap<&'static str, &'static str>,
+    order_stages: BTreeMap<&'static str, &'static str>,
+    resource_kinds: BTreeMap<&'static str, &'static str>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtocolCompactCodes {
+    terrain: BTreeMap<&'static str, u8>,
+    kind: BTreeMap<&'static str, u8>,
+    state: BTreeMap<&'static str, u8>,
+    setup_state: BTreeMap<&'static str, u8>,
+    event: BTreeMap<&'static str, u8>,
+    order_stage: BTreeMap<&'static str, u8>,
+    ability: BTreeMap<&'static str, u8>,
+    ability_object_kind: BTreeMap<&'static str, u8>,
+    upgrade: BTreeMap<&'static str, u8>,
+    notice_severity: BTreeMap<&'static str, u8>,
+    resource_kind: BTreeMap<&'static str, u8>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactSlotSchemas {
+    snapshot: Vec<SlotField>,
+    entity: Vec<SlotField>,
+    event: BTreeMap<&'static str, Vec<SlotField>>,
+    ability_object: Vec<SlotField>,
+    ability_object_owner_state: Vec<SlotField>,
+    ability_cooldown: Vec<SlotField>,
+    order_plan_marker: Vec<SlotField>,
+    net_status: Vec<SlotField>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlotField {
+    index: u8,
+    name: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code_map: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    optional: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    omitted_when_empty: Option<bool>,
+}
+
+fn field(index: u8, name: &'static str) -> SlotField {
+    SlotField {
+        index,
+        name,
+        code_map: None,
+        optional: None,
+        omitted_when_empty: None,
+    }
+}
+
+fn code_field(index: u8, name: &'static str, code_map: &'static str) -> SlotField {
+    SlotField {
+        index,
+        name,
+        code_map: Some(code_map),
+        optional: None,
+        omitted_when_empty: None,
+    }
+}
+
+fn optional_field(index: u8, name: &'static str) -> SlotField {
+    SlotField {
+        index,
+        name,
+        code_map: None,
+        optional: Some(true),
+        omitted_when_empty: None,
+    }
+}
+
+fn optional_code_field(index: u8, name: &'static str, code_map: &'static str) -> SlotField {
+    SlotField {
+        index,
+        name,
+        code_map: Some(code_map),
+        optional: Some(true),
+        omitted_when_empty: None,
+    }
+}
+
+fn omitted_field(index: u8, name: &'static str) -> SlotField {
+    SlotField {
+        index,
+        name,
+        code_map: None,
+        optional: None,
+        omitted_when_empty: Some(true),
+    }
+}
+
+fn string_map(entries: &[(&'static str, &'static str)]) -> BTreeMap<&'static str, &'static str> {
+    entries.iter().copied().collect()
+}
+
+fn code_map(entries: &[(&'static str, u8)]) -> BTreeMap<&'static str, u8> {
+    entries.iter().copied().collect()
+}
+
+const KIND_CODES: &[(&str, u8)] = &[
+    (kinds::WORKER, 1),
+    (kinds::RIFLEMAN, 2),
+    (kinds::MACHINE_GUNNER, 3),
+    (kinds::ANTI_TANK_GUN, 4),
+    (kinds::MORTAR_TEAM, 15),
+    (kinds::ARTILLERY, 16),
+    (kinds::TANK, 5),
+    (kinds::SCOUT_CAR, 14),
+    (kinds::CITY_CENTRE, 6),
+    (kinds::DEPOT, 7),
+    (kinds::BARRACKS, 8),
+    (kinds::TRAINING_CENTRE, 9),
+    (kinds::FACTORY, 10),
+    (kinds::STEEL, 11),
+    (kinds::OIL, 12),
+    (kinds::STEELWORKS, 13),
+    (kinds::RESEARCH_COMPLEX, 17),
+    (kinds::COMMAND_CAR, 18),
+    (kinds::EKAT, 19),
+    (kinds::ZAMOK, 20),
+];
+
+const STATE_CODES: &[(&str, u8)] = &[
+    (states::IDLE, 1),
+    (states::MOVE, 2),
+    (states::ATTACK, 3),
+    (states::GATHER, 4),
+    (states::BUILD, 5),
+    (states::TRAIN, 6),
+    (states::CONSTRUCT, 7),
+    (states::DEAD, 8),
+];
+
+const SETUP_STATE_CODES: &[(&str, u8)] = &[
+    ("packed", 1),
+    ("setting_up", 2),
+    ("deployed", 3),
+    ("tearing_down", 4),
+];
+
+const EVENT_CODES: &[(&str, u8)] = &[
+    ("attack", 1),
+    ("death", 2),
+    ("build", 3),
+    ("notice", 4),
+    ("smokeLaunch", 5),
+    ("mortarImpact", 6),
+    ("artilleryTarget", 7),
+    ("artilleryImpact", 8),
+    ("mortarLaunch", 9),
+];
+
+const ORDER_STAGE_CODES: &[(&str, u8)] = &[
+    ("move", 1),
+    ("attackMove", 2),
+    ("attack", 3),
+    ("gather", 4),
+    ("build", 5),
+    (abilities::SMOKE, 6),
+    ("setupAntiTankGuns", 7),
+    (abilities::CHARGE, 8),
+    (abilities::MORTAR_FIRE, 9),
+    (abilities::POINT_FIRE, 10),
+    (abilities::BREAKTHROUGH, 11),
+    (abilities::EKAT_TELEPORT, 12),
+    (abilities::EKAT_LINE_SHOT, 13),
+    (abilities::EKAT_MAGIC_ANCHOR, 14),
+];
+
+const ABILITY_CODES: &[(&str, u8)] = &[
+    (abilities::CHARGE, 1),
+    (abilities::SMOKE, 2),
+    (abilities::MORTAR_FIRE, 3),
+    (abilities::POINT_FIRE, 4),
+    (abilities::BREAKTHROUGH, 5),
+    (abilities::EKAT_TELEPORT, 6),
+    (abilities::EKAT_LINE_SHOT, 7),
+    (abilities::EKAT_MAGIC_ANCHOR, 8),
+];
+
+const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
+    (ability_object_kinds::RETURN_MARKER, 1),
+    (ability_object_kinds::MAGIC_ANCHOR, 2),
+    (ability_object_kinds::LINE_PROJECTILE, 3),
+];
+
+const UPGRADE_CODES: &[(&str, u8)] = &[
+    (upgrades::METHAMPHETAMINES, 1),
+    (upgrades::ANTI_TANK_GUN_UNLOCK, 2),
+    (upgrades::TANK_UNLOCK, 3),
+    (upgrades::ARTILLERY_UNLOCK, 4),
+    (upgrades::MORTAR_AUTOCAST, 5),
+    (upgrades::COMMAND_CAR_UNLOCK, 6),
+];
+
+fn lookup_code(entries: &[(&str, u8)], value: &str) -> u8 {
+    entries
+        .iter()
+        .find_map(|(name, code)| (*name == value).then_some(*code))
+        .unwrap_or(COMPACT_UNKNOWN_CODE)
+}
+
+fn event_code(event: &str) -> u8 {
+    lookup_code(EVENT_CODES, event)
+}
+
+pub fn protocol_contract() -> ProtocolContract {
+    ProtocolContract {
+        schema_version: 1,
+        compact_snapshot_version: COMPACT_SNAPSHOT_VERSION,
+        prediction_protocol_version: PREDICTION_PROTOCOL_VERSION,
+        default_faction_id: DEFAULT_FACTION_ID,
+        unknown_code_sentinel: COMPACT_UNKNOWN_CODE,
+        message_tags: ProtocolMessageTags {
+            client: string_map(&[
+                ("JOIN", "join"),
+                ("READY", "ready"),
+                ("START", "start"),
+                ("SET_TEAM_PRESET", "setTeamPreset"),
+                ("SET_TEAM", "setTeam"),
+                ("SET_FACTION", "setFaction"),
+                ("ADD_AI", "addAi"),
+                ("SET_AI_PROFILE", "setAiProfile"),
+                ("REMOVE_AI", "removeAi"),
+                ("SET_QUICKSTART", "setQuickstart"),
+                ("SET_SPECTATOR", "setSpectator"),
+                ("COMMAND", "command"),
+                ("GIVE_UP", "giveUp"),
+                ("RETURN_TO_LOBBY", "returnToLobby"),
+                ("PING", "ping"),
+                ("NET_REPORT", "netReport"),
+                ("SET_REPLAY_SPEED", "setReplaySpeed"),
+                ("STEP_DEV_TICK", "stepDevTick"),
+                ("SEEK_REPLAY", "seekReplay"),
+                ("SEEK_REPLAY_TO", "seekReplayTo"),
+                ("SET_REPLAY_VISION", "setReplayVision"),
+                ("REQUEST_REPLAY_BRANCH", "requestReplayBranch"),
+                ("CLAIM_BRANCH_SEAT", "claimBranchSeat"),
+                ("RELEASE_BRANCH_SEAT", "releaseBranchSeat"),
+                ("START_BRANCH", "startBranch"),
+                ("SELECT_MAP", "selectMap"),
+            ]),
+            server: string_map(&[
+                ("WELCOME", "welcome"),
+                ("LOBBY", "lobby"),
+                ("MATCH_COUNTDOWN", "matchCountdown"),
+                ("START", "start"),
+                ("SNAPSHOT", "snapshot"),
+                ("REPLAY_STATE", "replayState"),
+                ("REPLAY_ANALYSIS", "replayAnalysis"),
+                ("JOIN_REPLAY_PROMPT", "joinReplayPrompt"),
+                ("REPLAY_BRANCH_CREATED", "replayBranchCreated"),
+                ("BRANCH_STAGING", "branchStaging"),
+                ("SHUTDOWN_WARNING", "shutdownWarning"),
+                ("GAME_OVER", "gameOver"),
+                ("PONG", "pong"),
+                ("ERROR", "error"),
+            ]),
+        },
+        command_tags: string_map(&[
+            ("MOVE", "move"),
+            ("ATTACK_MOVE", "attackMove"),
+            ("ATTACK", "attack"),
+            ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
+            ("TEAR_DOWN_ANTI_TANK_GUNS", "tearDownAntiTankGuns"),
+            ("CHARGE", "charge"),
+            ("USE_ABILITY", "useAbility"),
+            ("RECAST_ABILITY", "recastAbility"),
+            ("SET_AUTOCAST", "setAutocast"),
+            ("GATHER", "gather"),
+            ("BUILD", "build"),
+            ("TRAIN", "train"),
+            ("RESEARCH", "research"),
+            ("CANCEL", "cancel"),
+            ("STOP", "stop"),
+            ("SET_RALLY", "setRally"),
+        ]),
+        vocabularies: ProtocolVocabularies {
+            terrain: terrain_codes(),
+            kinds: kind_vocabulary(),
+            states: string_map(&[
+                ("IDLE", states::IDLE),
+                ("MOVE", states::MOVE),
+                ("ATTACK", states::ATTACK),
+                ("GATHER", states::GATHER),
+                ("BUILD", states::BUILD),
+                ("TRAIN", states::TRAIN),
+                ("CONSTRUCT", states::CONSTRUCT),
+                ("DEAD", states::DEAD),
+            ]),
+            setup_states: setup_state_vocabulary(),
+            events: event_vocabulary(),
+            abilities: ability_vocabulary(),
+            ability_object_kinds: ability_object_kind_vocabulary(),
+            upgrades: upgrade_vocabulary(),
+            notice_severities: notice_severity_vocabulary(),
+            order_stages: order_stage_vocabulary(),
+            resource_kinds: resource_kind_vocabulary(),
+        },
+        compact_codes: ProtocolCompactCodes {
+            terrain: terrain_codes(),
+            kind: kind_codes(),
+            state: state_codes(),
+            setup_state: setup_state_codes(),
+            event: event_codes(),
+            order_stage: order_stage_codes(),
+            ability: ability_codes(),
+            ability_object_kind: ability_object_kind_codes(),
+            upgrade: upgrade_codes(),
+            notice_severity: notice_severity_codes(),
+            resource_kind: code_map(&[
+                (kinds::STEEL, kind_code(kinds::STEEL)),
+                (kinds::OIL, kind_code(kinds::OIL)),
+            ]),
+        },
+        compact_slot_schemas: compact_slot_schemas(),
+    }
+}
+
+fn terrain_codes() -> BTreeMap<&'static str, u8> {
+    code_map(&[
+        ("GRASS", terrain::GRASS),
+        ("ROCK", terrain::ROCK),
+        ("WATER", terrain::WATER),
+    ])
+}
+
+fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("WORKER", kinds::WORKER),
+        ("RIFLEMAN", kinds::RIFLEMAN),
+        ("MACHINE_GUNNER", kinds::MACHINE_GUNNER),
+        ("ANTI_TANK_GUN", kinds::ANTI_TANK_GUN),
+        ("MORTAR_TEAM", kinds::MORTAR_TEAM),
+        ("ARTILLERY", kinds::ARTILLERY),
+        ("SCOUT_CAR", kinds::SCOUT_CAR),
+        ("TANK", kinds::TANK),
+        ("COMMAND_CAR", kinds::COMMAND_CAR),
+        ("EKAT", kinds::EKAT),
+        ("CITY_CENTRE", kinds::CITY_CENTRE),
+        ("ZAMOK", kinds::ZAMOK),
+        ("DEPOT", kinds::DEPOT),
+        ("BARRACKS", kinds::BARRACKS),
+        ("TRAINING_CENTRE", kinds::TRAINING_CENTRE),
+        ("RESEARCH_COMPLEX", kinds::RESEARCH_COMPLEX),
+        ("FACTORY", kinds::FACTORY),
+        ("STEELWORKS", kinds::STEELWORKS),
+        ("STEEL", kinds::STEEL),
+        ("OIL", kinds::OIL),
+    ])
+}
+
+fn setup_state_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("PACKED", "packed"),
+        ("SETTING_UP", "setting_up"),
+        ("DEPLOYED", "deployed"),
+        ("TEARING_DOWN", "tearing_down"),
+    ])
+}
+
+fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("ATTACK", "attack"),
+        ("DEATH", "death"),
+        ("BUILD", "build"),
+        ("NOTICE", "notice"),
+        ("SMOKE_LAUNCH", "smokeLaunch"),
+        ("MORTAR_LAUNCH", "mortarLaunch"),
+        ("MORTAR_IMPACT", "mortarImpact"),
+        ("ARTILLERY_TARGET", "artilleryTarget"),
+        ("ARTILLERY_IMPACT", "artilleryImpact"),
+    ])
+}
+
+fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("CHARGE", abilities::CHARGE),
+        ("SMOKE", abilities::SMOKE),
+        ("MORTAR_FIRE", abilities::MORTAR_FIRE),
+        ("POINT_FIRE", abilities::POINT_FIRE),
+        ("BREAKTHROUGH", abilities::BREAKTHROUGH),
+        ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
+        ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
+        ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
+    ])
+}
+
+fn ability_object_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("RETURN_MARKER", ability_object_kinds::RETURN_MARKER),
+        ("MAGIC_ANCHOR", ability_object_kinds::MAGIC_ANCHOR),
+        ("LINE_PROJECTILE", ability_object_kinds::LINE_PROJECTILE),
+    ])
+}
+
+fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("METHAMPHETAMINES", upgrades::METHAMPHETAMINES),
+        ("ANTI_TANK_GUN_UNLOCK", upgrades::ANTI_TANK_GUN_UNLOCK),
+        ("TANK_UNLOCK", upgrades::TANK_UNLOCK),
+        ("ARTILLERY_UNLOCK", upgrades::ARTILLERY_UNLOCK),
+        ("COMMAND_CAR_UNLOCK", upgrades::COMMAND_CAR_UNLOCK),
+        ("MORTAR_AUTOCAST", upgrades::MORTAR_AUTOCAST),
+    ])
+}
+
+fn notice_severity_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[("INFO", "info"), ("WARN", "warn"), ("ALERT", "alert")])
+}
+
+fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[
+        ("MOVE", "move"),
+        ("ATTACK_MOVE", "attackMove"),
+        ("ATTACK", "attack"),
+        ("GATHER", "gather"),
+        ("BUILD", "build"),
+        ("CHARGE", abilities::CHARGE),
+        ("SMOKE", abilities::SMOKE),
+        ("MORTAR_FIRE", abilities::MORTAR_FIRE),
+        ("POINT_FIRE", abilities::POINT_FIRE),
+        ("BREAKTHROUGH", abilities::BREAKTHROUGH),
+        ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
+        ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
+        ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
+        ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
+    ])
+}
+
+fn resource_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
+    string_map(&[("STEEL", kinds::STEEL), ("OIL", kinds::OIL)])
+}
+
+fn kind_codes() -> BTreeMap<&'static str, u8> {
+    code_map(KIND_CODES)
+}
+
+fn state_codes() -> BTreeMap<&'static str, u8> {
+    code_map(STATE_CODES)
+}
+
+fn setup_state_codes() -> BTreeMap<&'static str, u8> {
+    code_map(SETUP_STATE_CODES)
+}
+
+fn event_codes() -> BTreeMap<&'static str, u8> {
+    code_map(EVENT_CODES)
+}
+
+fn order_stage_codes() -> BTreeMap<&'static str, u8> {
+    code_map(ORDER_STAGE_CODES)
+}
+
+fn ability_codes() -> BTreeMap<&'static str, u8> {
+    code_map(ABILITY_CODES)
+}
+
+fn ability_object_kind_codes() -> BTreeMap<&'static str, u8> {
+    code_map(ABILITY_OBJECT_KIND_CODES)
+}
+
+fn upgrade_codes() -> BTreeMap<&'static str, u8> {
+    code_map(UPGRADE_CODES)
+}
+
+fn notice_severity_codes() -> BTreeMap<&'static str, u8> {
+    code_map(&[("info", 1), ("warn", 2), ("alert", 3)])
+}
+
+fn compact_slot_schemas() -> CompactSlotSchemas {
+    CompactSlotSchemas {
+        snapshot: vec![
+            field(0, "tick"),
+            field(1, "steel"),
+            field(2, "oil"),
+            field(3, "supplyUsed"),
+            field(4, "supplyCap"),
+        ],
+        entity: vec![
+            field(0, "id"),
+            field(1, "owner"),
+            code_field(2, "kind", "kind"),
+            field(3, "x"),
+            field(4, "y"),
+            field(5, "hp"),
+            field(6, "maxHp"),
+            code_field(7, "state", "state"),
+            optional_field(8, "facing"),
+            optional_field(9, "weaponFacing"),
+            optional_code_field(10, "prodKind", "kind"),
+            optional_field(11, "prodProgress"),
+            optional_field(12, "prodQueue"),
+            optional_field(13, "buildProgress"),
+            optional_field(14, "latchedNode"),
+            optional_field(15, "targetId"),
+            optional_code_field(16, "setupState", "setupState"),
+            optional_field(17, "remaining"),
+            optional_field(18, "rally"),
+            optional_field(19, "oilUsed"),
+            optional_field(20, "setupFacing"),
+            optional_field(21, "orderPlan"),
+            optional_field(22, "chargeCooldownLeft"),
+            optional_field(23, "abilities"),
+            optional_field(24, "breakthroughTicks"),
+            optional_field(25, "visionOnly"),
+            optional_field(26, "debugPath"),
+            optional_field(27, "rallyPlan"),
+            optional_code_field(28, "prodUpgrade", "upgrade"),
+            optional_field(29, "buildActive"),
+        ],
+        event: event_slot_schemas(),
+        ability_object: vec![
+            field(0, "id"),
+            field(1, "owner"),
+            code_field(2, "ability", "ability"),
+            code_field(3, "kind", "abilityObjectKind"),
+            field(4, "x"),
+            field(5, "y"),
+            optional_field(6, "expiresIn"),
+            optional_field(7, "sourceCasterId"),
+            optional_field(8, "ownerState"),
+        ],
+        ability_object_owner_state: vec![
+            optional_field(0, "earliestReturnTick"),
+            optional_field(1, "hp"),
+            optional_field(2, "radius"),
+            optional_field(3, "destroyedLockoutTicks"),
+            optional_field(4, "distanceTraveled"),
+            optional_field(5, "ticksOut"),
+        ],
+        ability_cooldown: vec![
+            code_field(0, "ability", "ability"),
+            field(1, "cooldownLeft"),
+            optional_field(2, "remainingUses"),
+            optional_field(3, "autocastEnabled"),
+            optional_field(4, "activeObjectId"),
+            optional_field(5, "availableTick"),
+            optional_field(6, "lockoutUntilTick"),
+            optional_field(7, "expiresIn"),
+        ],
+        order_plan_marker: vec![
+            code_field(0, "kind", "orderStage"),
+            field(1, "x"),
+            field(2, "y"),
+        ],
+        net_status: vec![
+            field(0, "serverLagMs"),
+            field(1, "tickMs"),
+            field(2, "flags"),
+            field(3, "slowTickCount"),
+            field(4, "headOfLineCount"),
+            omitted_field(5, "predictionVersion"),
+            omitted_field(6, "lastSimConsumedClientSeq"),
+            omitted_field(7, "lastSimConsumedClientTick"),
+        ],
+    }
+}
+
+fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
+    [
+        (
+            "attack",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "from"),
+                field(2, "to"),
+                optional_field(3, "reveal"),
+                optional_field(4, "toPos"),
+            ],
+        ),
+        (
+            "death",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "id"),
+                field(2, "x"),
+                field(3, "y"),
+                code_field(4, "kind", "kind"),
+            ],
+        ),
+        (
+            "build",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "id"),
+                code_field(2, "kind", "kind"),
+            ],
+        ),
+        (
+            "notice",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "msg"),
+                optional_code_field(2, "severity", "noticeSeverity"),
+                optional_field(3, "x"),
+                optional_field(4, "y"),
+            ],
+        ),
+        (
+            "smokeLaunch",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "from"),
+                field(2, "to"),
+                field(3, "delayTicks"),
+            ],
+        ),
+        (
+            "mortarLaunch",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "from"),
+                field(2, "fromPos"),
+                field(3, "toPos"),
+                field(4, "radiusTiles"),
+                field(5, "delayTicks"),
+            ],
+        ),
+        (
+            "mortarImpact",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "x"),
+                field(2, "y"),
+                field(3, "radiusTiles"),
+                optional_field(4, "from"),
+                optional_field(5, "reveal"),
+            ],
+        ),
+        (
+            "artilleryTarget",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "from"),
+                field(2, "target"),
+                field(3, "radiusTiles"),
+                field(4, "delayTicks"),
+            ],
+        ),
+        (
+            "artilleryImpact",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "x"),
+                field(2, "y"),
+                field(3, "radiusTiles"),
+            ],
+        ),
+    ]
+    .into_iter()
+    .collect()
+}
+
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
     serde_json::to_string(&CompactSnapshot(snapshot))
@@ -1097,7 +1792,7 @@ impl Serialize for CompactEvent<'_> {
                     3
                 };
                 let mut seq = serializer.serialize_seq(Some(len))?;
-                seq.serialize_element(&1u8)?;
+                seq.serialize_element(&event_code("attack"))?;
                 seq.serialize_element(from)?;
                 seq.serialize_element(to)?;
                 if len > 3 {
@@ -1110,7 +1805,7 @@ impl Serialize for CompactEvent<'_> {
             }
             Event::Death { id, x, y, kind } => {
                 let mut seq = serializer.serialize_seq(Some(5))?;
-                seq.serialize_element(&2u8)?;
+                seq.serialize_element(&event_code("death"))?;
                 seq.serialize_element(id)?;
                 seq.serialize_element(x)?;
                 seq.serialize_element(y)?;
@@ -1119,7 +1814,7 @@ impl Serialize for CompactEvent<'_> {
             }
             Event::Build { id, kind } => {
                 let mut seq = serializer.serialize_seq(Some(3))?;
-                seq.serialize_element(&3u8)?;
+                seq.serialize_element(&event_code("build"))?;
                 seq.serialize_element(id)?;
                 seq.serialize_element(&kind_code(kind))?;
                 seq.end()
@@ -1132,7 +1827,7 @@ impl Serialize for CompactEvent<'_> {
                 delay_ticks,
             } => {
                 let mut seq = serializer.serialize_seq(Some(4))?;
-                seq.serialize_element(&5u8)?;
+                seq.serialize_element(&event_code("smokeLaunch"))?;
                 seq.serialize_element(&[from_x, from_y])?;
                 seq.serialize_element(&[to_x, to_y])?;
                 seq.serialize_element(delay_ticks)?;
@@ -1148,7 +1843,7 @@ impl Serialize for CompactEvent<'_> {
                 delay_ticks,
             } => {
                 let mut seq = serializer.serialize_seq(Some(6))?;
-                seq.serialize_element(&9u8)?;
+                seq.serialize_element(&event_code("mortarLaunch"))?;
                 seq.serialize_element(from)?;
                 seq.serialize_element(&[from_x, from_y])?;
                 seq.serialize_element(&[to_x, to_y])?;
@@ -1171,7 +1866,7 @@ impl Serialize for CompactEvent<'_> {
                     4
                 };
                 let mut seq = serializer.serialize_seq(Some(len))?;
-                seq.serialize_element(&6u8)?;
+                seq.serialize_element(&event_code("mortarImpact"))?;
                 seq.serialize_element(x)?;
                 seq.serialize_element(y)?;
                 seq.serialize_element(radius_tiles)?;
@@ -1191,7 +1886,7 @@ impl Serialize for CompactEvent<'_> {
                 delay_ticks,
             } => {
                 let mut seq = serializer.serialize_seq(Some(5))?;
-                seq.serialize_element(&7u8)?;
+                seq.serialize_element(&event_code("artilleryTarget"))?;
                 seq.serialize_element(from)?;
                 seq.serialize_element(&[x, y])?;
                 seq.serialize_element(radius_tiles)?;
@@ -1200,7 +1895,7 @@ impl Serialize for CompactEvent<'_> {
             }
             Event::ArtilleryImpact { x, y, radius_tiles } => {
                 let mut seq = serializer.serialize_seq(Some(4))?;
-                seq.serialize_element(&8u8)?;
+                seq.serialize_element(&event_code("artilleryImpact"))?;
                 seq.serialize_element(x)?;
                 seq.serialize_element(y)?;
                 seq.serialize_element(radius_tiles)?;
@@ -1221,7 +1916,7 @@ impl Serialize for CompactEvent<'_> {
                     2
                 };
                 let mut seq = serializer.serialize_seq(Some(len))?;
-                seq.serialize_element(&4u8)?;
+                seq.serialize_element(&event_code("notice"))?;
                 seq.serialize_element(msg)?;
                 if len > 2 {
                     seq.serialize_element(&notice_severity_code(*severity))?;
@@ -1276,108 +1971,31 @@ impl Serialize for CompactAttackReveal<'_> {
 }
 
 fn kind_code(kind: &str) -> u8 {
-    match kind {
-        kinds::WORKER => 1,
-        kinds::RIFLEMAN => 2,
-        kinds::MACHINE_GUNNER => 3,
-        kinds::ANTI_TANK_GUN => 4,
-        kinds::MORTAR_TEAM => 15,
-        kinds::ARTILLERY => 16,
-        kinds::TANK => 5,
-        kinds::SCOUT_CAR => 14,
-        kinds::CITY_CENTRE => 6,
-        kinds::DEPOT => 7,
-        kinds::BARRACKS => 8,
-        kinds::TRAINING_CENTRE => 9,
-        kinds::FACTORY => 10,
-        kinds::STEEL => 11,
-        kinds::OIL => 12,
-        kinds::STEELWORKS => 13,
-        kinds::RESEARCH_COMPLEX => 17,
-        kinds::COMMAND_CAR => 18,
-        kinds::EKAT => 19,
-        kinds::ZAMOK => 20,
-        _ => 255,
-    }
+    lookup_code(KIND_CODES, kind)
 }
 
 fn state_code(state: &str) -> u8 {
-    match state {
-        states::IDLE => 1,
-        states::MOVE => 2,
-        states::ATTACK => 3,
-        states::GATHER => 4,
-        states::BUILD => 5,
-        states::TRAIN => 6,
-        states::CONSTRUCT => 7,
-        states::DEAD => 8,
-        _ => 255,
-    }
+    lookup_code(STATE_CODES, state)
 }
 
 fn setup_state_code(setup_state: &str) -> u8 {
-    match setup_state {
-        "packed" => 1,
-        "setting_up" => 2,
-        "deployed" => 3,
-        "tearing_down" => 4,
-        _ => 255,
-    }
+    lookup_code(SETUP_STATE_CODES, setup_state)
 }
 
 fn order_stage_code(kind: &str) -> u8 {
-    match kind {
-        "move" => 1,
-        "attackMove" => 2,
-        "attack" => 3,
-        "gather" => 4,
-        "build" => 5,
-        abilities::SMOKE => 6,
-        abilities::MORTAR_FIRE => 9,
-        abilities::POINT_FIRE => 10,
-        abilities::BREAKTHROUGH => 11,
-        abilities::EKAT_TELEPORT => 12,
-        abilities::EKAT_LINE_SHOT => 13,
-        abilities::EKAT_MAGIC_ANCHOR => 14,
-        "setupAntiTankGuns" => 7,
-        abilities::CHARGE => 8,
-        _ => 255,
-    }
+    lookup_code(ORDER_STAGE_CODES, kind)
 }
 
 fn ability_code(ability: &str) -> u8 {
-    match ability {
-        abilities::CHARGE => 1,
-        abilities::SMOKE => 2,
-        abilities::MORTAR_FIRE => 3,
-        abilities::POINT_FIRE => 4,
-        abilities::BREAKTHROUGH => 5,
-        abilities::EKAT_TELEPORT => 6,
-        abilities::EKAT_LINE_SHOT => 7,
-        abilities::EKAT_MAGIC_ANCHOR => 8,
-        _ => 255,
-    }
+    lookup_code(ABILITY_CODES, ability)
 }
 
 fn ability_object_kind_code(kind: &str) -> u8 {
-    match kind {
-        ability_object_kinds::RETURN_MARKER => 1,
-        ability_object_kinds::MAGIC_ANCHOR => 2,
-        ability_object_kinds::LINE_PROJECTILE => 3,
-        _ => 255,
-    }
+    lookup_code(ABILITY_OBJECT_KIND_CODES, kind)
 }
 
 fn upgrade_code(upgrade: &str) -> u8 {
-    match upgrade {
-        upgrades::METHAMPHETAMINES => 1,
-        upgrades::ANTI_TANK_GUN_UNLOCK => 2,
-        upgrades::TANK_UNLOCK => 3,
-        upgrades::ARTILLERY_UNLOCK => 4,
-        upgrades::MORTAR_AUTOCAST => 5,
-        upgrades::COMMAND_CAR_UNLOCK => 6,
-        _ => 255,
-    }
+    lookup_code(UPGRADE_CODES, upgrade)
 }
 
 fn notice_severity_code(severity: NoticeSeverity) -> u8 {

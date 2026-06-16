@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -30,11 +30,11 @@ Make protocol parity compare structured Rust-owned metadata to the JS mirror.
 
 ## Implementation Checklist
 
-- [ ] Add structured Rust protocol metadata export.
-- [ ] Update JS parity test to consume the export.
-- [ ] Move any remaining regex/source-text assertions to an explicit temporary allowlist with a
+- [x] Add structured Rust protocol metadata export.
+- [x] Update JS parity test to consume the export.
+- [x] Move any remaining regex/source-text assertions to an explicit temporary allowlist with a
       removal note.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
