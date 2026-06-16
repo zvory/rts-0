@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -25,10 +25,10 @@ Isolate replay branch staging and launch policy in a lobby-local module.
 
 ## Implementation Checklist
 
-- [ ] Extract branch staging state and policy.
-- [ ] Preserve room-owned membership and send decisions.
-- [ ] Add or update mapped-seat branch tests.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Extract branch staging state and policy.
+- [x] Preserve room-owned membership and send decisions.
+- [x] Add or update mapped-seat branch tests.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

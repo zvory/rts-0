@@ -5,6 +5,7 @@ use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
 use super::live_tick::{LiveTickDriver, LiveTickResult};
+use super::replay_branch::{BranchLaunchError, BranchStagingState};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
 use super::*;
@@ -163,105 +164,6 @@ struct DevScenarioDriver {
     goal: (f32, f32),
     issue_after_ticks: u32,
     issued: bool,
-}
-
-struct BranchStagingState {
-    seed: ReplayBranchSeed,
-    claimed_by_seat: HashMap<u32, u32>,
-}
-
-impl BranchStagingState {
-    fn new(seed: ReplayBranchSeed) -> Self {
-        Self {
-            seed,
-            claimed_by_seat: HashMap::new(),
-        }
-    }
-
-    fn source_tick(&self) -> u32 {
-        self.seed.source_tick
-    }
-
-    fn can_start(&self) -> bool {
-        self.seed
-            .seats
-            .iter()
-            .filter(|seat| seat.claimable)
-            .all(|seat| self.claimed_by_seat.contains_key(&seat.player_id))
-    }
-
-    fn claimant_for_occupant(&self, occupant_id: u32) -> Option<u32> {
-        self.claimed_by_seat
-            .iter()
-            .find_map(|(seat_player_id, claimant_id)| {
-                (*claimant_id == occupant_id).then_some(*seat_player_id)
-            })
-    }
-
-    fn claim(&mut self, occupant_id: u32, seat_player_id: u32) -> Result<(), &'static str> {
-        if !self
-            .seed
-            .seats
-            .iter()
-            .any(|seat| seat.player_id == seat_player_id && seat.claimable)
-        {
-            return Err("unknown branch seat");
-        }
-        if self.claimant_for_occupant(occupant_id).is_some() {
-            return Err("occupant already claimed a branch seat");
-        }
-        if self.claimed_by_seat.contains_key(&seat_player_id) {
-            return Err("branch seat already claimed");
-        }
-        self.claimed_by_seat.insert(seat_player_id, occupant_id);
-        Ok(())
-    }
-
-    fn release(&mut self, occupant_id: u32, seat_player_id: u32) -> bool {
-        if self.claimed_by_seat.get(&seat_player_id) != Some(&occupant_id) {
-            return false;
-        }
-        self.claimed_by_seat.remove(&seat_player_id);
-        true
-    }
-
-    fn release_occupant(&mut self, occupant_id: u32) {
-        self.claimed_by_seat
-            .retain(|_, claimant_id| *claimant_id != occupant_id);
-    }
-
-    fn connection_to_seat_map(&self) -> Option<HashMap<u32, u32>> {
-        if !self.can_start() {
-            return None;
-        }
-        Some(
-            self.claimed_by_seat
-                .iter()
-                .map(|(seat_player_id, occupant_id)| (*occupant_id, *seat_player_id))
-                .collect(),
-        )
-    }
-
-    fn seats_for_message(&self, players: &HashMap<u32, RoomPlayer>) -> Vec<BranchStagingSeat> {
-        self.seed
-            .seats
-            .iter()
-            .map(|seat| {
-                let claimant_id = self.claimed_by_seat.get(&seat.player_id).copied();
-                let claimant_name =
-                    claimant_id.and_then(|id| players.get(&id).map(|p| p.name.clone()));
-                BranchStagingSeat {
-                    player_id: seat.player_id,
-                    team_id: seat.team_id,
-                    faction_id: seat.faction_id.clone(),
-                    name: seat.name.clone(),
-                    color: seat.color.clone(),
-                    claimant_id,
-                    claimant_name,
-                }
-            })
-            .collect()
-    }
 }
 
 impl DevScenarioDriver {
@@ -1869,14 +1771,18 @@ impl RoomTask {
                 return;
             }
         };
-        for seat in &staging.seed.seats {
-            if let FactionValidation::Rejected { requested, reason } = validate_faction_request(
-                FactionRequestContext::ReplayBranch,
-                Some(&seat.faction_id),
-            ) {
+        let launch = match staging
+            .prepare_launch(|connection_id| self.players.contains_key(&connection_id))
+        {
+            Ok(launch) => launch,
+            Err(BranchLaunchError::UnsupportedFaction {
+                seat_player_id,
+                requested,
+                reason,
+            }) => {
                 crate::log_warn!(
                     room = %self.room,
-                    seat_player_id = seat.player_id,
+                    seat_player_id,
                     faction_id = ?requested,
                     reason = ?reason,
                     "replay branch seat rejected by faction policy"
@@ -1885,38 +1791,23 @@ impl RoomTask {
                 self.broadcast_branch_staging();
                 return;
             }
-        }
-        let Some(seat_by_connection) = staging.connection_to_seat_map() else {
-            self.phase = Phase::BranchStaging(staging);
-            self.broadcast_branch_staging();
-            return;
+            Err(BranchLaunchError::NotReady | BranchLaunchError::MissingOccupant) => {
+                self.phase = Phase::BranchStaging(staging);
+                self.broadcast_branch_staging();
+                return;
+            }
         };
-        if !seat_by_connection
-            .keys()
-            .all(|connection_id| self.players.contains_key(connection_id))
-        {
-            self.phase = Phase::BranchStaging(staging);
-            self.broadcast_branch_staging();
-            return;
-        }
 
-        let game = staging.seed.game.clone_for_replay_keyframe();
+        let game = launch.game;
         let payload = game.start_payload();
-        let active_seats: HashSet<u32> = seat_by_connection.values().copied().collect();
-        self.branch_live_seat_by_connection = seat_by_connection;
-        self.match_player_count = active_seats.len();
-        self.match_human_count = active_seats.len();
+        self.branch_live_seat_by_connection = launch.seat_by_connection;
+        self.match_player_count = launch.match_player_count;
+        self.match_human_count = launch.match_player_count;
         self.match_started_at = Some(chrono::Utc::now());
         let match_run_id = structured_log::new_match_run_id(&self.room);
         self.match_run_id = Some(match_run_id);
-        self.match_map_name = staging.seed.source_replay.map_name.clone();
-        self.match_participants = staging
-            .seed
-            .seats
-            .iter()
-            .filter(|seat| active_seats.contains(&seat.player_id))
-            .map(|seat| seat.name.clone())
-            .collect();
+        self.match_map_name = launch.map_name;
+        self.match_participants = launch.participants;
         self.outcome_sent.clear();
         self.ai_controllers.clear();
         self.dev_driver = None;
@@ -1958,7 +1849,7 @@ impl RoomTask {
             match_run_id: self.match_run_id.as_deref().unwrap_or(""),
             mode: "replay_branch",
             map: &self.match_map_name,
-            seed: staging.seed.source_replay.seed,
+            seed: launch.seed,
             players: self.match_player_count,
             humans: self.match_human_count,
             ai: 0,
@@ -2662,16 +2553,12 @@ impl RoomTask {
                 })
             })
             .collect();
-        ServerMessage::BranchStaging {
-            room: self.room.clone(),
-            source_tick: staging.source_tick(),
-            host_id: self.host_id.unwrap_or(0),
-            seats: staging.seats_for_message(&self.players),
+        staging.message(
+            self.room.clone(),
+            self.host_id.unwrap_or(0),
             occupants,
-            can_start: self.match_countdown_deadline.is_none()
-                && !self.drain.is_draining()
-                && staging.can_start(),
-        }
+            self.match_countdown_deadline.is_none() && !self.drain.is_draining(),
+        )
     }
 
     fn broadcast_branch_staging(&self) {
@@ -3850,7 +3737,7 @@ mod tests {
             panic!("branch staging should stay active");
         };
         assert_eq!(staging.claimant_for_occupant(100), Some(players[0].id));
-        assert!(!staging.claimed_by_seat.contains_key(&players[1].id));
+        assert_eq!(staging.claimant_for_seat(players[1].id), None);
     }
 
     #[test]
@@ -3887,6 +3774,27 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn branch_launch_preparation_preserves_original_replay_seat_mapping() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut staging = BranchStagingState::new(seed);
+        staging.claim(101, players[1].id).unwrap();
+        staging.claim(100, players[0].id).unwrap();
+
+        let launch = staging
+            .prepare_launch(|connection_id| matches!(connection_id, 100 | 101))
+            .unwrap();
+
+        assert_eq!(launch.seat_by_connection.get(&100), Some(&players[0].id));
+        assert_eq!(launch.seat_by_connection.get(&101), Some(&players[1].id));
+        assert_eq!(
+            launch.participants,
+            vec![players[0].name.clone(), players[1].name.clone()]
+        );
+        assert_eq!(launch.game.tick_count(), 0);
     }
 
     #[test]
