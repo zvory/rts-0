@@ -29,6 +29,7 @@ use tracing_subscriber::EnvFilter;
 use std::sync::Arc;
 
 mod unit_design_lab;
+mod wiki;
 
 use rts_server::db::Db;
 use rts_server::dev_scenarios::{
@@ -130,6 +131,8 @@ async fn main() {
         .route("/beta", get(beta_redirect_handler))
         .route("/beta/", get(beta_redirect_handler))
         .route("/version", get(version_handler))
+        .route("/wiki", get(wiki::wiki_index_handler))
+        .route("/wiki/{*path}", get(wiki::wiki_page_handler))
         .route("/ws", get(ws_handler))
         .route("/dev/unit-lab", get(unit_design_lab_handler))
         .route("/api/unit-designs", get(unit_design_lab_list_handler))
