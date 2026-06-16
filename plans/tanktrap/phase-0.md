@@ -190,9 +190,11 @@ Phase 1 dormant identity should edit `server/crates/rules/src/kind.rs`,
 
 ### Targeted Tests for Later Phases
 
-- Phase 1: `cargo test --manifest-path server/Cargo.toml -p rts-rules stable_kind_ids_round_trip
-  every_entity_kind_has_exactly_one_def`, `cargo test --manifest-path server/Cargo.toml -p
-  rts-protocol`, `node tests/protocol_parity.mjs`, and
+- Phase 1: `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml
+  --profile default -E 'package(rts-rules) & (test(stable_kind_ids_round_trip) |
+  test(every_entity_kind_has_exactly_one_def))'`, `cargo nextest run --config-file
+  .config/nextest.toml --manifest-path server/Cargo.toml --profile default -E
+  'package(rts-protocol)'`, `node tests/protocol_parity.mjs`, and
   `node scripts/check-faction-catalog-parity.mjs`.
 - Phase 2: focused sim tests in `occupancy.rs`, `standability.rs`, `pathing.rs`, and
   `movement/tests.rs` for infantry pass-through, vehicle-body rejection, two-tile vehicle gaps,

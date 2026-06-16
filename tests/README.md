@@ -44,7 +44,7 @@ build/boot, each background suite, browser scenario groups, and client dependenc
 runs. Rust tests inside `run-all.sh` use `cargo nextest run --config-file .config/nextest.toml
 --manifest-path server/Cargo.toml --profile default`. Install nextest with
 `cargo install cargo-nextest --locked`; if it is missing, the local Rust gate fails with that
-install hint instead of falling back to `cargo test`.
+install hint instead of falling back to Cargo's built-in test runner.
 The workspace currently has no Rust doctests, so `run-all.sh` does not run a separate
 `cargo test --doc` step.
 

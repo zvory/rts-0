@@ -126,8 +126,8 @@ Do not start by reading:
 - server/src/game/systems.rs
 
 Run:
-- cd server && cargo test scripted_self_play
-- cd server && cargo run --bin ai_matchup -- rush tech
+- cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default scripted_self_play
+- cd server && cargo run --bin ai-matchup -- rush tech
 - tests/run-all.sh --no-client
 
 Invariants:
@@ -206,8 +206,8 @@ Do not start by reading:
 - server/src/game/selfplay/**    (separate harness; only if changing replays)
 
 Run:
-- cd server && cargo test ai
-- cd server && cargo run --bin ai_matchup -- rush tech
+- cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default -E 'package(rts-ai)'
+- cd server && cargo run --bin ai-matchup -- rush tech
 - node tests/ai_integration.mjs
 
 Invariants:
@@ -219,8 +219,8 @@ Invariants:
   uses; do not bypass fog for AI decisions.
 
 Grep for:
-- "fn decide" "fn observe" "Profile" in server/src/game/ai_core/
-- "ai_matchup" in server/src/
+- "fn decide" "fn observe" "Profile" in server/crates/ai/src/ai_core/
+- "ai-matchup" "ai_matchup" in server/
 EOF
 ;;
 
@@ -248,12 +248,12 @@ Do not start by reading:
 Run:
 - tests/run-all.sh                  # canonical "is the build green?"
 - tests/run-all.sh --no-client      # skip headless Chrome
-- cd server && cargo test           # scripted self-play, in-process, no server
+- cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default
 - node tests/server_integration.mjs # requires a running server on the test port
 
 Invariants:
 - Node tests need a RUNNING server on the test runner's private port. They are
-  NOT cargo test.
+  live integration scripts, not Rust/nextest tests.
 - Debug builds have overflow checks ON; hardening regression tests depend on
   that — do NOT switch the test server to --release.
 - If a self-play test fails and the cause is not obvious, open the replay in a

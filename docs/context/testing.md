@@ -40,7 +40,7 @@ Use when writing or debugging tests, or before claiming a change is done.
   client dependency hydration attempt. Its default Rust test phase is
   `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
   default`. Missing nextest is a local gate failure with an install hint; the runner does not fall
-  back to `cargo test`.
+  back to Cargo's built-in test runner.
 - Slow Rust investigation starts from the normal nextest-backed logs. Use the printed Rust context
   lines (Cargo target dir, Rust/cargo/nextest versions, and CI Cargo cache exact-hit result), the
   final timing summary, and nextest's per-test status/slow-test output before running narrower
@@ -84,8 +84,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   Rust cache hits stayed at 0% across different per-worktree target dirs because target-dir-specific
   rustc arguments changed the cache keys. It only produced Rust hits when rebuilding the exact same
   target directory path.
-- Node tests need a **running** server on the test runner's private port. They are not
-  `cargo test`. Start the server first.
+- Node tests need a **running** server on the test runner's private port. They are live integration
+  scripts, not Rust test binaries. Start the server first.
 - `tests/run-all.sh` boots its private server with `RTS_TEST_TICK_MS=5` by default so live-server
   suites advance simulated time quickly without changing normal `cargo run` pacing.
 - `node tests/team_integration.mjs` is the canonical live multi-client team suite. It covers
