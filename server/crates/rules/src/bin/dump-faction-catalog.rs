@@ -1,4 +1,4 @@
-use rts_rules::{defs, economy, faction, EntityKind};
+use rts_rules::{balance, defs, economy, faction, EntityKind};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -144,8 +144,387 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
             oil
         );
     }
+    println!("{indent}  }},");
+    let child_indent = format!("{indent}  ");
+    print_client_config(&child_indent);
+    println!();
+    print!("{indent}}}");
+}
+
+fn print_client_config(indent: &str) {
+    println!("{indent}\"clientConfig\": {{");
+    print_client_constants(indent);
+    println!("{indent}  \"unitStats\": {{");
+    for (index, def) in defs::UNITS.iter().enumerate() {
+        let comma = if index + 1 == defs::UNITS.len() {
+            ""
+        } else {
+            ","
+        };
+        println!(
+            "{indent}    \"{}\": {{\"size\":{},\"sight\":{},\"rangeTiles\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"supply\":{},\"buildTicks\":{}}}{comma}",
+            def.kind.stable_id(),
+            json_f32(def.stats.radius),
+            def.stats.sight_tiles,
+            client_visible_range_tiles(def.kind, def.stats.range_tiles),
+            def.stats.cost_steel,
+            def.stats.cost_oil,
+            def.stats.supply,
+            def.stats.build_ticks,
+        );
+    }
+    println!("{indent}  }},");
+    println!("{indent}  \"buildingStats\": {{");
+    for (index, def) in defs::BUILDINGS.iter().enumerate() {
+        let comma = if index + 1 == defs::BUILDINGS.len() {
+            ""
+        } else {
+            ","
+        };
+        println!(
+            "{indent}    \"{}\": {{\"footW\":{},\"footH\":{},\"sight\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"buildTicks\":{}}}{comma}",
+            def.kind.stable_id(),
+            def.stats.foot_w,
+            def.stats.foot_h,
+            def.stats.sight_tiles,
+            def.stats.cost_steel,
+            def.stats.cost_oil,
+            def.stats.build_ticks,
+        );
+    }
+    println!("{indent}  }},");
+    println!("{indent}  \"resourceAmounts\": {{");
+    for (index, def) in defs::NODES.iter().enumerate() {
+        let comma = if index + 1 == defs::NODES.len() {
+            ""
+        } else {
+            ","
+        };
+        println!(
+            "{indent}    \"{}\": {}{comma}",
+            def.kind.stable_id(),
+            def.amount
+        );
+    }
+    println!("{indent}  }},");
+    println!("{indent}  \"bodies\": {{");
+    println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
+        EntityKind::Tank.stable_id(),
+        json_f32(balance::TANK_BODY_LENGTH_PX),
+        json_f32(balance::TANK_BODY_WIDTH_PX),
+        json_f32(balance::TANK_BODY_CLEARANCE_PX),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
+        EntityKind::AntiTankGun.stable_id(),
+        json_f32(balance::ANTI_TANK_GUN_BODY_LENGTH_PX),
+        json_f32(balance::ANTI_TANK_GUN_BODY_WIDTH_PX),
+        json_f32(balance::ANTI_TANK_GUN_BODY_CLEARANCE_PX),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
+        EntityKind::Artillery.stable_id(),
+        json_f32(balance::ARTILLERY_BODY_LENGTH_PX),
+        json_f32(balance::ARTILLERY_BODY_WIDTH_PX),
+        json_f32(balance::ARTILLERY_BODY_CLEARANCE_PX),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
+        EntityKind::ScoutCar.stable_id(),
+        json_f32(balance::SCOUT_CAR_BODY_LENGTH_PX),
+        json_f32(balance::SCOUT_CAR_BODY_WIDTH_PX),
+        json_f32(balance::SCOUT_CAR_BODY_CLEARANCE_PX),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}}",
+        EntityKind::CommandCar.stable_id(),
+        json_f32(balance::COMMAND_CAR_BODY_LENGTH_PX),
+        json_f32(balance::COMMAND_CAR_BODY_WIDTH_PX),
+        json_f32(balance::COMMAND_CAR_BODY_CLEARANCE_PX),
+    );
+    println!("{indent}  }},");
+    print_upgrades(indent);
+    println!("{indent}  \"abilityEffects\": {{");
+    print_ability_effects(indent);
     println!("{indent}  }}");
     print!("{indent}}}");
+}
+
+fn print_client_constants(indent: &str) {
+    println!("{indent}  \"constants\": {{");
+    println!("{indent}    \"tickHz\": {},", balance::TICK_HZ);
+    println!(
+        "{indent}    \"miningCcRangeTiles\": {},",
+        json_f32(balance::MINING_CC_RANGE_TILES)
+    );
+    println!(
+        "{indent}    \"antiTankGunDeployedRangeTiles\": {},",
+        balance::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"antiTankGunFieldOfFireRad\": {},",
+        json_f32(balance::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD)
+    );
+    println!(
+        "{indent}    \"artilleryMinRangeTiles\": {},",
+        balance::ARTILLERY_MIN_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"artilleryMaxRangeTiles\": {},",
+        balance::ARTILLERY_MAX_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"artilleryFieldOfFireRad\": {},",
+        json_f32(balance::ARTILLERY_FIELD_OF_FIRE_RAD)
+    );
+    println!(
+        "{indent}    \"artillerySetupTicks\": {},",
+        balance::ARTILLERY_SETUP_TICKS
+    );
+    println!(
+        "{indent}    \"artilleryShellDelayTicks\": {},",
+        balance::ARTILLERY_SHELL_DELAY_TICKS
+    );
+    println!(
+        "{indent}    \"artilleryOuterRadiusTiles\": {},",
+        json_f32(balance::ARTILLERY_OUTER_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"artilleryAmmoCost\": {{\"steel\":{},\"oil\":0}},",
+        balance::ARTILLERY_AMMO_COST_STEEL
+    );
+    println!(
+        "{indent}    \"riflemanChargeCooldownTicks\": {},",
+        balance::RIFLEMAN_CHARGE_COOLDOWN_TICKS
+    );
+    println!(
+        "{indent}    \"smokeAbilityRangeTiles\": {},",
+        balance::SMOKE_ABILITY_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"smokeLaunchMaxDelayMs\": {},",
+        ticks_to_ceil_ms(balance::SMOKE_LAUNCH_MAX_DELAY_TICKS)
+    );
+    println!(
+        "{indent}    \"smokeCloudRadiusTiles\": {},",
+        json_f32(balance::SMOKE_CLOUD_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"smokeCloudDurationTicks\": {},",
+        balance::SMOKE_CLOUD_DURATION_TICKS
+    );
+    println!(
+        "{indent}    \"smokeAbilityCooldownTicks\": {},",
+        balance::SMOKE_ABILITY_COOLDOWN_TICKS
+    );
+    println!(
+        "{indent}    \"scoutCarSmokeUses\": {},",
+        balance::SCOUT_CAR_SMOKE_USES
+    );
+    println!(
+        "{indent}    \"smokeAbilityCost\": {{\"steel\":{},\"oil\":{}}},",
+        balance::SMOKE_ABILITY_COST_STEEL,
+        balance::SMOKE_ABILITY_COST_OIL
+    );
+    println!(
+        "{indent}    \"mortarShellDelayTicks\": {},",
+        balance::MORTAR_SHELL_DELAY_TICKS
+    );
+    println!(
+        "{indent}    \"mortarOuterRadiusTiles\": {},",
+        json_f32(balance::MORTAR_OUTER_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"mortarInnerRadiusTiles\": {},",
+        json_f32(balance::MORTAR_INNER_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"mortarFireCooldownTicks\": {},",
+        balance::TICK_HZ * 2
+    );
+    println!(
+        "{indent}    \"ekatRegenTicks\": {},",
+        balance::EKAT_REGEN_TICKS
+    );
+    println!(
+        "{indent}    \"ekatTeleportRangeTiles\": {},",
+        balance::EKAT_TELEPORT_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"ekatTeleportCooldownTicks\": {},",
+        balance::EKAT_TELEPORT_COOLDOWN_TICKS
+    );
+    println!(
+        "{indent}    \"ekatLineShotRangeTiles\": {},",
+        balance::EKAT_LINE_SHOT_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"ekatLineShotWidthTiles\": {},",
+        json_f32(balance::EKAT_LINE_SHOT_WIDTH_TILES)
+    );
+    println!(
+        "{indent}    \"ekatLineShotSpeedPxPerTick\": {},",
+        json_f32(balance::EKAT_LINE_SHOT_SPEED_PX_PER_TICK)
+    );
+    println!(
+        "{indent}    \"ekatLineShotDamage\": {},",
+        balance::EKAT_LINE_SHOT_DAMAGE
+    );
+    println!(
+        "{indent}    \"ekatLineShotCooldownTicks\": {},",
+        balance::EKAT_LINE_SHOT_COOLDOWN_TICKS
+    );
+    println!(
+        "{indent}    \"ekatMagicAnchorRangeTiles\": {},",
+        balance::EKAT_MAGIC_ANCHOR_RANGE_TILES
+    );
+    println!(
+        "{indent}    \"ekatMagicAnchorDurationTicks\": {},",
+        balance::EKAT_MAGIC_ANCHOR_DURATION_TICKS
+    );
+    println!(
+        "{indent}    \"ekatMagicAnchorLockoutTicks\": {},",
+        balance::EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS
+    );
+    println!(
+        "{indent}    \"ekatMagicAnchorHp\": {},",
+        balance::EKAT_MAGIC_ANCHOR_HP
+    );
+    println!(
+        "{indent}    \"ekatMagicAnchorRadiusTiles\": {},",
+        json_f32(balance::EKAT_MAGIC_ANCHOR_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"breakthroughRadiusTiles\": {},",
+        json_f32(balance::BREAKTHROUGH_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"breakthroughDurationTicks\": {},",
+        balance::BREAKTHROUGH_DURATION_TICKS
+    );
+    println!(
+        "{indent}    \"breakthroughCooldownTicks\": {}",
+        balance::BREAKTHROUGH_COOLDOWN_TICKS
+    );
+    println!("{indent}  }},");
+}
+
+fn print_upgrades(indent: &str) {
+    println!("{indent}  \"upgrades\": {{");
+    print_upgrade(
+        indent,
+        faction::METHAMPHETAMINES_UPGRADE,
+        balance::METHAMPHETAMINES_COST_STEEL,
+        balance::METHAMPHETAMINES_COST_OIL,
+        balance::METHAMPHETAMINES_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::ANTI_TANK_GUN_UNLOCK_UPGRADE,
+        balance::ANTI_TANK_GUN_UNLOCK_COST_STEEL,
+        balance::ANTI_TANK_GUN_UNLOCK_COST_OIL,
+        balance::ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::ARTILLERY_UNLOCK_UPGRADE,
+        balance::ARTILLERY_UNLOCK_COST_STEEL,
+        balance::ARTILLERY_UNLOCK_COST_OIL,
+        balance::ARTILLERY_UNLOCK_RESEARCH_TICKS,
+        Some(faction::ANTI_TANK_GUN_UNLOCK_UPGRADE),
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::TANK_UNLOCK_UPGRADE,
+        balance::TANK_UNLOCK_COST_STEEL,
+        balance::TANK_UNLOCK_COST_OIL,
+        balance::TANK_UNLOCK_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::COMMAND_CAR_UNLOCK_UPGRADE,
+        balance::COMMAND_CAR_UNLOCK_COST_STEEL,
+        balance::COMMAND_CAR_UNLOCK_COST_OIL,
+        balance::COMMAND_CAR_UNLOCK_RESEARCH_TICKS,
+        Some(faction::TANK_UNLOCK_UPGRADE),
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::MORTAR_AUTOCAST_UPGRADE,
+        balance::MORTAR_AUTOCAST_COST_STEEL,
+        balance::MORTAR_AUTOCAST_COST_OIL,
+        balance::MORTAR_AUTOCAST_RESEARCH_TICKS,
+        None,
+        false,
+    );
+    println!("{indent}  }},");
+}
+
+fn print_upgrade(
+    indent: &str,
+    id: &str,
+    steel: u32,
+    oil: u32,
+    research_ticks: u32,
+    requires_upgrade: Option<&str>,
+    comma: bool,
+) {
+    println!(
+        "{indent}    \"{id}\": {{\"cost\":{{\"steel\":{steel},\"oil\":{oil}}},\"researchTicks\":{research_ticks},\"requiresUpgrade\":{}}}{}",
+        json_string_or_null(requires_upgrade),
+        if comma { "," } else { "" },
+    );
+}
+
+fn print_ability_effects(indent: &str) {
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{}}},",
+        faction::SMOKE_ABILITY,
+        json_f32(balance::SMOKE_CLOUD_RADIUS_TILES),
+        balance::SMOKE_CLOUD_DURATION_TICKS,
+    );
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{}}},",
+        faction::MORTAR_FIRE_ABILITY,
+        json_f32(balance::MORTAR_OUTER_RADIUS_TILES),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"delayTicks\":{}}},",
+        faction::POINT_FIRE_ABILITY,
+        json_f32(balance::ARTILLERY_OUTER_RADIUS_TILES),
+        balance::ARTILLERY_SHELL_DELAY_TICKS,
+    );
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{}}},",
+        faction::BREAKTHROUGH_ABILITY,
+        json_f32(balance::BREAKTHROUGH_RADIUS_TILES),
+        balance::BREAKTHROUGH_DURATION_TICKS,
+    );
+    println!("{indent}    \"{}\": {{}},", faction::EKAT_TELEPORT_ABILITY,);
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"speedPxPerTick\":{},\"damage\":{}}},",
+        faction::EKAT_LINE_SHOT_ABILITY,
+        json_f32(balance::EKAT_LINE_SHOT_WIDTH_TILES * 0.5),
+        json_f32(balance::EKAT_LINE_SHOT_SPEED_PX_PER_TICK),
+        balance::EKAT_LINE_SHOT_DAMAGE,
+    );
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"lockoutTicks\":{},\"hp\":{}}}",
+        faction::EKAT_MAGIC_ANCHOR_ABILITY,
+        json_f32(balance::EKAT_MAGIC_ANCHOR_RADIUS_TILES),
+        balance::EKAT_MAGIC_ANCHOR_DURATION_TICKS,
+        balance::EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS,
+        balance::EKAT_MAGIC_ANCHOR_HP,
+    );
 }
 
 fn print_kind_array(name: &str, kinds: &[EntityKind], comma: bool, indent: &str) {
@@ -185,6 +564,25 @@ fn json_u16_or_null(value: Option<u16>) -> String {
     value
         .map(|value| value.to_string())
         .unwrap_or_else(|| "null".to_string())
+}
+
+fn json_f32(value: f32) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.1}")
+    } else {
+        value.to_string()
+    }
+}
+
+fn ticks_to_ceil_ms(ticks: u32) -> u32 {
+    (ticks * 1000_u32 + balance::TICK_HZ - 1) / balance::TICK_HZ
+}
+
+fn client_visible_range_tiles(kind: EntityKind, default_range_tiles: u32) -> u32 {
+    match kind {
+        EntityKind::AntiTankGun => balance::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
+        _ => default_range_tiles,
+    }
 }
 
 fn json_kind_or_null(value: Option<EntityKind>) -> String {
