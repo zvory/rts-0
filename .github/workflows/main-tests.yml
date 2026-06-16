@@ -141,6 +141,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Install cargo-nextest
+        if: needs.changed-files.outputs.docs_only != 'true'
+        run: cargo install cargo-nextest --locked
+
       - name: Run Rust and architecture suites
         if: needs.changed-files.outputs.docs_only != 'true'
         run: ./tests/run-all.sh --only-rust

@@ -5,7 +5,7 @@
 # What it runs, in order:
 #   1. Architecture/contract policy (crate boundaries + sim/client architecture + faction guardrails + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
-#   3. Rust fast scripted tests     (workspace cargo test — deterministic, in-process, no server)
+#   3. Rust fast scripted tests     (cargo nextest — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
 #   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration, faction_integration, team_integration)
 #   6. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
@@ -30,7 +30,6 @@
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
 #   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the per-worktree Cargo target dir
 #   RTS_SERVER_BIN=/path/to/rts-server tests/run-all.sh --only-live-node  # reuse a prebuilt server
-#   RTS_CARGO_PACKAGE_TIMINGS=1 tests/run-all.sh  # profile Cargo tests package-by-package
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 #   CHROME=/path/to/chrome tests/run-all.sh
@@ -61,16 +60,10 @@ RUN_LIVE_NODE=1
 RUN_CLIENT=1
 RUN_FULL_AI=0
 RUN_TRI_STATE_BROWSER=0
-RUN_CARGO_PACKAGE_TIMINGS=0
 VERBOSE=0
 case "${RTS_RUN_TRI_STATE_BROWSER:-}" in
   1|true|TRUE|yes|YES|on|ON) RUN_TRI_STATE_BROWSER=1 ;;
   0|false|FALSE|no|NO|off|OFF) RUN_TRI_STATE_BROWSER=0 ;;
-esac
-case "${RTS_CARGO_PACKAGE_TIMINGS:-}" in
-  1|true|TRUE|yes|YES|on|ON) RUN_CARGO_PACKAGE_TIMINGS=1 ;;
-  0|false|FALSE|no|NO|off|OFF|"") RUN_CARGO_PACKAGE_TIMINGS=0 ;;
-  *) echo "invalid RTS_CARGO_PACKAGE_TIMINGS=${RTS_CARGO_PACKAGE_TIMINGS}; use 1/0, true/false, yes/no, or on/off" >&2; exit 2 ;;
 esac
 if [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${CI:-}" ]; then
   RUN_TRI_STATE_BROWSER=1
@@ -302,11 +295,6 @@ collect_bg_results() {
     [ -n "$elapsed" ] || elapsed=0
     if [ "$status" = "ok" ]; then
       record_timing "$name" "$elapsed" "PASS"
-      case "$name" in
-        "Rust fast scripted tests (cargo test package timings)"|"Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test package timings)")
-          [ -n "$logf" ] && cat "$logf"
-          ;;
-      esac
       [ -n "$logf" ] && rm -f "$logf"
       rm -f "$resultf"
       [ "$VERBOSE" = "1" ] && info "${GRN}PASS${RST} $name (${elapsed}s)"
@@ -453,34 +441,38 @@ hydrate_client_deps() {
   fi
 }
 
+run_nextest_tests() {
+  if ! command -v cargo-nextest >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+cargo-nextest not found on PATH.
+Install it with:
+  cargo install cargo-nextest --locked
+Then rerun the local Rust gate.
+EOF
+    return 2
+  fi
+  cargo nextest run \
+    --config-file "$REPO_ROOT/.config/nextest.toml" \
+    --manifest-path "$SERVER_DIR/Cargo.toml" \
+    --profile default
+}
+
+run_nextest_tests_full_ai() {
+  RTS_FULL_AI_TESTS=1 run_nextest_tests
+}
+
 run_cargo_tests_bg() {
   local name
   if [ "$RUN_FULL_AI" = "1" ]; then
-    if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
-      name="Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test package timings)"
-    else
-      name="Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test)"
-    fi
+    name="Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo nextest)"
   else
-    if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
-      name="Rust fast scripted tests (cargo test package timings)"
-    else
-      name="Rust fast scripted tests (cargo test)"
-    fi
+    name="Rust fast scripted tests (cargo nextest)"
   fi
 
-  if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
-    if [ "$RUN_FULL_AI" = "1" ]; then
-      run_suite_bg "$name" env RTS_FULL_AI_TESTS=1 "$SCRIPT_DIR/cargo-test-timed.sh"
-    else
-      run_suite_bg "$name" "$SCRIPT_DIR/cargo-test-timed.sh"
-    fi
+  if [ "$RUN_FULL_AI" = "1" ]; then
+    run_suite_bg "$name" run_nextest_tests_full_ai
   else
-    if [ "$RUN_FULL_AI" = "1" ]; then
-      run_suite_bg "$name" env RTS_FULL_AI_TESTS=1 cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
-    else
-      run_suite_bg "$name" cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
-    fi
+    run_suite_bg "$name" run_nextest_tests
   fi
 }
 
@@ -542,7 +534,7 @@ if [ "$RUN_LIVE_NODE" = "1" ] || [ "$RUN_CLIENT" = "1" ]; then
 fi
 
 if [ "$NEEDS_SERVER" = "1" ]; then
-  # Build the server before Rust suites. In the default local gate, cargo test and clippy can then
+  # Build the server before Rust suites. In the default local gate, nextest and clippy can then
   # reuse compiled artifacts instead of competing with the live-server build for Cargo's lock.
   if is_up; then
     info "reusing server already listening on :$PORT (will not stop it)"

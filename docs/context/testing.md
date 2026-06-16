@@ -15,14 +15,15 @@ Use when writing or debugging tests, or before claiming a change is done.
   `puppeteer-core` through the shared lockfile-keyed cache
 - `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into latency-sensitive browser
   tri-state lag scenarios locally; CI includes them automatically
-- `tests/run-all.sh --only-rust` — architecture policy plus Rust format, test, and lint only
+- `tests/run-all.sh --only-rust` — architecture policy plus Rust format, nextest, and lint only
 - `tests/run-all.sh --only-live-node` — JS contracts plus live Node API suites only
 - `tests/run-all.sh --only-browser` — browser smoke plus configured tri-state browser suites only
-- `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
-- `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
+- `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
+  default` — simulation behavior + fast scripted self-play (no running server needed)
+- `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
+  server/Cargo.toml --profile default` —
+  includes long AI self-play/simulation coverage
 - `tests/run-all.sh --full-ai` — full orchestrator plus long AI self-play/simulation coverage
-- `tests/cargo-test-timed.sh` — opt-in server Cargo test profiling wrapper; runs workspace
-  default members package-by-package and prints per-package durations
 - `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files
 - `node scripts/check-wiki.mjs` — wiki route hardening, internal links, generated stats table
   completeness, and faction catalog parity
@@ -36,9 +37,12 @@ Use when writing or debugging tests, or before claiming a change is done.
   browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`; Markdown-only
   PRs keep the same green check context and skip the long suites after changed-file detection.
 - `tests/run-all.sh` prints a timing summary for every measured suite, server build/boot, and
-  client dependency hydration attempt. Its default Rust test phase is a single workspace
-  `cargo test --manifest-path server/Cargo.toml` invocation. Set `RTS_CARGO_PACKAGE_TIMINGS=1`
-  or run `tests/cargo-test-timed.sh` directly when CI/package-level profiling is needed.
+  client dependency hydration attempt. Its default Rust test phase is
+  `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
+  default`. Missing nextest is a local gate failure with an install hint; the runner does not fall
+  back to `cargo test`.
+- The workspace currently has no Rust doctests, so the local gate does not run a separate
+  `cargo test --doc` step. Add one beside nextest if doctests are introduced.
 - `CI / server binary`, `CI / rust and architecture`, `CI / live Node suites`, and
   `CI / browser and tri-state` are the auditable coverage jobs under the aggregate required check.
   Branch protection should require the aggregate `./tests/run-all.sh` check unless rulesets are
@@ -82,7 +86,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   singleton FFA, solo, `1v2`, `1v3`, `2v2`, shared team snapshots, malicious lobby/team/combat
   inputs, and team victory. `tests/run-all.sh --no-rust` includes it in the live Node API pass.
 - After any change, run the focused local suites that match the changed files or contracts. Use
-  `RTS_FULL_AI_TESTS=1 cargo test` when touching AI strategy, profile-backed self-play, replay
+  `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
+  server/Cargo.toml --profile default` when touching AI strategy, profile-backed self-play, replay
   determinism, or balance behavior that depends on long AI matches. The PR full gate is required
   for merge; do not rely on cheap local hooks as test coverage.
 - For CI failure recovery, workflow canaries, and moving the full gate to another runner, see

@@ -20,7 +20,7 @@ The `Main test gate` workflow cancels superseded runs for the same PR and cancel
 deploys; only a successful push run for `main` can do that.
 
 ```bash
-tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + API suites + client smoke
+tests/run-all.sh                 # local gate: cargo fmt --check + cargo nextest + clippy + API suites + client smoke
 tests/run-all.sh --full-ai       # local gate plus long AI self-play/simulation coverage
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
@@ -29,11 +29,9 @@ tests/run-all.sh --only-live-node # JS contracts + live Node API suites only
 tests/run-all.sh --only-browser  # browser smoke + configured tri-state browser suites only
 tests/run-all.sh --with-tri-state-browser  # include latency-sensitive tri-state browser scenarios locally
 tests/run-all.sh -v              # also print headers and pass/fail lines; timing summary is always printed
-tests/cargo-test-timed.sh        # run Cargo tests package-by-package with per-package timings
 PORT=8090 tests/run-all.sh       # use a different port
 CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the per-worktree Cargo target dir
 RTS_SERVER_BIN=/tmp/rts-server tests/run-all.sh --only-live-node  # reuse a prebuilt server
-RTS_CARGO_PACKAGE_TIMINGS=1 tests/run-all.sh  # profile Cargo tests package-by-package
 RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh  # override shared Node deps cache
 RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 CHROME=/path/to/chrome tests/run-all.sh
@@ -41,11 +39,12 @@ CHROME=/path/to/chrome tests/run-all.sh
 
 `run-all.sh` prints a final timing summary even in the default quiet mode, including server
 build/boot, each background suite, browser scenario groups, and client dependency hydration when it
-runs. Rust tests inside `run-all.sh` use a single workspace
-`cargo test --manifest-path server/Cargo.toml` invocation by default. Set
-`RTS_CARGO_PACKAGE_TIMINGS=1` or run `tests/cargo-test-timed.sh` directly when profiling needs a
-per-package Rust breakdown; the wrapper discovers the Cargo workspace default members and runs
-`cargo test -p <package>` for each one.
+runs. Rust tests inside `run-all.sh` use `cargo nextest run --config-file .config/nextest.toml
+--manifest-path server/Cargo.toml --profile default`. Install nextest with
+`cargo install cargo-nextest --locked`; if it is missing, the local Rust gate fails with that
+install hint instead of falling back to `cargo test`.
+The workspace currently has no Rust doctests, so `run-all.sh` does not run a separate
+`cargo test --doc` step.
 
 The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
 is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the
@@ -118,9 +117,9 @@ node tests/team_integration.mjs
 
 ## Headless simulation self-play
 
-Runs inside the Rust test suite with no live server. Plain `cargo test` runs the fast scripted
-self-play coverage. Long profile-backed matchups, long AI simulation checks, and the full real-AI
-match are gated behind `RTS_FULL_AI_TESTS=1` because they dominate wall-clock time.
+Runs inside the Rust test suite with no live server. Plain `cargo nextest run` runs the fast
+scripted self-play coverage. Long profile-backed matchups, long AI simulation checks, and the full
+real-AI match are gated behind `RTS_FULL_AI_TESTS=1` because they dominate wall-clock time.
 The tests create scripted API clients that drive `Game` through `enqueue`/`tick`/`snapshot_for`,
 exercising gathering, oil, Depot/Barracks/Vehicle Works construction, Rifleman/Tank training, rush
 pressure, and combat. Successful runs replay the authoritative tick-stamped command log through a
@@ -135,9 +134,11 @@ start a fresh one on its own port before loading `/dev/selfplay?replay=<artifact
 
 ```bash
 RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
-  cargo test scripted_self_play_worker_rush_vs_economy
+  cargo nextest run --config-file .config/nextest.toml \
+    --manifest-path server/Cargo.toml scripted_self_play_worker_rush_vs_economy
 
-RTS_FULL_AI_TESTS=1 cargo test
+RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml \
+  --manifest-path server/Cargo.toml
 ```
 
 For manual profile-vs-profile balance checks, use the fixed-horizon matchup CLI. It runs one
