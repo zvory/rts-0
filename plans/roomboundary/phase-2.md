@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -25,10 +25,10 @@ Move replay session state and replay playback logic out of `room_task.rs` into a
 
 ## Implementation Checklist
 
-- [ ] Extract replay runtime types and methods.
-- [ ] Keep room-owned send/broadcast decisions in `RoomTask`.
-- [ ] Move focused replay tests with the extracted module.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Extract replay runtime types and methods.
+- [x] Keep room-owned send/broadcast decisions in `RoomTask`.
+- [x] Move focused replay tests with the extracted module.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

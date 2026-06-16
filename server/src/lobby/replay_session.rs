@@ -1,0 +1,889 @@
+use super::replay_validation;
+use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
+use crate::game::command::SimCommand;
+use crate::game::map::Map;
+use crate::game::replay::{ReplayArtifactV1, ReplayValidationError};
+use crate::game::Game;
+use crate::protocol::{
+    Event, ReplayBranchSeat, ReplayPlaybackState, ReplayVisionRequest, StartPayload,
+};
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant as StdInstant};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ReplayVisionSelection {
+    All,
+    Players(Vec<u32>),
+}
+
+impl ReplayVisionSelection {
+    fn from_request(request: ReplayVisionRequest) -> Self {
+        match request {
+            ReplayVisionRequest::All => ReplayVisionSelection::All,
+            ReplayVisionRequest::Player { player_id } => {
+                ReplayVisionSelection::Players(vec![player_id])
+            }
+            ReplayVisionRequest::Players { player_ids } => {
+                ReplayVisionSelection::Players(player_ids)
+            }
+        }
+    }
+
+    fn player_ids(&self, all_players: &[u32]) -> Vec<u32> {
+        match self {
+            ReplayVisionSelection::All => all_players.to_vec(),
+            ReplayVisionSelection::Players(ids) => ids.clone(),
+        }
+    }
+}
+
+pub(super) fn validate_replay_vision_request(
+    vision: &ReplayVisionRequest,
+    valid_player_ids: &[u32],
+) -> Result<(), &'static str> {
+    let valid: HashSet<u32> = valid_player_ids.iter().copied().collect();
+    match vision {
+        ReplayVisionRequest::All => {
+            if valid.is_empty() {
+                Err("no replay players")
+            } else {
+                Ok(())
+            }
+        }
+        ReplayVisionRequest::Player { player_id } => {
+            if valid.contains(player_id) {
+                Ok(())
+            } else {
+                Err("unknown replay player")
+            }
+        }
+        ReplayVisionRequest::Players { player_ids } => {
+            if player_ids.is_empty() {
+                return Err("empty replay player subset");
+            }
+            let mut seen = HashSet::new();
+            for player_id in player_ids {
+                if !valid.contains(player_id) {
+                    return Err("unknown replay player");
+                }
+                if !seen.insert(*player_id) {
+                    return Err("duplicate replay player");
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Reusable server-side replay runtime. It owns the artifact and a rebuilt simulation, and the
+/// room task drives it exactly like a live game.
+pub(super) struct ReplaySession {
+    pub(super) artifact: ReplayArtifactV1,
+    pub(super) game: Box<Game>,
+    pub(super) next_command: usize,
+    pub(super) keyframes: Vec<ReplayKeyframe>,
+    pub(super) duration_ticks: u32,
+    speed: f32,
+    viewer_vision: HashMap<u32, ReplayVisionSelection>,
+    last_controller_id: Option<u32>,
+    last_seek_at: Option<StdInstant>,
+}
+
+pub(super) struct ReplayKeyframe {
+    pub(super) tick: u32,
+    pub(super) game: Box<Game>,
+    pub(super) next_command: usize,
+}
+
+impl ReplaySession {
+    #[allow(dead_code)]
+    pub(super) const DEFAULT_SPEED: f32 = 2.0;
+    pub(super) const PAUSED_SPEED: f32 = 0.0;
+    const MIN_SPEED: f32 = 0.125;
+    pub(super) const MAX_SPEED: f32 = 8.0;
+    pub(super) const MAX_DURATION_TICKS: u32 = 30 * 60 * 60;
+    const MAX_COMMAND_LOG_ENTRIES: usize = 200_000;
+    const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
+    const KEYFRAME_INTERVAL_TICKS: u32 = 2_000;
+
+    #[allow(dead_code)]
+    pub(super) fn new(artifact: ReplayArtifactV1) -> Result<Self, String> {
+        Self::validate_artifact_limits(&artifact)?;
+        let duration_ticks = artifact.duration_ticks;
+        let build_start = StdInstant::now();
+        let game = Box::new(Self::build_game(&artifact)?);
+        let keyframes = vec![ReplayKeyframe {
+            tick: 0,
+            game: Box::new(game.clone_for_replay_keyframe()),
+            next_command: 0,
+        }];
+        crate::log_info!(
+            map = %artifact.map_name,
+            duration_ticks,
+            command_count = artifact.command_log.len(),
+            player_count = artifact.players.len(),
+            build_ms = build_start.elapsed().as_millis(),
+            "replay session built"
+        );
+        Ok(ReplaySession {
+            artifact,
+            game,
+            next_command: 0,
+            keyframes,
+            duration_ticks,
+            speed: Self::DEFAULT_SPEED,
+            viewer_vision: HashMap::new(),
+            last_controller_id: None,
+            last_seek_at: None,
+        })
+    }
+
+    fn validate_artifact_limits(artifact: &ReplayArtifactV1) -> Result<(), String> {
+        if artifact.players.is_empty() {
+            return Err("replay artifact has no players".to_string());
+        }
+        if artifact.players.len() > MAX_PLAYERS {
+            return Err(format!(
+                "replay artifact has {} players; maximum is {MAX_PLAYERS}",
+                artifact.players.len()
+            ));
+        }
+        replay_validation::validate_faction_loadouts(artifact)?;
+        let seen_players: HashSet<u32> = artifact.players.iter().map(|player| player.id).collect();
+        if artifact.duration_ticks > Self::MAX_DURATION_TICKS {
+            return Err(format!(
+                "replay duration {} exceeds maximum {}",
+                artifact.duration_ticks,
+                Self::MAX_DURATION_TICKS
+            ));
+        }
+        if artifact.command_log.len() > Self::MAX_COMMAND_LOG_ENTRIES {
+            return Err(format!(
+                "replay command log has {} entries; maximum is {}",
+                artifact.command_log.len(),
+                Self::MAX_COMMAND_LOG_ENTRIES
+            ));
+        }
+        let mut previous_tick = 0;
+        for (index, entry) in artifact.command_log.iter().enumerate() {
+            if !seen_players.contains(&entry.player_id) {
+                return Err(format!(
+                    "replay command {index} references unknown player {}",
+                    entry.player_id
+                ));
+            }
+            if entry.tick == 0 {
+                return Err(format!("replay command {index} has invalid tick 0"));
+            }
+            if entry.tick > artifact.duration_ticks {
+                return Err(format!(
+                    "replay command {index} tick {} exceeds duration {}",
+                    entry.tick, artifact.duration_ticks
+                ));
+            }
+            if entry.tick < previous_tick {
+                return Err(format!(
+                    "replay command {index} is out of order: tick {} before {}",
+                    entry.tick, previous_tick
+                ));
+            }
+            previous_tick = entry.tick;
+        }
+        Ok(())
+    }
+
+    fn build_game(artifact: &ReplayArtifactV1) -> Result<Game, String> {
+        let metadata = Map::metadata_for_name(&artifact.map_name)
+            .map_err(|err| format!("cannot load replay map metadata: {err}"))?;
+        artifact
+            .validate_against(crate::build_info::build_id(), &metadata)
+            .or_else(|err| match err {
+                ReplayValidationError::BuildShaMismatch { artifact, running } => {
+                    crate::log_warn!(
+                        replay_build_sha = %artifact,
+                        server_build_sha = %running,
+                        "replay build differs from current server; attempting playback"
+                    );
+                    Ok(())
+                }
+                err => Err(err),
+            })
+            .map_err(|err| err.to_string())?;
+        let replay_start_players: Vec<_> = artifact
+            .players
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    normalize_start_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map = Map::load_for_players(&artifact.map_name, &replay_start_players, artifact.seed)
+            .map_err(|err| format!("cannot load replay map: {err}"))?;
+        Ok(Game::new_for_replay_with_map_metadata(
+            &artifact.players,
+            artifact.seed,
+            &artifact.player_loadouts,
+            map,
+            metadata,
+        ))
+    }
+
+    pub(super) fn active_player_ids(&self) -> Vec<u32> {
+        self.artifact.players.iter().map(|p| p.id).collect()
+    }
+
+    pub(super) fn start_payload_for(&self, viewer_id: u32) -> StartPayload {
+        StartPayload {
+            player_id: viewer_id,
+            spectator: true,
+            replay: Some(self.artifact.start_metadata()),
+            ..self.game.start_payload()
+        }
+    }
+
+    pub(super) fn state(&self) -> ReplayPlaybackState {
+        ReplayPlaybackState {
+            current_tick: self.current_tick(),
+            duration_ticks: self.duration_ticks,
+            keyframe_ticks: self
+                .keyframes
+                .iter()
+                .map(|keyframe| keyframe.tick)
+                .collect(),
+            speed: self.speed,
+            paused: self.speed == Self::PAUSED_SPEED,
+            ended: self.current_tick() >= self.duration_ticks,
+            controller_id: self.last_controller_id,
+        }
+    }
+
+    pub(super) fn speed(&self) -> f32 {
+        self.speed
+    }
+
+    pub(super) fn is_paused(&self) -> bool {
+        self.speed == Self::PAUSED_SPEED
+    }
+
+    pub(super) fn has_remaining_ticks(&self) -> bool {
+        self.current_tick() < self.duration_ticks
+    }
+
+    pub(super) fn current_tick(&self) -> u32 {
+        self.game.tick_count()
+    }
+
+    pub(super) fn game(&self) -> &Game {
+        &self.game
+    }
+
+    pub(super) fn remove_viewer(&mut self, viewer_id: u32) {
+        self.viewer_vision.remove(&viewer_id);
+    }
+
+    pub(super) fn branch_seed(&self) -> Result<ReplayBranchSeed, String> {
+        if self.artifact.players.iter().any(|player| player.is_ai) {
+            return Err("Replay branching does not support replays with AI seats yet.".to_string());
+        }
+        let source_tick = self.current_tick();
+        let seats = self
+            .artifact
+            .players
+            .iter()
+            .map(|player| ReplayBranchSeat {
+                player_id: player.id,
+                team_id: normalize_start_team_id(player.id, player.team_id),
+                faction_id: player.faction_id.clone(),
+                name: player.name.clone(),
+                color: player.color.clone(),
+                claimable: true,
+            })
+            .collect();
+        Ok(ReplayBranchSeed {
+            source_replay: self.artifact.start_metadata(),
+            source_tick,
+            game: Box::new(self.game.clone_for_replay_keyframe()),
+            seats,
+        })
+    }
+
+    pub(super) fn set_speed(&mut self, controller_id: u32, speed: f32) {
+        self.speed = if speed == Self::PAUSED_SPEED {
+            Self::PAUSED_SPEED
+        } else {
+            speed.clamp(Self::MIN_SPEED, Self::MAX_SPEED)
+        };
+        self.last_controller_id = Some(controller_id);
+    }
+
+    pub(super) fn set_vision(&mut self, viewer_id: u32, vision: ReplayVisionRequest) {
+        self.viewer_vision
+            .insert(viewer_id, ReplayVisionSelection::from_request(vision));
+    }
+
+    pub(super) fn vision_player_ids_for(&self, viewer_id: u32) -> Vec<u32> {
+        let all_players = self.active_player_ids();
+        self.viewer_vision
+            .get(&viewer_id)
+            .unwrap_or(&ReplayVisionSelection::All)
+            .player_ids(&all_players)
+    }
+
+    pub(super) fn enqueue_for_current_tick(&mut self) -> Result<(), String> {
+        let tick = self.current_tick().saturating_add(1);
+        while let Some(entry) = self.artifact.command_log.get(self.next_command) {
+            if entry.tick < tick {
+                return Err(format!(
+                    "replay command {} is out of order: tick {} before {}",
+                    self.next_command, entry.tick, tick
+                ));
+            }
+            if entry.tick != tick {
+                break;
+            }
+            self.game.enqueue(
+                entry.player_id,
+                SimCommand::from_protocol(entry.command.clone()),
+            );
+            self.next_command += 1;
+        }
+        Ok(())
+    }
+
+    pub(super) fn tick(
+        &mut self,
+        perf: Option<&mut crate::perf::TickPerf>,
+    ) -> HashMap<u32, Vec<Event>> {
+        self.game.tick_with_perf(perf).into_iter().collect()
+    }
+
+    pub(super) fn record_keyframe_if_due(&mut self) {
+        let tick = self.current_tick();
+        if tick == 0 || !tick.is_multiple_of(Self::KEYFRAME_INTERVAL_TICKS) {
+            return;
+        }
+        match self
+            .keyframes
+            .binary_search_by_key(&tick, |keyframe| keyframe.tick)
+        {
+            Ok(_) => (),
+            Err(index) => self.keyframes.insert(
+                index,
+                ReplayKeyframe {
+                    tick,
+                    game: Box::new(self.game.clone_for_replay_keyframe()),
+                    next_command: self.next_command,
+                },
+            ),
+        }
+    }
+
+    pub(super) fn seek_back(
+        &mut self,
+        room: &str,
+        viewer_count: usize,
+        controller_id: u32,
+        ticks_back: u32,
+    ) -> Result<u32, String> {
+        let target_tick = self
+            .current_tick()
+            .saturating_sub(ticks_back)
+            .min(self.duration_ticks);
+        self.seek_to(room, viewer_count, controller_id, target_tick)
+    }
+
+    pub(super) fn seek_to(
+        &mut self,
+        room: &str,
+        viewer_count: usize,
+        controller_id: u32,
+        target_tick: u32,
+    ) -> Result<u32, String> {
+        if self
+            .last_seek_at
+            .is_some_and(|last_seek| last_seek.elapsed() < Self::SEEK_COOLDOWN)
+        {
+            return Err("Replay seek ignored; wait before seeking again.".to_string());
+        }
+        let from_tick = self.current_tick();
+        let target_tick = target_tick.min(self.duration_ticks);
+        let seek_start = StdInstant::now();
+        let keyframe_tick = self.rebuild_to(target_tick)?;
+        self.last_seek_at = Some(StdInstant::now());
+        self.last_controller_id = Some(controller_id);
+        crate::log_info!(
+            room = %room,
+            controller_id,
+            viewer_count,
+            from_tick,
+            to_tick = target_tick,
+            keyframe_tick,
+            duration_ticks = self.duration_ticks,
+            command_count = self.artifact.command_log.len(),
+            keyframe_count = self.keyframes.len(),
+            rebuild_ms = seek_start.elapsed().as_millis(),
+            "replay seek rebuilt"
+        );
+        Ok(target_tick)
+    }
+
+    pub(super) fn rebuild_to(&mut self, target_tick: u32) -> Result<u32, String> {
+        let (keyframe_tick, keyframe_game, keyframe_next_command) = self
+            .keyframes
+            .iter()
+            .rev()
+            .find(|keyframe| keyframe.tick <= target_tick)
+            .map(|keyframe| {
+                (
+                    keyframe.tick,
+                    keyframe.game.clone_for_replay_keyframe(),
+                    keyframe.next_command,
+                )
+            })
+            .ok_or_else(|| "replay has no valid keyframe".to_string())?;
+        *self.game = keyframe_game;
+        self.next_command = keyframe_next_command;
+        while self.current_tick() < target_tick {
+            self.enqueue_for_current_tick()?;
+            self.game.tick();
+            self.record_keyframe_if_due();
+        }
+        Ok(keyframe_tick)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::PlayerInit;
+    use crate::protocol::Command;
+    use rts_rules::faction::EMPTY_FIXTURE_FACTION_ID;
+
+    fn replay_test_players(count: usize) -> Vec<PlayerInit> {
+        (1..=count as u32)
+            .map(|id| PlayerInit {
+                id,
+                team_id: id,
+                faction_id: "kriegsia".to_string(),
+                name: format!("Player {id}"),
+                color: crate::lobby::PLAYER_PALETTE
+                    [(id as usize - 1) % crate::lobby::PLAYER_PALETTE.len()]
+                .to_string(),
+                is_ai: false,
+            })
+            .collect()
+    }
+
+    fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
+        let metadata = Map::metadata_for_name("Default").unwrap();
+        let map = Map::load("Default", players.len(), seed).unwrap();
+        Game::new_with_random_ai_profiles_and_map_metadata(players, seed, map, metadata)
+    }
+
+    fn replay_test_artifact(players: &[PlayerInit], ticks: u32) -> (Game, ReplayArtifactV1) {
+        let seed = 0x5150_2202;
+        let mut game = replay_test_game(players, seed);
+        for _ in 0..ticks {
+            game.tick();
+        }
+        let artifact = ReplayArtifactV1::capture_from_game(
+            &game,
+            crate::build_info::build_id(),
+            None,
+            game.scores(),
+        );
+        (game, artifact)
+    }
+
+    #[test]
+    fn replay_vision_validation_rejects_unknown_and_empty_subsets() {
+        let valid = [1, 2, 3];
+
+        assert!(validate_replay_vision_request(&ReplayVisionRequest::All, &valid).is_ok());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Player { player_id: 2 },
+            &valid,
+        )
+        .is_ok());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players {
+                player_ids: vec![1, 3],
+            },
+            &valid,
+        )
+        .is_ok());
+
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Player { player_id: 99 },
+            &valid,
+        )
+        .is_err());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players { player_ids: vec![] },
+            &valid,
+        )
+        .is_err());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players {
+                player_ids: vec![1, 99],
+            },
+            &valid,
+        )
+        .is_err());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players {
+                player_ids: vec![1, 1],
+            },
+            &valid,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn replay_session_reaches_live_final_snapshots() {
+        let players = replay_test_players(2);
+        let (live, artifact) = replay_test_artifact(&players, 5);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+
+        while replay.current_tick() < replay.duration_ticks {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+
+        for player in &players {
+            assert_eq!(
+                replay.game.snapshot_for(player.id),
+                live.snapshot_for(player.id)
+            );
+        }
+    }
+
+    #[test]
+    fn replay_session_records_keyframes_and_restores_nearest_before_seek_target() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.duration_ticks = 2_001;
+        let mut replay = ReplaySession::new(artifact).unwrap();
+
+        while replay.current_tick() < replay.duration_ticks {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+            replay.record_keyframe_if_due();
+        }
+
+        assert_eq!(
+            replay
+                .keyframes
+                .iter()
+                .map(|keyframe| keyframe.tick)
+                .collect::<Vec<_>>(),
+            vec![0, 2_000]
+        );
+
+        let mut expected = replay
+            .keyframes
+            .iter()
+            .find(|keyframe| keyframe.tick == 2_000)
+            .expect("replay should record the first interval keyframe")
+            .game
+            .clone_for_replay_keyframe();
+        expected.tick();
+
+        let restored_from = replay.rebuild_to(2_001).unwrap();
+
+        assert_eq!(restored_from, 2_000);
+        assert_eq!(replay.current_tick(), 2_001);
+
+        for player in &players {
+            assert_eq!(
+                replay.game.snapshot_for(player.id),
+                expected.snapshot_for(player.id)
+            );
+        }
+    }
+
+    #[test]
+    fn replay_viewer_snapshot_hides_resource_outside_union_fog() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let replay = ReplaySession::new(artifact).unwrap();
+
+        let full = replay.game.snapshot_full_for(players[0].id);
+        let union = replay
+            .game
+            .snapshot_for_spectator(&replay.active_player_ids());
+
+        assert!(
+            full.resource_deltas.len() > union.resource_deltas.len(),
+            "default replay spectator fog should not expose every resource node"
+        );
+    }
+
+    #[test]
+    fn single_player_replay_fog_matches_player_visibility() {
+        let players = replay_test_players(1);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let replay = ReplaySession::new(artifact).unwrap();
+
+        let player = replay.game.snapshot_for(players[0].id);
+        let replay_view = replay.game.snapshot_for_spectator(&[players[0].id]);
+
+        assert_eq!(replay_view.visible_tiles, player.visible_tiles);
+        assert_eq!(
+            replay_view
+                .entities
+                .iter()
+                .map(|entity| entity.id)
+                .collect::<Vec<_>>(),
+            player
+                .entities
+                .iter()
+                .map(|entity| entity.id)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn replay_vision_selection_is_per_viewer() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+
+        replay.set_vision(
+            100,
+            ReplayVisionRequest::Player {
+                player_id: players[0].id,
+            },
+        );
+        replay.set_vision(
+            101,
+            ReplayVisionRequest::Player {
+                player_id: players[1].id,
+            },
+        );
+
+        assert_eq!(replay.vision_player_ids_for(100), vec![players[0].id]);
+        assert_eq!(replay.vision_player_ids_for(101), vec![players[1].id]);
+        assert_eq!(
+            replay.vision_player_ids_for(102),
+            replay.active_player_ids()
+        );
+    }
+
+    #[test]
+    fn replay_speed_and_seek_are_clamped_in_state() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        for _ in 0..3 {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+
+        replay.set_speed(42, 99.0);
+        assert_eq!(replay.state().speed, ReplaySession::MAX_SPEED);
+        assert_eq!(replay.state().controller_id, Some(42));
+        assert_eq!(replay.state().keyframe_ticks, vec![0]);
+
+        replay.set_speed(42, 0.0);
+        assert_eq!(replay.state().speed, ReplaySession::PAUSED_SPEED);
+        assert!(replay.state().paused);
+
+        let target = replay.seek_back("test", 1, 42, u32::MAX).unwrap();
+        assert_eq!(target, 0);
+        assert_eq!(replay.state().current_tick, 0);
+    }
+
+    #[test]
+    fn observer_analysis_restores_from_keyframe_without_accumulating_extra_losses() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 1);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+
+        replay.game.eliminate(players[1].id);
+        let expected = replay.game.observer_analysis();
+        replay.keyframes[0] = ReplayKeyframe {
+            tick: replay.current_tick(),
+            game: Box::new(replay.game.clone_for_replay_keyframe()),
+            next_command: replay.next_command,
+        };
+
+        replay.game.eliminate(players[0].id);
+        replay.rebuild_to(0).unwrap();
+
+        assert_eq!(replay.game.observer_analysis(), expected);
+    }
+
+    #[test]
+    fn replay_seek_frequency_is_bounded() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        for _ in 0..3 {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+
+        assert!(replay.seek_back("test", 1, 42, 1).is_ok());
+        let err = replay.seek_back("test", 1, 42, 1).unwrap_err();
+        assert!(
+            err.contains("wait before seeking again"),
+            "unexpected seek reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_session_allows_build_sha_mismatch() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 1);
+        artifact.server_build_sha = "older-build".to_string();
+
+        let replay = ReplaySession::new(artifact).unwrap();
+
+        assert_eq!(replay.current_tick(), 0);
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_malformed_command_logs() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 2);
+        artifact
+            .command_log
+            .push(crate::game::replay::CommandLogEntry {
+                tick: artifact.duration_ticks + 1,
+                player_id: players[0].id,
+                command: Command::Stop { units: vec![1] },
+            });
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("malformed replay artifact should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("exceeds duration"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_duplicate_players() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.players.push(artifact.players[0].clone());
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("duplicate-player replay artifact should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("duplicate player id"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_require_matching_player_loadouts() {
+        let players = replay_test_players(2);
+        let (_live, mut missing_artifact) = replay_test_artifact(&players, 0);
+        missing_artifact
+            .player_loadouts
+            .retain(|loadout| loadout.player_id != players[0].id);
+
+        let err = match ReplaySession::new(missing_artifact) {
+            Ok(_) => panic!("missing replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("missing a loadout"),
+            "unexpected artifact reject: {err}"
+        );
+
+        let (_live, mut mismatched_artifact) = replay_test_artifact(&players, 0);
+        mismatched_artifact.player_loadouts[0].faction_id = "ekat".to_string();
+
+        let err = match ReplaySession::new(mismatched_artifact) {
+            Ok(_) => panic!("mismatched replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("loadout faction"),
+            "unexpected artifact reject: {err}"
+        );
+
+        let (_live, mut unknown_loadout_artifact) = replay_test_artifact(&players, 0);
+        unknown_loadout_artifact.player_loadouts[0].loadout_id = "kriegsia.missing".to_string();
+
+        let err = match ReplaySession::new(unknown_loadout_artifact) {
+            Ok(_) => panic!("unknown replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unknown loadout"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_unknown_player_loadout() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        let mut extra_loadout = artifact.player_loadouts[0].clone();
+        extra_loadout.player_id = 999;
+        artifact.player_loadouts.push(extra_loadout);
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("unknown-player replay loadout should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unknown player 999"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_oversized_duration() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.duration_ticks = ReplaySession::MAX_DURATION_TICKS + 1;
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("oversized replay artifact should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("exceeds maximum"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_session_rejects_unknown_or_fixture_faction_ids() {
+        let players = replay_test_players(2);
+        let (_live, mut unknown_artifact) = replay_test_artifact(&players, 0);
+        unknown_artifact.players[0].faction_id = "unknown-faction".to_string();
+
+        let err = match ReplaySession::new(unknown_artifact) {
+            Ok(_) => panic!("unsupported replay faction should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unknown faction"),
+            "unexpected artifact reject: {err}"
+        );
+
+        let (_live, mut fixture_artifact) = replay_test_artifact(&players, 0);
+        fixture_artifact.players[0].faction_id = EMPTY_FIXTURE_FACTION_ID.to_string();
+
+        let err = match ReplaySession::new(fixture_artifact) {
+            Ok(_) => panic!("fixture replay faction should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("fixture-only"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+}

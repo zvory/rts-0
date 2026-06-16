@@ -42,12 +42,14 @@ mod connection;
 mod crash_replay;
 mod dev_replay;
 mod faction_validation;
+mod replay_session;
 mod replay_validation;
 mod room_task;
 mod snapshots;
 
 pub use connection::{ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
+use replay_session::{validate_replay_vision_request, ReplaySession};
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
 use room_task::{RoomMode, RoomTask};
 pub use snapshots::compact_snapshot_for_wire;
@@ -82,6 +84,14 @@ static NEXT_MATCH_REPLAY_ROOM_ID: AtomicU32 = AtomicU32::new(1);
 /// Allocate a fresh, process-unique player id. Called once per connection.
 pub fn next_player_id() -> u32 {
     NEXT_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+fn normalize_start_team_id(player_id: u32, team_id: TeamId) -> TeamId {
+    if team_id == 0 {
+        player_id
+    } else {
+        team_id
+    }
 }
 
 /// Frozen server-side seed for a future practice branch staging room.
