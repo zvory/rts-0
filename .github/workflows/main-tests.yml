@@ -21,16 +21,53 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs-only PR
+        id: changed-files
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          changed=()
+          while IFS= read -r path; do
+            [ -n "$path" ] && changed+=("$path")
+          done < <(git diff --name-only --no-renames \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}")
+
+          docs_only=true
+          if [ "${#changed[@]}" -eq 0 ]; then
+            docs_only=false
+          else
+            for path in "${changed[@]}"; do
+              if [[ "$path" != *.md ]]; then
+                docs_only=false
+                break
+              fi
+            done
+          fi
+
+          printf 'docs_only=%s\n' "$docs_only" >> "$GITHUB_OUTPUT"
+          printf 'Changed files:\n'
+          printf '  %s\n' "${changed[@]}"
+
+      - name: Skip full suite for docs-only PR
+        if: github.event_name == 'pull_request' && steps.changed-files.outputs.docs_only == 'true'
+        run: echo "Only Markdown files changed; ./tests/run-all.sh is not needed for this PR."
 
       - name: Set up Rust
+        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Node
+        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Cache Cargo registry
+        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -42,6 +79,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install headless client dependencies
+        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
         working-directory: tests
         run: npm ci
 
@@ -49,4 +87,5 @@ jobs:
       # and client smoke. A narrower suite can be used only when tests/select-suites.mjs
       # maps every changed file away from the skipped behavior.
       - name: Run full local CI suite
+        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
         run: ./tests/run-all.sh
