@@ -14,8 +14,7 @@ use crate::ai_core::observation::{
     AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AI_1_0_TECH, AI_1_1_TANK_MG, AI_1_2_TANK_MG_MICRO, RIFLE_FLOOD_FAST,
-    RIFLE_FLOOD_FULL_SATURATION,
+    AI_1_0_TECH, AI_1_1_TANK_MG, RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION,
     STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
 
@@ -26,8 +25,6 @@ fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
         kind: EntityKind::Worker,
         x: id as f32,
         y: 0.0,
-        hp: 40,
-        max_hp: 40,
         state,
         is_complete: true,
         production_queue_len: None,
@@ -88,8 +85,6 @@ fn building_at(
         kind,
         x,
         y,
-        hp: 1_000,
-        max_hp: 1_000,
         state: queue_len
             .filter(|queue| *queue > 0)
             .map(|_| AiEntityState::Train)
@@ -114,8 +109,6 @@ fn combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         kind,
         x,
         y,
-        hp: 100,
-        max_hp: 100,
         state: AiEntityState::Idle,
         is_complete: true,
         production_queue_len: None,
@@ -133,8 +126,6 @@ fn enemy(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         kind,
         x,
         y,
-        hp: 100,
-        max_hp: 100,
         state: AiEntityState::Idle,
         is_complete: true,
         production_queue_len: None,
@@ -3882,60 +3873,6 @@ fn scout_cars_join_the_normal_frontal_wave() {
             )
         }),
         "Scout Cars should not receive separate flank or evasion moves"
-    );
-}
-
-#[test]
-fn ai_1_2_pulls_back_wounded_tanks_before_frontal_orders() {
-    let ts = config::TILE_SIZE as f32;
-    let mut wounded = combat_at(30, EntityKind::Tank, 18.0 * ts, 18.0 * ts);
-    wounded.hp = 30;
-    wounded.max_hp = 100;
-    let mut observation = observation(
-        AiEconomy {
-            steel: 0,
-            oil: 0,
-            supply_used: 60,
-            supply_cap: 90,
-        },
-        vec![
-            building(10, EntityKind::CityCentre, Some(0)),
-            building(11, EntityKind::Barracks, Some(0)),
-            building(12, EntityKind::TrainingCentre, None),
-            building(13, EntityKind::ResearchComplex, None),
-            building(14, EntityKind::Factory, Some(0)),
-            wounded,
-            combat_at(31, EntityKind::Tank, 18.5 * ts, 18.0 * ts),
-            combat_at(32, EntityKind::Tank, 19.0 * ts, 18.0 * ts),
-            combat_at(33, EntityKind::Tank, 19.5 * ts, 18.0 * ts),
-        ],
-    );
-    observation.upgrades.push(UpgradeKind::TankUnlock);
-    observation.upgrades.push(UpgradeKind::Methamphetamines);
-
-    let decision = decide(
-        &observation,
-        &AI_1_2_TANK_MG_MICRO,
-        &mut AiDecisionMemory::for_profile(&AI_1_2_TANK_MG_MICRO),
-    );
-
-    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-    assert!(decision.commands.iter().any(|command| {
-        matches!(
-            command,
-            Command::Move { units, x, y, .. }
-                if units.as_slice() == [30] && *x == own_base.0 && *y == own_base.1
-        )
-    }));
-    assert!(
-        !decision.commands.iter().any(|command| {
-            matches!(
-                command,
-                Command::AttackMove { units, .. } | Command::Attack { units, .. }
-                    if units.contains(&30)
-            )
-        }),
-        "wounded Tank should not also receive a same-think combat order"
     );
 }
 

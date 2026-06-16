@@ -10,7 +10,6 @@ use crate::ai_core::decision::{decide_profile, AiDecisionMemory};
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID,
-    AI_1_2_TANK_MG_MICRO_ID,
 };
 use crate::ai_shared;
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -24,21 +23,16 @@ use rts_sim::protocol::{Snapshot, StartPayload};
 const DECISION_INTERVAL: u32 = 9;
 
 /// Default live-lobby profile. Keep this on the highest supported live AI version.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_2_TANK_MG_MICRO_ID;
+pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_1_1_TANK_MG_ID;
 
 /// Profiles available to ordinary lobby AI opponents.
-pub const LIVE_PROFILE_IDS: [&str; 3] = [
-    AI_1_0_TECH_ID,
-    AI_1_1_TANK_MG_ID,
-    AI_1_2_TANK_MG_MICRO_ID,
-];
+pub const LIVE_PROFILE_IDS: [&str; 2] = [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
         "ai1" | "ai_1_0" | "ai_1_0_tech" => Some(AI_1_0_TECH_ID),
         "ai_1_1" | "ai11" | "ai_1_1_tank_mg" => Some(AI_1_1_TANK_MG_ID),
-        "ai_1_2" | "ai12" | "ai_1_2_tank_mg_micro" => Some(AI_1_2_TANK_MG_MICRO_ID),
         _ => None,
     }
 }
@@ -247,19 +241,12 @@ mod tests {
         let ai = AiController::new(2);
 
         assert_eq!(ai.player_id(), 2);
-        assert_eq!(ai.profile_id(), AI_1_2_TANK_MG_MICRO_ID);
+        assert_eq!(ai.profile_id(), AI_1_1_TANK_MG_ID);
     }
 
     #[test]
     fn live_profile_pool_exposes_supported_lobby_profiles() {
-        assert_eq!(
-            LIVE_PROFILE_IDS,
-            [
-                AI_1_0_TECH_ID,
-                AI_1_1_TANK_MG_ID,
-                AI_1_2_TANK_MG_MICRO_ID
-            ]
-        );
+        assert_eq!(LIVE_PROFILE_IDS, [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID]);
     }
 
     #[test]
@@ -300,10 +287,6 @@ mod tests {
         assert_eq!(
             canonical_live_profile_id("ai_1_1"),
             Some(AI_1_1_TANK_MG_ID)
-        );
-        assert_eq!(
-            canonical_live_profile_id("ai_1_2"),
-            Some(AI_1_2_TANK_MG_MICRO_ID)
         );
         assert_eq!(canonical_live_profile_id("rifle_flood_fast"), None);
     }
