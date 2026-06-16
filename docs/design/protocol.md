@@ -455,8 +455,9 @@ means the ability is depleted and cannot be used by that caster.
 toggle autocast without exposing enemy data.
 `activeObjectId`, `availableTick`, and `expiresIn` are owner-only per-caster affordance fields for
 two-stage or persistent ability state such as Ekat's return marker, Magic Anchor, and the active
-Breakthrough aura duration on the casting Command Car.
-`lockoutUntilTick` carries owner-only Magic Anchor placement lockout after enemy destruction.
+Breakthrough aura duration on the casting Command Car. `lockoutUntilTick` is available for
+owner-only ability lockouts; Magic Anchor does not currently use a destruction lockout because the
+anchor is not attackable.
 `breakthroughTicks` is present only while the affected visible unit has active Breakthrough speed
 status; it is not caster identity. Owner snapshots also expose the Command Car's `breakthrough`
 ability cooldown and, while the caster's aura is active, its caster-only `expiresIn` through
@@ -477,6 +478,8 @@ with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transp
 The compact `ao` slot uses ability ids from the existing ability code table and
 `abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data
 encoded as `[earliestReturnTick?, hp?, radius?, destroyedLockoutTicks?, distanceTraveled?, ticksOut?]`.
+Magic Anchor currently fills only `radius`; the hp and destroyed-lockout slots are retained as
+optional compact slots for compatibility.
 Normal enemy snapshots receive only the public object fields needed to render a marker at a visible
 position.
 

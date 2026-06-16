@@ -61,14 +61,8 @@ fn ability_object_owner_state_to_protocol(
             earliest_return_tick: Some(earliest_return_tick),
             ..Default::default()
         },
-        AbilityObjectPayload::MagicAnchor {
-            hp,
-            radius,
-            destroyed_lockout_ticks,
-        } => crate::protocol::AbilityObjectOwnerStateView {
-            hp: Some(hp),
+        AbilityObjectPayload::MagicAnchor { radius } => crate::protocol::AbilityObjectOwnerStateView {
             radius: Some(radius),
-            destroyed_lockout_ticks: Some(destroyed_lockout_ticks),
             ..Default::default()
         },
         AbilityObjectPayload::LineProjectile {

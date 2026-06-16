@@ -951,7 +951,7 @@ fn ekat_magic_anchor_natural_expiry_does_not_lock_out_recast() {
 }
 
 #[test]
-fn ekat_magic_anchor_destroyed_by_enemy_applies_sixty_second_lockout() {
+fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut game = empty_flat_game(&players);
     let pos = game.map.tile_center(10, 10);
@@ -981,22 +981,68 @@ fn ekat_magic_anchor_destroyed_by_enemy_applies_sixty_second_lockout() {
     refresh_visibility(&mut game);
     for _ in 0..240 {
         game.tick();
-        if active_anchor_id(&game, hero).is_none() {
-            break;
-        }
     }
 
-    assert!(active_anchor_id(&game, hero).is_none());
-    let lockout = game
+    assert!(
+        active_anchor_id(&game, hero).is_some(),
+        "enemy combat should ignore Magic Anchor instead of damaging it"
+    );
+    assert!(game
         .entities
         .get(hero)
         .expect("hero exists")
         .ability_lockout_until_tick(ability::AbilityKind::EkatMagicAnchor, game.current_tick())
-        .expect("destroyed anchor should lock out placement");
+        .is_none());
+}
+
+#[test]
+fn ekat_magic_anchor_pull_field_slows_away_and_boosts_toward_movement() {
+    let away_delta = ekat_anchor_move_delta(-6.0);
+    let toward_delta = ekat_anchor_move_delta(14.0);
+
     assert!(
-        lockout > game.current_tick() + config::TICK_HZ * 50,
-        "lockout should be close to sixty seconds from destruction"
+        away_delta < config::unit_stats(EntityKind::Ekat).unwrap().speed,
+        "moving away from the anchor should be slowed, delta={away_delta}"
     );
+    assert!(
+        toward_delta > config::unit_stats(EntityKind::Ekat).unwrap().speed,
+        "moving toward the anchor should be boosted, delta={toward_delta}"
+    );
+    assert!(
+        toward_delta > away_delta,
+        "toward movement should cover more distance than away movement"
+    );
+}
+
+fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let start = game.map.tile_center(10, 10);
+    let anchor_target = game.map.tile_center(12, 10);
+    let destination = (
+        start.0 + destination_tiles_from_start * config::TILE_SIZE as f32,
+        start.1,
+    );
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, start.0, start.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_anchor(&mut game, hero, anchor_target);
+    game.tick();
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![hero],
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    (hero_entity.pos_x - start.0).abs()
 }
 
 #[test]
@@ -1183,7 +1229,7 @@ fn ekat_line_shot_with_active_anchor_launches_from_both_origins_once() {
 }
 
 #[test]
-fn ekat_line_shot_ignores_expired_or_destroyed_anchors() {
+fn ekat_line_shot_ignores_expired_anchors() {
     let players = [ekat_player(), kriegsia_enemy()];
     let mut expired_game = empty_flat_game(&players);
     let pos = expired_game.map.tile_center(10, 10);
@@ -1203,40 +1249,6 @@ fn ekat_line_shot_ignores_expired_or_destroyed_anchors() {
     enqueue_ekat_line_shot(&mut expired_game, expired_hero, target);
     expired_game.tick();
     assert_eq!(line_projectiles(&expired_game).len(), 1);
-
-    let mut destroyed_game = empty_flat_game(&players);
-    let destroyed_hero = destroyed_game
-        .entities
-        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
-        .expect("hero should spawn");
-    enqueue_ekat_anchor(&mut destroyed_game, destroyed_hero, anchor_pos);
-    destroyed_game.tick();
-    let anchor_id = active_anchor_id(&destroyed_game, destroyed_hero).expect("anchor exists");
-    let destroyed = destroyed_game
-        .ability_runtime
-        .damage_anchor(anchor_id, config::EKAT_MAGIC_ANCHOR_HP as u32)
-        .expect("anchor should be destroyed");
-    let lockout_until = destroyed_game
-        .current_tick()
-        .saturating_add(destroyed.destroyed_lockout_ticks);
-    destroyed_game
-        .entities
-        .get_mut(destroyed.caster_id)
-        .expect("anchor caster exists")
-        .start_ability_lockout_until(destroyed.ability, lockout_until);
-    assert!(destroyed_game
-        .entities
-        .get(destroyed_hero)
-        .expect("hero exists")
-        .ability_lockout_until_tick(
-            ability::AbilityKind::EkatMagicAnchor,
-            destroyed_game.current_tick()
-        )
-        .is_some());
-
-    enqueue_ekat_line_shot(&mut destroyed_game, destroyed_hero, target);
-    destroyed_game.tick();
-    assert_eq!(line_projectiles(&destroyed_game).len(), 1);
 }
 
 #[test]

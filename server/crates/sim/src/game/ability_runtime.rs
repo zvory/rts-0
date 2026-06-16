@@ -2,6 +2,7 @@
 
 use crate::game::ability::AbilityKind;
 use crate::game::ability_projectile::{AbilityProjectile, AbilityProjectileSpec};
+use crate::config;
 use crate::game::entity::EntityStore;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
@@ -41,9 +42,7 @@ pub(crate) enum AbilityObjectPayload {
         earliest_return_tick: u32,
     },
     MagicAnchor {
-        hp: u16,
         radius: f32,
-        destroyed_lockout_ticks: u32,
     },
     LineProjectile {
         distance_traveled: f32,
@@ -364,80 +363,53 @@ impl AbilityRuntime {
         })
     }
 
-    pub(in crate::game) fn first_enemy_anchor_in_range(
+    pub(crate) fn magic_anchor_movement_multiplier(
         &self,
-        attacker_owner: u32,
-        teams: &TeamRelations,
         x: f32,
         y: f32,
-        range_px: f32,
+        move_dir: (f32, f32),
         tick: u32,
-    ) -> Option<AbilityWorldObject> {
+    ) -> f32 {
+        if !x.is_finite() || !y.is_finite() {
+            return 1.0;
+        }
+        let move_len = (move_dir.0 * move_dir.0 + move_dir.1 * move_dir.1).sqrt();
+        if move_len <= 0.0001 {
+            return 1.0;
+        }
+        let move_dir = (move_dir.0 / move_len, move_dir.1 / move_len);
         self.world_objects()
             .filter(|object| {
                 object.kind == AbilityWorldObjectKind::MagicAnchor
                     && object.active_at(tick)
-                    && teams.is_enemy_owner(attacker_owner, object.owner)
                     && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
             })
-            .filter(|object| {
-                let AbilityObjectPayload::MagicAnchor { radius, .. } = object.payload else {
-                    return false;
+            .filter_map(|object| {
+                let AbilityObjectPayload::MagicAnchor { radius } = object.payload else {
+                    return None;
                 };
+                if radius <= 0.0 || !radius.is_finite() {
+                    return None;
+                }
                 let dx = object.x - x;
                 let dy = object.y - y;
-                let effective_range = range_px + radius;
-                dx * dx + dy * dy <= effective_range * effective_range
-            })
-            .min_by(|a, b| {
-                let da = {
-                    let dx = a.x - x;
-                    let dy = a.y - y;
-                    dx * dx + dy * dy
+                let dist = (dx * dx + dy * dy).sqrt();
+                if dist > radius || dist <= 0.0001 {
+                    return None;
+                }
+                let toward = (dx / dist, dy / dist);
+                let alignment = move_dir.0 * toward.0 + move_dir.1 * toward.1;
+                let strength = 1.0 - (dist / radius).clamp(0.0, 1.0);
+                let directional = if alignment >= 0.0 {
+                    (config::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER - 1.0) * alignment
+                } else {
+                    (1.0 - config::EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER) * alignment
                 };
-                let db = {
-                    let dx = b.x - x;
-                    let dy = b.y - y;
-                    dx * dx + dy * dy
-                };
-                da.partial_cmp(&db)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| a.id.get().cmp(&b.id.get()))
+                Some(1.0 + directional * strength)
             })
-            .copied()
-    }
-
-    pub(in crate::game) fn damage_anchor(
-        &mut self,
-        id: u32,
-        damage: u32,
-    ) -> Option<DestroyedAbilityAnchor> {
-        let object = self.world_objects.get_mut(id)?;
-        let AbilityObjectPayload::MagicAnchor {
-            hp,
-            radius,
-            destroyed_lockout_ticks,
-        } = object.payload
-        else {
-            return None;
-        };
-        if damage < hp as u32 {
-            object.payload = AbilityObjectPayload::MagicAnchor {
-                hp: hp.saturating_sub(damage as u16),
-                radius,
-                destroyed_lockout_ticks,
-            };
-            return None;
-        }
-        let removed = self.world_objects.remove(id)?;
-        Some(DestroyedAbilityAnchor {
-            owner: removed.owner,
-            caster_id: removed.caster_id,
-            ability: removed.ability,
-            x: removed.x,
-            y: removed.y,
-            destroyed_lockout_ticks,
-        })
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(1.0)
+            .max(0.0)
     }
 
     pub(in crate::game) fn tick_projectiles(
@@ -459,16 +431,6 @@ impl AbilityRuntime {
         }
         self.projectiles = active;
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(in crate::game) struct DestroyedAbilityAnchor {
-    pub(in crate::game) owner: u32,
-    pub(in crate::game) caster_id: u32,
-    pub(in crate::game) ability: AbilityKind,
-    pub(in crate::game) x: f32,
-    pub(in crate::game) y: f32,
-    pub(in crate::game) destroyed_lockout_ticks: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

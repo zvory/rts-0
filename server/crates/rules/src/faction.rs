@@ -318,7 +318,7 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         label: "Magic Anchor",
         icon: "ANC",
         hotkey: Some("C"),
-        title: "Place a destructible 10-second anchor",
+        title: "Place a 10-second pull field",
         carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),

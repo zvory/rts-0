@@ -110,9 +110,9 @@ export const EKAT_LINE_SHOT_DAMAGE = 40;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 5;
 export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
-export const EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS = TICK_HZ * 60;
-export const EKAT_MAGIC_ANCHOR_HP = 100;
-export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 0.4;
+export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 3.0;
+export const EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER = 0.45;
+export const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER = 1.35;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 12;
 
@@ -293,7 +293,7 @@ export const ABILITIES = Object.freeze({
     label: "Magic Anchor",
     icon: "ANC",
     hotkey: "C",
-    title: "Place a destructible 10-second anchor",
+    title: "Place a 10-second pull field",
     carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
@@ -301,8 +301,8 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,
     durationTicks: EKAT_MAGIC_ANCHOR_DURATION_TICKS,
-    lockoutTicks: EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS,
-    hp: EKAT_MAGIC_ANCHOR_HP,
+    pullAwayMultiplier: EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER,
+    pullTowardMultiplier: EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER,
     queued: true,
   }),
 });

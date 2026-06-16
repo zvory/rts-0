@@ -365,9 +365,7 @@ pub(crate) fn launch_world_ability(
                     created_tick: tick,
                     expires_tick: tick.saturating_add(config::EKAT_MAGIC_ANCHOR_DURATION_TICKS),
                     payload: AbilityObjectPayload::MagicAnchor {
-                        hp: config::EKAT_MAGIC_ANCHOR_HP,
                         radius,
-                        destroyed_lockout_ticks: config::EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS,
                     },
                 })
                 .is_none()

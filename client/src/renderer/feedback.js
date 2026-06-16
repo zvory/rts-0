@@ -32,6 +32,7 @@ import {
   WEAPON_RECOIL_PX,
   ZERO_OFFSET,
 } from "./palette.js";
+import { drawMagicAnchor } from "./magic_anchor_effect.js";
 import {
   angleDelta,
   clamp01,
@@ -48,7 +49,6 @@ import {
   drawTankHull,
   drawTankTracks,
   finiteNumber,
-  hash2,
   hexToInt,
   isImpassableAt,
   isVehicleBodyKind,
@@ -67,7 +67,6 @@ import {
 const MORTAR_WARNING_COLOR = 0x9f1f1f;
 const FIELD_OF_FIRE_COLOR = 0x4aa3ff;
 const ABILITY_RETURN_MARKER_COLOR = 0x82d8ff;
-const ABILITY_ANCHOR_COLOR = 0xc7d07a;
 const ABILITY_LINE_SHOT_COLOR = 0x0b3a78;
 const LINE_PROJECTILE_TRAIL_MAX_POINTS = 9;
 const LINE_PROJECTILE_TRAIL_MIN_STEP_PX = 1.5;
@@ -522,21 +521,6 @@ function drawReturnMarker(g, x, y, radius, color, alpha) {
   g.lineTo(x, y + radius * 0.7);
   g.lineTo(x - radius * 0.7, y);
   g.lineTo(x, y - radius * 0.7);
-}
-
-function drawMagicAnchor(g, object, radius) {
-  const hp = object.ownerState?.hp;
-  const hpAlpha = typeof hp === "number" ? Math.max(0.35, Math.min(1, hp / 100)) : 0.78;
-  g.lineStyle(2.4, ABILITY_ANCHOR_COLOR, hpAlpha);
-  g.beginFill(ABILITY_ANCHOR_COLOR, 0.16);
-  g.moveTo(object.x, object.y - radius);
-  g.lineTo(object.x + radius * 0.8, object.y);
-  g.lineTo(object.x, object.y + radius);
-  g.lineTo(object.x - radius * 0.8, object.y);
-  g.lineTo(object.x, object.y - radius);
-  g.endFill();
-  g.lineStyle(1.5, 0x11110f, 0.45);
-  g.drawCircle(object.x, object.y, radius * 0.46);
 }
 
 function drawLineProjectile(g, object, radius, trails) {
