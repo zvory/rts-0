@@ -19,6 +19,32 @@ catalog parity check.
 Rust-owned balance exports while call sites are migrated. They should not accumulate server-shell
 or sim-only implementation constants. Those values belong beside the module that owns the behavior.
 
+### Final source-of-truth map and guardrails
+
+Use `server/crates/rules/src/defs.rs` for unit/building stat records, costs, supply, sight, ranges,
+footprints, body dimensions, and build/train timing. Use `server/crates/rules/src/faction.rs` for
+faction catalogs: buildables, trainables, research rows, ability carriers, command-card descriptors,
+and ability/upgrade metadata exported by Rust. Use `server/crates/rules/src/balance.rs` for shared
+scalar constants such as tick rate, resource-node amounts, support-weapon timings/ranges, upgrade
+durations, body dimensions, and ability effect scalars. Sim-only behavior constants belong beside
+the sim module that owns the behavior rather than in the compatibility config shims.
+
+`client/src/config.js` mirrors only the subset needed by UI, rendering, fog previews, and command
+cards. Rust-owned mirrored values include gameplay-visible costs, supply, sight, footprints, body
+dimensions, client-visible timing/range/duration constants, faction legality, upgrade metadata,
+ability descriptors exported by the Rust faction catalog, ability effect fields exported in the
+rules dump, and resource starting amounts. Client-owned values include render colors, camera
+defaults, fog overlay alpha, command-card layout hints, local presentation labels/icons that are not
+exported by Rust, and resource render labels/sizes.
+
+Run `node scripts/check-faction-catalog-parity.mjs` after changing Rust-owned values that are
+mirrored into `client/src/config.js`. The check runs the Rust `rts-rules` faction catalog dump,
+including the `clientConfig` parity payload, and compares the client mirror for catalogs, stat
+fields, body dimensions, resource amounts, upgrade metadata, ability compact/order-stage codes, and
+Rust-owned ability descriptors/effect fields. Run `node scripts/check-wiki.mjs` as well when a
+change affects visible stats, faction availability, upgrades, or ability metadata that appears on
+the generated `/wiki/stats` page.
+
 | Constant | Before Phase 5 | After Phase 5 | Mirror impact |
 |----------|----------------|---------------|---------------|
 | `MORTAR_FIRE_TOLERANCE_RAD` | Sim-only mortar aim tolerance exported from `server/crates/sim/src/config.rs` beside mirrored balance constants | Sim-local `server/crates/sim/src/game/mortar.rs` `FIRE_TOLERANCE_RAD`, owned by mortar firing behavior | None; it is not mirrored into `client/src/config.js` and does not change wire shape or balance values |
