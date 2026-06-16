@@ -99,12 +99,14 @@ import {
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
+import { buildRendererFeedbackView } from "../client/src/renderer/feedback_view_model.js";
 import {
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
   _drawPlacement,
+  _drawResourceMiningPreview,
 } from "../client/src/renderer/feedback.js";
 import { buildGiveUpAction, buildSettingsTabs } from "../client/src/settings_panels.js";
 import { readPredictionEnabled, writePredictionEnabled } from "../client/src/prediction_settings.js";
@@ -1424,35 +1426,29 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 }
 
 {
-  const placementGfx = new RecordingGraphics();
-  const feedbackGfx = new RecordingGraphics();
-  const abilityObjectGfx = new RecordingGraphics();
-  const renderer = {
-    _placementGfx: placementGfx,
-    _feedbackGfx: feedbackGfx,
-    _abilityObjectGfx: abilityObjectGfx,
-    _lineProjectileTrails: new Map(),
-    _map: { tileSize: 32 },
-  };
-  const state = {
+  let selectedReads = 0;
+  let commandFeedbackNow = 0;
+  const selected = [{
+    id: 7,
+    owner: 1,
+    kind: KIND.ANTI_TANK_GUN,
+    x: 128,
+    y: 128,
+    facing: 0,
+    setupState: SETUP.DEPLOYED,
+  }];
+  const feedbackState = {
     playerId: 1,
-    placement: { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true },
-    map: { resources: [] },
-    liveCommandFeedback() {
-      return [{ kind: "move", x: 96, y: 128, append: true, createdAt: performance.now() }];
+    map: {
+      tileSize: 32,
+      resources: [{ id: 200, kind: KIND.STEEL, x: 80, y: 112, remaining: 900 }],
     },
-    selectedEntities() {
-      return [{
-        id: 7,
-        owner: 1,
-        kind: KIND.ANTI_TANK_GUN,
-        x: 128,
-        y: 128,
-        facing: 0,
-        setupState: SETUP.DEPLOYED,
-      }];
+    placement: { building: KIND.CITY_CENTRE, tileX: 2, tileY: 3, valid: true },
+    antiTankGunSetupPreview: {
+      mouseX: 180,
+      mouseY: 128,
+      guns: [{ kind: KIND.ANTI_TANK_GUN, x: 128, y: 128 }],
     },
-    antiTankGunSetupPreview: { mouseX: 180, mouseY: 128, guns: [{ kind: KIND.ANTI_TANK_GUN, x: 128, y: 128 }] },
     abilityTargetPreview: {
       ability: ABILITY.SMOKE,
       mouseX: 180,
@@ -1470,6 +1466,33 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       x: 220,
       y: 240,
     }],
+    resourceMiningPreview: {
+      resourceId: 200,
+      resourceX: 80,
+      resourceY: 112,
+      ccId: 3,
+      ccX: 220,
+      ccY: 220,
+      inRange: false,
+    },
+    smokes: [{ id: 1, x: 64, y: 80, radiusTiles: 2 }],
+    selectedEntities() {
+      selectedReads += 1;
+      return selected;
+    },
+    liveCommandFeedback(now) {
+      commandFeedbackNow = now;
+      return [{ kind: "move", x: 96, y: 128, append: true, createdAt: now - 100 }];
+    },
+    liveSmokeCanisters() { return []; },
+    liveMortarLaunches() { return []; },
+    liveMortarShells() { return []; },
+    liveMortarTargets() { return []; },
+    liveMortarImpacts() { return []; },
+    liveArtilleryTargets() { return []; },
+    liveArtilleryLaunches() { return []; },
+    liveArtilleryImpacts() { return []; },
+    liveMuzzleFlashes() { return []; },
     isOwnOwner(owner) {
       return owner === 1;
     },
@@ -1477,16 +1500,44 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       return false;
     },
   };
+  const feedbackView = buildRendererFeedbackView(feedbackState, {
+    entities: selected,
+    now: 1500,
+  });
 
-  _drawPlacement.call(renderer, state, null);
-  _drawCommandFeedback.call(renderer, state);
-  _drawAntiTankGunSetupPreview.call(renderer, state);
-  _drawAbilityTargetPreview.call(renderer, state);
-  _drawAbilityObjects.call(renderer, state);
+  assert(feedbackView.playerId === 1, "feedback view exposes player id");
+  assert(feedbackView.placement?.building === KIND.CITY_CENTRE, "feedback view exposes placement shape");
+  assert(feedbackView.commandFeedback.length === 1, "feedback view exposes live command feedback");
+  assert(commandFeedbackNow === 1500, "feedback view samples live feedback at the requested frame time");
+  assert(feedbackView.liveCommandFeedback(999) === feedbackView.commandFeedback, "feedback view returns stable command feedback for the frame");
+  assert(feedbackView.selectedEntities() === selected, "feedback view exposes stable selected entities for the frame");
+  assert(selectedReads === 1, "feedback view snapshots selected entities once per frame");
+  assert(feedbackView.entityById(7) === selected[0], "feedback view exposes renderer entity lookup");
+  assert(feedbackView.abilityTargetPreview?.ability === ABILITY.SMOKE, "feedback view exposes ability target preview");
+  assert(feedbackView.resourceMiningPreview?.resourceId === 200, "feedback view exposes resource mining preview");
+  assert(feedbackView.abilityObjects.length === 1, "feedback view exposes ability objects");
 
-  assert(placementGfx.calls.some((call) => call[0] === "drawRoundedRect"), "renderer feedback reads placement through the current state shape");
-  assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the current state shape");
-  assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the current state shape");
+  const placementGfx = new RecordingGraphics();
+  const feedbackGfx = new RecordingGraphics();
+  const abilityObjectGfx = new RecordingGraphics();
+  const renderer = {
+    _placementGfx: placementGfx,
+    _feedbackGfx: feedbackGfx,
+    _abilityObjectGfx: abilityObjectGfx,
+    _lineProjectileTrails: new Map(),
+    _map: { tileSize: 32 },
+  };
+  _drawPlacement.call(renderer, feedbackView, null);
+  _drawCommandFeedback.call(renderer, feedbackView);
+  _drawAntiTankGunSetupPreview.call(renderer, feedbackView);
+  _drawAbilityTargetPreview.call(renderer, feedbackView);
+  _drawAbilityObjects.call(renderer, feedbackView);
+  _drawResourceMiningPreview.call(renderer, feedbackView);
+
+  assert(placementGfx.calls.some((call) => call[0] === "drawRoundedRect"), "renderer feedback reads placement through the feedback view");
+  assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the feedback view");
+  assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
+  assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -27,11 +27,11 @@ Give renderer feedback a narrow, stable data shape instead of broad `GameState` 
 
 ## Implementation Checklist
 
-- [ ] Define the feedback view-model shape.
-- [ ] Build the view model from model/intent state.
-- [ ] Route renderer feedback through the view model.
-- [ ] Add focused tests for the view model.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Define the feedback view-model shape.
+- [x] Build the view model from model/intent state.
+- [x] Route renderer feedback through the view model.
+- [x] Add focused tests for the view model.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

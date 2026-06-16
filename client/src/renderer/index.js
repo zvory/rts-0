@@ -54,6 +54,7 @@ import {
   drawSelectionBox,
 } from "./feedback.js";
 import { _drawFog, _fogLevel } from "./fog.js";
+import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { _drawResource } from "./resources.js";
 import { buildStaticMap } from "./terrain.js";
@@ -191,6 +192,7 @@ export class Renderer {
     const entities = state.entitiesInterpolated(alpha) || [];
     const regularEntities = entities.filter((e) => !e.shotReveal);
     const shotReveals = entities.filter((e) => e.shotReveal);
+    const feedbackView = buildRendererFeedbackView(state, { entities });
     const selection = state.selection || new Set();
     const colorByOwner = this._ownerColors(state);
     const liveIds = new Set();
@@ -233,29 +235,29 @@ export class Renderer {
 
     // Overlays.
     this._abilityObjectGfx.clear();
-    this._drawAbilityObjects(state);
+    this._drawAbilityObjects(feedbackView);
     this._smokeGfx.clear();
-    this._drawSmokes(state);
+    this._drawSmokes(feedbackView);
     this._drawFog(fog);
-    this._drawSmokeCanisters(state);
-    this._drawCommandFeedback(state);
-    this._drawMortarTargets(state);
-    this._drawMortarLaunches(state);
-    this._drawMortarShells(state);
-    this._drawMortarImpacts(state);
-    this._drawArtilleryLaunches(state);
-    this._drawArtilleryTargets(state);
-    this._drawArtilleryImpacts(state);
-    this._drawSelectedMortarRanges(state);
-    this._drawBreakthroughAuras(state, regularEntities);
-    this._drawAbilityTargetPreview(state);
-    this._drawAntiTankGunSetupPreview(state);
-    this._drawOrderPlan(state);
-    this._drawDebugPathOverlay(state, regularEntities);
-    this._drawRallyPoints(state);
-    this._drawResourceMiningPreview(state);
-    this._drawMuzzleFlashes(state);
-    this._drawPlacement(state, fog);
+    this._drawSmokeCanisters(feedbackView);
+    this._drawCommandFeedback(feedbackView);
+    this._drawMortarTargets(feedbackView);
+    this._drawMortarLaunches(feedbackView);
+    this._drawMortarShells(feedbackView);
+    this._drawMortarImpacts(feedbackView);
+    this._drawArtilleryLaunches(feedbackView);
+    this._drawArtilleryTargets(feedbackView);
+    this._drawArtilleryImpacts(feedbackView);
+    this._drawSelectedMortarRanges(feedbackView);
+    this._drawBreakthroughAuras(feedbackView, regularEntities);
+    this._drawAbilityTargetPreview(feedbackView);
+    this._drawAntiTankGunSetupPreview(feedbackView);
+    this._drawOrderPlan(feedbackView);
+    this._drawDebugPathOverlay(feedbackView, regularEntities);
+    this._drawRallyPoints(feedbackView);
+    this._drawResourceMiningPreview(feedbackView);
+    this._drawMuzzleFlashes(feedbackView);
+    this._drawPlacement(feedbackView, fog);
   }
 
   // --- Entity drawing ------------------------------------------------------
