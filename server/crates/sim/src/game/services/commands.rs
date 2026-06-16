@@ -93,7 +93,7 @@ pub(crate) fn apply_commands(
         ($player:expr, $facts:expr, $request:expr) => {{
             let facts = $facts;
             let mut ctx = command_context!();
-            apply_planned_unit_order(&mut ctx, players, $player, &facts, $request);
+            planned_actions::execute(&mut ctx, players, $player, &facts, $request);
         }};
     }
     for (player, cmd) in pending {
@@ -685,207 +685,112 @@ fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
     )
 }
 
-fn apply_planned_unit_order(
-    ctx: &mut CommandExecutionContext<'_, '_>,
-    players: &mut [PlayerState],
-    player: u32,
-    facts: &[planner::UnitFacts],
-    request: &planner::OrderRequest,
-) {
-    let faction_id = faction_id_for(
-        players.iter().map(|p| (p.id, p.faction_id.as_str())),
-        player,
-    );
-    let map = ctx.map;
-    let entities = &mut *ctx.entities;
-    let spatial = ctx.spatial;
-    let coordinator = &mut *ctx.coordinator;
-    let teams = &ctx.teams;
-    let fog = ctx.fog;
-    let smokes = &mut *ctx.smokes;
-    let ability_runtime = &mut *ctx.ability_runtime;
-    let mortar_shells = &mut *ctx.mortar_shells;
-    let artillery_shells = &mut *ctx.artillery_shells;
-    let events = &mut *ctx.events;
-    let tick = ctx.tick;
+mod planned_actions {
+    use super::*;
 
-    let output = planner::plan_order(planner_config(), facts, request);
-    let mut move_units = Vec::new();
-    let mut attack_move_units = Vec::new();
-    let mut move_goal = None;
-    let mut attack_move_goal = None;
+    pub(super) fn execute(
+        ctx: &mut CommandExecutionContext<'_, '_>,
+        players: &mut [PlayerState],
+        player: u32,
+        facts: &[planner::UnitFacts],
+        request: &planner::OrderRequest,
+    ) {
+        let faction_id = faction_id_for(
+            players.iter().map(|p| (p.id, p.faction_id.as_str())),
+            player,
+        );
+        let map = ctx.map;
+        let entities = &mut *ctx.entities;
+        let spatial = ctx.spatial;
+        let coordinator = &mut *ctx.coordinator;
+        let teams = &ctx.teams;
+        let fog = ctx.fog;
+        let smokes = &mut *ctx.smokes;
+        let ability_runtime = &mut *ctx.ability_runtime;
+        let mortar_shells = &mut *ctx.mortar_shells;
+        let artillery_shells = &mut *ctx.artillery_shells;
+        let events = &mut *ctx.events;
+        let tick = ctx.tick;
 
-    for action in output.actions {
-        match action {
-            planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
-                planner::OrderIntent::Move(point) => {
-                    if immediate_unit_can_replace(entities, player, unit) {
-                        move_goal = Some((point.x, point.y));
-                        move_units.push(unit);
-                    }
-                }
-                planner::OrderIntent::AttackMove(point) => {
-                    if immediate_unit_can_replace(entities, player, unit) {
-                        attack_move_goal = Some((point.x, point.y));
-                        attack_move_units.push(unit);
-                    }
-                }
-                planner::OrderIntent::AttackTarget(target) => {
-                    if immediate_unit_can_replace(entities, player, unit)
-                        && attack_unit_can_target(
-                            entities, teams, fog, smokes, player, unit, target,
-                        )
-                        && !deployed_anti_tank_gun_target_outside_arc(entities, unit, target)
-                    {
-                        if let Some(e) = entities.get_mut(unit) {
-                            e.clear_queued_orders();
+        let output = planner::plan_order(planner_config(), facts, request);
+        let mut move_units = Vec::new();
+        let mut attack_move_units = Vec::new();
+        let mut move_goal = None;
+        let mut attack_move_goal = None;
+
+        for action in output.actions {
+            match action {
+                planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
+                    planner::OrderIntent::Move(point) => {
+                        if immediate_unit_can_replace(entities, player, unit) {
+                            move_goal = Some((point.x, point.y));
+                            move_units.push(unit);
                         }
-                        clear_staged_anti_tank_gun_setup(entities, &[unit]);
-                        coordinator.order_attack(entities, unit, target);
                     }
-                }
-                planner::OrderIntent::Gather(node) => {
-                    if gather_unit_can_use_node(entities, players, player, unit, node) {
-                        if let Some(e) = entities.get_mut(unit) {
-                            e.clear_queued_orders();
+                    planner::OrderIntent::AttackMove(point) => {
+                        if immediate_unit_can_replace(entities, player, unit) {
+                            attack_move_goal = Some((point.x, point.y));
+                            attack_move_units.push(unit);
                         }
-                        coordinator.order_gather(entities, unit, node);
                     }
-                }
-                planner::OrderIntent::Build {
-                    kind,
-                    tile_x,
-                    tile_y,
-                } => {
-                    let Some(building) = build_kind_from_code(kind) else {
-                        continue;
-                    };
-                    order_build(
-                        map,
-                        entities,
-                        players,
-                        spatial,
-                        coordinator,
-                        player,
-                        unit,
-                        building,
+                    planner::OrderIntent::AttackTarget(target) => {
+                        if immediate_unit_can_replace(entities, player, unit)
+                            && attack_unit_can_target(
+                                entities, teams, fog, smokes, player, unit, target,
+                            )
+                            && !deployed_anti_tank_gun_target_outside_arc(entities, unit, target)
+                        {
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.clear_queued_orders();
+                            }
+                            clear_staged_anti_tank_gun_setup(entities, &[unit]);
+                            coordinator.order_attack(entities, unit, target);
+                        }
+                    }
+                    planner::OrderIntent::Gather(node) => {
+                        if gather_unit_can_use_node(entities, players, player, unit, node) {
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.clear_queued_orders();
+                            }
+                            coordinator.order_gather(entities, unit, node);
+                        }
+                    }
+                    planner::OrderIntent::Build {
+                        kind,
                         tile_x,
                         tile_y,
-                        events,
-                    );
-                }
-                planner::OrderIntent::SetupAntiTankGuns { face_toward } => {
-                    if immediate_unit_can_replace(entities, player, unit) {
-                        execute_anti_tank_gun_setup(entities, unit, face_toward.x, face_toward.y);
-                    }
-                }
-                planner::OrderIntent::WorldAbility { ability, target } => {
-                    let Some(ability) = ability_from_planner(ability) else {
-                        continue;
-                    };
-                    if ability == AbilityKind::PointFire {
-                        order_artillery_point_fire(
+                    } => {
+                        let Some(building) = build_kind_from_code(kind) else {
+                            continue;
+                        };
+                        order_build(
                             map,
                             entities,
                             players,
-                            teams,
-                            fog,
-                            artillery_shells,
-                            events,
+                            spatial,
+                            coordinator,
                             player,
                             unit,
-                            target.x,
-                            target.y,
-                            tick,
+                            building,
+                            tile_x,
+                            tile_y,
+                            events,
                         );
-                        continue;
                     }
-                    if !immediate_unit_can_replace(entities, player, unit) {
-                        continue;
-                    }
-                    if let Some(e) = entities.get_mut(unit) {
-                        e.clear_queued_orders();
-                    }
-                    clear_staged_anti_tank_gun_setup(entities, &[unit]);
-                    order_or_launch_world_ability(
-                        map,
-                        entities,
-                        players,
-                        fog,
-                        teams,
-                        coordinator,
-                        smokes,
-                        ability_runtime,
-                        mortar_shells,
-                        events,
-                        player,
-                        &faction_id,
-                        unit,
-                        ability,
-                        target.x,
-                        target.y,
-                        tick,
-                        true,
-                    );
-                }
-                planner::OrderIntent::SelfAbility { ability } => {
-                    if let Some(ability) = ability_from_planner(ability) {
-                        launch_self_ability(entities, &faction_id, player, unit, ability);
-                    }
-                }
-            },
-            planner::PlannedAction::AppendQueued { unit, intent } => {
-                if let planner::OrderIntent::WorldAbility { ability, target } = intent {
-                    if ability_from_planner(ability) == Some(AbilityKind::PointFire) {
-                        if artillery_point_fire_command_target(
-                            map, entities, player, unit, target.x, target.y,
-                        )
-                        .is_some()
-                        {
-                            if let Some(e) = entities.get_mut(unit) {
-                                e.append_queued_order(OrderIntent::point_fire(target.x, target.y));
-                            }
+                    planner::OrderIntent::SetupAntiTankGuns { face_toward } => {
+                        if immediate_unit_can_replace(entities, player, unit) {
+                            execute_anti_tank_gun_setup(
+                                entities,
+                                unit,
+                                face_toward.x,
+                                face_toward.y,
+                            );
                         }
-                        continue;
                     }
-                }
-                if let Some(intent) = entity_order_intent_from_planner(intent) {
-                    if matches!(intent, OrderIntent::Attack(_))
-                        && !matches!(
-                            intent,
-                            OrderIntent::Attack(attack)
-                                if attack_unit_can_target(
-                                    entities,
-                                    teams,
-                                    fog,
-                                    smokes,
-                                    player,
-                                    unit,
-                                    attack.target
-                                )
-                        )
-                    {
-                        continue;
-                    }
-                    if let Some(e) = entities.get_mut(unit) {
-                        e.append_queued_order(intent);
-                    }
-                }
-            }
-            planner::PlannedAction::ExecuteAbilityNow {
-                unit,
-                ability,
-                target,
-                preserve_orders,
-            } => {
-                let Some(ability) = ability_from_planner(ability) else {
-                    continue;
-                };
-                match target {
-                    planner::AbilityTarget::SelfTarget => {
-                        launch_self_ability(entities, &faction_id, player, unit, ability);
-                    }
-                    planner::AbilityTarget::WorldPoint(point) => {
+                    planner::OrderIntent::WorldAbility { ability, target } => {
+                        let Some(ability) = ability_from_planner(ability) else {
+                            continue;
+                        };
                         if ability == AbilityKind::PointFire {
                             order_artillery_point_fire(
                                 map,
@@ -897,18 +802,26 @@ fn apply_planned_unit_order(
                                 events,
                                 player,
                                 unit,
-                                point.x,
-                                point.y,
+                                target.x,
+                                target.y,
                                 tick,
                             );
                             continue;
                         }
-                        launch_world_ability(
+                        if !immediate_unit_can_replace(entities, player, unit) {
+                            continue;
+                        }
+                        if let Some(e) = entities.get_mut(unit) {
+                            e.clear_queued_orders();
+                        }
+                        clear_staged_anti_tank_gun_setup(entities, &[unit]);
+                        order_or_launch_world_ability(
                             map,
                             entities,
                             players,
                             fog,
                             teams,
+                            coordinator,
                             smokes,
                             ability_runtime,
                             mortar_shells,
@@ -917,35 +830,133 @@ fn apply_planned_unit_order(
                             &faction_id,
                             unit,
                             ability,
-                            point.x,
-                            point.y,
+                            target.x,
+                            target.y,
                             tick,
-                            preserve_orders,
                             true,
                         );
+                    }
+                    planner::OrderIntent::SelfAbility { ability } => {
+                        if let Some(ability) = ability_from_planner(ability) {
+                            launch_self_ability(entities, &faction_id, player, unit, ability);
+                        }
+                    }
+                },
+                planner::PlannedAction::AppendQueued { unit, intent } => {
+                    if let planner::OrderIntent::WorldAbility { ability, target } = intent {
+                        if ability_from_planner(ability) == Some(AbilityKind::PointFire) {
+                            if artillery_point_fire_command_target(
+                                map, entities, player, unit, target.x, target.y,
+                            )
+                            .is_some()
+                            {
+                                if let Some(e) = entities.get_mut(unit) {
+                                    e.append_queued_order(OrderIntent::point_fire(
+                                        target.x, target.y,
+                                    ));
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                    if let Some(intent) = entity_order_intent_from_planner(intent) {
+                        if matches!(intent, OrderIntent::Attack(_))
+                            && !matches!(
+                                intent,
+                                OrderIntent::Attack(attack)
+                                    if attack_unit_can_target(
+                                        entities,
+                                        teams,
+                                        fog,
+                                        smokes,
+                                        player,
+                                        unit,
+                                        attack.target
+                                    )
+                            )
+                        {
+                            continue;
+                        }
+                        if let Some(e) = entities.get_mut(unit) {
+                            e.append_queued_order(intent);
+                        }
+                    }
+                }
+                planner::PlannedAction::ExecuteAbilityNow {
+                    unit,
+                    ability,
+                    target,
+                    preserve_orders,
+                } => {
+                    let Some(ability) = ability_from_planner(ability) else {
+                        continue;
+                    };
+                    match target {
+                        planner::AbilityTarget::SelfTarget => {
+                            launch_self_ability(entities, &faction_id, player, unit, ability);
+                        }
+                        planner::AbilityTarget::WorldPoint(point) => {
+                            if ability == AbilityKind::PointFire {
+                                order_artillery_point_fire(
+                                    map,
+                                    entities,
+                                    players,
+                                    teams,
+                                    fog,
+                                    artillery_shells,
+                                    events,
+                                    player,
+                                    unit,
+                                    point.x,
+                                    point.y,
+                                    tick,
+                                );
+                                continue;
+                            }
+                            launch_world_ability(
+                                map,
+                                entities,
+                                players,
+                                fog,
+                                teams,
+                                smokes,
+                                ability_runtime,
+                                mortar_shells,
+                                events,
+                                player,
+                                &faction_id,
+                                unit,
+                                ability,
+                                point.x,
+                                point.y,
+                                tick,
+                                preserve_orders,
+                                true,
+                            );
+                        }
                     }
                 }
             }
         }
-    }
 
-    if let Some(goal) = move_goal {
-        clear_queued_orders(entities, &move_units);
-        clear_staged_anti_tank_gun_setup(entities, &move_units);
-        coordinator.order_group_move(entities, player, &move_units, goal, false);
-        begin_artillery_teardown_for_movement(entities, &move_units);
-    }
-    if let Some(goal) = attack_move_goal {
-        clear_queued_orders(entities, &attack_move_units);
-        clear_staged_anti_tank_gun_setup(entities, &attack_move_units);
-        coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
-        begin_artillery_teardown_for_movement(entities, &attack_move_units);
-    }
+        if let Some(goal) = move_goal {
+            clear_queued_orders(entities, &move_units);
+            clear_staged_anti_tank_gun_setup(entities, &move_units);
+            coordinator.order_group_move(entities, player, &move_units, goal, false);
+            begin_artillery_teardown_for_movement(entities, &move_units);
+        }
+        if let Some(goal) = attack_move_goal {
+            clear_queued_orders(entities, &attack_move_units);
+            clear_staged_anti_tank_gun_setup(entities, &attack_move_units);
+            coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
+            begin_artillery_teardown_for_movement(entities, &attack_move_units);
+        }
 
-    for planner_notice in output.notices {
-        match planner_notice {
-            planner::PlannerNotice::QueueFull { .. } => {
-                notice(events, player, "Command queue full");
+        for planner_notice in output.notices {
+            match planner_notice {
+                planner::PlannerNotice::QueueFull { .. } => {
+                    notice(events, player, "Command queue full");
+                }
             }
         }
     }
@@ -1128,14 +1139,14 @@ fn use_ability(
                     }
                 }
             } else {
-                order_artillery_point_fire(
-                    map,
-                    entities,
-                    players,
-                    &teams,
-                    fog,
-                    artillery_shells,
-                    events,
+                    order_artillery_point_fire(
+                        map,
+                        entities,
+                        players,
+                        teams,
+                        fog,
+                        artillery_shells,
+                        events,
                     player,
                     unit,
                     x,
@@ -1207,7 +1218,7 @@ fn use_ability(
             target,
         },
     };
-    apply_planned_unit_order(ctx, players, player, &facts, &order);
+    planned_actions::execute(ctx, players, player, &facts, &order);
 }
 
 #[allow(clippy::too_many_arguments)]
