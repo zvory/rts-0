@@ -450,6 +450,26 @@ pub const BUILDINGS: &[BuildingDef] = &[
         trains: STEELWORKS_UNITS,
         build_requires: FACTORY_REQUIRED,
     },
+    BuildingDef {
+        kind: EntityKind::TankTrap,
+        stats: balance::BuildingStats {
+            hp: 200,
+            sight_tiles: 0,
+            cost_steel: 15,
+            cost_oil: 0,
+            foot_w: 1,
+            foot_h: 1,
+            build_ticks: balance::TICK_HZ * 10,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: TRAINING_CENTRE_REQUIRED,
+    },
 ];
 
 pub const NODES: &[NodeDef] = &[
@@ -553,6 +573,7 @@ mod tests {
                 EntityKind::Factory,
                 EntityKind::ResearchComplex,
                 EntityKind::Steelworks,
+                EntityKind::TankTrap,
             ]
         );
 
@@ -612,6 +633,22 @@ mod tests {
             .stats;
 
         assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
+    }
+
+    #[test]
+    fn tank_trap_uses_dormant_obstacle_stats() {
+        let def = building_def(EntityKind::TankTrap).expect("tank trap def");
+
+        assert_eq!(def.stats.hp, 200);
+        assert_eq!(def.stats.sight_tiles, 0);
+        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (15, 0));
+        assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
+        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);
+        assert_eq!(def.stats.provides_supply, 0);
+        assert_eq!(def.armor_class, ArmorClass::Armored);
+        assert_eq!(def.weapon, WeaponClass::None);
+        assert!(def.trains.is_empty());
+        assert_eq!(def.build_requires, TRAINING_CENTRE_REQUIRED);
     }
 
     #[test]

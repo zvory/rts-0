@@ -21,12 +21,13 @@ pub enum EntityKind {
     ResearchComplex,
     Factory,
     Steelworks,
+    TankTrap,
     Steel,
     Oil,
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 20] = [
+    pub const ALL: [EntityKind; 21] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
@@ -45,6 +46,7 @@ impl EntityKind {
         EntityKind::ResearchComplex,
         EntityKind::Factory,
         EntityKind::Steelworks,
+        EntityKind::TankTrap,
         EntityKind::Steel,
         EntityKind::Oil,
     ];
@@ -81,6 +83,7 @@ impl EntityKind {
             EntityKind::ResearchComplex => "research_complex",
             EntityKind::Factory => "factory",
             EntityKind::Steelworks => "steelworks",
+            EntityKind::TankTrap => "tank_trap",
             EntityKind::Steel => "steel",
             EntityKind::Oil => "oil",
         }
@@ -110,6 +113,7 @@ impl FromStr for EntityKind {
             "research_complex" => Ok(EntityKind::ResearchComplex),
             "factory" => Ok(EntityKind::Factory),
             "steelworks" => Ok(EntityKind::Steelworks),
+            "tank_trap" => Ok(EntityKind::TankTrap),
             "steel" => Ok(EntityKind::Steel),
             "oil" => Ok(EntityKind::Oil),
             _ => Err(()),

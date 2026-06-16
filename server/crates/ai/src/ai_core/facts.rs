@@ -322,6 +322,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::ResearchComplex
         | EntityKind::Factory
         | EntityKind::Steelworks
+        | EntityKind::TankTrap
         | EntityKind::Artillery
         | EntityKind::CommandCar
         | EntityKind::Steel
