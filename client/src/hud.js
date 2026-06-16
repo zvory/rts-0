@@ -143,8 +143,9 @@ function selectionBudgetForHudEntities(entities) {
   let cap = BASE_COMMAND_SUPPLY_CAP;
   for (const entity of entities || []) {
     if (!entity) continue;
-    used += commandWeight(entity.kind);
-    if (entity.kind === KIND.COMMAND_CAR) cap += COMMAND_CAR_SUPPLY_CAP_BONUS;
+    const weight = commandWeight(entity.kind);
+    used += weight;
+    if (entity.kind === KIND.COMMAND_CAR) cap += COMMAND_CAR_SUPPLY_CAP_BONUS + weight;
   }
   return { used, cap, over: used > cap };
 }

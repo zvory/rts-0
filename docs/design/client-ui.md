@@ -263,9 +263,10 @@ provide `visibleTiles`, so the overlay follows server-authoritative fog includin
 local stamping remains a fallback for older/dev object snapshots.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
-`command_budget.js`: 24 base command supply plus 12 per admitted Command Car, with unit supply as
-weight and a fallback weight of 1. Drag selection, shift-add, double-click same-kind selection, and
-control-group save/add/recall preserve their normal candidate ordering, except Command Cars in the
+`command_budget.js`: 24 base command supply plus 12 and the Command Car's own command weight per
+admitted Command Car, with unit supply as weight and a fallback weight of 1. Drag selection,
+shift-add, double-click same-kind selection, and control-group save/add/recall preserve their normal
+candidate ordering, except Command Cars in the
 candidate set are admitted first so their budget bonus is reliable. Overflow candidates are ignored
 client-side and surface `selectionBudgetOverflow` for the HUD; outgoing commands that still exceed
 the budget are blocked before `Net.command`.
