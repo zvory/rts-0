@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -28,11 +28,11 @@ context.
 
 ## Implementation Checklist
 
-- [ ] Identify repeated parameter groups and shared lookup logic in command helpers.
-- [ ] Add a private command execution context.
-- [ ] Convert helpers incrementally while preserving existing validation order.
-- [ ] Keep or reduce archcheck broad-signature pressure.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Identify repeated parameter groups and shared lookup logic in command helpers.
+- [x] Add a private command execution context.
+- [x] Convert helpers incrementally while preserving existing validation order.
+- [x] Keep or reduce archcheck broad-signature pressure.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
