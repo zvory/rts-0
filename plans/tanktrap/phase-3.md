@@ -1,6 +1,6 @@
 # Phase 3 - Authoritative Construction and Gameplay Rules
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 

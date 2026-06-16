@@ -50,6 +50,15 @@ pub(crate) fn completed_buildings(
     owned_buildings(entities, player).filter(|e| !e.under_construction())
 }
 
+/// Owned buildings that count as keeping a player alive. Field obstacles use generic building
+/// mechanics for targeting, snapshots, and cleanup, but do not satisfy elimination rules.
+pub(crate) fn owned_survival_buildings(
+    entities: &EntityStore,
+    player: u32,
+) -> impl Iterator<Item = &Entity> + '_ {
+    owned_buildings(entities, player).filter(|e| e.kind != EntityKind::TankTrap)
+}
+
 /// Kinds of all owned buildings (any state).
 #[cfg(test)]
 pub(crate) fn owned_building_kinds(entities: &EntityStore, player: u32) -> Vec<EntityKind> {
@@ -352,6 +361,7 @@ mod tests {
         let s = store_with_two_players();
         assert_eq!(owned_units(&s, 1).count(), 1);
         assert_eq!(owned_buildings(&s, 1).count(), 2);
+        assert_eq!(owned_survival_buildings(&s, 1).count(), 2);
         assert_eq!(completed_buildings(&s, 1).count(), 1);
         assert_eq!(owned_units(&s, 2).count(), 1);
         assert_eq!(owned_buildings(&s, 2).count(), 0);
@@ -364,6 +374,16 @@ mod tests {
         // All-kinds includes it.
         let ak = owned_building_kinds(&s, 1);
         assert!(ak.contains(&EntityKind::Barracks));
+    }
+
+    #[test]
+    fn survival_buildings_exclude_tank_traps_without_hiding_generic_buildings() {
+        let mut s = EntityStore::default();
+        s.spawn_building(1, EntityKind::TankTrap, 100.0, 100.0, true)
+            .unwrap();
+
+        assert_eq!(owned_buildings(&s, 1).count(), 1);
+        assert_eq!(owned_survival_buildings(&s, 1).count(), 0);
     }
 
     #[test]
