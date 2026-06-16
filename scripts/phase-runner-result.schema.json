@@ -28,6 +28,23 @@
     },
     "blocked_reason": {
       "type": "string"
+    },
+    "pr_number": {
+      "type": ["integer", "null"]
+    },
+    "pr_url": {
+      "type": "string"
+    },
+    "head_sha": {
+      "type": "string"
+    },
+    "auto_merge_state": {
+      "type": "string",
+      "enum": ["unknown", "not_requested", "armed", "missing", "disabled", "blocked"]
+    },
+    "merge_wait_state": {
+      "type": "string",
+      "enum": ["not_waited", "waiting", "merged", "blocked", "unknown"]
     }
   },
   "required": [

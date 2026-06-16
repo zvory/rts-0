@@ -2,7 +2,7 @@
 
 ## Status
 
-Pending.
+Done.
 
 ## Goal
 
@@ -64,4 +64,3 @@ failed.
 
 Include examples for single-phase, phase range with non-blocking PRs, and phase range with blocking
 serial waits. Note any branch naming or PR title conventions that follow-up agents must preserve.
-
