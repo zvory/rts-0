@@ -3029,7 +3029,7 @@ fn test_tick_interval_override() -> Option<Duration> {
 mod tests {
     use super::*;
     use crate::protocol::DEFAULT_FACTION_ID;
-    use rts_rules::faction::EMPTY_FIXTURE_FACTION_ID;
+    use rts_rules::faction::{EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
 
     fn replay_test_players(count: usize) -> Vec<PlayerInit> {
         (1..=count as u32)
@@ -3127,6 +3127,98 @@ mod tests {
             },
         );
         writer
+    }
+
+    #[test]
+    fn set_faction_accepts_playable_and_rejects_fixture_in_lobby() {
+        let mut task = RoomTask::new(
+            "faction-lobby-policy".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        task.host_id = Some(1);
+        add_test_room_player(&mut task, 1, true);
+        task.assign_missing_faction_for(1);
+
+        task.on_set_faction(1, EKAT_FACTION_ID.to_string());
+        assert_eq!(
+            task.human_faction_assignments.get(&1).map(String::as_str),
+            Some(EKAT_FACTION_ID)
+        );
+
+        task.on_set_faction(1, EMPTY_FIXTURE_FACTION_ID.to_string());
+        assert_eq!(
+            task.human_faction_assignments.get(&1).map(String::as_str),
+            Some(EKAT_FACTION_ID),
+            "fixture-only catalog ids must not overwrite a playable lobby selection"
+        );
+
+        task.on_set_faction(1, "unknown_faction".to_string());
+        assert_eq!(
+            task.human_faction_assignments.get(&1).map(String::as_str),
+            Some(EKAT_FACTION_ID),
+            "unknown catalog ids must be ignored"
+        );
+    }
+
+    #[test]
+    fn set_faction_is_ignored_for_spectators_countdown_and_in_game() {
+        let mut spectator_task = RoomTask::new(
+            "faction-spectator-policy".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_spectator(&mut spectator_task, 1);
+        spectator_task.on_set_faction(1, EKAT_FACTION_ID.to_string());
+        assert!(
+            !spectator_task.human_faction_assignments.contains_key(&1),
+            "spectator setFaction requests must not create active-seat faction state"
+        );
+
+        let mut countdown_task = RoomTask::new(
+            "faction-countdown-policy".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut countdown_task, 1, true);
+        countdown_task.assign_missing_faction_for(1);
+        countdown_task.match_countdown_deadline = Some(TokioInstant::now());
+        countdown_task.on_set_faction(1, EKAT_FACTION_ID.to_string());
+        assert_eq!(
+            countdown_task
+                .human_faction_assignments
+                .get(&1)
+                .map(String::as_str),
+            Some(DEFAULT_FACTION_ID),
+            "countdown setFaction requests must preserve the pre-countdown selection"
+        );
+
+        let players = replay_test_players(2);
+        let mut in_game_task = RoomTask::new(
+            "faction-in-game-policy".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut in_game_task, 1, true);
+        in_game_task.assign_missing_faction_for(1);
+        in_game_task.phase = Phase::InGame(Box::new(replay_test_game(&players, 0)));
+        in_game_task.on_set_faction(1, EKAT_FACTION_ID.to_string());
+        assert_eq!(
+            in_game_task
+                .human_faction_assignments
+                .get(&1)
+                .map(String::as_str),
+            Some(DEFAULT_FACTION_ID),
+            "in-game setFaction requests must not mutate active match faction state"
+        );
     }
 
     #[test]

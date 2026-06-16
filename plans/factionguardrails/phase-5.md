@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -37,14 +37,14 @@ Audit runtime faction acceptance, defaulting, exposure, and rejection surfaces.
 
 ## Implementation Checklist
 
-- [ ] Inventory runtime surfaces that accept or default faction ids.
-- [ ] Add a table-driven test covering every `FactionRequestContext` by faction id.
-- [ ] Verify catalog existence alone never grants AI, prediction, dev, replay, quickstart,
+- [x] Inventory runtime surfaces that accept or default faction ids.
+- [x] Add a table-driven test covering every `FactionRequestContext` by faction id.
+- [x] Verify catalog existence alone never grants AI, prediction, dev, replay, quickstart,
       self-play, or fixture support.
-- [ ] Add focused negative and fixture tests.
-- [ ] Check client selector, command cards, hotkeys, and prediction compatibility.
-- [ ] Document lifecycle path decisions.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Add focused negative and fixture tests.
+- [x] Check client selector, command cards, hotkeys, and prediction compatibility.
+- [x] Document lifecycle path decisions.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
