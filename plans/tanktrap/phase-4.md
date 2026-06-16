@@ -1,6 +1,6 @@
 # Phase 4 - Client Mirror, Rendering, and Preview Policy
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 

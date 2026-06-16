@@ -10,6 +10,7 @@ export function footprintValidAgainstEntities(
   footW,
   footH,
   map,
+  policy = placementPolicyForBuilding(null),
 ) {
   if (tileX < 0 || tileY < 0) return false;
   if (tileX + footW > map.width || tileY + footH > map.height) return false;
@@ -27,7 +28,27 @@ export function footprintValidAgainstEntities(
   for (const e of entities) {
     if (e.shotReveal || e.visionOnly) continue;
     if (allowedOverlapIds?.has(e.id)) continue;
+    if (!entityBlocksPlacement(e, policy)) continue;
     if (entityIntersectsRect(e, minX, minY, maxX, maxY, ts)) return false;
+  }
+  return true;
+}
+
+export function placementPolicyForBuilding(kind) {
+  return Object.freeze({
+    unitOverlap: kind === KIND.TANK_TRAP ? "infantryAllowed" : "none",
+  });
+}
+
+export function movementBodyClass(kind) {
+  return isVehicleBodyKind(kind) ? "vehicleBody" : "infantryLike";
+}
+
+function entityBlocksPlacement(e, policy) {
+  if (isBuilding(e.kind) || isResource(e.kind)) return true;
+  if (!isUnit(e.kind)) return false;
+  if (policy?.unitOverlap === "infantryAllowed") {
+    return movementBodyClass(e.kind) === "vehicleBody";
   }
   return true;
 }
@@ -69,11 +90,11 @@ export function _refreshPlacement() {
   // Snap so the footprint is centered on the cursor (top-left tile of the footprint).
   const tileX = Math.floor(world.x / map.tileSize - footW / 2 + 0.5);
   const tileY = Math.floor(world.y / map.tileSize - footH / 2 + 0.5);
-  const valid = this._footprintValid(tileX, tileY, footW, footH, map);
+  const valid = this._footprintValid(tileX, tileY, footW, footH, map, place.building);
   intent?.updatePlacement?.(tileX, tileY, valid);
 }
 
-export function _footprintValid(tileX, tileY, footW, footH, map) {
+export function _footprintValid(tileX, tileY, footW, footH, map, buildingKind = null) {
   const chosenWorker = this._selectedWorkerIds()[0];
   const allowed = chosenWorker === undefined ? new Set() : new Set([chosenWorker]);
   return footprintValidAgainstEntities(
@@ -84,6 +105,7 @@ export function _footprintValid(tileX, tileY, footW, footH, map) {
     footW,
     footH,
     map,
+    placementPolicyForBuilding(buildingKind),
   );
 }
 
@@ -161,7 +183,12 @@ export function vehicleBody(e, pad) {
 }
 
 export function isVehicleBodyKind(kind) {
-  return kind === KIND.TANK || kind === KIND.SCOUT_CAR || kind === KIND.COMMAND_CAR;
+  return kind === KIND.ANTI_TANK_GUN ||
+    kind === KIND.MORTAR_TEAM ||
+    kind === KIND.ARTILLERY ||
+    kind === KIND.TANK ||
+    kind === KIND.SCOUT_CAR ||
+    kind === KIND.COMMAND_CAR;
 }
 
 export function orientedBoxIntersectsRect(body, minX, minY, maxX, maxY) {

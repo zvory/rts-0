@@ -283,6 +283,8 @@ const approvedSpecialCaseBudgets = new Map([
   // Phase 7 final audit: catalog, economy helper, and command-service references intentionally
   // grew during the fixture, ability, and client-surface phases; keep the ratchet explicit until
   // those helpers shrink or move behind catalog APIs.
+  // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
+  // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
   ["server/crates/rules/src/faction.rs", 84],
   ["server/crates/rules/src/economy.rs", 101],
   ["server/crates/sim/src/game/setup.rs", 30],
