@@ -2910,6 +2910,57 @@ mod tests {
     }
 
     #[test]
+    fn mixed_selection_move_filters_to_owned_movable_units() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let owned_rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("owned rifleman should spawn");
+        let owned_worker = entities
+            .spawn_unit(1, EntityKind::Worker, 132.0, 100.0)
+            .expect("owned worker should spawn");
+        let enemy_rifle = entities
+            .spawn_unit(2, EntityKind::Rifleman, 164.0, 100.0)
+            .expect("enemy rifleman should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, 196.0, 100.0)
+            .expect("resource node should spawn");
+        mark_units_moving(&mut entities, &[owned_rifle, owned_worker, enemy_rifle]);
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Move {
+                    units: vec![owned_rifle, enemy_rifle, node, 99_999, owned_worker],
+                    x: 220.0,
+                    y: 180.0,
+                    queued: false,
+                },
+            )],
+        );
+
+        assert!(
+            matches!(entities.get(owned_rifle).unwrap().order(), Order::Move(_)),
+            "owned movable units in a mixed selection should accept the move"
+        );
+        assert!(
+            matches!(entities.get(owned_worker).unwrap().order(), Order::Move(_)),
+            "later owned units should still be processed after invalid selection entries"
+        );
+        assert_eq!(
+            entities.get(enemy_rifle).unwrap().move_intent(),
+            Some((10.0, 10.0)),
+            "enemy units in the selected id list must be ignored"
+        );
+        assert!(
+            entities.get(node).unwrap().queued_orders().is_empty(),
+            "resource node ids in the selected list must not gain queued state"
+        );
+    }
+
+    #[test]
     fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
@@ -4370,6 +4421,62 @@ mod tests {
         assert!(events.get(&1).is_some_and(|events| events.iter().any(
             |event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery)
         )));
+    }
+
+    #[test]
+    fn artillery_point_fire_system_rechecks_ammo_affordability() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].steel = 0;
+        let pos = (320.0, 320.0);
+        let target = (pos.0 + config::TILE_SIZE as f32 * 22.0, pos.1);
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        {
+            let unit = entities.get_mut(artillery).expect("artillery should exist");
+            unit.set_weapon_setup(WeaponSetup::Deployed);
+            unit.set_emplacement_facing(Some(0.0));
+            unit.set_weapon_facing(0.0);
+            unit.set_order(Order::artillery_point_fire(target.0, target.1));
+        }
+        let mut artillery_shells = ArtilleryShellStore::default();
+        let mut events: HashMap<u32, Vec<Event>> =
+            HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+
+        artillery_point_fire_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut artillery_shells,
+            &mut events,
+            &fog,
+            7,
+        );
+
+        assert_eq!(
+            players[0].steel, 0,
+            "failed artillery fire should not spend unavailable ammo"
+        );
+        assert_eq!(
+            entities
+                .get(artillery)
+                .expect("artillery should exist")
+                .attack_cd(),
+            config::ARTILLERY_RELOAD_TICKS,
+            "promotion-time ammo failure still applies the current reload penalty"
+        );
+        assert_notice(&events, 1, "Not enough steel");
+        assert!(
+            events
+                .values()
+                .flat_map(|events| events.iter())
+                .all(|event| !matches!(event, Event::ArtilleryTarget { .. })),
+            "unaffordable point fire should not schedule a visible target marker"
+        );
     }
 
     #[test]
