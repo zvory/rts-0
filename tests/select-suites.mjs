@@ -12,6 +12,8 @@ const suiteOrder = [
   "cargo-test-server",
   "cargo-clippy",
   "client-architecture",
+  "faction-assumptions",
+  "faction-catalog-parity",
   "js-protocol-contracts",
   "node-server-integration",
   "node-regression",
@@ -68,6 +70,58 @@ function isRulesVisibleBalance(pathname) {
   );
 }
 
+function isFactionDocsOrPlan(pathname) {
+  return (
+    pathname === "docs/design/faction-architecture-inventory.md" ||
+    pathname.startsWith("docs/context/faction") ||
+    pathname.startsWith("plans/factionguardrails/")
+  );
+}
+
+function isFactionCatalogSurface(pathname) {
+  return (
+    pathname === "server/crates/rules/src/faction.rs" ||
+    pathname === "server/crates/rules/src/bin/dump-faction-catalog.rs" ||
+    pathname === "client/src/config.js" ||
+    pathname === "client/src/lobby_view.js"
+  );
+}
+
+function isFactionRuntimeSurface(pathname) {
+  return (
+    pathname === "server/src/lobby/faction_validation.rs" ||
+    pathname === "tests/faction_integration.mjs"
+  );
+}
+
+function isFactionChecker(pathname) {
+  return (
+    pathname === "scripts/check-faction-assumptions.mjs" ||
+    pathname === "scripts/check-faction-catalog-parity.mjs"
+  );
+}
+
+function addFactionSuites(suites, pathname) {
+  if (
+    isFactionDocsOrPlan(pathname) ||
+    isFactionCatalogSurface(pathname) ||
+    isFactionRuntimeSurface(pathname) ||
+    isProtocolShape(pathname) ||
+    pathname === "server/src/config.rs" ||
+    isFactionChecker(pathname)
+  ) {
+    suites.add("faction-assumptions");
+  }
+  if (
+    isFactionCatalogSurface(pathname) ||
+    isProtocolShape(pathname) ||
+    pathname === "server/src/config.rs" ||
+    pathname === "scripts/check-faction-catalog-parity.mjs"
+  ) {
+    suites.add("faction-catalog-parity");
+  }
+}
+
 function isTeamRelated(pathname) {
   return (
     pathname === "tests/team_integration.mjs" ||
@@ -118,7 +172,10 @@ export function selectSuites(files) {
   for (const pathname of files) {
     const normalized = pathname.split(path.sep).join("/");
     const rustCode = normalized.startsWith("server/") && normalized.endsWith(".rs");
-    const ciOrScript = normalized.startsWith(".github/") || normalized.startsWith("scripts/") || normalized === "tests/run-all.sh";
+    const ciOrScript =
+      normalized.startsWith(".github/") ||
+      (normalized.startsWith("scripts/") && !isFactionChecker(normalized)) ||
+      normalized === "tests/run-all.sh";
     const clientArchitecturePolicy =
       normalized.startsWith("client/src/") ||
       normalized === "scripts/check-client-architecture.mjs" ||
@@ -138,6 +195,8 @@ export function selectSuites(files) {
     if (clientArchitecturePolicy) {
       suites.add("client-architecture");
     }
+
+    addFactionSuites(suites, normalized);
 
     if (normalized.startsWith("server/crates/contract/") || isProtocolShape(normalized)) {
       addAll(suites, [
@@ -232,6 +291,13 @@ function verify() {
     [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
     [["plans/teams/phase-1.md"], ["node-team-integration"]],
     [["tests/team_harness.mjs"], ["node-server-integration", "node-regression", "node-ai-integration", "node-team-integration"]],
+    [["server/crates/rules/src/faction.rs"], ["cargo-test-rules", "cargo-test-sim", "faction-assumptions", "faction-catalog-parity"]],
+    [["client/src/lobby_view.js"], ["client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
+    [["server/src/lobby/faction_validation.rs"], ["cargo-test-server", "faction-assumptions", "node-server-integration", "node-regression", "node-ai-integration"]],
+    [["scripts/check-faction-assumptions.mjs"], ["faction-assumptions"]],
+    [["scripts/check-faction-catalog-parity.mjs"], ["faction-assumptions", "faction-catalog-parity"]],
+    [["docs/design/faction-architecture-inventory.md"], ["faction-assumptions"]],
+    [["plans/factionguardrails/phase-6.md"], ["faction-assumptions"]],
     [["docs/design/architecture.md"], ["docs-only"]],
   ];
 
@@ -242,6 +308,23 @@ function verify() {
       if (!actual.includes(suite)) {
         failures.push(`${files.join(", ")} did not select ${suite}; got ${actual.join(", ")}`);
       }
+    }
+  }
+
+  for (const files of [
+    ["scripts/check-faction-assumptions.mjs"],
+    ["scripts/check-faction-catalog-parity.mjs"],
+    ["docs/design/faction-architecture-inventory.md"],
+    ["plans/factionguardrails/phase-6.md"],
+  ]) {
+    const actual = selectSuites(files);
+    for (const suite of ["node-server-integration", "node-regression", "node-ai-integration", "client-smoke"]) {
+      if (actual.includes(suite)) {
+        failures.push(`${files.join(", ")} should not select live-server suite ${suite}; got ${actual.join(", ")}`);
+      }
+    }
+    if (actual.includes("docs-only")) {
+      failures.push(`${files.join(", ")} should select faction guardrails instead of docs-only; got ${actual.join(", ")}`);
     }
   }
 

@@ -68,6 +68,7 @@ for (const anchor of [
   "Current Prediction And WASM Coupling",
   "Lifecycle Paths",
   "Current Guardrail Checks",
+  "Guardrail Map For Future Faction Work",
 ]) {
   assert(
     inventory.includes(`## ${anchor}`),
@@ -89,6 +90,8 @@ for (const requiredText of [
   "Kriegsia and Ekat command ids are namespaced by faction",
   "Public AI seats default to `kriegsia`; no public Ekat selector",
   "Enabled only for local Kriegsia",
+  "When faction behavior changes, update the owning source and its guard in the same change",
+  "Do not import lifecycle policy, status tables, checker allowlists, or source paths from archived plan files",
 ]) {
   assertIncludes(inventory, requiredText, "docs/design/faction-architecture-inventory.md");
 }
@@ -277,8 +280,9 @@ const sourceRoots = [
 ];
 const offenders = [];
 const approvedSpecialCaseBudgets = new Map([
-  // Phase 8.5: catalog data and command-service tests intentionally grew during the fixture,
-  // ability, and client-surface phases; keep the ratchet explicit until those helpers shrink.
+  // Phase 7 final audit: catalog, economy helper, and command-service references intentionally
+  // grew during the fixture, ability, and client-surface phases; keep the ratchet explicit until
+  // those helpers shrink or move behind catalog APIs.
   // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
   // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
   ["server/crates/rules/src/faction.rs", 84],

@@ -185,3 +185,30 @@ paths. Later phases must update this section whenever they touch one of those li
   Rust dump and verifies that all Rust catalogs are dumpable while fixture/future catalogs stay
   deliberately bounded on the client surface. Every real-faction descriptor exposed in
   `client/src/config.js` must be compared against the Rust dump by this gate.
+
+## Guardrail Map For Future Faction Work
+
+When faction behavior changes, update the owning source and its guard in the same change:
+
+- Faction catalog facts, loadouts, and ability availability: update
+  `server/crates/rules/src/faction.rs`, the Rust catalog dump, `client/src/config.js`, and
+  `scripts/check-faction-catalog-parity.mjs`.
+- Lifecycle admission for lobby, quickstart, AI, replay, branch, dev scenario, self-play, match
+  history, and fixture contexts: update `server/src/lobby/faction_validation.rs`, this inventory's
+  lifecycle table, and focused server or Node tests for the touched path.
+- Wire vocabulary, payload fields, compact codes, default ids, and replay schema shape: update
+  `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs` if it adapts the payload,
+  `client/src/protocol.js`, `docs/design/protocol.md`, and `tests/protocol_parity.mjs`.
+- Client command cards, hotkeys, UI faction selectors, prediction compatibility, and client-visible
+  mirrors: update the relevant `client/src/*` module, `docs/design/client-ui.md`,
+  `tests/hud_command_card.mjs`, `tests/hotkey_profiles.mjs`, `tests/client_contracts.mjs`, or
+  `tests/prediction_controller.mjs` as applicable.
+- Server simulation starts, loadouts, setup helpers, AI scripts, self-play artifacts, and replay
+  reconstruction: update `docs/design/server-sim.md` plus the focused Rust tests under the touched
+  crate.
+- Guard wiring: keep `tests/run-all.sh`, `tests/select-suites.mjs`, and
+  `docs/design/testing.md` aligned so faction-sensitive files select the assumption checker and
+  catalog parity checker.
+- Archive policy: archived plans under `plans/archive/faction/*` are evidence only. Do not import
+  lifecycle policy, status tables, checker allowlists, or source paths from archived plan files;
+  copy any still-current rule into this inventory or another active design doc before using it.

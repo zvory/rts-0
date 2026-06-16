@@ -3,7 +3,7 @@
 # non-zero if anything failed. This is the canonical "is the build green?" command.
 #
 # What it runs, in order:
-#   1. Architecture policy          (crate boundaries + sim/client architecture + test-selector self-check)
+#   1. Architecture/contract policy (crate boundaries + sim/client architecture + faction guardrails + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
 #   3. Rust fast scripted tests     (timed cargo test by package — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
@@ -436,6 +436,10 @@ run_rust_suites_bg() {
       node "$REPO_ROOT/scripts/check-client-architecture.mjs"
     run_suite_bg "Architecture: prediction guardrails" \
       node "$REPO_ROOT/scripts/check-prediction-guardrails.mjs"
+    run_suite_bg "Architecture: faction assumptions" \
+      node "$REPO_ROOT/scripts/check-faction-assumptions.mjs"
+    run_suite_bg "Contract: faction catalog parity" \
+      node "$REPO_ROOT/scripts/check-faction-catalog-parity.mjs"
     run_suite_bg "Architecture: structured logging" \
       "$REPO_ROOT/scripts/check-structured-logging.sh"
     run_suite_bg "Architecture: test selection policy" \
