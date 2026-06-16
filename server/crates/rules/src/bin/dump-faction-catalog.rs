@@ -575,7 +575,7 @@ fn json_f32(value: f32) -> String {
 }
 
 fn ticks_to_ceil_ms(ticks: u32) -> u32 {
-    (ticks * 1000_u32 + balance::TICK_HZ - 1) / balance::TICK_HZ
+    (ticks * 1000_u32).div_ceil(balance::TICK_HZ)
 }
 
 fn client_visible_range_tiles(kind: EntityKind, default_range_tiles: u32) -> u32 {
