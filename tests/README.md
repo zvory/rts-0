@@ -14,6 +14,9 @@ verification for the files or contracts you changed, then rely on the PR check n
 `./tests/run-all.sh` before merge. Run `./scripts/install-hooks.sh` once per
 checkout to install the tracked hooks locally; those hooks run cheap staged-diff checks instead of
 the full suite. Normal `main` updates go through owned PRs with auto-merge armed.
+The `Main test gate` workflow cancels superseded runs for the same PR and cancels stale post-merge
+`main` push runs when a newer `main` push starts. Canceled stale `main` runs do not trigger beta
+deploys; only a successful push run for `main` can do that.
 
 ```bash
 tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + API suites + client smoke

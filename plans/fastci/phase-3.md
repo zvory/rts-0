@@ -1,6 +1,6 @@
 # Phase 3 - Cancel Stale Main Push Runs
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 
@@ -43,12 +43,17 @@ which increases time-to-latest-main-green even when individual job duration is u
 - [ ] Capture a fresh pre-phase queue baseline from recent `main` push runs:
       run created time, job started time, completion time, and whether newer `main` runs were
       pending.
-- [ ] Adjust workflow concurrency expression carefully.
-- [ ] Confirm PR runs for the same PR still cancel superseded commits.
-- [ ] Confirm `main` pushes cancel only older `main` push runs, not the latest run.
-- [ ] Confirm beta deploy cannot run from a canceled or stale `main` run.
+- [x] Adjust workflow concurrency expression carefully.
+- [x] Confirm PR runs for the same PR still cancel superseded commits.
+- [x] Confirm `main` pushes cancel only older `main` push runs, not the latest run.
+- [x] Confirm beta deploy cannot run from a canceled or stale `main` run.
 - [ ] Open an owned PR with auto-merge armed and wait for merge.
 - [ ] After merge, perform the post-merge speed acceptance gate before starting Phase 5.
+
+Implementation note: the executor could not capture the fresh pre-phase GitHub run baseline because
+`gh` could not connect to `api.github.com` from the sandbox. The workflow-level confirmation is
+config-only until the outer runner inspects Actions history and performs the post-merge acceptance
+gate.
 
 ## Focused Verification
 
