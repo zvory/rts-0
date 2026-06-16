@@ -20,7 +20,7 @@ use crate::game::entity::{
     Order, WeaponSetup,
 };
 use crate::game::map::Map;
-use crate::game::pathfinding::{self, Passability};
+use crate::game::pathfinding;
 use crate::game::services::geometry::{
     building_rect_for_entity, unit_bodies_intersect, unit_body, unit_body_for_entity,
     unit_body_with_facing, RectBody, UnitBody,
@@ -1026,6 +1026,7 @@ mod tests {
     use super::*;
     use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order};
     use crate::game::map::Map;
+    use crate::game::pathfinding::Passability;
     use crate::game::services::occupancy::Occupancy;
     use crate::protocol::terrain;
 

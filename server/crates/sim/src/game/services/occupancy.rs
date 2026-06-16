@@ -146,6 +146,7 @@ impl<'a> Occupancy<'a> {
 
     /// Fingerprint of the static blocker layer used to keep path-cache entries scoped to the
     /// terrain/building clearance field that produced them.
+    #[cfg(test)]
     pub(crate) fn static_fingerprint(&self) -> u64 {
         self.static_fingerprint_for_movement_body(MovementBodyClass::InfantryLike)
     }
