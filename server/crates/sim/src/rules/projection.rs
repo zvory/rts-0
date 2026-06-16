@@ -610,6 +610,9 @@ fn active_ability_object_expires_in(
     entity: &Entity,
     ability: ability::AbilityKind,
 ) -> Option<u16> {
+    if ability == ability::AbilityKind::Breakthrough {
+        return (entity.breakthrough_aura_ticks() > 0).then_some(entity.breakthrough_aura_ticks());
+    }
     if ability == ability::AbilityKind::EkatMagicAnchor {
         return context
             .ability_runtime?

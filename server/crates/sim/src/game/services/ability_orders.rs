@@ -461,6 +461,7 @@ pub(crate) fn launch_self_ability(
                 }
             }
             if let Some(e) = entities.get_mut(caster) {
+                e.start_breakthrough_aura(config::BREAKTHROUGH_DURATION_TICKS);
                 e.start_ability_cooldown(ability, definition.cooldown_ticks);
             }
             true

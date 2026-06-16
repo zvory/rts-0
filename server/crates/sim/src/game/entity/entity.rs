@@ -466,6 +466,13 @@ impl Entity {
             .unwrap_or(0)
     }
 
+    pub(crate) fn breakthrough_aura_ticks(&self) -> u16 {
+        self.movement
+            .as_ref()
+            .map(|m| m.breakthrough_aura_ticks)
+            .unwrap_or(0)
+    }
+
     pub(crate) fn recent_smoke_ticks(&self) -> u16 {
         self.movement
             .as_ref()
@@ -481,6 +488,14 @@ impl Entity {
         }
     }
 
+    pub(crate) fn start_breakthrough_aura(&mut self, ticks: u16) {
+        if self.kind == EntityKind::CommandCar {
+            if let Some(m) = self.movement.as_mut() {
+                m.breakthrough_aura_ticks = ticks;
+            }
+        }
+    }
+
     pub(crate) fn mark_in_smoke_for_breakthrough(&mut self, grace_ticks: u16) {
         if let Some(m) = self.movement.as_mut() {
             m.recent_smoke_ticks = grace_ticks;
@@ -490,6 +505,7 @@ impl Entity {
     pub(crate) fn tick_breakthrough_status(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.breakthrough_ticks = m.breakthrough_ticks.saturating_sub(1);
+            m.breakthrough_aura_ticks = m.breakthrough_aura_ticks.saturating_sub(1);
             m.recent_smoke_ticks = m.recent_smoke_ticks.saturating_sub(1);
         }
     }

@@ -136,23 +136,15 @@ export function _drawCommandFeedback(state) {
     const r = 12 + t * 10;
     const color = f.kind === "mortar" || f.kind === "artillery"
       ? MORTAR_WARNING_COLOR
-      : f.kind === "breakthrough"
-        ? 0xf2d16b
       : f.kind === "attack"
         ? COLORS.selectEnemy
         : COLORS.selectOwn;
 
     g.lineStyle(2, color, alpha);
-    if (f.kind === "mortar" || f.kind === "artillery" || f.kind === "breakthrough") {
+    if (f.kind === "mortar" || f.kind === "artillery") {
       const tileSize = (this._map && this._map.tileSize) || 32;
       const splash = Number.isFinite(f.radiusTiles) ? f.radiusTiles * tileSize : 48;
       drawDashedCircle(g, f.x, f.y, splash, 14);
-      if (f.kind === "breakthrough") {
-        g.beginFill(color, 0.055 * alpha);
-        g.drawCircle(f.x, f.y, splash);
-        g.endFill();
-        continue;
-      }
       g.drawCircle(f.x, f.y, r * 0.45);
       g.moveTo(f.x - r * 0.7, f.y);
       g.lineTo(f.x + r * 0.7, f.y);
@@ -353,7 +345,7 @@ export function _drawBreakthroughAuras(state, entities = []) {
   if (radiusPx <= 0) return;
 
   for (const e of entities) {
-    if (e.kind !== KIND.COMMAND_CAR || !(e.breakthroughTicks > 0)) continue;
+    if (e.kind !== KIND.COMMAND_CAR || !(breakthroughAuraExpiresIn(e) > 0)) continue;
     if (!ownOrAllyOwner(state, e.owner)) continue;
     drawBreakthroughAura(g, e.x, e.y, radiusPx, 0.78);
   }
@@ -464,11 +456,13 @@ export function _drawAbilityTargetPreview(state) {
 function drawBreakthroughAura(g, x, y, radiusPx, alpha = 0.8) {
   const color = 0xf2d16b;
   g.lineStyle(2.5, color, alpha);
-  g.beginFill(color, 0.045 * alpha);
   g.drawCircle(x, y, radiusPx);
-  g.endFill();
-  g.lineStyle(1.5, color, 0.58 * alpha);
-  dashedCircle(g, x, y, radiusPx * 0.72, 72);
+}
+
+function breakthroughAuraExpiresIn(entity) {
+  if (!Array.isArray(entity?.abilities)) return 0;
+  const ability = entity.abilities.find((entry) => entry?.ability === ABILITY.BREAKTHROUGH);
+  return Number.isFinite(ability?.expiresIn) ? ability.expiresIn : 0;
 }
 
 function ownOrAllyOwner(state, owner) {

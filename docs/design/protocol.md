@@ -401,10 +401,12 @@ means the ability is depleted and cannot be used by that caster.
 `autocastEnabled` is present for Mortar Team `mortarFire` so the command card can display and
 toggle autocast without exposing enemy data.
 `activeObjectId`, `availableTick`, and `expiresIn` are owner-only per-caster affordance fields for
-two-stage or persistent ability state such as Ekat's return marker and Magic Anchor.
+two-stage or persistent ability state such as Ekat's return marker, Magic Anchor, and the active
+Breakthrough aura duration on the casting Command Car.
 `lockoutUntilTick` carries owner-only Magic Anchor placement lockout after enemy destruction.
 `breakthroughTicks` is present only while the affected visible unit has active Breakthrough speed
-status. Owner snapshots also expose the Command Car's `breakthrough` ability cooldown through
+status; it is not caster identity. Owner snapshots also expose the Command Car's `breakthrough`
+ability cooldown and, while the caster's aura is active, its caster-only `expiresIn` through
 `abilities`.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
