@@ -39,6 +39,78 @@ pub(super) enum FactionValidation {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FactionLifecycleStatus {
+    Playable,
+    TestFixtureOnly,
+    UnsupportedCatalog,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FactionContextPolicy {
+    context: FactionRequestContext,
+    missing: MissingFactionPolicy,
+    playable: bool,
+    test_fixture: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MissingFactionPolicy {
+    Default,
+    Reject,
+}
+
+const CONTEXT_POLICIES: &[FactionContextPolicy] = &[
+    FactionContextPolicy {
+        context: FactionRequestContext::NormalLobby,
+        missing: MissingFactionPolicy::Default,
+        playable: true,
+        test_fixture: false,
+    },
+    FactionContextPolicy {
+        context: FactionRequestContext::Quickstart,
+        missing: MissingFactionPolicy::Default,
+        playable: true,
+        test_fixture: false,
+    },
+    FactionContextPolicy {
+        context: FactionRequestContext::AiSeat,
+        missing: MissingFactionPolicy::Default,
+        playable: true,
+        test_fixture: false,
+    },
+    FactionContextPolicy {
+        context: FactionRequestContext::ReplayPlayback,
+        missing: MissingFactionPolicy::Reject,
+        playable: true,
+        test_fixture: false,
+    },
+    FactionContextPolicy {
+        context: FactionRequestContext::ReplayBranch,
+        missing: MissingFactionPolicy::Reject,
+        playable: true,
+        test_fixture: false,
+    },
+    FactionContextPolicy {
+        context: FactionRequestContext::DevScenario,
+        missing: MissingFactionPolicy::Default,
+        playable: true,
+        test_fixture: false,
+    },
+    FactionContextPolicy {
+        context: FactionRequestContext::SelfPlay,
+        missing: MissingFactionPolicy::Default,
+        playable: true,
+        test_fixture: false,
+    },
+    FactionContextPolicy {
+        context: FactionRequestContext::TestFixture,
+        missing: MissingFactionPolicy::Default,
+        playable: false,
+        test_fixture: true,
+    },
+];
+
 pub(super) fn default_faction_id_for(context: FactionRequestContext) -> String {
     match validate_faction_request(context, None) {
         FactionValidation::Defaulted { faction_id }
@@ -58,15 +130,13 @@ pub(super) fn validate_faction_request(
     });
 
     let Some(faction_id) = requested else {
-        return match context {
-            FactionRequestContext::ReplayPlayback | FactionRequestContext::ReplayBranch => {
-                FactionValidation::Rejected {
-                    requested: None,
-                    reason: FactionRejectReason::MissingFaction,
-                }
-            }
-            _ => FactionValidation::Defaulted {
+        return match policy_for(context).missing {
+            MissingFactionPolicy::Default => FactionValidation::Defaulted {
                 faction_id: DEFAULT_FACTION_ID.to_string(),
+            },
+            MissingFactionPolicy::Reject => FactionValidation::Rejected {
+                requested: None,
+                reason: FactionRejectReason::MissingFaction,
             },
         };
     };
@@ -78,28 +148,46 @@ pub(super) fn validate_faction_request(
         };
     }
 
-    if faction_id == EMPTY_FIXTURE_FACTION_ID {
-        return if context == FactionRequestContext::TestFixture {
+    let policy = policy_for(context);
+    match lifecycle_status_for(faction_id) {
+        FactionLifecycleStatus::Playable if policy.playable => {
+            FactionValidation::AcceptedPlayable {
+                faction_id: faction_id.to_string(),
+            }
+        }
+        FactionLifecycleStatus::TestFixtureOnly if policy.test_fixture => {
             FactionValidation::AcceptedFixture {
                 faction_id: faction_id.to_string(),
             }
-        } else {
+        }
+        FactionLifecycleStatus::TestFixtureOnly => FactionValidation::Rejected {
+            requested: Some(faction_id.to_string()),
+            reason: FactionRejectReason::FixtureNotAllowed,
+        },
+        FactionLifecycleStatus::Playable | FactionLifecycleStatus::UnsupportedCatalog => {
             FactionValidation::Rejected {
                 requested: Some(faction_id.to_string()),
-                reason: FactionRejectReason::FixtureNotAllowed,
+                reason: FactionRejectReason::FactionNotAllowedInContext,
             }
-        };
+        }
     }
+}
 
+fn policy_for(context: FactionRequestContext) -> FactionContextPolicy {
+    CONTEXT_POLICIES
+        .iter()
+        .copied()
+        .find(|policy| policy.context == context)
+        .expect("every faction request context must have a policy")
+}
+
+fn lifecycle_status_for(faction_id: &str) -> FactionLifecycleStatus {
     if matches!(faction_id, DEFAULT_FACTION_ID | EKAT_FACTION_ID) {
-        return FactionValidation::AcceptedPlayable {
-            faction_id: faction_id.to_string(),
-        };
-    }
-
-    FactionValidation::Rejected {
-        requested: Some(faction_id.to_string()),
-        reason: FactionRejectReason::FactionNotAllowedInContext,
+        FactionLifecycleStatus::Playable
+    } else if faction_id == EMPTY_FIXTURE_FACTION_ID {
+        FactionLifecycleStatus::TestFixtureOnly
+    } else {
+        FactionLifecycleStatus::UnsupportedCatalog
     }
 }
 
@@ -107,18 +195,108 @@ pub(super) fn validate_faction_request(
 mod tests {
     use super::*;
 
+    const ALL_CONTEXTS: &[FactionRequestContext] = &[
+        FactionRequestContext::NormalLobby,
+        FactionRequestContext::Quickstart,
+        FactionRequestContext::AiSeat,
+        FactionRequestContext::ReplayPlayback,
+        FactionRequestContext::ReplayBranch,
+        FactionRequestContext::DevScenario,
+        FactionRequestContext::SelfPlay,
+        FactionRequestContext::TestFixture,
+    ];
+
     #[test]
-    fn normal_lobby_defaults_to_kriegsia() {
-        assert_eq!(
-            validate_faction_request(FactionRequestContext::NormalLobby, None),
-            FactionValidation::Defaulted {
-                faction_id: "kriegsia".to_string()
-            }
-        );
+    fn lifecycle_policy_table_covers_every_context() {
+        for context in ALL_CONTEXTS {
+            assert_eq!(policy_for(*context).context, *context);
+        }
+        assert_eq!(CONTEXT_POLICIES.len(), ALL_CONTEXTS.len());
     }
 
     #[test]
-    fn normal_lobby_rejects_fixture_or_unknown_reserved_ids() {
+    fn context_policy_validates_missing_playable_fixture_and_unknown_ids() {
+        for context in ALL_CONTEXTS {
+            let policy = policy_for(*context);
+
+            let missing = validate_faction_request(*context, None);
+            if policy.missing == MissingFactionPolicy::Default {
+                assert_eq!(
+                    missing,
+                    FactionValidation::Defaulted {
+                        faction_id: DEFAULT_FACTION_ID.to_string()
+                    },
+                    "missing faction should default in {context:?}"
+                );
+                assert_eq!(default_faction_id_for(*context), DEFAULT_FACTION_ID);
+            } else {
+                assert_eq!(
+                    missing,
+                    FactionValidation::Rejected {
+                        requested: None,
+                        reason: FactionRejectReason::MissingFaction,
+                    },
+                    "missing faction should reject in {context:?}"
+                );
+                assert_eq!(default_faction_id_for(*context), DEFAULT_FACTION_ID);
+            }
+
+            for faction_id in [DEFAULT_FACTION_ID, EKAT_FACTION_ID] {
+                let validation = validate_faction_request(*context, Some(faction_id));
+                if policy.playable {
+                    assert_eq!(
+                        validation,
+                        FactionValidation::AcceptedPlayable {
+                            faction_id: faction_id.to_string()
+                        },
+                        "playable faction {faction_id:?} should be accepted in {context:?}"
+                    );
+                } else {
+                    assert_eq!(
+                        validation,
+                        FactionValidation::Rejected {
+                            requested: Some(faction_id.to_string()),
+                            reason: FactionRejectReason::FactionNotAllowedInContext,
+                        },
+                        "playable faction {faction_id:?} should reject in {context:?}"
+                    );
+                }
+            }
+
+            let fixture = validate_faction_request(*context, Some(EMPTY_FIXTURE_FACTION_ID));
+            if policy.test_fixture {
+                assert_eq!(
+                    fixture,
+                    FactionValidation::AcceptedFixture {
+                        faction_id: EMPTY_FIXTURE_FACTION_ID.to_string()
+                    },
+                    "fixture faction should be accepted in {context:?}"
+                );
+            } else {
+                assert_eq!(
+                    fixture,
+                    FactionValidation::Rejected {
+                        requested: Some(EMPTY_FIXTURE_FACTION_ID.to_string()),
+                        reason: FactionRejectReason::FixtureNotAllowed,
+                    },
+                    "fixture faction should reject in {context:?}"
+                );
+            }
+
+            assert_eq!(
+                validate_faction_request(*context, Some("unknown_faction")),
+                FactionValidation::Rejected {
+                    requested: Some("unknown_faction".to_string()),
+                    reason: FactionRejectReason::UnknownCatalog,
+                },
+                "unknown catalog should reject in {context:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn catalog_existence_does_not_define_runtime_admission() {
+        assert!(catalog_for(EMPTY_FIXTURE_FACTION_ID).is_some());
         assert_eq!(
             validate_faction_request(
                 FactionRequestContext::NormalLobby,
@@ -130,64 +308,18 @@ mod tests {
             }
         );
         assert_eq!(
-            validate_faction_request(FactionRequestContext::NormalLobby, Some("unknown_faction")),
+            validate_faction_request(
+                FactionRequestContext::AiSeat,
+                Some(EMPTY_FIXTURE_FACTION_ID)
+            ),
             FactionValidation::Rejected {
-                requested: Some("unknown_faction".to_string()),
-                reason: FactionRejectReason::UnknownCatalog,
-            }
-        );
-    }
-
-    #[test]
-    fn ekat_is_a_playable_faction() {
-        assert_eq!(
-            validate_faction_request(FactionRequestContext::NormalLobby, Some(EKAT_FACTION_ID)),
-            FactionValidation::AcceptedPlayable {
-                faction_id: EKAT_FACTION_ID.to_string()
-            }
-        );
-    }
-
-    #[test]
-    fn ai_and_replay_contexts_accept_only_explicit_current_playable_policy() {
-        assert_eq!(
-            validate_faction_request(FactionRequestContext::AiSeat, Some(DEFAULT_FACTION_ID)),
-            FactionValidation::AcceptedPlayable {
-                faction_id: DEFAULT_FACTION_ID.to_string()
-            }
-        );
-        assert_eq!(
-            validate_faction_request(FactionRequestContext::ReplayPlayback, None),
-            FactionValidation::Rejected {
-                requested: None,
-                reason: FactionRejectReason::MissingFaction,
+                requested: Some(EMPTY_FIXTURE_FACTION_ID.to_string()),
+                reason: FactionRejectReason::FixtureNotAllowed,
             }
         );
         assert_eq!(
             validate_faction_request(
                 FactionRequestContext::ReplayBranch,
-                Some(DEFAULT_FACTION_ID)
-            ),
-            FactionValidation::AcceptedPlayable {
-                faction_id: DEFAULT_FACTION_ID.to_string()
-            }
-        );
-    }
-
-    #[test]
-    fn fixture_faction_is_test_fixture_only() {
-        assert_eq!(
-            validate_faction_request(
-                FactionRequestContext::TestFixture,
-                Some(EMPTY_FIXTURE_FACTION_ID)
-            ),
-            FactionValidation::AcceptedFixture {
-                faction_id: EMPTY_FIXTURE_FACTION_ID.to_string()
-            }
-        );
-        assert_eq!(
-            validate_faction_request(
-                FactionRequestContext::DevScenario,
                 Some(EMPTY_FIXTURE_FACTION_ID)
             ),
             FactionValidation::Rejected {
