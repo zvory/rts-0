@@ -36,7 +36,7 @@ actionable, and agents can either stop cheaply or wait without burning model tok
 - `AGENTS.md`
 - `CLAUDE.md`
 - `README.md`
-- `docs/ci/plan.md`
+- `plans/ci/plan.md`
 
 ## Verification
 
@@ -56,4 +56,3 @@ next?" without opening every PR in a browser.
 
 Document exact command examples for normal agents and serial phase agents. Note any GitHub API
 limitations that Phase 5 must work around.
-

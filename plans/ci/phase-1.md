@@ -32,7 +32,7 @@ can require stable, meaningful checks.
 - `README.md`
 - `docs/context/testing.md`
 - `docs/design/testing.md`
-- `docs/ci/plan.md` if details shift during implementation
+- `plans/ci/plan.md` if details shift during implementation
 
 ## Verification
 
@@ -51,4 +51,3 @@ merge gate. Confirm canceled superseded PR runs do not hide the latest commit's 
 
 Record the exact required check names chosen for Phase 2. Note any workflow timing or cache issues
 that Phase 4 or Phase 6 should consider.
-

@@ -27,7 +27,7 @@ must pass, and auto-merge can complete green PRs without an agent spending token
 - `AGENTS.md`
 - `CLAUDE.md`
 - `README.md`
-- `docs/ci/plan.md` if the chosen protection model changes the constraints
+- `plans/ci/plan.md` if the chosen protection model changes the constraints
 
 ## Verification
 
@@ -49,4 +49,3 @@ auto-merge availability on a PR and that the required checks match Phase 1's nam
 Include the exact settings evidence and any admin-bypass decision. If branch protection cannot
 express a needed rule, document the gap and the compensating script or workflow check planned for
 Phase 4.
-
