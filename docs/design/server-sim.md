@@ -358,10 +358,12 @@ direct line of fire through the friendly-blocker safety rule, but they are not l
 overpenetration victims.
 
 `server/crates/archcheck` classifies each top-level service module before accepting
-service-to-service imports. The roles are intentionally coarse:
+service-to-service imports. The roles are intentionally coarse and are part of the command/order
+boundary:
 
 - tick systems are the phases called by `systems.rs`;
-- command adapters translate validated command facts into mutations;
+- command adapters translate queued or immediate command facts into plans and call narrow
+  executors;
 - pure policy modules accept facts and return decisions without mutable world state;
 - query/index services read derived or immutable world state;
 - mutation helpers perform narrow execution work below a caller-owned phase.
@@ -369,9 +371,10 @@ service-to-service imports. The roles are intentionally coarse:
 Every service import must be present in the exact import allowlist and must also be legal under the
 role matrix. A role failure explains why the edge is forbidden, usually because orchestration should
 stay in `systems.rs` or because command-family growth should use command input -> issue-time facts
--> pure plan -> narrow executor. `services::commands` and `services::order_queue` are
-grandfathered broad command adapters: their current allowed imports pass so cleanup can proceed
-gradually, but new service modules must be classified and new edges still need explicit review.
+-> pure plan -> narrow executor. Residual `services::commands` and `services::order_queue` imports
+into tick-system helpers are named one by one in the role allowlist; there is no blanket broad
+adapter exception. New command/order service edges therefore need both an exact import allowlist
+entry and a role-matrix justification.
 
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
@@ -399,6 +402,12 @@ economy, or cooldown mutation dependency; it accepts plain facts and emits one o
 - `AppendQueued` — append one future intent to this unit's queue.
 - `ExecuteAbilityNow { preserve_orders: true }` — execute an immediate ability without replacing
   the active order or queued intents.
+
+`services::order_execution` is the shared narrow mutation helper for order-state transitions that
+are needed by both issue-time command application and queued promotion, such as support-weapon
+setup, artillery point-fire targeting, and artillery teardown before movement. It should not grow
+new validation policy or tick orchestration; those responsibilities remain with command admission,
+queued promotion, or the owning tick system.
 
 General rules:
 

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -26,11 +26,11 @@ Lock in the new command/order boundaries with architecture checks and design doc
 
 ## Implementation Checklist
 
-- [ ] Capture the final service responsibility map.
-- [ ] Tighten archcheck rules and baselines around command/order service edges.
-- [ ] Update design/context docs.
-- [ ] Run verification and record exact results in the handoff.
-- [ ] Mark this phase complete in the implementation commit.
+- [x] Capture the final service responsibility map.
+- [x] Tighten archcheck rules and baselines around command/order service edges.
+- [x] Update design/context docs.
+- [x] Run verification and record exact results in the handoff.
+- [x] Mark this phase complete in the implementation commit.
 
 ## Verification
 

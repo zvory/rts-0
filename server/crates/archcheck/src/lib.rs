@@ -45,8 +45,6 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("world_query", ServiceRole::QueryIndex),
 ];
 
-const GRANDFATHERED_BROAD_ADAPTERS: &[&str] = &["commands", "order_queue"];
-
 const ROLE_EDGE_ALLOWLIST: &[(&str, &str)] = &[
     // Ability execution still reuses command notice constructors. New command families should
     // prefer facts -> pure plan -> narrow executor instead of adding more adapter back-edges.
@@ -55,6 +53,12 @@ const ROLE_EDGE_ALLOWLIST: &[(&str, &str)] = &[
     ("ability_orders", "move_coordinator"),
     // Combat uses movement's shared facing helpers while combat policy is being split out.
     ("combat", "movement"),
+    // Residual command/order adapter edges into tick systems. Keep these explicit so adding another
+    // broad adapter dependency requires a named exception instead of inheriting a blanket bypass.
+    ("commands", "construction"),
+    ("commands", "movement"),
+    ("order_queue", "construction"),
+    ("order_queue", "movement"),
 ];
 
 const ENTITY_FIELD_WRITE_APPROVED_PREFIXES: &[&str] = &["entity/"];
@@ -914,9 +918,6 @@ fn service_role_edge_rejection(
 ) -> Option<String> {
     let source_role = roles.get(source).copied()?;
     let target_role = roles.get(target).copied()?;
-    if GRANDFATHERED_BROAD_ADAPTERS.contains(&source) {
-        return None;
-    }
     if service_role_edge_allowed(source, target, source_role, target_role) {
         return None;
     }
@@ -948,13 +949,6 @@ fn service_role_edge_allowed(
     if ROLE_EDGE_ALLOWLIST.contains(&(source, target)) {
         return true;
     }
-    if source_role == ServiceRole::CommandAdapter
-        && target_role == ServiceRole::CommandAdapter
-        && GRANDFATHERED_BROAD_ADAPTERS.contains(&source)
-    {
-        return true;
-    }
-
     matches!(
         (source_role, target_role),
         (ServiceRole::TickSystem, ServiceRole::PurePolicy)
@@ -1396,7 +1390,10 @@ mod tests {
 
         assert_eq!(
             report.failures,
-            vec!["services/commands.rs:1: service module commands must not import services::death without updating the architecture allowlist".to_string()]
+            vec![
+                "services/commands.rs:1: service module commands must not import services::death without updating the architecture allowlist".to_string(),
+                "services/commands.rs:1: service module commands must not import services::death: command adapter -> tick system edges are forbidden by the service role matrix; route orchestration through systems.rs or introduce facts/plans plus a narrow executor".to_string(),
+            ]
         );
     }
 
@@ -1417,6 +1414,28 @@ mod tests {
                 source: "production".to_string(),
                 target: "standability".to_string(),
                 path: "services/production.rs".to_string(),
+                line: 1,
+            }]
+        );
+    }
+
+    #[test]
+    fn residual_command_adapter_tick_edges_need_named_role_exceptions() {
+        let report = analyze_source_files(&[
+            source(
+                "services/commands.rs",
+                "use crate::game::services::construction;\n",
+            ),
+            source("services/construction.rs", ""),
+        ]);
+
+        assert!(report.failures.is_empty());
+        assert_eq!(
+            report.metrics.service_edges,
+            vec![ServiceEdge {
+                source: "commands".to_string(),
+                target: "construction".to_string(),
+                path: "services/commands.rs".to_string(),
                 line: 1,
             }]
         );
