@@ -314,6 +314,8 @@ Phase: plans/$PLAN_NAME/$phase_id.md
 Current branch: $branch
 
 This is an executor pass only:
+- You are already running inside the assigned clean worktree for this phase. This satisfies the
+  repository worktree requirement; do not create another worktree or switch to another checkout.
 - Do not create or revise the overall plan.
 - Do not run a final review pass.
 - Do not merge, push, or open a PR; the outer phase runner handles merge and push after you commit.
