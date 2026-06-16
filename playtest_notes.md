@@ -3,7 +3,6 @@ the vehicle works should take way longer to build or take longer, or need someth
 
 when activating breakthrough on a command car, or when mousing over the ability, it shoudl dislpay the AOE ring, and icnrease the AOE of rbeakthrough by two
 
-command cars should not count towards seleciton limit
 
 engineers should be able to make tank traps that vehicles can't pass through but units can
 
@@ -11,19 +10,20 @@ control groups don't work in replays, like the players don't inherit them
 
 add audible countdown before match start
 
-
 reduce scout car hp by 50%
 
 make At guns available automatically from the Gun Works and not require AT gun research. 
 
 magic anchor should anchor units, but it should be a visual effect iwth a radius so it's more obvious, and it should add movement speed towards the anchor. as in, walking away you move with reduced movement speed, walking toward the anchor should porivde increased movement speed
 
-make the line shot a deep blue color that leaves a streak
 
 create a stats wiki, how armor works, etc
 
 
 -----
+make the line shot a deep blue color that leaves a streak
+
+command cars should not count towards seleciton limit
 
 make it so taht mortarts shoot instantly and have no setup time, and reduce their fly time to 1s, and they do 1.5x the damage they do now
 
