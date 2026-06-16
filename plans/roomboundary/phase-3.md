@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -25,11 +25,11 @@ Centralize room-local snapshot fanout while preserving each projection mode's vi
 
 ## Implementation Checklist
 
-- [ ] Inventory all current snapshot send paths and projection modes.
-- [ ] Extract a fanout helper with explicit projection choices.
-- [ ] Preserve perf and net-status metadata.
-- [ ] Add or update focused tests for spectator/replay/branch/dev visibility.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Inventory all current snapshot send paths and projection modes.
+- [x] Extract a fanout helper with explicit projection choices.
+- [x] Preserve perf and net-status metadata.
+- [x] Add or update focused tests for spectator/replay/branch/dev visibility.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
