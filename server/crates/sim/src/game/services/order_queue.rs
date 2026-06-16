@@ -18,6 +18,11 @@ use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
+use crate::game::services::order_execution::{
+    artillery_point_fire_target, begin_artillery_teardown_for_movement,
+    execute_anti_tank_gun_setup, start_artillery_point_fire_promoted_order,
+    ArtilleryPointFireAcceptance, FutureOrderMode,
+};
 use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
@@ -188,7 +193,7 @@ pub(crate) fn promote_ready_orders(
                     continue;
                 };
                 if ability == AbilityKind::PointFire {
-                    execute_artillery_point_fire(entities, id, x, y);
+                    execute_artillery_point_fire(map, entities, id, x, y);
                     continue;
                 }
                 let faction_id = players
@@ -230,10 +235,10 @@ pub(crate) fn promote_ready_orders(
                 launch_self_ability(entities, faction_id, owner, id, ability);
             }
             PromotedIntent::SetupAntiTankGuns { x, y } => {
-                execute_anti_tank_gun_setup(entities, id, x, y);
+                execute_anti_tank_gun_setup(entities, id, x, y, FutureOrderMode::Preserve);
             }
             PromotedIntent::PointFire { x, y } => {
-                execute_artillery_point_fire(entities, id, x, y);
+                execute_artillery_point_fire(map, entities, id, x, y);
             }
         }
     }
@@ -241,23 +246,6 @@ pub(crate) fn promote_ready_orders(
     for (key, ids) in groups {
         coordinator.order_group_move(entities, key.owner, &ids, key.point(), key.attack_move);
         begin_artillery_teardown_for_movement(entities, &ids);
-    }
-}
-
-fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, ids: &[u32]) {
-    for id in ids {
-        let Some(e) = entities.get_mut(*id) else {
-            continue;
-        };
-        if e.kind != EntityKind::Artillery {
-            continue;
-        }
-        e.reset_artillery_accuracy();
-        if !matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Packed) {
-            e.set_weapon_setup(crate::game::entity::WeaponSetup::TearingDown {
-                ticks: config::ARTILLERY_SETUP_TICKS,
-            });
-        }
     }
 }
 
@@ -417,69 +405,40 @@ fn artillery_point_fire_intent_valid(
     if x < 0.0 || y < 0.0 || x >= map.world_size_px() || y >= map.world_size_px() {
         return false;
     }
-    let Some(e) = entities.get(id) else {
-        return false;
-    };
-    if e.owner != owner
-        || e.kind != EntityKind::Artillery
-        || e.under_construction()
-        || !e.path_is_empty()
-        || !matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Deployed)
-    {
-        return false;
-    }
-    let dx = x - e.pos_x;
-    let dy = y - e.pos_y;
-    let distance2 = dx * dx + dy * dy;
-    if !distance2.is_finite() {
-        return false;
-    }
-    let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
-    let max_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
-    distance2 >= min_px * min_px && distance2 <= max_px * max_px
+    artillery_point_fire_target(
+        map,
+        entities,
+        owner,
+        id,
+        x,
+        y,
+        ArtilleryPointFireAcceptance::Deployed,
+    )
+    .is_some()
 }
 
-fn execute_artillery_point_fire(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
-    let Some(e) = entities.get(id) else {
+fn execute_artillery_point_fire(
+    map: &Map,
+    entities: &mut EntityStore,
+    id: u32,
+    x: f32,
+    y: f32,
+) -> bool {
+    let Some(owner) = entities.get(id).map(|e| e.owner) else {
         return false;
     };
-    if e.kind != EntityKind::Artillery || !x.is_finite() || !y.is_finite() {
-        return false;
-    }
-    let facing = (y - e.pos_y).atan2(x - e.pos_x);
-    if !facing.is_finite() {
-        return false;
-    }
-    let inside_field_of_fire = artillery_point_inside_field_of_fire(e, facing);
-    let Some(e) = entities.get_mut(id) else {
-        return false;
-    };
-    if !matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Deployed) {
-        return false;
-    }
-    e.clear_active_order();
-    e.set_path_goal(None);
-    if !inside_field_of_fire {
-        e.set_pending_redeploy_facing(Some(facing));
-        e.set_weapon_setup(crate::game::entity::WeaponSetup::TearingDownToRedeploy {
-            ticks: setup_ticks_for(e.kind),
-        });
-    } else {
-        e.set_desired_weapon_facing(facing);
-    }
-    e.replace_active_order(Order::artillery_point_fire(x, y));
-    true
-}
-
-fn artillery_point_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
-    let Some(center) = e
-        .emplacement_facing()
-        .or_else(|| e.weapon_facing())
-        .filter(|facing| facing.is_finite())
-    else {
+    let Some(target) = artillery_point_fire_target(
+        map,
+        entities,
+        owner,
+        id,
+        x,
+        y,
+        ArtilleryPointFireAcceptance::Deployed,
+    ) else {
         return false;
     };
-    angle_delta(center, target_angle).abs() <= config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5
+    start_artillery_point_fire_promoted_order(entities, id, target)
 }
 
 fn world_ability_intent_valid(
@@ -532,42 +491,6 @@ fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: 
     }
     let facing = (y - e.pos_y).atan2(x - e.pos_x);
     facing.is_finite()
-}
-
-fn execute_anti_tank_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
-    if !setup_anti_tank_gun_intent_valid(entities, id, x, y) {
-        return false;
-    }
-    let Some(e) = entities.get(id) else {
-        return false;
-    };
-    let facing = (y - e.pos_y).atan2(x - e.pos_x);
-    entities.release_miner(id);
-    let Some(e) = entities.get_mut(id) else {
-        return false;
-    };
-    e.clear_active_order();
-    e.set_path_goal(None);
-    if matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Packed) {
-        e.set_emplacement_facing(Some(facing));
-        e.set_desired_weapon_facing(facing);
-    } else {
-        e.set_pending_redeploy_facing(Some(facing));
-        e.set_weapon_setup(crate::game::entity::WeaponSetup::TearingDownToRedeploy {
-            ticks: setup_ticks_for(e.kind),
-        });
-    }
-    e.reset_gather_state();
-    let (px, py) = (e.pos_x, e.pos_y);
-    e.reset_stuck(px, py);
-    true
-}
-
-fn setup_ticks_for(kind: EntityKind) -> u16 {
-    match kind {
-        EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
-        _ => config::ANTI_TANK_GUN_SETUP_TICKS,
-    }
 }
 
 fn attack_intent_valid(
@@ -847,6 +770,48 @@ mod tests {
         assert!(matches!(entity.order(), Order::Move(_)));
         assert_eq!(entity.move_phase(), Some(MovePhase::AwaitingPath));
         assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_point_moves_promote_same_destination_as_group() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let first = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("first rifleman should spawn");
+        let second = entities
+            .spawn_unit(1, EntityKind::Rifleman, 132.0, 100.0)
+            .expect("second rifleman should spawn");
+        let target = (240.0, 160.0);
+        for unit in [first, second] {
+            entities
+                .get_mut(unit)
+                .expect("unit should exist")
+                .append_queued_order(OrderIntent::move_to(target.0, target.1));
+        }
+
+        promote(&map, &mut entities);
+
+        let first_goal = entities
+            .get(first)
+            .expect("first rifleman should exist")
+            .move_intent()
+            .expect("first rifleman should receive a move");
+        let second_goal = entities
+            .get(second)
+            .expect("second rifleman should exist")
+            .move_intent()
+            .expect("second rifleman should receive a move");
+        assert_ne!(
+            first_goal, second_goal,
+            "same-destination queued moves should promote through one grouped formation"
+        );
+        for unit in [first, second] {
+            let entity = entities.get(unit).expect("unit should exist");
+            assert!(matches!(entity.order(), Order::Move(_)));
+            assert_eq!(entity.move_phase(), Some(MovePhase::AwaitingPath));
+            assert!(entity.queued_orders().is_empty());
+        }
     }
 
     #[test]
