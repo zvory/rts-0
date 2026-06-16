@@ -29,12 +29,15 @@ workflow.
 - Preserve normal single-click behavior as a one-site line whose start tile is included.
 - Implement command dispatch using existing `build` commands unless Phase 0 explicitly required a
   protocol change:
-  - without Shift, send at most one immediate build command per selected worker, assigning the first
-    valid sites from drag start toward drag end
+  - send at most one immediate build command per selected worker, assigning the first valid sites
+    from drag start toward drag end
   - use one selected worker id per immediate command so 12 workers and 20 valid sites send exactly
-    the first 12 sites
-  - with Shift, send additional queued build commands for remaining valid sites using the existing
-    queued worker-distribution semantics
+    12 immediate commands for the first 12 sites
+  - when valid sites remain after the immediate assignments, send additional queued build commands
+    for sites `n+1..m` against the selected worker set using the existing queued
+    worker-distribution semantics, even when Shift is not held
+  - Shift may still preserve placement mode according to existing build-placement behavior, but it
+    is not required for overflow sites in a drawn Tank Trap line
   - keep current affordability-on-arrival semantics; do not reserve steel for the whole line
   - accept that later queued sites may fail independently for resources, blockers, queue limits, or
     arrival-time validation; surface feedback through existing command notices
@@ -44,19 +47,20 @@ workflow.
   - line tile generation for orthogonal one-tile gaps, diagonal touching, and shallow/steep lines
     that must avoid knight-move spacing
   - invalid-site skipping
-  - non-Shift command count and worker/site assignment
-  - non-Shift dispatch emits one single-worker `build` command per selected worker/site rather than
+  - immediate command count and worker/site assignment
+  - immediate dispatch emits one single-worker `build` command per selected worker/site rather than
     one multi-worker command that the ordinary planner could collapse to one closest builder
-  - Shift extra-site queued command behavior
+  - non-Shift overflow-site queued command behavior for a line with more valid sites than selected
+    workers
+  - Shift placement preservation without changing overflow-site queueing
   - build-card descriptor slot, hotkey, affordability, and requirement disabled states
 
 ## Expected Deliverables
 
 - Engineers can select Tank Trap from the worker build card after Training Centre.
 - Left-click builds one Tank Trap; left-drag builds a no-diagonal-gap line.
-- Non-Shift drag sends no more sites than selected workers.
-- Shift drag queues enough additional standard build commands to finish the valid line under
-  existing server queue semantics.
+- A drag with `n` selected workers and `m` valid sites sends up to `n` immediate builds and
+  automatically queues sites `n+1..m` under existing server queue semantics, even without Shift.
 - The client does not introduce a new authoritative placement rule that can disagree permanently
   with the server.
 
@@ -77,11 +81,13 @@ workflow.
 
 ## Manual Testing Focus
 
-In a local match, select multiple engineers, build a Tank Trap line without Shift, and confirm only
-the first selected-worker-count valid sites receive commands. Repeat with Shift and confirm later
-sites are queued/distributed, invalid terrain is skipped, and vehicles cannot drive through the
-completed line unless a wide enough gap exists. Include a shallow or steep diagonal drag and confirm
-the preview never places consecutive Tank Traps a knight's move apart.
+In a local match, select multiple engineers, build a Tank Trap line longer than the selected worker
+count without Shift, and confirm the first selected-worker-count valid sites receive immediate
+commands while later valid sites are queued/distributed across those workers. Repeat with Shift and
+confirm Shift only preserves placement behavior; overflow site queueing remains the same, invalid
+terrain is skipped, and vehicles cannot drive through the completed line unless a wide enough gap
+exists. Include a shallow or steep diagonal drag and confirm the preview never places consecutive
+Tank Traps a knight's move apart.
 
 ## Handoff Expectations
 

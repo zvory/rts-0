@@ -34,10 +34,12 @@ body/clearance rules.
   knight's move apart (`abs(dx), abs(dy)` of `2,1` or `1,2`); when a shallow or steep Bresenham line
   would produce that spacing, the line helper should emit a diagonal-touching bridge site instead.
   Invalid trap positions are skipped while later valid positions remain eligible.
-- Without Shift, a line command sends at most one build site per selected worker, assigning the
-  first valid trap positions from drag start toward drag end.
-- With Shift, additional sites beyond the selected worker count use the existing queued build worker
-  distribution semantics instead of a new client-side scheduler.
+- Line command dispatch sends one immediate build command per selected worker for the first valid
+  trap positions from drag start toward drag end.
+- If the line contains more valid trap positions than selected workers, positions `n+1..m` are
+  automatically sent as queued build commands against the selected worker set even when Shift is not
+  held. Use the existing queued build worker distribution semantics instead of a new client-side
+  scheduler.
 - Resource charging keeps the current construction model: affordability is checked at command time
   for feedback and charged on worker arrival; later sites may fail if resources are unavailable.
 - Tank Trap uses the next open worker build-card slot and a placeholder readable hedgehog visual
@@ -81,9 +83,9 @@ Phase 5 implements the Tank Trap line-placement interaction and exposes the buil
 adds a small line-placement collaborator that derives Bresenham trap sites with one-tile orthogonal
 gaps or diagonal-touching bridges, skips invalid sites, previews the line, sends one immediate build
 command per selected worker for the first sites, and sends queued standard build commands for
-additional Shift sites using the existing server worker distribution. The outcome is the requested
-player workflow without changing the wire command shape unless Phase 0 proves the standard `build`
-command cannot support it safely.
+additional overflow sites using the existing server worker distribution, even when Shift is not
+held. The outcome is the requested player workflow without changing the wire command shape unless
+Phase 0 proves the standard `build` command cannot support it safely.
 
 Phase 6 consolidates tests, docs, dev/manual scenarios, and cleanup. It adds focused regression
 coverage for vehicle-only blocking, infantry pass-through, two-tile vehicle gaps,
@@ -147,7 +149,8 @@ repair/cancel mechanics.
   plan.
 - Patch notes should say that engineers can build 15-steel Tank Traps after Training Centre, Tank
   Traps block vehicles but not infantry, and line-drag placement distributes construction across
-  selected workers while avoiding diagonal vehicle gaps in dragged lines.
+  selected workers, automatically queues overflow sites, and avoids diagonal vehicle gaps in dragged
+  lines.
 
 ## Implementation and Handoff Rules
 
