@@ -1294,6 +1294,9 @@ class RecordingGraphics extends FakeGraphics {
   drawCircle(x, y, radius) {
     this.calls.push(["drawCircle", x, y, radius]);
   }
+  drawPolygon(points) {
+    this.calls.push(["drawPolygon", points]);
+  }
   drawRoundedRect(x, y, width, height, radius) {
     this.calls.push(["drawRoundedRect", x, y, width, height, radius]);
   }
@@ -5901,6 +5904,7 @@ function fakeAudioContext() {
   };
   const fakePools = new Map();
   let iconCalls = 0;
+  let tintCalls = 0;
   const fakeRenderer = {
     _map: { tileSize: 32 },
     _slot(pool, id) {
@@ -5909,6 +5913,7 @@ function fakeAudioContext() {
       return fakePools.get(key);
     },
     _tintFor() {
+      tintCalls += 1;
       return 0x4878c8;
     },
     _icon() {
@@ -5918,9 +5923,24 @@ function fakeAudioContext() {
   };
   _drawBuilding.call(fakeRenderer, tankTrapEntity, new Map([[1, 0x4878c8]]), {});
   const trapGraphics = fakePools.get("buildings:720");
-  const trapStrokes = trapGraphics.calls.filter((call) => call[0] === "moveTo").length;
-  assert(trapStrokes >= 6, "Tank Trap renderer draws crossed hedgehog beams");
+  const trapPolygons = trapGraphics.calls.filter((call) => call[0] === "drawPolygon");
+  const trapColors = trapGraphics.calls
+    .filter((call) => call[0] === "beginFill" || call[0] === "lineStyle")
+    .map((call) => (call[0] === "beginFill" ? call[1] : call[2]));
+  assert(trapPolygons.length >= 12, "Tank Trap renderer draws filled steel hedgehog beams");
+  assert(!trapColors.includes(0x4878c8), "Tank Trap renderer avoids owner/team coloring");
+  assert(tintCalls === 0, "Tank Trap renderer does not request owner tint");
   assert(iconCalls === 0, "Tank Trap renderer uses geometry instead of the generic building stencil");
+
+  const secondTrapEntity = { ...tankTrapEntity, id: 721 };
+  _drawBuilding.call(fakeRenderer, secondTrapEntity, new Map([[1, 0x4878c8]]), {});
+  const secondTrapGraphics = fakePools.get("buildings:721");
+  const firstBeam = trapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
+  const secondBeam = secondTrapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
+  assert(
+    firstBeam?.some((value, index) => Math.abs(value - secondBeam[index]) > 0.1),
+    "Tank Trap renderer varies rotation between trap instances",
+  );
 }
 
 {

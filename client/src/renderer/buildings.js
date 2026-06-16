@@ -22,6 +22,7 @@ import {
   dashedLine,
   drawAntiTankGun,
   drawFacingWedge,
+  drawFreeRotatedRect,
   drawImpassableEdge,
   drawInfantryBase,
   drawInfantryMachineGun,
@@ -52,7 +53,6 @@ export function _drawBuilding(e, colorByOwner, state) {
   const ts = (this._map && this._map.tileSize) || 32;
   const w = (stat.footW || 2) * ts;
   const h = (stat.footH || 2) * ts;
-  const tint = this._tintFor(e.owner, colorByOwner);
   const x0 = e.x - w / 2;
   const y0 = e.y - h / 2;
 
@@ -69,8 +69,9 @@ export function _drawBuilding(e, colorByOwner, state) {
   const g = this._slot("buildings", e.id);
   g.position.set(0, 0);
   if (e.kind === KIND.TANK_TRAP) {
-    drawTankTrap(g, e.x, e.y, ts, tint, bodyAlpha);
+    drawTankTrap(g, e.x, e.y, ts, e.id, bodyAlpha);
   } else {
+    const tint = this._tintFor(e.owner, colorByOwner);
     g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
     g.beginFill(0x2b2a23, bodyAlpha);
     g.drawRect(x0, y0, w, h);
@@ -133,26 +134,63 @@ export function _drawBuilding(e, colorByOwner, state) {
   this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
 }
 
-function drawTankTrap(g, cx, cy, tileSize, tint, bodyAlpha) {
-  const r = tileSize * 0.36;
-  g.lineStyle(3, 0x17140f, bodyAlpha * 0.92);
-  drawBeam(g, cx, cy, -Math.PI / 4, r);
-  drawBeam(g, cx, cy, Math.PI / 4, r);
-  drawBeam(g, cx, cy, 0, r * 0.92);
+function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {
+  const base = tankTrapRotation(id);
+  const length = tileSize * 0.82;
+  const beamW = tileSize * 0.16;
+  const lipW = tileSize * 0.055;
+  const beamAngles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3];
 
-  g.lineStyle(1.5, 0xd8d0b0, bodyAlpha * 0.75);
-  drawBeam(g, cx, cy, -Math.PI / 4, r * 0.82);
-  drawBeam(g, cx, cy, Math.PI / 4, r * 0.82);
-  drawBeam(g, cx, cy, 0, r * 0.72);
+  for (const a of beamAngles) {
+    drawSteelBeam(g, cx, cy, base + a, length, beamW, lipW, bodyAlpha);
+  }
 
-  g.beginFill(tint, bodyAlpha * 0.85);
-  g.drawCircle(cx, cy, 3.5);
+  g.lineStyle(1.2, 0x1a1712, bodyAlpha * 0.75);
+  g.beginFill(0x817b6f, bodyAlpha * 0.96);
+  g.drawCircle(cx, cy, tileSize * 0.105);
+  g.endFill();
+  g.lineStyle(0);
+  g.beginFill(0xd7d2c1, bodyAlpha * 0.5);
+  g.drawCircle(cx - tileSize * 0.025, cy - tileSize * 0.025, tileSize * 0.035);
   g.endFill();
 }
 
-function drawBeam(g, cx, cy, angle, halfLen) {
-  const dx = Math.cos(angle) * halfLen;
-  const dy = Math.sin(angle) * halfLen;
-  g.moveTo(cx - dx, cy - dy);
-  g.lineTo(cx + dx, cy + dy);
+function tankTrapRotation(id) {
+  const n = Number.isFinite(id) ? id : 0;
+  return ((n * 1.9634954084936207) % Math.PI) - Math.PI / 2;
+}
+
+function drawSteelBeam(g, cx, cy, angle, length, width, lipWidth, alpha) {
+  g.lineStyle(1.6, 0x15130f, alpha * 0.95);
+  g.beginFill(0x4d5150, alpha * 0.98);
+  drawFreeRotatedRect(g, cx, cy, length, width, angle);
+  g.endFill();
+
+  const edgeOffset = width * 0.36;
+  g.lineStyle(0);
+  g.beginFill(0x222724, alpha * 0.68);
+  drawFreeRotatedRect(
+    g,
+    cx + Math.cos(angle + Math.PI / 2) * edgeOffset,
+    cy + Math.sin(angle + Math.PI / 2) * edgeOffset,
+    length * 0.92,
+    lipWidth,
+    angle,
+  );
+  g.endFill();
+
+  g.beginFill(0xa8aaa3, alpha * 0.68);
+  drawFreeRotatedRect(
+    g,
+    cx - Math.cos(angle + Math.PI / 2) * edgeOffset,
+    cy - Math.sin(angle + Math.PI / 2) * edgeOffset,
+    length * 0.86,
+    lipWidth,
+    angle,
+  );
+  g.endFill();
+
+  g.beginFill(0x343937, alpha * 0.9);
+  drawFreeRotatedRect(g, cx, cy, width * 1.05, width * 1.05, angle + Math.PI / 4);
+  g.endFill();
 }
