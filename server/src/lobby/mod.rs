@@ -32,9 +32,8 @@ use crate::game::command::SimCommand;
 use crate::game::replay::ReplayArtifactV1;
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    BranchStagingOccupant, BranchStagingSeat, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat,
-    ReplayStartMetadata, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload,
-    TeamId,
+    BranchStagingOccupant, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata,
+    ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload, TeamId,
 };
 use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
 
@@ -43,6 +42,7 @@ mod crash_replay;
 mod dev_replay;
 mod faction_validation;
 mod live_tick;
+mod replay_branch;
 mod replay_session;
 mod replay_validation;
 mod room_task;
