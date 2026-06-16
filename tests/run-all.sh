@@ -5,7 +5,7 @@
 # What it runs, in order:
 #   1. Architecture/contract policy (crate boundaries + sim/client architecture + faction guardrails + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
-#   3. Rust fast scripted tests     (timed cargo test by package — deterministic, in-process, no server)
+#   3. Rust fast scripted tests     (workspace cargo test — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
 #   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration, faction_integration, team_integration)
 #   6. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
@@ -26,6 +26,7 @@
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
 #   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the per-worktree Cargo target dir
+#   RTS_CARGO_PACKAGE_TIMINGS=1 tests/run-all.sh  # profile Cargo tests package-by-package
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 #   CHROME=/path/to/chrome tests/run-all.sh
@@ -54,10 +55,16 @@ RUN_RUST=1
 RUN_CLIENT=1
 RUN_FULL_AI=0
 RUN_TRI_STATE_BROWSER=0
+RUN_CARGO_PACKAGE_TIMINGS=0
 VERBOSE=0
 case "${RTS_RUN_TRI_STATE_BROWSER:-}" in
   1|true|TRUE|yes|YES|on|ON) RUN_TRI_STATE_BROWSER=1 ;;
   0|false|FALSE|no|NO|off|OFF) RUN_TRI_STATE_BROWSER=0 ;;
+esac
+case "${RTS_CARGO_PACKAGE_TIMINGS:-}" in
+  1|true|TRUE|yes|YES|on|ON) RUN_CARGO_PACKAGE_TIMINGS=1 ;;
+  0|false|FALSE|no|NO|off|OFF|"") RUN_CARGO_PACKAGE_TIMINGS=0 ;;
+  *) echo "invalid RTS_CARGO_PACKAGE_TIMINGS=${RTS_CARGO_PACKAGE_TIMINGS}; use 1/0, true/false, yes/no, or on/off" >&2; exit 2 ;;
 esac
 if [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${CI:-}" ]; then
   RUN_TRI_STATE_BROWSER=1
@@ -276,7 +283,7 @@ collect_bg_results() {
     if [ "$status" = "ok" ]; then
       record_timing "$name" "$elapsed" "PASS"
       case "$name" in
-        "Rust fast scripted tests (cargo test)"|"Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test)")
+        "Rust fast scripted tests (cargo test package timings)"|"Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test package timings)")
           [ -n "$logf" ] && cat "$logf"
           ;;
       esac
@@ -426,6 +433,31 @@ hydrate_client_deps() {
   fi
 }
 
+run_cargo_tests_bg() {
+  local name full_ai_env
+  full_ai_env=()
+  if [ "$RUN_FULL_AI" = "1" ]; then
+    full_ai_env=(RTS_FULL_AI_TESTS=1)
+    if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
+      name="Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test package timings)"
+    else
+      name="Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test)"
+    fi
+  else
+    if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
+      name="Rust fast scripted tests (cargo test package timings)"
+    else
+      name="Rust fast scripted tests (cargo test)"
+    fi
+  fi
+
+  if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
+    run_suite_bg "$name" env "${full_ai_env[@]}" "$SCRIPT_DIR/cargo-test-timed.sh"
+  else
+    run_suite_bg "$name" env "${full_ai_env[@]}" cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+  fi
+}
+
 run_rust_suites_bg() {
   if [ "$RUN_RUST" = "1" ]; then
     run_suite_bg "Architecture: crate boundaries" \
@@ -446,12 +478,8 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/select-suites.mjs" --verify
     run_suite_bg "Rust format (cargo fmt --check)" \
       cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
-    if [ "$RUN_FULL_AI" = "1" ]; then
-      run_suite_bg "Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test)" \
-        env RTS_FULL_AI_TESTS=1 "$SCRIPT_DIR/cargo-test-timed.sh"
-    else
-      run_suite_bg "Rust fast scripted tests (cargo test)" \
-        "$SCRIPT_DIR/cargo-test-timed.sh"
+    run_cargo_tests_bg
+    if [ "$RUN_FULL_AI" != "1" ]; then
       SKIPPED+=("Rust full AI coverage (--full-ai not set)")
     fi
     run_suite_bg "Rust lint (cargo clippy)" \
