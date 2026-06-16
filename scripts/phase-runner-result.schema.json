@@ -33,10 +33,10 @@
       "type": ["integer", "null"]
     },
     "pr_url": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "head_sha": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "auto_merge_state": {
       "type": "string",
@@ -55,6 +55,11 @@
     "gameplay_impact",
     "next_executor_notes",
     "manual_test_notes",
-    "blocked_reason"
+    "blocked_reason",
+    "pr_number",
+    "pr_url",
+    "head_sha",
+    "auto_merge_state",
+    "merge_wait_state"
   ]
 }
