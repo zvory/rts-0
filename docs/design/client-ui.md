@@ -131,6 +131,35 @@ scripts, foreign objects, images/use/external hrefs, filters, masks, clip paths,
 patterns, CSS classes or style attributes, percentage units, duplicate ids, lowercase or unsupported
 path commands, non-finite values, and transforms that cannot decompose into translate/rotate/scale.
 
+`renderer/rigs/animation.js`
+```js
+export function createRigRenderContext(entity, options?)
+export function sampleRigAnimation(definition, entity, renderContext?)
+```
+Rig animation sampling is pure data math: it derives a narrow render context from existing client
+entity state and renderer-local visual state, then applies normalized animation bindings to part
+transforms, alpha, visibility, and tint slots without creating Pixi objects. The sampler accepts
+only the schema-approved runtime inputs such as `facing`, `weaponFacing`, `recoilProgress`,
+`setupVisual`, `vehicleMotion`, selected/damaged flags, shot-reveal alpha, map tile size, worker
+busy state, breakthrough ticks, and oil cue flags.
+
+`renderer/rigs/runtime.js`
+```js
+export function createDefaultPixiFactory(pixi?)
+export function createUnitRigInstance(kind, definition, pixiFactory?)
+export function renderRigLegacyComparison(renderer, entity, colorByOwner, state, definition)
+export class UnitRigInstance {
+  update(entity, renderContext)
+  destroy()
+}
+```
+The Phase 4 rig runtime is dormant in live matches. `UnitRigInstance` owns one Pixi container and
+one graphics child per normalized rig part, redraws primitive geometry with sampled transforms and
+tint slots, and tears down all owned children through `destroy()`. `renderer/units.js` exposes only
+a test-gated side-by-side comparison seam: `_rigComparisonEnabled` must be set and a definition
+must exist in `_rigDefinitionsByKind`; otherwise normal gameplay continues to draw legacy
+procedural units.
+
 `branch_staging.js`
 ```js
 export class BranchStaging {

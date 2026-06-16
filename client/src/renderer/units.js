@@ -10,6 +10,8 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { createRigRenderContext } from "./rigs/animation.js";
+import { renderRigLegacyComparison } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
@@ -314,6 +316,11 @@ function unitVehicleBody(kind, stat) {
 }
 
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
+  if (this._rigComparisonEnabled && !pools.skipRigComparison) {
+    const definition = this._rigDefinitionsByKind?.get(e.kind);
+    return renderRigLegacyComparison(this, e, colorByOwner, state, definition);
+  }
+
   const shadowPool = pools.shadow || "unitShadows";
   const unitPool = pools.unit || "units";
   const stat = STATS[e.kind] || {};
@@ -437,6 +444,20 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     g.moveTo(0, 0);
     g.lineTo(fp.x, fp.y);
   }
+}
+
+export function _rigRenderContextFor(e, colorByOwner, state) {
+  const facing = typeof e.facing === "number" ? e.facing : 0;
+  const stat = STATS[e.kind] || {};
+  const body = unitVehicleBody(e.kind, stat);
+  return createRigRenderContext(e, {
+    state,
+    colorByOwner,
+    setupVisual: this._deployedWeaponSetupVisual(e),
+    vehicleMotion: body ? this._tankMotionVisual(e, facing, state, body) : null,
+    selected: state.selection?.has?.(e.id) ?? false,
+    map: this._map,
+  });
 }
 
 export function _drawShotRevealUnit(e, colorByOwner, state) {

@@ -61,6 +61,7 @@ import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
   _drawUnit,
+  _rigRenderContextFor,
   _sweepSetupVisuals,
   _sweepTankMotion,
   _tankMotionVisual,
@@ -145,6 +146,12 @@ export class Renderer {
     // Local visual-only track phase for tanks. The server owns movement; this
     // just turns interpolated distance/facing deltas into tread offsets.
     this._tankMotion = new Map();
+    // Dormant SVG rig comparison instances. Tests opt in by enabling
+    // _rigComparisonEnabled and providing _rigDefinitionsByKind.
+    this._rigComparisonEnabled = false;
+    this._rigDefinitionsByKind = new Map();
+    this._rigComparisonPool = new Map();
+    this._seen.rigComparisons = new Set();
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
     this._map = null;
@@ -422,6 +429,10 @@ export class Renderer {
     this._unseen.clear();
     this._setupVisuals.clear();
     this._tankMotion.clear();
+    if (this._rigComparisonPool) {
+      for (const instance of this._rigComparisonPool.values()) instance.destroy();
+      this._rigComparisonPool.clear();
+    }
     this._lineProjectileTrails.clear();
 
     // Long-lived single Graphics.
@@ -458,6 +469,7 @@ Object.assign(Renderer.prototype, {
   _sweepTankMotion,
   _tankMotionVisual,
   _drawUnit,
+  _rigRenderContextFor,
   _drawShotRevealUnit,
   _drawBuilding,
   _drawResource,
