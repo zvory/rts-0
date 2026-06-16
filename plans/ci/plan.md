@@ -29,7 +29,8 @@ reachable from `origin/main`.
   the PR is merged through GitHub and verify the phase head is an ancestor of `origin/main`.
 - Avoid merge-queue-only designs. This repo is a personal public repository today, so the durable
   path is branch protection, required checks, auto-merge, stale-branch handling, and explicit PR
-  sweeps.
+  sweeps. The initial protection uses admin bypass for emergency repair and this migration's
+  remaining direct-merge phases only.
 - Keep broad local test runs optional for agents. Focused local verification remains required when
   it is useful for fast feedback, but the full gate moves to PR CI.
 - Every phase handoff should name the next implementation step and the core manual checks to run.

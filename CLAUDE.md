@@ -74,6 +74,10 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 ## Git / GitHub
 
 - The default branch is `main`.
+- `main` is protected in GitHub: normal updates require a PR, an up-to-date branch, and the required
+  `Main test gate / ./tests/run-all.sh` check. Admin bypass is left available only for emergency
+  repair and the active CI migration phases until the PR-first workflow phases replace this
+  direct-merge contract.
 - ordinary commits have a commit hook that silently runs all tests; merge commits bypass it.
 - Use the commit hook for full-suite coverage only when the change is ready to merge. During
   development, run only targeted tests that match the files or contracts changed instead of running
