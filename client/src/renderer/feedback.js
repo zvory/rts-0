@@ -68,7 +68,9 @@ const MORTAR_WARNING_COLOR = 0x9f1f1f;
 const FIELD_OF_FIRE_COLOR = 0x4aa3ff;
 const ABILITY_RETURN_MARKER_COLOR = 0x82d8ff;
 const ABILITY_ANCHOR_COLOR = 0xc7d07a;
-const ABILITY_PROJECTILE_COLOR = 0xd47a5f;
+const ABILITY_LINE_SHOT_COLOR = 0x0b3a78;
+const LINE_PROJECTILE_TRAIL_MAX_POINTS = 9;
+const LINE_PROJECTILE_TRAIL_MIN_STEP_PX = 1.5;
 
 export function _drawPlacement(state, fog) {
   const g = this._placementGfx;
@@ -428,10 +430,14 @@ export function _drawAbilityTargetPreview(state) {
 
 export function _drawAbilityObjects(state) {
   const objects = state?.abilityObjects;
-  if (!Array.isArray(objects) || objects.length === 0) return;
+  if (!Array.isArray(objects) || objects.length === 0) {
+    if (this._lineProjectileTrails) this._lineProjectileTrails.clear();
+    return;
+  }
   const g = this._abilityObjectGfx;
   if (!g) return;
   const ts = (this._map && this._map.tileSize) || 32;
+  const activeLineProjectileIds = new Set();
 
   for (const object of objects) {
     if (!finiteNumber(object?.x) || !finiteNumber(object?.y)) continue;
@@ -441,10 +447,14 @@ export function _drawAbilityObjects(state) {
       drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * 0.38));
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE) {
       const r = Math.max(5, object.ownerState?.radius || ts * 0.18);
-      g.lineStyle(2, ABILITY_PROJECTILE_COLOR, 0.75);
-      g.beginFill(ABILITY_PROJECTILE_COLOR, 0.18);
-      g.drawCircle(object.x, object.y, r);
-      g.endFill();
+      activeLineProjectileIds.add(object.id);
+      drawLineProjectile(g, object, r, this._lineProjectileTrails);
+    }
+  }
+
+  if (this._lineProjectileTrails) {
+    for (const id of this._lineProjectileTrails.keys()) {
+      if (!activeLineProjectileIds.has(id)) this._lineProjectileTrails.delete(id);
     }
   }
 }
@@ -474,6 +484,57 @@ function drawMagicAnchor(g, object, radius) {
   g.endFill();
   g.lineStyle(1.5, 0x11110f, 0.45);
   g.drawCircle(object.x, object.y, radius * 0.46);
+}
+
+function drawLineProjectile(g, object, radius, trails) {
+  const points = lineProjectileTrailPoints(object, trails);
+  if (points.length >= 2) {
+    drawLineProjectileTrail(g, points, radius);
+  }
+
+  const previous = points.length >= 2 ? points[points.length - 2] : null;
+  if (previous) {
+    g.lineStyle(Math.max(3.5, radius * 0.72), ABILITY_LINE_SHOT_COLOR, 0.95);
+    g.moveTo(previous.x, previous.y);
+    g.lineTo(object.x, object.y);
+  }
+
+  g.lineStyle(2, ABILITY_LINE_SHOT_COLOR, 0.96);
+  g.beginFill(ABILITY_LINE_SHOT_COLOR, 0.68);
+  g.drawCircle(object.x, object.y, radius);
+  g.endFill();
+}
+
+function lineProjectileTrailPoints(object, trails) {
+  if (!trails || object.id == null) return [{ x: object.x, y: object.y }];
+  const lastTicksOut = finiteNumber(object.ownerState?.ticksOut) ? object.ownerState.ticksOut : null;
+  let trail = trails.get(object.id);
+  if (!trail || (lastTicksOut !== null && trail.lastTicksOut !== null && lastTicksOut < trail.lastTicksOut)) {
+    trail = { points: [], lastTicksOut: null };
+    trails.set(object.id, trail);
+  }
+  const last = trail.points[trail.points.length - 1];
+  const moved = !last || Math.hypot(object.x - last.x, object.y - last.y) >= LINE_PROJECTILE_TRAIL_MIN_STEP_PX;
+  if (moved) {
+    trail.points.push({ x: object.x, y: object.y });
+    if (trail.points.length > LINE_PROJECTILE_TRAIL_MAX_POINTS) {
+      trail.points.splice(0, trail.points.length - LINE_PROJECTILE_TRAIL_MAX_POINTS);
+    }
+  }
+  trail.lastTicksOut = lastTicksOut;
+  return trail.points;
+}
+
+function drawLineProjectileTrail(g, points, radius) {
+  const maxSegment = points.length - 1;
+  for (let i = 1; i < points.length; i += 1) {
+    const age = (maxSegment - i) / Math.max(1, maxSegment);
+    const alpha = 0.14 + (1 - age) * 0.38;
+    const width = Math.max(2, radius * (0.36 + (1 - age) * 0.42));
+    g.lineStyle(width, ABILITY_LINE_SHOT_COLOR, alpha);
+    g.moveTo(points[i - 1].x, points[i - 1].y);
+    g.lineTo(points[i].x, points[i].y);
+  }
 }
 
 function fieldOfFireProfile(kind, tileSize) {
