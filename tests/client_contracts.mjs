@@ -3303,7 +3303,7 @@ function fakeAudioContext() {
   assert(
     ABILITIES[ABILITY.BREAKTHROUGH].carriers.includes(KIND.COMMAND_CAR) &&
       ABILITIES[ABILITY.BREAKTHROUGH].targetMode === "self" &&
-      ABILITIES[ABILITY.BREAKTHROUGH].radiusTiles === 7 &&
+      ABILITIES[ABILITY.BREAKTHROUGH].radiusTiles === 9 &&
       ABILITIES[ABILITY.BREAKTHROUGH].durationTicks === 180 &&
       ABILITIES[ABILITY.BREAKTHROUGH].cooldownTicks === 750,
     "Breakthrough ability exposes Command Car carrier, self target, radius, duration, and cooldown",

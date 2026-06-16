@@ -136,14 +136,23 @@ export function _drawCommandFeedback(state) {
     const r = 12 + t * 10;
     const color = f.kind === "mortar" || f.kind === "artillery"
       ? MORTAR_WARNING_COLOR
+      : f.kind === "breakthrough"
+        ? 0xf2d16b
       : f.kind === "attack"
         ? COLORS.selectEnemy
         : COLORS.selectOwn;
 
     g.lineStyle(2, color, alpha);
-    if (f.kind === "mortar" || f.kind === "artillery") {
-      const splash = Number.isFinite(f.radiusTiles) ? f.radiusTiles * 32 : 48;
+    if (f.kind === "mortar" || f.kind === "artillery" || f.kind === "breakthrough") {
+      const tileSize = (this._map && this._map.tileSize) || 32;
+      const splash = Number.isFinite(f.radiusTiles) ? f.radiusTiles * tileSize : 48;
       drawDashedCircle(g, f.x, f.y, splash, 14);
+      if (f.kind === "breakthrough") {
+        g.beginFill(color, 0.055 * alpha);
+        g.drawCircle(f.x, f.y, splash);
+        g.endFill();
+        continue;
+      }
       g.drawCircle(f.x, f.y, r * 0.45);
       g.moveTo(f.x - r * 0.7, f.y);
       g.lineTo(f.x + r * 0.7, f.y);
@@ -335,10 +344,34 @@ export function _drawAntiTankGunSetupPreview(state) {
   }
 }
 
+export function _drawBreakthroughAuras(state, entities = []) {
+  if (!state || !Array.isArray(entities)) return;
+  const g = this._feedbackGfx;
+  const definition = ABILITIES[ABILITY.BREAKTHROUGH];
+  const tileSize = (this._map && this._map.tileSize) || 32;
+  const radiusPx = (definition?.radiusTiles || 0) * tileSize;
+  if (radiusPx <= 0) return;
+
+  for (const e of entities) {
+    if (e.kind !== KIND.COMMAND_CAR || !(e.breakthroughTicks > 0)) continue;
+    if (!ownOrAllyOwner(state, e.owner)) continue;
+    drawBreakthroughAura(g, e.x, e.y, radiusPx, 0.78);
+  }
+}
+
 export function _drawAbilityTargetPreview(state) {
   const preview = state?.abilityTargetPreview;
   if (!preview || !Array.isArray(preview.carriers)) return;
   const g = this._feedbackGfx;
+  const areaOrigins = Array.isArray(preview.areaOrigins) ? preview.areaOrigins : [];
+  if (areaOrigins.length > 0 && preview.radiusPx > 0) {
+    for (const origin of areaOrigins) {
+      if (!finiteNumber(origin.x) || !finiteNumber(origin.y)) continue;
+      drawBreakthroughAura(g, origin.x, origin.y, preview.radiusPx, 0.92);
+    }
+    return;
+  }
+  if (!finiteNumber(preview.mouseX) || !finiteNumber(preview.mouseY)) return;
   const rangeColor = FIELD_OF_FIRE_COLOR;
   const minRangeColor = 0x8f2d2a;
   const rangeOrigins = Array.isArray(preview.rangeOrigins) ? preview.rangeOrigins : preview.carriers;
@@ -426,6 +459,22 @@ export function _drawAbilityTargetPreview(state) {
     g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
     g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
   }
+}
+
+function drawBreakthroughAura(g, x, y, radiusPx, alpha = 0.8) {
+  const color = 0xf2d16b;
+  g.lineStyle(2.5, color, alpha);
+  g.beginFill(color, 0.045 * alpha);
+  g.drawCircle(x, y, radiusPx);
+  g.endFill();
+  g.lineStyle(1.5, color, 0.58 * alpha);
+  dashedCircle(g, x, y, radiusPx * 0.72, 72);
+}
+
+function ownOrAllyOwner(state, owner) {
+  if (typeof state?.isOwnOwner === "function" && state.isOwnOwner(owner)) return true;
+  if (typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner)) return true;
+  return Number(owner) === state?.playerId;
 }
 
 export function _drawAbilityObjects(state) {
