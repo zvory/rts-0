@@ -47,7 +47,8 @@ reachable from `origin/main`.
    gate. It preserves focused verification and makes the PR lifecycle the normal completion path.
 4. Phase 4 adds ownership and waiting helpers so PRs do not go unowned under normal operations.
    The helpers should open or audit agent PRs, arm auto-merge, wait cheaply for merge/failure when
-   requested, and summarize stale or failed owned PRs.
+   requested, and summarize stale or failed owned PRs. The helper names are
+   `scripts/agent-pr.sh`, `scripts/wait-pr.sh`, and `scripts/pr-sweep.sh`.
 5. Phase 5 converts `scripts/phase-runner.sh` to PR-first serial execution. It must support
    non-blocking "open and arm PR" mode and blocking "wait until merged before next phase" mode.
 6. Phase 6 hardens cleanup, recovery, and rollout validation. It updates worktree cleanup for
