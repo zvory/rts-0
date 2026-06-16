@@ -45,6 +45,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   `cargo test --doc` step. Add one beside nextest if doctests are introduced.
 - `CI / server binary`, `CI / rust and architecture`, `CI / live Node suites`, and
   `CI / browser and tri-state` are the auditable coverage jobs under the aggregate required check.
+  The Rust/architecture job installs `cargo-nextest` and runs `./tests/run-all.sh --only-rust`, so
+  CI uses the same nextest-backed Rust command path as local development.
   Branch protection should require the aggregate `./tests/run-all.sh` check unless rulesets are
   deliberately migrated to require every split coverage job directly. The split jobs also
   short-circuit as green checks for Markdown-only PRs.

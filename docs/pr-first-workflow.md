@@ -13,8 +13,10 @@ The normal agent lifecycle is:
 GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
 the `Main test gate` workflow. The workflow runs split coverage jobs for server build,
 Rust/architecture, live Node, and browser/tri-state suites, then fails the aggregate check if any
-required coverage job fails. Local hooks are intentionally cheap; they catch staged whitespace
-errors and run opportunistic cleanup on `main`.
+required coverage job fails. The Rust/architecture job installs `cargo-nextest` and runs
+`./tests/run-all.sh --only-rust`, matching the local nextest-backed Rust command path. Local hooks
+are intentionally cheap; they catch staged whitespace errors and run opportunistic cleanup on
+`main`.
 
 ## Recovery states
 
