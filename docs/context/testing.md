@@ -43,9 +43,11 @@ Use when writing or debugging tests, or before claiming a change is done.
   unrelated branches should not cancel each other.
 - Beta deploys are triggered only from successful `Main test gate` workflow runs whose original
   event was a push to `main`; PR-head workflow runs must not deploy.
-- `tests/run-all.sh` uses a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
+- Local `tests/run-all.sh` uses a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
   parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
-  with `CARGO_TARGET_DIR` if a task needs a specific target location.
+  with `CARGO_TARGET_DIR` if a task needs a specific target location. The `Main test gate`
+  workflow sets `CARGO_TARGET_DIR` to `server/target` so GitHub Actions can restore and save the
+  same target directory that Cargo uses during `./tests/run-all.sh`.
 - Installed hooks run cheap staged-diff checks before commits and merges. They do not run
   `tests/run-all.sh` by default; GitHub Actions owns the full-suite gate for normal PR work.
 - Installed hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main` to

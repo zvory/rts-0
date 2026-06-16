@@ -17,6 +17,8 @@ jobs:
     name: ./tests/run-all.sh
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
 
     steps:
       - name: Check out repository

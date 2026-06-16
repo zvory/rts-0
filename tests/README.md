@@ -45,7 +45,9 @@ gate instead of silently reusing the wrong dependency tree.
 By default, the local gate and Cargo helper use an isolated target directory for each worktree
 under `/tmp/rts-cargo-target/`. This keeps final binaries, test harnesses, and self-play
 artifacts branch-local while keeping the checkout clean. Override with
-`CARGO_TARGET_DIR=/path/to/target` when you need a specific target location.
+`CARGO_TARGET_DIR=/path/to/target` when you need a specific target location. CI intentionally sets
+`CARGO_TARGET_DIR` to `server/target` in the `Main test gate` workflow so the existing Cargo cache
+restores the same target directory that `tests/run-all.sh` uses during the run.
 
 Installed repo hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main`.
 Auto cleanup removes only clean `zvorygin/*` worktrees whose branch head is reachable from local
