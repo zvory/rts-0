@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -25,11 +25,11 @@ Freeze current client boundary behavior before extracting state and facades.
 
 ## Implementation Checklist
 
-- [ ] Inventory existing client boundary tests.
-- [ ] Add command-target and preview lifetime coverage.
-- [ ] Add HUD dispatch and prediction optimism coverage.
-- [ ] Document target boundary and migration rule.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Inventory existing client boundary tests.
+- [x] Add command-target and preview lifetime coverage.
+- [x] Add HUD dispatch and prediction optimism coverage.
+- [x] Document target boundary and migration rule.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

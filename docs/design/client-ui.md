@@ -290,11 +290,48 @@ export class GameState {
   openWorkerBuildMenu(), closeCommandCardMenu()
   placement                              // null | { building, valid, tileX, tileY }
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
+  // command targeting and renderer feedback (client-only, temporary broad-state shim):
+  commandTarget                          // null | "move" | "attack" | "setupAntiTankGuns" | ability target object
+  beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
+  holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
+  releaseCommandTargetShift()
+  commandFeedback                        // short-lived local accepted-click markers
+  liveCommandFeedback(now)
+  antiTankGunSetupPreview                // null | {mouseX, mouseY, guns}
+  abilityTargetPreview                   // null | ability targeting preview view data
   // resource hover preview (client-only):
   resourceMiningPreview                  // null | {resourceId, resourceX, resourceY, ccId, ccX, ccY, inRange}
   updateResourceMiningPreview(preview)
+  setOptimisticCommandState(state)        // production/rally optimism display overlay
+  setPredictedSnapshot(snapshot, diagnostics, options), clearPredictedSnapshot()
 }
 ```
+
+#### Client Boundary Migration Target
+
+`Match` remains the app-shell composer and owner of cross-area dependency injection. Runtime modules
+should not gain direct imports across the model, input, UI, minimap, renderer, and prediction areas
+except for pinned mirrors such as `protocol.js` and `config.js`, or for explicitly documented
+architecture-check exceptions. New client behavior should move through constructor-injected
+collaborators and narrow facades that express one boundary at a time.
+
+`GameState` is the authoritative browser view of server snapshots, interpolation, selected ids,
+control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
+authoritative snapshots. It should stop accumulating unrelated transient controller/UI state:
+placement intent, command-card submenu state, command-target arming, hover previews, renderer
+feedback, ability previews, and prediction display mutations should migrate into explicit helper
+objects or view models. During the staged migration, temporary `GameState` compatibility fields are
+allowed only to keep existing HUD, input, minimap, renderer, and prediction callers stable for the
+next phase; each compatibility field must preserve the current shape above until its owning phase
+removes all direct reads.
+
+Renderer feedback should consume a narrow read model containing placement, command feedback,
+support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
+rather than relying on the full mutable `GameState`. HUD and input should exchange command intent
+through descriptor/facade methods, while gameplay command emission continues to flow through
+`commandIssuer.issueCommand`. `PredictionController` owns client sequence allocation and optimistic
+bookkeeping; `GameState` may apply named display overlays during the shim period but should not own
+prediction policy.
 
 `camera.js`
 ```js

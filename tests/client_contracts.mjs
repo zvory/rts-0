@@ -98,7 +98,13 @@ import {
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
-import { _drawAbilityObjects, _drawAbilityTargetPreview } from "../client/src/renderer/feedback.js";
+import {
+  _drawAbilityObjects,
+  _drawAbilityTargetPreview,
+  _drawAntiTankGunSetupPreview,
+  _drawCommandFeedback,
+  _drawPlacement,
+} from "../client/src/renderer/feedback.js";
 import { buildGiveUpAction, buildSettingsTabs } from "../client/src/settings_panels.js";
 import { readPredictionEnabled, writePredictionEnabled } from "../client/src/prediction_settings.js";
 import {
@@ -121,6 +127,10 @@ import {
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+function assertDeepEqual(actual, expected, msg) {
+  assert(JSON.stringify(actual) === JSON.stringify(expected), msg);
 }
 
 function assertApprox(actual, expected, epsilon, msg) {
@@ -1228,12 +1238,14 @@ class FakeGraphics {
   constructor() {
     this.position = { set() {} };
   }
+  clear() {}
   lineStyle() {}
   beginFill() {}
   endFill() {}
   drawPolygon() {}
   drawCircle() {}
   drawRect() {}
+  drawRoundedRect() {}
   moveTo() {}
   lineTo() {}
   arc() {}
@@ -1256,8 +1268,14 @@ class RecordingGraphics extends FakeGraphics {
   beginFill(color, alpha) {
     this.calls.push(["beginFill", color, alpha]);
   }
+  clear() {
+    this.calls.push(["clear"]);
+  }
   drawCircle(x, y, radius) {
     this.calls.push(["drawCircle", x, y, radius]);
+  }
+  drawRoundedRect(x, y, width, height, radius) {
+    this.calls.push(["drawRoundedRect", x, y, width, height, radius]);
   }
 }
 
@@ -1272,6 +1290,127 @@ assert(noticeSoundId("Cannot build there") === "notice_cannot_build", "cannot-bu
 assert(noticeSoundId("Requirement not met") === null, "generic invalid notices stay silent");
 assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent");
 assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
+
+// ---------------------------------------------------------------------------
+// Client boundary baseline contracts
+// ---------------------------------------------------------------------------
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 12, height: 12, tileSize: 32, terrain: new Array(144).fill(0), resources: [] },
+    players: [{ id: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 }],
+  });
+
+  state.openWorkerBuildMenu();
+  assert(state.commandCardMode === "workerBuild", "worker build menu is tracked on GameState during the shim phase");
+  state.beginPlacement(KIND.DEPOT);
+  assert(state.commandCardMode === null, "beginPlacement closes the worker build submenu");
+  assertDeepEqual(state.placement, {
+    building: KIND.DEPOT,
+    tileX: 0,
+    tileY: 0,
+    valid: false,
+  }, "beginPlacement seeds the renderer placement shape");
+  state.updatePlacement(3, 4, true);
+  assertDeepEqual(state.placement, {
+    building: KIND.DEPOT,
+    tileX: 3,
+    tileY: 4,
+    valid: true,
+  }, "updatePlacement keeps the renderer placement shape stable");
+
+  const armed = state.beginCommandTarget("attack", { now: 100, shiftKey: true });
+  assert(armed.queued, "beginCommandTarget reports queued arms for HUD/input dispatch");
+  assert(state.placement === null, "arming a command target clears build placement");
+  assert(state.commandTarget === "attack", "command target is mirrored on GameState during the shim phase");
+  const issued = state.issueCommandTarget({ shiftKey: true });
+  assert(issued.keepArmed && issued.target === "attack", "shift-issued command targets remain armed for queued clicks");
+  state.releaseCommandTargetShift();
+  assert(state.commandTarget === null, "releasing Shift clears a tap-preserved command target");
+
+  state.updateAntiTankGunSetupPreview({ mouseX: 100, mouseY: 120, guns: [] });
+  state.updateAbilityTargetPreview({
+    ability: ABILITY.SMOKE,
+    mouseX: 100,
+    mouseY: 120,
+    carriers: [],
+    rangePx: 64,
+    hoverInRange: true,
+  });
+  state.beginCommandTarget("move", { now: 500 });
+  assert(state.antiTankGunSetupPreview === null, "changing command targets clears support-weapon preview state");
+  assert(state.abilityTargetPreview === null, "changing command targets clears ability preview state");
+  assert(state.issueCommandTarget({}).keepArmed === false, "plain target clicks clear the armed target");
+  assert(state.commandTarget === null, "plain target clicks clear the GameState commandTarget shim");
+}
+
+{
+  const placementGfx = new RecordingGraphics();
+  const feedbackGfx = new RecordingGraphics();
+  const abilityObjectGfx = new RecordingGraphics();
+  const renderer = {
+    _placementGfx: placementGfx,
+    _feedbackGfx: feedbackGfx,
+    _abilityObjectGfx: abilityObjectGfx,
+    _lineProjectileTrails: new Map(),
+    _map: { tileSize: 32 },
+  };
+  const state = {
+    playerId: 1,
+    placement: { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true },
+    map: { resources: [] },
+    liveCommandFeedback() {
+      return [{ kind: "move", x: 96, y: 128, append: true, createdAt: performance.now() }];
+    },
+    selectedEntities() {
+      return [{
+        id: 7,
+        owner: 1,
+        kind: KIND.ANTI_TANK_GUN,
+        x: 128,
+        y: 128,
+        facing: 0,
+        setupState: SETUP.DEPLOYED,
+      }];
+    },
+    antiTankGunSetupPreview: { mouseX: 180, mouseY: 128, guns: [{ kind: KIND.ANTI_TANK_GUN, x: 128, y: 128 }] },
+    abilityTargetPreview: {
+      ability: ABILITY.SMOKE,
+      mouseX: 180,
+      mouseY: 128,
+      carriers: [{ kind: KIND.SCOUT_CAR, x: 128, y: 128 }],
+      rangePx: 96,
+      radiusPx: 24,
+      hoverInRange: true,
+    },
+    abilityObjects: [{
+      id: 9,
+      owner: 1,
+      kind: ABILITY_OBJECT_KIND.RETURN_MARKER,
+      ability: ABILITY.EKAT_TELEPORT,
+      x: 220,
+      y: 240,
+    }],
+    isOwnOwner(owner) {
+      return owner === 1;
+    },
+    isAllyOwner() {
+      return false;
+    },
+  };
+
+  _drawPlacement.call(renderer, state, null);
+  _drawCommandFeedback.call(renderer, state);
+  _drawAntiTankGunSetupPreview.call(renderer, state);
+  _drawAbilityTargetPreview.call(renderer, state);
+  _drawAbilityObjects.call(renderer, state);
+
+  assert(placementGfx.calls.some((call) => call[0] === "drawRoundedRect"), "renderer feedback reads placement through the current state shape");
+  assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the current state shape");
+  assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the current state shape");
+}
 
 // ---------------------------------------------------------------------------
 // Control groups

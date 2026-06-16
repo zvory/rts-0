@@ -255,7 +255,9 @@ function sentSeqs(sent) {
     entities: [{ id: 20, owner: 1, kind: "barracks", prodQueue: 0 }],
     netStatus: { lastSimConsumedClientSeq: 0 },
   });
-  controller.issueCommand({ c: "train", building: 20, unit: "rifleman" });
+  const issued = controller.issueCommand({ c: "train", building: 20, unit: "rifleman" });
+  assert(issued.sent === true && issued.predicted === false, "train commands remain network handoff only");
+  assert(issued.clientSeq === 1, "optimistic UI entries are keyed by the sequenced command handoff");
   let ui = controller.optimisticUiState();
   assert(ui.production.length === 1, "train optimism appears immediately");
   assert(ui.production[0].optimisticQueue === 1, "train optimism exposes predicted queue depth");
