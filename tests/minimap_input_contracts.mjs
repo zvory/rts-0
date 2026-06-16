@@ -2,7 +2,6 @@
 // These cover the pointer-lock virtual-cursor path without launching a browser.
 
 import { MatchInputRouter } from "../client/src/input/router.js";
-import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { Minimap } from "../client/src/minimap.js";
 import { KIND } from "../client/src/protocol.js";
@@ -63,7 +62,7 @@ function minimapHarness({
   commandTarget = null,
   commandsEnabled = true,
   legacySender = false,
-  explicitClientIntent = false,
+  explicitClientIntent = true,
 } = {}) {
   installWindowStub();
   const viewport = {
@@ -74,13 +73,9 @@ function minimapHarness({
   const router = new MatchInputRouter(viewport);
   const canvas = fakeCanvas();
   const centers = [];
-  const commands = [];
-  const endedTargets = [];
   const clientIntent = explicitClientIntent ? new ClientIntent() : null;
   const state = {
     playerId: 1,
-    commandTarget,
-    commandComposer: new CommandComposer(),
     map: {
       width: 242,
       height: 242,
@@ -91,28 +86,11 @@ function minimapHarness({
     selectedEntities() {
       return selected;
     },
-    endCommandTarget() {
-      if (clientIntent) throw new Error("Minimap must use injected ClientIntent to end targeting");
-      endedTargets.push(this.commandTarget);
-      this.commandComposer.cancel();
-      this.commandTarget = null;
-    },
-    issueCommandTarget(ev = {}) {
-      if (clientIntent) throw new Error("Minimap must use injected ClientIntent to issue targeting");
-      const issued = this.commandComposer.issue(ev);
-      this.commandTarget = this.commandComposer.target;
-      return issued;
-    },
-    addCommandFeedback(type, x, y) {
-      if (clientIntent) throw new Error("Minimap must use injected ClientIntent for command feedback");
-      commands.push({ feedback: type, x, y });
-    },
     entitiesInterpolated() {
       return [];
     },
     players: [],
   };
-  if (commandTarget) state.commandComposer.arm(commandTarget);
   if (commandTarget && clientIntent) clientIntent.beginCommandTarget(commandTarget);
   const camera = {
     centerOn(x, y) {
@@ -134,7 +112,7 @@ function minimapHarness({
       };
   const minimap = new Minimap(canvas, state, camera, null, commandIssuer, router, {
     commandsEnabled,
-    clientIntent: clientIntent || undefined,
+    clientIntent,
   });
   return {
     router,
@@ -145,9 +123,7 @@ function minimapHarness({
     commandIssuer,
     minimap,
     centers,
-    commands,
-    endedTargets,
-    clientIntent: clientIntent || state,
+    clientIntent,
   };
 }
 
@@ -228,8 +204,7 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(h.net.sent.length === 1, "attack-move minimap click sends one command");
   assert(h.net.sent[0].c === "attackMove", "attack command-target sends attack-move");
   assert(h.net.sent[0].queued !== true, "plain minimap attack target does not queue attack-move");
-  assert(h.state.commandTarget === null, "attack command-target exits after minimap click");
-  assert(h.endedTargets.length === 1, "endCommandTarget is called");
+  assert(h.clientIntent.commandTarget === null, "attack command-target exits after minimap click");
   h.minimap.destroy();
 }
 
@@ -256,13 +231,12 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
 {
   const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
   const h = minimapHarness({ selected, commandTarget: "attack" });
-  h.state.commandComposer.hold("attack", "KeyA", { shiftKey: true });
+  h.clientIntent.holdCommandTarget("attack", "KeyA", true);
   assert(h.router.pointerDown(lockedEvent(150, 250, 0, { shiftKey: true })), "first held-A minimap attack click is consumed");
   assert(h.router.pointerDown(lockedEvent(160, 260, 0, { shiftKey: true })), "second held-A minimap attack click is consumed");
   assert(h.net.sent.length === 2, "held-A minimap targeting sends multiple commands");
   assert(h.net.sent.every((command) => command.c === "attackMove" && command.queued === true), "held-A minimap targeting queues attack-move commands");
-  assert(h.state.commandTarget === "attack", "held-A minimap targeting stays armed after queued clicks");
-  assert(h.endedTargets.length === 0, "held-A minimap targeting does not end while queueing");
+  assert(h.clientIntent.commandTarget === "attack", "held-A minimap targeting stays armed after queued clicks");
   h.minimap.destroy();
 }
 

@@ -11,27 +11,27 @@ export function _commitClickSelection(p, additive, ctrl) {
   const world = this._worldAt(p.x, p.y);
   const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
   if (!hit) {
-    if (!additive) this.state.clearSelection();
+    if (!additive) clearSelection(this);
     return;
   }
   if (ctrl && isUnit(hit.kind) && ownOwner(this.state, hit.owner)) {
     const ids = this._closestOwnUnitKindInViewport(hit.kind, hit.x, hit.y, hit);
-    if (additive) this.state.addToSelection(ids);
-    else this.state.setSelection(ids);
+    if (additive) addToSelection(this, ids);
+    else setSelection(this, ids);
     return;
   }
   if (ctrl && isBuilding(hit.kind) && ownOwner(this.state, hit.owner)) {
     const ids = this._ownBuildingsOfKindInViewport(hit.kind);
-    if (additive) this.state.addToSelection(ids);
-    else this.state.setSelection(ids);
+    if (additive) addToSelection(this, ids);
+    else setSelection(this, ids);
     return;
   }
   if (additive) {
-    if (this.state.selection.has(hit.id)) this.state.removeFromSelection([hit.id]);
-    else this.state.addToSelection([hit.id]);
+    if (this.state.selection.has(hit.id)) removeFromSelection(this, [hit.id]);
+    else addToSelection(this, [hit.id]);
     return;
   }
-  else this.state.setSelection([hit.id]);
+  else setSelection(this, [hit.id]);
 }
 
 export function _ownBuildingsOfKindInViewport(kind) {
@@ -117,11 +117,11 @@ export function _commitBoxSelection(drag, additive) {
     ? this._closestIdsToPoint(units, drag.x0, drag.y0)
     : buildings;
   if (picked.length === 0) {
-    if (!additive) this.state.clearSelection();
+    if (!additive) clearSelection(this);
     return;
   }
-  if (additive) this.state.addToSelection(picked);
-  else this.state.setSelection(picked);
+  if (additive) addToSelection(this, picked);
+  else setSelection(this, picked);
 }
 
 export function _closestIdsToPoint(ids, screenX, screenY) {
@@ -164,6 +164,30 @@ function ownOwner(state, owner) {
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;
+}
+
+function closeCommandCardMenu(input) {
+  input?.clientIntent?.closeCommandCardMenu?.();
+}
+
+function setSelection(input, ids) {
+  closeCommandCardMenu(input);
+  input.state.setSelection(ids);
+}
+
+function addToSelection(input, ids) {
+  closeCommandCardMenu(input);
+  input.state.addToSelection(ids);
+}
+
+function removeFromSelection(input, ids) {
+  closeCommandCardMenu(input);
+  input.state.removeFromSelection(ids);
+}
+
+function clearSelection(input) {
+  closeCommandCardMenu(input);
+  input.state.clearSelection();
 }
 
 export function _resourceAtWorld(wx, wy) {

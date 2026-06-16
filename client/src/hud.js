@@ -199,7 +199,7 @@ export class HUD {
     this.commandIssuer = commandIssuer;
     this.audio = audio;
     this.hotkeyProfiles = hotkeyProfiles;
-    this.clientIntent = clientIntent || state?.clientIntent || state;
+    this.clientIntent = clientIntent;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -267,7 +267,7 @@ export class HUD {
   }
 
   _intent() {
-    return this.clientIntent || this.state?.clientIntent || this.state;
+    return this.clientIntent;
   }
 
   // --- Resource / supply bar -------------------------------------------------

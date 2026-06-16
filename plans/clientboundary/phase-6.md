@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -34,11 +34,11 @@ Remove temporary compatibility shims and enforce the new client boundaries.
 
 ## Implementation Checklist
 
-- [ ] Remove compatibility reads and methods.
-- [ ] Tighten architecture checker policy.
-- [ ] Update docs with final boundaries.
-- [ ] Verify suite selection rules.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Remove compatibility reads and methods.
+- [x] Tighten architecture checker policy.
+- [x] Update docs with final boundaries.
+- [x] Verify suite selection rules.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

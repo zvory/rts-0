@@ -39,6 +39,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   imports are allowed, and `app-shell` may compose other areas. Non-shell cross-area imports should
   use dependency injection through `Match`/`App`; if an import is intentional, update
   `ALLOWED_CROSS_AREA_IMPORTS` in `scripts/check-client-architecture.mjs` with a reason.
+- **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,
+  minimap, and renderer feedback. Do not read or write placement, command targeting, command-card
+  mode, previews, or command feedback through `GameState` shims.
 - **Teardown.** Any module that holds DOM/window listeners or GPU resources must implement
   `destroy()`. `Match.destroy()` calls it on every module between matches — omitting it leaks
   listeners/WebGL contexts across rematches.

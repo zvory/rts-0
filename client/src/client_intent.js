@@ -1,11 +1,10 @@
 import { CommandComposer } from "./command_composer.js";
 
 /**
- * Browser-local intent state shared by HUD, input, minimap, and renderer shims.
+ * Browser-local intent state shared by HUD, input, minimap, and renderer feedback.
  *
  * This helper owns transient client decisions that are not part of the
- * authoritative server snapshot. GameState exposes temporary compatibility
- * accessors during the migration so existing callers keep the same shapes.
+ * authoritative server snapshot.
  */
 export class ClientIntent {
   constructor({ now = defaultNow } = {}) {

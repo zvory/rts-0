@@ -321,24 +321,6 @@ export class GameState {
   controlGroups                          // ten budget-admitted Array<entityId> slots; slot 9 maps to key 0
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
   selectControlGroup(slot), controlGroupEntities(slot)
-  // build placement (client-only):
-  clientIntent                           // ClientIntent owner for temporary local intent state
-  commandCardMode                       // null | "workerBuild"
-  openWorkerBuildMenu(), closeCommandCardMenu()
-  placement                              // null | { building, valid, tileX, tileY }
-  beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
-  // command targeting and renderer feedback (client-only, temporary broad-state shim):
-  commandTarget                          // null | "move" | "attack" | "setupAntiTankGuns" | ability target object
-  beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
-  holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
-  releaseCommandTargetShift()
-  commandFeedback                        // short-lived local accepted-click markers
-  liveCommandFeedback(now)
-  antiTankGunSetupPreview                // null | {mouseX, mouseY, guns}
-  abilityTargetPreview                   // null | ability targeting preview view data
-  // resource hover preview (client-only):
-  resourceMiningPreview                  // null | {resourceId, resourceX, resourceY, ccId, ccX, ccY, inRange}
-  updateResourceMiningPreview(preview)
   setOptimisticCommandState(state)        // production/rally optimism display overlay
   setPredictedSnapshot(snapshot, diagnostics, options), clearPredictedSnapshot()
 }
@@ -364,28 +346,26 @@ export class ClientIntent {
 
 #### Client Boundary Migration Target
 
-`Match` remains the app-shell composer and owner of cross-area dependency injection. Runtime modules
-should not gain direct imports across the model, input, UI, minimap, renderer, and prediction areas
-except for pinned mirrors such as `protocol.js` and `config.js`, or for explicitly documented
-architecture-check exceptions. New client behavior should move through constructor-injected
-collaborators and narrow facades that express one boundary at a time.
+`Match` remains the app-shell composer and owner of cross-area dependency injection. It constructs
+`GameState` for authoritative snapshot display data and constructs `ClientIntent` for browser-local
+cursor/command intent, then injects the intent facade into HUD, input, minimap, and renderer
+feedback. Runtime modules should not gain direct imports across the model, input, UI, minimap,
+renderer, and prediction areas except for pinned mirrors such as `protocol.js` and `config.js`, or
+for explicitly documented architecture-check exceptions.
 
 `GameState` is the authoritative browser view of server snapshots, interpolation, selected ids,
 control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
-authoritative snapshots. `ClientIntent` now owns placement intent, command-card submenu state,
-command-target arming, hover previews, renderer feedback, and ability previews while `GameState`
-keeps temporary compatibility accessors with the current shapes above for HUD, input, minimap, and
-renderer callers. Prediction display mutations should migrate into explicit helper objects or view
-models in their owning phase; each compatibility field must preserve the current shape above until
-its owning phase removes all direct reads.
+authoritative snapshots. `ClientIntent` owns placement intent, command-card submenu state,
+command-target arming, hover previews, command feedback, and ability previews. `GameState` must not
+grow compatibility accessors for those intent fields; HUD, input, minimap, and renderer feedback
+use the injected facade or a narrow read model.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
 rather than relying on the full mutable `GameState`. HUD and input should exchange command intent
 through descriptor/facade methods, while gameplay command emission continues to flow through
 `commandIssuer.issueCommand`. `PredictionController` owns client sequence allocation and optimistic
-bookkeeping; `GameState` may apply named display overlays during the shim period but should not own
-prediction policy.
+bookkeeping; `GameState` applies named display overlays but does not own prediction policy.
 
 `camera.js`
 ```js
@@ -603,7 +583,7 @@ abilities. When the HUD command card calls `ClientIntent.beginCommandTarget({ ki
 the input module enters targeted cursor mode:
 - Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
   carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor,
-  update `ClientIntent.abilityTargetPreview` for the renderer shim.
+  update `ClientIntent.abilityTargetPreview` for renderer feedback.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
   hotkey is still held for repeated world-point targeting.
@@ -614,14 +594,14 @@ the input module enters targeted cursor mode:
 - While the resolved hotkey remains held, repeated left-clicks keep the current selection intact and
   keep targeted mode armed so multi-selected Mortar Teams and Scout Cars can distribute repeated
   point commands without the next click falling back to normal selection.
-- Right-click / Escape: cancel cursor mode, `state.commandTarget = null`.
+- Right-click / Escape: cancel cursor mode through `ClientIntent.endCommandTarget()`.
 - Minimap right-click also fires an ability command if in targeted mode.
 Selected owned Mortar Teams also draw dotted firing-range circles even when the Fire command is not
 armed. The Mortar Team Fire command-card button shows an autocast swirl while any selected mortar's
 owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that button sends
 `setAutocast(mortarFire, enabled=false)` and does not arm manual targeting.
 
-`state.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
+`client_intent.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
 (null or `{ ability, mouseX, mouseY, carriers, rangeOrigins, pathOrigins, returnMarkers,
 hoverInRange }`). `commandTarget` is a transient UI state; `abilityTargetPreview` is rebuilt every
 mouse move from the cursor world position and the current selection. Server-projected complex
@@ -727,7 +707,9 @@ and unit layer):
 Client modules are organized by area and checked by `node scripts/check-client-architecture.mjs`.
 The checker classifies every `client/src/**/*.js` file, reports the largest files and fan-in/out
 baseline, rejects unclassified files, and rejects cross-area imports that are not allowed by rule or
-by an explicit allowlist reason in the script.
+by an explicit allowlist reason in the script. It also rejects production reads or writes through
+removed `GameState` intent shims such as `state.commandTarget`, `state.placement`, and preview
+update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,

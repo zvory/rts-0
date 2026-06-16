@@ -1344,49 +1344,9 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     map: { width: 12, height: 12, tileSize: 32, terrain: new Array(144).fill(0), resources: [] },
     players: [{ id: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 }],
   });
-  assert(state.clientIntent instanceof ClientIntent, "GameState composes ClientIntent for transient intent state");
-
-  state.openWorkerBuildMenu();
-  assert(state.commandCardMode === "workerBuild", "worker build menu is tracked on GameState during the shim phase");
-  state.beginPlacement(KIND.DEPOT);
-  assert(state.commandCardMode === null, "beginPlacement closes the worker build submenu");
-  assertDeepEqual(state.placement, {
-    building: KIND.DEPOT,
-    tileX: 0,
-    tileY: 0,
-    valid: false,
-  }, "beginPlacement seeds the renderer placement shape");
-  state.updatePlacement(3, 4, true);
-  assertDeepEqual(state.placement, {
-    building: KIND.DEPOT,
-    tileX: 3,
-    tileY: 4,
-    valid: true,
-  }, "updatePlacement keeps the renderer placement shape stable");
-
-  const armed = state.beginCommandTarget("attack", { now: 100, shiftKey: true });
-  assert(armed.queued, "beginCommandTarget reports queued arms for HUD/input dispatch");
-  assert(state.placement === null, "arming a command target clears build placement");
-  assert(state.commandTarget === "attack", "command target is mirrored on GameState during the shim phase");
-  const issued = state.issueCommandTarget({ shiftKey: true });
-  assert(issued.keepArmed && issued.target === "attack", "shift-issued command targets remain armed for queued clicks");
-  state.releaseCommandTargetShift();
-  assert(state.commandTarget === null, "releasing Shift clears a tap-preserved command target");
-
-  state.updateAntiTankGunSetupPreview({ mouseX: 100, mouseY: 120, guns: [] });
-  state.updateAbilityTargetPreview({
-    ability: ABILITY.SMOKE,
-    mouseX: 100,
-    mouseY: 120,
-    carriers: [],
-    rangePx: 64,
-    hoverInRange: true,
-  });
-  state.beginCommandTarget("move", { now: 500 });
-  assert(state.antiTankGunSetupPreview === null, "changing command targets clears support-weapon preview state");
-  assert(state.abilityTargetPreview === null, "changing command targets clears ability preview state");
-  assert(state.issueCommandTarget({}).keepArmed === false, "plain target clicks clear the armed target");
-  assert(state.commandTarget === null, "plain target clicks clear the GameState commandTarget shim");
+  assert(!("clientIntent" in state), "GameState no longer owns browser-local intent state");
+  assert(!("placement" in state), "GameState no longer exposes placement intent shims");
+  assert(!("commandTarget" in state), "GameState no longer exposes command-target intent shims");
 
   const explicitHudIntent = new ClientIntent();
   const facadeHud = Object.create(HUD.prototype);
@@ -1443,21 +1403,6 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       tileSize: 32,
       resources: [{ id: 200, kind: KIND.STEEL, x: 80, y: 112, remaining: 900 }],
     },
-    placement: { building: KIND.CITY_CENTRE, tileX: 2, tileY: 3, valid: true },
-    antiTankGunSetupPreview: {
-      mouseX: 180,
-      mouseY: 128,
-      guns: [{ kind: KIND.ANTI_TANK_GUN, x: 128, y: 128 }],
-    },
-    abilityTargetPreview: {
-      ability: ABILITY.SMOKE,
-      mouseX: 180,
-      mouseY: 128,
-      carriers: [{ kind: KIND.SCOUT_CAR, x: 128, y: 128 }],
-      rangePx: 96,
-      radiusPx: 24,
-      hoverInRange: true,
-    },
     abilityObjects: [{
       id: 9,
       owner: 1,
@@ -1466,23 +1411,10 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       x: 220,
       y: 240,
     }],
-    resourceMiningPreview: {
-      resourceId: 200,
-      resourceX: 80,
-      resourceY: 112,
-      ccId: 3,
-      ccX: 220,
-      ccY: 220,
-      inRange: false,
-    },
     smokes: [{ id: 1, x: 64, y: 80, radiusTiles: 2 }],
     selectedEntities() {
       selectedReads += 1;
       return selected;
-    },
-    liveCommandFeedback(now) {
-      commandFeedbackNow = now;
-      return [{ kind: "move", x: 96, y: 128, append: true, createdAt: now - 100 }];
     },
     liveSmokeCanisters() { return []; },
     liveMortarLaunches() { return []; },
@@ -1500,7 +1432,38 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       return false;
     },
   };
+  const feedbackIntent = {
+    placement: { building: KIND.CITY_CENTRE, tileX: 2, tileY: 3, valid: true },
+    antiTankGunSetupPreview: {
+      mouseX: 180,
+      mouseY: 128,
+      guns: [{ kind: KIND.ANTI_TANK_GUN, x: 128, y: 128 }],
+    },
+    abilityTargetPreview: {
+      ability: ABILITY.SMOKE,
+      mouseX: 180,
+      mouseY: 128,
+      carriers: [{ kind: KIND.SCOUT_CAR, x: 128, y: 128 }],
+      rangePx: 96,
+      radiusPx: 24,
+      hoverInRange: true,
+    },
+    resourceMiningPreview: {
+      resourceId: 200,
+      resourceX: 80,
+      resourceY: 112,
+      ccId: 3,
+      ccX: 220,
+      ccY: 220,
+      inRange: false,
+    },
+    liveCommandFeedback(now) {
+      commandFeedbackNow = now;
+      return [{ kind: "move", x: 96, y: 128, append: true, createdAt: now - 100 }];
+    },
+  };
   const feedbackView = buildRendererFeedbackView(feedbackState, {
+    clientIntent: feedbackIntent,
     entities: selected,
     now: 1500,
   });
@@ -3805,6 +3768,7 @@ function fakeAudioContext() {
   }
   function renderCommandCard(hud) {
     if (!hud.elCommand) hud.elCommand = fakeElement("div");
+    if (!hud.clientIntent) hud.clientIntent = new ClientIntent();
     hud._renderCommandCard();
     return hud.elCommand;
   }
@@ -4000,8 +3964,8 @@ function fakeAudioContext() {
     const multiBreakthroughButton = renderedButtons.find((button) => button.innerHTML.includes("Breakthrough"));
     multiBreakthroughButton.dispatchEvent({ type: "mouseenter" });
     assert(
-      commandCarHud.state.abilityTargetPreview?.areaOrigins.length === 1 &&
-        commandCarHud.state.abilityTargetPreview.areaOrigins[0].id === centralCommandCar.id,
+      commandCarHud.clientIntent.abilityTargetPreview?.areaOrigins.length === 1 &&
+        commandCarHud.clientIntent.abilityTargetPreview.areaOrigins[0].id === centralCommandCar.id,
       "Breakthrough hover preview should show only the Command Car that would activate",
     );
     multiBreakthroughButton.click({});
@@ -4185,7 +4149,8 @@ function fakeAudioContext() {
     shortResourceHud._cardSig = null;
     shortResourceHud._resourceIcons = {};
 
-    shortResourceHud.state.commandCardMode = "workerBuild";
+    shortResourceHud.clientIntent = new ClientIntent();
+    shortResourceHud.clientIntent.openWorkerBuildMenu();
     renderCommandCard(shortResourceHud);
     const barracksButton = renderedButtons.find((button) => button.innerHTML.includes("Barracks"));
     const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Vehicle Works"));
@@ -4262,12 +4227,14 @@ function fakeAudioContext() {
     const setupInput = Object.create(Input.prototype);
     setupInput.state = {
       playerId,
-      commandTarget: "setupAntiTankGuns",
       selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
-      addCommandFeedback() {},
     };
+    setupInput.clientIntent = new ClientIntent();
+    setupInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
+    setupInput.clientIntent.addCommandFeedback = () => {};
     setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
     setupInput._worldAt = (x, y) => ({ x, y });
+    setupInput._entityAtWorld = () => null;
     setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id];
     setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
     assert(
@@ -4346,9 +4313,9 @@ function fakeAudioContext() {
   assert(state.currRecvTime === null, "currRecvTime null before snapshots");
   assert(state.resources !== undefined, "GameState.resources");
   assert(Array.isArray(state.events), "GameState.events");
-  assert(state.resourceMiningPreview === null, "GameState.resourceMiningPreview initially null");
-  assert(state.antiTankGunSetupPreview === null, "GameState.antiTankGunSetupPreview initially null");
-  assertHasMethod(state, "updateResourceMiningPreview", "GameState");
+  assert(!("resourceMiningPreview" in state), "GameState no longer exposes resource preview shims");
+  assert(!("antiTankGunSetupPreview" in state), "GameState no longer exposes support preview shims");
+  assert(!("updateResourceMiningPreview" in state), "GameState no longer exposes preview update shims");
   assert(state.selection instanceof Set, "GameState.selection");
   assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
   assert(state.debugPathOverlaysEnabled === false, "GameState leaves waypoint diagnostics off by default");
@@ -4357,13 +4324,10 @@ function fakeAudioContext() {
   assertHasMethod(state, "clearSelection", "GameState");
   assertHasMethod(state, "selectedEntities", "GameState");
   assertHasMethod(state, "entityById", "GameState");
-  assert(state.commandCardMode === null, "GameState.commandCardMode initially null");
-  assertHasMethod(state, "openWorkerBuildMenu", "GameState");
-  assertHasMethod(state, "closeCommandCardMenu", "GameState");
-  assert(state.placement === null, "GameState.placement initially null");
-  assertHasMethod(state, "beginPlacement", "GameState");
-  assertHasMethod(state, "updatePlacement", "GameState");
-  assertHasMethod(state, "endPlacement", "GameState");
+  assert(!("commandCardMode" in state), "GameState no longer exposes command-card intent shims");
+  assert(!("openWorkerBuildMenu" in state), "GameState no longer exposes command-card methods");
+  assert(!("placement" in state), "GameState no longer exposes placement intent shims");
+  assert(!("beginPlacement" in state), "GameState no longer exposes placement methods");
 
   const debugState = new GameState({
     ...start,
@@ -4406,23 +4370,6 @@ function fakeAudioContext() {
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
   assert(state.entityById(200).remaining === 0, "visible resource death tombstones known resource");
   assert(state.entityById(201).remaining === 3333, "untouched resources keep their last-known amount");
-  state.updateResourceMiningPreview({
-    resourceId: 200,
-    resourceX: 64,
-    resourceY: 96,
-    ccId: 3,
-    ccX: 48,
-    ccY: 48,
-    inRange: true,
-  });
-  assert(state.resourceMiningPreview?.resourceId === 200, "resource mining preview stores hover link");
-  state.updateResourceMiningPreview(null);
-  assert(state.resourceMiningPreview === null, "resource mining preview can be cleared");
-  state.updateAntiTankGunSetupPreview({ mouseX: 1, mouseY: 2, guns: [{ id: 9 }] });
-  assert(state.antiTankGunSetupPreview?.guns?.[0]?.id === 9, "Anti-Tank Gun setup preview stores selected guns");
-  state.endCommandTarget();
-  assert(state.antiTankGunSetupPreview === null, "ending command target clears Anti-Tank Gun setup preview");
-
   const artilleryState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   artilleryState.applySnapshot({
     tick: 10,
@@ -4729,25 +4676,23 @@ function fakeAudioContext() {
   assert(controlGroupCommands.length === 1, "legal recalled control-group command is sent through the budget guard");
   assert(controlGroupToasts.length === 1, "over-budget command restored from stale group data is blocked before send");
 
-  // Command-card submenu is local-only and is closed by mode-changing actions.
-  state.openWorkerBuildMenu();
-  assert(state.commandCardMode === "workerBuild", "worker build submenu opens");
-  assert(state.closeCommandCardMenu() === true, "closeCommandCardMenu reports an open submenu");
-  assert(state.closeCommandCardMenu() === false, "closeCommandCardMenu reports when no submenu was open");
-  state.openWorkerBuildMenu();
-  state.beginCommandTarget("attack");
-  assert(state.commandCardMode === null, "command targeting closes the worker build submenu");
-  assert(state.commandTarget === "attack", "command targeting mirrors the composer target");
-  const queuedIssue = state.issueCommandTarget({ shiftKey: true });
-  assert(queuedIssue.keepArmed && state.commandTarget === "attack", "Shift-issued command remains armed");
-  state.releaseCommandTargetShift();
-  assert(state.commandTarget === null, "Shift release clears a Shift-preserved command target");
-  state.openWorkerBuildMenu();
-  state.beginPlacement(KIND.DEPOT);
-  assert(state.commandCardMode === null, "build placement closes the worker build submenu");
-  state.openWorkerBuildMenu();
-  state.setSelection([1]);
-  assert(state.commandCardMode === null, "selection replacement closes the worker build submenu");
+  // Command-card submenu is local-only and is closed by mode-changing intent actions.
+  const commandCardIntent = new ClientIntent();
+  commandCardIntent.openWorkerBuildMenu();
+  assert(commandCardIntent.commandCardMode === "workerBuild", "worker build submenu opens");
+  assert(commandCardIntent.closeCommandCardMenu() === true, "closeCommandCardMenu reports an open submenu");
+  assert(commandCardIntent.closeCommandCardMenu() === false, "closeCommandCardMenu reports when no submenu was open");
+  commandCardIntent.openWorkerBuildMenu();
+  commandCardIntent.beginCommandTarget("attack");
+  assert(commandCardIntent.commandCardMode === null, "command targeting closes the worker build submenu");
+  assert(commandCardIntent.commandTarget === "attack", "command targeting mirrors the composer target");
+  const queuedIssue = commandCardIntent.issueCommandTarget({ shiftKey: true });
+  assert(queuedIssue.keepArmed && commandCardIntent.commandTarget === "attack", "Shift-issued command remains armed");
+  commandCardIntent.releaseCommandTargetShift();
+  assert(commandCardIntent.commandTarget === null, "Shift release clears a Shift-preserved command target");
+  commandCardIntent.openWorkerBuildMenu();
+  commandCardIntent.beginPlacement(KIND.DEPOT);
+  assert(commandCardIntent.commandCardMode === null, "build placement closes the worker build submenu");
 
   // Control groups are local-only, own controllable entities only, and budgeted like selection.
   const cgState = new GameState({ ...start, map: { ...start.map, resources: [] } });
@@ -4983,14 +4928,15 @@ function fakeAudioContext() {
   );
 
   // Placement is local-only
-  state.beginPlacement("barracks");
-  assert(state.placement !== null, "placement started");
-  state.updatePlacement(2, 3, true);
-  assert(state.placement.tileX === 2, "updatePlacement sets tileX");
-  assert(state.placement.tileY === 3, "updatePlacement sets tileY");
-  assert(state.placement.valid === true, "updatePlacement sets valid");
-  state.endPlacement();
-  assert(state.placement === null, "endPlacement clears placement");
+  const placementIntent = new ClientIntent();
+  placementIntent.beginPlacement("barracks");
+  assert(placementIntent.placement !== null, "placement started");
+  placementIntent.updatePlacement(2, 3, true);
+  assert(placementIntent.placement.tileX === 2, "updatePlacement sets tileX");
+  assert(placementIntent.placement.tileY === 3, "updatePlacement sets tileY");
+  assert(placementIntent.placement.valid === true, "updatePlacement sets valid");
+  placementIntent.endPlacement();
+  assert(placementIntent.placement === null, "endPlacement clears placement");
 
   const map = { width: 6, height: 6, tileSize: 32, terrain: new Array(36).fill(0) };
   const worker = { id: 7, owner: 1, kind: "worker", x: 80, y: 80 };
@@ -5233,15 +5179,14 @@ function fakeAudioContext() {
   let menuClosed = 0;
   let selectionCleared = 0;
   menuCancelInput.state = {
-    placement: null,
-    commandTarget: null,
-    closeCommandCardMenu() {
-      menuClosed += 1;
-      return true;
-    },
     clearSelection() {
       selectionCleared += 1;
     },
+  };
+  menuCancelInput.clientIntent = new ClientIntent();
+  menuCancelInput.clientIntent.closeCommandCardMenu = () => {
+    menuClosed += 1;
+    return true;
   };
   menuCancelInput._cancel();
   assert(menuClosed === 1, "Esc closes the worker build submenu first");
@@ -5278,33 +5223,15 @@ function fakeAudioContext() {
   const sentCommands = [];
   const selectionClicks = [];
   const feedback = [];
-  targetedInput.state = {
-    placement: null,
-    commandTarget: "attack",
-    commandComposer: new CommandComposer(),
-    playerId: 1,
-    addCommandFeedback(kind, x, y) {
-      feedback.push({ kind, x, y });
-    },
-    endCommandTarget() {
-      this.commandComposer.cancel();
-      this.commandTarget = null;
-    },
-    issueCommandTarget(ev = {}) {
-      const issued = this.commandComposer.issue(ev);
-      this.commandTarget = this.commandComposer.target;
-      return issued;
-    },
-    holdCommandTarget(kind, key, shiftKey = false) {
-      this.commandComposer.hold(kind, key, { shiftKey });
-      this.commandTarget = this.commandComposer.target;
-    },
-    releaseCommandTargetKey(key, shiftKey = false) {
-      this.commandComposer.releaseKey(key, { shiftKey });
-      this.commandTarget = this.commandComposer.target;
-    },
+  const targetedIntent = new ClientIntent();
+  targetedIntent.addCommandFeedback = (kind, x, y) => {
+    feedback.push({ kind, x, y });
   };
-  targetedInput.state.commandComposer.arm("attack");
+  targetedIntent.beginCommandTarget("attack");
+  targetedInput.state = {
+    playerId: 1,
+  };
+  targetedInput.clientIntent = targetedIntent;
   targetedInput.renderer = { drawSelectionBox() {} };
   targetedInput.commandIssuer = { issueCommand: (command) => sentCommands.push(command) };
   targetedInput._worldAt = (x, y) => ({ x, y });
@@ -5314,7 +5241,7 @@ function fakeAudioContext() {
   targetedInput._screenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
   targetedInput._trackMouse = () => {};
   targetedInput._onLeftDown({ x: 200, y: 200 }, {});
-  assert(targetedInput.state.commandTarget === null, "attack targeting clears after one click");
+  assert(targetedInput.clientIntent.commandTarget === null, "attack targeting clears after one click");
   assert(sentCommands.length === 1, "own click while attack targeting should issue one command");
   assert(sentCommands[0].c === "attackMove", "own click while attack targeting should attack-move");
   assert(sentCommands[0].units.join(",") === "7", "attack-move should use selected own units");
@@ -5331,7 +5258,7 @@ function fakeAudioContext() {
   });
   assert(selectionClicks.length === 0, "attack targeting click should not also select on mouse-up");
 
-  targetedInput.state.commandTarget = null;
+  targetedInput.clientIntent.endCommandTarget();
   targetedInput._drag = null;
   targetedInput._entityAtWorld = () => null;
   targetedInput._onLeftDown({ x: 240, y: 240 }, {});
@@ -5346,23 +5273,20 @@ function fakeAudioContext() {
   assert(sentCommands.length === 1, "a second click without another A press should not issue attack-move");
   assert(selectionClicks.length === 1, "a second click without another A press should be normal selection");
 
-  targetedInput.state.commandTarget = "move";
-  targetedInput.state.commandComposer.arm("move");
+  targetedInput.clientIntent.beginCommandTarget("move");
   targetedInput._onLeftDown({ x: 260, y: 260 }, { shiftKey: true });
   let lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "move", "move targeting should issue a move command");
   assert(lastSent.queued === true, "Shift move targeting should queue movement");
 
-  targetedInput.state.commandTarget = "attack";
-  targetedInput.state.commandComposer.arm("attack");
+  targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput._entityAtWorld = () => null;
   targetedInput._onLeftDown({ x: 280, y: 280 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "attackMove", "attack targeting terrain should attack-move");
   assert(lastSent.queued === true, "Shift attack-move targeting should queue attack-move");
 
-  targetedInput.state.commandTarget = "attack";
-  targetedInput.state.commandComposer.arm("attack");
+  targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput._entityAtWorld = () => ({ id: 99, owner: 2, kind: KIND.RIFLEMAN, x: 300, y: 300 });
   targetedInput._onLeftDown({ x: 300, y: 300 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
@@ -5372,12 +5296,12 @@ function fakeAudioContext() {
     "Shift enemy attack targeting should queue attack",
   );
 
-  targetedInput.state.commandTarget = "attack";
-  targetedInput.state.commandComposer.hold("attack", "KeyA", { shiftKey: true });
+  targetedInput.clientIntent.beginCommandTarget("attack");
+  targetedInput.clientIntent.holdCommandTarget("attack", "KeyA", true);
   targetedInput._entityAtWorld = () => null;
   targetedInput._onLeftDown({ x: 320, y: 320 }, { shiftKey: true });
   assert(
-    targetedInput.state.commandTarget === "attack",
+    targetedInput.clientIntent.commandTarget === "attack",
     "Shift attack targeting should stay armed while A is held",
   );
   targetedInput._onLeftDown({ x: 340, y: 340 }, { shiftKey: true });
@@ -5390,15 +5314,15 @@ function fakeAudioContext() {
   );
   targetedInput._onLeftDown({ x: 360, y: 360 }, { shiftKey: false });
   assert(
-    targetedInput.state.commandTarget === "attack",
+    targetedInput.clientIntent.commandTarget === "attack",
     "held A keeps attack targeting armed after an unqueued click",
   );
 
-  targetedInput.state.commandComposer.cancel();
-  targetedInput.state.commandTarget = "attack";
-  targetedInput.state.commandComposer.hold("attack", "KeyA");
+  targetedInput.clientIntent.endCommandTarget();
+  targetedInput.clientIntent.beginCommandTarget("attack");
+  targetedInput.clientIntent.holdCommandTarget("attack", "KeyA");
   targetedInput._handleKeyUp({ code: "KeyA", preventDefault() {} });
-  assert(targetedInput.state.commandTarget === null, "A keyup exits sticky attack targeting");
+  assert(targetedInput.clientIntent.commandTarget === null, "A keyup exits sticky attack targeting");
 
   const originalDocument = globalThis.document;
   const hotkeyTargetedInput = Object.create(Input.prototype);
@@ -5412,39 +5336,8 @@ function fakeAudioContext() {
   hotkeyTargetedInput._issueTargetedCommand = (p, ev) => {
     hotkeyIssues.push({ issuedAt: p, queued: !!ev.shiftKey });
   };
-  hotkeyTargetedInput.state = {
-    commandTarget: null,
-    commandComposer: new CommandComposer(),
-    lastCommandTargetArm: null,
-    beginCommandTarget(kind, options = {}) {
-      const armed = this.commandComposer.arm(kind, options);
-      this.lastCommandTargetArm = armed;
-      this.commandTarget = this.commandComposer.target;
-      return armed;
-    },
-    endCommandTarget() {
-      this.commandComposer.cancel();
-      this.commandTarget = null;
-      this.lastCommandTargetArm = null;
-    },
-    issueCommandTarget(ev = {}) {
-      const issued = this.commandComposer.issue(ev);
-      this.commandTarget = this.commandComposer.target;
-      return issued;
-    },
-    holdCommandTarget(kind, key, shiftKey = false) {
-      this.commandComposer.hold(kind, key, { shiftKey });
-      this.commandTarget = this.commandComposer.target;
-    },
-    releaseCommandTargetKey(key, shiftKey = false) {
-      this.commandComposer.releaseKey(key, { shiftKey });
-      this.commandTarget = this.commandComposer.target;
-    },
-    releaseCommandTargetShift() {
-      this.commandComposer.releaseShift();
-      this.commandTarget = this.commandComposer.target;
-    },
-  };
+  hotkeyTargetedInput.state = {};
+  hotkeyTargetedInput.clientIntent = new ClientIntent();
   globalThis.document = {
     getElementById(id) {
       assert(id === "command-card", "command hotkeys should query the command card");
@@ -5455,7 +5348,7 @@ function fakeAudioContext() {
             dataset: { hotkey: "Y" },
             disabled: false,
             click() {
-              hotkeyTargetedInput.state.beginCommandTarget("attack", { now: 100 + hotkeyIssues.length * 100 });
+              hotkeyTargetedInput.clientIntent.beginCommandTarget("attack", { now: 100 + hotkeyIssues.length * 100 });
             },
           }];
         },
@@ -5464,13 +5357,13 @@ function fakeAudioContext() {
   };
   hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA"));
   assert(
-    hotkeyTargetedInput.state.commandTarget === null && hotkeyIssues.length === 0,
+    hotkeyTargetedInput.clientIntent.commandTarget === null && hotkeyIssues.length === 0,
     "unbound legacy A key should not arm attack when Attack is rebound",
   );
   hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY"));
   hotkeyTargetedInput._handleKeyUp({ code: "KeyY", shiftKey: false, preventDefault() {} });
   assert(
-    hotkeyTargetedInput.state.commandTarget === "attack",
+    hotkeyTargetedInput.clientIntent.commandTarget === "attack",
     "plain targeted-order hotkey tap should stay armed after keyup",
   );
   hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY"));
@@ -5479,7 +5372,7 @@ function fakeAudioContext() {
     "second same targeted-order hotkey should quick-cast at the cursor",
   );
   assert(
-    hotkeyTargetedInput.state.commandTarget === null,
+    hotkeyTargetedInput.clientIntent.commandTarget === null,
     "unqueued quick-cast should consume the armed targeted order",
   );
 
@@ -5490,27 +5383,27 @@ function fakeAudioContext() {
     "Shift double-tap targeted-order hotkey should quick-cast a queued order at the cursor",
   );
   assert(
-    hotkeyTargetedInput.state.commandTarget === "attack",
+    hotkeyTargetedInput.clientIntent.commandTarget === "attack",
     "Shift quick-cast should keep the targeted order armed until Shift is released",
   );
   hotkeyTargetedInput._handleKeyUp({ code: "KeyY", shiftKey: true, preventDefault() {} });
   hotkeyTargetedInput._handleKeyUp({ code: "ShiftLeft", preventDefault() {} });
-  assert(hotkeyTargetedInput.state.commandTarget === null, "Shift release clears the queued hotkey target");
+  assert(hotkeyTargetedInput.clientIntent.commandTarget === null, "Shift release clears the queued hotkey target");
   globalThis.document = originalDocument;
 
   const placementKeyInput = Object.create(Input.prototype);
   let placementEnded = 0;
   let commandTargetShiftReleased = 0;
   let shiftKeyupPrevented = false;
-  placementKeyInput.state = {
-    placement: { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true },
-    releaseCommandTargetShift() {
-      commandTargetShiftReleased += 1;
-    },
-    endPlacement() {
-      placementEnded += 1;
-      this.placement = null;
-    },
+  placementKeyInput.state = {};
+  placementKeyInput.clientIntent = new ClientIntent();
+  placementKeyInput.clientIntent.placement = { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true };
+  placementKeyInput.clientIntent.releaseCommandTargetShift = () => {
+    commandTargetShiftReleased += 1;
+  };
+  placementKeyInput.clientIntent.endPlacement = () => {
+    placementEnded += 1;
+    placementKeyInput.clientIntent.placement = null;
   };
   placementKeyInput._handleKeyUp({
     code: "ShiftRight",
@@ -5519,7 +5412,7 @@ function fakeAudioContext() {
     },
   });
   assert(commandTargetShiftReleased === 1, "Shift release still clears command-target preservation");
-  assert(placementEnded === 1 && placementKeyInput.state.placement === null, "Shift release clears build placement");
+  assert(placementEnded === 1 && placementKeyInput.clientIntent.placement === null, "Shift release clears build placement");
   assert(shiftKeyupPrevented === true, "Shift placement release prevents browser default");
 
   const placementBlurInput = Object.create(Input.prototype);
@@ -5530,16 +5423,16 @@ function fakeAudioContext() {
   placementBlurInput._spacePan = true;
   placementBlurInput._panDrag = { x: 1, y: 2, button: 1 };
   placementBlurInput._drag = null;
-  placementBlurInput.state = {
-    placement: { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true },
-    endCommandTarget() {},
-    endPlacement() {
-      blurPlacementEnded += 1;
-      this.placement = null;
-    },
+  placementBlurInput.state = {};
+  placementBlurInput.clientIntent = new ClientIntent();
+  placementBlurInput.clientIntent.placement = { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true };
+  placementBlurInput.clientIntent.endCommandTarget = () => {};
+  placementBlurInput.clientIntent.endPlacement = () => {
+    blurPlacementEnded += 1;
+    placementBlurInput.clientIntent.placement = null;
   };
   placementBlurInput._handleBlur();
-  assert(blurPlacementEnded === 1 && placementBlurInput.state.placement === null, "window blur clears build placement");
+  assert(blurPlacementEnded === 1 && placementBlurInput.clientIntent.placement === null, "window blur clears build placement");
 
   const placementConfirmInput = Object.create(Input.prototype);
   const placementCommands = [];
@@ -5549,12 +5442,12 @@ function fakeAudioContext() {
       placementCommands.push(command);
     },
   };
-  placementConfirmInput.state = {
-    placement: { building: KIND.DEPOT, tileX: 4, tileY: 5, valid: true },
-    endPlacement() {
-      confirmedPlacementEnded += 1;
-      this.placement = null;
-    },
+  placementConfirmInput.state = {};
+  placementConfirmInput.clientIntent = new ClientIntent();
+  placementConfirmInput.clientIntent.placement = { building: KIND.DEPOT, tileX: 4, tileY: 5, valid: true };
+  placementConfirmInput.clientIntent.endPlacement = () => {
+    confirmedPlacementEnded += 1;
+    placementConfirmInput.clientIntent.placement = null;
   };
   placementConfirmInput._selectedWorkerIds = () => [77];
   placementConfirmInput._confirmPlacement();
@@ -5576,14 +5469,12 @@ function fakeAudioContext() {
   pointFireInput.state = {
     playerId: 1,
     map: { tileSize: 32 },
-    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
     selectedEntities: () => [selectedArtillery],
-    updateAbilityTargetPreview(preview) {
-      this.abilityTargetPreview = preview;
-    },
-    addCommandFeedback(kind, x, y, queued, radiusTiles) {
-      artilleryFeedback.push({ kind, x, y, queued, radiusTiles });
-    },
+  };
+  pointFireInput.clientIntent = new ClientIntent();
+  pointFireInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  pointFireInput.clientIntent.addCommandFeedback = (kind, x, y, queued, radiusTiles) => {
+    artilleryFeedback.push({ kind, x, y, queued, radiusTiles });
   };
   pointFireInput.commandIssuer = { issueCommand: (command) => artilleryCommands.push(command) };
   pointFireInput._worldAt = (x, y) => ({ x, y });
@@ -5603,28 +5494,28 @@ function fakeAudioContext() {
 
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
-  assert(pointFireInput.state.abilityTargetPreview?.hoverInRange === false, "Point Fire preview rejects the minimum range dead zone");
-  assert(pointFireInput.state.abilityTargetPreview?.hoverInsideMinRange === true, "Point Fire preview identifies minimum range invalidity");
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === false, "Point Fire preview rejects the minimum range dead zone");
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === true, "Point Fire preview identifies minimum range invalidity");
   assert(
-    pointFireInput.state.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32,
+    pointFireInput.clientIntent.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32,
     "Point Fire preview exposes minimum range in pixels",
   );
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
-  assert(pointFireInput.state.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
-  assert(pointFireInput.state.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview clears minimum range invalidity outside the dead zone");
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
+  assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview clears minimum range invalidity outside the dead zone");
 
   const previewGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
     { _feedbackGfx: previewGfx },
-    { abilityTargetPreview: { ...pointFireInput.state.abilityTargetPreview, carriers: [] } },
+    { abilityTargetPreview: { ...pointFireInput.clientIntent.abilityTargetPreview, carriers: [] } },
   );
   const validHorizontalStroke = previewGfx.calls.some(
     (call, i, calls) =>
       call[0] === "moveTo" &&
-      call[2] === pointFireInput.state.abilityTargetPreview.mouseY &&
+      call[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY &&
       calls[i + 1]?.[0] === "lineTo" &&
-      calls[i + 1]?.[2] === pointFireInput.state.abilityTargetPreview.mouseY,
+      calls[i + 1]?.[2] === pointFireInput.clientIntent.abilityTargetPreview.mouseY,
   );
   assert(validHorizontalStroke, "Point Fire valid cursor keeps the crosshair stroke");
 
@@ -5633,14 +5524,14 @@ function fakeAudioContext() {
   const invalidGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
     { _feedbackGfx: invalidGfx },
-    { abilityTargetPreview: { ...pointFireInput.state.abilityTargetPreview, carriers: [] } },
+    { abilityTargetPreview: { ...pointFireInput.clientIntent.abilityTargetPreview, carriers: [] } },
   );
   const invalidDiagonalStroke = invalidGfx.calls.some(
     (call, i, calls) =>
       call[0] === "moveTo" &&
-      call[2] < pointFireInput.state.abilityTargetPreview.mouseY &&
+      call[2] < pointFireInput.clientIntent.abilityTargetPreview.mouseY &&
       calls[i + 1]?.[0] === "lineTo" &&
-      calls[i + 1]?.[2] > pointFireInput.state.abilityTargetPreview.mouseY,
+      calls[i + 1]?.[2] > pointFireInput.clientIntent.abilityTargetPreview.mouseY,
   );
   assert(invalidDiagonalStroke, "Point Fire invalid minimum-range cursor draws an X");
 
@@ -5650,7 +5541,6 @@ function fakeAudioContext() {
   ekatInput.state = {
     playerId: 1,
     map: { tileSize: 32 },
-    commandTarget: { kind: "ability", ability: ABILITY.EKAT_LINE_SHOT },
     abilityObjects: [
       {
         id: 901,
@@ -5671,15 +5561,14 @@ function fakeAudioContext() {
       },
     ],
     selectedEntities: () => [ekatEntity],
-    updateAbilityTargetPreview(preview) {
-      this.abilityTargetPreview = preview;
-    },
   };
+  ekatInput.clientIntent = new ClientIntent();
+  ekatInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_LINE_SHOT });
   ekatInput._worldAt = (x, y) => ({ x, y });
   ekatInput._refreshAbilityTargetPreview();
-  assert(ekatInput.state.abilityTargetPreview?.pathOrigins.length === 2, "Ekat line preview includes caster plus owned anchor origin");
+  assert(ekatInput.clientIntent.abilityTargetPreview?.pathOrigins.length === 2, "Ekat line preview includes caster plus owned anchor origin");
   assert(
-    ekatInput.state.abilityTargetPreview.pathOrigins.some((origin) => origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR),
+    ekatInput.clientIntent.abilityTargetPreview.pathOrigins.some((origin) => origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR),
     "Ekat line preview marks anchor origin kind",
   );
 
@@ -5688,7 +5577,6 @@ function fakeAudioContext() {
   returnInput.state = {
     playerId: 1,
     map: { tileSize: 32 },
-    commandTarget: { kind: "ability", ability: ABILITY.EKAT_TELEPORT },
     abilityObjects: [
       {
         id: 903,
@@ -5701,13 +5589,12 @@ function fakeAudioContext() {
       },
     ],
     selectedEntities: () => [ekatEntity],
-    updateAbilityTargetPreview(preview) {
-      this.abilityTargetPreview = preview;
-    },
   };
+  returnInput.clientIntent = new ClientIntent();
+  returnInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_TELEPORT });
   returnInput._worldAt = (x, y) => ({ x, y });
   returnInput._refreshAbilityTargetPreview();
-  assert(returnInput.state.abilityTargetPreview?.returnMarkers[0]?.id === 903, "Ekat dash preview exposes owned return marker preview");
+  assert(returnInput.clientIntent.abilityTargetPreview?.returnMarkers[0]?.id === 903, "Ekat dash preview exposes owned return marker preview");
 
   const abilityObjectGfx = new RecordingGraphics();
   _drawAbilityObjects.call(

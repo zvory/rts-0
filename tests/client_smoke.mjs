@@ -118,6 +118,7 @@ try {
     const worker = s.entitiesInterpolated(1, { includePrediction: false })
       .find((e) => e.owner === s.playerId && e.kind === "worker");
     if (!worker) return { ready: true, worker: false };
+    m.clientIntent.closeCommandCardMenu();
     s.setSelection([worker.id]);
     const before = { x: worker.x, y: worker.y };
     const issued = m.commandIssuer.issueCommand({
@@ -216,7 +217,7 @@ try {
   await page.keyboard.press("z");
   await sleep(150);
   ok(
-    await page.evaluate(() => window.__rts.match.state.commandCardMode === "workerBuild"),
+    await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
     "worker build hotkey opened the build submenu",
   );
   await page.waitForFunction(() => {
@@ -227,11 +228,11 @@ try {
 
   await page.keyboard.press("w");
   await sleep(150);
-  let depotPlacement = await page.evaluate(() => window.__rts.match.state.placement?.building);
+  let depotPlacement = await page.evaluate(() => window.__rts.match.clientIntent.placement?.building);
   if (depotPlacement !== "depot") {
     await page.click('#command-card button[data-hotkey="W"]');
     await sleep(150);
-    depotPlacement = await page.evaluate(() => window.__rts.match.state.placement?.building);
+    depotPlacement = await page.evaluate(() => window.__rts.match.clientIntent.placement?.building);
   }
   ok(depotPlacement === "depot", "Depot build control entered placement mode");
 
@@ -262,7 +263,7 @@ try {
   for (const candidate of candidates) {
     await page.mouse.move(box.x + candidate.sx, box.y + candidate.sy, { steps: 4 });
     await sleep(60);
-    const valid = await page.evaluate(() => !!window.__rts.match.state.placement?.valid);
+    const valid = await page.evaluate(() => !!window.__rts.match.clientIntent.placement?.valid);
     if (!valid) continue;
     target = candidate;
     await page.mouse.click(box.x + candidate.sx, box.y + candidate.sy);
@@ -272,7 +273,7 @@ try {
     }
     if (depot) break;
     // Build was rejected (worker died, server occupancy disagreed, etc.); re-enter placement and try the next candidate.
-    await page.evaluate(() => window.__rts.match.state.endPlacement?.());
+    await page.evaluate(() => window.__rts.match.clientIntent.endPlacement?.());
     await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.press("s");
     await sleep(150);
@@ -281,9 +282,12 @@ try {
   ok(depot, "BUILD: placing a Supply Depot created an own depot entity (server round-trip)");
 
   const trainBtn = await page.evaluate(() => {
-    const s = window.__rts.match.state, cityCentre = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    const m = window.__rts.match, s = m.state;
+    const cityCentre = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
     if (!cityCentre) return false;
-    s.setSelection([cityCentre.id]); window.__rts.match.hud.update();
+    m.clientIntent.closeCommandCardMenu();
+    s.setSelection([cityCentre.id]);
+    m.hud.update();
     return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
   ok(trainBtn, "TRAIN CARD: selecting the City Centre shows a Worker train button");
@@ -350,23 +354,24 @@ try {
     const m = window.__rts.match, s = m.state;
     const worker = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "worker");
     if (!worker) return { worker: false, hotkey: null, target: null };
+    m.clientIntent.closeCommandCardMenu();
     s.setSelection([worker.id]);
     m.hud.update();
     return {
       worker: true,
       hotkey: document.querySelector('#command-card [data-command-id="unit.move"]')?.dataset.hotkey || null,
-      target: s.commandTarget,
+      target: m.clientIntent.commandTarget,
     };
   });
   ok(changedHotkey.worker && changedHotkey.hotkey === "B",
     `HOTKEYS: live command card shows changed Move binding (${changedHotkey.hotkey})`);
   await page.keyboard.press("b");
   await sleep(150);
-  ok(await page.evaluate(() => window.__rts.match.state.commandTarget === "move"),
+  ok(await page.evaluate(() => window.__rts.match.clientIntent.commandTarget === "move"),
     "HOTKEYS: changed Move binding activates the live command card");
   await page.keyboard.press("Escape");
   await sleep(100);
-  ok(await page.evaluate(() => window.__rts.match.state.commandTarget == null && window.__rts.match.state.selection.size === 1),
+  ok(await page.evaluate(() => window.__rts.match.clientIntent.commandTarget == null && window.__rts.match.state.selection.size === 1),
     "HOTKEYS: Escape cancels changed-key Move targeting before gameplay cancel");
 
   await page.keyboard.press("Escape");
@@ -384,9 +389,12 @@ try {
      `COMMAND CARD: empty selection keeps an inert 3x3 card (hidden=${afterGameplayEscape.commandCardHidden}, slots=${afterGameplayEscape.commandSlots}, buttons=${afterGameplayEscape.commandButtons})`);
 
   const beforePan = await page.evaluate(() => {
-    const s = window.__rts.match.state;
+    const m = window.__rts.match, s = m.state;
     const cityCentre = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
-    if (cityCentre) s.setSelection([cityCentre.id]);
+    if (cityCentre) {
+      m.clientIntent.closeCommandCardMenu();
+      s.setSelection([cityCentre.id]);
+    }
     return {
       x: window.__rts.match.camera.x,
       y: window.__rts.match.camera.y,
