@@ -641,7 +641,7 @@ function hotkeyService() {
     owner: 1,
     kind: KIND.RIFLEMAN,
   }));
-  const tanks = Array.from({ length: 4 }, (_, index) => ({
+  const tanks = Array.from({ length: 2 }, (_, index) => ({
     id: 1100 + index,
     owner: 1,
     kind: KIND.TANK,
@@ -656,9 +656,9 @@ function hotkeyService() {
     "HUD infantry blocks occupy one fixed cell each");
 
   const tankModel = selectionBudgetGridModel(tanks);
-  assert(tankModel.used === 24 && tankModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports four Tanks as 24/24");
-  assert(tankModel.blocks.every((block) => block.weight === 6 && block.cols === 3 && block.rows === 2 && block.placed),
-    "HUD Tank blocks occupy a two-row by three-column shape");
+  assert(tankModel.used === 24 && tankModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports two Tanks as 24/24");
+  assert(tankModel.blocks.every((block) => block.weight === 12 && block.cols === 6 && block.rows === 2 && block.placed),
+    "HUD Tank blocks occupy a two-row by six-column shape");
 
   const commandCarModel = selectionBudgetGridModel(tanks.concat(commandCar));
   assert(commandCarModel.used === 28 &&
@@ -691,8 +691,8 @@ function hotkeyService() {
     const blocks = panel.querySelectorAll(".sel-budget-block");
     const overflow = panel.querySelector(".sel-budget-overflow");
     assert(grid && grid.style.values.get("--sel-budget-cols") === "12", "HUD renders grid columns into selected panel DOM");
-    assert(blocks.length === 4 && blocks.every((block) => block.className.includes("weight-6")),
-      "HUD renders four Tank budget blocks into selected panel DOM");
+    assert(blocks.length === 2 && blocks.every((block) => block.className.includes("weight-12")),
+      "HUD renders two Tank budget blocks into selected panel DOM");
     assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
   });
 }
@@ -2966,7 +2966,7 @@ function fakeAudioContext() {
     };
   }
 
-  const tanks = Array.from({ length: 5 }, (_, index) => ({
+  const tanks = Array.from({ length: 3 }, (_, index) => ({
     id: index + 1,
     owner: 1,
     kind: KIND.TANK,
@@ -2976,16 +2976,15 @@ function fakeAudioContext() {
     budgetState(tanks),
     cmd.move(tanks.map((tank) => tank.id), 100, 100),
   );
-  assert(!overBudget.ok, "client command guard rejects five tanks without a Command Car");
-  assert(overBudget.used === 30 && overBudget.cap === BASE_COMMAND_SUPPLY_CAP, "client reports base command budget usage");
+  assert(!overBudget.ok, "client command guard rejects three tanks without a Command Car");
+  assert(overBudget.used === 36 && overBudget.cap === BASE_COMMAND_SUPPLY_CAP, "client reports base command budget usage");
 
   const commandCar = { id: 99, owner: 1, kind: KIND.COMMAND_CAR, state: STATE.IDLE };
-  const sixTanks = tanks.concat({ id: 6, owner: 1, kind: KIND.TANK, state: STATE.IDLE });
   const legalWithCar = commandWithinBudget(
-    budgetState(sixTanks.concat(commandCar)),
-    cmd.attackMove(sixTanks.map((tank) => tank.id).concat(commandCar.id), 100, 100),
+    budgetState(tanks.concat(commandCar)),
+    cmd.attackMove(tanks.map((tank) => tank.id).concat(commandCar.id), 100, 100),
   );
-  assert(legalWithCar.ok, "client command guard allows six tanks with one Command Car");
+  assert(legalWithCar.ok, "client command guard allows three tanks with one Command Car");
   assert(
     legalWithCar.used === 40 &&
       legalWithCar.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS + STATS[KIND.COMMAND_CAR].supply,
@@ -4346,23 +4345,23 @@ function fakeAudioContext() {
   );
   budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id));
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
-    "selection budget admits four six-supply tanks without a Command Car",
+    Array.from(budgetSelectionState.selection).join(",") === "400,401",
+    "selection budget admits two twelve-supply tanks without a Command Car",
   );
   budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id).concat([budgetExtraTank.id, budgetCommandCar.id]));
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "450,400,401,402,403,404,455",
+    Array.from(budgetSelectionState.selection).join(",") === "450,400,401,402",
     "selection budget offsets Command Car supply before filling normal candidates",
   );
-  budgetSelectionState.setSelection(budgetTanks.slice(0, 4).map((entity) => entity.id));
+  budgetSelectionState.setSelection(budgetTanks.slice(0, 2).map((entity) => entity.id));
   budgetSelectionState.addToSelection([budgetRiflemen[0].id]);
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
+    Array.from(budgetSelectionState.selection).join(",") === "400,401",
     "shift-add ignores overflow without replacing the existing selection",
   );
   budgetSelectionState.addToSelection([budgetCommandCar.id, budgetTanks[4].id]);
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,450,404",
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,450,404",
     "shift-add can admit a Command Car bonus and then later candidates",
   );
   budgetSelectionState.setControlGroup(0, budgetRiflemen.map((entity) => entity.id));
@@ -4376,17 +4375,17 @@ function fakeAudioContext() {
   );
   budgetSelectionState.setControlGroup(1, budgetTanks.map((entity) => entity.id));
   assert(
-    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    budgetSelectionState.controlGroups[1].join(",") === "400,401",
     "control-group save ignores over-budget Tanks",
   );
   budgetSelectionState.addToControlGroup(1, [budgetRiflemen[0].id]);
   assert(
-    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    budgetSelectionState.controlGroups[1].join(",") === "400,401",
     "control-group add ignores overflow without trimming existing legal members",
   );
   budgetSelectionState.addToControlGroup(1, [budgetCommandCar.id, budgetTanks[4].id]);
   assert(
-    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403,450,404",
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,450,404",
     "control-group add can admit one Command Car bonus and then later candidates",
   );
   const secondBudgetCommandCar = {
@@ -4410,23 +4409,23 @@ function fakeAudioContext() {
   });
   budgetSelectionState.setControlGroup(2, budgetTanks.map((entity) => entity.id).concat([budgetCommandCar.id, secondBudgetCommandCar.id]));
   assert(
-    budgetSelectionState.controlGroups[2].join(",") === "450,451,400,401,402,403,404",
+    budgetSelectionState.controlGroups[2].join(",") === "450,451,400,401,402,403",
     "control-group save stacks multiple Command Car bonuses",
   );
   budgetSelectionState.controlGroups[3] = budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id);
   const recalledLateCar = budgetSelectionState.selectControlGroup(3);
   assert(
-    recalledLateCar.join(",") === "450,400,401,402,403,404",
+    recalledLateCar.join(",") === "450,400,401,402",
     "control-group recall pre-admits a Command Car stored late in old runtime order",
   );
   assert(
-    budgetSelectionState.controlGroups[3].join(",") === "450,400,401,402,403,404",
+    budgetSelectionState.controlGroups[3].join(",") === "450,400,401,402",
     "control-group recall rewrites old over-budget runtime groups to legal admitted order",
   );
   budgetSelectionState.controlGroups[4] = budgetTanks.map((entity) => entity.id);
   const recalledOverBudgetTanks = budgetSelectionState.selectControlGroup(4);
   assert(
-    recalledOverBudgetTanks.join(",") === "400,401,402,403",
+    recalledOverBudgetTanks.join(",") === "400,401",
     "control-group recall filters old over-budget Tank groups before selection",
   );
   assert(
@@ -4674,7 +4673,7 @@ function fakeAudioContext() {
   );
   budgetSelectionInput._commitBoxSelection({ x0: 0, y0: 204, x1: 120, y1: 236 }, false);
   assert(
-    Array.from(budgetInputState.selection).join(",") === "5400,5300,5301,5302,5303,5304",
+    Array.from(budgetInputState.selection).join(",") === "5400,5300,5301,5302",
     "drag selection pre-admits a late Command Car before budget-filling Tanks",
   );
   const alliedRightClickCommands = [];
