@@ -4,6 +4,7 @@ use axum::extract::Path as AxumPath;
 use axum::http::{header, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag};
+use rts_rules::{defs, faction, EntityKind};
 
 const REPO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 
@@ -25,6 +26,10 @@ pub async fn wiki_page_handler(AxumPath(path): AxumPath<String>) -> Response {
 }
 
 fn wiki_response_for(route_path: &str) -> Response {
+    if is_stats_route(route_path) {
+        return stats_page_html().into_response();
+    }
+
     match resolve_wiki_doc(route_path) {
         Ok(doc) => match std::fs::read_to_string(&doc.path) {
             Ok(markdown) => wiki_html(&doc.route_path, &markdown).into_response(),
@@ -74,6 +79,437 @@ th, td {{ border: 1px solid #d8d2c7; padding: 4px 8px; }}
         ],
         Html(html),
     )
+}
+
+fn is_stats_route(route_path: &str) -> bool {
+    matches!(route_path.trim_matches('/'), "stats" | "stats.html")
+}
+
+fn stats_page_html() -> impl IntoResponse {
+    let body = render_stats_tables(&build_stats_tables());
+    let html = format!(
+        r#"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gameplay Stats - Bewegungskrieg Wiki</title>
+<style>
+body {{ max-width: 1120px; margin: 0 auto; padding: 32px 20px; font: 16px/1.55 system-ui, sans-serif; color: #1c1f23; background: #f8f7f3; }}
+main {{ background: #fff; border: 1px solid #ddd7cc; padding: 24px; }}
+a {{ color: #0b5e86; }}
+table {{ border-collapse: collapse; width: 100%; margin: 16px 0 28px; font-size: 14px; }}
+th, td {{ border: 1px solid #d8d2c7; padding: 4px 8px; text-align: left; vertical-align: top; }}
+th {{ background: #f1eee6; }}
+td.numeric {{ text-align: right; font-variant-numeric: tabular-nums; }}
+</style>
+</head>
+<body>
+<nav><a href="/wiki">Wiki index</a></nav>
+<main>
+<h1>Gameplay Stats</h1>
+{body}
+</main>
+</body>
+</html>"#
+    );
+    (
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        Html(html),
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StatsTable {
+    title: &'static str,
+    columns: &'static [&'static str],
+    rows: Vec<Vec<String>>,
+}
+
+fn build_stats_tables() -> Vec<StatsTable> {
+    vec![
+        unit_stats_table(),
+        building_stats_table(),
+        resource_node_stats_table(),
+        faction_catalog_table(),
+        trainable_table(),
+        buildable_table(),
+        upgrade_table(),
+        ability_table(),
+    ]
+}
+
+fn unit_stats_table() -> StatsTable {
+    StatsTable {
+        title: "Units",
+        columns: &[
+            "Name",
+            "ID",
+            "HP",
+            "Damage",
+            "Range",
+            "Cooldown",
+            "Speed",
+            "Sight",
+            "Steel",
+            "Oil",
+            "Supply",
+            "Build ticks",
+            "Radius",
+            "Armor",
+            "Weapon",
+            "Trained at",
+            "Requires",
+        ],
+        rows: defs::UNITS
+            .iter()
+            .map(|def| {
+                vec![
+                    kind_label(def.kind),
+                    def.kind.stable_id().to_string(),
+                    def.stats.hp.to_string(),
+                    def.stats.dmg.to_string(),
+                    def.stats.range_tiles.to_string(),
+                    def.stats.cooldown.to_string(),
+                    format_float(def.stats.speed),
+                    def.stats.sight_tiles.to_string(),
+                    def.stats.cost_steel.to_string(),
+                    def.stats.cost_oil.to_string(),
+                    def.stats.supply.to_string(),
+                    def.stats.build_ticks.to_string(),
+                    format_float(def.stats.radius),
+                    format!("{:?}", def.armor_class),
+                    format!("{:?}", def.weapon),
+                    optional_kind(def.trained_at),
+                    kind_list(def.train_requires),
+                ]
+            })
+            .collect(),
+    }
+}
+
+fn building_stats_table() -> StatsTable {
+    StatsTable {
+        title: "Buildings",
+        columns: &[
+            "Name",
+            "ID",
+            "HP",
+            "Sight",
+            "Steel",
+            "Oil",
+            "Footprint",
+            "Build ticks",
+            "Supply",
+            "Damage",
+            "Range",
+            "Cooldown",
+            "Armor",
+            "Weapon",
+            "Trains",
+            "Requires",
+        ],
+        rows: defs::BUILDINGS
+            .iter()
+            .map(|def| {
+                vec![
+                    kind_label(def.kind),
+                    def.kind.stable_id().to_string(),
+                    def.stats.hp.to_string(),
+                    def.stats.sight_tiles.to_string(),
+                    def.stats.cost_steel.to_string(),
+                    def.stats.cost_oil.to_string(),
+                    format!("{}x{}", def.stats.foot_w, def.stats.foot_h),
+                    def.stats.build_ticks.to_string(),
+                    def.stats.provides_supply.to_string(),
+                    def.stats.dmg.to_string(),
+                    def.stats.range_tiles.to_string(),
+                    def.stats.cooldown.to_string(),
+                    format!("{:?}", def.armor_class),
+                    format!("{:?}", def.weapon),
+                    kind_list(def.trains),
+                    kind_list(def.build_requires),
+                ]
+            })
+            .collect(),
+    }
+}
+
+fn resource_node_stats_table() -> StatsTable {
+    StatsTable {
+        title: "Resource Nodes",
+        columns: &["Name", "ID", "Amount"],
+        rows: defs::NODES
+            .iter()
+            .map(|def| {
+                vec![
+                    kind_label(def.kind),
+                    def.kind.stable_id().to_string(),
+                    def.amount.to_string(),
+                ]
+            })
+            .collect(),
+    }
+}
+
+fn faction_catalog_table() -> StatsTable {
+    StatsTable {
+        title: "Faction Catalogs",
+        columns: &[
+            "Faction ID",
+            "Loadout ID",
+            "Starting steel",
+            "Starting oil",
+            "Starting entities",
+            "Units",
+            "Buildings",
+            "Builders",
+            "Gatherers",
+            "Production anchors",
+        ],
+        rows: faction::CATALOGS
+            .iter()
+            .map(|catalog| {
+                vec![
+                    catalog.id.to_string(),
+                    catalog.loadout.id.to_string(),
+                    catalog.loadout.initial_steel.to_string(),
+                    catalog.loadout.initial_oil.to_string(),
+                    starting_entity_list(catalog.loadout.starting_entities),
+                    kind_list(catalog.units),
+                    kind_list(catalog.buildings),
+                    kind_list(catalog.builders),
+                    kind_list(catalog.gatherers),
+                    kind_list(catalog.production_anchors),
+                ]
+            })
+            .collect(),
+    }
+}
+
+fn trainable_table() -> StatsTable {
+    StatsTable {
+        title: "Trainables By Faction",
+        columns: &["Faction ID", "Building", "Units"],
+        rows: faction::CATALOGS
+            .iter()
+            .flat_map(|catalog| {
+                catalog.buildings.iter().filter_map(move |building| {
+                    let units = catalog.trainable_units(*building);
+                    (!units.is_empty()).then(|| {
+                        vec![
+                            catalog.id.to_string(),
+                            kind_label(*building),
+                            kind_vec(units.as_slice()),
+                        ]
+                    })
+                })
+            })
+            .collect(),
+    }
+}
+
+fn buildable_table() -> StatsTable {
+    StatsTable {
+        title: "Buildables By Faction",
+        columns: &["Faction ID", "Building", "Requires"],
+        rows: faction::CATALOGS
+            .iter()
+            .flat_map(|catalog| {
+                catalog.buildables.iter().map(move |building| {
+                    let requires = defs::building_def(*building)
+                        .map(|def| def.build_requires)
+                        .unwrap_or(&[]);
+                    vec![
+                        catalog.id.to_string(),
+                        kind_label(*building),
+                        kind_list(requires),
+                    ]
+                })
+            })
+            .collect(),
+    }
+}
+
+fn upgrade_table() -> StatsTable {
+    StatsTable {
+        title: "Upgrades By Faction",
+        columns: &["Faction ID", "Upgrade ID", "Researched at"],
+        rows: faction::CATALOGS
+            .iter()
+            .flat_map(|catalog| {
+                catalog.upgrades.iter().map(move |upgrade| {
+                    vec![
+                        catalog.id.to_string(),
+                        upgrade.id.to_string(),
+                        kind_label(upgrade.researched_at),
+                    ]
+                })
+            })
+            .collect(),
+    }
+}
+
+fn ability_table() -> StatsTable {
+    StatsTable {
+        title: "Abilities By Faction",
+        columns: &[
+            "Faction ID",
+            "Ability ID",
+            "Label",
+            "Title",
+            "Carriers",
+            "Target",
+            "Range",
+            "Min range",
+            "Cooldown",
+            "Charges",
+            "Steel",
+            "Oil",
+            "Tech",
+            "Queue",
+            "Autocast",
+            "Command card",
+        ],
+        rows: faction::CATALOGS
+            .iter()
+            .flat_map(|catalog| {
+                catalog.abilities.iter().map(move |ability| {
+                    vec![
+                        catalog.id.to_string(),
+                        ability.id.to_string(),
+                        ability.label.to_string(),
+                        ability.title.to_string(),
+                        kind_list(ability.carriers),
+                        ability.target_mode.stable_id().to_string(),
+                        optional_u32(ability.range_tiles),
+                        optional_u32(ability.min_range_tiles),
+                        ability.cooldown_ticks.to_string(),
+                        optional_u16(ability.charges),
+                        ability.cost.steel.to_string(),
+                        ability.cost.oil.to_string(),
+                        optional_kind(ability.tech_requirement),
+                        bool_text(ability.may_queue),
+                        bool_text(ability.autocast),
+                        bool_text(ability.command_card),
+                    ]
+                })
+            })
+            .collect(),
+    }
+}
+
+fn render_stats_tables(tables: &[StatsTable]) -> String {
+    let mut rendered = String::new();
+    for table in tables {
+        rendered.push_str("<section>\n<h2>");
+        rendered.push_str(&escape_text(table.title));
+        rendered.push_str("</h2>\n<table>\n<thead><tr>");
+        for column in table.columns {
+            rendered.push_str("<th>");
+            rendered.push_str(&escape_text(column));
+            rendered.push_str("</th>");
+        }
+        rendered.push_str("</tr></thead>\n<tbody>\n");
+        for row in &table.rows {
+            rendered.push_str("<tr>");
+            for cell in row {
+                let class = if is_numeric_cell(cell) {
+                    r#" class="numeric""#
+                } else {
+                    ""
+                };
+                rendered.push_str("<td");
+                rendered.push_str(class);
+                rendered.push('>');
+                rendered.push_str(&escape_text(cell));
+                rendered.push_str("</td>");
+            }
+            rendered.push_str("</tr>\n");
+        }
+        rendered.push_str("</tbody>\n</table>\n</section>\n");
+    }
+    rendered
+}
+
+fn kind_label(kind: EntityKind) -> String {
+    kind.stable_id()
+        .split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn kind_list(kinds: &[EntityKind]) -> String {
+    if kinds.is_empty() {
+        "None".to_string()
+    } else {
+        kinds
+            .iter()
+            .map(|kind| kind_label(*kind))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+fn kind_vec(kinds: &[EntityKind]) -> String {
+    kind_list(kinds)
+}
+
+fn optional_kind(kind: Option<EntityKind>) -> String {
+    kind.map(kind_label).unwrap_or_else(|| "None".to_string())
+}
+
+fn optional_u32(value: Option<u32>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "None".to_string())
+}
+
+fn optional_u16(value: Option<u16>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "None".to_string())
+}
+
+fn bool_text(value: bool) -> String {
+    if value {
+        "Yes".to_string()
+    } else {
+        "No".to_string()
+    }
+}
+
+fn starting_entity_list(groups: &[faction::StartingEntityGroup]) -> String {
+    if groups.is_empty() {
+        return "None".to_string();
+    }
+    groups
+        .iter()
+        .map(|group| format!("{} x{}", kind_label(group.kind), group.count))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn format_float(value: f32) -> String {
+    let formatted = format!("{value:.3}");
+    formatted
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
+}
+
+fn is_numeric_cell(value: &str) -> bool {
+    !value.is_empty() && value.chars().all(|ch| ch.is_ascii_digit() || ch == '.')
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,6 +681,7 @@ fn wiki_index_markdown() -> std::io::Result<String> {
     for doc in docs_in_root("docs/design")? {
         markdown.push_str(&format_doc_link(&doc)?);
     }
+    markdown.push_str("\n## Generated References\n\n- [Gameplay Stats](/wiki/stats)\n");
     Ok(markdown)
 }
 
@@ -375,6 +812,141 @@ mod tests {
         assert!(rendered.contains(r#"href="../image.png""#));
     }
 
+    #[test]
+    fn generated_stats_tables_cover_authoritative_rules_data() {
+        let tables = build_stats_tables();
+        let units = table(&tables, "Units");
+        let buildings = table(&tables, "Buildings");
+        let nodes = table(&tables, "Resource Nodes");
+        let factions = table(&tables, "Faction Catalogs");
+        let trainables = table(&tables, "Trainables By Faction");
+        let buildables = table(&tables, "Buildables By Faction");
+        let upgrades = table(&tables, "Upgrades By Faction");
+        let abilities = table(&tables, "Abilities By Faction");
+
+        assert_eq!(units.rows.len(), defs::UNITS.len());
+        let tank = defs::unit_def(EntityKind::Tank).expect("tank def");
+        assert!(units.rows.contains(&vec![
+            "Tank".to_string(),
+            EntityKind::Tank.stable_id().to_string(),
+            tank.stats.hp.to_string(),
+            tank.stats.dmg.to_string(),
+            tank.stats.range_tiles.to_string(),
+            tank.stats.cooldown.to_string(),
+            format_float(tank.stats.speed),
+            tank.stats.sight_tiles.to_string(),
+            tank.stats.cost_steel.to_string(),
+            tank.stats.cost_oil.to_string(),
+            tank.stats.supply.to_string(),
+            tank.stats.build_ticks.to_string(),
+            format_float(tank.stats.radius),
+            format!("{:?}", tank.armor_class),
+            format!("{:?}", tank.weapon),
+            optional_kind(tank.trained_at),
+            kind_list(tank.train_requires),
+        ]));
+
+        assert_eq!(buildings.rows.len(), defs::BUILDINGS.len());
+        let depot = defs::building_def(EntityKind::Depot).expect("depot def");
+        assert!(buildings.rows.contains(&vec![
+            "Depot".to_string(),
+            EntityKind::Depot.stable_id().to_string(),
+            depot.stats.hp.to_string(),
+            depot.stats.sight_tiles.to_string(),
+            depot.stats.cost_steel.to_string(),
+            depot.stats.cost_oil.to_string(),
+            format!("{}x{}", depot.stats.foot_w, depot.stats.foot_h),
+            depot.stats.build_ticks.to_string(),
+            depot.stats.provides_supply.to_string(),
+            depot.stats.dmg.to_string(),
+            depot.stats.range_tiles.to_string(),
+            depot.stats.cooldown.to_string(),
+            format!("{:?}", depot.armor_class),
+            format!("{:?}", depot.weapon),
+            kind_list(depot.trains),
+            kind_list(depot.build_requires),
+        ]));
+
+        assert_eq!(nodes.rows.len(), defs::NODES.len());
+        assert!(nodes.rows.contains(&vec![
+            "Steel".to_string(),
+            EntityKind::Steel.stable_id().to_string(),
+            defs::node_def(EntityKind::Steel)
+                .unwrap()
+                .amount
+                .to_string(),
+        ]));
+
+        assert_eq!(factions.rows.len(), faction::CATALOGS.len());
+        assert!(factions
+            .rows
+            .iter()
+            .any(|row| row[0] == faction::DEFAULT_FACTION_ID && row[1] == "kriegsia.standard"));
+
+        for catalog in faction::CATALOGS {
+            for building in catalog.buildings {
+                let units = catalog.trainable_units(*building);
+                if units.is_empty() {
+                    continue;
+                }
+                assert!(trainables.rows.contains(&vec![
+                    catalog.id.to_string(),
+                    kind_label(*building),
+                    kind_vec(units.as_slice()),
+                ]));
+            }
+            for building in catalog.buildables {
+                let requires = defs::building_def(*building)
+                    .map(|def| def.build_requires)
+                    .unwrap_or(&[]);
+                assert!(buildables.rows.contains(&vec![
+                    catalog.id.to_string(),
+                    kind_label(*building),
+                    kind_list(requires),
+                ]));
+            }
+            for upgrade in catalog.upgrades {
+                assert!(upgrades.rows.contains(&vec![
+                    catalog.id.to_string(),
+                    upgrade.id.to_string(),
+                    kind_label(upgrade.researched_at),
+                ]));
+            }
+            for ability in catalog.abilities {
+                assert!(abilities.rows.contains(&vec![
+                    catalog.id.to_string(),
+                    ability.id.to_string(),
+                    ability.label.to_string(),
+                    ability.title.to_string(),
+                    kind_list(ability.carriers),
+                    ability.target_mode.stable_id().to_string(),
+                    optional_u32(ability.range_tiles),
+                    optional_u32(ability.min_range_tiles),
+                    ability.cooldown_ticks.to_string(),
+                    optional_u16(ability.charges),
+                    ability.cost.steel.to_string(),
+                    ability.cost.oil.to_string(),
+                    optional_kind(ability.tech_requirement),
+                    bool_text(ability.may_queue),
+                    bool_text(ability.autocast),
+                    bool_text(ability.command_card),
+                ]));
+            }
+        }
+    }
+
+    #[test]
+    fn generated_stats_table_renderer_escapes_cells() {
+        let rendered = render_stats_tables(&[StatsTable {
+            title: "Escaping",
+            columns: &["Name"],
+            rows: vec![vec!["<script>alert(\"x\")</script>".to_string()]],
+        }]);
+
+        assert!(rendered.contains("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;"));
+        assert!(!rendered.contains("<script>"));
+    }
+
     #[tokio::test]
     async fn wiki_index_route_renders_docs_readme() {
         let response = wiki_router()
@@ -398,6 +970,7 @@ mod tests {
         assert!(body.contains("<title>Bewegungskrieg Wiki - Bewegungskrieg Wiki</title>"));
         assert!(body.contains(r#"href="/wiki/docs/context/balance.md""#));
         assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
+        assert!(body.contains(r#"href="/wiki/stats""#));
         assert!(body.contains("<main>"));
     }
 
@@ -469,6 +1042,35 @@ mod tests {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
+    #[tokio::test]
+    async fn wiki_stats_route_renders_generated_rules_tables() {
+        let response = wiki_router()
+            .oneshot(
+                Request::builder()
+                    .uri("/wiki/stats")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("<title>Gameplay Stats - Bewegungskrieg Wiki</title>"));
+        assert!(body.contains("<h2>Units</h2>"));
+        assert!(body.contains("<td>Tank</td>"));
+        assert!(body.contains("<td>kriegsia</td>"));
+        assert!(body.contains("<td>Smoke</td>"));
+        assert!(body.contains("<td>Magic Anchor</td>"));
+    }
+
     #[test]
     fn rewritten_internal_wiki_links_resolve() {
         for doc in allowlisted_docs().expect("allowlisted docs should enumerate") {
@@ -520,5 +1122,12 @@ mod tests {
         Router::new()
             .route("/wiki", get(wiki_index_handler))
             .route("/wiki/{*path}", get(wiki_page_handler))
+    }
+
+    fn table<'a>(tables: &'a [StatsTable], title: &str) -> &'a StatsTable {
+        tables
+            .iter()
+            .find(|table| table.title == title)
+            .unwrap_or_else(|| panic!("missing table {title}"))
     }
 }
