@@ -20,6 +20,22 @@ mutating broad shared state.
   and the core client flows that should be manually tested.
 - Implement, commit, merge to `main`, and push each phase before starting the next phase.
 
+## Boundary Invariants
+
+- `Match` is the only cross-area composer. HUD, input, minimap, renderer, and prediction receive
+  explicit dependencies from `Match`; they do not import each other to coordinate behavior.
+- `GameState` owns authoritative snapshot view state, selection, control groups, relationship
+  helpers, fog-facing visibility data, and named display overlays only.
+- `ClientIntent` owns browser-local cursor/command intent: placement, command-card submenu state,
+  command targeting, click feedback, hover previews, support-weapon previews, and ability previews.
+- Gameplay commands continue to flow only through `commandIssuer.issueCommand`; intent facades must
+  never call `Net.command` directly.
+- Renderer inputs are data-only read models. Renderer code must not prune TTLs, mutate intent, or
+  call state methods with side effects during draw.
+- Prediction display overlays must never affect fog, authority reads, spectators, replay viewers,
+  dev-watch passive viewers, hidden enemies, allies, resources, ability objects, or command
+  sequence allocation policy.
+
 ## Phase Summaries
 
 ### [Phase 1 - Baseline Contracts](phase-1.md)
@@ -60,6 +76,14 @@ prediction-disabled.
 Remove temporary `GameState` compatibility fields after HUD, input, minimap, and renderer use the
 explicit facades. Update the client architecture checker, large-file baselines, and docs to enforce
 the new boundaries. This should be cleanup-only, not a new feature phase.
+
+## Remaining Phase Preconditions
+
+- Phase 4 may start only after HUD, input, and minimap intent writes are routed through role-shaped
+  facades from Phase 3.
+- Phase 5 may start only after renderer feedback no longer depends on broad intent state.
+- Phase 6 is cleanup-only. If removing shims reveals behavior changes, split that behavior work into
+  a new phase instead of folding it into enforcement.
 
 ## Non-Goals
 

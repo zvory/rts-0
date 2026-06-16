@@ -20,6 +20,10 @@ placement command surface.
   - infantry overlap should not make a Tank Trap site invalid if the server policy allows infantry
     to stand on the same tile
   - existing preview remains advisory and server arrival-time validation remains authoritative
+- Create a client placement policy helper, for example `placementPolicyForBuilding(kind)`, so
+  ordinary structures and Tank Trap preview share terrain/bounds/resource/building checks while
+  differing on unit overlap. Vehicle-body classification must mirror the server movement-body class;
+  do not embed a Tank Trap-only unit list in input code.
 - Keep Tank Trap hidden from normal worker build-card exposure until Phase 5.
 - Add focused client tests for metadata, rendering-adjacent descriptors if available, and advisory
   placement behavior.

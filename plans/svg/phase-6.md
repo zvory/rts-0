@@ -12,6 +12,11 @@ Migrate strict top-down infantry and crew-served weapon visuals to SVG-authored 
 
 - Author and validate SVG rigs for Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, and Ekat if Ekat still uses the generic fallback art at implementation time.
+- Migrate in family gates: Rifleman and Machine Gunner first to prove shared infantry bindings,
+  then Anti-Tank Gun, Mortar Team, and Artillery. Keep all previously migrated unit equivalence
+  tests passing before adding the next family.
+- Keep Ekat explicitly deferred unless its active-ability visual contract is stable at the start of
+  this phase.
 - Encode common infantry body parts as shared authoring patterns or reusable rig fragments only if
   Phase 2/3 APIs already support that cleanly. Do not add an abstraction just to remove minor SVG
   duplication.
@@ -23,6 +28,8 @@ Migrate strict top-down infantry and crew-served weapon visuals to SVG-authored 
   parts rather than duplicated geometry.
 - Extend equivalence coverage for all migrated unit kinds across static, recoil, setup, deploy,
   weapon-facing, and shot-reveal samples.
+- Require both semantic anchor/bounds comparison and bounded pixel or command comparison for each
+  migrated kind; keeping the old legacy oracle passing is not enough by itself.
 
 ## Expected Touch Points
 

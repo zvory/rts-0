@@ -58,12 +58,18 @@ and line construction.
 - A short implementation note appended to this phase file that answers:
   - which existing vehicle/body classification is canonical enough, or what new rules-level
     classification Phase 2 should introduce
+  - whether the current oriented-vehicle-body helper is intentionally equivalent to vehicle-body
+    blocker class or only a geometry helper that Phase 2 must separate
   - which occupancy/pathing functions need movement-class-aware signatures
+  - which server placement policy API Phase 3 should use for both issue-time and arrival-time
+    validation
   - how under-construction Tank Traps enter vehicle blocker occupancy
+  - which `is_building()` behaviors Tank Trap intentionally inherits and which ones it opts out of
   - which elimination helper must ignore Tank Traps
   - how zero-sight Tank Traps interact with own visibility and enemy remembered building projection
   - whether standard repeated `build` commands can support line placement without protocol changes
   - which client module should own Bresenham every-other-tile line generation
+  - which client placement policy helper Phase 4 should use to mirror server policy advisory-side
   - which targeted tests each later phase should extend
 - No gameplay behavior changes.
 - No UI behavior changes.

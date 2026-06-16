@@ -12,6 +12,10 @@ Traps can be destroyed, and they do not keep a player alive.
 
 - Add Tank Trap to server-side worker build eligibility for the default faction once a completed
   Training Centre exists.
+- Route issue-time and arrival-time build validation through one authoritative
+  `BuildPlacementPolicy` or equivalent helper selected by building kind. Tank Trap policy may allow
+  infantry overlap but must reject terrain, resources, ordinary buildings, vehicle-body units,
+  invalid/out-of-bounds footprints, and stale or destroyed sites.
 - Preserve current reserve-on-arrival construction semantics:
   - command-time placement and affordability produce feedback only
   - final placement and affordability are re-checked when the worker arrives
@@ -20,6 +24,9 @@ Traps can be destroyed, and they do not keep a player alive.
   including incomplete construction sites.
 - Exclude Tank Traps from elimination-survival building counts while keeping them attackable and
   removable through normal death cleanup.
+- Introduce `world_query::owned_survival_buildings` or an equivalent survival helper and make
+  `Game::alive_players` use it, leaving broad building iterators available for cleanup, scoring,
+  memory, and generic building behavior.
 - Ensure Tank Traps do not act as production anchors, rally targets, supply providers, research
   structures, or trainable-unit producers.
 - Verify zero sight does not grant owner fog reveal. Confirm enemy discovery uses the normal
@@ -28,6 +35,8 @@ Traps can be destroyed, and they do not keep a player alive.
   - Training Centre prerequisite is enforced
   - cost and build time match the spec
   - Tank Trap construction blocks vehicles before completion
+  - Tank Trap site is allowed under infantry, rejected under vehicle-body units/resources/buildings,
+    and rechecked on worker arrival
   - Tank Trap does not prevent owner elimination
   - Tank Trap can be damaged and destroyed
   - Tank Trap produces no sight/fog reveal

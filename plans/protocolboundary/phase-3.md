@@ -12,6 +12,12 @@ Make protocol parity compare structured Rust-owned metadata to the JS mirror.
 
 - Add a Rust-owned structured dump for message tags, compact codes, kind codes, ability codes,
   order-stage codes, resource codes, and compact snapshot versions.
+- Prefer `server/crates/protocol/src/bin/dump-protocol-contract.rs` producing deterministic JSON
+  with `schemaVersion`, `compactSnapshotVersion`, `predictionProtocolVersion`, message tags,
+  command tags, vocabularies, compact code maps, sentinel, and compact slot schemas for snapshot,
+  entity, event, ability-object, and net-status data.
+- Make `tests/protocol_parity.mjs` consume the dump via
+  `cargo run --manifest-path server/Cargo.toml -p rts-protocol --bin dump-protocol-contract --quiet`.
 - Migrate `tests/protocol_parity.mjs` away from source-text scraping where practical.
 - Keep `client/src/protocol.js` behavior unchanged unless the structured check exposes a real bug.
 
@@ -26,7 +32,8 @@ Make protocol parity compare structured Rust-owned metadata to the JS mirror.
 
 - [ ] Add structured Rust protocol metadata export.
 - [ ] Update JS parity test to consume the export.
-- [ ] Keep or document any remaining source-text assertions.
+- [ ] Move any remaining regex/source-text assertions to an explicit temporary allowlist with a
+      removal note.
 - [ ] Run verification and record exact results in the handoff.
 
 ## Verification

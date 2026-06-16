@@ -13,6 +13,12 @@ values.
 
 - Classify mirrored values as wire DTO, compact transport code, domain adapter mapping, balance
   scalar, faction catalog fact, UI-only presentation data, or server-only constant.
+- Record the classification as a table with columns for value/path, Rust owner, JS mirror path,
+  category, current checker, proposed future checker, client-only exclusion reason, and compact
+  version impact.
+- Explicitly cover `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, `PLAYER_PALETTE`, `TICK_HZ`,
+  body dimensions, ability descriptors, upgrade descriptors, resource amounts, camera defaults,
+  colors, and fog alpha.
 - Record ambiguous values that need a product or architecture decision before enforcement.
 - Update design docs only where they are stale about current authority.
 

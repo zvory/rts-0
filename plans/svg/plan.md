@@ -18,10 +18,18 @@ complete.
 - The live renderer consumes only the normalized rig API, not raw SVG DOM nodes.
 - Runtime unit art is a `PIXI.Container` per unit with one child per compiled rig part, using
   `PIXI.Graphics`, cached textures, or sprites behind a narrow part-renderer boundary.
+- Live renderer routing is distinct from the temporary equivalence/comparison seam. Production
+  routing owns kind-to-renderer selection, live rig pools, shot-reveal instances, and fallback
+  gating; it must not depend on `_rigComparisonEnabled`, `_rigComparisonPool`, or a test-only
+  comparison layer.
 - JS animation remains game-state-driven from entity snapshots: `facing`, `weaponFacing`,
   `setupState`, recoil progress, movement deltas, team color, visibility, and ability state.
 - Legacy procedural draw functions stay available only until their migrated unit kinds pass the
   temporary equivalence suite.
+- Rigs own unit body and shadow parts only. Selection rings, HP bars, fog, feedback overlays,
+  placement, command markers, and hit-testing remain outside rig definitions. If another renderer
+  area needs an anchor such as `muzzle`, expose a narrow anchor lookup rather than importing rig
+  internals.
 
 ## Phase Summaries
 

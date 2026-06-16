@@ -11,8 +11,15 @@ Audit runtime faction acceptance, defaulting, exposure, and rejection surfaces.
 ## Work
 
 - Confirm lobby validation matches the documented boundary.
+- Prefer a data-shaped lifecycle policy table over broad `matches!(DEFAULT_FACTION_ID | EKAT...)`
+  logic. Catalog existence alone must never grant AI, prediction, dev, replay, fixture, quickstart,
+  or self-play support.
 - Add or adjust tests for unknown ids, fixture-only ids, playable ids, AI defaults, replay
   validation, replay branch, dev scenarios, self-play, and prediction support.
+- Add a table-driven test covering every `FactionRequestContext` by faction id, including unknown
+  ids, fixture-only ids outside `TestFixture`, playable ids, AI seats, quickstart, self-play, dev
+  scenarios, replay branch preservation, spectator/countdown/in-game `setFaction`, and prediction
+  compatibility.
 - Ensure client selector, command cards, hotkeys, and unknown-faction fallback do not inherit the
   wrong catalog accidentally.
 
@@ -31,6 +38,9 @@ Audit runtime faction acceptance, defaulting, exposure, and rejection surfaces.
 ## Implementation Checklist
 
 - [ ] Inventory runtime surfaces that accept or default faction ids.
+- [ ] Add a table-driven test covering every `FactionRequestContext` by faction id.
+- [ ] Verify catalog existence alone never grants AI, prediction, dev, replay, quickstart,
+      self-play, or fixture support.
 - [ ] Add focused negative and fixture tests.
 - [ ] Check client selector, command cards, hotkeys, and prediction compatibility.
 - [ ] Document lifecycle path decisions.

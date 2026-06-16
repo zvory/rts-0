@@ -66,6 +66,16 @@ The replay-evidence table should cover:
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 
+Add database-enforced consistency where practical:
+
+- `available` evidence requires `replay_id` and must identify the canonical replay row.
+- `missing` evidence requires a non-empty `failure_reason`.
+- `pending` evidence must not point at a replay row.
+- Repeated report submissions for the same `replay_key` upsert or preserve one evidence row
+  idempotently instead of creating competing state.
+- `match_replays(replay_key)` should be unique when non-null so report review can resolve one
+  canonical replay artifact.
+
 Prefer indexes for newest-first review and replay/match lookup:
 
 - `(created_at desc)`
@@ -86,6 +96,9 @@ Prefer indexes for newest-first review and replay/match lookup:
 - Do not add categories, annotations, auth, screenshots, spam controls, or advanced search.
 - Keep clients as non-writers at the database layer. The HTTP/WebSocket server remains the only DB
   writer.
+- Treat `server_context` as server-owned. Browser payloads must not write it; later API phases stamp
+  it from `RoomReportContext` and request metadata after validating or resolving the reported
+  context.
 - Do not require a strict replay foreign key for mid-match reports. The whole point of `replay_key`
   is to let reports exist before the final replay row exists.
 - Do not overload the existing log-and-drop match-history write helper for report creation or

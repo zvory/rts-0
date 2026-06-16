@@ -26,11 +26,15 @@ Extract transient client intent state from `GameState` into a model-area helper.
 
 ## Implementation Checklist
 
-- [ ] Add client intent helper in the model area.
-- [ ] Move intent state and methods behind the helper.
-- [ ] Preserve `GameState` compatibility accessors.
-- [ ] Update tests for the helper and compatibility surface.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Add client intent helper in the model area.
+- [x] Move intent state and methods behind the helper.
+- [x] Preserve `GameState` compatibility accessors.
+- [x] Update tests for the helper and compatibility surface.
+- [x] Run verification and record exact results in the handoff.
+
+Historical note: this phase is already marked done. The checked list reflects completed phase
+status; later phases should rely on the committed implementation and handoff rather than treating
+the old unchecked list as pending work.
 
 ## Verification
 

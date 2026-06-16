@@ -18,6 +18,23 @@ Separate prediction bookkeeping from `GameState` display mutation.
 - Preserve authoritative snapshot dominance and prediction-disabled spectator/replay/dev-watch
   paths.
 
+## Prediction Overlay Contract
+
+Prediction code produces display overlays; it does not mutate snapshot truth. `PredictionController`
+owns sequencing, pending commands, acknowledgements/rejections, and optimistic UI bookkeeping.
+`GameState` applies named display overlays through a small method such as
+`applyDisplayOverlay("prediction", overlay)` and can clear that source independently.
+
+Overlay invariants:
+
+- authoritative snapshots dominate on every apply
+- `entitiesInterpolated(..., { includePrediction: false })` remains prediction-free for fog and
+  authority reads
+- predicted entity overlays are own-unit-only
+- optimistic production/rally overlays cannot unlock commands, supply, tech, fog, collision,
+  pathing, or visibility
+- disabling prediction clears prediction overlays and optimistic UI display
+
 ## Expected Touch Points
 
 - `client/src/prediction_controller.js`
@@ -38,7 +55,8 @@ Separate prediction bookkeeping from `GameState` display mutation.
 
 - `node scripts/check-client-architecture.mjs`
 - `node tests/prediction_controller.mjs`
-- Relevant tri-state prediction scenarios, if selected by changed files
+- Tri-state scenarios for spectator/replay no prediction, move prediction, train optimism, rally
+  optimism, and hidden blocker/no leak when selected by changed files
 
 ## Manual Test Focus
 

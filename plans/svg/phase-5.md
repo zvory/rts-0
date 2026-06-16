@@ -15,6 +15,10 @@ rendering behind a per-kind gate.
   the inventory names a safer target.
 - Author the SVG source and metadata for that unit's rig.
 - Compile and validate the rig through the Phase 3 importer.
+- Before enabling the first live unit, introduce a production rig routing seam distinct from the
+  temporary comparison seam. The seam owns live rig definitions, live rig instance pools,
+  shot-reveal rig instances, and fallback routing. It must not depend on `_rigComparisonEnabled`,
+  `_rigComparisonPool`, or a `rigComparisons` layer.
 - Enable the rig renderer for only that unit kind behind a small per-kind routing table or feature
   gate.
 - Compare the rig against the Phase 1 legacy oracle for:
@@ -36,6 +40,8 @@ rendering behind a per-kind gate.
 
 - [ ] Add selected unit SVG rig source.
 - [ ] Add or update metadata for required anchors and bounds.
+- [ ] Add production renderer routing and live rig pooling independent from the temporary
+      equivalence harness.
 - [ ] Enable per-kind rig routing for the selected unit.
 - [ ] Add equivalence coverage for selected unit static and animation samples.
 - [ ] Confirm legacy fallback/comparison path remains test-only or explicitly gated.
@@ -59,3 +65,5 @@ and rematch teardown.
 
 Name the migrated unit kind, equivalence results and thresholds, any visible approved drift, and
 whether the per-kind gate is ready for broader unit migration.
+Explicitly state whether the production seam is independent from the comparison seam and whether
+shot-reveal instances follow the same live routing.
