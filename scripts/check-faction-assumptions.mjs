@@ -6,8 +6,18 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 
-function read(relPath) {
-  return fs.readFileSync(path.join(repoRoot, relPath), "utf8");
+function read(relPath, label = relPath) {
+  const absPath = path.join(repoRoot, relPath);
+  try {
+    return fs.readFileSync(absPath, "utf8");
+  } catch (err) {
+    if (err?.code === "ENOENT") {
+      throw new Error(
+        `${label} is missing at ${relPath}. Update scripts/check-faction-assumptions.mjs if the active source of truth moved.`,
+      );
+    }
+    throw err;
+  }
 }
 
 function assert(condition, message) {
@@ -33,6 +43,8 @@ function walk(dirRel, out = []) {
 const inventory = read("docs/design/faction-architecture-inventory.md");
 for (const anchor of [
   "Compatibility Boundary",
+  "Active Faction Boundary Sources",
+  "Catalog Id Statuses",
   "Current Entity Identity",
   "Current Economy Shape",
   "Current Starting Loadout",
@@ -42,9 +54,35 @@ for (const anchor of [
   "Current AI Coupling",
   "Current Prediction And WASM Coupling",
   "Lifecycle Paths",
+  "Phase 0 Checks",
 ]) {
-  assert(inventory.includes(`## ${anchor}`), `inventory is missing section: ${anchor}`);
+  assert(
+    inventory.includes(`## ${anchor}`),
+    `docs/design/faction-architecture-inventory.md is missing section: ## ${anchor}`,
+  );
 }
+
+for (const requiredText of [
+  "`plans/archive/faction/*` files are historical-only evidence",
+  "they must not read archived phase files as the source",
+  "| `kriegsia` | playable |",
+  "| `ekat` | playable |",
+  "| `phase2_empty_fixture` | test-fixture-only |",
+  "| `plans/archive/faction/*` | historical-only |",
+  "Public AI seats default to `kriegsia`; no public Ekat selector",
+  "Enabled only for local Kriegsia",
+]) {
+  assert(
+    inventory.includes(requiredText),
+    `docs/design/faction-architecture-inventory.md is missing faction lifecycle/source-of-truth text: ${requiredText}`,
+  );
+}
+
+const archivedFactionDir = path.join(repoRoot, "plans/archive/faction");
+assert(
+  fs.existsSync(archivedFactionDir) && fs.statSync(archivedFactionDir).isDirectory(),
+  "plans/archive/faction must exist as historical-only evidence; do not point active lifecycle checks at moved plan files",
+);
 
 const balanceDoc = read("docs/design/balance.md");
 for (const anchor of [
@@ -55,13 +93,6 @@ for (const anchor of [
   assert(balanceDoc.includes(anchor), `balance design is missing resource policy note: ${anchor}`);
 }
 
-const phase = read("plans/faction/phase-0.md");
-assert(
-  phase.includes("Status: Done"),
-  "phase 0 must only be marked Done after the faction assumption checker is wired in",
-);
-
-const matrix = read("plans/faction/lifecycle-matrix.md");
 for (const pathName of [
   "Normal lobby start",
   "Quickstart/debug start",
@@ -75,23 +106,39 @@ for (const pathName of [
   "Spectator/no-fog view",
   "Post-match replay",
 ]) {
-  assert(matrix.includes(`| ${pathName} |`), `lifecycle matrix missing row: ${pathName}`);
+  assert(inventory.includes(`| ${pathName} |`), `inventory lifecycle table missing row: ${pathName}`);
 }
-assert(!matrix.includes("| TBD |"), "lifecycle matrix should name owning checks instead of TBD");
+assert(!inventory.includes("| TBD |"), "inventory lifecycle table should name owning checks instead of TBD");
 
 const rulesKind = read("server/crates/rules/src/kind.rs");
-assert(rulesKind.includes("pub const ALL: [EntityKind; 18]"), "EntityKind::ALL count changed");
+const allCount = rulesKind.match(/pub const ALL: \[EntityKind; (\d+)\]/);
+const allBody = rulesKind.match(/pub const ALL: \[EntityKind; \d+\] = \[([\s\S]*?)\];/);
+assert(allCount && allBody, "EntityKind::ALL declaration shape changed; update faction assumption parser");
+const allEntries = allBody[1].match(/EntityKind::[A-Za-z]+/g) ?? [];
+assert(
+  Number(allCount[1]) === allEntries.length,
+  `EntityKind::ALL count ${allCount[1]} does not match listed entries ${allEntries.length}`,
+);
+assert(
+  inventory.includes(`The current roster has ${allEntries.length} global kinds`),
+  `inventory must document current EntityKind::ALL count ${allEntries.length}`,
+);
 
 const protocol = read("server/crates/protocol/src/lib.rs");
 const clientProtocol = read("client/src/protocol.js");
-for (const token of ["WORKER", "CITY_CENTRE", "STEEL", "OIL"]) {
+for (const token of ["WORKER", "EKAT", "CITY_CENTRE", "ZAMOK", "STEEL", "OIL"]) {
   assert(protocol.includes(`pub const ${token}`), `Rust protocol missing ${token}`);
   assert(clientProtocol.includes(`${token}:`), `client protocol missing ${token}`);
 }
+const rustCompactVersion = protocol.match(/COMPACT_SNAPSHOT_VERSION: u8 = (\d+)/)?.[1];
+const clientCompactVersion = clientProtocol.match(/COMPACT_SNAPSHOT_VERSION = (\d+)/)?.[1];
 assert(
-  protocol.includes("COMPACT_SNAPSHOT_VERSION: u8 = 19") &&
-    clientProtocol.includes("COMPACT_SNAPSHOT_VERSION = 19"),
-  "compact snapshot version changed; update protocol parity and inventory deliberately",
+  rustCompactVersion && clientCompactVersion,
+  "compact snapshot version declaration missing in Rust or client protocol mirror",
+);
+assert(
+  rustCompactVersion === clientCompactVersion,
+  `compact snapshot version mismatch: Rust ${rustCompactVersion}, client ${clientCompactVersion}`,
 );
 
 const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|CityCentre|Depot|Barracks|TrainingCentre|ResearchComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS|QUICKSTART_STEEL|QUICKSTART_OIL)\b/;
@@ -110,6 +157,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/facts.rs",
   "server/crates/ai/src/ai_core/observation.rs",
   "server/crates/ai/src/ai_core/profiles.rs",
+  // Kriegsia-only AI resource scanner; non-Kriegsia AI remains unsupported by public lobby flow.
+  "server/crates/ai/src/ai_core/resource_availability.rs",
   "server/crates/ai/src/ai_shared.rs",
   "server/crates/ai/src/selfplay/milestones.rs",
   "server/crates/ai/src/selfplay/pending_build.rs",
@@ -117,12 +166,16 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/selfplay/replay.rs",
   "server/crates/ai/src/selfplay/scripts.rs",
   "server/crates/rules/src/balance.rs",
+  // Catalog dump tool projects current catalog stats for parity checks.
+  "server/crates/rules/src/bin/dump-faction-catalog.rs",
   "server/crates/rules/src/combat.rs",
   "server/crates/rules/src/defs.rs",
   "server/crates/rules/src/economy.rs",
   "server/crates/rules/src/faction.rs",
   "server/crates/rules/src/kind.rs",
   "server/crates/sim/src/game/ability.rs",
+  // Inline projectile tests spawn current units directly.
+  "server/crates/sim/src/game/ability_projectile.rs",
   "server/crates/sim/src/game/artillery.rs",
   "server/crates/sim/src/game/building_memory.rs",
   "server/crates/sim/src/game/command.rs",
@@ -150,6 +203,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/movement/scout_car.rs",
   "server/crates/sim/src/game/services/movement/standability.rs",
   "server/crates/sim/src/game/services/movement/waypoints.rs",
+  // Setup and artillery command execution is still global-kind based.
+  "server/crates/sim/src/game/services/order_execution.rs",
   "server/crates/sim/src/game/services/order_queue.rs",
   "server/crates/sim/src/game/services/occupancy.rs",
   "server/crates/sim/src/game/services/pathing.rs",
@@ -166,6 +221,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/src/dev_scenarios.rs",
   "server/src/lobby/room_task.rs",
   "server/src/protocol.rs",
+  // Server-rendered wiki examples intentionally cite current catalog kinds.
+  "server/src/wiki.rs",
 ]);
 
 const sourceRoots = [
@@ -178,11 +235,11 @@ const offenders = [];
 const approvedSpecialCaseBudgets = new Map([
   // Phase 8.5: catalog data and command-service tests intentionally grew during the fixture,
   // ability, and client-surface phases; keep the ratchet explicit until those helpers shrink.
-  ["server/crates/rules/src/faction.rs", 81],
-  ["server/crates/rules/src/economy.rs", 98],
+  ["server/crates/rules/src/faction.rs", 83],
+  ["server/crates/rules/src/economy.rs", 99],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
-  ["server/crates/sim/src/game/services/commands.rs", 229],
+  ["server/crates/sim/src/game/services/commands.rs", 244],
   ["server/crates/sim/src/game/invariants.rs", 13],
 ]);
 const budgetOverruns = [];

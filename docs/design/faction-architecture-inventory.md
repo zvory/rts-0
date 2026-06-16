@@ -1,9 +1,8 @@
 # Faction Architecture Inventory
 
-This inventory captures the current single-faction assumptions before faction identity is added.
-It is intentionally a Phase 0 guardrail: it records what exists today, names the temporary
-compatibility shims, and points later phases at focused checks. It does not define the final
-faction catalog shape.
+This inventory captures the active faction boundary for the current pre-alpha faction rollout. It
+records what exists today, names the temporary compatibility shims, and points later phases at
+focused checks. It does not define the final faction catalog shape.
 
 ## Compatibility Boundary
 
@@ -12,18 +11,42 @@ match-history replay payloads, compact snapshot versions, or old protocol payloa
 may break those formats when they add explicit faction identity. Preserve current live gameplay
 behavior for the existing faction unless a later phase explicitly changes it.
 
+## Active Faction Boundary Sources
+
+This document owns the active faction lifecycle taxonomy and the current catalog-id status table.
+`server/crates/rules/src/faction.rs` owns catalog facts, loadouts, and ability availability.
+`server/src/lobby/faction_validation.rs` owns lifecycle admission. `docs/design/protocol.md` owns
+wire vocabulary and payload shapes, and `docs/design/server-sim.md` owns the `Game` API and sim
+boundary wording.
+
+`plans/archive/faction/*` files are historical-only evidence from the earlier faction rollout. They
+are not active checker inputs and must not be treated as lifecycle policy unless a future plan
+explicitly copies a rule back into an active design document. Guard scripts may check that the
+archive exists and is named as historical, but they must not read archived phase files as the source
+of current faction truth.
+
+## Catalog Id Statuses
+
+| Faction id or path | Status | Current lifecycle policy |
+| --- | --- | --- |
+| `kriegsia` | playable | Default faction for missing non-replay requests. Supported by normal human lobby, quickstart/debug starts, AI seats, dev starts, self-play defaults, replay/branch records, match-history replay, post-match replay, spectator metadata, and local prediction when version/build metadata is compatible. |
+| `ekat` | playable | Human-selectable through normal lobby faction selection. Explicit playable validation accepts it for start/replay-capable contexts, and schema-2 replay/branch records may carry it. Public AI seat creation has no faction selector and still defaults to `kriegsia`; current local prediction is disabled when the local player is `ekat`. |
+| `phase2_empty_fixture` | test-fixture-only | Catalog and loadout exist for explicit Rust/test fixture coverage. It is rejected by normal lobby, quickstart, AI, replay, branch, dev scenario, self-play, match-history, and post-match paths unless the caller uses the `TestFixture` validation context or a direct lower-level sim test helper that deliberately owns the fixture. |
+| `plans/archive/faction/*` | historical-only | Archived phase plans, handoffs, and lifecycle matrices are not active faction policy and are not checker lifecycle inputs. |
+
 ## Current Entity Identity
 
-Runtime identity is still global `EntityKind`. The current roster has 18 global kinds: 9 units,
-7 buildings, and 2 resource nodes. Server rules own the stable ids in
+Runtime identity is still global `EntityKind`. The current roster has 20 global kinds: 10 units,
+8 buildings, and 2 resource nodes. Server rules own the stable ids in
 `server/crates/rules/src/kind.rs`; protocol mirrors expose the same string ids in
 `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 
 The current production catalog is in `server/crates/rules/src/defs.rs`:
 
 - Units: Worker, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank,
-  and Command Car.
-- Buildings: City Centre, Depot, Barracks, Training Centre, R&D Complex, Factory, and Gun Works.
+  Command Car, and Ekat.
+- Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, and Gun
+  Works.
 - Resource nodes: Steel and Oil.
 
 Temporary compatibility shim policy: direct global kind checks are approved in the current rules
@@ -57,6 +80,11 @@ starting Steel and Oil, and supply from the City Centre. Unknown non-empty facti
 catalog loadout, starting entities, starting Steel/Oil, or Kriegsia supply credit; lifecycle owners
 must validate before building a `Game`. Debug quickstart adds human-only extra buildings, combat
 units, resources, debug path overlays, and an inert enemy mortar corner for inspection.
+
+The standard Ekat match start is defined by the `ekat.standard` faction loadout: one completed
+Zamok and one Ekat hero, with no starting Steel/Oil or Supply requirement. The
+`phase2_empty_fixture.scout_depot` loadout starts one Depot and one Scout Car for explicit
+fixture tests only; catalog existence does not make that id product-playable.
 
 Replay starts reconstruct from recorded per-player `PlayerStartingLoadout` records. Replay
 validators reject missing loadouts, records for unknown players, faction mismatches, empty loadout
@@ -96,23 +124,39 @@ training, and R&D research. Until Phase 2 adds a generated or mechanically check
 
 ## Current AI Coupling
 
-AI is current-faction-only. The AI decision layer assumes Workers gather Steel/Oil, City Centres
-anchor bases and expansions, Barracks/Factory/Gun Works drive production, Tanks influence oil
-demand, and Steel/Oil/Supply budgets are fixed fields. New factions must be rejected for AI slots
-until an explicit AI phase adds support.
+AI is Kriegsia-only through the public lobby seat flow. The AI decision layer assumes Workers gather
+Steel/Oil, City Centres anchor bases and expansions, Barracks/Factory/Gun Works drive production,
+Tanks influence oil demand, and Steel/Oil/Supply budgets are fixed fields. Public `addAi` requests
+do not accept a faction id and always create Kriegsia AI seats; non-Kriegsia AI support needs an
+explicit AI phase.
 
 ## Current Prediction And WASM Coupling
 
 Prediction/WASM assumes the current start payload, global entity ids, current command set,
-Steel/Oil/Supply scalar resources, and compact snapshot version. Non-default factions may disable
-prediction until the WASM simulation and adapter support the faction contracts intentionally.
+Steel/Oil/Supply scalar resources, and compact snapshot version. Local prediction is currently
+supported only for local Kriegsia players; local Ekat or fixture players disable prediction with the
+stable `unsupported-local-faction` reason until the WASM simulation and adapter support those
+contracts intentionally.
 
 ## Lifecycle Paths
 
-`plans/faction/lifecycle-matrix.md` is the maintained source of truth for match creation,
-playback, replay branch, spectator, dev scenario, self-play, quickstart, AI, prediction,
-match-history, and post-match replay paths. Later phases must update the matrix whenever they touch
-one of those lifecycle paths.
+This section is the maintained source of truth for match creation, playback, replay branch,
+spectator, dev scenario, self-play, quickstart, AI, prediction, match-history, and post-match replay
+paths. Later phases must update this section whenever they touch one of those lifecycle paths.
+
+| Path | Faction source | Allowed factions | AI behavior | Prediction behavior | Replay/branch behavior | Tests or checks |
+| --- | --- | --- | --- | --- | --- | --- |
+| Normal lobby start | `LobbyPlayer.factionId` and `PlayerInit.faction_id`, defaulted by `lobby::faction_validation` | `kriegsia` and `ekat`; fixture and unknown ids reject | No AI assignment by `setFaction`; AI seats are separate | Enabled only for local Kriegsia when build/version metadata is compatible | Schema 2 records player faction id plus per-player loadout record | `tests/faction_integration.mjs`, `tests/prediction_controller.mjs`, `server/src/lobby/faction_validation.rs` tests |
+| Quickstart/debug start | Human lobby selection plus quickstart validation/defaulting | `kriegsia` and `ekat`; fixture and unknown ids reject | AI seats still default Kriegsia | Enabled only for local Kriegsia | Schema 2 records faction id and per-player debug/standard loadout records | `server/crates/sim/src/game/setup/tests.rs`, `server/src/lobby/faction_validation.rs` tests |
+| AI add/remove/start | AI `PlayerInit.faction_id`, created by public `addAi` | Public AI seats default to `kriegsia`; no public Ekat selector | Kriegsia-only through public lobby controls | Not applicable | Schema 2 records AI faction and per-player loadout if match starts | `tests/ai_integration.mjs`, `tests/server_integration.mjs` |
+| Fixture/dev faction start | Explicit Rust test/dev harness only | `phase2_empty_fixture` only in `TestFixture` validation or direct lower-level tests | Rejected unless a later phase explicitly adds fixture AI | Disabled when local fixture player is unsupported | Fixture ids stay in explicit test artifacts only | `server/crates/sim/src/game/setup/tests.rs`, `tests/prediction_controller.mjs`, `scripts/check-faction-assumptions.mjs` |
+| Replay playback | `ReplayArtifactV1.players[].faction_id` and `playerLoadouts[]` in artifact schema 2 | Recorded playable ids `kriegsia` or `ekat`; missing, unknown, and fixture ids reject | From artifact only | Disabled for replay viewers | Load from artifact schema, never lobby state | `server/crates/sim/src/game/replay.rs` tests, `server/src/lobby/room_task.rs` replay tests |
+| Replay branch staging/launch | Branch seed seats copy recorded `factionId` from replay players | Recorded playable ids `kriegsia` or `ekat`; unsupported seat faction ids reject before live launch | From recorded branch seed only | Disabled unless supported by branch schema/WASM | Reconstruct from branch seed and cloned keyframe | `server/src/lobby/room_task.rs` tests, `tests/protocol_parity.mjs` |
+| Dev scenarios | Scenario definition plus validation/defaulting | Current bundled scenarios default to Kriegsia; explicit playable ids may be accepted by an owning scenario | Not applicable unless scenario declares AI | Enabled only for local Kriegsia | Not replayed unless scenario recording exists | `server/crates/sim/src/game/setup/dev_scenarios/tests.rs`, `docs/context/testing.md` |
+| Self-play | Self-play `PlayerInit.faction_id`, validated by `lobby::faction_validation` | Current bundled self-play defaults to Kriegsia; explicit Ekat needs a self-play script that owns it | Kriegsia-only in current live AI scripts | Not applicable | Artifact schema 2 records faction ids and per-player loadouts | `server/crates/ai/src/selfplay` tests |
+| Match history replay | Stored schema-2 match artifact | Recorded playable ids `kriegsia` or `ekat`; missing, unknown, and fixture ids reject | From artifact only | Disabled for replay viewers | Load from persisted schema; schema 1 is incompatible for faction/loadout reconstruction | `server/src/main.rs` replay compatibility tests, `docs/design/match-history.md` |
+| Spectator/no-fog view | Live match start payload or replay schema | Match factions from start/replay metadata | Not applicable | Disabled | Preserve recorded faction metadata | `tests/server_integration.mjs` |
+| Post-match replay | Captured schema-2 match artifact | Recorded playable ids `kriegsia` or `ekat`; missing, unknown, and fixture ids reject | From artifact only | Disabled for replay viewers | Load from captured schema with Steel/Oil/Supply resource payloads | `tests/server_integration.mjs` |
 
 ## Phase 0 Checks
 
