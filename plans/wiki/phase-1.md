@@ -1,8 +1,6 @@
 # Phase 1 - Wiki Route Foundation
 
-## Phase Status
-
-- [ ] Not implemented.
+Status: Done.
 
 ## Objective
 
