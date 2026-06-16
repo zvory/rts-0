@@ -91,6 +91,12 @@ import {
   movementBodyClass,
   placementPolicyForBuilding,
 } from "../client/src/input/placement.js";
+import {
+  buildTankTrapLineSites,
+  tankTrapBuildCommands,
+  tankTrapLineTiles,
+  validTankTrapLineSites,
+} from "../client/src/input/tank_trap_line.js";
 import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
@@ -914,6 +920,10 @@ function hotkeyService() {
   assert(buildCard.slots[3].label === "Training Centre", "worker build menu should include Training Centre");
   assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");
   assert(buildCard.slots[3].title === "Requires Barracks", "locked build tooltip should explain requirement");
+  assert(buildCard.slots[7].label === "Tank Trap", "worker build menu should include Tank Trap in the next open slot");
+  assert(buildCard.slots[7].hotkey === "X", "Tank Trap build hotkey should use the next open grid key");
+  assert(!buildCard.slots[7].enabled, "Tank Trap build button should respect Training Centre requirements");
+  assert(buildCard.slots[7].title === "Requires Training Centre", "Tank Trap build tooltip should explain requirement");
   assert(buildCard.slots[8].intent.type === "closeCommandCardMenu", "worker return button should close submenu");
   assert(buildCard.slots[8].commandId === "worker.return", "worker return should expose stable command identity");
 
@@ -1508,6 +1518,33 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
   assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
+}
+
+{
+  const placementGfx = new RecordingGraphics();
+  _drawPlacement.call({
+    _placementGfx: placementGfx,
+    _map: { tileSize: 32 },
+  }, {
+    placement: {
+      building: KIND.TANK_TRAP,
+      tileX: 0,
+      tileY: 0,
+      valid: true,
+      lineSites: [
+        { tileX: 0, tileY: 0, valid: true },
+        { tileX: 2, tileY: 0, valid: false },
+        { tileX: 4, tileY: 0, valid: true },
+      ],
+    },
+  }, null);
+  const rects = placementGfx.calls.filter((call) => call[0] === "drawRoundedRect");
+  const fills = placementGfx.calls.filter((call) => call[0] === "beginFill");
+  assert(rects.length === 3, "Tank Trap line placement preview draws each candidate site");
+  assert(
+    fills.some((call) => call[1] === COLORS.placeOk) && fills.some((call) => call[1] === COLORS.placeBad),
+    "Tank Trap line placement preview distinguishes valid and invalid sites",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -3650,8 +3687,8 @@ function fakeAudioContext() {
     "Tank Trap dormant metadata mirrors Phase 1 server rules",
   );
   assert(
-    !WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
-    "Tank Trap remains hidden from the worker build menu until the placement phase",
+    WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
+    "Tank Trap is exposed in the worker build menu in the placement phase",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
@@ -5056,6 +5093,94 @@ function fakeAudioContext() {
     "Tank Trap input preview rejects vehicle-body units",
   );
 
+  const pairs = (tiles) => tiles.map((site) => [site.tileX, site.tileY]);
+  const noKnightSpacing = (tiles) => tiles.every((site, index) => {
+    if (index === 0) return true;
+    const prev = tiles[index - 1];
+    const dx = Math.abs(site.tileX - prev.tileX);
+    const dy = Math.abs(site.tileY - prev.tileY);
+    return !((dx === 2 && dy === 1) || (dx === 1 && dy === 2));
+  });
+  assertDeepEqual(
+    pairs(tankTrapLineTiles({ tileX: 0, tileY: 0 }, { tileX: 5, tileY: 0 })),
+    [[0, 0], [2, 0], [4, 0]],
+    "Tank Trap horizontal line uses one-tile orthogonal gaps and omits off-cadence end",
+  );
+  assertDeepEqual(
+    pairs(tankTrapLineTiles({ tileX: 1, tileY: 1 }, { tileX: 1, tileY: 5 })),
+    [[1, 1], [1, 3], [1, 5]],
+    "Tank Trap vertical line includes the end when it lands on cadence",
+  );
+  assertDeepEqual(
+    pairs(tankTrapLineTiles({ tileX: 0, tileY: 0 }, { tileX: 3, tileY: 3 })),
+    [[0, 0], [1, 1], [2, 2], [3, 3]],
+    "Tank Trap diagonal line keeps corner-touching sites",
+  );
+  const shallowLine = tankTrapLineTiles({ tileX: 0, tileY: 0 }, { tileX: 5, tileY: 2 });
+  const steepLine = tankTrapLineTiles({ tileX: 0, tileY: 0 }, { tileX: 2, tileY: 5 });
+  assert(noKnightSpacing(shallowLine), "Tank Trap shallow line inserts bridges to avoid knight spacing");
+  assert(noKnightSpacing(steepLine), "Tank Trap steep line inserts bridges to avoid knight spacing");
+  assertDeepEqual(
+    pairs(shallowLine),
+    [[0, 0], [1, 1], [2, 1], [3, 2], [4, 2]],
+    "Tank Trap shallow bridge sites keep the line closed to vehicles",
+  );
+  const lineSites = buildTankTrapLineSites({
+    start: { tileX: 0, tileY: 0 },
+    end: { tileX: 4, tileY: 0 },
+    isValid: (tileX) => tileX !== 2,
+  });
+  assertDeepEqual(
+    lineSites.map((site) => [site.tileX, site.tileY, site.valid]),
+    [[0, 0, true], [2, 0, false], [4, 0, true]],
+    "Tank Trap line preview marks invalid sites without stopping later valid sites",
+  );
+  assertDeepEqual(
+    pairs(validTankTrapLineSites(lineSites)),
+    [[0, 0], [4, 0]],
+    "Tank Trap dispatch skips invalid preview sites",
+  );
+  const lineCommands = tankTrapBuildCommands([77, 88], [
+    { tileX: 0, tileY: 0, valid: true },
+    { tileX: 2, tileY: 0, valid: true },
+    { tileX: 4, tileY: 0, valid: false },
+    { tileX: 6, tileY: 0, valid: true },
+    { tileX: 8, tileY: 0, valid: true },
+  ]);
+  assertDeepEqual(
+    lineCommands.map((command) => [command.units, command.tileX, command.tileY, command.queued === true]),
+    [
+      [[77], 0, 0, false],
+      [[88], 2, 0, false],
+      [[77, 88], 6, 0, true],
+      [[77, 88], 8, 0, true],
+    ],
+    "Tank Trap line dispatch assigns immediate single-worker builds then queued overflow builds",
+  );
+  const lineDragInput = Object.create(Input.prototype);
+  let dragRefreshes = 0;
+  let dragConfirms = 0;
+  lineDragInput.clientIntent = new ClientIntent();
+  lineDragInput.clientIntent.beginPlacement(KIND.TANK_TRAP);
+  lineDragInput.clientIntent.updatePlacement(3, 4, true, {
+    lineSites: [{ tileX: 3, tileY: 4, valid: true }],
+  });
+  lineDragInput._refreshPlacement = () => {
+    dragRefreshes += 1;
+  };
+  lineDragInput._confirmPlacement = () => {
+    dragConfirms += 1;
+  };
+  lineDragInput._onLeftDown({ x: 10, y: 10 }, {});
+  assert(
+    lineDragInput._placementDrag?.tileX === 3 &&
+      lineDragInput._placementDrag?.tileY === 4 &&
+      lineDragInput._drag === undefined &&
+      dragRefreshes === 1 &&
+      dragConfirms === 0,
+    "Tank Trap left-down starts placement drag instead of selection drag or immediate confirm",
+  );
+
   const clickableTank = { id: 10, owner: 1, kind: KIND.TANK, x: 0, y: 0, facing: 0 };
   assert(
     input._worldPointHitsEntity(clickableTank, 25.2, 0, 32) === true,
@@ -5536,6 +5661,45 @@ function fakeAudioContext() {
     "build placement confirm should send through a legacy one-argument command sender",
   );
   assert(confirmedPlacementEnded === 1, "build placement confirm exits placement after sending");
+
+  const trapPlacementInput = Object.create(Input.prototype);
+  const trapPlacementCommands = [];
+  let trapPlacementEnded = 0;
+  trapPlacementInput.commandIssuer = {
+    command(command) {
+      trapPlacementCommands.push(command);
+    },
+  };
+  trapPlacementInput.state = {};
+  trapPlacementInput.clientIntent = new ClientIntent();
+  trapPlacementInput.clientIntent.placement = {
+    building: KIND.TANK_TRAP,
+    tileX: 0,
+    tileY: 0,
+    valid: true,
+    lineSites: [
+      { tileX: 0, tileY: 0, valid: true },
+      { tileX: 2, tileY: 0, valid: false },
+      { tileX: 4, tileY: 0, valid: true },
+      { tileX: 6, tileY: 0, valid: true },
+    ],
+  };
+  trapPlacementInput.clientIntent.endPlacement = () => {
+    trapPlacementEnded += 1;
+    trapPlacementInput.clientIntent.placement = null;
+  };
+  trapPlacementInput._selectedWorkerIds = () => [77, 88];
+  trapPlacementInput._confirmPlacement({ shiftKey: true });
+  assertDeepEqual(
+    trapPlacementCommands.map((command) => [command.units, command.tileX, command.tileY, command.queued === true]),
+    [
+      [[77], 0, 0, false],
+      [[88], 4, 0, false],
+      [[77, 88], 6, 0, true],
+    ],
+    "Tank Trap placement confirmation sends single-worker immediate builds and queued overflow",
+  );
+  assert(trapPlacementEnded === 0, "Shift Tank Trap placement preserves placement mode without changing overflow queueing");
 
   const artilleryCommands = [];
   const artilleryFeedback = [];

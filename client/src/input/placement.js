@@ -1,6 +1,7 @@
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
 import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
+import { buildTankTrapLineSites, tankTrapBuildCommands } from "./tank_trap_line.js";
 
 export function footprintValidAgainstEntities(
   entities,
@@ -90,8 +91,22 @@ export function _refreshPlacement() {
   // Snap so the footprint is centered on the cursor (top-left tile of the footprint).
   const tileX = Math.floor(world.x / map.tileSize - footW / 2 + 0.5);
   const tileY = Math.floor(world.y / map.tileSize - footH / 2 + 0.5);
+  if (this._placementDrag && place.building === KIND.TANK_TRAP) {
+    const lineSites = buildTankTrapLineSites({
+      start: this._placementDrag,
+      end: { tileX, tileY },
+      isValid: (siteX, siteY) => this._footprintValid(siteX, siteY, footW, footH, map, place.building),
+    });
+    const firstValid = lineSites.find((site) => site.valid) || lineSites[0] || { tileX, tileY, valid: false };
+    intent?.updatePlacement?.(firstValid.tileX, firstValid.tileY, !!lineSites.some((site) => site.valid), {
+      lineSites,
+    });
+    return;
+  }
+
   const valid = this._footprintValid(tileX, tileY, footW, footH, map, place.building);
-  intent?.updatePlacement?.(tileX, tileY, valid);
+  const lineSites = place.building === KIND.TANK_TRAP ? [{ tileX, tileY, valid }] : undefined;
+  intent?.updatePlacement?.(tileX, tileY, valid, lineSites ? { lineSites } : {});
 }
 
 export function _footprintValid(tileX, tileY, footW, footH, map, buildingKind = null) {
@@ -119,6 +134,10 @@ export function _confirmPlacement(ev = {}) {
     intent?.endPlacement?.();
     return;
   }
+  if (place.building === KIND.TANK_TRAP && Array.isArray(place.lineSites)) {
+    this._confirmTankTrapLinePlacement(place, workers, ev);
+    return;
+  }
   const queued = !!ev.shiftKey;
   this._issueCommand(cmd.build(workers, place.building, place.tileX, place.tileY, queued));
   if (this.audio) this.audio.play("build_confirm", { category: "ui", priority: 2 });
@@ -126,6 +145,34 @@ export function _confirmPlacement(ev = {}) {
   // several queued buildings; Shift keyup owns the eventual de-arm.
   if (queued) return;
   intent?.endPlacement?.();
+}
+
+export function _beginTankTrapPlacementDrag() {
+  const place = clientIntent(this)?.placement;
+  if (!place || place.building !== KIND.TANK_TRAP) return false;
+  this._placementDrag = { tileX: place.tileX, tileY: place.tileY };
+  this._refreshPlacement();
+  return true;
+}
+
+export function _finishTankTrapPlacementDrag(ev = {}) {
+  if (!this._placementDrag) return false;
+  this._placementDrag = null;
+  this._confirmPlacement(ev);
+  return true;
+}
+
+export function _cancelPlacementDrag() {
+  this._placementDrag = null;
+}
+
+export function _confirmTankTrapLinePlacement(place, workers, ev = {}) {
+  const commands = tankTrapBuildCommands(workers, place.lineSites, place.building);
+  if (commands.length === 0) return false;
+  for (const command of commands) this._issueCommand(command);
+  if (this.audio) this.audio.play("build_confirm", { category: "ui", priority: 2 });
+  if (!ev.shiftKey) clientIntent(this)?.endPlacement?.();
+  return true;
 }
 
 // Shared input helpers.

@@ -72,10 +72,12 @@ const ALLOWED_PROTOTYPE_GRAFTS = new Set([
 // the largest modules. Future growth should either extract a focused helper or
 // update this table with the phase-specific reason.
 const LARGE_FILE_BASELINES = new Map(Object.entries({
-  "renderer/feedback.js": 46017,
+  // Tank Trap Phase 5 extends placement feedback to draw multi-site line previews.
+  "renderer/feedback.js": 46315,
   "hud.js": 43923,
   "state.js": 38576,
-  "input/index.js": 38439,
+  // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
+  "input/index.js": 38854,
   "match.js": 38289,
   // Tank Trap Phase 1 adds mirrored KIND, BUILDING_KINDS, and compact kind-code entries.
   "protocol.js": 35989,

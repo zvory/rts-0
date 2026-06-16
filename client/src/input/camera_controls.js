@@ -81,6 +81,7 @@ export function _handleKeyUp(ev) {
         clientIntent(this).releaseCommandTargetShift();
       }
       if (clientIntent(this)?.placement && typeof clientIntent(this).endPlacement === "function") {
+        this._cancelPlacementDrag?.();
         clientIntent(this).endPlacement();
       }
       ev.preventDefault();
@@ -105,6 +106,7 @@ export function _handleBlur() {
   }
   if (typeof clientIntent(this)?.endCommandTarget === "function") clientIntent(this).endCommandTarget();
   if (clientIntent(this)?.placement && typeof clientIntent(this).endPlacement === "function") {
+    this._cancelPlacementDrag?.();
     clientIntent(this).endPlacement();
   }
   if (this._drag) {

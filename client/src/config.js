@@ -386,6 +386,7 @@ export const WORKER_BUILDABLE = Object.freeze([
   KIND.RESEARCH_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
+  KIND.TANK_TRAP,
 ]);
 
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";

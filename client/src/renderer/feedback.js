@@ -79,30 +79,40 @@ export function _drawPlacement(view, fog) {
   if (!p) return;
   const ts = (this._map && this._map.tileSize) || 32;
   const stat = STATS[p.building] || {};
-  const w = (stat.footW || 2) * ts;
-  const h = (stat.footH || 2) * ts;
-  const x0 = p.tileX * ts;
-  const y0 = p.tileY * ts;
-  const color = p.valid ? COLORS.placeOk : COLORS.placeBad;
+  const footW = stat.footW || 2;
+  const footH = stat.footH || 2;
+  const w = footW * ts;
+  const h = footH * ts;
+  const sites = Array.isArray(p.lineSites) && p.lineSites.length > 0
+    ? p.lineSites
+    : [{ tileX: p.tileX, tileY: p.tileY, valid: p.valid }];
 
-  g.lineStyle(2, color, 0.95);
-  g.beginFill(color, 0.25);
-  g.drawRoundedRect(x0, y0, w, h, 6);
-  g.endFill();
+  for (const site of sites) {
+    const x0 = site.tileX * ts;
+    const y0 = site.tileY * ts;
+    const color = site.valid ? COLORS.placeOk : COLORS.placeBad;
 
-  // Per-tile grid hint inside the footprint so the snap target is obvious.
-  g.lineStyle(1, color, 0.4);
-  for (let i = 1; i < (stat.footW || 2); i++) {
-    g.moveTo(x0 + i * ts, y0);
-    g.lineTo(x0 + i * ts, y0 + h);
-  }
-  for (let j = 1; j < (stat.footH || 2); j++) {
-    g.moveTo(x0, y0 + j * ts);
-    g.lineTo(x0 + w, y0 + j * ts);
+    g.lineStyle(2, color, 0.95);
+    g.beginFill(color, 0.25);
+    g.drawRoundedRect(x0, y0, w, h, 6);
+    g.endFill();
+
+    // Per-tile grid hint inside the footprint so the snap target is obvious.
+    g.lineStyle(1, color, 0.4);
+    for (let i = 1; i < footW; i++) {
+      g.moveTo(x0 + i * ts, y0);
+      g.lineTo(x0 + i * ts, y0 + h);
+    }
+    for (let j = 1; j < footH; j++) {
+      g.moveTo(x0, y0 + j * ts);
+      g.lineTo(x0 + w, y0 + j * ts);
+    }
   }
 
   if (p.building !== KIND.CITY_CENTRE) return;
 
+  const x0 = p.tileX * ts;
+  const y0 = p.tileY * ts;
   const cx = x0 + w / 2;
   const cy = y0 + h / 2;
   const rangePx = MINING_CC_RANGE_TILES * ts;

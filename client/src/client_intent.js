@@ -9,7 +9,7 @@ import { CommandComposer } from "./command_composer.js";
 export class ClientIntent {
   constructor({ now = defaultNow } = {}) {
     this._now = now;
-    /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean}} */
+    /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean, lineSites?:Array<{tileX:number,tileY:number,valid:boolean}>}} */
     this.placement = null;
     /** @type {null | "workerBuild"} */
     this.commandCardMode = null;
@@ -66,11 +66,16 @@ export class ClientIntent {
    * @param {number} tileY
    * @param {boolean} valid
    */
-  updatePlacement(tileX, tileY, valid) {
+  updatePlacement(tileX, tileY, valid, options = {}) {
     if (!this.placement) return;
     this.placement.tileX = tileX;
     this.placement.tileY = tileY;
     this.placement.valid = !!valid;
+    if (Array.isArray(options.lineSites)) {
+      this.placement.lineSites = options.lineSites;
+    } else if ("lineSites" in this.placement) {
+      delete this.placement.lineSites;
+    }
   }
 
   /** Stop previewing placement. */
