@@ -10,7 +10,7 @@ The normal agent lifecycle is:
 5. For serial work, run `scripts/wait-pr.sh <pr>` before starting the next phase.
 
 GitHub Actions owns the full-suite merge gate through
-`Main test gate / ./tests/run-all.sh`. Local hooks are intentionally cheap; they
+`./tests/run-all.sh` in the `Main test gate` workflow. Local hooks are intentionally cheap; they
 catch staged whitespace errors and run opportunistic cleanup on `main`.
 
 ## Recovery states
@@ -64,7 +64,7 @@ only a bounded number of stale Cargo target directories per run.
 Before relying on a changed workflow broadly, run three canaries:
 
 - A docs-only branch that opens with `scripts/agent-pr.sh`, has auto-merge
-  armed, passes `Main test gate / ./tests/run-all.sh`, and merges.
+  armed, passes `./tests/run-all.sh`, and merges.
 - A representative implementation branch with focused local verification in the
   PR body, auto-merge armed, and a successful merge through the same required
   gate.
