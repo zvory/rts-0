@@ -127,6 +127,14 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         println!("}}{comma}");
     }
     println!("{indent}  ],");
+    print_kind_array("builders", catalog.builders, true, indent);
+    print_kind_array("gatherers", catalog.gatherers, true, indent);
+    print_kind_array(
+        "productionAnchors",
+        catalog.production_anchors,
+        true,
+        indent,
+    );
     println!("{indent}  \"costs\": {{");
     let priced: Vec<_> = catalog
         .units
