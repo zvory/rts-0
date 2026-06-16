@@ -279,11 +279,13 @@ const offenders = [];
 const approvedSpecialCaseBudgets = new Map([
   // Phase 8.5: catalog data and command-service tests intentionally grew during the fixture,
   // ability, and client-surface phases; keep the ratchet explicit until those helpers shrink.
-  ["server/crates/rules/src/faction.rs", 83],
-  ["server/crates/rules/src/economy.rs", 99],
+  // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
+  // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
+  ["server/crates/rules/src/faction.rs", 84],
+  ["server/crates/rules/src/economy.rs", 101],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
-  ["server/crates/sim/src/game/services/commands.rs", 244],
+  ["server/crates/sim/src/game/services/commands.rs", 254],
   ["server/crates/sim/src/game/invariants.rs", 13],
 ]);
 const budgetOverruns = [];
