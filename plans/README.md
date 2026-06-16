@@ -25,6 +25,14 @@ Each phase document should describe its scope, expected code or documentation to
 verification, manual testing focus, and handoff expectations. When a phase is complete, mark that
 phase document as done in the implementation commit for that phase.
 
+## Archive policy
+
+Archived plans under `plans/archive/` are historical evidence only. Active scripts, tests, and
+design docs must not read archived phase files as source-of-truth inputs for current product policy,
+allowlists, lifecycle matrices, or checker budgets. If an archived rule is still valid, copy it into
+the current plan or relevant `docs/design/*` source-of-truth file and point automation at that
+active file instead.
+
 ## Executor runner
 
 For unattended executor passes, use `scripts/phase-runner.sh` from a clean checkout. The runner
