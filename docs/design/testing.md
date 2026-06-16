@@ -86,6 +86,13 @@ suites.
 - `rts-rules`: run rules tests plus sim tests that consume stats/formulas. If visible balance
   values changed, run client config/protocol mirror checks and include factual player-facing patch
   notes.
+- Faction guardrails: run `node scripts/check-faction-assumptions.mjs` for faction docs, lifecycle
+  policy, lobby admission, protocol/config vocabulary, or checker changes. Run
+  `node scripts/check-faction-catalog-parity.mjs` when faction catalog facts or client mirrors can
+  change, including `server/crates/rules/src/faction.rs`, `client/src/config.js`,
+  `client/src/lobby_view.js`, protocol/config mirror files, or the catalog parity checker itself.
+  Docs-only faction policy edits should select these guardrails without requiring live-server
+  suites.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
   changed behavior that crosses the room/network boundary.
 - Team-aware authored start assignment is covered by `cargo test map --workspace` for deterministic
