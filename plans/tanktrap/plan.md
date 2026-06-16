@@ -26,10 +26,14 @@ body/clearance rules.
   Tank Trap-specific list.
 - Infantry can path through and stand on the same tile as a Tank Trap.
 - Tank Traps block vehicles while under construction and after completion.
-- Placement uses Bresenham-style tile lines between drag start and drag end. The drag start tile is
-  always included; the end tile is included only when it lands on the every-other-tile cadence.
-- Line placement skips one tile between each Tank Trap. Invalid trap positions are skipped while
-  later valid positions remain eligible.
+- Placement uses Bresenham-style tile lines between drag start and drag end, but emitted Tank Trap
+  sites must never leave a diagonal vehicle gap. The drag start tile is always included; the end
+  tile is included only when it lands on the line cadence.
+- Line placement allows one empty tile between Tank Traps on the same row or column, and allows
+  diagonally touching Tank Traps. Consecutive emitted sites from the drag algorithm must not be a
+  knight's move apart (`abs(dx), abs(dy)` of `2,1` or `1,2`); when a shallow or steep Bresenham line
+  would produce that spacing, the line helper should emit a diagonal-touching bridge site instead.
+  Invalid trap positions are skipped while later valid positions remain eligible.
 - Without Shift, a line command sends at most one build site per selected worker, assigning the
   first valid trap positions from drag start toward drag end.
 - With Shift, additional sites beyond the selected worker count use the existing queued build worker
@@ -74,11 +78,12 @@ or structure overlap. The outcome is a client that can display and preview Tank 
 the final placement command surface turns on.
 
 Phase 5 implements the Tank Trap line-placement interaction and exposes the build-card button. It
-adds a small line-placement collaborator that derives every-other-tile Bresenham trap sites, skips
-invalid sites, previews the line, sends one immediate build command per selected worker for the
-first sites, and sends queued standard build commands for additional Shift sites using the existing
-server worker distribution. The outcome is the requested player workflow without changing the wire
-command shape unless Phase 0 proves the standard `build` command cannot support it safely.
+adds a small line-placement collaborator that derives Bresenham trap sites with one-tile orthogonal
+gaps or diagonal-touching bridges, skips invalid sites, previews the line, sends one immediate build
+command per selected worker for the first sites, and sends queued standard build commands for
+additional Shift sites using the existing server worker distribution. The outcome is the requested
+player workflow without changing the wire command shape unless Phase 0 proves the standard `build`
+command cannot support it safely.
 
 Phase 6 consolidates tests, docs, manual scenarios, and cleanup. It adds focused regression coverage
 for vehicle-only blocking, infantry pass-through, two-tile vehicle gaps, under-construction
@@ -131,7 +136,7 @@ known follow-ups limited to art, sound, AI usage, and future repair/cancel mecha
   plan.
 - Patch notes should say that engineers can build 15-steel Tank Traps after Training Centre, Tank
   Traps block vehicles but not infantry, and line-drag placement distributes construction across
-  selected workers.
+  selected workers while avoiding diagonal vehicle gaps in dragged lines.
 
 ## Implementation and Handoff Rules
 

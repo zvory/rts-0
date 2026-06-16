@@ -14,6 +14,9 @@ feature is playable.
   - vehicle-body blocking for Tank, Scout Car, Command Car, Anti-Tank Gun, Mortar Team, and
     Artillery
   - two-tile gap behavior emerging from body/clearance rules
+  - no vehicle path through diagonal-touching Tank Trap lines; if ordinary A* clearance still
+    admits that path, vehicle pathing should use the Phase 2 0.5-tile Tank Trap blocker inflation
+    fallback
   - under-construction vehicle blocking
   - ordinary buildings still blocking infantry and vehicles
   - elimination ignores Tank Traps
@@ -22,6 +25,8 @@ feature is playable.
   - worker build-card visibility after Training Centre
   - advisory placement policy
   - line preview and command dispatch
+  - shallow and steep line drags that use diagonal-touching bridge sites instead of knight-move
+    spacing
   - hotkey/profile behavior if the new build slot affects hotkey tests
   - renderer stability for live and remembered Tank Traps
 - Update design docs and capsules as needed:
@@ -60,8 +65,9 @@ feature is playable.
 ## Manual Testing Focus
 
 Run one local match flow: build Training Centre, construct single and line Tank Traps, watch
-engineers distribute work, verify infantry can cross, verify vehicles need a wide enough gap, destroy
-some traps, and confirm a player with only Tank Traps is eliminated.
+engineers distribute work, verify infantry can cross, verify vehicles need a wide enough gap, verify
+shallow or steep dragged lines do not leave knight-move diagonal gaps, destroy some traps, and
+confirm a player with only Tank Traps is eliminated.
 
 ## Handoff Expectations
 
