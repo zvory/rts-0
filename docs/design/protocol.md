@@ -405,6 +405,8 @@ Compact numeric codes:
 | `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
+| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor` |
+| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
@@ -434,9 +436,7 @@ trailing missing optional fields are omitted; interior missing optional fields a
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
 stage first, followed by queued unit stages in execution order. Each compact stage is
-`[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`,
-6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`,
-11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, or 14 `ekatMagicAnchor`.
+`[kind, x, y]`, where `kind` uses the `orderStage` compact code table above.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
@@ -445,8 +445,8 @@ capped at four stages, and uses the same `[kind, x, y]` compact stage encoding w
 `attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
 `[ability, cooldownLeft, remainingUses?, autocastEnabled?, activeObjectId?, availableTick?, lockoutUntilTick?, expiresIn?]`,
-where `ability` is 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`,
-6 `ekatTeleport`, 7 `ekatLineShot`, or 8 `ekatMagicAnchor`; 1 `charge` is legacy.
+where `ability` uses the `ability` compact code table above. `charge` is legacy and currently has
+no eligible carriers.
 The server projects ability affordances only when the owning player's faction catalog exposes that
 ability for the entity's global kind.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
