@@ -10,9 +10,11 @@ The normal agent lifecycle is:
 5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged and the
    head SHA reachable from `origin/main`.
 
-GitHub Actions owns the full-suite merge gate through
-`./tests/run-all.sh` in the `Main test gate` workflow. Local hooks are intentionally cheap; they
-catch staged whitespace errors and run opportunistic cleanup on `main`.
+GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
+the `Main test gate` workflow. The workflow runs split coverage jobs for server build,
+Rust/architecture, live Node, and browser/tri-state suites, then fails the aggregate check if any
+required coverage job fails. Local hooks are intentionally cheap; they catch staged whitespace
+errors and run opportunistic cleanup on `main`.
 
 ## Recovery states
 
@@ -70,7 +72,7 @@ only a bounded number of stale Cargo target directories per run.
 Before relying on a changed workflow broadly, run three canaries:
 
 - A docs-only branch that opens with `scripts/agent-pr.sh`, has auto-merge
-  armed, passes `./tests/run-all.sh`, and merges.
+  armed, passes the aggregate `./tests/run-all.sh` check, and merges.
 - A representative implementation branch with focused local verification in the
   PR body, auto-merge armed, and a successful merge through the same required
   gate.
@@ -91,7 +93,7 @@ the same command to another runner instead of changing the agent lifecycle.
 The durable contract is:
 
 - PRs target `main`.
-- The required check remains a stable full-gate signal for `./tests/run-all.sh`.
+- The required check remains a stable full-gate signal named `./tests/run-all.sh`.
 - Auto-merge is armed only after ownership metadata and focused verification are
   recorded.
 - Serial automation waits for a definite merge and verifies the phase head is

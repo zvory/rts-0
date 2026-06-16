@@ -9,9 +9,10 @@ fails. The private server runs with `RTS_TEST_TICK_MS=5` by default, so live-ser
 simulated progress instead of real-time 30 Hz wall clock; normal `cargo run` remains 30 Hz.
 If a server is already answering on the port it is reused and left running.
 
-This command is the portable full gate and the required GitHub Actions PR signal. Run focused local
-verification for the files or contracts you changed, then rely on the PR check named
-`./tests/run-all.sh` before merge. Run `./scripts/install-hooks.sh` once per
+This command is the portable local full gate. GitHub Actions runs the same coverage as split
+parallel jobs and keeps the required aggregate PR check named `./tests/run-all.sh`. Run focused local
+verification for the files or contracts you changed, then rely on that aggregate check before merge.
+Run `./scripts/install-hooks.sh` once per
 checkout to install the tracked hooks locally; those hooks run cheap staged-diff checks instead of
 the full suite. Normal `main` updates go through owned PRs with auto-merge armed.
 The `Main test gate` workflow cancels superseded runs for the same PR and cancels stale post-merge
@@ -23,11 +24,15 @@ tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + 
 tests/run-all.sh --full-ai       # local gate plus long AI self-play/simulation coverage
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
+tests/run-all.sh --only-rust     # architecture policy + Rust fmt/test/lint only
+tests/run-all.sh --only-live-node # JS contracts + live Node API suites only
+tests/run-all.sh --only-browser  # browser smoke + configured tri-state browser suites only
 tests/run-all.sh --with-tri-state-browser  # include latency-sensitive tri-state browser scenarios locally
 tests/run-all.sh -v              # also print headers and pass/fail lines; timing summary is always printed
 tests/cargo-test-timed.sh        # run Cargo tests package-by-package with per-package timings
 PORT=8090 tests/run-all.sh       # use a different port
 CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the per-worktree Cargo target dir
+RTS_SERVER_BIN=/tmp/rts-server tests/run-all.sh --only-live-node  # reuse a prebuilt server
 RTS_CARGO_PACKAGE_TIMINGS=1 tests/run-all.sh  # profile Cargo tests package-by-package
 RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh  # override shared Node deps cache
 RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
@@ -52,8 +57,10 @@ By default, the local gate and Cargo helper use an isolated target directory for
 under `/tmp/rts-cargo-target/`. This keeps final binaries, test harnesses, and self-play
 artifacts branch-local while keeping the checkout clean. Override with
 `CARGO_TARGET_DIR=/path/to/target` when you need a specific target location. CI intentionally sets
-`CARGO_TARGET_DIR` to `server/target` in the `Main test gate` workflow so the existing Cargo cache
-restores the same target directory that `tests/run-all.sh` uses during the run.
+`CARGO_TARGET_DIR` to `server/target` in Rust-building `Main test gate` jobs so the existing Cargo
+cache restores the same target directory that Cargo uses during the run. The workflow builds the
+debug server once, uploads it as an artifact, and passes it into live Node and browser jobs with
+`RTS_SERVER_BIN` so those split jobs do not rebuild the server independently.
 
 Installed repo hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main`.
 Auto cleanup removes only clean `zvorygin/*` worktrees whose branch head is reachable from local
@@ -160,10 +167,10 @@ node tests/client_smoke.mjs
 # env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to Chrome/Chromium)
 ```
 
-> CI note: `run-all.sh` is the CI entry point — it builds the server, launches it, waits for
-> `GET /` to return 200, checks Rust formatting, runs every suite, and exits non-zero on any
-> failure. In a headless CI image without Chrome, the client smoke test self-skips; pass
-> `CHROME=...` to include it. If Chrome is present but dependency hydration fails, the gate fails.
+> CI note: `Main test gate` uses `run-all.sh` sub-suite modes in parallel jobs, then reports the
+> required aggregate check as `./tests/run-all.sh`. In a headless CI image without Chrome, the
+> client smoke test self-skips; pass `CHROME=...` to include it. If Chrome is present but dependency
+> hydration fails, the gate fails.
 
 ## Tri-State lag scenarios
 

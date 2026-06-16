@@ -22,10 +22,14 @@
 #   tests/run-all.sh -v              # verbose: print headers and pass lines; timings are always summarized
 #   tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
+#   tests/run-all.sh --only-rust     # run architecture policy + Rust fmt/test/lint only
+#   tests/run-all.sh --only-live-node # run JS contracts + live Node API suites only
+#   tests/run-all.sh --only-browser  # run browser suites only
 #   tests/run-all.sh --with-tri-state-browser  # run latency-sensitive browser tri-state scenarios locally
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
 #   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the per-worktree Cargo target dir
+#   RTS_SERVER_BIN=/path/to/rts-server tests/run-all.sh --only-live-node  # reuse a prebuilt server
 #   RTS_CARGO_PACKAGE_TIMINGS=1 tests/run-all.sh  # profile Cargo tests package-by-package
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
@@ -47,11 +51,13 @@ if [ -z "${CARGO_TARGET_DIR:-}" ]; then
 else
   export CARGO_TARGET_DIR
 fi
-SERVER_BIN="$CARGO_TARGET_DIR/debug/rts-server"
+SERVER_BIN="${RTS_SERVER_BIN:-$CARGO_TARGET_DIR/debug/rts-server}"
 
 # --- Options --------------------------------------------------------------------------------
 PORT="${PORT:-}"
 RUN_RUST=1
+RUN_STATIC_JS=1
+RUN_LIVE_NODE=1
 RUN_CLIENT=1
 RUN_FULL_AI=0
 RUN_TRI_STATE_BROWSER=0
@@ -73,12 +79,15 @@ for arg in "$@"; do
   case "$arg" in
     --no-rust)   RUN_RUST=0 ;;
     --no-client) RUN_CLIENT=0 ;;
+    --only-rust) RUN_RUST=1; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=0 ;;
+    --only-live-node) RUN_RUST=0; RUN_STATIC_JS=1; RUN_LIVE_NODE=1; RUN_CLIENT=0 ;;
+    --only-browser) RUN_RUST=0; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=1 ;;
     --with-tri-state-browser|--with-tri-state) RUN_TRI_STATE_BROWSER=1 ;;
     --full-ai|--full-selfplay) RUN_FULL_AI=1 ;;
     --port) echo "use --port=N or PORT=N" >&2; exit 2 ;;
     --port=*) PORT="${arg#*=}" ;;
     -v|--verbose) VERBOSE=1 ;;
-    -h|--help) sed -n '2,31p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,35p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -193,18 +202,29 @@ boot_server() {
   [ "$VERBOSE" = "1" ] && hdr "Build server (debug)"
   local build_log
   local build_start=$SECONDS
-  build_log="$(mktemp -t rts-build.XXXXXX)"
-  if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml" >"$build_log" 2>&1; then
-    record_timing "Server build (debug)" "$((SECONDS - build_start))" "FAIL"
-    warn "server build failed ($(elapsed_since "$build_start"))"
-    cat "$build_log"
+  if [ -n "${RTS_SERVER_BIN:-}" ]; then
+    if [ ! -x "$SERVER_BIN" ]; then
+      record_timing "Server build (debug, prebuilt)" "$((SECONDS - build_start))" "FAIL"
+      warn "prebuilt server binary not executable at $SERVER_BIN"
+      FAILED+=("server build")
+      return 1
+    fi
+    record_timing "Server build (debug, prebuilt)" "$((SECONDS - build_start))" "SKIP"
+    info "using prebuilt server binary at $SERVER_BIN"
+  else
+    build_log="$(mktemp -t rts-build.XXXXXX)"
+    if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml" >"$build_log" 2>&1; then
+      record_timing "Server build (debug)" "$((SECONDS - build_start))" "FAIL"
+      warn "server build failed ($(elapsed_since "$build_start"))"
+      cat "$build_log"
+      rm -f "$build_log"
+      FAILED+=("server build")
+      return 1
+    fi
+    record_timing "Server build (debug)" "$((SECONDS - build_start))" "PASS"
+    info "${GRN}PASS${RST} server build ($(elapsed_since "$build_start"))"
     rm -f "$build_log"
-    FAILED+=("server build")
-    return 1
   fi
-  record_timing "Server build (debug)" "$((SECONDS - build_start))" "PASS"
-  info "${GRN}PASS${RST} server build ($(elapsed_since "$build_start"))"
-  rm -f "$build_log"
   if [ ! -x "$SERVER_BIN" ]; then
     warn "server binary not found at $SERVER_BIN"
     FAILED+=("server build")
@@ -434,10 +454,8 @@ hydrate_client_deps() {
 }
 
 run_cargo_tests_bg() {
-  local name full_ai_env
-  full_ai_env=()
+  local name
   if [ "$RUN_FULL_AI" = "1" ]; then
-    full_ai_env=(RTS_FULL_AI_TESTS=1)
     if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
       name="Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test package timings)"
     else
@@ -452,9 +470,17 @@ run_cargo_tests_bg() {
   fi
 
   if [ "$RUN_CARGO_PACKAGE_TIMINGS" = "1" ]; then
-    run_suite_bg "$name" env "${full_ai_env[@]}" "$SCRIPT_DIR/cargo-test-timed.sh"
+    if [ "$RUN_FULL_AI" = "1" ]; then
+      run_suite_bg "$name" env RTS_FULL_AI_TESTS=1 "$SCRIPT_DIR/cargo-test-timed.sh"
+    else
+      run_suite_bg "$name" "$SCRIPT_DIR/cargo-test-timed.sh"
+    fi
   else
-    run_suite_bg "$name" env "${full_ai_env[@]}" cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    if [ "$RUN_FULL_AI" = "1" ]; then
+      run_suite_bg "$name" env RTS_FULL_AI_TESTS=1 cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    else
+      run_suite_bg "$name" cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    fi
   fi
 }
 
@@ -493,41 +519,54 @@ run_rust_suites_bg() {
   fi
 }
 
-run_suite_bg "JS protocol contracts" \
-  node "$SCRIPT_DIR/protocol_parity.mjs"
-run_suite_bg "JS client contracts" \
-  node "$SCRIPT_DIR/client_contracts.mjs"
-run_suite_bg "JS prediction controller" \
-  node "$SCRIPT_DIR/prediction_controller.mjs"
-run_suite_bg "JS tri-state harness self-test" \
-  node "$SCRIPT_DIR/tri_state/self_test.mjs"
-run_suite_bg "JS minimap input contracts" \
-  node "$SCRIPT_DIR/minimap_input_contracts.mjs"
-run_suite_bg "JS HUD command card" \
-  node "$SCRIPT_DIR/hud_command_card.mjs"
-
-# --- 1. Build server first (both cargo build and cargo test share the target dir and
-#        serialize via cargo's file lock, so we build once, then run both in parallel
-#        — cargo test reuses the already-compiled artifacts and mostly just links+runs).
-if is_up; then
-  info "reusing server already listening on :$PORT (will not stop it)"
-  SERVER_HEALTHY=1
-  # No build needed; kick off Rust suites immediately if requested.
-  run_rust_suites_bg
+if [ "$RUN_STATIC_JS" = "1" ]; then
+  run_suite_bg "JS protocol contracts" \
+    node "$SCRIPT_DIR/protocol_parity.mjs"
+  run_suite_bg "JS client contracts" \
+    node "$SCRIPT_DIR/client_contracts.mjs"
+  run_suite_bg "JS prediction controller" \
+    node "$SCRIPT_DIR/prediction_controller.mjs"
+  run_suite_bg "JS tri-state harness self-test" \
+    node "$SCRIPT_DIR/tri_state/self_test.mjs"
+  run_suite_bg "JS minimap input contracts" \
+    node "$SCRIPT_DIR/minimap_input_contracts.mjs"
+  run_suite_bg "JS HUD command card" \
+    node "$SCRIPT_DIR/hud_command_card.mjs"
 else
-  # Build the server binary first (blocks until done).
-  if boot_server; then SERVER_HEALTHY=1; else SERVER_HEALTHY=0; fi
-  # Now artifacts are compiled; cargo test and clippy can reuse them with minimal recompilation.
+  SKIPPED+=("JS contract suites")
+fi
+
+NEEDS_SERVER=0
+if [ "$RUN_LIVE_NODE" = "1" ] || [ "$RUN_CLIENT" = "1" ]; then
+  NEEDS_SERVER=1
+fi
+
+if [ "$NEEDS_SERVER" = "1" ]; then
+  # Build the server before Rust suites. In the default local gate, cargo test and clippy can then
+  # reuse compiled artifacts instead of competing with the live-server build for Cargo's lock.
+  if is_up; then
+    info "reusing server already listening on :$PORT (will not stop it)"
+    SERVER_HEALTHY=1
+    run_rust_suites_bg
+  else
+    if boot_server; then SERVER_HEALTHY=1; else SERVER_HEALTHY=0; fi
+    run_rust_suites_bg
+  fi
+else
   run_rust_suites_bg
 fi
 
 # --- 2/3. Node suites + client smoke (all parallelised) ------------------------------------
 if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
+  if [ "$RUN_LIVE_NODE" = "1" ]; then
   run_suite_bg "API: server_integration" node "$SCRIPT_DIR/server_integration.mjs"
   run_suite_bg "API: regression"         node "$SCRIPT_DIR/regression.mjs"
   run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
   run_suite_bg "API: faction_integration" node "$SCRIPT_DIR/faction_integration.mjs"
   run_suite_bg "API: team_integration"   node "$SCRIPT_DIR/team_integration.mjs"
+  else
+    SKIPPED+=("Live Node API suites")
+  fi
 
   # Browser suites are latency-sensitive and each may drive its own Chrome/WebSocket room. Keep
   # them off the already-parallel background batch so snapshot-lane comparisons are not distorted
@@ -599,9 +638,11 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
     SKIPPED+=("Client smoke (--no-client)")
     SKIPPED+=("Tri-state lag scenarios (--no-client)")
   fi
-else
+elif [ "$NEEDS_SERVER" = "1" ]; then
   warn "server not healthy — skipping all live-server suites"
   SKIPPED+=("API + client suites (server unavailable)")
+else
+  collect_bg_results
 fi
 
 collect_bg_results

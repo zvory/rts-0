@@ -13,13 +13,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 jobs:
-  run-all:
-    name: ./tests/run-all.sh
+  changed-files:
+    name: CI / changed files
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
-
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.changed-files.outputs.docs_only }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,48 +27,59 @@ jobs:
 
       - name: Detect docs-only PR
         id: changed-files
-        if: github.event_name == 'pull_request'
         shell: bash
         run: |
-          changed=()
-          while IFS= read -r path; do
-            [ -n "$path" ] && changed+=("$path")
-          done < <(git diff --name-only --no-renames \
-            "${{ github.event.pull_request.base.sha }}" \
-            "${{ github.event.pull_request.head.sha }}")
+          docs_only=false
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=()
+            while IFS= read -r path; do
+              [ -n "$path" ] && changed+=("$path")
+            done < <(git diff --name-only --no-renames \
+              "${{ github.event.pull_request.base.sha }}" \
+              "${{ github.event.pull_request.head.sha }}")
 
-          docs_only=true
-          if [ "${#changed[@]}" -eq 0 ]; then
-            docs_only=false
-          else
-            for path in "${changed[@]}"; do
-              if [[ "$path" != *.md ]]; then
-                docs_only=false
-                break
-              fi
-            done
+            docs_only=true
+            if [ "${#changed[@]}" -eq 0 ]; then
+              docs_only=false
+            else
+              for path in "${changed[@]}"; do
+                if [[ "$path" != *.md ]]; then
+                  docs_only=false
+                  break
+                fi
+              done
+            fi
+
+            printf 'Changed files:\n'
+            printf '  %s\n' "${changed[@]}"
           fi
 
           printf 'docs_only=%s\n' "$docs_only" >> "$GITHUB_OUTPUT"
-          printf 'Changed files:\n'
-          printf '  %s\n' "${changed[@]}"
+          printf 'docs_only=%s\n' "$docs_only"
 
-      - name: Skip full suite for docs-only PR
-        if: github.event_name == 'pull_request' && steps.changed-files.outputs.docs_only == 'true'
-        run: echo "Only Markdown files changed; ./tests/run-all.sh is not needed for this PR."
+  server-build:
+    name: CI / server binary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changed-files
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip server build for docs-only PR
+        if: needs.changed-files.outputs.docs_only == 'true'
+        run: echo "Only Markdown files changed; server binary is not needed for this PR."
 
       - name: Set up Rust
-        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Set up Node
-        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Cache Cargo registry
-        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
+      - name: Cache Cargo registry and target
+        if: needs.changed-files.outputs.docs_only != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -80,14 +90,161 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install headless client dependencies
-        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
-        working-directory: tests
-        run: npm ci
+      - name: Build debug server
+        if: needs.changed-files.outputs.docs_only != 'true'
+        run: cargo build --manifest-path server/Cargo.toml
 
-      # Full local gate: architecture policy, Rust packages, live-server Node suites,
-      # and client smoke. A narrower suite can be used only when tests/select-suites.mjs
-      # maps every changed file away from the skipped behavior.
-      - name: Run full local CI suite
-        if: github.event_name != 'pull_request' || steps.changed-files.outputs.docs_only != 'true'
-        run: ./tests/run-all.sh
+      - name: Upload server binary
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rts-server-debug
+          path: server/target/debug/rts-server
+          if-no-files-found: error
+
+  rust:
+    name: CI / rust and architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changed-files
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip Rust and architecture suites for docs-only PR
+        if: needs.changed-files.outputs.docs_only == 'true'
+        run: echo "Only Markdown files changed; Rust and architecture suites are not needed for this PR."
+
+      - name: Set up Rust
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cache Cargo registry and target
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            server/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('server/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run Rust and architecture suites
+        if: needs.changed-files.outputs.docs_only != 'true'
+        run: ./tests/run-all.sh --only-rust
+
+  live-node:
+    name: CI / live Node suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - changed-files
+      - server-build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip live Node suites for docs-only PR
+        if: needs.changed-files.outputs.docs_only == 'true'
+        run: echo "Only Markdown files changed; live Node suites are not needed for this PR."
+
+      - name: Set up Node
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Download server binary
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: rts-server-debug
+          path: .ci-server
+
+      - name: Run live Node suites
+        if: needs.changed-files.outputs.docs_only != 'true'
+        run: |
+          chmod +x .ci-server/rts-server
+          RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-live-node
+
+  browser:
+    name: CI / browser and tri-state
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - changed-files
+      - server-build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip browser suites for docs-only PR
+        if: needs.changed-files.outputs.docs_only == 'true'
+        run: echo "Only Markdown files changed; browser suites are not needed for this PR."
+
+      - name: Set up Node
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Download server binary
+        if: needs.changed-files.outputs.docs_only != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: rts-server-debug
+          path: .ci-server
+
+      - name: Run browser and tri-state suites
+        if: needs.changed-files.outputs.docs_only != 'true'
+        run: |
+          chmod +x .ci-server/rts-server
+          RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-browser
+
+  aggregate:
+    name: ./tests/run-all.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - server-build
+      - rust
+      - live-node
+      - browser
+    if: always()
+    steps:
+      - name: Verify split full gate
+        env:
+          SERVER_BUILD_RESULT: ${{ needs.server-build.result }}
+          RUST_RESULT: ${{ needs.rust.result }}
+          LIVE_NODE_RESULT: ${{ needs.live-node.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        shell: bash
+        run: |
+          printf 'Split full gate results:\n'
+          printf '  server binary: %s\n' "$SERVER_BUILD_RESULT"
+          printf '  rust and architecture: %s\n' "$RUST_RESULT"
+          printf '  live Node suites: %s\n' "$LIVE_NODE_RESULT"
+          printf '  browser and tri-state: %s\n' "$BROWSER_RESULT"
+
+          if [ "$SERVER_BUILD_RESULT" != "success" ] ||
+             [ "$RUST_RESULT" != "success" ] ||
+             [ "$LIVE_NODE_RESULT" != "success" ] ||
+             [ "$BROWSER_RESULT" != "success" ]; then
+            exit 1
+          fi
