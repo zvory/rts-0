@@ -825,6 +825,11 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
 
 #[test]
 fn profile_backed_ai_prefers_mineable_steel_over_known_non_mineable_oil() {
+    if crate::skip_unless_full_ai(
+        "profile_backed_ai_prefers_mineable_steel_over_known_non_mineable_oil",
+    ) {
+        return;
+    }
     let evidence = run_resource_regression_profile(6_000);
 
     assert!(
@@ -893,6 +898,9 @@ fn profile_backed_self_play_exercises_ai_1_0_tech_arc() {
 
 #[test]
 fn scripted_self_play_worker_rush_vs_economy() {
+    if crate::skip_unless_full_ai("scripted_self_play_worker_rush_vs_economy") {
+        return;
+    }
     let players = vec![
         PlayerInit {
             id: 1,
@@ -958,6 +966,9 @@ fn scripted_self_play_worker_rush_vs_economy() {
 
 #[test]
 fn scripted_self_play_mine_only_steel_fairness() {
+    if crate::skip_unless_full_ai("scripted_self_play_mine_only_steel_fairness") {
+        return;
+    }
     const TWO_MINUTES_TICKS: u32 = 2 * 60 * config::TICK_HZ;
     const STEEL_TOLERANCE: u32 = 15;
 
@@ -1300,6 +1311,11 @@ fn identical_scripted_runs_are_identical() {
 
 #[test]
 fn live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile() {
+    if crate::skip_unless_full_ai(
+        "live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile",
+    ) {
+        return;
+    }
     const TICKS: u32 = 3_600;
 
     let players = vec![
