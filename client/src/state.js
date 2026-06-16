@@ -707,7 +707,31 @@ export class GameState {
     return this.progressExtrapolator.diagnostics();
   }
 
+  applyPredictionDisplayOverlay(overlay = null) {
+    if (!overlay || typeof overlay !== "object") {
+      this._applyOptimisticCommandOverlay(null);
+      this._clearPredictedSnapshotOverlay();
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(overlay, "optimisticCommands")) {
+      this._applyOptimisticCommandOverlay(overlay.optimisticCommands);
+    }
+    if (Object.prototype.hasOwnProperty.call(overlay, "predictedSnapshot")) {
+      if (overlay.predictedSnapshot) {
+        this._applyPredictedSnapshotOverlay(overlay.predictedSnapshot, overlay.diagnostics ?? null, {
+          smoothCorrections: !!overlay.smoothCorrections,
+        });
+      } else {
+        this._clearPredictedSnapshotOverlay();
+      }
+    }
+  }
+
   setOptimisticCommandState(state = null) {
+    this.applyPredictionDisplayOverlay({ optimisticCommands: state });
+  }
+
+  _applyOptimisticCommandOverlay(state = null) {
     this.optimisticProduction = [];
     this.optimisticProductionByBuilding.clear();
     this.optimisticRallyByBuilding.clear();
@@ -728,6 +752,10 @@ export class GameState {
   }
 
   setPredictedSnapshot(snapshot, diagnostics = null, { smoothCorrections = false } = {}) {
+    this.applyPredictionDisplayOverlay({ predictedSnapshot: snapshot, diagnostics, smoothCorrections });
+  }
+
+  _applyPredictedSnapshotOverlay(snapshot, diagnostics = null, { smoothCorrections = false } = {}) {
     const predicted = new Map();
     for (const entity of snapshot?.entities || []) {
       if (entity?.owner !== this.playerId || !isUnit(entity.kind)) continue;
@@ -753,6 +781,10 @@ export class GameState {
   }
 
   clearPredictedSnapshot() {
+    this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
+  }
+
+  _clearPredictedSnapshotOverlay() {
     this.predictedById.clear();
     this.predictionCorrectionById.clear();
     this.predictionDiagnostics = null;

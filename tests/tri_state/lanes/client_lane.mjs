@@ -415,7 +415,7 @@ export class ClientLane {
       const controller = match?.prediction;
       if (!controller) return { error: "prediction controller unavailable" };
       const summary = controller.recordCommandRejection(clientSeq, reason);
-      match.state?.setOptimisticCommandState?.(controller.optimisticUiState());
+      match.state?.applyPredictionDisplayOverlay?.(controller.predictionDisplayOverlay());
       return summary;
     }, { clientSeq, reason });
     if (result?.error) throw new Error(result.error);

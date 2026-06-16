@@ -95,6 +95,7 @@ export class PredictionController {
   recordSocketReceipt(clientSeq, detail?)// diagnostic only; does not reconcile
   recordCommandRejection(clientSeq, reason?)
   enterPredicting(), beginResync(correction?), finishResync()
+  predictionDisplayOverlay()             // view data for optimistic production/rally display only
   reset({enabled?})
   debugSummary()                         // pending count/seqs, latest authoritative tick, ack/correction metrics
   get pendingCommandCount()
@@ -104,8 +105,11 @@ Live player command sources receive a `commandIssuer` seam from `Match` and call
 `commandIssuer.issueCommand(cmd)`. The controller owns browser-local `clientSeq` allocation and
 passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
-`GameState.applySnapshot` remains authoritative in Phase 2; prediction diagnostics are bookkeeping
-only until a later WASM predictor supplies predicted render snapshots.
+`GameState.applySnapshot` remains authoritative. Prediction display writes go through
+`GameState.applyPredictionDisplayOverlay({optimisticCommands?, predictedSnapshot?, diagnostics?,
+smoothCorrections?})`, so controller bookkeeping and WASM render snapshots stay outside broad
+snapshot mutation. Replay viewers, spectators, and dev-watch passive viewers keep prediction
+disabled and clear this overlay instead of allocating gameplay prediction state.
 
 `renderer/rigs/schema.js`
 ```js

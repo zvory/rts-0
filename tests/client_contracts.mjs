@@ -2427,11 +2427,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   predictionPolicyMatch.replayViewer = false;
   predictionPolicyMatch.state = {
     spectator: false,
-    clearPredictedSnapshot() {
-      this.clearedPrediction = true;
-    },
-    setOptimisticCommandState(state) {
-      this.optimisticState = state;
+    applyPredictionDisplayOverlay(overlay) {
+      if (Object.prototype.hasOwnProperty.call(overlay || {}, "predictedSnapshot")) {
+        this.predictedSnapshot = overlay.predictedSnapshot;
+      }
+      if (Object.prototype.hasOwnProperty.call(overlay || {}, "optimisticCommands")) {
+        this.optimisticCommands = overlay.optimisticCommands;
+      }
     },
   };
   predictionPolicyMatch.prediction = {
@@ -2483,8 +2485,8 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   predictionPolicyMatch.logPredictionStatus = () => {};
   predictionPolicyMatch.setPredictionEnabled(false);
   assert(!predictionPolicyMatch.prediction.enabled, "prediction setting can disable live prediction");
-  assert(predictionPolicyMatch.state.clearedPrediction, "disabling prediction clears local predicted overlay");
-  assert(predictionPolicyMatch.state.optimisticState === null, "disabling prediction clears optimistic command UI");
+  assert(predictionPolicyMatch.state.predictedSnapshot === null, "disabling prediction clears local predicted overlay");
+  assert(predictionPolicyMatch.state.optimisticCommands === null, "disabling prediction clears optimistic command UI");
   assert(predictionPolicyMatch.prediction.predictor === predictionPolicyMatch.predictionAdapter,
     "disabling prediction replaces the controller predictor with a fresh inactive adapter");
   assert(predictionAdapterDestroy === 1, "disabling prediction destroys the active WASM adapter");

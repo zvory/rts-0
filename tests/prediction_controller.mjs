@@ -199,9 +199,11 @@ function sentSeqs(sent) {
     entities: [{ id: 10, owner: 1, kind: "worker", x: 32, y: 32, hp: 40, maxHp: 40, state: "idle" }],
     events: [],
   });
-  state.setPredictedSnapshot({
-    tick: 3,
-    entities: [{ id: 10, owner: 1, kind: "worker", x: 52, y: 32, hp: 40, maxHp: 40, state: "move" }],
+  state.applyPredictionDisplayOverlay({
+    predictedSnapshot: {
+      tick: 3,
+      entities: [{ id: 10, owner: 1, kind: "worker", x: 52, y: 32, hp: 40, maxHp: 40, state: "move" }],
+    },
   });
   assert(state.entitiesInterpolated(1)[0].x === 52, "render reads predicted owned position");
   assert(
@@ -209,6 +211,8 @@ function sentSeqs(sent) {
     "authoritative reads can ignore prediction for fog",
   );
   assert(state.entityById(10).x === 52, "entityById exposes predicted owned position for local UX");
+  state.applyPredictionDisplayOverlay({ optimisticCommands: { production: [], rally: [] } });
+  assert(state.entitiesInterpolated(1)[0].x === 52, "optimistic overlay updates do not clear predicted movement");
   assert(state.localFactionId === DEFAULT_FACTION_ID, "GameState exposes normalized local faction identity");
 }
 
@@ -259,7 +263,9 @@ function sentSeqs(sent) {
   assert(issued.sent === true && issued.predicted === false, "train commands remain network handoff only");
   assert(issued.clientSeq === 1, "optimistic UI entries are keyed by the sequenced command handoff");
   let ui = controller.optimisticUiState();
+  const overlay = controller.predictionDisplayOverlay();
   assert(ui.production.length === 1, "train optimism appears immediately");
+  assert(overlay.optimisticCommands.production.length === 1, "controller exposes optimism through prediction display overlay");
   assert(ui.production[0].optimisticQueue === 1, "train optimism exposes predicted queue depth");
   controller.applyAuthoritativeSnapshot({
     tick: 3,
@@ -429,9 +435,11 @@ function sentSeqs(sent) {
     events: [],
   });
   state.setSelection([30]);
-  state.setOptimisticCommandState({
-    production: [{ building: 30, unit: "worker", optimisticQueue: 1 }],
-    rally: [{ building: 30, plan: [{ kind: "move", x: 220, y: 240 }] }],
+  state.applyPredictionDisplayOverlay({
+    optimisticCommands: {
+      production: [{ building: 30, unit: "worker", optimisticQueue: 1 }],
+      rally: [{ building: 30, plan: [{ kind: "move", x: 220, y: 240 }] }],
+    },
   });
   assert(state.optimisticProduction.length === 1, "state keeps full optimistic production list for reservations");
   const selected = state.selectedEntities()[0];
@@ -463,12 +471,14 @@ function sentSeqs(sent) {
     ],
     events: [],
   });
-  state.setPredictedSnapshot({
-    tick: 2,
-    entities: [
-      { id: 10, owner: 1, kind: "worker", x: 48, y: 32, hp: 40, maxHp: 40, state: "move" },
-      { id: 11, owner: 2, kind: "worker", x: 128, y: 32, hp: 40, maxHp: 40, state: "move" },
-    ],
+  state.applyPredictionDisplayOverlay({
+    predictedSnapshot: {
+      tick: 2,
+      entities: [
+        { id: 10, owner: 1, kind: "worker", x: 48, y: 32, hp: 40, maxHp: 40, state: "move" },
+        { id: 11, owner: 2, kind: "worker", x: 128, y: 32, hp: 40, maxHp: 40, state: "move" },
+      ],
+    },
   });
   const rendered = state.entitiesInterpolated(1);
   assert(rendered.find((e) => e.id === 10)?.predicted === true, "prediction applies to own units");
@@ -492,6 +502,7 @@ function sentSeqs(sent) {
   assert(matchSource.includes("new SimWasmPredictionAdapter"), "Match wires the WASM prediction adapter");
   assert(matchSource.includes("predictor: this.predictionAdapter"), "PredictionController receives the adapter");
   assert(matchSource.includes("advancePredictionVisual"), "Match advances predicted movement before render");
+  assert(matchSource.includes("applyPredictionDisplayOverlay"), "Match routes prediction display through the overlay seam");
 }
 
 console.log("prediction_controller: ok");
