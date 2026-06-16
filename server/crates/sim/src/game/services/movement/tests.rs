@@ -2656,6 +2656,7 @@ fn tank_oil_starvation_emits_positioned_oil_alert_once_per_pause() {
     let mut players = vec![player_with_oil(1, 0)];
     let mut events = HashMap::new();
     let smokes = crate::game::smoke::SmokeCloudStore::new();
+    let ability_runtime = crate::game::ability_runtime::AbilityRuntime::new();
 
     let occ = Occupancy::build(&map, &entities);
     let spatial = SpatialIndex::build(&entities, map.size);
@@ -2668,6 +2669,7 @@ fn tank_oil_starvation_emits_positioned_oil_alert_once_per_pause() {
         0,
         &mut events,
         &smokes,
+        &ability_runtime,
     );
 
     assert!(
@@ -2699,6 +2701,7 @@ fn tank_oil_starvation_emits_positioned_oil_alert_once_per_pause() {
         1,
         &mut events,
         &smokes,
+        &ability_runtime,
     );
 
     assert!(

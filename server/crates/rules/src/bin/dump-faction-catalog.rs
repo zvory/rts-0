@@ -392,16 +392,16 @@ fn print_client_constants(indent: &str) {
         balance::EKAT_MAGIC_ANCHOR_DURATION_TICKS
     );
     println!(
-        "{indent}    \"ekatMagicAnchorLockoutTicks\": {},",
-        balance::EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS
-    );
-    println!(
-        "{indent}    \"ekatMagicAnchorHp\": {},",
-        balance::EKAT_MAGIC_ANCHOR_HP
-    );
-    println!(
         "{indent}    \"ekatMagicAnchorRadiusTiles\": {},",
         json_f32(balance::EKAT_MAGIC_ANCHOR_RADIUS_TILES)
+    );
+    println!(
+        "{indent}    \"ekatMagicAnchorPullAwayMultiplier\": {},",
+        json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER)
+    );
+    println!(
+        "{indent}    \"ekatMagicAnchorPullTowardMultiplier\": {},",
+        json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER)
     );
     println!(
         "{indent}    \"breakthroughRadiusTiles\": {},",
@@ -526,12 +526,12 @@ fn print_ability_effects(indent: &str) {
         balance::EKAT_LINE_SHOT_DAMAGE,
     );
     println!(
-        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"lockoutTicks\":{},\"hp\":{}}}",
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"pullAwayMultiplier\":{},\"pullTowardMultiplier\":{}}}",
         faction::EKAT_MAGIC_ANCHOR_ABILITY,
         json_f32(balance::EKAT_MAGIC_ANCHOR_RADIUS_TILES),
         balance::EKAT_MAGIC_ANCHOR_DURATION_TICKS,
-        balance::EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS,
-        balance::EKAT_MAGIC_ANCHOR_HP,
+        json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER),
+        json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER),
     );
 }
 

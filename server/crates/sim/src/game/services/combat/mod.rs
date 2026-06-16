@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
-use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     fires_while_moving, AttackPhase, Entity, EntityKind, EntityStore, Order,
 };
@@ -70,7 +69,6 @@ pub(crate) fn combat_system(
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
-    ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     rng: &mut SmallRng,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -154,26 +152,6 @@ pub(crate) fn combat_system(
             map, entities, teams, spatial, &los, fog, smokes, id, owner, px, py, acquire_px, mode,
         );
         let Some(tid) = target else {
-            if try_fire_on_anchor(
-                map,
-                entities,
-                teams,
-                ability_runtime,
-                &los,
-                fog,
-                smokes,
-                events,
-                id,
-                owner,
-                px,
-                py,
-                range_px,
-                dmg,
-                cd_reset,
-                tick,
-            ) {
-                continue;
-            }
             // No target: clear stale combat target id for opportunistic-combat orders.
             if let Some(e) = entities.get_mut(id) {
                 if matches!(
@@ -359,116 +337,6 @@ pub(crate) fn combat_system(
             if want_repath {
                 coordinator.request_chase_path(entities, id, chase_goal);
             }
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn try_fire_on_anchor(
-    map: &Map,
-    entities: &mut EntityStore,
-    teams: &TeamRelations,
-    ability_runtime: &mut AbilityRuntime,
-    los: &LineOfSight<'_>,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    events: &mut HashMap<u32, Vec<Event>>,
-    attacker: u32,
-    owner: u32,
-    px: f32,
-    py: f32,
-    range_px: f32,
-    dmg: u32,
-    cd_reset: u32,
-    tick: u32,
-) -> bool {
-    let Some(anchor) =
-        ability_runtime.first_enemy_anchor_in_range(owner, teams, px, py, range_px, tick)
-    else {
-        return false;
-    };
-    if !fog.is_visible_world(owner, anchor.x, anchor.y) || smokes.point_inside(anchor.x, anchor.y) {
-        return false;
-    }
-    let terrain_clear = los.clear_between_world_points((px, py), (anchor.x, anchor.y));
-    let friendly_blocked = terrain_clear
-        && friendly_hard_blocker_between(
-            map,
-            entities,
-            attacker,
-            owner,
-            (px, py),
-            (anchor.x, anchor.y),
-        );
-    if !terrain_clear || friendly_blocked {
-        return false;
-    }
-    let target_angle = (anchor.y - py).atan2(anchor.x - px);
-    let mut weapon_aligned = true;
-    if let Some(e) = entities.get_mut(attacker) {
-        if fires_while_moving(e.kind) {
-            weapon_aligned = rotate_vehicle_weapon_for_combat(e, target_angle);
-        } else if e.kind == EntityKind::AntiTankGun {
-            weapon_aligned = rotate_anti_tank_gun_for_combat(e, target_angle);
-        } else if e.kind == EntityKind::MortarTeam {
-            rotate_mortar_for_fire(e, target_angle);
-        } else if target_angle.is_finite() {
-            e.set_facing(target_angle);
-            mirror_weapon_to_body(e, target_angle);
-        }
-        e.set_target_id(None);
-        e.mark_attack_phase(AttackPhase::Firing);
-        if !can_fire_while_moving(e) {
-            e.clear_path();
-        }
-    }
-    if !weapon_aligned || !deployed_weapon_ready_to_fire(entities, attacker) {
-        return true;
-    }
-    let ready = matches!(entities.get(attacker), Some(e) if e.attack_cd() == 0);
-    if !ready {
-        return true;
-    }
-    if let Some(destroyed) = ability_runtime.damage_anchor(anchor.id.get(), dmg) {
-        if let Some(caster) = entities.get_mut(destroyed.caster_id) {
-            if caster.owner == destroyed.owner {
-                caster.start_ability_lockout_until(
-                    destroyed.ability,
-                    tick.saturating_add(destroyed.destroyed_lockout_ticks),
-                );
-            }
-        }
-        emit_anchor_destroyed(
-            events,
-            fog,
-            teams,
-            destroyed.owner,
-            destroyed.x,
-            destroyed.y,
-        );
-    }
-    if let Some(e) = entities.get_mut(attacker) {
-        e.set_attack_cd(cd_reset);
-    }
-    true
-}
-
-fn emit_anchor_destroyed(
-    events: &mut HashMap<u32, Vec<Event>>,
-    fog: &Fog,
-    teams: &TeamRelations,
-    owner: u32,
-    x: f32,
-    y: f32,
-) {
-    for pid in events.keys().copied().collect::<Vec<_>>() {
-        if teams.same_team_or_same_owner(pid, owner) || fog.is_visible_world(pid, x, y) {
-            events.entry(pid).or_default().push(Event::Notice {
-                msg: "Magic Anchor destroyed".to_string(),
-                severity: crate::protocol::NoticeSeverity::Info,
-                x: Some(x),
-                y: Some(y),
-            });
         }
     }
 }

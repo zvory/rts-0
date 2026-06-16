@@ -168,6 +168,7 @@ pub(crate) fn run_tick(
             tick,
             events,
             smokes,
+            ability_runtime,
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
@@ -216,7 +217,6 @@ pub(crate) fn run_tick(
             &mut coordinator,
             fog,
             smokes,
-            ability_runtime,
             mortar_shells,
             rng,
             events,

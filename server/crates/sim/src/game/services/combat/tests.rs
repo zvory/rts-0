@@ -126,7 +126,6 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         .collect();
 
     let mut rng = SmallRng::seed_from_u64(rng_seed);
-    let mut ability_runtime = crate::game::ability_runtime::AbilityRuntime::new();
     let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
     let mortar_autocast_researched = |owner| {
         players
@@ -143,7 +142,6 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         &mut coordinator,
         &fog,
         smokes,
-        &mut ability_runtime,
         &mut mortar_shells,
         &mut rng,
         &mut events,
@@ -842,7 +840,6 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let mut fog = Fog::new(map.size);
     fog.recompute(&[1], &entities, &map);
     let smokes = SmokeCloudStore::new();
-    let mut ability_runtime = crate::game::ability_runtime::AbilityRuntime::new();
     let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
     let mut events = HashMap::from([(1, Vec::new())]);
 
@@ -858,7 +855,6 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
         &mut coordinator,
         &fog,
         &smokes,
-        &mut ability_runtime,
         &mut mortar_shells,
         &mut rng,
         &mut events,

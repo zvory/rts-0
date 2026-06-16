@@ -351,12 +351,12 @@ current server position each tick, so moving or dashing after firing can bend th
 Enemies intersecting the swept line are damaged once per leg; stale or dead casters remove the
 projectile without resolving further hits.
 
-Ekat's `ekatMagicAnchor` world-point activation places one replacement-style, non-blocking runtime
-object at the target point. It naturally expires after 10 seconds without lockout, can be damaged by
-enemy combat when visible and in line of sight, and applies the 60-second owner-only placement
-lockout only when destroyed by enemies. If an active anchor exists when `ekatLineShot` is accepted,
-the runtime spawns one projectile from Ekat and one from the anchor toward the same cursor point;
-both return toward Ekat's current server position.
+Ekat's `ekatMagicAnchor` world-point activation places one replacement-style, non-blocking,
+non-attackable runtime object at the target point. It naturally expires after 10 seconds. While
+active, it creates a 3-tile pull field: units moving away from the anchor are slowed, units moving
+toward it are boosted, and the multiplier strengthens closer to the anchor. If an active anchor
+exists when `ekatLineShot` is accepted, the runtime spawns one projectile from Ekat and one from the
+anchor toward the same cursor point; both return toward Ekat's current server position.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource

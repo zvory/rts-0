@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 
 use crate::config;
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::EntityKind;
 use crate::game::entity::EntityStore;
 use crate::game::map::Map;
@@ -55,6 +56,7 @@ pub(crate) fn movement_system(
 ) {
     let mut ignored_events = HashMap::new();
     let smokes = SmokeCloudStore::new();
+    let ability_runtime = AbilityRuntime::new();
     movement_system_with_events(
         map,
         entities,
@@ -64,6 +66,7 @@ pub(crate) fn movement_system(
         tick,
         &mut ignored_events,
         &smokes,
+        &ability_runtime,
     );
 }
 
@@ -78,6 +81,7 @@ pub(crate) fn movement_system_with_events(
     tick: u32,
     events: &mut HashMap<u32, Vec<Event>>,
     smokes: &SmokeCloudStore,
+    ability_runtime: &AbilityRuntime,
 ) {
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
@@ -109,7 +113,16 @@ pub(crate) fn movement_system_with_events(
             }
         }
     }
-    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, events);
+    waypoints::advance_moving_units(
+        map,
+        entities,
+        players,
+        occ,
+        spatial,
+        tick,
+        events,
+        ability_runtime,
+    );
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_charge();

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity,
     EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
@@ -44,10 +45,11 @@ pub(super) fn advance_moving_units(
     spatial: &SpatialIndex,
     tick: u32,
     events: &mut HashMap<u32, Vec<Event>>,
+    ability_runtime: &AbilityRuntime,
 ) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
-        let (kind, speed, mut x, mut y, can_local_steer) = {
+        let (kind, mut speed, mut x, mut y, can_local_steer, movement_target) = {
             let e = match entities.get(id) {
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
@@ -77,8 +79,17 @@ pub(super) fn advance_moving_units(
                 !uses_oriented_vehicle_body(e.kind)
                     && matches!(e.order(), Order::Move(_))
                     && footing_profile(e) != FootingProfile::Ghost,
+                e.next_waypoint(),
             )
         };
+        if let Some((wx, wy)) = movement_target {
+            speed *= ability_runtime.magic_anchor_movement_multiplier(
+                x,
+                y,
+                (wx - x, wy - y),
+                tick,
+            );
+        }
         if speed <= 0.0 {
             continue;
         }
