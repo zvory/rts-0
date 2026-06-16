@@ -207,6 +207,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: SMOKE_ABILITY_RANGE_TILES,
     cooldownTicks: SMOKE_ABILITY_COOLDOWN_TICKS,
+    charges: SCOUT_CAR_SMOKE_USES,
     cost: SMOKE_ABILITY_COST,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,

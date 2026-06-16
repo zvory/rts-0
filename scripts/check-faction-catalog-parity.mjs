@@ -66,6 +66,7 @@ import {
   trainableUnitsForFaction,
   workerBuildablesForFaction,
 } from "../client/src/config.js";
+import { PLAYABLE_FACTIONS } from "../client/src/lobby_view.js";
 import {
   ABILITY,
   ABILITY_CODE,
@@ -111,6 +112,15 @@ const allRustCatalogs = JSON.parse(execFileSync("cargo", [
 const kindByStableId = new Map(Object.entries(KIND).map(([, value]) => [value, value]));
 const upgradeByStableId = new Map(Object.entries(UPGRADE).map(([, value]) => [value, value]));
 const abilityByStableId = new Map(Object.entries(ABILITY).map(([, value]) => [value, value]));
+const EXPECTED_CLIENT_CATALOG_IDS = Object.freeze([
+  DEFAULT_FACTION_ID,
+  "ekat",
+  "phase2_empty_fixture",
+]);
+const EXPECTED_PLAYABLE_FACTION_IDS = Object.freeze([
+  DEFAULT_FACTION_ID,
+  "ekat",
+]);
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {
@@ -145,6 +155,54 @@ function assertClientObjectFields(actual, expected, message) {
   }
 }
 
+function sorted(values) {
+  return [...values].sort();
+}
+
+function assertObjectKeys(actual, expected, message) {
+  assert.deepEqual(Object.keys(actual || {}), expected, message);
+}
+
+function assertAbilityDescriptor(entry, factionId) {
+  assert(abilityByStableId.has(entry.id), `client ABILITY is missing ${entry.id}`);
+  const ability = abilityByStableId.get(entry.id);
+  assert.equal(ABILITY_CODE[ability], entry.protocolCode, `${factionId} ${entry.id} compact ability code mirrors Rust registry`);
+  assert.equal(
+    ORDER_STAGE_CODE[ability],
+    entry.orderStageCode,
+    `${factionId} ${entry.id} order stage code mirrors Rust registry`,
+  );
+  if (!entry.commandCard) {
+    assert.equal(
+      ABILITIES[ability],
+      undefined,
+      `${factionId} ${entry.id} is registry-only and should not render a command-card descriptor`,
+    );
+    return;
+  }
+  const descriptor = ABILITIES[ability];
+  assert(descriptor, `client ABILITIES is missing command-card descriptor for ${factionId} ${entry.id}`);
+  assert.equal(descriptor.ability, ability, `${factionId} ${entry.id} descriptor identity mirrors protocol ability`);
+  assert.equal(descriptor.label, entry.label, `${factionId} ${entry.id} label mirrors Rust registry`);
+  assert.equal(descriptor.icon, entry.icon, `${factionId} ${entry.id} icon mirrors Rust registry`);
+  assert.equal(descriptor.hotkey ?? null, entry.hotkey, `${factionId} ${entry.id} hotkey mirrors Rust registry`);
+  assert.equal(descriptor.title, entry.title, `${factionId} ${entry.id} title mirrors Rust registry`);
+  assert.deepEqual(
+    descriptor.carriers,
+    asClientKinds(entry.carriers),
+    `${factionId} ${entry.id} carriers mirror Rust catalog`,
+  );
+  assert.equal(descriptor.targetMode, entry.targetMode, `${factionId} ${entry.id} target mode mirrors Rust registry`);
+  assert.equal(descriptor.rangeTiles ?? null, entry.rangeTiles, `${factionId} ${entry.id} range mirrors Rust registry`);
+  assert.equal(descriptor.minRangeTiles ?? null, entry.minRangeTiles, `${factionId} ${entry.id} min range mirrors Rust registry`);
+  assert.equal(descriptor.cooldownTicks, entry.cooldownTicks, `${factionId} ${entry.id} cooldown mirrors Rust registry`);
+  assert.equal(descriptor.charges ?? null, entry.charges, `${factionId} ${entry.id} charges mirror Rust registry`);
+  assert.deepEqual(descriptor.cost, entry.cost, `${factionId} ${entry.id} cost mirrors Rust registry`);
+  assert.equal(descriptor.techRequirement ?? null, entry.techRequirement, `${factionId} ${entry.id} tech requirement mirrors Rust registry`);
+  assert.equal(descriptor.queued, entry.mayQueue, `${factionId} ${entry.id} queue behavior mirrors Rust registry`);
+  assert.equal(!!descriptor.autocast, entry.autocast, `${factionId} ${entry.id} autocast flag mirrors Rust registry`);
+}
+
 assert.equal(rustCatalog.id, DEFAULT_FACTION_ID, "default faction id mirrors client protocol");
 assert.equal(
   allRustCatalogs.catalogs.some((catalog) => catalog.id === DEFAULT_FACTION_ID),
@@ -157,6 +215,26 @@ assert.equal(
   "all-catalog dump exposes fixture catalogs for explicit unsupported handling",
 );
 assert.deepEqual(
+  allRustCatalogs.catalogs.map((catalog) => catalog.id),
+  EXPECTED_CLIENT_CATALOG_IDS,
+  "Rust all-catalog dump exposes the expected client-mirrored catalog ids",
+);
+assert.deepEqual(
+  sorted(Object.keys(FACTION_CATALOGS)),
+  sorted(EXPECTED_CLIENT_CATALOG_IDS),
+  "client FACTION_CATALOGS must not add or omit catalog ids silently",
+);
+assert.deepEqual(
+  PLAYABLE_FACTIONS.map((entry) => entry.id),
+  EXPECTED_PLAYABLE_FACTION_IDS,
+  "client playable faction selector must only expose product-playable ids",
+);
+assert.equal(
+  PLAYABLE_FACTIONS.some((entry) => entry.id === "phase2_empty_fixture"),
+  false,
+  "fixture-only faction id must not appear as a playable client option",
+);
+assert.deepEqual(
   WORKER_BUILDABLE,
   asClientKinds(rustCatalog.buildables.map((entry) => entry.kind)),
   "client worker build menu mirrors Rust faction catalog",
@@ -165,6 +243,8 @@ assert.deepEqual(
 for (const rustFaction of allRustCatalogs.catalogs) {
   const clientFaction = FACTION_CATALOGS[rustFaction.id];
   assert(clientFaction, `client FACTION_CATALOGS is missing ${rustFaction.id}`);
+  assert.equal(clientFaction.id, rustFaction.id, `${rustFaction.id} catalog id mirrors Rust catalog`);
+  assert.equal(clientFaction.loadoutId, rustFaction.loadoutId, `${rustFaction.id} loadoutId mirrors Rust catalog`);
   assert.deepEqual(clientFaction.units, asClientKinds(rustFaction.units), `${rustFaction.id} units mirror Rust catalog`);
   assert.deepEqual(clientFaction.buildings, asClientKinds(rustFaction.buildings), `${rustFaction.id} buildings mirror Rust catalog`);
   assert.deepEqual(
@@ -179,6 +259,11 @@ for (const rustFaction of allRustCatalogs.catalogs) {
       `${rustFaction.id} ${entry.building} trainables mirror Rust catalog`,
     );
   }
+  assertObjectKeys(
+    clientFaction.trainables,
+    rustFaction.trainables.map((entry) => kindByStableId.get(entry.building)),
+    `${rustFaction.id} trainable producer keys mirror Rust catalog`,
+  );
   for (const building of rustFaction.buildings) {
     const clientBuilding = kindByStableId.get(building);
     const expectedResearch = rustFaction.research
@@ -190,6 +275,13 @@ for (const rustFaction of allRustCatalogs.catalogs) {
       `${rustFaction.id} ${building} research list mirrors Rust catalog`,
     );
   }
+  assertObjectKeys(
+    clientFaction.research,
+    rustFaction.research
+      .map((entry) => kindByStableId.get(entry.researchedAt))
+      .filter((building, index, buildings) => buildings.indexOf(building) === index),
+    `${rustFaction.id} research building keys mirror Rust catalog`,
+  );
   assert.deepEqual(
     commandCardAbilitiesForFaction(rustFaction.id).map((entry) => entry.ability),
     rustFaction.abilities
@@ -197,6 +289,28 @@ for (const rustFaction of allRustCatalogs.catalogs) {
       .map((entry) => abilityByStableId.get(entry.id)),
     `${rustFaction.id} command-card abilities mirror Rust catalog`,
   );
+  assert.deepEqual(
+    rustFaction.builders.map((kind) => kindByStableId.get(kind)),
+    rustFaction.id === DEFAULT_FACTION_ID ? [KIND.WORKER] : [],
+    `${rustFaction.id} builder set remains explicit`,
+  );
+  assert.deepEqual(
+    rustFaction.gatherers.map((kind) => kindByStableId.get(kind)),
+    rustFaction.id === DEFAULT_FACTION_ID ? [KIND.WORKER] : [],
+    `${rustFaction.id} gatherer set remains explicit`,
+  );
+  assert.deepEqual(
+    rustFaction.productionAnchors.map((kind) => kindByStableId.get(kind)),
+    rustFaction.trainables.map((entry) => kindByStableId.get(entry.building)),
+    `${rustFaction.id} production anchors match exported trainable producers`,
+  );
+  for (const entry of rustFaction.abilities) {
+    assertAbilityDescriptor(entry, rustFaction.id);
+  }
+  for (const [kind, cost] of Object.entries(rustFaction.costs)) {
+    const clientKind = kindByStableId.get(kind);
+    assert.deepEqual(STATS[clientKind]?.cost, cost, `${rustFaction.id} ${kind} cost mirrors Rust catalog`);
+  }
 }
 
 for (const entry of rustCatalog.buildables) {
@@ -227,43 +341,6 @@ for (const entry of rustCatalog.research) {
     kindByStableId.get(entry.researchedAt),
     `${entry.id} research building mirrors Rust catalog`,
   );
-}
-
-for (const entry of rustCatalog.abilities) {
-  assert(abilityByStableId.has(entry.id), `client ABILITY is missing ${entry.id}`);
-  const ability = abilityByStableId.get(entry.id);
-  assert.equal(ABILITY_CODE[ability], entry.protocolCode, `${entry.id} compact ability code mirrors Rust registry`);
-  assert.equal(
-    ORDER_STAGE_CODE[ability],
-    entry.orderStageCode,
-    `${entry.id} order stage code mirrors Rust registry`,
-  );
-  if (!entry.commandCard) {
-    assert.equal(
-      ABILITIES[ability],
-      undefined,
-      `${entry.id} is registry-only and should not render a command-card descriptor`,
-    );
-    continue;
-  }
-  const descriptor = ABILITIES[ability];
-  assert(descriptor, `client ABILITIES is missing command-card descriptor for ${entry.id}`);
-  assert.equal(descriptor.label, entry.label, `${entry.id} label mirrors Rust registry`);
-  assert.equal(descriptor.icon, entry.icon, `${entry.id} icon mirrors Rust registry`);
-  assert.equal(descriptor.hotkey ?? null, entry.hotkey, `${entry.id} hotkey mirrors Rust registry`);
-  assert.equal(descriptor.title, entry.title, `${entry.id} title mirrors Rust registry`);
-  assert.deepEqual(
-    descriptor.carriers,
-    asClientKinds(entry.carriers),
-    `${entry.id} carriers mirror Rust catalog`,
-  );
-  assert.equal(descriptor.targetMode, entry.targetMode, `${entry.id} target mode mirrors Rust registry`);
-  assert.equal(descriptor.rangeTiles ?? null, entry.rangeTiles, `${entry.id} range mirrors Rust registry`);
-  assert.equal(descriptor.minRangeTiles ?? null, entry.minRangeTiles, `${entry.id} min range mirrors Rust registry`);
-  assert.equal(descriptor.cooldownTicks, entry.cooldownTicks, `${entry.id} cooldown mirrors Rust registry`);
-  assert.deepEqual(descriptor.cost, entry.cost, `${entry.id} cost mirrors Rust registry`);
-  assert.equal(descriptor.queued, entry.mayQueue, `${entry.id} queue behavior mirrors Rust registry`);
-  assert.equal(!!descriptor.autocast, entry.autocast, `${entry.id} autocast flag mirrors Rust registry`);
 }
 
 for (const [kind, cost] of Object.entries(rustCatalog.costs)) {
