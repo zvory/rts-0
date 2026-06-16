@@ -182,6 +182,21 @@ impl Entity {
         }
     }
 
+    /// Replace only the active order. Future queued intents remain intact.
+    ///
+    /// This is the common command/promotion boundary for starting a fresh active order: the
+    /// previous path, target latch, and path goal no longer belong to the new order.
+    pub(crate) fn replace_active_order(&mut self, order: Order) {
+        if let Some(m) = self.movement.as_mut() {
+            m.order = order;
+            m.path.clear();
+            m.path_goal = None;
+            m.last_move_delta = (0.0, 0.0);
+            m.scout_car_reverse_waypoint = None;
+        }
+        self.set_target_id(None);
+    }
+
     #[allow(dead_code)]
     pub fn queued_orders(&self) -> &[OrderIntent] {
         self.movement
@@ -215,6 +230,10 @@ impl Entity {
         } else {
             Some(m.queued_orders.remove(0))
         }
+    }
+
+    pub(crate) fn pop_promoted_intent(&mut self) -> Option<OrderIntent> {
+        self.pop_queued_order()
     }
 
     pub fn mark_move_phase(&mut self, phase: MovePhase) {

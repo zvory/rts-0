@@ -72,10 +72,7 @@ pub(crate) fn order_or_launch_world_ability(
                 return AbilityOrderResult::Skipped;
             };
             if let Some(e) = entities.get_mut(caster) {
-                e.set_order(Order::ability(ability, x, y, sx, sy));
-                e.set_target_id(None);
-                e.set_path(Vec::new());
-                e.set_path_goal(None);
+                e.replace_active_order(Order::ability(ability, x, y, sx, sy));
                 e.mark_move_phase(MovePhase::Arrived);
             }
             return AbilityOrderResult::Moving;
