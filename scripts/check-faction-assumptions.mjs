@@ -26,6 +26,19 @@ function assert(condition, message) {
   }
 }
 
+function assertIncludes(source, text, label) {
+  const normalizedSource = source.replace(/\s+/g, " ");
+  const normalizedText = text.replace(/\s+/g, " ");
+  assert(
+    source.includes(text) || normalizedSource.includes(normalizedText),
+    `${label} is missing required faction boundary text: ${text}`,
+  );
+}
+
+function assertNotIncludes(source, text, label) {
+  assert(!source.includes(text), `${label} contains stale or contradictory faction boundary text: ${text}`);
+}
+
 function walk(dirRel, out = []) {
   const dir = path.join(repoRoot, dirRel);
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -54,7 +67,7 @@ for (const anchor of [
   "Current AI Coupling",
   "Current Prediction And WASM Coupling",
   "Lifecycle Paths",
-  "Phase 0 Checks",
+  "Current Guardrail Checks",
 ]) {
   assert(
     inventory.includes(`## ${anchor}`),
@@ -63,19 +76,28 @@ for (const anchor of [
 }
 
 for (const requiredText of [
+  "Lifecycle status is explicit and separate from catalog existence",
+  "`playable-human-only`: allowed for human selection but not for AI, prediction, or replay-capable",
+  "`reserved/future`: named for future work but not admitted",
   "`plans/archive/faction/*` files are historical-only evidence",
   "they must not read archived phase files as the source",
   "| `kriegsia` | playable |",
   "| `ekat` | playable |",
   "| `phase2_empty_fixture` | test-fixture-only |",
   "| `plans/archive/faction/*` | historical-only |",
+  "The Rust faction catalog in",
+  "Kriegsia and Ekat command ids are namespaced by faction",
   "Public AI seats default to `kriegsia`; no public Ekat selector",
   "Enabled only for local Kriegsia",
 ]) {
-  assert(
-    inventory.includes(requiredText),
-    `docs/design/faction-architecture-inventory.md is missing faction lifecycle/source-of-truth text: ${requiredText}`,
-  );
+  assertIncludes(inventory, requiredText, "docs/design/faction-architecture-inventory.md");
+}
+for (const staleText of [
+  "Phase 6 should make the faction-aware Rust ability registry",
+  "Until Phase 2 adds a generated or mechanically checked catalog mirror",
+  "Phase 10 client catalog path",
+]) {
+  assertNotIncludes(inventory, staleText, "docs/design/faction-architecture-inventory.md");
 }
 
 const archivedFactionDir = path.join(repoRoot, "plans/archive/faction");
@@ -89,9 +111,31 @@ for (const anchor of [
   "### 5.0 Faction economy contract",
   "Approved direct Steel/Oil/Supply modules",
   "Generic resources are deferred.",
+  "Catalog existence is not lifecycle admission.",
+  "reserved/future ids must not inherit Kriegsia economy behavior",
 ]) {
   assert(balanceDoc.includes(anchor), `balance design is missing resource policy note: ${anchor}`);
 }
+
+const protocolDoc = read("docs/design/protocol.md");
+for (const anchor of [
+  "Protocol vocabulary is not lifecycle admission",
+  "Fixture-only, reserved/future, and historical-only ids must not become valid `setFaction`",
+  "the `phase2_empty_fixture` test fixture",
+]) {
+  assertIncludes(protocolDoc, anchor, "docs/design/protocol.md");
+}
+
+const clientUiDoc = read("docs/design/client-ui.md");
+for (const anchor of [
+  "The client mirror is a checked projection, not lifecycle admission",
+  "fixture-only ids remain test harness data",
+  "public AI controls do not expose a faction selector",
+  "local prediction remains disabled for unsupported local faction ids",
+]) {
+  assertIncludes(clientUiDoc, anchor, "docs/design/client-ui.md");
+}
+assertNotIncludes(clientUiDoc, "Phase 10 may keep this checked mirror", "docs/design/client-ui.md");
 
 for (const pathName of [
   "Normal lobby start",

@@ -534,10 +534,12 @@ faction catalog use the local player's faction id as the command-id prefix.
 `commandCardAbilitiesForFaction`. `scripts/check-faction-catalog-parity.mjs` compares those
 descriptors with the Rust catalog dump for every client-exposed faction. Unknown valid faction ids
 fail closed in command-card data, so future factions do not inherit Kriegsia build, train, research,
-or ability buttons before their catalog is intentionally exposed. Phase 10 may keep this checked
-mirror for real faction descriptors as long as the parity check remains a required gate comparing
-every client-exposed descriptor against the Rust dump; generation is not required before adding the
-first real faction catalog slice.
+or ability buttons before their catalog is intentionally exposed. The client mirror is a checked
+projection, not lifecycle admission: lobby selectors must expose only playable human choices,
+fixture-only ids remain test harness data, public AI controls do not expose a faction selector, and
+local prediction remains disabled for unsupported local faction ids such as the current Ekat slice.
+Generation is not required as long as the parity check remains a required gate comparing every
+client-exposed descriptor against the Rust dump.
 
 `minimap.js`
 ```js

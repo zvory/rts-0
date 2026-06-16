@@ -87,6 +87,12 @@ Kriegsia catalog in lower-level economy queries: catalog-gated build/train/resea
 production-anchor, and supply checks return empty or false. Start-map resource nodes remain Steel
 and Oil nodes. Score values, replay analysis values, command-card costs, affordability checks,
 refunds, and supply reservation are intentionally Steel/Oil/Supply-shaped.
+Catalog existence is not lifecycle admission. `server/crates/rules/src/faction.rs` may contain
+playable catalogs, explicit fixture catalogs, and future catalog data, but
+`server/src/lobby/faction_validation.rs` decides which ids can enter normal lobby, AI, replay,
+branch, quickstart, self-play, dev, match-history, and post-match paths. Fixture-only and
+reserved/future ids must not inherit Kriegsia economy behavior or appear in product selectors just
+because their catalog rows are dumpable.
 
 Approved direct Steel/Oil/Supply modules for this plan are:
 

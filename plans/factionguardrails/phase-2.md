@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -26,11 +26,11 @@ Refresh faction inventory docs and ratchet against contradictory boundary langua
 
 ## Implementation Checklist
 
-- [ ] Refresh inventory to current code-confirmed facts.
-- [ ] Add playable/fixture/reserved/historical boundary language.
-- [ ] Add checker anchors for boundary language.
-- [ ] Ratchet direct special-case growth carefully.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Refresh inventory to current code-confirmed facts.
+- [x] Add playable/fixture/reserved/historical boundary language.
+- [x] Add checker anchors for boundary language.
+- [x] Ratchet direct special-case growth carefully.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
