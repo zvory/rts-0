@@ -123,3 +123,27 @@ Avoid broad allowlist additions unless the same change or a tracked follow-up ex
 path. `tests/select-suites.mjs --verify` keeps the changed file mapping itself covered by small
 examples. CI comments document any intentionally skipped suite; that skip becomes invalid when the
 changed-file mapping selects the skipped behavior.
+
+## 11. PR CI contract
+
+The canonical required PR check is `Main test gate / ./tests/run-all.sh`. The job runs the portable
+repo-root command `./tests/run-all.sh` on pull requests targeting `main` and on pushes to `main`.
+Later branch-protection work should require this single full-gate check unless a plan phase
+explicitly changes the contract.
+
+`Rust / test` and `Integration / integration` are stable auxiliary checks. They keep package,
+architecture, and live-server feedback visible earlier, but they do not replace the full gate
+because each intentionally skips part of the canonical suite.
+
+GitHub Actions uses standard `ubuntu-latest` runners for this contract. Public-repository standard
+runners are acceptable for the current cost posture, while larger paid runner classes are out of
+scope. The gate remains portable through `tests/run-all.sh` so it can run locally or on another
+runner if the hosting or billing posture changes.
+
+PR workflows use concurrency groups scoped by workflow plus PR number, with cancellation enabled
+only for pull request events. A newer push to the same PR branch may cancel superseded runs, while
+pushes to `main` and unrelated branches keep independent results.
+
+Beta deployment is downstream of the full gate but must only deploy tested `main` push commits. The
+deploy workflow checks that the completed `Main test gate` run came from a push event on `main`
+before checking out and deploying the tested head SHA.

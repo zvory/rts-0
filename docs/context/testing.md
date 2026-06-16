@@ -26,6 +26,16 @@ Use when writing or debugging tests, or before claiming a change is done.
   enforce `rts-sim::game` internal architecture ratchets
 
 ## Invariants
+- The stable required PR gate is `Main test gate / ./tests/run-all.sh`. It runs the same
+  `tests/run-all.sh` command used by the local hook on pull requests targeting `main` and on
+  pushes to `main`.
+- `Rust / test` and `Integration / integration` are auxiliary PR checks with stable names. They
+  give faster package and live-integration signal, but branch protection should treat the full gate
+  as the canonical required check unless a later plan phase changes that contract.
+- PR workflow concurrency cancels superseded runs for the same PR branch only. Pushes to `main` and
+  unrelated branches should not cancel each other.
+- Beta deploys are triggered only from successful `Main test gate` workflow runs whose original
+  event was a push to `main`; PR-head workflow runs must not deploy.
 - Local gate scripts use a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
   parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
   with `CARGO_TARGET_DIR` if a task needs a specific target location.

@@ -96,7 +96,7 @@ WebSocket/API suites, and runs the headless client smoke test when Chrome is ava
 
 For focused test runs, see [tests/README.md](tests/README.md).
 
-## Local Commit Test Gate
+## CI And Local Commit Gates
 
 Every local commit must pass the canonical local CI command:
 
@@ -117,8 +117,17 @@ commits. After commits and merges on `main`, the hooks also run
 small bounded batch of stale per-worktree Cargo target dirs.
 
 Git does not distribute active local hook configuration through clones. Each checkout needs to run
-the installer once. GitHub Actions also runs `./tests/run-all.sh` after pushes to `main` as a
-shared signal, but `main` is intentionally left open for direct pushes.
+the installer once. GitHub Actions runs the same full gate as the stable PR check
+`Main test gate / ./tests/run-all.sh` on pull requests targeting `main` and after pushes to `main`.
+That check is the intended required branch-protection signal once PR-only `main` updates are
+enabled. The `Rust / test` and `Integration / integration` workflows remain useful auxiliary
+signals, but they are not the canonical merge gate.
+
+The CI workflow uses standard `ubuntu-latest` GitHub-hosted runners and keeps `./tests/run-all.sh`
+portable for local or alternate runners. Larger paid runner classes are out of scope for the
+current workflow. PR pushes cancel superseded runs for the same PR without canceling unrelated
+branches, and beta deploys are tied only to successful tested `main` push runs, not unmerged PR
+heads.
 
 The local gate uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
 parallel agents do not share final binaries or test artifacts.
