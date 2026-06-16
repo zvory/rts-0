@@ -77,7 +77,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "state.js": 38576,
   "input/index.js": 38439,
   "match.js": 38289,
-  "protocol.js": 35921,
+  // Tank Trap Phase 1 adds mirrored KIND, BUILDING_KINDS, and compact kind-code entries.
+  "protocol.js": 35989,
   "hud_command_card.js": 29374,
   "renderer/shared.js": 28113,
   "observer_analysis_overlay.js": 27903,
