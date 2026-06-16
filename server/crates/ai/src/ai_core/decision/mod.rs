@@ -14,6 +14,7 @@ use crate::ai_core::observation::{
 use crate::ai_core::profiles::{
     AiProfile, AttackPolicy, BarracksCurve, ExpansionPolicy, ProductionPolicy, ProxyBarracksPolicy,
     RecoveryTransitionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    AI_1_2_TANK_MG_MICRO_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -622,24 +623,43 @@ where
         }
     }
 
-    let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
+    let wounded_retreat_units = issue_wounded_combat_retreats(
+        observation,
+        profile,
+        &mut actions,
+        &mut intents,
+    );
+    let defensive_machine_gunners: Vec<u32> = defensive_machine_gunner_units(observation, profile)
+        .into_iter()
+        .filter(|id| !wounded_retreat_units.contains(id))
+        .collect();
     let defensive_machine_gunner_units: BTreeSet<u32> =
         defensive_machine_gunners.iter().copied().collect();
+    let frontal_excluded_units: BTreeSet<u32> = defensive_machine_gunner_units
+        .union(&wounded_retreat_units)
+        .copied()
+        .collect();
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
         memory,
         profile,
-        &defensive_machine_gunner_units,
+        &frontal_excluded_units,
     );
     let ready_units_count = frontal_wave.ready_units.len();
     let attack_size = frontal_wave.desired_size;
     let attack_due = frontal_wave.attack_due;
-    let local_ready_units =
-        actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
+    let local_ready_units = actions::select_ready_combat_units_excluding(
+        &observation.owned,
+        &ALL_COMBAT_UNITS,
+        &wounded_retreat_units,
+    );
     let rifle_raid_policy = is_rifle_raid_policy(attack_policy);
     let rifle_raid_units = if rifle_raid_policy {
         select_rifle_raid_units(observation)
+            .into_iter()
+            .filter(|id| !wounded_retreat_units.contains(id))
+            .collect()
     } else {
         Vec::new()
     };
@@ -864,6 +884,44 @@ fn can_train_pre_tank_defensive_machine_gunner(
             .completed_upgrades()
             .contains(&UpgradeKind::Methamphetamines);
     !tank_production_available
+}
+
+const WOUNDED_COMBAT_RETREAT_HP_PERCENT: u32 = 35;
+
+fn issue_wounded_combat_retreats(
+    observation: &AiObservation,
+    profile: &AiProfile,
+    actions: &mut AiActionContext<'_>,
+    intents: &mut Vec<AiIntent>,
+) -> BTreeSet<u32> {
+    if profile.id != AI_1_2_TANK_MG_MICRO_ID {
+        return BTreeSet::new();
+    }
+    let own_base = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
+    let retreat_kinds = profile
+        .tech_transition
+        .map(|transition| transition.attack.unit_kinds)
+        .unwrap_or(profile.attack.unit_kinds);
+    let retreat_units: Vec<u32> = observation
+        .owned
+        .iter()
+        .filter(|unit| retreat_kinds.contains(&unit.kind))
+        .filter(|unit| unit.max_hp > 0)
+        .filter(|unit| {
+            unit.hp.saturating_mul(100)
+                <= unit
+                    .max_hp
+                    .saturating_mul(WOUNDED_COMBAT_RETREAT_HP_PERCENT)
+        })
+        .map(|unit| unit.id)
+        .collect();
+    let Some(units) = actions::move_units(actions, retreat_units, own_base.0, own_base.1) else {
+        return BTreeSet::new();
+    };
+    intents.push(AiIntent::Move {
+        units: units.clone(),
+    });
+    units.into_iter().collect()
 }
 
 fn queue_upgrade_if_available(

@@ -248,6 +248,8 @@ mod tests {
             kind,
             x,
             y,
+            hp: 100,
+            max_hp: 100,
             state: AiEntityState::Idle,
             is_complete: true,
             production_queue_len: None,
