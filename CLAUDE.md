@@ -65,9 +65,10 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   unless explicitly told to. Avoid parallel edits to shared contracts such as protocol, config,
   generated files, or design docs.
 - Stage and commit only files belonging to the current task. Never revert unrelated changes.
-- When the task is complete, push the worktree branch, open an owned PR, arm auto-merge, and hand
-  off either the PR evidence or the definite merge result if serial work requires waiting. Use
-  `scripts/agent-pr.sh` for the standard owned-PR body, labels, and auto-merge setup.
+- When the task is ready for review, push the worktree branch, open an owned PR, arm auto-merge,
+  then wait for the PR to merge before claiming completion. Use `scripts/agent-pr.sh` for the
+  standard owned-PR body, labels, and auto-merge setup, then `scripts/wait-pr.sh <pr>` to wait until
+  GitHub reports the PR merged and the head SHA is reachable from `origin/main`.
 - Do not merge, rebase, delete, or otherwise alter another agent's branch/worktree unless explicitly
   asked.
 - If running local servers, use different ports per worktree or stop the other server first.
@@ -99,14 +100,19 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   `scripts/agent-pr.sh` writes the `rts-agent-pr:v1` metadata block, applies `agent-owned` plus
   `automerge` or `needs-human`, and runs `gh pr merge --auto --merge`. If the branch needs human
   input, pass `--no-auto-merge` and explain the blocker in the PR body or handoff.
-- Normal completion states are: merged to `main`; PR opened, owned, and auto-merge armed; or
-  blocked with the PR link plus the exact failing check or human decision needed.
-- For serial phase work, do not start the next phase from an assumed merge. Use
-  `scripts/wait-pr.sh <pr>` after opening the PR; it exits successfully only after GitHub reports
-  the PR merged and the phase head SHA is reachable from `origin/main`.
+- After `scripts/agent-pr.sh` opens or updates the PR, run `scripts/wait-pr.sh <pr>`. Do not report
+  the task complete until that command confirms GitHub merged the PR and the head SHA is reachable
+  from `origin/main`.
+- Normal completion states are: merged to `main`; or blocked with the PR link plus the exact failing
+  check, merge conflict, GitHub/API failure, or human decision needed. A PR that is merely opened,
+  owned, and auto-merge armed is a pending handoff, not completion.
+- For serial phase work, do not start the next phase from an assumed merge. Use the same
+  `scripts/wait-pr.sh <pr>` gate after opening each PR; it exits successfully only after GitHub
+  reports the PR merged and the phase head SHA is reachable from `origin/main`.
 - For unattended serial phase execution, use `scripts/phase-runner.sh --pr --wait`. Use
-  `scripts/phase-runner.sh --pr` for one phase or for intentionally stopping after the first owned
-  PR is opened and auto-merge is armed.
+  `scripts/phase-runner.sh --pr` only when intentionally stopping after the first owned PR is opened
+  and auto-merge is armed; treat that result as a pending handoff until `scripts/wait-pr.sh <pr>`
+  confirms the merge.
 - To audit outstanding agent PRs, run `scripts/pr-sweep.sh`. It lists open `agent-owned` and
   `zvorygin/*` PRs with owner, age, head SHA, auto-merge state, checks, and flags for stale,
   failed, conflicted, missing-owner, or needs-human states.
