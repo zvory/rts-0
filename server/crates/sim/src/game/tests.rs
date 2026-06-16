@@ -2538,7 +2538,7 @@ fn manual_mortar_fire_launches_immediately_after_snapping_to_target() {
     );
     assert!(
         (mortar_entity.facing() + std::f32::consts::FRAC_PI_2).abs()
-            <= config::MORTAR_FIRE_TOLERANCE_RAD + 0.001,
+            <= mortar::FIRE_TOLERANCE_RAD + 0.001,
         "mortar should snap toward the manual target, got {:.4}",
         mortar_entity.facing()
     );

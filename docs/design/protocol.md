@@ -16,6 +16,30 @@ carrying compatibility shims for old builds by default.
 layer such as `server/src/protocol.rs` or `server/crates/sim/src/protocol.rs`, not in the wire DTO
 crate.
 
+### 2.0 Boundary authority and guardrails
+
+`server/crates/protocol/src/lib.rs` owns the wire DTO vocabulary, message tags, compact code
+tables, compact slot schemas, `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, and the
+unknown compact-code sentinel (`255`). `server/crates/contract/src/lib.rs` owns shared semantic DTOs
+that the protocol crate re-exports, including start/snapshot contract records and
+`DEFAULT_FACTION_ID`. `rts-rules::EntityKind::stable_id()` owns domain identity strings; rules- or
+sim-aware conversion into protocol kind strings belongs in adapter modules, not in `rts-protocol`.
+
+`client/src/protocol.js` is the browser mirror for protocol vocabulary, compact decode tables,
+message builders, and decode helpers. Protocol changes must update Rust DTOs or dumps, the JS
+mirror, this design file, and focused parity coverage in the same commit. Compact slot order is
+append-only unless the compact snapshot version is intentionally bumped and the Rust serializer, JS
+decoder, parity fixture, and docs change together.
+
+Run `node tests/protocol_parity.mjs` after any protocol vocabulary, compact code, compact slot,
+start/snapshot/replay DTO, prediction metadata, default faction id, or lobby color palette change.
+That check compares the structured Rust protocol contract dump to the JS mirror, rejects duplicate
+or sentinel compact codes, decodes representative compact fixtures, and also checks
+`PLAYER_PALETTE` against `server/src/lobby/mod.rs`. The palette is not a wire-protocol constant,
+but the server assigns lobby/start colors and the client keeps a fallback/render mirror, so the
+cross-surface guard intentionally lives with the protocol parity smoke test until a structured
+lobby/config dump replaces the source scrape.
+
 ### 2.1 Client → Server (`ClientMessage`)
 
 | `t`        | Fields | Meaning |

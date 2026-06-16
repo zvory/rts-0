@@ -4,6 +4,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
 
 ## Read first
 - [docs/design/protocol.md](../design/protocol.md) — full wire protocol
+  - §2.0 Boundary authority and guardrails
   - §2.1 `ClientMessage`
   - §2.2 `ServerMessage`
   - §2.3 `start` payload
@@ -15,8 +16,13 @@ Use when adding, removing, or changing any field on a client↔server message, s
 
 ## Code map
 - `server/crates/protocol/src/lib.rs` — authoritative Rust wire DTOs and compact transport
+- `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol, including
+  start/snapshot contract records and `DEFAULT_FACTION_ID`
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
+- `server/crates/sim/src/protocol.rs` — sim-facing adapter for typed kind conversion
 - `client/src/protocol.js` — mirror; must agree on every tag, field name, and shape
+- `server/src/lobby/mod.rs` + `client/src/config.js` — `PLAYER_PALETTE` cross-surface mirror,
+  guarded by `node tests/protocol_parity.mjs`
 
 ## Current lobby fields to remember
 - `selectMap { map }` is the host-only map selector command.
@@ -28,6 +34,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**
   [docs/design/protocol.md](../design/protocol.md) in the same commit.
+- **Parity.** Run `node tests/protocol_parity.mjs` after protocol vocabulary, compact code/slot,
+  prediction metadata, start/snapshot/replay DTO, default faction id, or lobby palette changes.
 - **Fog is authoritative.** Anything sent per-player (entity views, `target_id` tracers, death/
   positional events) must be gated on visibility/ownership. Never send a player an entity or
   position they can't see. See [docs/design/protocol.md](../design/protocol.md) §2.4 and

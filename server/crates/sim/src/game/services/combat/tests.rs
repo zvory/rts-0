@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
+use crate::game::mortar;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
 use crate::game::services::movement::movement_system;
@@ -1647,7 +1648,7 @@ fn mortar_snaps_and_auto_fires_immediately() {
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
         angle_delta(mortar.facing(), -std::f32::consts::FRAC_PI_2).abs()
-            <= config::MORTAR_FIRE_TOLERANCE_RAD + 0.001,
+            <= mortar::FIRE_TOLERANCE_RAD + 0.001,
         "mortar should snap to face the target before firing, got {:.4}",
         mortar.facing()
     );
