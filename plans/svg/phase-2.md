@@ -2,7 +2,9 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+Status: Done.
+
+- [x] Done.
 
 ## Objective
 
@@ -32,12 +34,12 @@ Add the data contract for unit rigs without changing live rendering.
 
 ## Implementation Checklist
 
-- [ ] Add pure rig schema validator.
-- [ ] Add normalized rig type comments or equivalent JS doc.
-- [ ] Add structured error reporting.
-- [ ] Add focused schema tests.
-- [ ] Update architecture checks or docs for the new boundary.
-- [ ] Run verification and record exact results.
+- [x] Add pure rig schema validator.
+- [x] Add normalized rig type comments or equivalent JS doc.
+- [x] Add structured error reporting.
+- [x] Add focused schema tests.
+- [x] Update architecture checks or docs for the new boundary.
+- [x] Run verification and record exact results.
 
 ## Verification
 
@@ -45,6 +47,14 @@ Add the data contract for unit rigs without changing live rendering.
 - `node scripts/check-client-architecture.mjs`
 - `node --check` for new JS files.
 - `git diff --check`.
+
+Results:
+
+- `node tests/rig_schema.mjs` - passed.
+- `node scripts/check-client-architecture.mjs` - passed.
+- `node --check client/src/renderer/rigs/schema.js && node --check tests/rig_schema.mjs` -
+  passed.
+- `git diff --check` - passed.
 
 ## Manual Test Focus
 

@@ -16,7 +16,7 @@ src/
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
-                  # resources, fog overlay, feedback, and renderer-local palette helpers
+                  # resources, fog overlay, feedback, rig schema, and renderer-local palette helpers
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
@@ -85,6 +85,33 @@ passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, 
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
 `GameState.applySnapshot` remains authoritative in Phase 2; prediction diagnostics are bookkeeping
 only until a later WASM predictor supplies predicted render snapshots.
+
+`renderer/rigs/schema.js`
+```js
+export const RIG_SCHEMA_VERSION = 1
+export const REQUIRED_ANCHORS = ["origin", "selection", "hp"]
+export const TINT_SLOTS = ["team", "team-light", "neutral", "fixed"]
+export const GEOMETRY_TYPES = ["rect", "circle", "ellipse", "line", "polygon", "polyline", "path"]
+export const ANIMATION_INPUTS = [
+  "now", "teamColor", "recoilProgress", "recoilPx", "setupVisual", "vehicleMotion",
+  "selected", "damaged", "shotRevealAlpha", "visibility", "mapTileSize", "facing",
+  "weaponFacing", "busy", "breakthroughTicks", "lowOil", "oilStarved",
+]
+export const ANIMATION_PROPERTIES = [
+  "transform.x", "transform.y", "transform.rotation", "transform.scaleX", "transform.scaleY",
+  "alpha", "visible", "tintSlot",
+]
+export function validateRigDefinition(definition, options?)
+  // Pure validator. Returns { ok: true, definition, errors: [] } or { ok: false, errors }.
+  // options.expectedKind rejects rigs whose kind does not match the importer/runtime caller.
+```
+Normalized rig definitions are plain objects with `id`, `kind`, `schemaVersion`, ordered `parts`,
+semantic `anchors`, semantic `bounds`, optional `animations`, and `requiredRuntimeInputs`. Parts
+use stable ids, integer `drawOrder`, normalized primitive geometry, local `transform`, `pivot`, and
+one tint slot. The validator is independent of Pixi and SVG DOM APIs; it fails closed with
+path-addressed structured errors for missing required anchors, duplicate part ids, unsupported
+geometry or transforms, non-finite coordinates, invalid tint slots, invalid animation bindings, and
+unit-kind mismatches.
 
 `branch_staging.js`
 ```js
