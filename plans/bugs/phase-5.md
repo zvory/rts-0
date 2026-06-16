@@ -6,7 +6,8 @@ Status: planned.
 
 Build the simple public review workflow for the developer. The page should show chronological bug
 reports, expose key context, allow `viewed`/`resolved` toggles, and open the linked replay near the
-reported tick.
+reported tick. Replay launch should be implemented as a reusable `ReplayReviewLaunch` result, not
+as dashboard-only glue that bypasses existing replay compatibility paths.
 
 ## Scope
 
@@ -28,9 +29,12 @@ reported tick.
   - show a clear missing state when expected replay upload failed, was gated off, or never produced
     an artifact
   - load persisted replay through existing compatibility checks
-  - create/join a replay room
-  - seek to roughly twenty seconds before `report_tick`, clamped to zero
-  - display report context alongside playback
+  - return a `ReplayReviewLaunch` payload containing replay room, initial seek tick, report id,
+    replay availability state, and report context
+  - create/join a replay room through the same room-creation path as match-history replay launch
+  - seek to roughly twenty seconds before `report_tick`, clamped to zero, using existing replay
+    seek plumbing after the viewer joins
+  - display report context alongside playback through an app/replay-viewer injected context value
 - Keep the dashboard public and simple. This is an internal pre-alpha utility, not a multi-user
   triage app.
 
@@ -53,11 +57,17 @@ reported tick.
 - No categories.
 - No advanced search or filters beyond what falls out of the chronological API.
 - Do not bypass replay compatibility validation.
+- Do not duplicate persisted replay loading rules outside the existing match-history/replay-launch
+  compatibility checks; factor a shared helper if needed.
+- Do not make replay-room creation know about dashboard DOM concerns. It should consume a replay
+  artifact and return a room, while the dashboard/app layer carries report context separately.
 - Do not make report status toggles required for review. They are convenience booleans only.
 
 ## Verification
 
 - Add API tests for report list/detail/status update and replay launch near report tick.
+- Add server tests for pending, available, missing, incompatible, and hidden-from-Recent-Matches
+  replay-evidence states.
 - Add focused client tests for dashboard rendering if existing DOM test patterns are available.
 - Run relevant Node live-server suite if the review launch crosses server/client behavior.
 
@@ -70,5 +80,6 @@ reported tick.
 
 ## Handoff
 
-After implementation, mark this phase done and summarize the dashboard URL, replay launch URL shape,
-status-toggle behavior, and any review UX rough edges left for Phase 6 hardening.
+After implementation, mark this phase done and summarize the dashboard URL, `ReplayReviewLaunch`
+response shape, replay launch URL/query behavior, status-toggle behavior, and any review UX rough
+edges left for Phase 6 hardening.

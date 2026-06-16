@@ -6,7 +6,8 @@ Status: planned.
 
 Expose the server API needed to create and review bug reports. The create path should validate a
 bounded client diagnostic envelope, stamp authoritative server context, persist replay evidence, and
-return the report id only after durable writes succeed.
+return the report id only after durable writes succeed. This phase must add the explicit
+`RoomReportContext` seam before any API path claims authoritative live/replay context.
 
 ## Scope
 
@@ -19,6 +20,13 @@ return the report id only after durable writes succeed.
 - Return a success payload with the created report id.
 - Return clear failures when the database is unavailable, the report context is invalid, or replay
   expectation registration cannot be completed.
+- Add `RoomReportContext`, a bounded authoritative room-task snapshot that can be requested for a
+  connected player or replay viewer. It should include only report-safe fields: room, phase, map,
+  `replay_key`, match id/replay id if already known, current live/replay tick, reporter seat id,
+  reporter display name/faction when known, spectator/replay flags, and server receipt time.
+- Route live/replay report creation through this context seam. HTTP may remain the final submission
+  transport, but it must not trust client-supplied room, tick, player, replay, or match ids unless
+  they were validated against `RoomReportContext`.
 - Capture authoritative server context: room, current phase, server build SHA, map, `replay_key`,
   replay id when already available, match id when already available, current tick when available,
   reporter seat identity when known, and report receipt time.
@@ -34,17 +42,25 @@ Prefer HTTP endpoints because reports are database-backed review artifacts:
 - `POST /api/bug-reports/{id}/replay` or a query-aware replay launch endpoint that can seek near
   the report tick
 
-If the live room task must provide authoritative context that HTTP cannot safely derive, add a small
-bounded WebSocket request that returns a report context token, then have HTTP submit the final
-report with that token.
+For live match and replay viewer reports, do not make this conditional: add an explicit bounded
+request/reply context path. Acceptable shapes are either:
+
+- a small WebSocket `RequestReportContext` message that returns a short-lived context token, followed
+  by HTTP `POST /api/bug-reports` with that token; or
+- an HTTP endpoint that calls `Lobby::capture_report_context(room, player_id)` through a room event
+  and one-shot reply before creating the report.
+
+Pick one shape during implementation and document why. The important boundary is that room state is
+read by the room task and represented as a narrow value object, not reached through shared mutable
+state.
 
 ## Touch Points
 
 - `server/src/main.rs`
 - `server/src/db.rs`
-- `server/src/lobby/mod.rs` and `server/src/lobby/room_task.rs` if room-local context is required
+- `server/src/lobby/mod.rs` and `server/src/lobby/room_task.rs` for `RoomReportContext`
 - `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`, `client/src/protocol.js`, and
-  `docs/design/protocol.md` only if WebSocket messages are added
+  `docs/design/protocol.md` if a WebSocket context request/response is added
 - `docs/design/match-history.md` or report-specific docs
 - `docs/context/match-history.md`
 - `docs/context/protocol.md` if the wire surface changes
@@ -54,6 +70,7 @@ report with that token.
 - Bound description length.
 - Bound JSON object sizes for client, network, and server-ish context supplied by the browser.
 - Treat client-supplied tick/player/match/replay fields as hints unless they can be validated.
+- Bound context-token lifetime and payload size if the WebSocket-token shape is chosen.
 - Never let a malformed report payload panic the network path.
 
 ## Constraints
@@ -63,6 +80,10 @@ report with that token.
   persisted. For in-progress matches, required replay linkage means the report row stores
   `replay_key` and the server has registered that the report expects final replay evidence for that
   key.
+- Do not let API handlers inspect or mutate room-task state directly. The room task owns room
+  context and exposes it only through `RoomReportContext`.
+- Do not let report creation depend on Recent Matches visibility. Hidden persisted replay rows must
+  still be resolvable through report review when the evidence registry says they are available.
 - If the database is unavailable, return a visible failure; do not pretend the report was accepted.
 - Do not expose arbitrary replay artifacts outside existing compatibility checks.
 
@@ -70,6 +91,8 @@ report with that token.
 
 - Add focused HTTP/API tests for create, list, status update, missing DB, malformed payload, and
   replay persistence failure behavior where practical.
+- Add room-context tests proving live match and replay viewer context is captured by the room task,
+  not trusted from client payload fields.
 - Add protocol mirror tests only if a WebSocket request/response is introduced.
 - Run the relevant Rust test target and any touched Node API suite.
 

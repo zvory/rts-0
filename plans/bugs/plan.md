@@ -38,35 +38,62 @@ diagnostics.
 - Server shutdown/deploy drain must not exit before report/replay persistence needed by submitted
   reports has completed or reached the existing drain deadline policy.
 
+## Durable Architecture Primitives
+
+The implementation should build these primitives explicitly before adding UI workflows. Later
+phases should compose these seams instead of scraping room internals, reaching across client
+modules, or overloading match-history helpers with incompatible reliability rules.
+
+- `ReplayIdentity`: a stable server-owned `replay_key` allocated when a live match or persisted
+  replay-review room is created. This is identity only; it is not a replay row and should not imply
+  that a final artifact already exists.
+- `ReplayEvidenceRegistry`: a DB-backed replay-evidence state keyed by `replay_key`, with
+  `pending`, `available`, and `missing` states plus optional `match_id`, `replay_id`, and failure
+  reason. This is the only place that tracks whether a submitted report expects a final replay.
+- `ReportStore`: a blocking persistence API for creating, listing, and updating bug reports. It
+  returns errors to the API layer; it must not inherit match history's log-and-drop write behavior.
+- `RoomReportContext`: a bounded authoritative snapshot produced by the room task through an
+  explicit request/reply seam. It should include only report-safe facts such as room, phase, map,
+  current tick, reporter seat, `replay_key`, and replay playback state.
+- `ClientReportService`: a browser-side service that owns bounded report payload construction and
+  HTTP submission. Match, replay, settings, health, and diagnostics modules should expose small
+  snapshot methods to this service rather than importing report UI code.
+- `ReplayReviewLaunch`: a server API result that resolves one report to a compatible replay room,
+  an initial seek tick, replay availability state, and report context for display alongside
+  playback.
+
 ## Phase Summaries
 
-Phase 1 establishes the persistence contract for bug reports and report-backed replays. It adds the
-database schema, server-side data model, and the stable server-generated `replay_key` used to
-associate reports with the eventual replay row without requiring a strict foreign key. It also
-documents how report writes differ from ordinary match-history writes: reports are blocking
-evidence capture, while normal match history remains a non-critical summary.
+Phase 1 establishes the persistence contract and durable DB primitives for bug reports and
+report-backed replay evidence. It adds `bug_reports`, replay-evidence state keyed by
+`replay_key`, and storage for `replay_key` on canonical replay rows without duplicating replay
+resolution fields on each report. It also documents the split between blocking `ReportStore`
+operations and best-effort match-history writes.
 
-Phase 2 binds bug reports to the current deployed replay-upload path. Since resolved deployed normal
-matches already persist replay-backed rows for solo, player-vs-AI, and AI-only games, this phase
-should add the stable `replay_key` to that existing final replay write and mark submitted reports as
-expecting the final replay artifact. The phase ends with server-side tests proving that a report can
-be anchored to a replay key before the match naturally ends and later resolve to the uploaded replay
-row.
+Phase 2 introduces `ReplayIdentity` and `ReplayEvidenceRegistry` into the room and match-end replay
+write path. Since resolved deployed normal matches already persist replay-backed rows for solo,
+player-vs-AI, and AI-only games, this phase writes the final replay under the existing
+`replay_key` and transitions evidence from pending to available or missing. The phase ends with
+server-side tests proving that report-backed replay evidence can be registered before match end and
+resolved by the existing canonical replay upload.
 
 Phase 3 adds the server API for creating bug reports and serving a reviewable report list. It
-validates and bounds untrusted client payloads, captures authoritative server context, writes the
-report transactionally with replay evidence, and returns the created report id. It also exposes the
-minimal read/update endpoints needed by the public review dashboard.
+adds the explicit `RoomReportContext` request/reply seam so HTTP report creation can validate live
+or replay context without owning room internals. It bounds untrusted client diagnostics, writes the
+report through `ReportStore`, registers replay evidence through the registry, and exposes minimal
+read/update endpoints for the public review dashboard.
 
 Phase 4 adds client-side evidence capture and the report form in match and replay contexts. It
-mounts the report affordance through the existing settings/gear menu, collects optional text plus
-client/browser/network/prediction diagnostics, and blocks the UI until the submission result is
+introduces `ClientReportService`, small report-context snapshot methods on match/replay/health
+surfaces, and a settings-menu action that opens the report form. It collects optional text plus
+bounded browser/network/prediction diagnostics and blocks the form until the submission result is
 known. It should preserve current match and replay lifecycle teardown behavior.
 
 Phase 5 builds the public bug-review page and report-to-replay launch flow. The reviewer can scan
 reports chronologically, see the optional description and key metadata, mark viewed/resolved, and
-open a persisted replay near the report tick. The replay review route should start around twenty
-seconds before the report tick and display the report context alongside playback.
+open a persisted replay through `ReplayReviewLaunch`. The replay review route should start around
+twenty seconds before the report tick and display report context alongside playback without
+bypassing existing replay compatibility checks.
 
 Phase 6 hardens the end-to-end workflow and updates documentation. It adds focused integration
 coverage for normal match, replay viewer, human-vs-AI, solo, and hidden-row report flows; verifies
@@ -102,6 +129,9 @@ nullable-replay path.
 - Keep report persistence separate from Recent Matches visibility. Report-backed replay lookup
   should be able to resolve hidden but persisted replay rows, including AI-only and Debug/quickstart
   rows that are omitted from the lobby table.
+- Keep blocking report writes separate from best-effort match-history writes. Shared lower-level SQL
+  helpers are acceptable, but `ReportStore` and evidence registration must return errors and must not
+  call a log-and-drop `record_match` style API.
 - A submitted report must mark its `replay_key` as requiring final replay evidence. For deployed
   normal matches this should compose with the existing final replay upload path rather than adding a
   second artifact. The review dashboard must handle the period where a report exists but the replay
@@ -109,6 +139,12 @@ nullable-replay path.
   fails or the room was intentionally excluded from replay upload.
 - Do not make normal room transitions wait on non-report match history writes. Blocking behavior is
   required only for submitted report evidence.
+- Do not let HTTP handlers read mutable room state directly. If authoritative live/replay context is
+  needed, request a bounded `RoomReportContext` from the room task through an explicit event/reply
+  API.
+- Do not make client report UI scrape arbitrary module internals. Add narrow report snapshot methods
+  or injected collaborators, and keep non-shell cross-area imports out unless the architecture check
+  allowlist is intentionally updated with a reason.
 - The review route may warn about build/map incompatibility just like match-history replay launch.
   It should not attempt best-effort playback across incompatible replay artifacts.
 - Any client module that adds DOM/window listeners, timers, or GPU resources must implement

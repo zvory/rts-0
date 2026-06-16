@@ -21,6 +21,12 @@ without expanding into a production ticketing system.
   - match ending after the report form opens but before submission, if earlier phases support that
     lifecycle directly
   - report dashboard replay launch near the report tick
+- Add focused contract coverage for the architectural seams introduced by earlier phases:
+  - `ReportStore` returns errors on required writes instead of swallowing them
+  - `ReplayEvidenceRegistry` transitions pending to available or missing deterministically
+  - `RoomReportContext` is captured by the room task and client-supplied ids remain hints
+  - `ClientReportService` bounds payload size and composes snapshot providers through injection
+  - `ReplayReviewLaunch` preserves existing replay compatibility checks
 - Verify deploy drain waits for required report/replay writes or document the exact deadline
   behavior if the existing drain timeout wins.
 - Update design docs and capsules to reflect the shipped report system.
@@ -47,6 +53,9 @@ without expanding into a production ticketing system.
 - Do not broaden test scope into long AI/balance gates unless implementation touched AI strategy,
   deterministic replay semantics, or long self-play behavior.
 - Keep dashboard UI utilitarian and compact.
+- Do not collapse the new primitives into one broad "bug reports" module during cleanup. Cleanup
+  should remove temporary scaffolding while preserving the explicit persistence, room-context,
+  client-service, and replay-launch boundaries.
 
 ## Verification
 
@@ -68,5 +77,5 @@ without expanding into a production ticketing system.
 ## Handoff
 
 After implementation, mark this phase done and summarize the verified end-to-end flows, the final
-manual review URL, remaining known limitations, and any later non-V1 ideas such as
-server-authoritative pause or screenshot capture.
+manual review URL, the final architecture seams that future work should reuse, remaining known
+limitations, and any later non-V1 ideas such as server-authoritative pause or screenshot capture.
