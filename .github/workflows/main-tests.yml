@@ -19,43 +19,35 @@ jobs:
     timeout-minutes: 5
     outputs:
       docs_only: ${{ steps.changed-files.outputs.docs_only }}
+      ci_class: ${{ steps.changed-files.outputs.ci_class }}
+      run_server_build: ${{ steps.changed-files.outputs.run_server_build }}
+      run_rust: ${{ steps.changed-files.outputs.run_rust }}
+      run_live_node: ${{ steps.changed-files.outputs.run_live_node }}
+      run_browser: ${{ steps.changed-files.outputs.run_browser }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect docs-only PR
+      - name: Classify changed files
         id: changed-files
         shell: bash
         run: |
-          docs_only=false
+          changed=()
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            changed=()
             while IFS= read -r path; do
               [ -n "$path" ] && changed+=("$path")
             done < <(git diff --name-only --no-renames \
               "${{ github.event.pull_request.base.sha }}" \
               "${{ github.event.pull_request.head.sha }}")
 
-            docs_only=true
-            if [ "${#changed[@]}" -eq 0 ]; then
-              docs_only=false
-            else
-              for path in "${changed[@]}"; do
-                if [[ "$path" != *.md ]]; then
-                  docs_only=false
-                  break
-                fi
-              done
-            fi
-
             printf 'Changed files:\n'
             printf '  %s\n' "${changed[@]}"
           fi
 
-          printf 'docs_only=%s\n' "$docs_only" >> "$GITHUB_OUTPUT"
-          printf 'docs_only=%s\n' "$docs_only"
+          policy_output="$(node tests/select-suites.mjs --ci-policy "${changed[@]}")"
+          printf '%s\n' "$policy_output" | tee -a "$GITHUB_OUTPUT"
 
   server-build:
     name: CI / server binary
@@ -70,16 +62,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Skip server build for docs-only PR
-        if: needs.changed-files.outputs.docs_only == 'true'
-        run: echo "Only Markdown files changed; server binary is not needed for this PR."
+      - name: Skip server build
+        if: needs.changed-files.outputs.run_server_build != 'true'
+        run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need a server binary."
 
       - name: Set up Rust
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_server_build == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo registry and target
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_server_build == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -91,11 +83,11 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build debug server
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_server_build == 'true'
         run: cargo build --manifest-path server/Cargo.toml
 
       - name: Upload server binary
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_server_build == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: rts-server-debug
@@ -115,22 +107,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Skip Rust and architecture suites for docs-only PR
-        if: needs.changed-files.outputs.docs_only == 'true'
-        run: echo "Only Markdown files changed; Rust and architecture suites are not needed for this PR."
+      - name: Skip Rust and architecture suites
+        if: needs.changed-files.outputs.run_rust != 'true'
+        run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need Rust format, nextest, lint, or Rust architecture suites."
 
       - name: Set up Rust
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_rust == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Node
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_rust == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Cache Cargo registry and target
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_rust == 'true'
         id: rust-cargo-cache
         uses: actions/cache@v4
         with:
@@ -143,11 +135,11 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install cargo-nextest
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_rust == 'true'
         run: cargo install cargo-nextest --locked
 
       - name: Print Rust test context
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_rust == 'true'
         shell: bash
         env:
           CARGO_CACHE_HIT: ${{ steps.rust-cargo-cache.outputs.cache-hit }}
@@ -160,7 +152,7 @@ jobs:
           printf '  cargo cache exact hit: %s\n' "${CARGO_CACHE_HIT:-false}"
 
       - name: Run Rust and architecture suites
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_rust == 'true'
         run: ./tests/run-all.sh --only-rust
 
   live-node:
@@ -176,26 +168,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Skip live Node suites for docs-only PR
-        if: needs.changed-files.outputs.docs_only == 'true'
-        run: echo "Only Markdown files changed; live Node suites are not needed for this PR."
+      - name: Skip live Node suites
+        if: needs.changed-files.outputs.run_live_node != 'true'
+        run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need live Node suites."
 
       - name: Set up Node
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_live_node == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Download server binary
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_live_node == 'true'
         uses: actions/download-artifact@v4
         with:
           name: rts-server-debug
           path: .ci-server
 
       - name: Run live Node suites
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_live_node == 'true'
+        env:
+          CI_CLASS: ${{ needs.changed-files.outputs.ci_class }}
         run: |
+          if [ "$CI_CLASS" = "client_only" ]; then
+            node tests/select-suites.mjs --verify
+            node scripts/check-client-architecture.mjs
+          fi
           chmod +x .ci-server/rts-server
           RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-live-node
 
@@ -212,25 +210,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Skip browser suites for docs-only PR
-        if: needs.changed-files.outputs.docs_only == 'true'
-        run: echo "Only Markdown files changed; browser suites are not needed for this PR."
+      - name: Skip browser suites
+        if: needs.changed-files.outputs.run_browser != 'true'
+        run: echo "CI class '${{ needs.changed-files.outputs.ci_class }}' does not need browser suites."
 
       - name: Set up Node
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_browser == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Download server binary
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_browser == 'true'
         uses: actions/download-artifact@v4
         with:
           name: rts-server-debug
           path: .ci-server
 
       - name: Run browser and tri-state suites
-        if: needs.changed-files.outputs.docs_only != 'true'
+        if: needs.changed-files.outputs.run_browser == 'true'
         env:
           CHROME: /usr/bin/google-chrome-stable
         run: |

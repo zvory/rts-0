@@ -34,8 +34,10 @@ Use when writing or debugging tests, or before claiming a change is done.
 ## Invariants
 - The stable required PR gate is the aggregate `./tests/run-all.sh` check from the `Main test gate`
   workflow. It depends on split jobs for server binary build, Rust/architecture, live Node, and
-  browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`; Markdown-only
-  PRs keep the same green check context and skip the long suites after changed-file detection.
+  browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`. Changed-file
+  detection emits a conservative CI class: `docs_only` skips expensive suites, `client_only` skips
+  Rust format/nextest/lint while keeping server-build, live Node, and browser coverage, and `full`
+  runs every split job.
 - `tests/run-all.sh` prints a timing summary for every measured suite, server build/boot, and
   client dependency hydration attempt. Its default Rust test phase is
   `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
@@ -53,7 +55,7 @@ Use when writing or debugging tests, or before claiming a change is done.
   CI uses the same nextest-backed Rust command path as local development.
   Branch protection should require the aggregate `./tests/run-all.sh` check unless rulesets are
   deliberately migrated to require every split coverage job directly. The split jobs also
-  short-circuit as green checks for Markdown-only PRs.
+  short-circuit as green checks when the CI class says that coverage lane is unnecessary.
 - The old standalone `Rust` and `Integration` workflows were retired because the split
   `Main test gate` jobs own that Rust, architecture, live Node, and browser coverage under the
   required aggregate check.
@@ -99,8 +101,10 @@ Use when writing or debugging tests, or before claiming a change is done.
 - For CI failure recovery, workflow canaries, and moving the full gate to another runner, see
   [docs/pr-first-workflow.md](../pr-first-workflow.md).
 - A suite can be skipped only when `tests/select-suites.mjs` maps the changed files away from that
-  behavior and both architecture checks still pass:
-  `scripts/check-crate-boundaries.mjs` and `rts-archcheck check-sim-architecture`.
+  behavior. The workflow-level classes are deliberately coarse: `client_only` is limited to files
+  under `client/` except server-contract-adjacent paths such as `client/src/config.js`,
+  `client/src/protocol.js`, `client/src/net.js`, `client/src/lobby_view.js`, and
+  `client/vendor/sim-wasm/`; anything uncertain falls back to `full`.
 
 ## Self-play failure protocol
 If a self-play test fails and the cause is not immediately obvious, **do not** speculate-debug.
