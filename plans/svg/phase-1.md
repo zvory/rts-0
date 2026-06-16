@@ -2,7 +2,9 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+Status: Done.
+
+- [x] Done.
 
 ## Objective
 
@@ -32,18 +34,24 @@ Create an automatically verifiable legacy-rendering oracle before the rig render
 
 ## Implementation Checklist
 
-- [ ] Add deterministic single-unit render fixture.
-- [ ] Add semantic measurement extraction.
-- [ ] Add bounded pixel-diff helper with documented thresholds.
-- [ ] Generate baselines for all unit kinds and required animation samples.
-- [ ] Mark all new oracle artifacts as temporary migration scaffolding.
-- [ ] Run focused verification and record exact results.
+- [x] Add deterministic single-unit render fixture.
+- [x] Add semantic measurement extraction.
+- [x] Add bounded pixel-diff helper with documented thresholds.
+- [x] Generate baselines for all unit kinds and required animation samples.
+- [x] Mark all new oracle artifacts as temporary migration scaffolding.
+- [x] Run focused verification and record exact results.
 
 ## Verification
 
 - Focused renderer oracle test or script added by this phase.
 - `node scripts/check-client-architecture.mjs` if client modules are touched.
 - `git diff --check`.
+
+Results:
+
+- `node tests/legacy_unit_visual_oracle.mjs` - passed, 170 samples.
+- `node scripts/check-client-architecture.mjs` - passed.
+- `git diff --check` - passed.
 
 ## Manual Test Focus
 
