@@ -121,6 +121,7 @@ esac
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
+git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
 
 if ! command -v codex >/dev/null 2>&1; then
   echo "error: codex CLI is not available on PATH" >&2
@@ -356,6 +357,7 @@ EOF
   codex_args=(
     exec
     --cd "$worktree_path"
+    --add-dir "$git_common_dir"
     --sandbox workspace-write
     --output-schema "$schema_file"
     --output-last-message "$handoff_file"
