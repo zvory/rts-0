@@ -4635,7 +4635,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
 }
 
 #[test]
-fn gather_command_to_occupied_patch_is_ignored() {
+fn gather_command_to_occupied_patch_redirects_without_stealing_slot() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -4691,9 +4691,10 @@ fn gather_command_to_occupied_patch_is_ignored() {
     game.tick();
 
     let ordered_worker = game.entities.get(ordered).expect("worker survives");
-    assert!(
-        !matches!(ordered_worker.order(), Order::Gather(_)),
-        "occupied patches should reject gather orders so extra workers do not move onto them"
+    assert_ne!(
+        ordered_worker.order().gather_node(),
+        Some(node),
+        "occupied patches should redirect extra workers away from the held node"
     );
     assert_eq!(
         game.entities.node_slot_holder(node),
