@@ -18,6 +18,8 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
 - `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
 - `tests/run-all.sh --full-ai` — full orchestrator plus long AI self-play/simulation coverage
+- `tests/cargo-test-timed.sh` — server Cargo test wrapper used by `run-all.sh`; runs workspace
+  default members package-by-package and prints per-package durations
 - `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files
 - `node scripts/check-wiki.mjs` — wiki route hardening, internal links, generated stats table
   completeness, and faction catalog parity
@@ -28,6 +30,10 @@ Use when writing or debugging tests, or before claiming a change is done.
 ## Invariants
 - The stable required PR gate is `./tests/run-all.sh` from the `Main test gate` workflow. It runs the portable
   repo-root `tests/run-all.sh` command on pull requests targeting `main` and on pushes to `main`.
+- `tests/run-all.sh` prints a timing summary for every measured suite, server build/boot, and
+  client dependency hydration attempt. Its Rust test phase uses `tests/cargo-test-timed.sh` so CI
+  logs show which Cargo package groups dominate `cargo test` time instead of only reporting one
+  workspace-level duration.
 - `Rust / test` and `Integration / integration` are auxiliary PR checks with stable names. They
   give faster package and live-integration signal, but branch protection should treat the full gate
   as the canonical required check unless a later plan phase changes that contract.
