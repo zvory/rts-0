@@ -1,27 +1,22 @@
 #!/usr/bin/env bash
-# Shared "local CI" gate.
+# Shared cheap local commit gate.
 #
-# Runs the full local gate (tests/run-all.sh) before ordinary local commits.
+# Runs only low-risk checks before local commits. The authoritative full gate is
+# GitHub Actions (`Main test gate / ./tests/run-all.sh`) on PRs and main pushes.
 #
-# Why this and not pre-push: the project keeps direct pushes to main unblocked.
-# pre-commit aborts before a bad local commit is written, while pushes remain a
-# normal Git operation.
+# Why this and not tests/run-all.sh: agents should use focused local
+# verification while GitHub Actions owns the expensive full-suite merge signal.
 #
 # Hook coverage:
 #   - ordinary commit                -> pre-commit fires here
-#   - clean non-ff merge commit      -> pre-merge-commit fires here, skipped
+#   - clean non-ff merge commit      -> pre-merge-commit fires here
 #   - merge-with-conflicts           -> the resolving `git commit` re-fires
-#                                      pre-commit with MERGE_HEAD, skipped
+#                                      pre-commit with MERGE_HEAD
 set -euo pipefail
 
 hook="${1:-hook}"
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [[ "$hook" == "pre-merge-commit" ]] || git rev-parse -q --verify MERGE_HEAD >/dev/null; then
-  echo "$hook: merge commit detected; skipping full local CI (tests/run-all.sh)"
-  exit 0
-fi
-
-echo "$hook: running full local CI (tests/run-all.sh)…"
-exec ./tests/run-all.sh
+echo "$hook: running cheap staged diff checks (git diff --cached --check)"
+git diff --cached --check

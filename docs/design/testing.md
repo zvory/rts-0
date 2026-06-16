@@ -21,7 +21,8 @@ tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
 
 **Fast/full AI split.** Plain `cargo test` keeps the self-play harness in the default gate, but only
 runs the fast scripted coverage. Long profile-backed and real-AI self-play tests return early unless
-`RTS_FULL_AI_TESTS=1` is set; `tests/run-all.sh --full-ai` enables that mode for the local gate.
+`RTS_FULL_AI_TESTS=1` is set; `tests/run-all.sh --full-ai` enables that mode for the full
+orchestrator.
 `RTS_SELFPLAY_FULL=1` remains accepted as an alias for manual self-play runs. Use full AI coverage
 when touching AI strategy, profile-backed self-play, replay determinism, or balance behavior that
 depends on long matches.
@@ -74,8 +75,8 @@ sampling.
 
 ## 10. Package-aware test selection policy
 
-The full gate is still `tests/run-all.sh`. Narrower local runs are allowed only when the changed
-files map away from the skipped behavior and the architecture checks still pass. Use
+The authoritative full gate is the PR `Main test gate / ./tests/run-all.sh` check. Local runs should
+usually be narrower and selected by the changed files or contracts. Use
 `node tests/select-suites.mjs --from=<base-ref>` or pass changed paths directly to see the expected
 suites.
 

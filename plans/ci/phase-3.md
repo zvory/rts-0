@@ -2,7 +2,7 @@
 
 ## Status
 
-Pending.
+Done.
 
 ## Goal
 
@@ -54,4 +54,3 @@ that it does not depend on a human remembering to watch an unowned PR.
 
 Call out any remaining archived plans that still mention direct merges. Archived plan text does not
 need to be rewritten unless it can confuse active automation.
-

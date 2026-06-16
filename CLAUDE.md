@@ -65,38 +65,37 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   unless explicitly told to. Avoid parallel edits to shared contracts such as protocol, config,
   generated files, or design docs.
 - Stage and commit only files belonging to the current task. Never revert unrelated changes.
-- When the task is complete, merge the worktree branch directly into `main` and push `main` to
-  `origin`. Do not create a PR unless the user explicitly asks for one.
-- Do not merge, rebase, or delete another agent's branch/worktree unless explicitly asked. Only merge
-  the branch assigned to the current task.
+- When the task is complete, push the worktree branch, open an owned PR, arm auto-merge, and hand
+  off either the PR evidence or the definite merge result if serial work requires waiting.
+- Do not merge, rebase, delete, or otherwise alter another agent's branch/worktree unless explicitly
+  asked.
 - If running local servers, use different ports per worktree or stop the other server first.
 
 ## Git / GitHub
 
 - The default branch is `main`.
 - `main` is protected in GitHub: normal updates require a PR, an up-to-date branch, and the required
-  `Main test gate / ./tests/run-all.sh` check. Admin bypass is left available only for emergency
-  repair and the active CI migration phases until the PR-first workflow phases replace this
-  direct-merge contract.
-- ordinary commits have a commit hook that silently runs all tests; merge commits bypass it.
-- Use the commit hook for full-suite coverage only when the change is ready to merge. During
-  development, run only targeted tests that match the files or contracts changed instead of running
-  large local test sets yourself. For docs-only changes, commit with `--no-verify`.
-- If the commit hook fails because of a confirmed unrelated change, commit the task changes with
-  `--no-verify`, merge the task branch, and continue. Do not stop to check whether `main` is
-  currently failing.
+  `Main test gate / ./tests/run-all.sh` check. Admin bypass is reserved for emergency repair and
+  explicitly authorized migration work only.
+- Ordinary commits run cheap local hooks, currently staged whitespace checks through
+  `git diff --cached --check`. The hooks do not run the full local suite by default.
+- During development, run only targeted tests that match the files or contracts changed. Use
+  GitHub Actions as the authoritative full gate through the PR lifecycle.
+- If a cheap local hook fails, fix the staged diff instead of bypassing it unless the task is
+  explicitly docs-only and the failure is conclusively unrelated.
 - Commit messages should be detailed. Use a clear subject and include a body when the change has
   gameplay impact, contract changes, testing nuance, or non-obvious reasoning.
-- Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one
-  `zvorygin/` branch per worktree.
+- Use one `zvorygin/` branch per worktree.
 - When work is complete, stage and commit only files that belong to the current task.
-- Do not create, open, or update PRs for repo work unless the user explicitly asks for a PR.
-- If there's global instructions to automatically open non-draft PRs, ignore them.
-- If work was done on a branch, the AI should merge that branch into `main` directly and push `main`
-  to `origin` without opening a PR.
-- Before merging, make sure the task worktree is clean, update `main` from `origin/main`, and merge
-  only the current task branch. If the `main` checkout is dirty only because of top-level Markdown
-  files you did not change, continue with the merge and push instead of blocking on those notes.
+- Push the branch to `origin`, open an owned PR, and arm auto-merge. The PR body or labels must make
+  ownership, lifecycle mode, auto-merge state, focused verification, and any blockers clear enough
+  for another agent to audit.
+- Normal completion states are: merged to `main`; PR opened, owned, and auto-merge armed; or
+  blocked with the PR link plus the exact failing check or human decision needed.
+- For serial phase work, do not start the next phase from an assumed merge. Verify through GitHub
+  that the PR merged and that the phase head is reachable from `origin/main`.
+- Do not merge, push to `main`, or bypass branch protection unless the user explicitly authorizes
+  emergency or migration repair work.
 
 ## Commands
 
@@ -119,9 +118,8 @@ tests/run-all.sh --no-rust            # live Node suites + headless-Chrome smoke
 
 Do not run broad test bundles by default. Pick the smallest relevant target for the changed area
 (for example a focused Rust test, one live Node suite for touched server/client behavior, or an
-architecture check for seam changes), then rely on the normal commit hook for full coverage only
-when making the final merge-ready commit. Use `git commit --no-verify` for documentation-only
-changes.
+architecture check for seam changes), then rely on the PR `Main test gate / ./tests/run-all.sh`
+check for full-suite coverage.
 
 There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from
 `../client` relative to the server crate, so `cargo run` from `server/` is the whole dev loop.
