@@ -30,9 +30,11 @@ Runs executor passes only. Each phase gets a separate worktree and branch under
 /tmp/rts-worktrees. Each phase starts from the current local main, then the
 runner pushes the completed phase branch, opens or updates an owned PR, and
 arms auto-merge. With --wait, the runner waits for that PR to merge and verifies
-the phase head is reachable from origin/main before starting the next phase.
+the phase head is reachable from origin/main before reporting success or
+starting the next phase.
 Without --wait, the runner stops after opening and arming the first phase PR so
-serial follow-up does not start from an assumed merge.
+serial follow-up does not start from an assumed merge; treat that as a pending
+handoff, not completion.
 Phase ids may be numeric, decimal interstitials such as 5.5, or suffixed ids
 such as 3a. Use --from/--to to discover all phase files in that interval; for
 example --from 5 --to 6 runs phase-5.5 before phase-6 if both files exist.
@@ -50,8 +52,8 @@ Options:
   --model MODEL     Optional Codex model override for executor passes.
   --from PHASE      Discover phases after PHASE, up to --to. Example: --from 5.
   --to PHASE        Discover phases through PHASE. Requires --from.
-  --pr              Push the phase branch, open/update an owned PR, arm auto-merge, and stop.
-  --wait            With --pr, wait for each phase PR to merge before continuing.
+  --pr              Push the phase branch, open/update an owned PR, arm auto-merge, and stop pending merge.
+  --wait            With --pr, wait for each phase PR to merge before reporting success or continuing.
   --dry-run         Print worktrees, branches, and prompts without running Codex.
   -h, --help        Show this help.
 
@@ -531,10 +533,10 @@ EOF
     echo "phase-runner: would push $branch to origin"
     echo "phase-runner: would run scripts/agent-pr.sh --base $BASE_BRANCH --head $branch --verification <executor verification>"
     if [ "$WAIT_FOR_PR" = "1" ]; then
-      echo "phase-runner: would run scripts/wait-pr.sh <opened-pr> before continuing"
+      echo "phase-runner: would run scripts/wait-pr.sh <opened-pr> before reporting success or continuing"
       echo "phase-runner: would fetch origin/$BASE_BRANCH and verify the phase head is reachable from origin/$BASE_BRANCH"
     else
-      echo "phase-runner: would stop after arming auto-merge for $branch"
+      echo "phase-runner: would stop with a pending handoff after arming auto-merge for $branch"
     fi
     printf '%s\n' "$prompt"
     if [ "$WAIT_FOR_PR" != "1" ]; then
@@ -685,7 +687,7 @@ EOF
   echo "phase-runner: timing saved to $timing_file (${total_seconds}s total)"
 
   if [ "$WAIT_FOR_PR" != "1" ]; then
-    echo "phase-runner: stopped after opening and arming PR #$pr_number because --wait was not set"
+    echo "phase-runner: stopped with a pending handoff after opening and arming PR #$pr_number because --wait was not set"
     break
   fi
 done
@@ -696,6 +698,6 @@ else
   if [ "$WAIT_FOR_PR" = "1" ]; then
     echo "phase-runner: finished executor passes. Each completed phase PR merged before the next phase started."
   else
-    echo "phase-runner: finished after arming the first phase PR. Re-run with --wait after merge for serial follow-up."
+    echo "phase-runner: finished with a pending handoff after arming the first phase PR. Run scripts/wait-pr.sh before claiming completion or starting follow-up work."
   fi
 fi

@@ -7,7 +7,8 @@ The normal agent lifecycle is:
 3. Commit with the normal hook.
 4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`
    and leave auto-merge armed.
-5. For serial work, run `scripts/wait-pr.sh <pr>` before starting the next phase.
+5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged and the
+   head SHA reachable from `origin/main`.
 
 GitHub Actions owns the full-suite merge gate through
 `./tests/run-all.sh` in the `Main test gate` workflow. Local hooks are intentionally cheap; they
@@ -21,8 +22,8 @@ catch staged whitespace errors and run opportunistic cleanup on `main`.
   body records the current evidence.
 - Branch stale or conflicted: fetch `origin/main`, merge it into the PR branch,
   resolve conflicts in the same worktree, rerun focused verification, and push.
-  Do not start a serial follow-up phase until `scripts/wait-pr.sh <pr>` reports
-  the PR merged and its head reachable from `origin/main`.
+  Do not claim completion or start follow-up work until `scripts/wait-pr.sh <pr>`
+  reports the PR merged and its head reachable from `origin/main`.
 - Auto-merge not armed: rerun `scripts/agent-pr.sh --verification "..."` from
   the branch, or run `gh pr merge <pr> --auto --merge` after confirming the PR
   is still agent-owned and should merge when green.
@@ -39,6 +40,11 @@ catch staged whitespace errors and run opportunistic cleanup on `main`.
 Run `scripts/pr-sweep.sh` when ownership or status is unclear. It lists open
 agent PRs and flags missing owner metadata, missing auto-merge, failed CI,
 conflicts, stale PRs, and `needs-human` state.
+
+An open PR with auto-merge armed is a pending handoff, not a completed task. If
+CI fails, GitHub is unavailable, the PR needs human input, or waiting would be
+inappropriate for an explicitly user-requested stop, report the PR link and the
+exact blocker instead of calling the work complete.
 
 ## Worktree cleanup
 

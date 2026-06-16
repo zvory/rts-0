@@ -17,8 +17,9 @@ clearer.
 - A requirement that each handoff message names the core features that should be manually tested.
   This should not be a comprehensive test matrix.
 - A requirement to push each phase branch as an owned PR with auto-merge armed.
-- A requirement that serial phase work waits for a definite PR merge and verifies the phase head is
-  reachable from `origin/main` before starting the next phase.
+- A requirement that after opening each PR, the implementing agent waits for a definite PR merge and
+  verifies the phase head is reachable from `origin/main` before reporting the phase complete or
+  starting the next phase.
 
 Each phase document should describe its scope, expected code or documentation touch points,
 verification, manual testing focus, and handoff expectations. When a phase is complete, mark that
@@ -30,13 +31,13 @@ For unattended executor passes, use `scripts/phase-runner.sh` from a clean check
 creates one `/tmp/rts-worktrees` worktree and one `zvorygin/` branch per phase, invokes Codex with
 the repo-local `$phase-runner` skill, saves a compact JSON handoff under the runner log directory,
 and commits completed phase work. Pass `--pr` to push the phase branch, open or update an owned PR
-with `scripts/agent-pr.sh`, and arm auto-merge. Add `--wait` when running serial phases; the runner
-will wait through `scripts/wait-pr.sh`, fetch `origin/main`, and verify the phase head is reachable
-there before discovering or starting the next phase.
+with `scripts/agent-pr.sh`, and arm auto-merge. Add `--wait` for normal unattended completion; the
+runner will wait through `scripts/wait-pr.sh`, fetch `origin/main`, and verify the phase head is
+reachable there before reporting success or starting another phase.
 
 The runner is only for implementation phases that already have approved phase files. It does not
 create plans or perform final review. Without `--wait`, the runner stops after the first PR is
-armed so the caller can decide when to resume serial follow-up work. Examples:
+armed; treat that as a pending handoff until `scripts/wait-pr.sh <pr>` confirms the merge. Examples:
 
 ```bash
 scripts/phase-runner.sh --plan ci 5 --pr
