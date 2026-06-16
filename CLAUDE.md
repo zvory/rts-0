@@ -66,7 +66,8 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   generated files, or design docs.
 - Stage and commit only files belonging to the current task. Never revert unrelated changes.
 - When the task is complete, push the worktree branch, open an owned PR, arm auto-merge, and hand
-  off either the PR evidence or the definite merge result if serial work requires waiting.
+  off either the PR evidence or the definite merge result if serial work requires waiting. Use
+  `scripts/agent-pr.sh` for the standard owned-PR body, labels, and auto-merge setup.
 - Do not merge, rebase, delete, or otherwise alter another agent's branch/worktree unless explicitly
   asked.
 - If running local servers, use different ports per worktree or stop the other server first.
@@ -89,11 +90,23 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 - When work is complete, stage and commit only files that belong to the current task.
 - Push the branch to `origin`, open an owned PR, and arm auto-merge. The PR body or labels must make
   ownership, lifecycle mode, auto-merge state, focused verification, and any blockers clear enough
-  for another agent to audit.
+  for another agent to audit. The standard command is:
+
+  ```bash
+  scripts/agent-pr.sh --verification "focused check command(s) passed"
+  ```
+
+  `scripts/agent-pr.sh` writes the `rts-agent-pr:v1` metadata block, applies `agent-owned` plus
+  `automerge` or `needs-human`, and runs `gh pr merge --auto --merge`. If the branch needs human
+  input, pass `--no-auto-merge` and explain the blocker in the PR body or handoff.
 - Normal completion states are: merged to `main`; PR opened, owned, and auto-merge armed; or
   blocked with the PR link plus the exact failing check or human decision needed.
-- For serial phase work, do not start the next phase from an assumed merge. Verify through GitHub
-  that the PR merged and that the phase head is reachable from `origin/main`.
+- For serial phase work, do not start the next phase from an assumed merge. Use
+  `scripts/wait-pr.sh <pr>` after opening the PR; it exits successfully only after GitHub reports
+  the PR merged and the phase head SHA is reachable from `origin/main`.
+- To audit outstanding agent PRs, run `scripts/pr-sweep.sh`. It lists open `agent-owned` and
+  `zvorygin/*` PRs with owner, age, head SHA, auto-merge state, checks, and flags for stale,
+  failed, conflicted, missing-owner, or needs-human states.
 - Do not merge, push to `main`, or bypass branch protection unless the user explicitly authorizes
   emergency or migration repair work.
 

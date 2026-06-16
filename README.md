@@ -139,6 +139,24 @@ Current GitHub repository settings for `zvory/rts-0`:
 - force pushes and branch deletion are disabled;
 - admins may bypass protection only for emergency repair and the active CI migration phases.
 
+Agent PR lifecycle helpers:
+
+```bash
+# Open or update the current zvorygin/* branch PR, label it, and arm auto-merge.
+scripts/agent-pr.sh --verification "focused check command(s) passed"
+
+# Serial work: wait until the PR merged and its head is reachable from origin/main.
+scripts/wait-pr.sh <pr-number-or-url>
+
+# Audit open agent PRs and stale/failing ownership states.
+scripts/pr-sweep.sh
+```
+
+Agent-owned PRs use the `rts-agent-pr:v1` body block and the labels `agent-owned`, `automerge`,
+`ci-failed`, and `needs-human`. A lightweight PR ownership workflow validates that `zvorygin/*` PRs
+carry the metadata needed for another agent to tell who owns the PR, whether auto-merge should be
+armed, what focused verification ran, and whether a human decision is needed.
+
 The full test runner uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
 parallel agents do not share final binaries or test artifacts.
 
