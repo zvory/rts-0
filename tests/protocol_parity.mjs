@@ -45,6 +45,8 @@ const rustContractPath = path.join(repoRoot, "server/crates/contract/src/lib.rs"
 const rustContract = fs.readFileSync(rustContractPath, "utf8");
 const rustLobbyPath = path.join(repoRoot, "server/src/lobby/mod.rs");
 const rustLobby = fs.readFileSync(rustLobbyPath, "utf8");
+const protocolDocPath = path.join(repoRoot, "docs/design/protocol.md");
+const protocolDoc = fs.readFileSync(protocolDocPath, "utf8");
 const protocolContract = JSON.parse(
   execFileSync(
     "cargo",
@@ -100,6 +102,19 @@ function assertNoDuplicateCodes(label, codes) {
   }
 }
 
+function extractMarkdownCodeRow(label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const row = protocolDoc.match(new RegExp(`^\\| \`${escaped}\` \\| ([^|]+) \\|$`, "m"));
+  assert(row, `protocol docs must list compact ${label} codes`);
+  return Object.fromEntries(
+    Array.from(row[1].matchAll(/(\d+)\s+`([^`]+)`/g), ([, code, name]) => [name, Number(code)]),
+  );
+}
+
+function assertDocsCodeTable(label, rustCodes) {
+  assertSameMap(`docs compact ${label}`, rustCodes, extractMarkdownCodeRow(label));
+}
+
 assert(protocolContract.schemaVersion === 1, "protocol contract schema version must be 1");
 assert(protocolContract.unknownCodeSentinel === 255, "unknown compact code sentinel must stay 255");
 assertSameMap("server message tags", protocolContract.messageTags.server, S);
@@ -135,6 +150,11 @@ assertSameCodes(
 );
 assert(protocolContract.compactSnapshotVersion === COMPACT_SNAPSHOT_VERSION, "compact snapshot version must match Rust");
 assert(
+  protocolDoc.includes(`compact JSON text, version ${COMPACT_SNAPSHOT_VERSION}`) &&
+    protocolDoc.includes(`"v": ${COMPACT_SNAPSHOT_VERSION}`),
+  "protocol docs must list the current compact snapshot version",
+);
+assert(
   protocolContract.predictionProtocolVersion === PREDICTION_PROTOCOL_VERSION,
   "prediction protocol version must match Rust",
 );
@@ -156,6 +176,14 @@ assert(
   protocolContract.compactSlotSchemas.netStatus.length === 8,
   "compact net status slot count must match JS decoder",
 );
+assertDocsCodeTable("kind", protocolContract.compactCodes.kind);
+assertDocsCodeTable("state", protocolContract.compactCodes.state);
+assertDocsCodeTable("setupState", protocolContract.compactCodes.setupState);
+assertDocsCodeTable("orderStage", protocolContract.compactCodes.orderStage);
+assertDocsCodeTable("ability", protocolContract.compactCodes.ability);
+assertDocsCodeTable("abilityObject.kind", protocolContract.compactCodes.abilityObjectKind);
+assertDocsCodeTable("upgrade", protocolContract.compactCodes.upgrade);
+assertDocsCodeTable("notice.severity", protocolContract.compactCodes.noticeSeverity);
 
 assert(
   JSON.stringify(extractRustPlayerPalette()) === JSON.stringify(PLAYER_PALETTE),
