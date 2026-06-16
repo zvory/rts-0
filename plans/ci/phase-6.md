@@ -39,7 +39,7 @@ new contract works before relying on it for broad work.
 - `CLAUDE.md`
 - `docs/context/planning.md`
 - `docs/context/testing.md`
-- `docs/ci/plan.md`
+- `plans/ci/plan.md`
 - Any active plan files whose instructions would conflict with the new lifecycle
 
 ## Verification
@@ -60,4 +60,3 @@ serial runner can safely proceed.
 
 Summarize the final lifecycle and any known exceptions. If a fallback remains manual, name the exact
 command and decision point.
-
