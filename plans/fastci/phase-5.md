@@ -1,6 +1,6 @@
 # Phase 5 - Split Full Gate Into Parallel Jobs
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 
@@ -96,3 +96,10 @@ Report baseline run ids, post-merge run ids, job timing table, slowest required 
 required-check names, cache behavior, and the acceptance decision. If accepted, summarize the
 final expected `Main test gate` wall time and any remaining optimization opportunities that would
 require coverage tradeoffs.
+
+## Implementation Note
+
+The executor split `Main test gate` into server binary, Rust/architecture, live Node, and
+browser/tri-state jobs, with an aggregate check retaining the required `./tests/run-all.sh` name.
+Post-merge timing acceptance remains pending for the outer phase runner because this executor does
+not push, open the PR, or inspect GitHub Actions after merge.

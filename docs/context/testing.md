@@ -15,6 +15,9 @@ Use when writing or debugging tests, or before claiming a change is done.
   `puppeteer-core` through the shared lockfile-keyed cache
 - `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into latency-sensitive browser
   tri-state lag scenarios locally; CI includes them automatically
+- `tests/run-all.sh --only-rust` — architecture policy plus Rust format, test, and lint only
+- `tests/run-all.sh --only-live-node` — JS contracts plus live Node API suites only
+- `tests/run-all.sh --only-browser` — browser smoke plus configured tri-state browser suites only
 - `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
 - `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
 - `tests/run-all.sh --full-ai` — full orchestrator plus long AI self-play/simulation coverage
@@ -28,16 +31,18 @@ Use when writing or debugging tests, or before claiming a change is done.
   enforce `rts-sim::game` internal architecture ratchets
 
 ## Invariants
-- The stable required PR gate is `./tests/run-all.sh` from the `Main test gate` workflow. It runs the portable
-  repo-root `tests/run-all.sh` command on pull requests targeting `main` and on pushes to `main`,
-  except Markdown-only PRs keep the same green check context and skip the long suite after changed-file detection.
+- The stable required PR gate is the aggregate `./tests/run-all.sh` check from the `Main test gate`
+  workflow. It depends on split jobs for server binary build, Rust/architecture, live Node, and
+  browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`; Markdown-only
+  PRs keep the same green check context and skip the long suites after changed-file detection.
 - `tests/run-all.sh` prints a timing summary for every measured suite, server build/boot, and
   client dependency hydration attempt. Its default Rust test phase is a single workspace
   `cargo test --manifest-path server/Cargo.toml` invocation. Set `RTS_CARGO_PACKAGE_TIMINGS=1`
   or run `tests/cargo-test-timed.sh` directly when CI/package-level profiling is needed.
-- `Rust / test` and `Integration / integration` are auxiliary PR checks with stable names. They
-  give faster package and live-integration signal, but branch protection should treat the full gate
-  as the canonical required check unless a later plan phase changes that contract. They also
+- `CI / server binary`, `CI / rust and architecture`, `CI / live Node suites`, and
+  `CI / browser and tri-state` are the auditable coverage jobs under the aggregate required check.
+  Branch protection should require the aggregate `./tests/run-all.sh` check unless rulesets are
+  deliberately migrated to require every split coverage job directly. The split jobs also
   short-circuit as green checks for Markdown-only PRs.
 - Workflow concurrency cancels superseded runs for the same PR branch, and cancels stale
   post-merge `main` push runs when a newer `main` push starts. Unrelated branches should not
@@ -47,8 +52,10 @@ Use when writing or debugging tests, or before claiming a change is done.
 - Local `tests/run-all.sh` uses a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
   parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
   with `CARGO_TARGET_DIR` if a task needs a specific target location. The `Main test gate`
-  workflow sets `CARGO_TARGET_DIR` to `server/target` so GitHub Actions can restore and save the
-  same target directory that Cargo uses during `./tests/run-all.sh`.
+  workflow sets `CARGO_TARGET_DIR` to `server/target` for Rust-building jobs so GitHub Actions can
+  restore and save the same target directory that Cargo uses. Live Node and browser jobs download
+  the debug server binary from the server-build job and pass it with `RTS_SERVER_BIN` to avoid
+  rebuilding the server in each split job.
 - Installed hooks run cheap staged-diff checks before commits and merges. They do not run
   `tests/run-all.sh` by default; GitHub Actions owns the full-suite gate for normal PR work.
 - Installed hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main` to
