@@ -5466,6 +5466,21 @@ mod tests {
             writer.reliable_rx.try_recv().unwrap(),
             ServerMessage::ReplayState(_)
         ));
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::ObserverAnalysis(analysis)
+                if analysis.tick == 0 && analysis.players.len() == players.len()
+        ));
+
+        task.on_tick_replay_viewer(TokioInstant::now());
+        let snapshot = writer.snapshots.take().expect("replay viewer snapshot");
+        let Phase::ReplayViewer(session) = &task.phase else {
+            panic!("confirmed replay join should keep replay viewer active");
+        };
+        let visible_players = players.iter().map(|player| player.id).collect::<Vec<_>>();
+        let expected = session.game.snapshot_for_spectator(&visible_players);
+        assert_eq!(snapshot.tick, expected.tick);
+        assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     }
 
     #[test]
@@ -5505,6 +5520,48 @@ mod tests {
         ));
 
         let _ = std::fs::remove_dir_all(artifact_dir);
+    }
+
+    #[test]
+    fn replay_branch_room_join_initializes_staging_and_broadcasts_seats() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 2);
+        let mut task = RoomTask::new(
+            "branch-join-baseline-test".to_string(),
+            RoomMode::ReplayBranch { seed },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(100, "Viewer 100".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert_eq!(task.host_id, Some(100));
+        assert!(matches!(task.phase, Phase::BranchStaging(_)));
+        let updates = branch_staging_messages(&mut writer);
+        let Some(ServerMessage::BranchStaging {
+            room,
+            source_tick,
+            host_id,
+            seats,
+            occupants,
+            can_start,
+        }) = updates.last()
+        else {
+            panic!("branch join should broadcast staging state");
+        };
+        assert_eq!(room, "branch-join-baseline-test");
+        assert_eq!(*source_tick, 2);
+        assert_eq!(*host_id, 100);
+        assert_eq!(seats.len(), players.len());
+        assert!(seats.iter().all(|seat| seat.claimant_id.is_none()));
+        assert_eq!(occupants.len(), 1);
+        assert_eq!(occupants[0].id, 100);
+        assert_eq!(occupants[0].name, "Viewer 100");
+        assert!(!can_start);
     }
 
     #[test]
