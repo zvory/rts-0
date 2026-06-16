@@ -75,7 +75,7 @@ sampling.
 
 ## 10. Package-aware test selection policy
 
-The authoritative full gate is the PR `Main test gate / ./tests/run-all.sh` check. Local runs should
+The authoritative full gate is the PR `./tests/run-all.sh` check from the `Main test gate` workflow. Local runs should
 usually be narrower and selected by the changed files or contracts. Use
 `node tests/select-suites.mjs --from=<base-ref>` or pass changed paths directly to see the expected
 suites.
@@ -127,7 +127,7 @@ changed-file mapping selects the skipped behavior.
 
 ## 11. PR CI contract
 
-The canonical required PR check is `Main test gate / ./tests/run-all.sh`. The job runs the portable
+The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow. The job runs the portable
 repo-root command `./tests/run-all.sh` on pull requests targeting `main` and on pushes to `main`.
 Later branch-protection work should require this single full-gate check unless a plan phase
 explicitly changes the contract.

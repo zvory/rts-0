@@ -55,7 +55,7 @@ Phase 4.
 - Repository auto-merge is enabled.
 - Delete-branch-on-merge is enabled.
 - `main` branch protection is enabled through the branch protection API.
-- Required status check: `Main test gate / ./tests/run-all.sh`.
+- Required status check context: `./tests/run-all.sh` from the `Main test gate` workflow.
 - Branches must be up to date before merge (`required_status_checks.strict: true`).
 - Pull requests are required for normal merges with zero required approving reviews.
 - Force pushes and branch deletion are disabled.

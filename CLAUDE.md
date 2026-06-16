@@ -76,7 +76,7 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 - The default branch is `main`.
 - `main` is protected in GitHub: normal updates require a PR, an up-to-date branch, and the required
-  `Main test gate / ./tests/run-all.sh` check. Admin bypass is reserved for emergency repair and
+  `./tests/run-all.sh` check from the `Main test gate` workflow. Admin bypass is reserved for emergency repair and
   explicitly authorized migration work only.
 - Ordinary commits run cheap local hooks, currently staged whitespace checks through
   `git diff --cached --check`. The hooks do not run the full local suite by default.
@@ -137,7 +137,7 @@ tests/run-all.sh --no-rust            # live Node suites + headless-Chrome smoke
 
 Do not run broad test bundles by default. Pick the smallest relevant target for the changed area
 (for example a focused Rust test, one live Node suite for touched server/client behavior, or an
-architecture check for seam changes), then rely on the PR `Main test gate / ./tests/run-all.sh`
+architecture check for seam changes), then rely on the PR `./tests/run-all.sh`
 check for full-suite coverage.
 
 There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from

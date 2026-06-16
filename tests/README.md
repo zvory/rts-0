@@ -11,7 +11,7 @@ If a server is already answering on the port it is reused and left running.
 
 This command is the portable full gate and the required GitHub Actions PR signal. Run focused local
 verification for the files or contracts you changed, then rely on the PR check named
-`Main test gate / ./tests/run-all.sh` before merge. Run `./scripts/install-hooks.sh` once per
+`./tests/run-all.sh` before merge. Run `./scripts/install-hooks.sh` once per
 checkout to install the tracked hooks locally; those hooks run cheap staged-diff checks instead of
 the full suite. Normal `main` updates go through owned PRs with auto-merge armed.
 

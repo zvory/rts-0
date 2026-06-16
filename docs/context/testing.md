@@ -26,7 +26,7 @@ Use when writing or debugging tests, or before claiming a change is done.
   enforce `rts-sim::game` internal architecture ratchets
 
 ## Invariants
-- The stable required PR gate is `Main test gate / ./tests/run-all.sh`. It runs the portable
+- The stable required PR gate is `./tests/run-all.sh` from the `Main test gate` workflow. It runs the portable
   repo-root `tests/run-all.sh` command on pull requests targeting `main` and on pushes to `main`.
 - `Rust / test` and `Integration / integration` are auxiliary PR checks with stable names. They
   give faster package and live-integration signal, but branch protection should treat the full gate

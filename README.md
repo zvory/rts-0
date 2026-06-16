@@ -99,7 +99,7 @@ For focused test runs, see [tests/README.md](tests/README.md).
 ## CI And Local Hooks
 
 GitHub Actions is the authoritative full-suite gate. The stable required PR check is
-`Main test gate / ./tests/run-all.sh`, which runs the portable repo-root command:
+`./tests/run-all.sh` from the `Main test gate` workflow, which runs the portable repo-root command:
 
 ```bash
 ./tests/run-all.sh
@@ -113,7 +113,7 @@ Install the tracked Git hooks in each checkout:
 
 The local hooks run cheap staged-diff checks before ordinary commits and merge commits. They do not
 run `./tests/run-all.sh` by default. Agents and developers should run focused local verification for
-the files or contracts they changed, then rely on the PR `Main test gate / ./tests/run-all.sh` check
+the files or contracts they changed, then rely on the PR `./tests/run-all.sh` check
 for full-suite coverage. After commits and merges on `main`, the hooks also run
 `scripts/cleanup-worktrees.sh --auto` to remove clean, already-merged `zvorygin/*` worktrees and a
 small bounded batch of stale per-worktree Cargo target dirs.
@@ -135,7 +135,7 @@ Current GitHub repository settings for `zvory/rts-0`:
 - delete-branch-on-merge is enabled;
 - `main` is protected and requires pull requests before normal merges;
 - `main` requires branches to be up to date and requires
-  `Main test gate / ./tests/run-all.sh`;
+  `./tests/run-all.sh`;
 - force pushes and branch deletion are disabled;
 - admins may bypass protection only for emergency repair and the active CI migration phases.
 
