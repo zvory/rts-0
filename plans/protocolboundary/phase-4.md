@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -30,11 +30,11 @@ Expand parity checks so client-visible balance values mirrored in `config.js` ca
 
 ## Implementation Checklist
 
-- [ ] Define which config values are Rust-authoritative and client-visible.
-- [ ] Add structured dump coverage for those values.
-- [ ] Extend parity assertions.
-- [ ] Document intentional client-only exclusions.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Define which config values are Rust-authoritative and client-visible.
+- [x] Add structured dump coverage for those values.
+- [x] Extend parity assertions.
+- [x] Document intentional client-only exclusions.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
