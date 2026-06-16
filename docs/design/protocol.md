@@ -272,6 +272,11 @@ player. Missing faction requests default to `kriegsia` in normal lobby, AI, quic
 and dev-start contexts, while explicit `kriegsia` and `ekat` requests are accepted by the current
 playable faction policy. Other ids are rejected unless a lifecycle path explicitly accepts recorded
 replay data or the `phase2_empty_fixture` test fixture.
+Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
+field does not make a faction playable. Fixture-only, reserved/future, and historical-only ids must
+not become valid `setFaction`, AI-seat, replay-branch, or post-match replay ids without updating
+`docs/design/faction-architecture-inventory.md`, the lifecycle validator, and protocol parity in
+the same change.
 
 Prediction start compatibility metadata is present only for live active players. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version

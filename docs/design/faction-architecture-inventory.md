@@ -27,6 +27,18 @@ of current faction truth.
 
 ## Catalog Id Statuses
 
+Lifecycle status is explicit and separate from catalog existence:
+
+- `playable`: allowed in normal product match starts where the owning lifecycle path accepts a
+  playable faction id.
+- `playable-human-only`: allowed for human selection but not for AI, prediction, or replay-capable
+  starts until those lifecycle paths explicitly opt in. No current catalog id uses this status.
+- `test-fixture-only`: allowed only by explicit fixture/test contexts and never by normal product
+  selectors or replayable starts.
+- `reserved/future`: named for future work but not admitted by catalog, lobby, replay, AI, or
+  prediction paths. No current catalog id uses this status.
+- `historical-only`: retained as archive evidence and never treated as active lifecycle policy.
+
 | Faction id or path | Status | Current lifecycle policy |
 | --- | --- | --- |
 | `kriegsia` | playable | Default faction for missing non-replay requests. Supported by normal human lobby, quickstart/debug starts, AI seats, dev starts, self-play defaults, replay/branch records, match-history replay, post-match replay, spectator metadata, and local prediction when version/build metadata is compatible. |
@@ -55,7 +67,8 @@ economy, combat, world-query helpers, and tests. New production files that intro
 current-faction kind checks should either use the faction catalog API or be added to
 `scripts/check-faction-assumptions.mjs` with a short reason. High-risk approved files have a direct
 special-case count ratchet so newly added current-faction checks inside those large files are also
-visible during review.
+visible during review. The ratchet is an inventory review tool, not approval to expand Kriegsia,
+Ekat, or fixture special cases casually.
 
 ## Current Economy Shape
 
@@ -104,23 +117,24 @@ Command Car Unlock, and Mortar Autocast.
 
 ## Current Ability Surface
 
-Current ability ids are Charge, Smoke, Mortar Fire, Point Fire, and Breakthrough. Ability carriers,
-costs, cooldowns, target modes, projection, and execution are split across
-`server/crates/sim/src/game/ability.rs`, `server/crates/sim/src/rules/projection.rs`,
-`server/crates/sim/src/game/services/ability_orders.rs`, `server/crates/protocol/src/lib.rs`, and
-`client/src/config.js`. Phase 6 should make the faction-aware Rust ability registry the
-authoritative source for ability id, carrier, target mode, cooldown/charge, cost, and command-card
-affordance metadata, then project that to command validation and client parity checks instead of
-adding another parallel table. Until then, the split metadata remains intentionally documented and
-guarded by catalog parity, protocol parity, and command tests.
+Current ability ids are Charge, Smoke, Mortar Fire, Point Fire, Breakthrough, Ekat Teleport, Ekat
+Line Shot, and Ekat Magic Anchor. The Rust faction catalog in
+`server/crates/rules/src/faction.rs` is authoritative for ability id, carrier, target mode,
+range, cooldown/charge, resource cost, queueability, autocast support, and command-card affordance
+metadata. `client/src/config.js` is the checked client projection, while
+`server/crates/sim/src/game/services/ability_orders.rs`, `server/crates/sim/src/game/ability.rs`,
+and `server/crates/sim/src/rules/projection.rs` own execution and projection hooks. Protocol
+ability vocabulary and compact codes remain mirrored through `server/crates/protocol/src/lib.rs`
+and `client/src/protocol.js`.
 
 ## Current Client Command Cards
 
-The client command-card descriptors are local JS data in `client/src/hud_command_card.js` and
-`client/src/config.js`. The representative descriptor catalog currently covers empty selection,
-Worker main/build cards, mixed ability units, City Centre training, Factory training, Gun Works
-training, and R&D research. Until Phase 2 adds a generated or mechanically checked catalog mirror,
-`node tests/hud_command_card.mjs` is the focused current-faction descriptor guard.
+The command-card renderer is local JS in `client/src/hud_command_card.js`; faction-sensitive
+build, train, research, and ability descriptors are driven by the checked catalog mirror in
+`client/src/config.js`. Kriegsia and Ekat command ids are namespaced by faction, unknown valid ids
+fail closed to an empty catalog, and fixture catalogs remain test-only. `node tests/hud_command_card.mjs`
+is the focused command-card guard, and `node scripts/check-faction-catalog-parity.mjs` compares
+client-exposed descriptor data against the Rust catalog dump.
 
 ## Current AI Coupling
 
@@ -158,7 +172,7 @@ paths. Later phases must update this section whenever they touch one of those li
 | Spectator/no-fog view | Live match start payload or replay schema | Match factions from start/replay metadata | Not applicable | Disabled | Preserve recorded faction metadata | `tests/server_integration.mjs` |
 | Post-match replay | Captured schema-2 match artifact | Recorded playable ids `kriegsia` or `ekat`; missing, unknown, and fixture ids reject | From artifact only | Disabled for replay viewers | Load from captured schema with Steel/Oil/Supply resource payloads | `tests/server_integration.mjs` |
 
-## Phase 0 Checks
+## Current Guardrail Checks
 
 - `scripts/check-faction-assumptions.mjs` validates this inventory's anchors and ratchets the
   current files that may contain direct current-faction kind or ability special cases.
@@ -167,8 +181,7 @@ paths. Later phases must update this section whenever they touch one of those li
 - `tests/protocol_parity.mjs` locks protocol kind, ability, upgrade, compact snapshot, and resource
   code parity.
 - `tests/hud_command_card.mjs` locks representative current command-card descriptors.
-- `node scripts/check-faction-catalog-parity.mjs` compares the client-exposed default catalog with
-  the Rust dump and verifies that all Rust catalogs are dumpable while fixture/future catalogs stay
-  explicitly unsupported on the client surface. This checked mirror remains the Phase 10 client
-  catalog path: every real-faction descriptor exposed in `client/src/config.js` must be compared
-  against the Rust dump by this gate.
+- `node scripts/check-faction-catalog-parity.mjs` compares every client-exposed catalog with the
+  Rust dump and verifies that all Rust catalogs are dumpable while fixture/future catalogs stay
+  deliberately bounded on the client surface. Every real-faction descriptor exposed in
+  `client/src/config.js` must be compared against the Rust dump by this gate.
