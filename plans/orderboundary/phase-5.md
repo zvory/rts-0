@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -28,12 +28,12 @@ Apply the planned-action boundary to queued promotion while preserving tick orde
 
 ## Implementation Checklist
 
-- [ ] Inventory promotion paths and mark which can share command-time execution helpers.
-- [ ] Move shared mutation into the executor without changing readiness checks.
-- [ ] Add regressions for stale stages, batching order, unaffordable build notice, and ability
+- [x] Inventory promotion paths and mark which can share command-time execution helpers.
+- [x] Move shared mutation into the executor without changing readiness checks.
+- [x] Add regressions for stale stages, batching order, unaffordable build notice, and ability
   rejection.
-- [ ] Confirm tick ordering in `systems.rs` is unchanged.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Confirm tick ordering in `systems.rs` is unchanged.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

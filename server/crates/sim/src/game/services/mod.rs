@@ -18,6 +18,7 @@ pub mod line_of_sight;
 pub mod move_coordinator;
 pub mod movement;
 pub mod occupancy;
+pub mod order_execution;
 pub mod order_planner;
 pub mod order_queue;
 pub mod pathing;
