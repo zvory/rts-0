@@ -1,0 +1,10 @@
+<svg viewBox="-24 -24 48 48" data-rts-rig-kind="worker" data-rts-rig-version="1" data-rts-origin="center" id="worker.authored">
+  <ellipse id="part.shadow" cx="0" cy="3" rx="11" ry="7" fill="#000000" opacity="0.32" />
+  <polygon id="part.body" points="13,0 -8,-9 -11,0 -8,9" fill="#6d89b8" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.facingTick" x1="5" y1="0" x2="15" y2="0" stroke="#e8efe3" stroke-width="2" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.hp" cx="0" cy="-18" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-13" y="-13" width="26" height="26" fill="none" />
+  <rect id="bounds.hp" x="-10" y="-23" width="20" height="4" fill="none" />
+</svg>

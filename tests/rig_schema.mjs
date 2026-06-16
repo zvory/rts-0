@@ -40,12 +40,14 @@ const validRig = {
           { x: -8, y: 8 },
         ],
       },
+      paint: { fill: "#6d89b8", stroke: null, strokeWidth: null, opacity: 1 },
     },
     {
       id: "part.shadow",
       drawOrder: 0,
       tintSlot: "fixed",
       geometry: { type: "ellipse", cx: 0, cy: 2, rx: 11, ry: 7 },
+      paint: { fill: "#000000", stroke: null, strokeWidth: null, opacity: 0.32 },
     },
   ],
   animations: [
@@ -69,6 +71,7 @@ test("valid rigs normalize to stable plain data", () => {
   assert.deepEqual(result.definition.parts.map((part) => part.id), ["part.shadow", "part.body"]);
   assert.deepEqual(result.definition.parts[1].transform, { x: 1, y: 2, rotation: 0.25, scaleX: 1, scaleY: 1 });
   assert.deepEqual(result.definition.parts[1].pivot, { x: 0, y: 0 });
+  assert.deepEqual(result.definition.parts[1].paint, { fill: "#6d89b8", stroke: null, strokeWidth: null, opacity: 1 });
 });
 
 test("public enum lists document the phase-2 contract", () => {
@@ -113,6 +116,16 @@ test("invalid tint slots fail closed", () => {
   rig.parts[0].tintSlot = "player-color";
   const result = validateRigDefinition(rig);
   assertError(result, "rig.invalidTintSlot", "parts.0.tintSlot");
+});
+
+test("invalid paint values fail closed", () => {
+  const rig = clone(validRig);
+  rig.parts[0].paint = { fill: "red", stroke: "#12345", strokeWidth: 0, opacity: 2 };
+  const result = validateRigDefinition(rig);
+  assertError(result, "rig.invalidPaintColor", "parts.0.paint.fill");
+  assertError(result, "rig.invalidPaintColor", "parts.0.paint.stroke");
+  assertError(result, "rig.nonPositiveNumber", "parts.0.paint.strokeWidth");
+  assertError(result, "rig.outOfRangeNumber", "parts.0.paint.opacity");
 });
 
 test("invalid animation references fail closed", () => {

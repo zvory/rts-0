@@ -44,7 +44,8 @@ const ANIMATION_PROPERTY_SET = new Set(ANIMATION_PROPERTIES);
 /**
  * @typedef {{x: number, y: number}} RigPoint
  * @typedef {{x: number, y: number, rotation: number, scaleX: number, scaleY: number}} RigTransform
- * @typedef {{id: string, drawOrder: number, geometry: object, transform: RigTransform, pivot: RigPoint, tintSlot: string}} RigPart
+ * @typedef {{fill: string | null, stroke: string | null, strokeWidth: number | null, opacity: number}} RigPaint
+ * @typedef {{id: string, drawOrder: number, geometry: object, transform: RigTransform, pivot: RigPoint, tintSlot: string, paint: RigPaint}} RigPart
  * @typedef {{id: string, kind: string, schemaVersion: number, parts: RigPart[], anchors: Record<string, RigPoint>, bounds: object, animations: object[], requiredRuntimeInputs: string[]}} RigDefinition
  */
 
@@ -132,18 +133,53 @@ function normalizeParts(parts, errors) {
     const geometry = normalizeGeometry(part.geometry, `${path}.geometry`, errors);
     const transform = normalizeTransform(part.transform, `${path}.transform`, errors);
     const pivot = normalizePoint(part.pivot ?? { x: 0, y: 0 }, `${path}.pivot`, errors);
+    const paint = normalizePaint(part.paint, `${path}.paint`, errors);
     const tintSlot = part.tintSlot ?? "fixed";
     if (!TINT_SLOT_SET.has(tintSlot)) {
       errors.push(error("rig.invalidTintSlot", `${path}.tintSlot`, `Unsupported tint slot ${JSON.stringify(tintSlot)}.`));
     }
 
-    if (id && Number.isFinite(drawOrder) && geometry && transform && pivot && TINT_SLOT_SET.has(tintSlot)) {
-      normalized.push({ id, drawOrder, geometry, transform, pivot, tintSlot });
+    if (id && Number.isFinite(drawOrder) && geometry && transform && pivot && paint && TINT_SLOT_SET.has(tintSlot)) {
+      normalized.push({ id, drawOrder, geometry, transform, pivot, tintSlot, paint });
     }
   });
 
   normalized.sort((a, b) => a.drawOrder - b.drawOrder || a.id.localeCompare(b.id));
   return { value: normalized, ids };
+}
+
+function normalizePaint(paint, path, errors) {
+  const source = paint ?? {};
+  if (!isPlainObject(source)) {
+    errors.push(error("rig.invalidPaint", path, "Paint must be a plain object."));
+    return null;
+  }
+  const fill = normalizePaintColor(source.fill ?? null, `${path}.fill`, errors);
+  const stroke = normalizePaintColor(source.stroke ?? null, `${path}.stroke`, errors);
+  const strokeWidth = source.strokeWidth == null ? null : readPositiveNumber(source.strokeWidth, `${path}.strokeWidth`, errors);
+  const opacity = readUnitNumber(source.opacity ?? 1, `${path}.opacity`, errors);
+  if ((fill === null || typeof fill === "string") && (stroke === null || typeof stroke === "string") && (strokeWidth === null || Number.isFinite(strokeWidth)) && Number.isFinite(opacity)) {
+    return { fill, stroke, strokeWidth, opacity };
+  }
+  return null;
+}
+
+function normalizePaintColor(value, path, errors) {
+  if (value === null) return null;
+  if (typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)) {
+    return value.toLowerCase();
+  }
+  errors.push(error("rig.invalidPaintColor", path, `${path} must be null or a six-digit hex color.`));
+  return undefined;
+}
+
+function readUnitNumber(value, path, errors) {
+  const number = readFiniteNumber(value, path, errors);
+  if (Number.isFinite(number) && (number < 0 || number > 1)) {
+    errors.push(error("rig.outOfRangeNumber", path, `${path} must be between zero and one.`));
+    return NaN;
+  }
+  return number;
 }
 
 function normalizeGeometry(geometry, path, errors) {

@@ -2,7 +2,9 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+Status: Done.
+
+- [x] Done.
 
 ## Objective
 
@@ -36,12 +38,12 @@ Turn SVG-authored unit files into validated normalized rig definitions.
 
 ## Implementation Checklist
 
-- [ ] Add pure SVG-to-rig importer.
-- [ ] Add supported/unsupported SVG feature tests.
-- [ ] Add representative SVG fixtures.
-- [ ] Add metadata and anchor extraction tests.
-- [ ] Keep importer output independent from Pixi.
-- [ ] Run verification and record exact results.
+- [x] Add pure SVG-to-rig importer.
+- [x] Add supported/unsupported SVG feature tests.
+- [x] Add representative SVG fixtures.
+- [x] Add metadata and anchor extraction tests.
+- [x] Keep importer output independent from Pixi.
+- [x] Run verification and record exact results.
 
 ## Verification
 
@@ -51,10 +53,21 @@ Turn SVG-authored unit files into validated normalized rig definitions.
 - `node --check` for new JS files.
 - `git diff --check`.
 
+Results:
+
+- `node tests/svg_rig_importer.mjs` - passed.
+- `node tests/rig_schema.mjs` - passed.
+- `node scripts/check-client-architecture.mjs` - passed.
+- `node --check client/src/renderer/rigs/svg_importer.js && node --check client/src/renderer/rigs/schema.js && node --check tests/svg_rig_importer.mjs && node --check tests/rig_schema.mjs` -
+  passed.
+- `git diff --check` - passed.
+
 ## Manual Test Focus
 
 If unit-lab preview is touched, open `/dev/unit-lab` and confirm existing generation browsing still
 works and SVG fixture previews do not require a server restart beyond the normal dev loop.
+
+Unit-lab preview was not touched in this phase, so no manual lab test is required.
 
 ## Handoff Expectations
 

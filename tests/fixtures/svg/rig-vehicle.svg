@@ -1,0 +1,15 @@
+<svg viewBox="-36 -28 72 56" data-rts-rig-kind="tank" data-rts-rig-version="1" data-rts-origin="center" id="tank.authored">
+  <ellipse id="part.shadow" cx="0" cy="4" rx="23" ry="15" fill="#000000" opacity="0.34" />
+  <rect id="part.track.left" x="-18" y="-15" width="34" height="7" fill="#272b2f" />
+  <rect id="part.track.right" x="-18" y="8" width="34" height="7" fill="#272b2f" />
+  <polygon id="part.hull" points="20,0 9,-13 -17,-12 -22,0 -17,12 9,13" fill="#5d7896" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <ellipse id="part.turret" cx="1" cy="0" rx="9" ry="7" fill="#6f8eaa" data-rts-tint="team-light" data-rts-animation="weaponFacing:transform.rotation:1:0" />
+  <line id="part.barrel" x1="7" y1="0" x2="29" y2="0" stroke="#343a42" stroke-width="4" data-rts-animation="weaponFacing:transform.rotation:1:0" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.hp" cx="0" cy="-24" r="1" fill="#ffffff" />
+  <circle id="anchor.muzzle" cx="30" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.turret" cx="1" cy="0" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-24" y="-18" width="48" height="36" fill="none" />
+  <rect id="bounds.hp" x="-16" y="-29" width="32" height="5" fill="none" />
+</svg>

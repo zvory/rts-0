@@ -1,0 +1,12 @@
+<svg viewBox="-28 -24 56 48" data-rts-rig-kind="rifleman" data-rts-rig-version="1" data-rts-origin="center" id="rifleman.authored">
+  <ellipse id="part.shadow" cx="0" cy="3" rx="10" ry="7" fill="#000000" opacity="0.30" />
+  <polygon id="part.body" points="11,0 -7,-8 -10,0 -7,8" fill="#7188b4" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.head" cx="-4" cy="0" r="4" fill="#d8c4a0" />
+  <line id="part.rifle" x1="-2" y1="-4" x2="21" y2="-7" stroke="#333840" stroke-width="2" data-rts-animation="weaponFacing:transform.rotation:1:0" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.hp" cx="0" cy="-18" r="1" fill="#ffffff" />
+  <circle id="anchor.muzzle" cx="21" cy="-7" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-13" y="-13" width="26" height="26" fill="none" />
+  <rect id="bounds.hp" x="-10" y="-23" width="20" height="4" fill="none" />
+</svg>
