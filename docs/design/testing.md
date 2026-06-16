@@ -136,12 +136,15 @@ changed-file mapping selects the skipped behavior.
 
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow. The job runs the portable
 repo-root command `./tests/run-all.sh` on pull requests targeting `main` and on pushes to `main`.
+For PRs whose changed files are all Markdown (`*.md`), the job keeps the same check context green
+but exits after changed-file detection instead of installing toolchains or running the long suite.
 Later branch-protection work should require this single full-gate check unless a plan phase
 explicitly changes the contract.
 
 `Rust / test` and `Integration / integration` are stable auxiliary checks. They keep package,
 architecture, and live-server feedback visible earlier, but they do not replace the full gate
-because each intentionally skips part of the canonical suite.
+because each intentionally skips part of the canonical suite. They use the same Markdown-only
+short-circuit so docs-only PRs show green auxiliary checks instead of spending CI on unchanged code.
 
 GitHub Actions uses standard `ubuntu-latest` runners for this contract. Public-repository standard
 runners are acceptable for the current cost posture, while larger paid runner classes are out of
