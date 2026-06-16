@@ -29,6 +29,13 @@ feature is playable.
     spacing
   - hotkey/profile behavior if the new build slot affects hotkey tests
   - renderer stability for live and remembered Tank Traps
+- Add local dev scenario launches for constructible Tank Trap blocker layouts:
+  - horizontal, vertical, and diagonal Tank Trap lines built through normal production/build
+    commands after the required Training Centre setup
+  - each layout should include at least one vehicle-body unit and one infantry unit attempting to
+    cross the trap line
+  - each scenario should make it easy to verify that vehicles cannot pass through the closed Tank
+    Trap line while infantry can path through and stand on trap tiles
 - Update design docs and capsules as needed:
   - `docs/design/balance.md`
   - `docs/design/protocol.md`
@@ -42,6 +49,8 @@ feature is playable.
 ## Expected Deliverables
 
 - The feature's highest-risk behavior is covered by targeted tests.
+- Dev scenarios cover producible horizontal, vertical, and diagonal Tank Trap configurations where
+  vehicles are blocked and infantry can pass.
 - Docs describe Tank Trap stats, protocol kind, vehicle-only blockers, line placement, and
   elimination exclusion.
 - Any rough art/sound/AI/repair/cancel follow-ups are explicitly recorded rather than hidden.
@@ -67,7 +76,9 @@ feature is playable.
 Run one local match flow: build Training Centre, construct single and line Tank Traps, watch
 engineers distribute work, verify infantry can cross, verify vehicles need a wide enough gap, verify
 shallow or steep dragged lines do not leave knight-move diagonal gaps, destroy some traps, and
-confirm a player with only Tank Traps is eliminated.
+confirm a player with only Tank Traps is eliminated. Also open the horizontal, vertical, and
+diagonal constructible Tank Trap dev scenarios and confirm every vehicle test unit is blocked while
+the infantry test unit crosses the same layout.
 
 ## Handoff Expectations
 

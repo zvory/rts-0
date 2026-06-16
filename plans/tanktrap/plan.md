@@ -85,11 +85,13 @@ additional Shift sites using the existing server worker distribution. The outcom
 player workflow without changing the wire command shape unless Phase 0 proves the standard `build`
 command cannot support it safely.
 
-Phase 6 consolidates tests, docs, manual scenarios, and cleanup. It adds focused regression coverage
-for vehicle-only blocking, infantry pass-through, two-tile vehicle gaps, under-construction
-blocking, line command distribution, elimination exclusion, and zero-sight behavior, then updates
-design docs and context capsules. The outcome is a documented, shippable Tank Trap rollout with
-known follow-ups limited to art, sound, AI usage, and future repair/cancel mechanics.
+Phase 6 consolidates tests, docs, dev/manual scenarios, and cleanup. It adds focused regression
+coverage for vehicle-only blocking, infantry pass-through, two-tile vehicle gaps,
+under-construction blocking, line command distribution, elimination exclusion, and zero-sight
+behavior, then creates dev scenarios for constructible horizontal, vertical, and diagonal Tank Trap
+layouts that prove vehicles cannot pass through while infantry can. The outcome is a documented,
+shippable Tank Trap rollout with known follow-ups limited to art, sound, AI usage, and future
+repair/cancel mechanics.
 
 ## Phase Index
 
