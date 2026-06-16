@@ -2,13 +2,13 @@
 // input all read from. See docs/design/client-ui.md §4.1.
 //
 // It holds the two most recent server snapshots (for interpolation), the
-// latest resources/events, the local selection set, and the local build
-// placement preview. Selection, command-card menus, and placement are client-only concepts; the
-// server never sees them directly (only the resulting commands).
+// latest resources/events, the local selection set, and a compatibility shim
+// to browser-local intent state. Selection and intent are client-only concepts;
+// the server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
-import { CommandComposer } from "./command_composer.js";
 import { admitSelectionIds } from "./command_budget.js";
+import { ClientIntent } from "./client_intent.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import {
   DEFAULT_FACTION_ID,
@@ -110,29 +110,8 @@ export class GameState {
     this.showAllDebugPathOverlays = false;
     /** @type {Array<Array<number>>} ten local control groups, slot 9 is key 0. */
     this.controlGroups = Array.from({ length: 10 }, () => []);
-
-    // --- build placement preview (client-only) ---
-    /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean}} */
-    this.placement = null;
-
-    // --- command card submenu (client-only) ---
-    /** @type {null | "workerBuild"} */
-    this.commandCardMode = null;
-
-    // --- command targeting / feedback (client-only) ---
-    /** @type {null | "move" | "attack" | "setupAntiTankGuns"} */
-    this.commandTarget = null;
-    this.commandComposer = new CommandComposer();
-    /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
-    this.lastCommandTargetArm = null;
-    /** @type {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>} */
-    this.commandFeedback = [];
-    /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
-    this.resourceMiningPreview = null;
-    /** @type {null | {mouseX:number, mouseY:number, guns:Array<object>}} */
-    this.antiTankGunSetupPreview = null;
-    /** @type {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
-    this.abilityTargetPreview = null;
+    /** @type {ClientIntent} browser-local command/placement/preview intent. */
+    this.clientIntent = new ClientIntent();
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
     this.smokes = [];
     /** @type {Array<{id:number,owner:number,ability:string,kind:string,x:number,y:number,expiresIn?:number,sourceCasterId?:number,ownerState?:object}>} */
@@ -179,6 +158,78 @@ export class GameState {
   /** World pixels per tile. */
   get tileSize() {
     return this.map.tileSize;
+  }
+
+  get placement() {
+    return this.clientIntent.placement;
+  }
+
+  set placement(value) {
+    this.clientIntent.placement = value;
+  }
+
+  get commandCardMode() {
+    return this.clientIntent.commandCardMode;
+  }
+
+  set commandCardMode(value) {
+    this.clientIntent.commandCardMode = value;
+  }
+
+  get commandTarget() {
+    return this.clientIntent.commandTarget;
+  }
+
+  set commandTarget(value) {
+    this.clientIntent.commandTarget = value;
+  }
+
+  get commandComposer() {
+    return this.clientIntent.commandComposer;
+  }
+
+  set commandComposer(value) {
+    this.clientIntent.commandComposer = value;
+  }
+
+  get lastCommandTargetArm() {
+    return this.clientIntent.lastCommandTargetArm;
+  }
+
+  set lastCommandTargetArm(value) {
+    this.clientIntent.lastCommandTargetArm = value;
+  }
+
+  get commandFeedback() {
+    return this.clientIntent.commandFeedback;
+  }
+
+  set commandFeedback(value) {
+    this.clientIntent.commandFeedback = value;
+  }
+
+  get resourceMiningPreview() {
+    return this.clientIntent.resourceMiningPreview;
+  }
+
+  set resourceMiningPreview(value) {
+    this.clientIntent.resourceMiningPreview = value;
+  }
+
+  get antiTankGunSetupPreview() {
+    return this.clientIntent.antiTankGunSetupPreview;
+  }
+
+  set antiTankGunSetupPreview(value) {
+    this.clientIntent.antiTankGunSetupPreview = value;
+  }
+
+  get abilityTargetPreview() {
+    return this.clientIntent.abilityTargetPreview;
+  }
+
+  set abilityTargetPreview(value) {
+    this.clientIntent.abilityTargetPreview = value;
   }
 
   playerById(id) {
@@ -1033,11 +1084,7 @@ export class GameState {
 
   /** Open the worker build command-card submenu. */
   openWorkerBuildMenu() {
-    this.placement = null;
-    this.commandTarget = null;
-    this.lastCommandTargetArm = null;
-    this.antiTankGunSetupPreview = null;
-    this.commandCardMode = "workerBuild";
+    this.clientIntent.openWorkerBuildMenu();
   }
 
   /**
@@ -1045,9 +1092,7 @@ export class GameState {
    * @returns {boolean} true if a submenu was open.
    */
   closeCommandCardMenu() {
-    const hadMenu = this.commandCardMode != null;
-    this.commandCardMode = null;
-    return hadMenu;
+    return this.clientIntent.closeCommandCardMenu();
   }
 
   /**
@@ -1056,10 +1101,7 @@ export class GameState {
    * @param {string} buildingKind a building EntityKind.
    */
   beginPlacement(buildingKind) {
-    this.commandTarget = null;
-    this.lastCommandTargetArm = null;
-    this.closeCommandCardMenu();
-    this.placement = { building: buildingKind, tileX: 0, tileY: 0, valid: false };
+    this.clientIntent.beginPlacement(buildingKind);
   }
 
   /**
@@ -1070,15 +1112,12 @@ export class GameState {
    * @param {boolean} valid
    */
   updatePlacement(tileX, tileY, valid) {
-    if (!this.placement) return;
-    this.placement.tileX = tileX;
-    this.placement.tileY = tileY;
-    this.placement.valid = !!valid;
+    this.clientIntent.updatePlacement(tileX, tileY, valid);
   }
 
   /** Stop previewing placement. */
   endPlacement() {
-    this.placement = null;
+    this.clientIntent.endPlacement();
   }
 
   // --- command targeting / feedback (client-only) ------------------------
@@ -1088,25 +1127,17 @@ export class GameState {
    * @param {"move"|"attack"|"setupAntiTankGuns"|{kind:"ability",ability:string}} kind
    */
   beginCommandTarget(kind, options = {}) {
-    this.placement = null;
-    this.closeCommandCardMenu();
-    const armed = this.commandComposer.arm(kind, options);
-    this.lastCommandTargetArm = armed;
-    this._syncCommandTargetFromComposer();
-    return armed;
+    return this.clientIntent.beginCommandTarget(kind, options);
   }
 
   /** Clear any armed command target mode. */
   endCommandTarget() {
-    this.commandComposer.cancel();
-    this.lastCommandTargetArm = null;
-    this._syncCommandTargetFromComposer();
+    this.clientIntent.endCommandTarget();
   }
 
   /** Mark a physical key as holding the current command target alive. */
   holdCommandTarget(kind, key, shiftKey = false) {
-    this.commandComposer.hold(kind, key, { shiftKey });
-    this._syncCommandTargetFromComposer();
+    this.clientIntent.holdCommandTarget(kind, key, shiftKey);
   }
 
   /**
@@ -1115,27 +1146,17 @@ export class GameState {
    * @returns {{target:null|string|object,queued:boolean,keepArmed:boolean}}
    */
   issueCommandTarget(ev = {}) {
-    const issued = this.commandComposer.issue(ev);
-    this._syncCommandTargetFromComposer();
-    return issued;
+    return this.clientIntent.issueCommandTarget(ev);
   }
 
   /** Release a physical command key. */
   releaseCommandTargetKey(key, shiftKey = false) {
-    this.commandComposer.releaseKey(key, { shiftKey });
-    this._syncCommandTargetFromComposer();
+    this.clientIntent.releaseCommandTargetKey(key, shiftKey);
   }
 
   /** Release Shift preservation for a tapped command. */
   releaseCommandTargetShift() {
-    this.commandComposer.releaseShift();
-    this._syncCommandTargetFromComposer();
-  }
-
-  _syncCommandTargetFromComposer() {
-    this.commandTarget = this.commandComposer.target;
-    this.antiTankGunSetupPreview = null;
-    this.abilityTargetPreview = null;
+    this.clientIntent.releaseCommandTargetShift();
   }
 
   /**
@@ -1146,23 +1167,14 @@ export class GameState {
    * @param {boolean=} append
    */
   addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
+    const now = performance.now();
     if (kind === "mortar" && Number.isFinite(x) && Number.isFinite(y)) {
-      this.pendingMortarTargets.push({ x, y, createdAt: performance.now() });
+      this.pendingMortarTargets.push({ x, y, createdAt: now });
       this.pendingMortarTargets = this.pendingMortarTargets.filter(
-        (p) => performance.now() - p.createdAt <= 700,
+        (p) => now - p.createdAt <= 700,
       );
     }
-    this.commandFeedback.push({
-      kind,
-      x,
-      y,
-      append: !!append,
-      radiusTiles,
-      createdAt: performance.now(),
-    });
-    if (this.commandFeedback.length > 12) {
-      this.commandFeedback.splice(0, this.commandFeedback.length - 12);
-    }
+    this.clientIntent.addCommandFeedback(kind, x, y, append, radiusTiles, now);
   }
 
   /**
@@ -1171,9 +1183,7 @@ export class GameState {
    * @returns {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>}
    */
   liveCommandFeedback(now) {
-    const ttlMs = 650;
-    this.commandFeedback = this.commandFeedback.filter((f) => now - f.createdAt <= ttlMs);
-    return this.commandFeedback;
+    return this.clientIntent.liveCommandFeedback(now);
   }
 
   /**
@@ -1181,7 +1191,7 @@ export class GameState {
    * @param {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} preview
    */
   updateResourceMiningPreview(preview) {
-    this.resourceMiningPreview = preview;
+    this.clientIntent.updateResourceMiningPreview(preview);
   }
 
   /**
@@ -1189,7 +1199,7 @@ export class GameState {
    * @param {null | {mouseX:number, mouseY:number, guns:Array<object>}} preview
    */
   updateAntiTankGunSetupPreview(preview) {
-    this.antiTankGunSetupPreview = preview;
+    this.clientIntent.updateAntiTankGunSetupPreview(preview);
   }
 
   /**
@@ -1197,7 +1207,7 @@ export class GameState {
    * @param {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} preview
    */
   updateAbilityTargetPreview(preview) {
-    this.abilityTargetPreview = preview;
+    this.clientIntent.updateAbilityTargetPreview(preview);
   }
 
   // --- map helpers --------------------------------------------------------

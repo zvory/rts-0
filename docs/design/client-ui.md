@@ -13,6 +13,7 @@ src/
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   state.js        # GameState: holds prev+current snapshot, selection, camera, placement
+  client_intent.js # ClientIntent: browser-local placement, command targeting, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
@@ -286,6 +287,7 @@ export class GameState {
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
   selectControlGroup(slot), controlGroupEntities(slot)
   // build placement (client-only):
+  clientIntent                           // ClientIntent owner for temporary local intent state
   commandCardMode                       // null | "workerBuild"
   openWorkerBuildMenu(), closeCommandCardMenu()
   placement                              // null | { building, valid, tileX, tileY }
@@ -307,6 +309,24 @@ export class GameState {
 }
 ```
 
+`client_intent.js`
+```js
+export class ClientIntent {
+  placement                              // null | { building, valid, tileX, tileY }
+  commandCardMode                        // null | "workerBuild"
+  openWorkerBuildMenu(), closeCommandCardMenu()
+  beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
+  commandTarget                          // null | "move" | "attack" | "setupAntiTankGuns" | ability target object
+  beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
+  holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
+  releaseCommandTargetShift()
+  commandFeedback, liveCommandFeedback(now)
+  resourceMiningPreview, updateResourceMiningPreview(preview)
+  antiTankGunSetupPreview, updateAntiTankGunSetupPreview(preview)
+  abilityTargetPreview, updateAbilityTargetPreview(preview)
+}
+```
+
 #### Client Boundary Migration Target
 
 `Match` remains the app-shell composer and owner of cross-area dependency injection. Runtime modules
@@ -317,13 +337,12 @@ collaborators and narrow facades that express one boundary at a time.
 
 `GameState` is the authoritative browser view of server snapshots, interpolation, selected ids,
 control groups, relationship helpers, fog-facing visibility data, and display overlays derived from
-authoritative snapshots. It should stop accumulating unrelated transient controller/UI state:
-placement intent, command-card submenu state, command-target arming, hover previews, renderer
-feedback, ability previews, and prediction display mutations should migrate into explicit helper
-objects or view models. During the staged migration, temporary `GameState` compatibility fields are
-allowed only to keep existing HUD, input, minimap, renderer, and prediction callers stable for the
-next phase; each compatibility field must preserve the current shape above until its owning phase
-removes all direct reads.
+authoritative snapshots. `ClientIntent` now owns placement intent, command-card submenu state,
+command-target arming, hover previews, renderer feedback, and ability previews while `GameState`
+keeps temporary compatibility accessors with the current shapes above for HUD, input, minimap, and
+renderer callers. Prediction display mutations should migrate into explicit helper objects or view
+models in their owning phase; each compatibility field must preserve the current shape above until
+its owning phase removes all direct reads.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,

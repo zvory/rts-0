@@ -87,6 +87,7 @@ import {
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
+import { ClientIntent } from "../client/src/client_intent.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
@@ -1296,12 +1297,52 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 // ---------------------------------------------------------------------------
 
 {
+  const intent = new ClientIntent({ now: () => 100 });
+  intent.openWorkerBuildMenu();
+  assert(intent.commandCardMode === "workerBuild", "ClientIntent owns command-card submenu state");
+  intent.beginPlacement(KIND.DEPOT);
+  assertDeepEqual(intent.placement, {
+    building: KIND.DEPOT,
+    tileX: 0,
+    tileY: 0,
+    valid: false,
+  }, "ClientIntent seeds placement previews");
+  intent.updatePlacement(3, 4, true);
+  assertDeepEqual(intent.placement, {
+    building: KIND.DEPOT,
+    tileX: 3,
+    tileY: 4,
+    valid: true,
+  }, "ClientIntent updates placement previews");
+  intent.beginCommandTarget("attack", { now: 100, shiftKey: true });
+  assert(intent.placement === null, "ClientIntent clears placement when targeting begins");
+  assert(intent.commandTarget === "attack", "ClientIntent mirrors armed command targets");
+  intent.updateAntiTankGunSetupPreview({ mouseX: 1, mouseY: 2, guns: [] });
+  intent.updateAbilityTargetPreview({ ability: ABILITY.SMOKE, carriers: [], hoverInRange: true });
+  intent.beginCommandTarget("move", { now: 200 });
+  assert(intent.antiTankGunSetupPreview === null, "ClientIntent clears support previews on target changes");
+  assert(intent.abilityTargetPreview === null, "ClientIntent clears ability previews on target changes");
+  intent.addCommandFeedback("move", 10, 20, true, null, 100);
+  assert(intent.liveCommandFeedback(700).length === 1, "ClientIntent keeps fresh command feedback");
+  assert(intent.liveCommandFeedback(751).length === 0, "ClientIntent expires command feedback by TTL");
+  intent.updateResourceMiningPreview({
+    resourceId: 200,
+    resourceX: 64,
+    resourceY: 96,
+    ccId: 3,
+    ccX: 48,
+    ccY: 48,
+    inRange: true,
+  });
+  assert(intent.resourceMiningPreview?.resourceId === 200, "ClientIntent owns resource hover previews");
+
   const state = new GameState({
     playerId: 1,
     spectator: false,
     map: { width: 12, height: 12, tileSize: 32, terrain: new Array(144).fill(0), resources: [] },
     players: [{ id: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 }],
   });
+  assert(state.clientIntent instanceof ClientIntent, "GameState composes ClientIntent for transient intent state");
 
   state.openWorkerBuildMenu();
   assert(state.commandCardMode === "workerBuild", "worker build menu is tracked on GameState during the shim phase");
