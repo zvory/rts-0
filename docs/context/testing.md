@@ -44,6 +44,9 @@ Use when writing or debugging tests, or before claiming a change is done.
   Branch protection should require the aggregate `./tests/run-all.sh` check unless rulesets are
   deliberately migrated to require every split coverage job directly. The split jobs also
   short-circuit as green checks for Markdown-only PRs.
+- The old standalone `Rust` and `Integration` workflows were retired because the split
+  `Main test gate` jobs own that Rust, architecture, live Node, and browser coverage under the
+  required aggregate check.
 - Workflow concurrency cancels superseded runs for the same PR branch, and cancels stale
   post-merge `main` push runs when a newer `main` push starts. Unrelated branches should not
   cancel each other.

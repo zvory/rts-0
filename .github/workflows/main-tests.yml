@@ -213,6 +213,8 @@ jobs:
 
       - name: Run browser and tri-state suites
         if: needs.changed-files.outputs.docs_only != 'true'
+        env:
+          CHROME: /usr/bin/google-chrome-stable
         run: |
           chmod +x .ci-server/rts-server
           RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-browser
