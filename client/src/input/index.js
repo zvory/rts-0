@@ -48,7 +48,11 @@ import { _handleBlur, _handleKeyDown, _handleKeyUp, _handleWheel } from "./camer
 import { CameraNavigationInput } from "./camera_navigation.js";
 import {
   _confirmPlacement,
+  _beginTankTrapPlacementDrag,
+  _cancelPlacementDrag,
+  _confirmTankTrapLinePlacement,
   _footprintValid,
+  _finishTankTrapPlacementDrag,
   _refreshPlacement,
   footprintValidAgainstEntities,
 } from "./placement.js";
@@ -150,6 +154,7 @@ export class Input {
     // Active left-drag selection box, in screen pixels, or null when not dragging.
     // { x0, y0, x1, y1 } where (x0,y0) is the press anchor.
     this._drag = null;
+    this._placementDrag = null;
     // Whether the current left press has moved far enough to count as a box drag.
     this._dragging = false;
     // Last completed single click: { x, y, t } in screen pixels + timestamp ms.
@@ -702,6 +707,7 @@ export class Input {
         this._dragging = false;
         this.renderer.drawSelectionBox(null);
       }
+      this._placementDrag = null;
     }
     if (this.onPointerLockChange) this.onPointerLockChange(locked);
   }
@@ -797,6 +803,7 @@ export class Input {
       return;
     }
     if (ev.button !== 0) return;
+    if (this._finishTankTrapPlacementDrag(ev)) return;
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
     if (this._routeLockedPointerUp(ev, p)) {
@@ -849,6 +856,7 @@ export class Input {
   _onLeftDown(p, ev) {
     // Build placement: a valid left-click confirms the build with a selected worker.
     if (this._placement()) {
+      if (this._beginTankTrapPlacementDrag()) return;
       this._confirmPlacement(ev);
       return;
     }
@@ -1017,6 +1025,10 @@ Object.assign(Input.prototype, {
   _refreshPlacement,
   _footprintValid,
   _confirmPlacement,
+  _confirmTankTrapLinePlacement,
+  _beginTankTrapPlacementDrag,
+  _finishTankTrapPlacementDrag,
+  _cancelPlacementDrag,
   _controlGroupSlotFromKey,
   _handleControlGroupHotkey,
   _jumpToControlGroupCluster,

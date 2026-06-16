@@ -133,6 +133,7 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::ResearchComplex,
     EntityKind::Factory,
     EntityKind::Steelworks,
+    EntityKind::TankTrap,
 ];
 
 const DEFAULT_UPGRADES: &[UpgradeCatalogEntry] = &[
@@ -602,7 +603,7 @@ mod tests {
         assert!(catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::ResearchComplex));
         assert!(!catalog.allows_research(TANK_UNLOCK_UPGRADE, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
-        assert!(!catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
+        assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(catalog.allows_ability(SMOKE_ABILITY, EntityKind::ScoutCar));
         assert!(catalog.allows_ability(POINT_FIRE_ABILITY, EntityKind::Artillery));

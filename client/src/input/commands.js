@@ -17,6 +17,7 @@ export function _onRightClick(p, ev = {}) {
   const intent = clientIntent(this);
   // During placement, right-click cancels.
   if (intent?.placement) {
+    this._cancelPlacementDrag?.();
     intent.endPlacement?.();
     return;
   }
@@ -422,6 +423,7 @@ export function _cancel() {
     return;
   }
   if (intent?.placement) {
+    this._cancelPlacementDrag?.();
     intent.endPlacement?.();
     return;
   }

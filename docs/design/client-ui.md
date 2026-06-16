@@ -329,10 +329,10 @@ export class GameState {
 `client_intent.js`
 ```js
 export class ClientIntent {
-  placement                              // null | { building, valid, tileX, tileY }
+  placement                              // null | { building, valid, tileX, tileY, lineSites? }
   commandCardMode                        // null | "workerBuild"
   openWorkerBuildMenu(), closeCommandCardMenu()
-  beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
+  beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid,options?), endPlacement()
   commandTarget                          // null | "move" | "attack" | "setupAntiTankGuns" | ability target object
   beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
   holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
@@ -465,6 +465,9 @@ optimistic production/rally, control groups, build/gather/train/research/cancel,
 execution remain strict local-owner checks.
 Shift-confirmed build placement keeps placement mode armed while Shift is physically held, allowing
 multiple queued building placements; releasing Shift or losing window focus clears placement mode.
+Tank Trap placement uses the same local placement intent, with optional `lineSites` preview data:
+the first valid sites dispatch as one immediate single-worker build per selected worker, and any
+remaining valid sites dispatch as queued standard build commands against the selected worker set.
 
 `command_composer.js` owns command-target arming lifetime for command-card targets. HUD, input, and
 minimap receive `ClientIntent` from `Match`; input and minimap clicks call

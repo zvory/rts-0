@@ -1,6 +1,6 @@
 # Phase 5 - Line Placement UX and Build Exposure
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 

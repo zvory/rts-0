@@ -3,7 +3,7 @@
 //! `rules::defs` owns kind-specific data; this module answers allowed/cost/supply questions.
 
 use crate::defs;
-use crate::faction::{catalog_for, DEFAULT_FACTION_ID};
+use crate::faction::catalog_for;
 use crate::EntityKind;
 
 /// The faction plan intentionally keeps resource costs shaped as fixed Steel/Oil fields.
@@ -91,12 +91,6 @@ pub fn can_build_for_faction(
     builder_kind: EntityKind,
     building_kind: EntityKind,
 ) -> bool {
-    if faction_id == DEFAULT_FACTION_ID
-        && builder_kind == EntityKind::Worker
-        && building_kind == EntityKind::TankTrap
-    {
-        return true;
-    }
     catalog_for(faction_id).is_some_and(|catalog| catalog.can_build(builder_kind, building_kind))
 }
 
@@ -342,7 +336,7 @@ mod tests {
         );
         assert!(
             can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::TankTrap),
-            "server-side Tank Trap command eligibility is enabled before client build-card exposure"
+            "default workers can build Tank Traps after client build-card exposure"
         );
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
