@@ -112,6 +112,7 @@ export class Renderer {
     this.layers.smokes.addChild(this._smokeGfx);
     this._abilityObjectGfx = new PIXI.Graphics();
     this.layers.smokes.addChild(this._abilityObjectGfx);
+    this._lineProjectileTrails = new Map();
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
 
@@ -419,6 +420,7 @@ export class Renderer {
     this._unseen.clear();
     this._setupVisuals.clear();
     this._tankMotion.clear();
+    this._lineProjectileTrails.clear();
 
     // Long-lived single Graphics.
     this._fogGfx.destroy();
