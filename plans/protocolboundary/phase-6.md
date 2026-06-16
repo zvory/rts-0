@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -29,10 +29,10 @@ Finalize documentation and lightweight checks for the protocol/config mirror bou
 
 ## Implementation Checklist
 
-- [ ] Document the final authority map.
-- [ ] Document required commands for protocol and balance changes.
-- [ ] Tighten any parity guardrails justified by earlier phases.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Document the final authority map.
+- [x] Document required commands for protocol and balance changes.
+- [x] Tighten any parity guardrails justified by earlier phases.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
