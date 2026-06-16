@@ -9,10 +9,11 @@ fails. The private server runs with `RTS_TEST_TICK_MS=5` by default, so live-ser
 simulated progress instead of real-time 30 Hz wall clock; normal `cargo run` remains 30 Hz.
 If a server is already answering on the port it is reused and left running.
 
-This command is the required local gate for ordinary commits. Run `./scripts/install-hooks.sh` once
-per checkout to install the tracked hooks locally. Merge commits intentionally bypass the local hook
-gate. GitHub Actions also runs this command after pushes to `main` as a shared signal, but `main` is
-intentionally left open for direct pushes.
+This command is the portable full gate and the required GitHub Actions PR signal. Run focused local
+verification for the files or contracts you changed, then rely on the PR check named
+`Main test gate / ./tests/run-all.sh` before merge. Run `./scripts/install-hooks.sh` once per
+checkout to install the tracked hooks locally; those hooks run cheap staged-diff checks instead of
+the full suite. Normal `main` updates go through owned PRs with auto-merge armed.
 
 ```bash
 tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + API suites + client smoke
@@ -40,9 +41,11 @@ artifacts branch-local while keeping the checkout clean. Override with
 `CARGO_TARGET_DIR=/path/to/target` when you need a specific target location.
 
 Installed repo hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main`.
-Auto cleanup removes only clean `zvorygin/*` worktrees whose branch is already contained in local
-`main`, their matching target dirs, and a small bounded number of old target dirs that do not map to
-any active worktree. Use `scripts/cleanup-worktrees.sh --dry-run` to inspect what would be removed.
+Auto cleanup removes only clean `zvorygin/*` worktrees whose branch head is reachable from local
+`main` or `origin/main`, their matching target dirs, and a small bounded number of old target dirs
+that do not map to any active worktree. It tolerates GitHub auto-deleting merged remote branches and
+keeps dirty worktrees or unmerged heads. Use `scripts/cleanup-worktrees.sh --dry-run` to inspect
+what would be removed.
 
 We tested `sccache` as the cross-worktree Rust reuse layer and do not enable it automatically.
 It cached Rust outputs when rebuilding the same target directory path, but produced 0% Rust cache

@@ -110,6 +110,9 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 - To audit outstanding agent PRs, run `scripts/pr-sweep.sh`. It lists open `agent-owned` and
   `zvorygin/*` PRs with owner, age, head SHA, auto-merge state, checks, and flags for stale,
   failed, conflicted, missing-owner, or needs-human states.
+- For recovery from failed CI, stale branches, missing auto-merge, closed PRs, GitHub API outages,
+  emergency direct pushes, cleanup, canaries, or alternate runners, see
+  `docs/pr-first-workflow.md`.
 - Do not merge, push to `main`, or bypass branch protection unless the user explicitly authorizes
   emergency or migration repair work.
 

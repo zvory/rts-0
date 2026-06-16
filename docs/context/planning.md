@@ -25,5 +25,7 @@ name is short, lowercase, and descriptive.
   isolated worktrees, push owned PRs, and arm auto-merge. Use `--pr --wait` for serial phase ranges
   that must wait for each PR to merge before starting the next phase. Planning and final review
   remain manual.
+- Recovery, cleanup, canary, and alternate-runner procedures for PR-first phase work live in
+  [docs/pr-first-workflow.md](../pr-first-workflow.md).
 
 See [plans/README.md](../../plans/README.md) for the full convention.
