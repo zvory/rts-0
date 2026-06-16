@@ -134,17 +134,20 @@ changed-file mapping selects the skipped behavior.
 
 ## 11. PR CI contract
 
-The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow. The job runs the portable
-repo-root command `./tests/run-all.sh` on pull requests targeting `main` and on pushes to `main`.
-For PRs whose changed files are all Markdown (`*.md`), the job keeps the same check context green
-but exits after changed-file detection instead of installing toolchains or running the long suite.
-Later branch-protection work should require this single full-gate check unless a plan phase
+The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
+It is an aggregate check over split coverage jobs for server binary build, Rust/architecture, live
+Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
+The split jobs run `tests/run-all.sh` sub-modes so the required aggregate gate preserves the same
+coverage as the portable repo-root command without serializing every suite in one runner. For PRs
+whose changed files are all Markdown (`*.md`), the split jobs keep the same check contexts green
+but exit after changed-file detection instead of installing toolchains or running the long suites.
+Branch protection should require this single aggregate full-gate check unless a plan phase
 explicitly changes the contract.
 
-`Rust / test` and `Integration / integration` are stable auxiliary checks. They keep package,
-architecture, and live-server feedback visible earlier, but they do not replace the full gate
-because each intentionally skips part of the canonical suite. They use the same Markdown-only
-short-circuit so docs-only PRs show green auxiliary checks instead of spending CI on unchanged code.
+The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
+live Node, and browser coverage is owned by the split `Main test gate` jobs under the required
+aggregate `./tests/run-all.sh` check, so separate auxiliary workflows would duplicate coverage and
+consume extra runner capacity without increasing merge safety.
 
 GitHub Actions uses standard `ubuntu-latest` runners for this contract. Public-repository standard
 runners are acceptable for the current cost posture, while larger paid runner classes are out of
