@@ -38,6 +38,21 @@ const COMMAND_CAR_SUPPLY_CAP_BONUS: u32 = 12;
 const MAX_UNITS_PER_COMMAND: usize = 256;
 const MAX_RALLY_STAGES: usize = 4;
 
+struct CommandExecutionContext<'a, 'pathing> {
+    map: &'a Map,
+    entities: &'a mut EntityStore,
+    spatial: &'a SpatialIndex,
+    coordinator: &'a mut MoveCoordinator<'pathing>,
+    fog: &'a Fog,
+    smokes: &'a mut SmokeCloudStore,
+    ability_runtime: &'a mut AbilityRuntime,
+    mortar_shells: &'a mut MortarShellStore,
+    artillery_shells: &'a mut ArtilleryShellStore,
+    events: &'a mut HashMap<u32, Vec<Event>>,
+    teams: TeamRelations,
+    tick: u32,
+}
+
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_commands(
@@ -56,6 +71,31 @@ pub(crate) fn apply_commands(
     tick: u32,
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
+    macro_rules! command_context {
+        () => {
+            CommandExecutionContext {
+                map,
+                entities,
+                spatial,
+                coordinator,
+                fog,
+                smokes,
+                ability_runtime,
+                mortar_shells,
+                artillery_shells,
+                events,
+                teams: teams.clone(),
+                tick,
+            }
+        };
+    }
+    macro_rules! apply_planned {
+        ($player:expr, $facts:expr, $request:expr) => {{
+            let facts = $facts;
+            let mut ctx = command_context!();
+            apply_planned_unit_order(&mut ctx, players, $player, &facts, $request);
+        }};
+    }
     for (player, cmd) in pending {
         let faction_id = faction_id_for(
             players.iter().map(|p| (p.id, p.faction_id.as_str())),
@@ -86,23 +126,10 @@ pub(crate) fn apply_commands(
                         to: planner::Point::new(x, y),
                     },
                 };
-                apply_planned_unit_order(
-                    map,
-                    entities,
-                    players,
-                    spatial,
-                    coordinator,
-                    &teams,
-                    fog,
-                    smokes,
-                    ability_runtime,
-                    mortar_shells,
-                    artillery_shells,
-                    events,
+                apply_planned!(
                     player,
-                    &planner_facts(entities, player, &faction_id, &units, false, None),
-                    &request,
-                    tick,
+                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    &request
                 );
             }
             SimCommand::AttackMove {
@@ -123,23 +150,10 @@ pub(crate) fn apply_commands(
                         to: planner::Point::new(x, y),
                     },
                 };
-                apply_planned_unit_order(
-                    map,
-                    entities,
-                    players,
-                    spatial,
-                    coordinator,
-                    &teams,
-                    fog,
-                    smokes,
-                    ability_runtime,
-                    mortar_shells,
-                    artillery_shells,
-                    events,
+                apply_planned!(
                     player,
-                    &planner_facts(entities, player, &faction_id, &units, false, None),
-                    &request,
-                    tick,
+                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    &request
                 );
             }
             SimCommand::Attack {
@@ -162,23 +176,10 @@ pub(crate) fn apply_commands(
                         target_valid,
                     },
                 };
-                apply_planned_unit_order(
-                    map,
-                    entities,
-                    players,
-                    spatial,
-                    coordinator,
-                    &teams,
-                    fog,
-                    smokes,
-                    ability_runtime,
-                    mortar_shells,
-                    artillery_shells,
-                    events,
+                apply_planned!(
                     player,
-                    &planner_facts(entities, player, &faction_id, &units, false, None),
-                    &request,
-                    tick,
+                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    &request
                 );
             }
             SimCommand::SetupAntiTankGuns {
@@ -200,24 +201,7 @@ pub(crate) fn apply_commands(
                     },
                 };
                 let facts = planner_facts(entities, player, &faction_id, &units, false, None);
-                apply_planned_unit_order(
-                    map,
-                    entities,
-                    players,
-                    spatial,
-                    coordinator,
-                    &teams,
-                    fog,
-                    smokes,
-                    ability_runtime,
-                    mortar_shells,
-                    artillery_shells,
-                    events,
-                    player,
-                    &facts,
-                    &request,
-                    tick,
-                );
+                apply_planned!(player, facts, &request);
             }
             SimCommand::TearDownAntiTankGuns { units } => {
                 let Some(units) =
@@ -262,18 +246,10 @@ pub(crate) fn apply_commands(
                 else {
                     continue;
                 };
+                let mut ctx = command_context!();
                 use_ability(
-                    map,
-                    entities,
+                    &mut ctx,
                     players,
-                    spatial,
-                    coordinator,
-                    fog,
-                    smokes,
-                    ability_runtime,
-                    mortar_shells,
-                    artillery_shells,
-                    events,
                     player,
                     AbilityUse {
                         ability,
@@ -282,7 +258,6 @@ pub(crate) fn apply_commands(
                         y,
                         queued,
                     },
-                    tick,
                 );
             }
             SimCommand::RecastAbility {
@@ -361,23 +336,10 @@ pub(crate) fn apply_commands(
                     mode: issue_mode(queued),
                     order: planner::RequestedOrder::Gather { node, node_valid },
                 };
-                apply_planned_unit_order(
-                    map,
-                    entities,
-                    players,
-                    spatial,
-                    coordinator,
-                    &teams,
-                    fog,
-                    smokes,
-                    ability_runtime,
-                    mortar_shells,
-                    artillery_shells,
-                    events,
+                apply_planned!(
                     player,
-                    &planner_facts(entities, player, &faction_id, &units, false, None),
-                    &request,
-                    tick,
+                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    &request
                 );
             }
             SimCommand::Build {
@@ -404,23 +366,10 @@ pub(crate) fn apply_commands(
                         placement_valid: true,
                     },
                 };
-                apply_planned_unit_order(
-                    map,
-                    entities,
-                    players,
-                    spatial,
-                    coordinator,
-                    &teams,
-                    fog,
-                    smokes,
-                    ability_runtime,
-                    mortar_shells,
-                    artillery_shells,
-                    events,
+                apply_planned!(
                     player,
-                    &planner_facts(entities, player, &faction_id, &units, false, None),
-                    &request,
-                    tick,
+                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    &request
                 );
             }
             SimCommand::Train { building, unit } => {
@@ -736,25 +685,30 @@ fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_planned_unit_order(
-    map: &Map,
-    entities: &mut EntityStore,
+    ctx: &mut CommandExecutionContext<'_, '_>,
     players: &mut [PlayerState],
-    spatial: &SpatialIndex,
-    coordinator: &mut MoveCoordinator<'_>,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &mut SmokeCloudStore,
-    ability_runtime: &mut AbilityRuntime,
-    mortar_shells: &mut MortarShellStore,
-    artillery_shells: &mut ArtilleryShellStore,
-    events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     facts: &[planner::UnitFacts],
     request: &planner::OrderRequest,
-    tick: u32,
 ) {
+    let faction_id = faction_id_for(
+        players.iter().map(|p| (p.id, p.faction_id.as_str())),
+        player,
+    );
+    let map = ctx.map;
+    let entities = &mut *ctx.entities;
+    let spatial = ctx.spatial;
+    let coordinator = &mut *ctx.coordinator;
+    let teams = &ctx.teams;
+    let fog = ctx.fog;
+    let smokes = &mut *ctx.smokes;
+    let ability_runtime = &mut *ctx.ability_runtime;
+    let mortar_shells = &mut *ctx.mortar_shells;
+    let artillery_shells = &mut *ctx.artillery_shells;
+    let events = &mut *ctx.events;
+    let tick = ctx.tick;
+
     let output = planner::plan_order(planner_config(), facts, request);
     let mut move_units = Vec::new();
     let mut attack_move_units = Vec::new();
@@ -853,10 +807,6 @@ fn apply_planned_unit_order(
                         e.clear_queued_orders();
                     }
                     clear_staged_anti_tank_gun_setup(entities, &[unit]);
-                    let faction_id = faction_id_for(
-                        players.iter().map(|p| (p.id, p.faction_id.as_str())),
-                        player,
-                    );
                     order_or_launch_world_ability(
                         map,
                         entities,
@@ -880,10 +830,6 @@ fn apply_planned_unit_order(
                 }
                 planner::OrderIntent::SelfAbility { ability } => {
                     if let Some(ability) = ability_from_planner(ability) {
-                        let faction_id = faction_id_for(
-                            players.iter().map(|p| (p.id, p.faction_id.as_str())),
-                            player,
-                        );
                         launch_self_ability(entities, &faction_id, player, unit, ability);
                     }
                 }
@@ -937,10 +883,6 @@ fn apply_planned_unit_order(
                 };
                 match target {
                     planner::AbilityTarget::SelfTarget => {
-                        let faction_id = faction_id_for(
-                            players.iter().map(|p| (p.id, p.faction_id.as_str())),
-                            player,
-                        );
                         launch_self_ability(entities, &faction_id, player, unit, ability);
                     }
                     planner::AbilityTarget::WorldPoint(point) => {
@@ -972,10 +914,7 @@ fn apply_planned_unit_order(
                             mortar_shells,
                             events,
                             player,
-                            &faction_id_for(
-                                players.iter().map(|p| (p.id, p.faction_id.as_str())),
-                                player,
-                            ),
+                            &faction_id,
                             unit,
                             ability,
                             point.x,
@@ -1138,23 +1077,24 @@ struct AbilityUse {
     queued: bool,
 }
 
-#[allow(clippy::too_many_arguments)]
 fn use_ability(
-    map: &Map,
-    entities: &mut EntityStore,
+    ctx: &mut CommandExecutionContext<'_, '_>,
     players: &mut [PlayerState],
-    spatial: &SpatialIndex,
-    coordinator: &mut MoveCoordinator<'_>,
-    fog: &Fog,
-    smokes: &mut SmokeCloudStore,
-    ability_runtime: &mut AbilityRuntime,
-    mortar_shells: &mut MortarShellStore,
-    artillery_shells: &mut ArtilleryShellStore,
-    events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     request: AbilityUse,
-    tick: u32,
 ) {
+    let faction_id = faction_id_for(
+        players.iter().map(|p| (p.id, p.faction_id.as_str())),
+        player,
+    );
+    let map = ctx.map;
+    let entities = &mut *ctx.entities;
+    let fog = ctx.fog;
+    let artillery_shells = &mut *ctx.artillery_shells;
+    let events = &mut *ctx.events;
+    let teams = &ctx.teams;
+    let tick = ctx.tick;
+
     let ability = request.ability;
     let definition = ability::definition(ability);
     if request.queued && !definition.may_queue {
@@ -1170,11 +1110,6 @@ fn use_ability(
         let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
             return;
         };
-        let faction_id = faction_id_for(
-            players.iter().map(|p| (p.id, p.faction_id.as_str())),
-            player,
-        );
-        let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         for unit in dedupe_cap_units(request.units) {
             if !ability_orders::caster_allowed_by_faction(entities, &faction_id, unit, ability) {
                 continue;
@@ -1253,10 +1188,7 @@ fn use_ability(
     let facts = planner_facts(
         entities,
         player,
-        &faction_id_for(
-            players.iter().map(|p| (p.id, p.faction_id.as_str())),
-            player,
-        ),
+        &faction_id,
         &units,
         false,
         Some(AbilityFactInput {
@@ -1275,25 +1207,7 @@ fn use_ability(
             target,
         },
     };
-    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-    apply_planned_unit_order(
-        map,
-        entities,
-        players,
-        spatial,
-        coordinator,
-        &teams,
-        fog,
-        smokes,
-        ability_runtime,
-        mortar_shells,
-        artillery_shells,
-        events,
-        player,
-        &facts,
-        &order,
-        tick,
-    );
+    apply_planned_unit_order(ctx, players, player, &facts, &order);
 }
 
 #[allow(clippy::too_many_arguments)]
