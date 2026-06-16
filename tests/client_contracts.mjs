@@ -3322,6 +3322,12 @@ function fakeAudioContext() {
     "Point Fire ability exposes Artillery carrier, max range, minimum range, and 5-second delay",
   );
   assert(
+    ABILITIES[ABILITY.EKAT_TELEPORT].queued === true &&
+      ABILITIES[ABILITY.EKAT_LINE_SHOT].queued === true &&
+      ABILITIES[ABILITY.EKAT_MAGIC_ANCHOR].queued === true,
+    "Ekat abilities expose queued command support",
+  );
+  assert(
     STATS[KIND.STEELWORKS].footW === 3 && STATS[KIND.STEELWORKS].footH === 3,
     "Gun Works should be a 3x3 building",
   );

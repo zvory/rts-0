@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::scoring::entity_score_value;
 use super::*;
 use crate::game::command::SimCommand as Command;
-use crate::game::entity::{Entity, EntityKind, GatherPhase, Order, WeaponSetup};
+use crate::game::entity::{Entity, EntityKind, GatherPhase, Order, OrderIntent, WeaponSetup};
 use crate::protocol::{kinds, terrain, AbilityCooldownView, EntityView, Event, OrderPlanMarker};
 use crate::rules::{combat, terrain::TerrainKind};
 
@@ -588,6 +588,101 @@ fn ekat_dash_moves_up_to_five_tiles_leaves_return_marker_and_starts_cooldown() {
         marker.expires_in(game.current_tick()),
         Some(config::EKAT_RETURN_MARKER_DURATION_TICKS as u16)
     );
+}
+
+#[test]
+fn ekat_dash_far_target_clamps_to_max_range_without_staging_move() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let far_target = (pos.0 + config::TILE_SIZE as f32 * 20.0, pos.1);
+    let expected_x = pos.0 + config::TILE_SIZE as f32 * config::EKAT_TELEPORT_RANGE_TILES as f32;
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, far_target);
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    assert!((hero_entity.pos_x - expected_x).abs() < 0.001);
+    assert!((hero_entity.pos_y - pos.1).abs() < 0.001);
+    assert!(
+        matches!(hero_entity.order(), Order::Idle),
+        "out-of-range Dash should resolve immediately instead of staging a movement order"
+    );
+    assert!(active_return_marker_id(&game, hero).is_some());
+}
+
+#[test]
+fn queued_ekat_abilities_append_future_world_ability_intents() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+    {
+        let hero_entity = game.entities.get_mut(hero).expect("hero exists");
+        hero_entity.set_order(Order::move_to(pos.0 + config::TILE_SIZE as f32, pos.1));
+        hero_entity.mark_move_phase(crate::game::entity::MovePhase::Moving);
+    }
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::EkatTeleport,
+            units: vec![hero],
+            x: Some(pos.0 + config::TILE_SIZE as f32 * 2.0),
+            y: Some(pos.1),
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::EkatLineShot,
+            units: vec![hero],
+            x: Some(pos.0 + config::TILE_SIZE as f32 * 3.0),
+            y: Some(pos.1),
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::EkatMagicAnchor,
+            units: vec![hero],
+            x: Some(pos.0),
+            y: Some(pos.1 + config::TILE_SIZE as f32 * 2.0),
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let queued = game
+        .entities
+        .get(hero)
+        .expect("hero exists")
+        .queued_orders();
+    assert_eq!(queued.len(), 3);
+    assert!(matches!(
+        queued[0],
+        OrderIntent::WorldAbility(intent)
+            if intent.ability == ability::AbilityKind::EkatTeleport
+    ));
+    assert!(matches!(
+        queued[1],
+        OrderIntent::WorldAbility(intent)
+            if intent.ability == ability::AbilityKind::EkatLineShot
+    ));
+    assert!(matches!(
+        queued[2],
+        OrderIntent::WorldAbility(intent)
+            if intent.ability == ability::AbilityKind::EkatMagicAnchor
+    ));
 }
 
 #[test]

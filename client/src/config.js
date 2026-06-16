@@ -265,7 +265,7 @@ export const ABILITIES = Object.freeze({
     rangeTiles: EKAT_TELEPORT_RANGE_TILES,
     cooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
-    queued: false,
+    queued: true,
   }),
   [ABILITY.EKAT_LINE_SHOT]: Object.freeze({
     ability: ABILITY.EKAT_LINE_SHOT,
@@ -281,7 +281,7 @@ export const ABILITIES = Object.freeze({
     radiusTiles: EKAT_LINE_SHOT_WIDTH_TILES * 0.5,
     speedPxPerTick: EKAT_LINE_SHOT_SPEED_PX_PER_TICK,
     damage: EKAT_LINE_SHOT_DAMAGE,
-    queued: false,
+    queued: true,
   }),
   [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze({
     ability: ABILITY.EKAT_MAGIC_ANCHOR,
@@ -298,7 +298,7 @@ export const ABILITIES = Object.freeze({
     durationTicks: EKAT_MAGIC_ANCHOR_DURATION_TICKS,
     lockoutTicks: EKAT_MAGIC_ANCHOR_LOCKOUT_TICKS,
     hp: EKAT_MAGIC_ANCHOR_HP,
-    queued: false,
+    queued: true,
   }),
 });
 
