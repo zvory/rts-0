@@ -1,6 +1,6 @@
 # Phase 2 - Movement-Class Static Blockers
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 

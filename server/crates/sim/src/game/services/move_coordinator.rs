@@ -870,7 +870,7 @@ fn is_free_goal(
     if !map.is_passable(tile.0 as i32, tile.1 as i32) {
         return false;
     }
-    if !occ.passable(tile.0 as i32, tile.1 as i32) {
+    if !occ.passable_for_kind(tile.0 as i32, tile.1 as i32, unit.kind) {
         return false;
     }
     if assigned.iter().any(|assignment| assignment.tile == tile) {
@@ -993,7 +993,7 @@ fn build_staging_goals(
                 if !map.is_passable(tx, ty) {
                     continue;
                 }
-                if !occ.passable(tx, ty) {
+                if !occ.passable_for_kind(tx, ty, worker.kind) {
                     continue;
                 }
                 let center = map.tile_center(tile.0, tile.1);

@@ -21,8 +21,8 @@ mod tests;
 pub use entity::Entity;
 pub use kind::EntityKind;
 pub(crate) use kind::{
-    fires_while_moving, uses_car_movement_semantics, uses_oriented_vehicle_body,
-    uses_pivot_vehicle_movement,
+    fires_while_moving, movement_body_class, static_blocker_class, uses_car_movement_semantics,
+    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, MovementBodyClass, StaticBlockerClass,
 };
 #[allow(unused_imports)]
 pub use order::{
