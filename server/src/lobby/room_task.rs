@@ -4,6 +4,7 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
+use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
 use super::*;
@@ -16,7 +17,7 @@ use crate::protocol::{ReplayPlaybackState, PREDICTION_PROTOCOL_VERSION};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
-use rts_ai::{AiController, AiThinkContext, DEFAULT_LIVE_PROFILE_ID};
+use rts_ai::{AiController, DEFAULT_LIVE_PROFILE_ID};
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
 
@@ -34,9 +35,9 @@ pub(super) struct RoomPlayer {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct PendingClientCommandAck {
-    connection_id: u32,
-    client_seq: u32,
+pub(super) struct PendingClientCommandAck {
+    pub(super) connection_id: u32,
+    pub(super) client_seq: u32,
 }
 
 /// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
@@ -2199,23 +2200,6 @@ impl RoomTask {
         );
     }
 
-    fn broadcast_live_observer_analysis_to_spectators(&self, game: &Game) {
-        let spectator_ids: Vec<u32> = self
-            .order
-            .iter()
-            .copied()
-            .filter(|id| self.players.get(id).is_some_and(|player| player.spectator))
-            .collect();
-        if spectator_ids.is_empty() {
-            return;
-        }
-
-        self.send_observer_analysis_to_ids(
-            spectator_ids,
-            ServerMessage::ObserverAnalysis(game.observer_analysis()),
-        );
-    }
-
     fn send_observer_analysis_to_ids(
         &self,
         recipient_ids: impl IntoIterator<Item = u32>,
@@ -2317,7 +2301,7 @@ impl RoomTask {
         }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
-        let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+        let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => {
                 // Stay in lobby; nothing to simulate.
                 self.phase = Phase::Lobby;
@@ -2333,135 +2317,43 @@ impl RoomTask {
                 return;
             }
         };
-        let scheduler_lag = scheduled.elapsed();
-        let tick_start = StdInstant::now();
-        let mut perf = crate::perf::TickPerf::maybe_new();
-
-        // Advance the simulation; collect this tick's per-player transient events.
-        // Wrap in `catch_unwind` so a panic on the tick path (including debug-build invariant
-        // failures) writes a replay artifact and resets the room instead of killing the task.
-        let game_tick_start = StdInstant::now();
-        let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.enqueue_live_ai_commands(&mut game, perf.as_mut());
-            game.tick_with_perf(perf.as_mut())
-        }));
-        if let Some(perf) = perf.as_mut() {
-            perf.record_phase("game_tick", game_tick_start.elapsed());
-        }
-        let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
-            Ok(events) => events.into_iter().collect(),
-            Err(payload) => {
-                let reason = panic_reason(&payload);
-                dump_crash_replay(&self.room, &game, &reason);
-                self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
-                self.end_match(None, game.scores(), None);
-                return;
-            }
-        };
-        self.record_consumed_client_sequences(game.tick_count());
-        let full_vision_events = crate::perf::timed(perf.as_mut(), "event_union", || {
-            union_events(per_player_events.values())
-        });
-
-        // Fan out fog-filtered snapshots to active players and union-fog snapshots to lobby-time
-        // spectators, merging in the events each recipient is allowed to observe.
         let tick_budget = self.current_tick_interval();
-        let recipients: Vec<u32> = self.order.clone();
+        let match_run_id = self.match_run_id.as_deref();
+        let ai_player_count = self.ai_players.len();
         let spectator_visible_players = self.spectator_visible_player_ids();
-        let active_snapshot_recipients = recipients
-            .into_iter()
-            .filter(|id| !self.outcome_sent.contains(id));
-        SnapshotFanout::new(
-            &self.room,
-            scheduler_lag,
+        let result = LiveTickDriver {
+            room: &self.room,
+            scheduled,
             tick_budget,
-            tick_start,
-            &mut self.slow_tick_count,
-            perf.as_mut(),
-        )
-        .send_to_recipients(
-            &mut self.players,
-            active_snapshot_recipients,
-            |id, player| {
-                let mapped_seat = self.branch_live_seat_by_connection.get(&id).copied();
-                let mut snapshot = if player.spectator {
-                    game.snapshot_for_spectator(&spectator_visible_players)
-                } else {
-                    game.snapshot_for(mapped_seat.unwrap_or(id))
-                };
-                if player.spectator {
-                    snapshot.events.extend(full_vision_events.clone());
-                } else if let Some(mut events) =
-                    per_player_events.remove(&mapped_seat.unwrap_or(id))
-                {
-                    snapshot.events.append(&mut events);
-                }
-                Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
-            },
-        );
-        self.broadcast_live_observer_analysis_to_spectators(&game);
-
-        // Check for game over. A 1-player match never ends (sandbox/exploration mode).
-        let outcome_start = StdInstant::now();
-        let alive = game.alive_players();
-        let alive_teams = game.alive_team_ids();
-        if self.match_player_count >= 2 && alive_teams.len() <= 1 {
-            if let Some(perf) = perf.as_mut() {
-                perf.record_phase("outcome_checks", outcome_start.elapsed());
-            }
-            self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
-            let winner_id = alive_teams
-                .first()
-                .and_then(|team_id| game.first_alive_player_on_team(*team_id));
-            self.end_match(winner_id, game.scores(), Some(&game));
-            // end_match drops the live game and moves to replay or lobby; do not restore it.
-            return;
+            match_run_id,
+            match_player_count: self.match_player_count,
+            ai_player_count,
+            players: &mut self.players,
+            order: &self.order,
+            outcome_sent: &mut self.outcome_sent,
+            branch_live_seat_by_connection: &self.branch_live_seat_by_connection,
+            ai_controllers: &mut self.ai_controllers,
+            pending_client_command_acks: &mut self.pending_client_command_acks,
+            slow_tick_count: &mut self.slow_tick_count,
+            spectator_visible_players,
         }
-        if self.match_player_count >= 2 {
-            self.send_new_defeats(&game, &alive);
-        }
-        if let Some(perf) = perf.as_mut() {
-            perf.record_phase("outcome_checks", outcome_start.elapsed());
-        }
+        .run(game);
 
-        self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
-        self.phase = Phase::InGame(game);
-    }
-
-    fn enqueue_live_ai_commands(
-        &mut self,
-        game: &mut Game,
-        perf: Option<&mut crate::perf::TickPerf>,
-    ) {
-        crate::perf::timed(perf, "ai_think", || {
-            if self.ai_controllers.is_empty() {
-                return;
+        match result {
+            LiveTickResult::Continue(game) => {
+                self.phase = Phase::InGame(game);
             }
-            let start = game.start_payload();
-            let alive_player_ids = game.alive_players();
-            let mut commands = Vec::new();
-            for controller in &mut self.ai_controllers {
-                let player_id = controller.player_id();
-                if !alive_player_ids.contains(&player_id) {
-                    continue;
-                }
-                let snapshot = game.snapshot_for(player_id);
-                commands.extend(
-                    controller
-                        .think(AiThinkContext {
-                            start: &start,
-                            snapshot: &snapshot,
-                            alive_player_ids: &alive_player_ids,
-                            retreat_commands: game.worker_retreat_commands_for(player_id),
-                        })
-                        .into_iter()
-                        .map(|command| (player_id, command)),
-                );
+            LiveTickResult::EndMatch {
+                game,
+                winner_id,
+                scores,
+            } => {
+                self.end_match(winner_id, scores, Some(&game));
             }
-            for (player_id, command) in commands {
-                game.enqueue(player_id, command);
+            LiveTickResult::PanicEnd { scores } => {
+                self.end_match(None, scores, None);
             }
-        });
+        }
     }
 
     fn on_tick_dev_selfplay(&mut self, scheduled: TokioInstant) {
@@ -3201,19 +3093,6 @@ impl RoomTask {
             player.last_received_client_seq = 0;
             player.last_sim_consumed_client_seq = 0;
             player.last_sim_consumed_client_tick = None;
-        }
-    }
-
-    fn record_consumed_client_sequences(&mut self, tick: u32) {
-        let pending = std::mem::take(&mut self.pending_client_command_acks);
-        for ack in pending {
-            let Some(player) = self.players.get_mut(&ack.connection_id) else {
-                continue;
-            };
-            if ack.client_seq == player.last_sim_consumed_client_seq.saturating_add(1) {
-                player.last_sim_consumed_client_seq = ack.client_seq;
-                player.last_sim_consumed_client_tick = Some(tick);
-            }
         }
     }
 }

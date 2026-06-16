@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -26,10 +26,10 @@ Extract live match tick orchestration while keeping `Game` AI-free and transport
 
 ## Implementation Checklist
 
-- [ ] Extract live tick sequencing into a room-local driver.
-- [ ] Keep AI command generation outside `Game`.
-- [ ] Preserve panic replay capture and outcome timing.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Extract live tick sequencing into a room-local driver.
+- [x] Keep AI command generation outside `Game`.
+- [x] Preserve panic replay capture and outcome timing.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

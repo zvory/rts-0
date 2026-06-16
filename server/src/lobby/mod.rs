@@ -42,6 +42,7 @@ mod connection;
 mod crash_replay;
 mod dev_replay;
 mod faction_validation;
+mod live_tick;
 mod replay_session;
 mod replay_validation;
 mod room_task;

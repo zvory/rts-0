@@ -1,0 +1,311 @@
+use super::connection::send_or_log;
+use super::crash_replay::{dump_crash_replay, panic_reason};
+use super::room_task::{PendingClientCommandAck, RoomPlayer};
+use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
+use super::snapshots::union_events;
+use crate::game::Game;
+use crate::protocol::{Event, PlayerScore, ServerMessage};
+use rts_ai::{AiController, AiThinkContext};
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant as StdInstant};
+use tokio::time::Instant as TokioInstant;
+
+pub(super) enum LiveTickResult {
+    Continue(Box<Game>),
+    EndMatch {
+        game: Box<Game>,
+        winner_id: Option<u32>,
+        scores: Vec<PlayerScore>,
+    },
+    PanicEnd {
+        scores: Vec<PlayerScore>,
+    },
+}
+
+pub(super) struct LiveTickDriver<'a> {
+    pub(super) room: &'a str,
+    pub(super) scheduled: TokioInstant,
+    pub(super) tick_budget: Duration,
+    pub(super) match_run_id: Option<&'a str>,
+    pub(super) match_player_count: usize,
+    pub(super) ai_player_count: usize,
+    pub(super) players: &'a mut HashMap<u32, RoomPlayer>,
+    pub(super) order: &'a [u32],
+    pub(super) outcome_sent: &'a mut HashSet<u32>,
+    pub(super) branch_live_seat_by_connection: &'a HashMap<u32, u32>,
+    pub(super) ai_controllers: &'a mut [AiController],
+    pub(super) pending_client_command_acks: &'a mut Vec<PendingClientCommandAck>,
+    pub(super) slow_tick_count: &'a mut u32,
+    pub(super) spectator_visible_players: Vec<u32>,
+}
+
+impl LiveTickDriver<'_> {
+    pub(super) fn run(mut self, mut game: Box<Game>) -> LiveTickResult {
+        let scheduler_lag = self.scheduled.elapsed();
+        let tick_start = StdInstant::now();
+        let mut perf = crate::perf::TickPerf::maybe_new();
+
+        let tick_result = self.tick_game(&mut game, perf.as_mut());
+        let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
+            Ok(events) => events.into_iter().collect(),
+            Err(payload) => {
+                let reason = panic_reason(&payload);
+                dump_crash_replay(self.room, &game, &reason);
+                self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
+                return LiveTickResult::PanicEnd {
+                    scores: game.scores(),
+                };
+            }
+        };
+
+        self.record_consumed_client_sequences(game.tick_count());
+        self.fan_out_snapshots(
+            &game,
+            &mut per_player_events,
+            scheduler_lag,
+            tick_start,
+            perf.as_mut(),
+        );
+        self.broadcast_observer_analysis_to_spectators(&game);
+
+        let outcome_start = StdInstant::now();
+        let alive = game.alive_players();
+        let alive_teams = game.alive_team_ids();
+        if self.match_player_count >= 2 && alive_teams.len() <= 1 {
+            if let Some(perf) = perf.as_mut() {
+                perf.record_phase("outcome_checks", outcome_start.elapsed());
+            }
+            self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
+            let winner_id = alive_teams
+                .first()
+                .and_then(|team_id| game.first_alive_player_on_team(*team_id));
+            return LiveTickResult::EndMatch {
+                scores: game.scores(),
+                game,
+                winner_id,
+            };
+        }
+
+        if self.match_player_count >= 2 {
+            self.send_new_defeats(&game, &alive);
+        }
+        if let Some(perf) = perf.as_mut() {
+            perf.record_phase("outcome_checks", outcome_start.elapsed());
+        }
+
+        self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
+        LiveTickResult::Continue(game)
+    }
+
+    fn tick_game(
+        &mut self,
+        game: &mut Game,
+        perf: Option<&mut crate::perf::TickPerf>,
+    ) -> std::thread::Result<Vec<(u32, Vec<Event>)>> {
+        let mut perf = perf;
+        let game_tick_start = StdInstant::now();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.enqueue_ai_commands(game, perf.as_deref_mut());
+            game.tick_with_perf(perf.as_deref_mut())
+        }));
+        if let Some(perf) = perf {
+            perf.record_phase("game_tick", game_tick_start.elapsed());
+        }
+        result
+    }
+
+    fn enqueue_ai_commands(&mut self, game: &mut Game, perf: Option<&mut crate::perf::TickPerf>) {
+        crate::perf::timed(perf, "ai_think", || {
+            if self.ai_controllers.is_empty() {
+                return;
+            }
+            let start = game.start_payload();
+            let alive_player_ids = game.alive_players();
+            let mut commands = Vec::new();
+            for controller in self.ai_controllers.iter_mut() {
+                let player_id = controller.player_id();
+                if !alive_player_ids.contains(&player_id) {
+                    continue;
+                }
+                let snapshot = game.snapshot_for(player_id);
+                commands.extend(
+                    controller
+                        .think(AiThinkContext {
+                            start: &start,
+                            snapshot: &snapshot,
+                            alive_player_ids: &alive_player_ids,
+                            retreat_commands: game.worker_retreat_commands_for(player_id),
+                        })
+                        .into_iter()
+                        .map(|command| (player_id, command)),
+                );
+            }
+            for (player_id, command) in commands {
+                game.enqueue(player_id, command);
+            }
+        });
+    }
+
+    fn fan_out_snapshots(
+        &mut self,
+        game: &Game,
+        per_player_events: &mut HashMap<u32, Vec<Event>>,
+        scheduler_lag: Duration,
+        tick_start: StdInstant,
+        mut perf: Option<&mut crate::perf::TickPerf>,
+    ) {
+        let full_vision_events = crate::perf::timed(perf.as_deref_mut(), "event_union", || {
+            union_events(per_player_events.values())
+        });
+        let recipients: Vec<u32> = self
+            .order
+            .iter()
+            .copied()
+            .filter(|id| !self.outcome_sent.contains(id))
+            .collect();
+        let branch_live_seat_by_connection = self.branch_live_seat_by_connection;
+        let spectator_visible_players = self.spectator_visible_players.clone();
+
+        SnapshotFanout::new(
+            self.room,
+            scheduler_lag,
+            self.tick_budget,
+            tick_start,
+            self.slow_tick_count,
+            perf.as_deref_mut(),
+        )
+        .send_to_recipients(self.players, recipients, |id, player| {
+            let mapped_seat = branch_live_seat_by_connection.get(&id).copied();
+            let mut snapshot = if player.spectator {
+                game.snapshot_for_spectator(&spectator_visible_players)
+            } else {
+                game.snapshot_for(mapped_seat.unwrap_or(id))
+            };
+            if player.spectator {
+                snapshot.events.extend(full_vision_events.clone());
+            } else if let Some(mut events) = per_player_events.remove(&mapped_seat.unwrap_or(id)) {
+                snapshot.events.append(&mut events);
+            }
+            Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
+        });
+    }
+
+    fn broadcast_observer_analysis_to_spectators(&self, game: &Game) {
+        let spectator_ids: Vec<u32> = self
+            .order
+            .iter()
+            .copied()
+            .filter(|id| self.players.get(id).is_some_and(|player| player.spectator))
+            .collect();
+        if spectator_ids.is_empty() {
+            return;
+        }
+
+        let msg = ServerMessage::ObserverAnalysis(game.observer_analysis());
+        for id in spectator_ids {
+            let Some(player) = self.players.get(&id) else {
+                continue;
+            };
+            send_or_log(self.room, id, &player.msg_tx, msg.clone());
+        }
+    }
+
+    fn send_new_defeats(&mut self, game: &Game, alive: &[u32]) {
+        let alive: HashSet<u32> = alive.iter().copied().collect();
+        let recipients: Vec<u32> = self
+            .order
+            .iter()
+            .copied()
+            .filter(|id| {
+                self.live_connection_is_player(*id)
+                    && self
+                        .live_seat_id_for_connection(*id)
+                        .map(|seat_id| {
+                            !alive.contains(&seat_id) && !game.team_has_alive_player(seat_id)
+                        })
+                        .unwrap_or(false)
+                    && !self.outcome_sent.contains(id)
+            })
+            .collect();
+        if recipients.is_empty() {
+            return;
+        }
+
+        let scores = game.scores();
+        for id in recipients {
+            let Some(player) = self.players.get(&id) else {
+                continue;
+            };
+            send_or_log(
+                self.room,
+                id,
+                &player.msg_tx,
+                ServerMessage::GameOver {
+                    winner_id: None,
+                    winner_team_id: None,
+                    you: "lost".to_string(),
+                    scores: scores.clone(),
+                },
+            );
+            self.outcome_sent.insert(id);
+        }
+    }
+
+    fn live_seat_id_for_connection(&self, connection_id: u32) -> Option<u32> {
+        self.branch_live_seat_by_connection
+            .get(&connection_id)
+            .copied()
+            .or_else(|| {
+                self.players
+                    .contains_key(&connection_id)
+                    .then_some(connection_id)
+            })
+    }
+
+    fn live_connection_is_player(&self, connection_id: u32) -> bool {
+        self.players
+            .get(&connection_id)
+            .map(|p| !p.spectator)
+            .unwrap_or(false)
+            && (self.branch_live_seat_by_connection.is_empty()
+                || self
+                    .branch_live_seat_by_connection
+                    .contains_key(&connection_id))
+    }
+
+    fn record_consumed_client_sequences(&mut self, tick: u32) {
+        let pending = std::mem::take(self.pending_client_command_acks);
+        for ack in pending {
+            let Some(player) = self.players.get_mut(&ack.connection_id) else {
+                continue;
+            };
+            if ack.client_seq == player.last_sim_consumed_client_seq.saturating_add(1) {
+                player.last_sim_consumed_client_seq = ack.client_seq;
+                player.last_sim_consumed_client_tick = Some(tick);
+            }
+        }
+    }
+
+    fn finish_perf_tick(
+        &self,
+        perf: Option<&crate::perf::TickPerf>,
+        game: &Game,
+        scheduler_lag: Duration,
+        tick_start: StdInstant,
+    ) {
+        let Some(perf) = perf else {
+            return;
+        };
+        perf.finish(crate::perf::TickContext {
+            room: self.room,
+            match_run_id: self.match_run_id.unwrap_or(""),
+            tick: game.current_tick(),
+            scheduler_lag,
+            total: tick_start.elapsed(),
+            players: self.players.values().filter(|p| !p.spectator).count(),
+            spectators: self.players.values().filter(|p| p.spectator).count(),
+            ai_players: self.ai_player_count,
+            counts: game.perf_entity_counts(),
+        });
+    }
+}
