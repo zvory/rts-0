@@ -120,9 +120,7 @@ impl<'a> MoveCoordinator<'a> {
             } else {
                 Order::move_to(g.0, g.1)
             };
-            e.set_order(order);
-            e.set_target_id(None);
-            e.set_path(Vec::new());
+            e.replace_active_order(order);
             e.set_path_goal(Some(*g));
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
@@ -142,9 +140,8 @@ impl<'a> MoveCoordinator<'a> {
         entities.release_miner(id);
         let mut request_initial_path = true;
         if let Some(e) = entities.get_mut(id) {
-            e.set_order(Order::attack(target));
+            e.replace_active_order(Order::attack(target));
             e.set_target_id(Some(target));
-            e.set_path(Vec::new());
             e.set_path_goal(Some((tx, ty)));
             e.reset_gather_state();
             // An explicit attack order is not necessarily a move command for a deployed weapon:
@@ -167,9 +164,8 @@ impl<'a> MoveCoordinator<'a> {
         };
         entities.release_miner(id);
         if let Some(e) = entities.get_mut(id) {
-            e.set_order(Order::gather(node));
+            e.replace_active_order(Order::gather(node));
             e.set_target_id(Some(node));
-            e.set_path(Vec::new());
             e.set_path_goal(Some((nx, ny)));
             e.clear_worker_carry();
             let (px, py) = (e.pos_x, e.pos_y);
@@ -189,11 +185,9 @@ impl<'a> MoveCoordinator<'a> {
     ) {
         entities.release_miner(id);
         if let Some(e) = entities.get_mut(id) {
-            e.set_order(Order::ability(
+            e.replace_active_order(Order::ability(
                 ability, target.0, target.1, staging.0, staging.1,
             ));
-            e.set_target_id(None);
-            e.set_path(Vec::new());
             e.set_path_goal(Some(staging));
             e.reset_gather_state();
             let (px, py) = (e.pos_x, e.pos_y);
@@ -215,9 +209,7 @@ impl<'a> MoveCoordinator<'a> {
     ) -> bool {
         entities.release_miner(id);
         if let Some(e) = entities.get_mut(id) {
-            e.set_order(Order::build(kind, tile_x, tile_y));
-            e.set_target_id(None);
-            e.set_path(Vec::new());
+            e.replace_active_order(Order::build(kind, tile_x, tile_y));
             e.reset_gather_state();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);

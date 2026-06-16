@@ -1321,7 +1321,6 @@ fn order_artillery_point_fire(
     };
     e.clear_orders();
     e.set_path_goal(None);
-    e.set_target_id(None);
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
     e.reset_stuck(px, py);
@@ -1330,11 +1329,11 @@ fn order_artillery_point_fire(
         e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
             ticks: setup_ticks_for(e.kind),
         });
-        e.set_order(Order::artillery_point_fire(target.x, target.y));
+        e.replace_active_order(Order::artillery_point_fire(target.x, target.y));
         return true;
     }
     e.set_desired_weapon_facing(target.facing);
-    e.set_order(Order::artillery_point_fire(target.x, target.y));
+    e.replace_active_order(Order::artillery_point_fire(target.x, target.y));
     try_fire_artillery(
         entities,
         players,

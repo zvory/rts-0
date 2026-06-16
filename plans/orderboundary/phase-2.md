@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -29,11 +29,11 @@ Move repeated order mutation sequences behind narrow, named entity APIs without 
 
 ## Implementation Checklist
 
-- [ ] Identify repeated direct order-field mutation patterns.
-- [ ] Add the smallest helper set needed to name those patterns.
-- [ ] Convert command/order/ability call sites incrementally.
-- [ ] Confirm archcheck field-write ratchets do not expand outside entity-owned modules.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Identify repeated direct order-field mutation patterns.
+- [x] Add the smallest helper set needed to name those patterns.
+- [x] Convert command/order/ability call sites incrementally.
+- [x] Confirm archcheck field-write ratchets do not expand outside entity-owned modules.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

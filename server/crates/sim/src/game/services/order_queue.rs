@@ -310,7 +310,7 @@ fn pop_next_valid_intent(
 ) -> Option<PromotedIntent> {
     let owner = entities.get(id)?.owner;
     for _ in 0..MAX_QUEUED_ORDERS {
-        let intent = entities.get_mut(id)?.pop_queued_order()?;
+        let intent = entities.get_mut(id)?.pop_promoted_intent()?;
         match intent {
             OrderIntent::Move(point) => {
                 if let Some(key) = PointPromotionKey::new(owner, false, point.x, point.y) {
@@ -467,7 +467,7 @@ fn execute_artillery_point_fire(entities: &mut EntityStore, id: u32, x: f32, y: 
     } else {
         e.set_desired_weapon_facing(facing);
     }
-    e.set_order(Order::artillery_point_fire(x, y));
+    e.replace_active_order(Order::artillery_point_fire(x, y));
     true
 }
 
