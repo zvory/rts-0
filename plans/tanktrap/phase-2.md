@@ -28,6 +28,11 @@ pathing and standability instead of scattered Tank Trap checks.
   - infantry can stand on and path through a Tank Trap tile
   - each vehicle-body kind rejects standing on a Tank Trap tile
   - vehicles naturally pass through a gap only when the body/clearance rules fit
+  - vehicles cannot path through the diagonal corner gaps created by a line whose consecutive Tank
+    Trap sites are diagonal-touching rather than a knight's move apart
+  - if diagonal-touching Tank Trap sites still leave a vehicle-pathable gap, inflate Tank Trap
+    static blocker clearance by 0.5 tiles for vehicle A* requests rather than adding line-placement
+    special cases to pathfinding
   - under-construction Tank Traps already block vehicle-body units
   - ordinary buildings still block all ground movement
 
@@ -57,7 +62,8 @@ pathing and standability instead of scattered Tank Trap checks.
 
 Use a debug/dev scenario or small local harness to inspect one infantry unit and one vehicle moving
 through the same Tank Trap line. Confirm the infantry crosses and the vehicle routes around or stops
-unless the gap is wide enough.
+unless the gap is wide enough; specifically include a shallow or steep line that would have produced
+knight-move trap spacing under a naive every-other-tile cadence.
 
 ## Handoff Expectations
 

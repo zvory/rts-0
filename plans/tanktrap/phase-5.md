@@ -12,10 +12,15 @@ workflow.
 - Add Tank Trap to the default worker build-card sequence in the next open slot.
 - Add a focused client line-placement helper/collaborator rather than embedding all line math in
   the main input class.
-- Implement Bresenham-style tile line generation:
+- Implement Bresenham-style tile line generation with no diagonal vehicle gaps:
   - start tile included
-  - every other tile used for trap sites
-  - end tile included only when it lands on the cadence
+  - same-row or same-column trap sites may have one empty tile between them
+  - diagonal trap sites should touch corner-to-corner
+  - consecutive emitted trap sites must not be a knight's move apart (`abs(dx), abs(dy)` of `2,1`
+    or `1,2`)
+  - when a shallow or steep Bresenham line would otherwise emit a knight-move pair, insert or choose
+    the diagonal-touching bridge site that keeps the line closed to vehicles
+  - end tile included only when it lands on the no-gap cadence
   - invalid positions skipped while later positions remain eligible
 - Add line preview rendering that shows valid and invalid trap positions while dragging.
 - Preserve normal single-click behavior as a one-site line whose start tile is included.
@@ -31,7 +36,8 @@ workflow.
 - Ensure right-click/Escape/blur/Shift-release interactions cleanly cancel or preserve placement in
   the same style as current placement targeting.
 - Add focused client tests for:
-  - line tile generation and every-other-tile cadence
+  - line tile generation for orthogonal one-tile gaps, diagonal touching, and shallow/steep lines
+    that must avoid knight-move spacing
   - invalid-site skipping
   - non-Shift command count and worker/site assignment
   - Shift extra-site queued command behavior
@@ -40,7 +46,7 @@ workflow.
 ## Expected Deliverables
 
 - Engineers can select Tank Trap from the worker build card after Training Centre.
-- Left-click builds one Tank Trap; left-drag builds an every-other-tile line.
+- Left-click builds one Tank Trap; left-drag builds a no-diagonal-gap line.
 - Non-Shift drag sends no more sites than selected workers.
 - Shift drag queues enough additional standard build commands to finish the valid line under
   existing server queue semantics.
@@ -67,7 +73,8 @@ workflow.
 In a local match, select multiple engineers, build a Tank Trap line without Shift, and confirm only
 the first selected-worker-count valid sites receive commands. Repeat with Shift and confirm later
 sites are queued/distributed, invalid terrain is skipped, and vehicles cannot drive through the
-completed line unless a wide enough gap exists.
+completed line unless a wide enough gap exists. Include a shallow or steep diagonal drag and confirm
+the preview never places consecutive Tank Traps a knight's move apart.
 
 ## Handoff Expectations
 
