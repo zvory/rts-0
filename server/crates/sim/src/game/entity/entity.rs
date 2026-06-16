@@ -13,6 +13,9 @@ use super::{
     ResourceNodeState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
+const BUILDING_START_HP_NUMERATOR: u32 = 1;
+const BUILDING_START_HP_DENOMINATOR: u32 = 10;
+
 /// A single simulation entity: unit, building, or resource node.
 ///
 /// All positional state is in world pixels (`pos_x`/`pos_y` are the entity center).
@@ -96,7 +99,11 @@ impl Entity {
             kind,
             pos_x: x,
             pos_y: y,
-            hp: s.hp,
+            hp: if finished {
+                s.hp
+            } else {
+                construction_hp_for_progress(s.hp, 0, s.build_ticks)
+            },
             max_hp: s.hp,
             last_damage_owner: None,
             last_damage_tick: None,
@@ -947,9 +954,11 @@ impl Entity {
         let c = self.construction.as_mut()?;
         c.progress = c.progress.saturating_add(1);
         if c.progress < c.total {
+            self.hp = construction_hp_for_progress(self.max_hp, c.progress, c.total);
             return Some(false);
         }
         c.progress = c.total;
+        self.hp = self.max_hp;
         self.construction = None;
         Some(true)
     }
@@ -959,6 +968,7 @@ impl Entity {
             return false;
         };
         c.progress = progress.min(c.total);
+        self.hp = construction_hp_for_progress(self.max_hp, c.progress, c.total);
         true
     }
 
@@ -1115,6 +1125,25 @@ impl Entity {
         }
         self.set_target_id(None);
     }
+}
+
+fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u32) -> u32 {
+    if max_hp == 0 {
+        return 0;
+    }
+    if total == 0 || progress >= total {
+        return max_hp;
+    }
+    let start_hp = max_hp
+        .saturating_mul(BUILDING_START_HP_NUMERATOR)
+        .div_ceil(BUILDING_START_HP_DENOMINATOR)
+        .clamp(1, max_hp);
+    let remaining_hp = max_hp.saturating_sub(start_hp);
+    let gained_hp = (remaining_hp as u64)
+        .saturating_mul(progress as u64)
+        .checked_div(total as u64)
+        .unwrap_or(remaining_hp as u64) as u32;
+    start_hp.saturating_add(gained_hp).min(max_hp)
 }
 
 fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {

@@ -188,10 +188,7 @@ mod tests {
         assert_eq!(entry.owner, 2);
         assert_eq!(entry.kind, EntityKind::Depot);
         assert_eq!((entry.x, entry.y), depot_pos);
-        assert_eq!(
-            entry.hp,
-            config::building_stats(EntityKind::Depot).unwrap().hp
-        );
+        assert_eq!(entry.hp, entities.get(depot).expect("depot exists").hp);
         assert_eq!(
             entry.max_hp,
             config::building_stats(EntityKind::Depot).unwrap().hp
