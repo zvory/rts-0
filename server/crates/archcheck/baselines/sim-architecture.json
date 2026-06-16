@@ -1,5 +1,5 @@
 {
-  "reason": "order boundary final service map",
+  "reason": "Tank Trap Phase 2 movement-class blockers",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -47,7 +47,7 @@
     },
     {
       "path": "entity/kind.rs",
-      "lines": 4
+      "lines": 5
     },
     {
       "path": "entity/mod.rs",
@@ -103,7 +103,7 @@
     },
     {
       "path": "mortar.rs",
-      "lines": 307
+      "lines": 309
     },
     {
       "path": "pathfinding.rs",
@@ -155,7 +155,7 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "lines": 3073
+      "lines": 3074
     },
     {
       "path": "services/combat/weapons.rs",
@@ -163,7 +163,7 @@
     },
     {
       "path": "services/commands.rs",
-      "lines": 5090
+      "lines": 5081
     },
     {
       "path": "services/construction.rs",
@@ -215,7 +215,7 @@
     },
     {
       "path": "services/movement/scout_car.rs",
-      "lines": 946
+      "lines": 950
     },
     {
       "path": "services/movement/standability.rs",
@@ -235,7 +235,7 @@
     },
     {
       "path": "services/occupancy.rs",
-      "lines": 343
+      "lines": 469
     },
     {
       "path": "services/order_execution.rs",
@@ -251,7 +251,7 @@
     },
     {
       "path": "services/pathing.rs",
-      "lines": 1629
+      "lines": 1795
     },
     {
       "path": "services/production.rs",
@@ -263,7 +263,7 @@
     },
     {
       "path": "services/standability.rs",
-      "lines": 769
+      "lines": 833
     },
     {
       "path": "services/supply.rs",
@@ -537,7 +537,7 @@
       "source": "movement",
       "target": "geometry",
       "path": "services/movement/scout_car.rs",
-      "line": 7
+      "line": 6
     },
     {
       "source": "movement",
@@ -567,7 +567,7 @@
       "source": "movement",
       "target": "occupancy",
       "path": "services/movement/scout_car.rs",
-      "line": 11
+      "line": 10
     },
     {
       "source": "movement",
@@ -609,7 +609,7 @@
       "source": "movement",
       "target": "spatial",
       "path": "services/movement/scout_car.rs",
-      "line": 12
+      "line": 11
     },
     {
       "source": "movement",
@@ -627,7 +627,7 @@
       "source": "movement",
       "target": "standability",
       "path": "services/movement/scout_car.rs",
-      "line": 13
+      "line": 12
     },
     {
       "source": "movement",
@@ -711,19 +711,19 @@
       "source": "standability",
       "target": "geometry",
       "path": "services/standability.rs",
-      "line": 5
+      "line": 4
     },
     {
       "source": "standability",
       "target": "occupancy",
       "path": "services/standability.rs",
-      "line": 10
+      "line": 9
     },
     {
       "source": "standability",
       "target": "spatial",
       "path": "services/standability.rs",
-      "line": 11
+      "line": 10
     },
     {
       "source": "world_query",
@@ -750,27 +750,27 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 1413,
+      "line": 1410,
       "name": "artillery_point_fire_system"
     },
     {
       "path": "services/commands.rs",
-      "line": 1246,
+      "line": 1243,
       "name": "order_artillery_point_fire"
     },
     {
       "path": "services/commands.rs",
-      "line": 1784,
+      "line": 1775,
       "name": "order_cancel"
     },
     {
       "path": "services/commands.rs",
-      "line": 1669,
+      "line": 1660,
       "name": "order_train"
     },
     {
       "path": "services/commands.rs",
-      "line": 1293,
+      "line": 1290,
       "name": "try_fire_artillery"
     },
     {
@@ -867,47 +867,47 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 51,
+      "line": 52,
       "code": "PlayerState {"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 50,
+      "line": 51,
       "code": "fn player_state(id: u32, is_ai: bool) -> PlayerState {"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 84,
+      "line": 85,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 92,
+      "line": 93,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 100,
+      "line": 101,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 110,
+      "line": 111,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 13,
+      "line": 14,
       "code": "use crate::game::{PlayerState, ScoreState};"
     },
     {
       "path": "services/commands.rs",
-      "line": 1017,
+      "line": 1015,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1592,
+      "line": 1583,
       "code": "players: &[PlayerState],"
     },
     {
@@ -917,37 +917,37 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 698,
+      "line": 696,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1105,
+      "line": 1103,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1249,
+      "line": 1246,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1295,
+      "line": 1292,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1416,
+      "line": 1413,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1671,
+      "line": 1662,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1786,
+      "line": 1777,
       "code": "players: &mut [PlayerState],"
     },
     {
@@ -1154,7 +1154,7 @@
   "entity_field_writes": [
     {
       "path": "services/combat/tests.rs",
-      "line": 1048,
+      "line": 1049,
       "field": "hp",
       "code": "dead_target.hp = 0;"
     },
@@ -1360,7 +1360,7 @@
     },
     {
       "path": "mortar.rs",
-      "count": 5
+      "count": 6
     },
     {
       "path": "pathfinding.rs",
@@ -1440,7 +1440,7 @@
     },
     {
       "path": "services/occupancy.rs",
-      "count": 10
+      "count": 16
     },
     {
       "path": "services/order_execution.rs",
