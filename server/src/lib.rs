@@ -12,7 +12,3 @@ pub mod lobby;
 pub mod protocol;
 pub mod structured_log;
 pub mod tools;
-
-pub use rts_ai as ai;
-pub use rts_sim::game;
-pub use rts_sim::perf;

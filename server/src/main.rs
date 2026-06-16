@@ -36,15 +36,15 @@ use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
     parse_dev_scenario_launch,
 };
-use rts_server::game::map::Map;
-use rts_server::game::replay::{
-    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
-};
-use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
-use rts_server::perf;
 use rts_server::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
 use rts_server::structured_log;
+use rts_sim::game::map::Map;
+use rts_sim::game::replay::{
+    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
+};
+use rts_sim::game::SimCommand;
+use rts_sim::perf;
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
@@ -993,7 +993,7 @@ mod tests {
     }
 
     fn replay_artifact_for_faction(faction_id: &str) -> ReplayArtifactV1 {
-        let players = vec![rts_server::game::PlayerInit {
+        let players = vec![rts_sim::game::PlayerInit {
             id: 1,
             team_id: 1,
             faction_id: faction_id.to_string(),
@@ -1001,7 +1001,7 @@ mod tests {
             color: "#ffffff".to_string(),
             is_ai: false,
         }];
-        let game = rts_server::game::Game::new(&players, 0x5150_030d);
+        let game = rts_sim::game::Game::new(&players, 0x5150_030d);
         ReplayArtifactV1::capture_from_game(&game, "current-build", None, game.scores())
     }
 

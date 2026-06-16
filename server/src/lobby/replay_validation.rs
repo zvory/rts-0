@@ -1,7 +1,7 @@
 use super::faction_validation::{
     validate_faction_request, FactionRejectReason, FactionRequestContext, FactionValidation,
 };
-use crate::game::replay::ReplayArtifactV1;
+use rts_sim::game::replay::ReplayArtifactV1;
 use std::collections::HashSet;
 
 pub fn faction_loadout_incompatibility_reason(artifact: &ReplayArtifactV1) -> Option<String> {

@@ -4,8 +4,8 @@ use super::faction_validation::{
     validate_faction_request, FactionRejectReason, FactionRequestContext, FactionValidation,
 };
 use super::ReplayBranchSeed;
-use crate::game::Game;
 use crate::protocol::{BranchStagingOccupant, BranchStagingSeat, ServerMessage};
+use rts_sim::game::Game;
 
 pub(super) struct BranchLaunchPlan {
     pub(super) game: Game,

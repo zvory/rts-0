@@ -11,7 +11,7 @@ pub(super) struct SnapshotFanout<'a> {
     tick_budget: Duration,
     tick_start: StdInstant,
     slow_tick_count: &'a mut u32,
-    perf: Option<&'a mut crate::perf::TickPerf>,
+    perf: Option<&'a mut rts_sim::perf::TickPerf>,
 }
 
 pub(super) struct SnapshotFanoutPayload {
@@ -35,7 +35,7 @@ impl<'a> SnapshotFanout<'a> {
         tick_budget: Duration,
         tick_start: StdInstant,
         slow_tick_count: &'a mut u32,
-        perf: Option<&'a mut crate::perf::TickPerf>,
+        perf: Option<&'a mut rts_sim::perf::TickPerf>,
     ) -> Self {
         Self {
             room,
@@ -89,7 +89,7 @@ impl<'a> SnapshotFanout<'a> {
             let compact_duration = compact_start.elapsed();
 
             if let Some(perf) = self.perf.as_mut() {
-                perf.record_snapshot(crate::perf::SnapshotRecord {
+                perf.record_snapshot(rts_sim::perf::SnapshotRecord {
                     player_id: id,
                     spectator: payload.spectator,
                     snapshot: snapshot_duration,
@@ -158,11 +158,11 @@ fn snapshot_net_status(
     }
 }
 
-fn snapshot_enqueue_status(status: SnapshotSendStatus) -> crate::perf::SnapshotEnqueue {
+fn snapshot_enqueue_status(status: SnapshotSendStatus) -> rts_sim::perf::SnapshotEnqueue {
     match status {
-        SnapshotSendStatus::Stored => crate::perf::SnapshotEnqueue::Stored,
-        SnapshotSendStatus::Replaced => crate::perf::SnapshotEnqueue::Replaced,
-        SnapshotSendStatus::Closed => crate::perf::SnapshotEnqueue::Closed,
+        SnapshotSendStatus::Stored => rts_sim::perf::SnapshotEnqueue::Stored,
+        SnapshotSendStatus::Replaced => rts_sim::perf::SnapshotEnqueue::Replaced,
+        SnapshotSendStatus::Closed => rts_sim::perf::SnapshotEnqueue::Closed,
     }
 }
 

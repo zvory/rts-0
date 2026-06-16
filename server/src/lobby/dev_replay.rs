@@ -1,7 +1,7 @@
 use super::room_task::{DevScenarioConfig, DevScenarioId, DevSelfPlayConfig, RoomMode};
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
-use crate::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
+use rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
     if room == format!("{DEV_SELFPLAY_ROOM_PREFIX}live") {
@@ -93,8 +93,8 @@ pub(super) fn load_replay_artifact(name: &str) -> Result<ReplayArtifactV1, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::replay::ReplayArtifactV1;
-    use crate::game::{Game, PlayerInit};
+    use rts_sim::game::replay::ReplayArtifactV1;
+    use rts_sim::game::{Game, PlayerInit};
 
     fn artifact_dir(name: &str) -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))

@@ -5,7 +5,7 @@
 
 pub use rts_protocol::*;
 
-use crate::game::entity::EntityKind;
+use rts_sim::game::entity::EntityKind;
 
 /// Convert domain entity vocabulary to the current wire string vocabulary.
 pub fn kind_to_wire(kind: EntityKind) -> &'static str {

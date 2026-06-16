@@ -28,7 +28,7 @@ use crate::game::services::order_execution::{
 use crate::game::services::order_planner as planner;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
-use crate::game::services::world_query;
+use crate::game::services::world_query::{self, owns_unit};
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::game::upgrade::{self, UpgradeKind};
@@ -133,7 +133,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    planner_facts(entities, player, &faction_id, &units, None),
                     &request
                 );
             }
@@ -157,7 +157,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    planner_facts(entities, player, &faction_id, &units, None),
                     &request
                 );
             }
@@ -183,7 +183,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    planner_facts(entities, player, &faction_id, &units, None),
                     &request
                 );
             }
@@ -205,7 +205,7 @@ pub(crate) fn apply_commands(
                         face_toward: planner::Point::new(x, y),
                     },
                 };
-                let facts = planner_facts(entities, player, &faction_id, &units, false, None);
+                let facts = planner_facts(entities, player, &faction_id, &units, None);
                 apply_planned!(player, facts, &request);
             }
             SimCommand::TearDownAntiTankGuns { units } => {
@@ -343,7 +343,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    planner_facts(entities, player, &faction_id, &units, None),
                     &request
                 );
             }
@@ -373,7 +373,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, false, None),
+                    planner_facts(entities, player, &faction_id, &units, None),
                     &request
                 );
             }
@@ -587,7 +587,6 @@ fn planner_facts(
     player: u32,
     faction_id: &str,
     units: &[u32],
-    build_notice_compat: bool,
     ability: Option<AbilityFactInput>,
 ) -> Vec<planner::UnitFacts> {
     dedupe_cap_units(units.to_vec())
@@ -615,8 +614,7 @@ fn planner_facts(
             facts.can_attack = e.can_attack();
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
             facts.can_build = rules::faction::catalog_for(faction_id)
-                .is_some_and(|catalog| catalog.builders.contains(&e.kind))
-                || build_notice_compat;
+                .is_some_and(|catalog| catalog.builders.contains(&e.kind));
             facts.can_setup_anti_tank_gun =
                 matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
             if let Some(ability) = ability {
@@ -1222,7 +1220,6 @@ fn use_ability(
         player,
         &faction_id,
         &units,
-        false,
         Some(AbilityFactInput {
             kind: ability,
             id: planner_id,
@@ -1516,12 +1513,6 @@ fn choose_smoke_caster(
         }
     }
     furthest_in_range.or(closest).map(|(id, _)| id)
-}
-
-/// Whether `player` owns a *unit* with this id. Local re-export of
-/// [`world_query::owns_unit`] to keep call sites in this module terse.
-fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
-    world_query::owns_unit(entities, player, id)
 }
 
 fn clear_queued_orders(entities: &mut EntityStore, ids: &[u32]) {

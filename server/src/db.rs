@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{PgPool, Row};
 
-use crate::game::replay::ReplayArtifactV1;
+use rts_sim::game::replay::ReplayArtifactV1;
 
 /// One match-history row to insert.
 #[derive(Debug, Clone)]
