@@ -39,10 +39,11 @@ Use when writing or debugging tests, or before claiming a change is done.
   give faster package and live-integration signal, but branch protection should treat the full gate
   as the canonical required check unless a later plan phase changes that contract. They also
   short-circuit as green checks for Markdown-only PRs.
-- PR workflow concurrency cancels superseded runs for the same PR branch only. Pushes to `main` and
-  unrelated branches should not cancel each other.
+- Workflow concurrency cancels superseded runs for the same PR branch, and cancels stale
+  post-merge `main` push runs when a newer `main` push starts. Unrelated branches should not
+  cancel each other.
 - Beta deploys are triggered only from successful `Main test gate` workflow runs whose original
-  event was a push to `main`; PR-head workflow runs must not deploy.
+  event was a push to `main`; PR-head workflow runs and canceled stale `main` runs must not deploy.
 - Local `tests/run-all.sh` uses a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
   parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
   with `CARGO_TARGET_DIR` if a task needs a specific target location. The `Main test gate`
