@@ -8,16 +8,17 @@ const EMPTY_ARRAY = Object.freeze([]);
  * transient effect markers stay behind one explicit boundary.
  *
  * @param {object} state GameState-compatible browser model.
- * @param {{entities?:Array<object>, now?:number}=} options
+ * @param {{clientIntent?:object|null, entities?:Array<object>, now?:number}=} options
  * @returns {object}
  */
-export function buildRendererFeedbackView(state, { entities = EMPTY_ARRAY, now = defaultNow() } = {}) {
+export function buildRendererFeedbackView(state, { clientIntent = null, entities = EMPTY_ARRAY, now = defaultNow() } = {}) {
   const selectedEntities = typeof state?.selectedEntities === "function"
     ? arrayOrEmpty(state.selectedEntities())
     : EMPTY_ARRAY;
   const entityLookup = buildEntityLookup(entities, selectedEntities);
+  const intent = clientIntent || null;
 
-  const commandFeedback = liveArray(state, "liveCommandFeedback", now);
+  const commandFeedback = liveArray(intent, "liveCommandFeedback", now);
   const smokeCanisters = liveArray(state, "liveSmokeCanisters", now);
   const mortarLaunches = liveArray(state, "liveMortarLaunches", now);
   const mortarShells = liveArray(state, "liveMortarShells", now);
@@ -31,13 +32,13 @@ export function buildRendererFeedbackView(state, { entities = EMPTY_ARRAY, now =
   return {
     playerId: state?.playerId,
     map: state?.map || null,
-    placement: state?.placement || null,
+    placement: intent?.placement || null,
     commandFeedback,
     selectedEntities: () => selectedEntities,
     debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,
     showAllDebugPathOverlays: !!state?.showAllDebugPathOverlays,
-    antiTankGunSetupPreview: state?.antiTankGunSetupPreview || null,
-    abilityTargetPreview: state?.abilityTargetPreview || null,
+    antiTankGunSetupPreview: intent?.antiTankGunSetupPreview || null,
+    abilityTargetPreview: intent?.abilityTargetPreview || null,
     abilityObjects: arrayOrEmpty(state?.abilityObjects),
     smokes: arrayOrEmpty(state?.smokes),
     smokeCanisters,
@@ -48,7 +49,7 @@ export function buildRendererFeedbackView(state, { entities = EMPTY_ARRAY, now =
     artilleryTargets,
     artilleryLaunches,
     artilleryImpacts,
-    resourceMiningPreview: state?.resourceMiningPreview || null,
+    resourceMiningPreview: intent?.resourceMiningPreview || null,
     muzzleFlashes,
     liveCommandFeedback: () => commandFeedback,
     liveSmokeCanisters: () => smokeCanisters,

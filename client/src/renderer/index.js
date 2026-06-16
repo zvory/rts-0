@@ -181,7 +181,7 @@ export class Renderer {
    * @param {import("./fog.js").Fog} fog
    * @param {number} alpha interpolation factor 0..1 between the two latest snapshots
    */
-  render(state, camera, fog, alpha) {
+  render(state, camera, fog, alpha, { clientIntent = null } = {}) {
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
@@ -192,7 +192,7 @@ export class Renderer {
     const entities = state.entitiesInterpolated(alpha) || [];
     const regularEntities = entities.filter((e) => !e.shotReveal);
     const shotReveals = entities.filter((e) => e.shotReveal);
-    const feedbackView = buildRendererFeedbackView(state, { entities });
+    const feedbackView = buildRendererFeedbackView(state, { clientIntent, entities });
     const selection = state.selection || new Set();
     const colorByOwner = this._ownerColors(state);
     const liveIds = new Set();
@@ -369,7 +369,7 @@ export class Renderer {
    * @returns {0|1|2|3} 0 visible, 1 explored (dim), 2 unexplored (dark), 3 unexplored impassable (light dim)
    */
   /**
-   * Draw the build placement ghost from `state.placement`: footprint-sized
+   * Draw the build placement ghost from the feedback view: footprint-sized
    * rounded-rect tinted green (valid) or red (invalid), at the candidate tile.
    * @private
    */

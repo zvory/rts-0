@@ -2,13 +2,11 @@
 // input all read from. See docs/design/client-ui.md §4.1.
 //
 // It holds the two most recent server snapshots (for interpolation), the
-// latest resources/events, the local selection set, and a compatibility shim
-// to browser-local intent state. Selection and intent are client-only concepts;
-// the server never sees them directly (only the resulting commands).
+// latest resources/events, and the local selection set. Selection is a
+// client-only concept; the server never sees it directly.
 
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { admitSelectionIds } from "./command_budget.js";
-import { ClientIntent } from "./client_intent.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import {
   DEFAULT_FACTION_ID,
@@ -110,8 +108,6 @@ export class GameState {
     this.showAllDebugPathOverlays = false;
     /** @type {Array<Array<number>>} ten local control groups, slot 9 is key 0. */
     this.controlGroups = Array.from({ length: 10 }, () => []);
-    /** @type {ClientIntent} browser-local command/placement/preview intent. */
-    this.clientIntent = new ClientIntent();
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
     this.smokes = [];
     /** @type {Array<{id:number,owner:number,ability:string,kind:string,x:number,y:number,expiresIn?:number,sourceCasterId?:number,ownerState?:object}>} */
@@ -158,78 +154,6 @@ export class GameState {
   /** World pixels per tile. */
   get tileSize() {
     return this.map.tileSize;
-  }
-
-  get placement() {
-    return this.clientIntent.placement;
-  }
-
-  set placement(value) {
-    this.clientIntent.placement = value;
-  }
-
-  get commandCardMode() {
-    return this.clientIntent.commandCardMode;
-  }
-
-  set commandCardMode(value) {
-    this.clientIntent.commandCardMode = value;
-  }
-
-  get commandTarget() {
-    return this.clientIntent.commandTarget;
-  }
-
-  set commandTarget(value) {
-    this.clientIntent.commandTarget = value;
-  }
-
-  get commandComposer() {
-    return this.clientIntent.commandComposer;
-  }
-
-  set commandComposer(value) {
-    this.clientIntent.commandComposer = value;
-  }
-
-  get lastCommandTargetArm() {
-    return this.clientIntent.lastCommandTargetArm;
-  }
-
-  set lastCommandTargetArm(value) {
-    this.clientIntent.lastCommandTargetArm = value;
-  }
-
-  get commandFeedback() {
-    return this.clientIntent.commandFeedback;
-  }
-
-  set commandFeedback(value) {
-    this.clientIntent.commandFeedback = value;
-  }
-
-  get resourceMiningPreview() {
-    return this.clientIntent.resourceMiningPreview;
-  }
-
-  set resourceMiningPreview(value) {
-    this.clientIntent.resourceMiningPreview = value;
-  }
-
-  get antiTankGunSetupPreview() {
-    return this.clientIntent.antiTankGunSetupPreview;
-  }
-
-  set antiTankGunSetupPreview(value) {
-    this.clientIntent.antiTankGunSetupPreview = value;
-  }
-
-  get abilityTargetPreview() {
-    return this.clientIntent.abilityTargetPreview;
-  }
-
-  set abilityTargetPreview(value) {
-    this.clientIntent.abilityTargetPreview = value;
   }
 
   playerById(id) {
@@ -957,7 +881,6 @@ export class GameState {
     const admitted = admitSelectionIds(this, ids);
     this.selection = new Set(admitted.ids);
     this._recordSelectionBudgetOverflow(admitted);
-    this.closeCommandCardMenu();
   }
 
   /**
@@ -969,7 +892,6 @@ export class GameState {
     const admitted = admitSelectionIds(this, ids, { baseIds: this.selection });
     this.selection = new Set(admitted.ids);
     this._recordSelectionBudgetOverflow(admitted);
-    this.closeCommandCardMenu();
   }
 
   /**
@@ -982,14 +904,12 @@ export class GameState {
       this.selection.delete(id);
     }
     this.selectionBudgetOverflow = null;
-    this.closeCommandCardMenu();
   }
 
   /** Clear the selection. */
   clearSelection() {
     this.selection.clear();
     this.selectionBudgetOverflow = null;
-    this.closeCommandCardMenu();
   }
 
   /** Drop selected ids that are no longer present in the latest snapshot. */
@@ -1110,136 +1030,6 @@ export class GameState {
       this.controlGroups[slot] = admitted.ids;
     }
     return admitted;
-  }
-
-  // --- build placement (client-only) -------------------------------------
-
-  /** Open the worker build command-card submenu. */
-  openWorkerBuildMenu() {
-    this.clientIntent.openWorkerBuildMenu();
-  }
-
-  /**
-   * Close any command-card submenu.
-   * @returns {boolean} true if a submenu was open.
-   */
-  closeCommandCardMenu() {
-    return this.clientIntent.closeCommandCardMenu();
-  }
-
-  /**
-   * Start previewing placement of a building. Position/validity are filled in
-   * by updatePlacement as the cursor moves.
-   * @param {string} buildingKind a building EntityKind.
-   */
-  beginPlacement(buildingKind) {
-    this.clientIntent.beginPlacement(buildingKind);
-  }
-
-  /**
-   * Update the placement preview's tile and validity. No-op if no placement
-   * is in progress.
-   * @param {number} tileX
-   * @param {number} tileY
-   * @param {boolean} valid
-   */
-  updatePlacement(tileX, tileY, valid) {
-    this.clientIntent.updatePlacement(tileX, tileY, valid);
-  }
-
-  /** Stop previewing placement. */
-  endPlacement() {
-    this.clientIntent.endPlacement();
-  }
-
-  // --- command targeting / feedback (client-only) ------------------------
-
-  /**
-   * Arm a one-click command target mode from the HUD.
-   * @param {"move"|"attack"|"setupAntiTankGuns"|{kind:"ability",ability:string}} kind
-   */
-  beginCommandTarget(kind, options = {}) {
-    return this.clientIntent.beginCommandTarget(kind, options);
-  }
-
-  /** Clear any armed command target mode. */
-  endCommandTarget() {
-    this.clientIntent.endCommandTarget();
-  }
-
-  /** Mark a physical key as holding the current command target alive. */
-  holdCommandTarget(kind, key, shiftKey = false) {
-    this.clientIntent.holdCommandTarget(kind, key, shiftKey);
-  }
-
-  /**
-   * Record a click issue and return whether the target remains armed.
-   * @param {{shiftKey?: boolean}} ev
-   * @returns {{target:null|string|object,queued:boolean,keepArmed:boolean}}
-   */
-  issueCommandTarget(ev = {}) {
-    return this.clientIntent.issueCommandTarget(ev);
-  }
-
-  /** Release a physical command key. */
-  releaseCommandTargetKey(key, shiftKey = false) {
-    this.clientIntent.releaseCommandTargetKey(key, shiftKey);
-  }
-
-  /** Release Shift preservation for a tapped command. */
-  releaseCommandTargetShift() {
-    this.clientIntent.releaseCommandTargetShift();
-  }
-
-  /**
-   * Add a short-lived local command marker at a world point.
-   * @param {"move"|"attack"} kind
-   * @param {number} x
-   * @param {number} y
-   * @param {boolean=} append
-   */
-  addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
-    const now = performance.now();
-    if (kind === "mortar" && Number.isFinite(x) && Number.isFinite(y)) {
-      this.pendingMortarTargets.push({ x, y, createdAt: now });
-      this.pendingMortarTargets = this.pendingMortarTargets.filter(
-        (p) => now - p.createdAt <= 700,
-      );
-    }
-    this.clientIntent.addCommandFeedback(kind, x, y, append, radiusTiles, now);
-  }
-
-  /**
-   * Return live command feedback markers, pruning expired ones.
-   * @param {number} now
-   * @returns {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>}
-   */
-  liveCommandFeedback(now) {
-    return this.clientIntent.liveCommandFeedback(now);
-  }
-
-  /**
-   * Set or clear the hovered resource-to-City-Centre mining preview.
-   * @param {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} preview
-   */
-  updateResourceMiningPreview(preview) {
-    this.clientIntent.updateResourceMiningPreview(preview);
-  }
-
-  /**
-   * Set or clear the anti-tank gun manual setup cone preview.
-   * @param {null | {mouseX:number, mouseY:number, guns:Array<object>}} preview
-   */
-  updateAntiTankGunSetupPreview(preview) {
-    this.clientIntent.updateAntiTankGunSetupPreview(preview);
-  }
-
-  /**
-   * Set or clear the armed-ability targeting preview (range circles + hover validity).
-   * @param {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} preview
-   */
-  updateAbilityTargetPreview(preview) {
-    this.clientIntent.updateAbilityTargetPreview(preview);
   }
 
   // --- map helpers --------------------------------------------------------

@@ -72,10 +72,10 @@ const ABILITY_LINE_SHOT_COLOR = 0x0b3a78;
 const LINE_PROJECTILE_TRAIL_MAX_POINTS = 9;
 const LINE_PROJECTILE_TRAIL_MIN_STEP_PX = 1.5;
 
-export function _drawPlacement(state, fog) {
+export function _drawPlacement(view, fog) {
   const g = this._placementGfx;
   g.clear();
-  const p = state.placement;
+  const p = view.placement;
   if (!p) return;
   const ts = (this._map && this._map.tileSize) || 32;
   const stat = STATS[p.building] || {};
@@ -108,7 +108,7 @@ export function _drawPlacement(state, fog) {
   const rangePx = MINING_CC_RANGE_TILES * ts;
   const rangeSq = rangePx * rangePx;
   const resourceColor = 0x4aa3ff;
-  for (const node of state.map?.resources || []) {
+  for (const node of view.map?.resources || []) {
     if (!node || !isResource(node.kind) || node.remaining === 0) continue;
     const dx = node.x - cx;
     const dy = node.y - cy;
@@ -123,13 +123,13 @@ export function _drawPlacement(state, fog) {
   }
 }
 
-export function _drawCommandFeedback(state) {
+export function _drawCommandFeedback(view) {
   const g = this._feedbackGfx;
   g.clear();
-  if (!state || typeof state.liveCommandFeedback !== "function") return;
+  if (!view || typeof view.liveCommandFeedback !== "function") return;
 
   const now = performance.now();
-  for (const f of state.liveCommandFeedback(now)) {
+  for (const f of view.liveCommandFeedback(now)) {
     const age = now - f.createdAt;
     const t = clamp01(age / 650);
     const alpha = (1 - t) * 0.95;
@@ -277,16 +277,16 @@ export function _drawDebugPathOverlay(state, entities = null) {
   }
 }
 
-export function _drawAntiTankGunSetupPreview(state) {
-  if (!state || typeof state.selectedEntities !== "function") return;
+export function _drawAntiTankGunSetupPreview(view) {
+  if (!view || typeof view.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
-  const pointFirePreview = state.abilityTargetPreview?.ability === ABILITY.POINT_FIRE
-    ? state.abilityTargetPreview
+  const pointFirePreview = view.abilityTargetPreview?.ability === ABILITY.POINT_FIRE
+    ? view.abilityTargetPreview
     : null;
 
-  for (const e of state.selectedEntities()) {
-    if (e.owner !== state.playerId || (e.kind !== KIND.ANTI_TANK_GUN && e.kind !== KIND.ARTILLERY)) continue;
+  for (const e of view.selectedEntities()) {
+    if (e.owner !== view.playerId || (e.kind !== KIND.ANTI_TANK_GUN && e.kind !== KIND.ARTILLERY)) continue;
     if (e.setupState !== SETUP.DEPLOYED) continue;
     const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
     if (facing == null) continue;
@@ -313,7 +313,7 @@ export function _drawAntiTankGunSetupPreview(state) {
     );
   }
 
-  const preview = state.antiTankGunSetupPreview;
+  const preview = view.antiTankGunSetupPreview;
   if (!preview || !Array.isArray(preview.guns)) return;
   for (const e of preview.guns) {
     if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
@@ -351,8 +351,8 @@ export function _drawBreakthroughAuras(state, entities = []) {
   }
 }
 
-export function _drawAbilityTargetPreview(state) {
-  const preview = state?.abilityTargetPreview;
+export function _drawAbilityTargetPreview(view) {
+  const preview = view?.abilityTargetPreview;
   if (!preview || !Array.isArray(preview.carriers)) return;
   const g = this._feedbackGfx;
   const areaOrigins = Array.isArray(preview.areaOrigins) ? preview.areaOrigins : [];
@@ -1215,10 +1215,10 @@ function drawDashedCircle(g, x, y, radius, segments) {
   }
 }
 
-export function _drawResourceMiningPreview(state) {
-  if (!state || !state.resourceMiningPreview) return;
+export function _drawResourceMiningPreview(view) {
+  if (!view || !view.resourceMiningPreview) return;
   const g = this._feedbackGfx;
-  const p = state.resourceMiningPreview;
+  const p = view.resourceMiningPreview;
   const ccStat = STATS[KIND.CITY_CENTRE] || {};
   const ts = (this._map && this._map.tileSize) || 32;
   const ccEndpoint = rectEdgePointTowardCenter(

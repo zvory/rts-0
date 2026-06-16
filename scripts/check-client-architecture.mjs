@@ -68,6 +68,46 @@ const ALLOWED_PROTOTYPE_GRAFTS = new Set([
   "renderer/index.js:Renderer",
 ]);
 
+// Phase 6 client-boundary ratchet: these are the cleanup-phase byte counts for
+// the largest modules. Future growth should either extract a focused helper or
+// update this table with the phase-specific reason.
+const LARGE_FILE_BASELINES = new Map(Object.entries({
+  "renderer/feedback.js": 46017,
+  "hud.js": 43923,
+  "state.js": 38576,
+  "input/index.js": 38439,
+  "match.js": 38289,
+  "protocol.js": 35921,
+  "hud_command_card.js": 29374,
+  "renderer/shared.js": 28113,
+  "observer_analysis_overlay.js": 27903,
+  "audio.js": 27339,
+}));
+
+const FORBIDDEN_GAMESTATE_INTENT_SHIMS = [
+  "commandTarget",
+  "placement",
+  "commandCardMode",
+  "resourceMiningPreview",
+  "antiTankGunSetupPreview",
+  "abilityTargetPreview",
+  "liveCommandFeedback",
+  "openWorkerBuildMenu",
+  "closeCommandCardMenu",
+  "beginPlacement",
+  "updatePlacement",
+  "endPlacement",
+  "beginCommandTarget",
+  "endCommandTarget",
+  "holdCommandTarget",
+  "issueCommandTarget",
+  "releaseCommandTargetKey",
+  "releaseCommandTargetShift",
+  "updateResourceMiningPreview",
+  "updateAntiTankGunSetupPreview",
+  "updateAbilityTargetPreview",
+];
+
 const importRe = /\bimport\s+(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g;
 const prototypeGraftRe = /\bObject\.assign\s*\(\s*([A-Za-z_$][\w$]*)\.prototype\s*,/g;
 
@@ -93,6 +133,8 @@ for (const file of files) {
     prototypeGrafts: parsePrototypeGrafts(source, file),
     fanIn: 0,
   });
+  checkLargeFileBaseline(file, source);
+  checkForbiddenGameStateIntentShims(file, source);
 }
 
 for (const mod of modules.values()) {
@@ -173,6 +215,24 @@ function parsePrototypeGrafts(source) {
     grafts.push(match[1]);
   }
   return grafts;
+}
+
+function checkLargeFileBaseline(file, source) {
+  const baseline = LARGE_FILE_BASELINES.get(file);
+  if (baseline == null) return;
+  const bytes = Buffer.byteLength(source, "utf8");
+  if (bytes > baseline) {
+    failures.push(`${file}: ${bytes} bytes exceeds large-file baseline ${baseline}; extract a focused helper or update the ratchet with a reason`);
+  }
+}
+
+function checkForbiddenGameStateIntentShims(file, source) {
+  for (const name of FORBIDDEN_GAMESTATE_INTENT_SHIMS) {
+    const directStateRe = new RegExp(`(?:\\bstate|\\bthis\\.state)(?:\\.${name}\\b|\\?\\.${name}\\b)`);
+    if (directStateRe.test(source)) {
+      failures.push(`${file}: forbidden GameState intent shim reference ${name}; use injected ClientIntent or a narrow view model`);
+    }
+  }
 }
 
 function resolveImport(fromFile, specifier) {

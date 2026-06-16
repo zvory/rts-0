@@ -58,7 +58,7 @@ export class Minimap {
     this.camera = camera;
     this.fog = fog;
     this.commandIssuer = commandIssuer;
-    this.clientIntent = options.clientIntent || state?.clientIntent || state;
+    this.clientIntent = options.clientIntent || null;
     this.inputRouter = inputRouter;
     this.commandsEnabled = options.commandsEnabled !== false;
     this._unregisterInputZone = null;
@@ -368,7 +368,7 @@ export class Minimap {
   }
 
   _intent() {
-    return this.clientIntent || this.state?.clientIntent || this.state;
+    return this.clientIntent;
   }
 
   _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {

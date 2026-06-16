@@ -19,6 +19,7 @@ import { ReplayControls } from "./replay_controls.js";
 import { predictionBlockedReason, predictionCompatibility } from "./prediction_compatibility.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
+import { ClientIntent } from "./client_intent.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, KIND, NOTICE_SEVERITY, S } from "./protocol.js";
 import {
@@ -138,7 +139,7 @@ export class Match {
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
-    this.clientIntent = this.state.clientIntent;
+    this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
     this.state.debugPathOverlaysAvailable =
       this.state.debugPathOverlaysAvailable || this.devWatch?.kind === "scenario";
     this.state.debugPathOverlaysEnabled = this.state.debugPathOverlaysAvailable;
@@ -938,7 +939,7 @@ export class Match {
     this.advancePredictionVisual();
     this.fog.update(this.ownEntities(), this.state.map.tileSize, this.state.visibleTiles);
 
-    this.renderer.render(this.state, this.camera, this.fog, alpha);
+    this.renderer.render(this.state, this.camera, this.fog, alpha, { clientIntent: this.clientIntent });
     this.hud.update();
     this.minimap.render();
     this.observerAnalysisOverlay?.update();

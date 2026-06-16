@@ -115,7 +115,7 @@ export function _handleBlur() {
 }
 
 function clientIntent(input) {
-  return input?.clientIntent || input?.state?.clientIntent || input?.state;
+  return input?.clientIntent || null;
 }
 
 export function _handleWheel(ev) {

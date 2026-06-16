@@ -127,7 +127,7 @@ export class Input {
     this.audio = audio || null;
     this.inputRouter = inputRouter;
     this.hotkeyProfiles = hotkeyProfiles;
-    this.clientIntent = clientIntent || state?.clientIntent || state;
+    this.clientIntent = clientIntent;
 
     this.cameraNavigation = new CameraNavigationInput(domElement, camera);
     this.keys = this.cameraNavigation.keys;
@@ -240,7 +240,7 @@ export class Input {
   }
 
   _intent() {
-    return this.clientIntent || this.state?.clientIntent || this.state;
+    return this.clientIntent;
   }
 
   _commandTarget() {

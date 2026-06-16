@@ -433,5 +433,5 @@ export function _cancel() {
 }
 
 function clientIntent(input) {
-  return input?.clientIntent || input?.state?.clientIntent || input?.state;
+  return input?.clientIntent || null;
 }
