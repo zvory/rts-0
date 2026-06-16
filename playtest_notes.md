@@ -1,9 +1,37 @@
+
+the vehicle works should take way longer to build or take longer, or need something more
+
+when activating breakthrough on a command car, or when mousing over the ability, it shoudl dislpay the AOE ring, and icnrease the AOE of rbeakthrough by two
+
+command cars should not count towards seleciton limit
+
+engineers should be able to make tank traps that vehicles can't pass through but units can
+
+control groups don't work in replays, like the players don't inherit them
+
+add audible countdown before match start
+
+
+reduce scout car hp by 50%
+
+make At guns available automatically from the Gun Works and not require AT gun research. 
+
+magic anchor should anchor units, but it should be a visual effect iwth a radius so it's more obvious, and it should add movement speed towards the anchor. as in, walking away you move with reduced movement speed, walking toward the anchor should porivde increased movement speed
+
+make the line shot a deep blue color that leaves a streak
+
+create a stats wiki, how armor works, etc
+
+
+-----
+
+make it so taht mortarts shoot instantly and have no setup time, and reduce their fly time to 1s, and they do 1.5x the damage they do now
+
+ekat line shot and dash, if targetted outside of max range, should just do a max range use of the ability, and they should not have ekat walk towards a position wher ehtey can use the ability. you should be able to shift queue a dash also. also you should be able to dash over walla nd buildings. 
 when a mortar is autocasting on a unit that is attack moved but stantionary, it keeps predicted their attack will not be at their location
 
 
-
 make it so tanks take up more selection slots
-
 
 attempting to join a replay in progress doesn't give you vision, it's all fog, but when reclaiming position from this all fog mode, the top bar actualy works
 
