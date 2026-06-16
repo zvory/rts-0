@@ -1,8 +1,6 @@
 # Phase 2 - Docs Navigation And Link Rewriting
 
-## Phase Status
-
-- [ ] Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -26,12 +24,12 @@ integrity checks.
 
 ## Implementation Checklist
 
-- [ ] Render a navigation index for context capsules and design docs.
-- [ ] Rewrite relative `.md` links into `/wiki/...` URLs.
-- [ ] Preserve hash anchors on rewritten links.
-- [ ] Keep external URLs and non-doc assets from being incorrectly rewritten.
-- [ ] Add a link-integrity test over the allowlisted docs set.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Render a navigation index for context capsules and design docs.
+- [x] Rewrite relative `.md` links into `/wiki/...` URLs.
+- [x] Preserve hash anchors on rewritten links.
+- [x] Keep external URLs and non-doc assets from being incorrectly rewritten.
+- [x] Add a link-integrity test over the allowlisted docs set.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
