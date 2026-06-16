@@ -1,8 +1,6 @@
 # Phase 3 - Rust-Authoritative Stats Tables
 
-## Phase Status
-
-- [ ] Not implemented.
+Status: Done.
 
 ## Objective
 
