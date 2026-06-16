@@ -835,6 +835,11 @@ fn profile_backed_ai_prefers_mineable_steel_over_known_non_mineable_oil() {
 
 #[test]
 fn profile_backed_ai_assigns_oil_after_expansion_city_centre_completes() {
+    if crate::skip_unless_full_ai(
+        "profile_backed_ai_assigns_oil_after_expansion_city_centre_completes",
+    ) {
+        return;
+    }
     let evidence = run_resource_regression_profile(9_000);
 
     assert!(
