@@ -30,6 +30,7 @@ function usage() {
   node tests/select-suites.mjs --from=<git-ref>
   node tests/select-suites.mjs --staged
   node tests/select-suites.mjs <file>...
+  node tests/select-suites.mjs --ci-policy <file>...
   node tests/select-suites.mjs --verify`);
 }
 
@@ -46,6 +47,61 @@ function staged() {
 function addAll(set, suites) {
   for (const suite of suites) {
     set.add(suite);
+  }
+}
+
+const ciClientFullFallbackPaths = new Set([
+  "client/src/config.js",
+  "client/src/lobby_view.js",
+  "client/src/net.js",
+  "client/src/protocol.js",
+]);
+
+const ciClientFullFallbackPrefixes = [
+  "client/vendor/sim-wasm/",
+];
+
+function normalizeChangedPath(pathname) {
+  return pathname.split(path.sep).join("/");
+}
+
+function isMarkdownPath(pathname) {
+  return pathname.endsWith(".md");
+}
+
+function isClientOnlyCiPath(pathname) {
+  if (!pathname.startsWith("client/")) {
+    return false;
+  }
+  if (ciClientFullFallbackPaths.has(pathname)) {
+    return false;
+  }
+  return !ciClientFullFallbackPrefixes.some((prefix) => pathname.startsWith(prefix));
+}
+
+export function ciPolicy(files) {
+  const normalized = files.map(normalizeChangedPath).filter(Boolean);
+  let ciClass = "full";
+
+  if (normalized.length > 0 && normalized.every(isMarkdownPath)) {
+    ciClass = "docs_only";
+  } else if (normalized.length > 0 && normalized.every(isClientOnlyCiPath)) {
+    ciClass = "client_only";
+  }
+
+  return {
+    ci_class: ciClass,
+    docs_only: ciClass === "docs_only",
+    run_server_build: ciClass !== "docs_only",
+    run_rust: ciClass === "full",
+    run_live_node: ciClass !== "docs_only",
+    run_browser: ciClass !== "docs_only",
+  };
+}
+
+function printCiPolicy(policy) {
+  for (const key of ["ci_class", "docs_only", "run_server_build", "run_rust", "run_live_node", "run_browser"]) {
+    console.log(`${key}=${policy[key]}`);
   }
 }
 
@@ -170,7 +226,7 @@ export function selectSuites(files) {
   let docsOnly = files.length > 0;
 
   for (const pathname of files) {
-    const normalized = pathname.split(path.sep).join("/");
+    const normalized = normalizeChangedPath(pathname);
     const rustCode = normalized.startsWith("server/") && normalized.endsWith(".rs");
     const ciOrScript =
       normalized.startsWith(".github/") ||
@@ -328,6 +384,28 @@ function verify() {
     }
   }
 
+  const policyCases = [
+    [[], { ci_class: "full", run_rust: true }],
+    [["docs/design/architecture.md"], { ci_class: "docs_only", run_rust: false, run_server_build: false }],
+    [["client/src/match.js"], { ci_class: "client_only", run_rust: false, run_server_build: true }],
+    [["client/src/renderer/units.js", "client/assets/sound/ui/ui_victory_01.mp3"], { ci_class: "client_only", run_rust: false }],
+    [["client/src/config.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/protocol.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/net.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/lobby_view.js"], { ci_class: "full", run_rust: true }],
+    [["client/vendor/sim-wasm/rts_sim_wasm.js"], { ci_class: "full", run_rust: true }],
+    [["client/src/match.js", "server/src/main.rs"], { ci_class: "full", run_rust: true }],
+  ];
+
+  for (const [files, expected] of policyCases) {
+    const actual = ciPolicy(files);
+    for (const [key, value] of Object.entries(expected)) {
+      if (actual[key] !== value) {
+        failures.push(`${files.join(", ") || "(no files)"} ci policy ${key}=${actual[key]}; expected ${value}`);
+      }
+    }
+  }
+
   if (failures.length > 0) {
     console.error("test selector verification failed:");
     for (const failure of failures) {
@@ -348,6 +426,11 @@ if (args.includes("--help") || args.includes("-h")) {
 
 if (args.includes("--verify")) {
   verify();
+  process.exit(0);
+}
+
+if (args.includes("--ci-policy")) {
+  printCiPolicy(ciPolicy(args.filter((arg) => !arg.startsWith("--"))));
   process.exit(0);
 }
 
