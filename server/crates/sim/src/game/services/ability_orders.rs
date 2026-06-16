@@ -396,7 +396,10 @@ pub(crate) fn launch_world_ability(
 }
 
 fn ability_clamps_world_target(ability: AbilityKind) -> bool {
-    matches!(ability, AbilityKind::EkatLineShot)
+    matches!(
+        ability,
+        AbilityKind::EkatTeleport | AbilityKind::EkatLineShot
+    )
 }
 
 fn caster_locked_out(entities: &EntityStore, caster: u32, ability: AbilityKind, tick: u32) -> bool {
