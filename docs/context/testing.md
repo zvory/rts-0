@@ -13,6 +13,8 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock input contracts
 - `tests/run-all.sh --no-rust` — live Node suites plus headless-Chrome client smoke; hydrates
   `puppeteer-core` through the shared lockfile-keyed cache
+- `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into latency-sensitive browser
+  tri-state lag scenarios locally; CI includes them automatically
 - `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
 - `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
 - `tests/run-all.sh --full-ai` — local gate plus long AI self-play/simulation coverage

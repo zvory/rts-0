@@ -15,14 +15,16 @@ gate. GitHub Actions also runs this command after pushes to `main` as a shared s
 intentionally left open for direct pushes.
 
 ```bash
-tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + API suites + client smoke + tri-state scenarios
+tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + API suites + client smoke
 tests/run-all.sh --full-ai       # local gate plus long AI self-play/simulation coverage
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
+tests/run-all.sh --with-tri-state-browser  # include latency-sensitive tri-state browser scenarios locally
 tests/run-all.sh -v              # print suite timings and pass/fail lines
 PORT=8090 tests/run-all.sh       # use a different port
 CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the per-worktree Cargo target dir
 RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh  # override shared Node deps cache
+RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 CHROME=/path/to/chrome tests/run-all.sh
 ```
 
@@ -154,6 +156,11 @@ authoritative lane, a real browser client lane, and a WASM local lane backed by
 `rts-sim-wasm`. When generated WASM assets are absent, the local lane records an explicit
 `wasmAssetsMissing` disabled reason instead of omitting local artifacts.
 
+Tri-state browser scenarios run automatically in CI, where they are the shared signal for lag and
+prediction regressions. Local `tests/run-all.sh` skips them by default because the browser lanes are
+latency-sensitive under workstation CPU contention; opt in with `--with-tri-state-browser` or
+`RTS_RUN_TRI_STATE_BROWSER=1`.
+
 Run the no-server harness contract checks:
 
 ```bash
@@ -172,6 +179,7 @@ node tests/tri_state/run.mjs --scenario dev_scenario_step_tick
 Run the lag backfill groups that are wired into `tests/run-all.sh`:
 
 ```bash
+RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh --no-rust
 node tests/tri_state/run.mjs --scenario phase-0.5
 node tests/tri_state/run.mjs --scenario phase-2.5
 ```

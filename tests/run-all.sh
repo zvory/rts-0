@@ -8,7 +8,7 @@
 #   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
 #   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration, faction_integration, team_integration)
-#   6. Headless browser suites      (client_smoke + tri-state lag scenarios; needs Chrome)
+#   6. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -22,10 +22,12 @@
 #   tests/run-all.sh -v              # verbose: print headers and passes
 #   tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
+#   tests/run-all.sh --with-tri-state-browser  # run latency-sensitive browser tri-state scenarios locally
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
 #   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the per-worktree Cargo target dir
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
+#   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -51,16 +53,25 @@ PORT="${PORT:-}"
 RUN_RUST=1
 RUN_CLIENT=1
 RUN_FULL_AI=0
+RUN_TRI_STATE_BROWSER=0
 VERBOSE=0
+case "${RTS_RUN_TRI_STATE_BROWSER:-}" in
+  1|true|TRUE|yes|YES|on|ON) RUN_TRI_STATE_BROWSER=1 ;;
+  0|false|FALSE|no|NO|off|OFF) RUN_TRI_STATE_BROWSER=0 ;;
+esac
+if [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${CI:-}" ]; then
+  RUN_TRI_STATE_BROWSER=1
+fi
 for arg in "$@"; do
   case "$arg" in
     --no-rust)   RUN_RUST=0 ;;
     --no-client) RUN_CLIENT=0 ;;
+    --with-tri-state-browser|--with-tri-state) RUN_TRI_STATE_BROWSER=1 ;;
     --full-ai|--full-selfplay) RUN_FULL_AI=1 ;;
     --port) echo "use --port=N or PORT=N" >&2; exit 2 ;;
     --port=*) PORT="${arg#*=}" ;;
     -v|--verbose) VERBOSE=1 ;;
-    -h|--help) sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,31p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -478,24 +489,29 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       SKIPPED+=("Tri-state lag scenarios (no Chrome)")
     elif hydrate_client_deps; then
       CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
-      CHROME="$CHROME" run_suite "Tri-state scenarios: phase 0.5" \
-        node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-0.5
-      CHROME="$CHROME" run_suite "Tri-state scenarios: phase 2.5" \
-        node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-2.5
-      CHROME="$CHROME" run_suite "Tri-state scenarios: phase 5" \
-        node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-5
-      if [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm.js" ] && [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm_bg.wasm" ]; then
-        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 3.5" \
-          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-3.5
-        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 4.5" \
-          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-4.5
-        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 6" \
-          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-6
+      if [ "$RUN_TRI_STATE_BROWSER" = "1" ]; then
+        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 0.5" \
+          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-0.5
+        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 2.5" \
+          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-2.5
+        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 5" \
+          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-5
+        if [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm.js" ] && [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm_bg.wasm" ]; then
+          CHROME="$CHROME" run_suite "Tri-state scenarios: phase 3.5" \
+            node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-3.5
+          CHROME="$CHROME" run_suite "Tri-state scenarios: phase 4.5" \
+            node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-4.5
+          CHROME="$CHROME" run_suite "Tri-state scenarios: phase 6" \
+            node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-6
+        else
+          info "skipping WASM-backed tri-state scenarios: generated sim-wasm assets missing"
+          SKIPPED+=("Tri-state scenarios: phase 3.5 (missing sim-wasm assets)")
+          SKIPPED+=("Tri-state scenarios: phase 4.5 (missing sim-wasm assets)")
+          SKIPPED+=("Tri-state scenarios: phase 6 (missing sim-wasm assets)")
+        fi
       else
-        info "skipping WASM-backed tri-state scenarios: generated sim-wasm assets missing"
-        SKIPPED+=("Tri-state scenarios: phase 3.5 (missing sim-wasm assets)")
-        SKIPPED+=("Tri-state scenarios: phase 4.5 (missing sim-wasm assets)")
-        SKIPPED+=("Tri-state scenarios: phase 6 (missing sim-wasm assets)")
+        info "skipping tri-state browser scenarios locally; use --with-tri-state-browser or RTS_RUN_TRI_STATE_BROWSER=1 to include them"
+        SKIPPED+=("Tri-state lag scenarios (local opt-in)")
       fi
     else
       FAILED+=("Client smoke dependency hydration")
