@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -29,13 +29,13 @@ Consolidate duplicated kind-to-wire conversion without changing protocol shapes.
 
 ## Implementation Checklist
 
-- [ ] Identify duplicated conversion tables.
-- [ ] Choose a dependency-safe shared adapter location.
-- [ ] Preserve public import compatibility.
-- [ ] Add focused conversion tests.
-- [ ] Confirm there is exactly one runtime implementation of `kind_to_wire` / `kind_from_wire`;
+- [x] Identify duplicated conversion tables.
+- [x] Choose a dependency-safe shared adapter location.
+- [x] Preserve public import compatibility.
+- [x] Add focused conversion tests.
+- [x] Confirm there is exactly one runtime implementation of `kind_to_wire` / `kind_from_wire`;
       compatibility modules may re-export but must not duplicate tables.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
