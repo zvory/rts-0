@@ -18,6 +18,11 @@ required coverage job fails. The Rust/architecture job installs `cargo-nextest` 
 are intentionally cheap; they catch staged whitespace errors and run opportunistic cleanup on
 `main`.
 
+When the Rust job is slow, use the ordinary job log first: the Rust context lines show
+`CARGO_TARGET_DIR`, Rust/cargo/nextest versions, and the Actions Cargo cache exact-hit result,
+while the `tests/run-all.sh` timing summary and nextest output show whether time was spent
+compiling or running specific tests. Do not add a separate diagnostic workflow for that question.
+
 ## Recovery states
 
 - CI failed: inspect the failing check from the PR or `gh pr checks <pr>`.
