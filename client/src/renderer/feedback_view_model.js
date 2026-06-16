@@ -1,0 +1,103 @@
+const EMPTY_ARRAY = Object.freeze([]);
+
+/**
+ * Build the narrow renderer feedback read model.
+ *
+ * The renderer feedback layer consumes this shape instead of the full GameState
+ * so placement, previews, command markers, selected-entity overlays, and
+ * transient effect markers stay behind one explicit boundary.
+ *
+ * @param {object} state GameState-compatible browser model.
+ * @param {{entities?:Array<object>, now?:number}=} options
+ * @returns {object}
+ */
+export function buildRendererFeedbackView(state, { entities = EMPTY_ARRAY, now = defaultNow() } = {}) {
+  const selectedEntities = typeof state?.selectedEntities === "function"
+    ? arrayOrEmpty(state.selectedEntities())
+    : EMPTY_ARRAY;
+  const entityLookup = buildEntityLookup(entities, selectedEntities);
+
+  const commandFeedback = liveArray(state, "liveCommandFeedback", now);
+  const smokeCanisters = liveArray(state, "liveSmokeCanisters", now);
+  const mortarLaunches = liveArray(state, "liveMortarLaunches", now);
+  const mortarShells = liveArray(state, "liveMortarShells", now);
+  const mortarTargets = liveArray(state, "liveMortarTargets", now);
+  const mortarImpacts = liveArray(state, "liveMortarImpacts", now);
+  const artilleryTargets = liveArray(state, "liveArtilleryTargets", now);
+  const artilleryLaunches = liveArray(state, "liveArtilleryLaunches", now);
+  const artilleryImpacts = liveArray(state, "liveArtilleryImpacts", now);
+  const muzzleFlashes = liveArray(state, "liveMuzzleFlashes", now);
+
+  return {
+    playerId: state?.playerId,
+    map: state?.map || null,
+    placement: state?.placement || null,
+    commandFeedback,
+    selectedEntities: () => selectedEntities,
+    debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,
+    showAllDebugPathOverlays: !!state?.showAllDebugPathOverlays,
+    antiTankGunSetupPreview: state?.antiTankGunSetupPreview || null,
+    abilityTargetPreview: state?.abilityTargetPreview || null,
+    abilityObjects: arrayOrEmpty(state?.abilityObjects),
+    smokes: arrayOrEmpty(state?.smokes),
+    smokeCanisters,
+    mortarLaunches,
+    mortarShells,
+    mortarTargets,
+    mortarImpacts,
+    artilleryTargets,
+    artilleryLaunches,
+    artilleryImpacts,
+    resourceMiningPreview: state?.resourceMiningPreview || null,
+    muzzleFlashes,
+    liveCommandFeedback: () => commandFeedback,
+    liveSmokeCanisters: () => smokeCanisters,
+    liveMortarLaunches: () => mortarLaunches,
+    liveMortarShells: () => mortarShells,
+    liveMortarTargets: () => mortarTargets,
+    liveMortarImpacts: () => mortarImpacts,
+    liveArtilleryTargets: () => artilleryTargets,
+    liveArtilleryLaunches: () => artilleryLaunches,
+    liveArtilleryImpacts: () => artilleryImpacts,
+    liveMuzzleFlashes: () => muzzleFlashes,
+    entityById(id) {
+      return entityLookup.get(id);
+    },
+    isOwnOwner(owner) {
+      if (typeof state?.isOwnOwner === "function") return state.isOwnOwner(owner);
+      return Number(owner) === state?.playerId;
+    },
+    isAllyOwner(owner) {
+      if (typeof state?.isAllyOwner === "function") return state.isAllyOwner(owner);
+      return false;
+    },
+  };
+}
+
+function liveArray(state, method, now) {
+  return typeof state?.[method] === "function" ? arrayOrEmpty(state[method](now)) : EMPTY_ARRAY;
+}
+
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : EMPTY_ARRAY;
+}
+
+function buildEntityLookup(entities, selectedEntities) {
+  const lookup = new Map();
+  addEntities(lookup, entities);
+  addEntities(lookup, selectedEntities);
+  return lookup;
+}
+
+function addEntities(lookup, entities) {
+  if (!Array.isArray(entities)) return;
+  for (const entity of entities) {
+    if (entity && entity.id != null) lookup.set(entity.id, entity);
+  }
+}
+
+function defaultNow() {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}

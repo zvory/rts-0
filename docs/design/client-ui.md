@@ -18,6 +18,7 @@ src/
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
+  renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
@@ -160,6 +161,16 @@ tint slots, and tears down all owned children through `destroy()`. `renderer/uni
 a test-gated side-by-side comparison seam: `_rigComparisonEnabled` must be set and a definition
 must exist in `_rigDefinitionsByKind`; otherwise normal gameplay continues to draw legacy
 procedural units.
+
+`renderer/feedback_view_model.js`
+```js
+export function buildRendererFeedbackView(state, options?)
+  // Per-frame read model builder. Returns placement, command feedback,
+  // selected entities, resource mining previews, support-weapon previews,
+  // ability target previews, ability objects, smokes, transient projectile/
+  // target markers, relationship helpers, and entity lookup for renderer
+  // feedback drawing without exposing the full mutable GameState.
+```
 
 `branch_staging.js`
 ```js
