@@ -11,6 +11,8 @@ use crate::rules::combat;
 use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
 
+pub(crate) const FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
+
 #[derive(Debug, Clone)]
 struct MortarShell {
     owner: u32,
@@ -42,7 +44,7 @@ pub(crate) fn mortar_current_facing_ready(e: &Entity, target_angle: f32) -> bool
         .unwrap_or_else(|| e.facing());
     target_angle.is_finite()
         && current.is_finite()
-        && angle_delta(current, target_angle).abs() <= config::MORTAR_FIRE_TOLERANCE_RAD
+        && angle_delta(current, target_angle).abs() <= FIRE_TOLERANCE_RAD
 }
 
 fn angle_delta(from: f32, to: f32) -> f32 {

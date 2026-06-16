@@ -15,6 +15,14 @@ catalogs. For changes that affect visible stats, faction availability, upgrades,
 metadata, run `node scripts/check-wiki.mjs`; it includes the wiki route/table checks and the client
 catalog parity check.
 
+`server/src/config.rs` and `server/crates/sim/src/config.rs` are compatibility shims for
+Rust-owned balance exports while call sites are migrated. They should not accumulate server-shell
+or sim-only implementation constants. Those values belong beside the module that owns the behavior.
+
+| Constant | Before Phase 5 | After Phase 5 | Mirror impact |
+|----------|----------------|---------------|---------------|
+| `MORTAR_FIRE_TOLERANCE_RAD` | Sim-only mortar aim tolerance exported from `server/crates/sim/src/config.rs` beside mirrored balance constants | Sim-local `server/crates/sim/src/game/mortar.rs` `FIRE_TOLERANCE_RAD`, owned by mortar firing behavior | None; it is not mirrored into `client/src/config.js` and does not change wire shape or balance values |
+
 ### Client mirror boundary inventory
 
 Phase 1 records the current source-of-truth map before later phases add broader mechanical checks.
