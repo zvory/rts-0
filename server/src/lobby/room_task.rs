@@ -6,10 +6,10 @@ use super::faction_validation::{
 };
 use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::participants::{CommandIssuer, Participants};
+use super::projection::{ObserverAnalysisAudience, ProjectionPolicy};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
 use super::session_policy::{SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
-use super::snapshots::union_events;
 use super::tick_control::{DevWatchSpeed, ReplayPlaybackClock, ScheduledTickAction, TickControl};
 use super::*;
 #[cfg(test)]
@@ -376,6 +376,10 @@ impl RoomTask {
 
     fn session_policy(&self) -> SessionPolicy {
         SessionPolicy::for_room(&self.mode, self.session_phase())
+    }
+
+    fn projection_policy(&self) -> ProjectionPolicy {
+        ProjectionPolicy::new(self.session_policy().vision)
     }
 
     fn is_dev_watch(&self) -> bool {
@@ -2049,6 +2053,11 @@ impl RoomTask {
         let Phase::ReplayViewer(session) = &self.phase else {
             return;
         };
+        if self.projection_policy().observer_analysis_audience()
+            != ObserverAnalysisAudience::ReplayViewers
+        {
+            return;
+        }
         self.send_observer_analysis_to_ids(
             [watcher_id],
             ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
@@ -2061,6 +2070,11 @@ impl RoomTask {
     }
 
     fn broadcast_observer_analysis_for(&self, session: &ReplaySession) {
+        if self.projection_policy().observer_analysis_audience()
+            != ObserverAnalysisAudience::ReplayViewers
+        {
+            return;
+        }
         self.send_observer_analysis_to_ids(
             self.order.clone(),
             ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
@@ -2105,13 +2119,14 @@ impl RoomTask {
     fn fanout_replay_snapshots(
         &mut self,
         session: &ReplaySession,
-        per_player_events: HashMap<u32, Vec<Event>>,
+        mut per_player_events: HashMap<u32, Vec<Event>>,
         scheduler_lag: Duration,
         tick_start: StdInstant,
         perf: Option<&mut rts_sim::perf::TickPerf>,
     ) {
         let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
+        let projection_policy = self.projection_policy();
         SnapshotFanout::new(
             &self.room,
             scheduler_lag,
@@ -2121,13 +2136,10 @@ impl RoomTask {
             perf,
         )
         .send_to_recipients(&mut self.players, recipients, |id, _player| {
-            let visible_players = session.vision_player_ids_for(id);
-            let mut snapshot = session.game().snapshot_for_spectator(&visible_players);
-            snapshot.events.extend(union_events(
-                visible_players
-                    .iter()
-                    .filter_map(|player_id| per_player_events.get(player_id)),
-            ));
+            let projection =
+                projection_policy.replay_snapshot_for(session.vision_player_ids_for(id));
+            let snapshot =
+                projection.snapshot_with_events(session.game(), &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, true))
         });
     }
@@ -2167,6 +2179,7 @@ impl RoomTask {
         }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
+        let projection_policy = self.projection_policy();
         let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => {
                 // Stay in lobby; nothing to simulate.
@@ -2202,6 +2215,7 @@ impl RoomTask {
             pending_client_command_acks: &mut self.pending_client_command_acks,
             slow_tick_count: &mut self.slow_tick_count,
             spectator_visible_players,
+            projection_policy,
         }
         .run(game);
 
@@ -2268,6 +2282,7 @@ impl RoomTask {
         let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
+        let projection = self.projection_policy().dev_snapshot_for(view_player_id);
         SnapshotFanout::new(
             &self.room,
             scheduler_lag,
@@ -2277,10 +2292,7 @@ impl RoomTask {
             perf.as_mut(),
         )
         .send_to_recipients(&mut self.players, recipients, |_id, player| {
-            let mut snapshot = game.snapshot_full_for(view_player_id);
-            if let Some(mut events) = per_player_events.remove(&view_player_id) {
-                snapshot.events.append(&mut events);
-            }
+            let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
 
@@ -2380,6 +2392,8 @@ impl RoomTask {
     }
 
     fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
+        let send_analysis = self.projection_policy().observer_analysis_audience()
+            == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
             if !self.players.contains_key(&player_id) {
                 return;
@@ -2399,8 +2413,8 @@ impl RoomTask {
                 return;
             }
             session.set_vision(player_id, vision);
-            let analysis = session.game().observer_analysis();
-            if let Some(player) = self.players.get(&player_id) {
+            let analysis = send_analysis.then(|| session.game().observer_analysis());
+            if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
                 send_or_log(
                     &self.room,
                     player_id,
@@ -2527,6 +2541,8 @@ impl RoomTask {
     /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
     /// No-op outside replay rooms or when no game is active.
     fn on_seek_replay(&mut self, player_id: u32, ticks_back: u32) {
+        let send_analysis = self.projection_policy().observer_analysis_audience()
+            == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
             if !self.players.contains_key(&player_id) {
                 return;
@@ -2553,6 +2569,7 @@ impl RoomTask {
             let analysis = seek_result
                 .as_ref()
                 .ok()
+                .filter(|_| send_analysis)
                 .map(|_| session.game().observer_analysis());
             match seek_result {
                 Ok(_) => {
@@ -2576,6 +2593,8 @@ impl RoomTask {
 
     /// Seek a replay to an absolute tick. No-op outside replay rooms or when no game is active.
     fn on_seek_replay_to(&mut self, player_id: u32, tick: u32) {
+        let send_analysis = self.projection_policy().observer_analysis_audience()
+            == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
             if !self.players.contains_key(&player_id) {
                 return;
@@ -2602,6 +2621,7 @@ impl RoomTask {
             let analysis = seek_result
                 .as_ref()
                 .ok()
+                .filter(|_| send_analysis)
                 .map(|_| session.game().observer_analysis());
             match seek_result {
                 Ok(_) => {

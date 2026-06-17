@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Done.
+- [x] Done.
 
 ## Objective
 
@@ -36,12 +36,12 @@ fog and visibility behavior.
 
 ## Implementation Checklist
 
-- [ ] Add focused tests for projection classification before moving fanout code.
-- [ ] Preserve per-recipient player snapshots for active players.
-- [ ] Preserve live spectator visible-player list semantics, including branch live aliases.
-- [ ] Preserve replay per-viewer vision validation and clamping.
-- [ ] Preserve dev full-world snapshot behavior and observer analysis delivery.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Add focused tests for projection classification before moving fanout code.
+- [x] Preserve per-recipient player snapshots for active players.
+- [x] Preserve live spectator visible-player list semantics, including branch live aliases.
+- [x] Preserve replay per-viewer vision validation and clamping.
+- [x] Preserve dev full-world snapshot behavior and observer analysis delivery.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
