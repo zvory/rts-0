@@ -3562,6 +3562,84 @@ mod tests {
     }
 
     #[test]
+    fn lobby_phase_ignores_gameplay_commands() {
+        let mut task = RoomTask::new(
+            "lobby-command-readonly-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 1, true);
+
+        task.on_command(
+            1,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(
+            task.players.get(&1).unwrap().last_received_client_seq,
+            0,
+            "lobby-phase commands must not consume client sequence state"
+        );
+    }
+
+    #[test]
+    fn normal_live_spectator_start_payload_is_read_only() {
+        let mut task = RoomTask::new(
+            "live-spectator-readonly-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer_player = add_test_room_player(&mut task, 1, true);
+        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+
+        task.start_match();
+        let start_messages: Vec<_> =
+            std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
+        assert!(start_messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::Start(payload)
+                    if payload.player_id == 99
+                        && payload.spectator
+                        && payload.prediction_build_id.is_none()
+                        && payload.prediction_version == 0
+                        && payload.replay.is_none()
+            )
+        }));
+
+        task.on_command(
+            99,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+        task.on_tick(TokioInstant::now());
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert!(game.command_log().is_empty());
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(task.players.get(&99).unwrap().last_received_client_seq, 0);
+        let snapshot = writer_spectator
+            .snapshots
+            .take()
+            .expect("spectator snapshot");
+        assert_eq!(snapshot.net_status.prediction_version, 0);
+        assert_eq!(snapshot.net_status.last_sim_consumed_client_seq, 0);
+    }
+
+    #[test]
     fn replay_phase_ignores_gameplay_commands() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 0);
