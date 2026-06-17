@@ -42,7 +42,26 @@ export const COMMAND_CAR_PARTS = Object.freeze({
 
 export const EKAT_PARTS = Object.freeze({
   shadow: Object.freeze(["part.shadow"]),
-  unit: Object.freeze(["part.body", "part.facingTick"]),
+  unit: Object.freeze([
+    "part.dress.trail",
+    "part.dress.core",
+    "part.shoulders",
+    "part.staff.shadow",
+    "part.staff",
+    "part.arm.left",
+    "part.arm.right",
+    "part.head",
+    "part.hair.back",
+    "part.hair.bun",
+    "part.hair.flow.crown",
+    "part.hair.flow.upper",
+    "part.hair.flow.side",
+    "part.hair.flow.lower",
+    "part.hair.flow.tip",
+    "part.hair.bun.flow.upper",
+    "part.hair.bun.flow.lower",
+    "part.orb",
+  ]),
 });
 
 export const SCOUT_CAR_RIG_SVG = `<svg viewBox="-40 -32 80 64" data-rts-rig-kind="scout_car" data-rts-rig-version="1" data-rts-origin="center" id="scout-car.authored">
@@ -99,12 +118,28 @@ export const COMMAND_CAR_RIG_SVG = `<svg viewBox="-36 -28 72 56" data-rts-rig-ki
 </svg>`;
 
 export const EKAT_RIG_SVG = `<svg viewBox="-24 -24 48 48" data-rts-rig-kind="ekat" data-rts-rig-version="1" data-rts-origin="center" id="ekat.authored">
-  <ellipse id="part.shadow" cx="0" cy="3.5" rx="10" ry="6" fill="#000000" opacity="0.28" />
-  <polygon id="part.body" points="0,-10 8.5,-2.5 5.5,9 -5.5,9 -8.5,-2.5" fill="#5d7896" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team" />
-  <line id="part.facingTick" x1="0" y1="0" x2="13" y2="0" stroke="#d8d0b0" stroke-width="2" opacity="0.85" data-rts-animation="facing:transform.rotation:1:0" />
+  <ellipse id="part.shadow" cx="-2" cy="4.2" rx="14" ry="7" fill="#000000" opacity="0.28" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.dress.trail" d="M 3.5 -5.2 C -4.5 -11.5 -15.5 -10.5 -20 -4.2 L -13.6 0 L -20 4.2 C -15.5 10.5 -4.5 11.5 3.5 5.2 L 1 0 Z" fill="#5d7896" fill-opacity="0.92" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <polygon id="part.dress.core" points="5,-3.8 0,-7.2 -9.5,-6 -14,0 -9.5,6 0,7.2 5,3.8 3,0" fill="#6d89b8" fill-opacity="0.98" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team-light-soft" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.shoulders" d="M 2.4 -6 C 4.7 -6 5.8 -4.2 5.8 -2 L 5.8 2 C 5.8 4.2 4.7 6 2.4 6 C 0.1 6 -1 4.2 -1 2 L -1 -2 C -1 -4.2 0.1 -6 2.4 -6 Z" fill="#d8ad8b" stroke="#1a1712" stroke-width="1.25" stroke-opacity="0.95" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.staff.shadow" x1="-7.5" y1="6.25" x2="19.2" y2="8.8" stroke="#1a1712" stroke-width="4" opacity="0.95" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.staff" x1="-7.5" y1="6.25" x2="19.2" y2="8.8" stroke="#6b3f22" stroke-width="2.25" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0" />
+  <polygon id="part.arm.left" points="-0.2,-6.7 4.8,-7.4 5.6,-4.2 0.2,-3.1" fill="#d8ad8b" fill-opacity="0.95" stroke="#1a1712" stroke-width="0.8" stroke-opacity="0.85" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.arm.right" d="M -0.7 2.8 L 3 3 L 5.6 5.4 L 8.5 5.7 L 7.8 9.3 L 4.1 8.8 L 1.2 6.1 L -1 5.4 Z" fill="#d8ad8b" fill-opacity="0.95" stroke="#1a1712" stroke-width="0.8" stroke-opacity="0.85" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.head" cx="3.2" cy="0" r="3.15" fill="#d8ad8b" stroke="#1a1712" stroke-width="1.25" stroke-opacity="0.95" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.back" d="M 3.54 -3.65 C 0.95 -5.23 -2.74 -3.47 -2.93 0.18 C -3.11 3.58 0.59 4.44 3.51 2.67 L 3.14 -0.13 Z" fill="#e1bf4f" stroke="#1a1712" stroke-width="1.13" stroke-opacity="0.95" data-rts-animation="facing:transform.rotation:1:0" />
+  <ellipse id="part.hair.bun" cx="-3.95" cy="0.2" rx="1.05" ry="1.18" fill="#e1bf4f" stroke="#1a1712" stroke-width="0.8" stroke-opacity="0.95" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.flow.crown" d="M 2.77 -2.61 Q 0.82 -3.89 -1.54 -2.25" fill="none" stroke="#8f6b1f" stroke-width="0.56" opacity="0.72" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.flow.upper" d="M 2.4 -3.2 Q 0.17 -3.2 -2.05 -1.46" fill="none" stroke="#8f6b1f" stroke-width="0.5" opacity="0.58" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.flow.side" d="M 2.52 -0.97 Q 0.34 -0.31 -2.09 0.97" fill="none" stroke="#8f6b1f" stroke-width="0.56" opacity="0.62" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.flow.lower" d="M 2.54 0.81 Q 0.26 1.96 -2.05 1.58" fill="none" stroke="#8f6b1f" stroke-width="0.5" opacity="0.58" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.flow.tip" d="M 2.83 1.83 Q 0.82 3.04 -1.54 2.19" fill="none" stroke="#8f6b1f" stroke-width="0.56" opacity="0.62" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.bun.flow.upper" d="M -4.5 -0.25 Q -3.9 -0.82 -3.27 -0.12" fill="none" stroke="#8f6b1f" stroke-width="0.42" opacity="0.68" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.hair.bun.flow.lower" d="M -4.49 0.55 Q -3.83 0.94 -3.23 0.34" fill="none" stroke="#8f6b1f" stroke-width="0.42" opacity="0.62" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.orb" cx="19.2" cy="8.8" r="3.1" fill="#7fa8c9" stroke="#d8d0b0" stroke-width="1.35" stroke-opacity="0.9" data-rts-tint="team-light-strong" data-rts-animation="facing:transform.rotation:1:0" />
   <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
   <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
-  <circle id="anchor.hp" cx="0" cy="-18" r="1" fill="#ffffff" />
-  <rect id="bounds.selection" x="-13" y="-13" width="26" height="26" fill="none" />
-  <rect id="bounds.hp" x="-11" y="-20" width="22" height="6" fill="none" />
+  <circle id="anchor.hp" cx="0" cy="-21" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-22" y="-16" width="45" height="33" fill="none" />
+  <rect id="bounds.hp" x="-13" y="-24" width="26" height="6" fill="none" />
 </svg>`;
