@@ -11,6 +11,7 @@ members = [
     "crates/ai",
     "crates/archcheck",
     "crates/contract",
+    "crates/phaserunner",
     "crates/protocol",
     "crates/rules",
     "crates/sim",
