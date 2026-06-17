@@ -11,7 +11,7 @@ import {
   createLegacyUnitPartCapture,
 } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
-import { createLiveRigDefinitions } from "../client/src/renderer/rigs/live_routing.js";
+import { createLiveRigDefinitions, liveRigRoutesFor } from "../client/src/renderer/rigs/live_routing.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import { createRigRenderContext, sampleRigAnimation } from "../client/src/renderer/rigs/animation.js";
 import {
@@ -20,6 +20,7 @@ import {
   renderLiveUnitRig,
   renderRigLegacyComparison,
 } from "../client/src/renderer/rigs/runtime.js";
+import { TANK_RIG_SVG } from "../client/src/renderer/rigs/tank_svg.js";
 import { WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -175,12 +176,29 @@ test("side-by-side comparison path is explicit and leaves default unit draw on l
   assert.equal(renderer._rigComparisonPool.get(entity.id).container.x, entity.x + 48);
 });
 
-test("live rig definitions compile Worker from the production SVG source", () => {
-  const fixtureText = fs.readFileSync(path.join(fixturesDir, "rig-worker.svg"), "utf8").trim();
-  assert.equal(WORKER_RIG_SVG.trim(), fixtureText);
+test("live rig definitions compile production SVG sources", () => {
+  const workerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-worker.svg"), "utf8").trim();
+  const tankFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-vehicle.svg"), "utf8").trim();
+  assert.equal(WORKER_RIG_SVG.trim(), workerFixtureText);
+  assert.equal(TANK_RIG_SVG.trim(), tankFixtureText);
   const definitions = createLiveRigDefinitions();
   assert.equal(definitions.has(KIND.WORKER), true);
   assert.equal(definitions.get(KIND.WORKER).id, "worker.authored");
+  assert.equal(definitions.has(KIND.TANK), true);
+  assert.equal(definitions.get(KIND.TANK).id, "tank.authored");
+});
+
+test("live rig routes expose kind-specific production part groups", () => {
+  const workerRoutes = liveRigRoutesFor(KIND.WORKER);
+  assert.deepEqual(workerRoutes[0].parts, ["part.shadow"]);
+  assert.deepEqual(workerRoutes[1].parts, ["part.body", "part.busyIndicator", "part.facingTick"]);
+
+  const tankRoutes = liveRigRoutesFor(KIND.TANK);
+  assert.deepEqual(tankRoutes[0].parts, ["part.shadow"]);
+  assert.equal(tankRoutes[1].parts.includes("part.track.left"), true);
+  assert.equal(tankRoutes[1].parts.includes("part.turret"), true);
+  assert.equal(tankRoutes[1].parts.includes("part.barrel"), true);
+  assert.equal(tankRoutes[1].parts.includes("part.fuelCue.box"), true);
 });
 
 test("default Worker draw uses live SVG rig without enabling comparison", () => {
@@ -198,6 +216,33 @@ test("default Worker draw uses live SVG rig without enabling comparison", () => 
   assert.equal(renderer.layers.units.children.length, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.get(entity.id).parts.get("part.shadow").display.visible, true);
   assert.equal(renderer._liveRigPools.liveUnitRigs.get(entity.id).parts.get("part.shadow").display.visible, false);
+});
+
+test("default Tank draw uses live SVG rig with separate turret and hull parts", () => {
+  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const entity = {
+    id: 40,
+    kind: KIND.TANK,
+    owner: 1,
+    x: 32,
+    y: 44,
+    facing: 0,
+    weaponFacing: Math.PI / 2,
+    state: STATE.IDLE,
+  };
+  const renderer = makeComparisonRenderer(definition);
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, definition]]);
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
+
+  assert.equal(renderer.legacyDraws, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
+  assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
+  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  assert.equal(unit.parts.get("part.hull").display.rotation, 0);
+  assert.equal(unit.parts.get("part.turret").display.rotation, Math.PI / 2);
+  assert.equal(unit.parts.get("part.barrel").display.rotation, Math.PI / 2);
+  assert.equal(unit.parts.get("part.shadow").display.visible, false);
 });
 
 test("non-routed units fall back to legacy procedural drawing", () => {

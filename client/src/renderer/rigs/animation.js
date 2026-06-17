@@ -25,13 +25,33 @@ export function createRigRenderContext(entity, {
   const recoilProgress = typeof state.weaponRecoil === "function"
     ? clamp01(state.weaponRecoil(entity.id, entity.kind, now))
     : clamp01(entity.recoilProgress ?? 0);
+  const recoilPx = weaponRecoilOffset(entity.kind, recoilProgress);
+  const recoilKickFactor = entity.kind === KIND.TANK
+    ? 0.85
+    : entity.kind === KIND.ARTILLERY
+      ? 0.65
+      : entity.kind === KIND.ANTI_TANK_GUN
+        ? 0.42
+        : entity.kind === KIND.MORTAR_TEAM
+          ? 0.28
+          : 0;
+  const recoilKick = recoilPx > 0 && recoilKickFactor > 0
+    ? {
+      x: Math.cos(weaponFacing + Math.PI) * recoilPx * recoilKickFactor,
+      y: Math.sin(weaponFacing + Math.PI) * recoilPx * recoilKickFactor,
+    }
+    : { x: 0, y: 0 };
   const ownUnit = entity.owner === state.playerId;
   const oil = state.resources ? state.resources.oil : null;
+  const lowOil = ownUnit && typeof oil === "number" && oil > 0 && oil <= 5;
+  const oilStarved = ownUnit && oil === 0 && (entity.state === STATE.MOVE || entity.state === STATE.ATTACK);
   return {
     now,
     teamColor: colorByOwner.get(entity.owner) ?? hexToInt(entity.teamColor),
     recoilProgress,
-    recoilPx: weaponRecoilOffset(entity.kind, recoilProgress),
+    recoilPx,
+    recoilKickX: recoilKick.x,
+    recoilKickY: recoilKick.y,
     setupVisual: setupVisual ?? defaultSetupVisual(entity),
     vehicleMotion: vehicleMotion ?? defaultVehicleMotion(),
     selected: Boolean(selected),
@@ -43,8 +63,9 @@ export function createRigRenderContext(entity, {
     weaponFacing,
     busy: isBusy(entity),
     breakthroughTicks: finite(entity.breakthroughTicks, 0),
-    lowOil: ownUnit && typeof oil === "number" && oil > 0 && oil <= 5,
-    oilStarved: ownUnit && oil === 0 && (entity.state === STATE.MOVE || entity.state === STATE.ATTACK),
+    lowOil,
+    oilStarved,
+    fuelCueVisible: lowOil || oilStarved,
   };
 }
 
