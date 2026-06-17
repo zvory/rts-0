@@ -5,10 +5,12 @@ use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
 use super::live_tick::{LiveTickDriver, LiveTickResult};
+use super::participants::{CommandIssuer, Participants};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
-use super::session_policy::{ClockPolicy, SessionPhase, SessionPolicy};
+use super::session_policy::{SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
+use super::tick_control::{DevWatchSpeed, ReplayPlaybackClock, ScheduledTickAction, TickControl};
 use super::*;
 #[cfg(test)]
 use crate::protocol::SnapshotNetStatus;
@@ -341,22 +343,28 @@ impl RoomTask {
     pub(super) fn current_tick_interval(&self) -> Duration {
         let base =
             test_tick_interval_override().unwrap_or_else(|| Duration::from_millis(config::TICK_MS));
-        base.div_f32(self.current_speed_multiplier())
+        self.tick_control().tick_interval(base)
     }
 
     fn current_speed_multiplier(&self) -> f32 {
-        if self.dev_watch_paused {
-            return 1.0;
-        }
-        match self.session_policy().clock {
-            ClockPolicy::ReplayPlayback => match &self.phase {
-                Phase::ReplayViewer(session) if session.is_paused() => 1.0,
-                Phase::ReplayViewer(session) => session.speed(),
-                _ => self.replay_speed,
-            },
-            ClockPolicy::BranchStaging => 1.0,
-            _ => self.replay_speed,
-        }
+        self.tick_control().speed_multiplier()
+    }
+
+    fn tick_control(&self) -> TickControl {
+        let replay = match &self.phase {
+            Phase::ReplayViewer(session) => Some(ReplayPlaybackClock {
+                speed: session.speed(),
+                paused: session.is_paused(),
+            }),
+            _ => None,
+        };
+        TickControl::new(
+            self.session_policy().clock,
+            replay,
+            self.dev_watch_paused,
+            self.replay_speed,
+            self.match_countdown_deadline.is_some(),
+        )
     }
 
     fn session_phase(&self) -> SessionPhase {
@@ -1031,23 +1039,16 @@ impl RoomTask {
     }
 
     fn active_human_count(&self) -> usize {
-        self.order
-            .iter()
-            .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
-            .count()
+        self.participants().active_human_count()
     }
 
     fn active_human_ids(&self) -> impl Iterator<Item = u32> + '_ {
-        self.order
-            .iter()
-            .copied()
-            .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
+        self.participants().active_human_ids().into_iter()
     }
 
     fn active_seat_ids(&self) -> Vec<u32> {
-        let mut ids: Vec<u32> = self.active_human_ids().collect();
-        ids.extend(self.ai_players.iter().map(|ai| ai.id));
-        ids
+        self.participants()
+            .active_seat_ids(self.ai_players.iter().map(|ai| ai.id))
     }
 
     fn team_id_for_active_seat(&self, id: u32) -> TeamId {
@@ -1144,49 +1145,34 @@ impl RoomTask {
     }
 
     fn spectator_visible_player_ids(&self) -> Vec<u32> {
-        if !self.branch_live_seat_by_connection.is_empty() {
-            return self
-                .branch_live_seat_by_connection
-                .values()
-                .copied()
-                .collect();
-        }
-        let mut ids: Vec<u32> = self.active_human_ids().collect();
-        ids.extend(self.ai_players.iter().map(|ai| ai.id));
-        ids
+        self.participants()
+            .spectator_visible_player_ids(self.ai_players.iter().map(|ai| ai.id))
     }
 
     fn live_seat_id_for_connection(&self, connection_id: u32) -> Option<u32> {
-        self.branch_live_seat_by_connection
-            .get(&connection_id)
-            .copied()
-            .or_else(|| {
-                self.players
-                    .contains_key(&connection_id)
-                    .then_some(connection_id)
-            })
+        self.participants()
+            .live_seat_id_for_connection(connection_id)
     }
 
     fn live_connection_is_player(&self, connection_id: u32) -> bool {
-        self.players
-            .get(&connection_id)
-            .map(|p| !p.spectator)
-            .unwrap_or(false)
-            && (self.branch_live_seat_by_connection.is_empty()
-                || self
-                    .branch_live_seat_by_connection
-                    .contains_key(&connection_id))
+        self.participants().live_connection_is_player(connection_id)
+    }
+
+    fn command_issuer_for_connection(&self, connection_id: u32) -> Option<CommandIssuer> {
+        self.participants()
+            .command_issuer_for_connection(connection_id, &self.outcome_sent)
     }
 
     fn reassign_host_if_needed(&mut self) {
-        if self
-            .host_id
-            .and_then(|id| self.players.get(&id).map(|_| id))
-            .is_some()
-        {
-            return;
-        }
-        self.host_id = self.order.first().copied();
+        self.host_id = self.participants().host_with_fallback(self.host_id);
+    }
+
+    fn participants(&self) -> Participants<'_> {
+        Participants::new(
+            &self.order,
+            &self.players,
+            &self.branch_live_seat_by_connection,
+        )
     }
 
     /// Pick the first palette color not currently held by a human player. Join order alone is
@@ -1226,16 +1212,11 @@ impl RoomTask {
             crate::log_debug!(room = %self.room, player_id, "ignoring command with reserved clientSeq 0");
             return;
         }
-        let live_seat_id = (self.live_connection_is_player(player_id)
-            && !self.outcome_sent.contains(&player_id))
-        .then(|| {
-            self.live_seat_id_for_connection(player_id)
-                .unwrap_or(player_id)
-        });
+        let issuer = self.command_issuer_for_connection(player_id);
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
-            if let Some(seat_id) = live_seat_id {
+            if let Some(issuer) = issuer {
                 let Some(player) = self.players.get_mut(&player_id) else {
                     return;
                 };
@@ -1250,10 +1231,10 @@ impl RoomTask {
                     return;
                 }
                 player.last_received_client_seq = client_seq;
-                game.enqueue(seat_id, cmd);
+                game.enqueue(issuer.seat_id, cmd);
                 self.pending_client_command_acks
                     .push(PendingClientCommandAck {
-                        connection_id: player_id,
+                        connection_id: issuer.connection_id,
                         client_seq,
                     });
             }
@@ -2189,22 +2170,21 @@ impl RoomTask {
     /// One simulation step. No-op in the `Lobby` phase (the ticker keeps running so a room is
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
-        if self.is_dev_watch() {
-            if self.dev_watch_paused {
+        match self.tick_control().scheduled_action() {
+            ScheduledTickAction::Noop => return,
+            ScheduledTickAction::Countdown => {
+                self.finish_match_countdown_if_due();
                 return;
             }
-            self.on_tick_dev_watch(scheduled);
-            return;
-        }
-        if matches!(self.phase, Phase::ReplayViewer(_)) {
-            if matches!(&self.phase, Phase::ReplayViewer(session) if session.is_paused()) {
+            ScheduledTickAction::ReplayPlayback => {
+                self.on_tick_replay_viewer(scheduled);
                 return;
             }
-            self.on_tick_replay_viewer(scheduled);
-            return;
-        }
-        if self.finish_match_countdown_if_due() {
-            return;
+            ScheduledTickAction::DevWatch => {
+                self.on_tick_dev_watch(scheduled);
+                return;
+            }
+            ScheduledTickAction::LiveMatch => {}
         }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
@@ -2397,22 +2377,22 @@ impl RoomTask {
         if !self.session_policy().is_dev_watch() {
             return;
         }
-        if speed == 0.0 {
-            self.dev_watch_paused = true;
-            self.broadcast_dev_watch_state();
-            return;
+        match TickControl::dev_watch_speed(speed) {
+            DevWatchSpeed::Paused => {
+                self.dev_watch_paused = true;
+            }
+            DevWatchSpeed::Running(speed) => {
+                self.dev_watch_paused = false;
+                self.replay_speed = speed;
+            }
         }
-        self.dev_watch_paused = false;
-        // Clamp to sensible range matching the UI buttons (0.125× – 8×).
-        let clamped = speed.clamp(0.125, 8.0);
-        self.replay_speed = clamped;
         self.broadcast_dev_watch_state();
     }
 
     fn on_step_dev_tick(&mut self, player_id: u32) {
-        if !self.players.contains_key(&player_id)
-            || !self.dev_watch_paused
-            || !self.session_policy().is_dev_watch()
+        if !self
+            .tick_control()
+            .can_step_dev_tick(self.players.contains_key(&player_id))
         {
             return;
         }
@@ -3443,6 +3423,67 @@ mod tests {
     }
 
     #[test]
+    fn room_task_tick_control_preserves_current_intervals_by_mode() {
+        let base = Duration::from_millis(config::TICK_MS);
+
+        let normal = RoomTask::new(
+            "tick-normal".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        assert_eq!(normal.current_tick_interval(), base);
+
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 3);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        replay.set_speed(99, 2.0);
+        let mut replay_task = RoomTask::new(
+            "tick-replay".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut replay_task, 99, true);
+        replay_task.phase = Phase::ReplayViewer(Box::new(replay));
+        assert_eq!(replay_task.current_tick_interval(), base.div_f32(2.0));
+
+        replay_task.on_set_replay_speed(99, 0.0);
+        assert_eq!(replay_task.current_tick_interval(), base);
+
+        let mut dev = RoomTask::new(
+            "tick-dev".to_string(),
+            RoomMode::DevScenario(DevScenarioConfig {
+                id: DevScenarioId::VehicleCornerWall,
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        dev.on_set_replay_speed(99, 2.0);
+        assert_eq!(dev.current_tick_interval(), base.div_f32(2.0));
+        dev.on_set_replay_speed(99, 0.0);
+        assert_eq!(dev.current_tick_interval(), base);
+
+        let seed = replay_branch_test_seed(&players, 1);
+        let mut branch = RoomTask::new(
+            "tick-branch".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        branch.replay_speed = 4.0;
+        branch.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+        assert_eq!(branch.current_tick_interval(), base);
+    }
+
+    #[test]
     fn replay_room_rejects_rapid_seek_without_resetting_viewers() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 4);
@@ -3622,6 +3663,75 @@ mod tests {
             0,
             "lobby-phase commands must not consume client sequence state"
         );
+    }
+
+    #[test]
+    fn normal_live_player_commands_use_connection_authority_and_ack_sequence() {
+        let mut task = RoomTask::new(
+            "live-command-authority-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 1, true);
+
+        task.start_match();
+        task.on_command(
+            1,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        assert_eq!(task.players.get(&1).unwrap().last_received_client_seq, 1);
+        assert_eq!(task.pending_client_command_acks.len(), 1);
+        assert_eq!(task.pending_client_command_acks[0].connection_id, 1);
+        assert_eq!(task.pending_client_command_acks[0].client_seq, 1);
+
+        task.on_tick(TokioInstant::now());
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert_eq!(game.command_log().len(), 1);
+        assert_eq!(game.command_log()[0].player_id, 1);
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(
+            task.players.get(&1).unwrap().last_sim_consumed_client_seq,
+            1
+        );
+    }
+
+    #[test]
+    fn defeated_live_players_cannot_issue_more_commands() {
+        let mut task = RoomTask::new(
+            "defeated-command-authority-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 1, true);
+        add_test_room_player(&mut task, 2, true);
+
+        task.start_match();
+        task.outcome_sent.insert(1);
+        task.on_command(
+            1,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert!(game.command_log().is_empty());
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(task.players.get(&1).unwrap().last_received_client_seq, 0);
     }
 
     #[test]
@@ -4221,6 +4331,9 @@ mod tests {
                 units: vec![4, 5, 6],
             },
         );
+        assert_eq!(task.pending_client_command_acks.len(), 1);
+        assert_eq!(task.pending_client_command_acks[0].connection_id, 100);
+        assert_eq!(task.pending_client_command_acks[0].client_seq, 1);
         task.on_tick(TokioInstant::now());
 
         let snapshot_a = writer_a.snapshots.take().expect("claimed A snapshot");
@@ -4234,6 +4347,11 @@ mod tests {
         };
         assert_eq!(game.command_log().len(), 1);
         assert_eq!(game.command_log()[0].player_id, players[0].id);
+        assert_eq!(
+            task.players.get(&100).unwrap().last_sim_consumed_client_seq,
+            1
+        );
+        assert_eq!(task.players.get(&102).unwrap().last_received_client_seq, 0);
         assert_eq!(
             snapshot_a.visible_tiles,
             game.snapshot_for(players[0].id).visible_tiles

@@ -45,6 +45,7 @@ mod crash_replay;
 mod dev_replay;
 mod faction_validation;
 mod live_tick;
+mod participants;
 mod replay_branch;
 mod replay_session;
 mod replay_validation;
@@ -52,6 +53,7 @@ mod room_task;
 mod session_policy;
 mod snapshot_fanout;
 mod snapshots;
+mod tick_control;
 
 pub use connection::{ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;

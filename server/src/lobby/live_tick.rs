@@ -1,5 +1,6 @@
 use super::connection::send_or_log;
 use super::crash_replay::{dump_crash_replay, panic_reason};
+use super::participants::Participants;
 use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
@@ -257,25 +258,20 @@ impl LiveTickDriver<'_> {
     }
 
     fn live_seat_id_for_connection(&self, connection_id: u32) -> Option<u32> {
-        self.branch_live_seat_by_connection
-            .get(&connection_id)
-            .copied()
-            .or_else(|| {
-                self.players
-                    .contains_key(&connection_id)
-                    .then_some(connection_id)
-            })
+        self.participants()
+            .live_seat_id_for_connection(connection_id)
     }
 
     fn live_connection_is_player(&self, connection_id: u32) -> bool {
-        self.players
-            .get(&connection_id)
-            .map(|p| !p.spectator)
-            .unwrap_or(false)
-            && (self.branch_live_seat_by_connection.is_empty()
-                || self
-                    .branch_live_seat_by_connection
-                    .contains_key(&connection_id))
+        self.participants().live_connection_is_player(connection_id)
+    }
+
+    fn participants(&self) -> Participants<'_> {
+        Participants::new(
+            self.order,
+            self.players,
+            self.branch_live_seat_by_connection,
+        )
     }
 
     fn record_consumed_client_sequences(&mut self, tick: u32) {
