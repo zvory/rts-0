@@ -221,10 +221,10 @@ mod tests {
     }
 
     #[test]
-    fn infantry_vs_tank_trap_full_damage() {
+    fn infantry_vs_tank_trap_reduced_by_armor() {
         assert_eq!(
             effective_damage(EntityKind::Rifleman, EntityKind::TankTrap, 5, None),
-            5
+            1
         );
     }
 
@@ -266,7 +266,7 @@ mod tests {
             (EntityKind::TrainingCentre, true, false, false),
             (EntityKind::Factory, true, false, false),
             (EntityKind::Steelworks, true, false, false),
-            (EntityKind::TankTrap, false, false, false),
+            (EntityKind::TankTrap, true, false, false),
             (EntityKind::Steel, false, false, false),
             (EntityKind::Oil, false, false, false),
         ];
