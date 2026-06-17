@@ -144,11 +144,15 @@ The canonical required PR check context is `./tests/run-all.sh` in the `Main tes
 It is an aggregate check over split coverage jobs for server binary build, Rust/architecture, live
 Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
 The split jobs run `tests/run-all.sh` sub-modes so the required aggregate gate preserves the same
-coverage as the portable repo-root command without serializing every suite in one runner. For PRs
-whose changed files are all Markdown (`*.md`), the split jobs keep the same check contexts green
-but exit after changed-file detection instead of installing toolchains or running the long suites.
-Branch protection should require this single aggregate full-gate check unless a plan phase
-explicitly changes the contract.
+coverage as the portable repo-root command without serializing every suite in one runner.
+Changed-file detection classifies PRs as `docs_only`, `client_only`, or `full`. `docs_only` keeps
+the same check contexts green but exits before expensive suites. `client_only` is limited to
+conservative `client/` paths and skips Rust format, nextest, lint, and Rust architecture work while
+still building the server and running live Node plus browser coverage. Contract-adjacent client
+paths such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
+`client/src/lobby_view.js`, and generated sim-WASM assets fall back to `full`. Branch protection
+should require this single aggregate full-gate check unless a plan phase explicitly changes the
+contract.
 
 The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
 live Node, and browser coverage is owned by the split `Main test gate` jobs under the required
