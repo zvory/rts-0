@@ -1,6 +1,7 @@
 use super::connection::send_or_log;
 use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::participants::Participants;
+use super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
 use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
@@ -38,6 +39,7 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) pending_client_command_acks: &'a mut Vec<PendingClientCommandAck>,
     pub(super) slow_tick_count: &'a mut u32,
     pub(super) spectator_visible_players: Vec<u32>,
+    pub(super) projection_policy: ProjectionPolicy,
 }
 
 impl LiveTickDriver<'_> {
@@ -67,7 +69,7 @@ impl LiveTickDriver<'_> {
             tick_start,
             perf.as_mut(),
         );
-        self.broadcast_observer_analysis_to_spectators(&game);
+        self.broadcast_observer_analysis(&game);
 
         let outcome_start = StdInstant::now();
         let alive = game.alive_players();
@@ -181,22 +183,29 @@ impl LiveTickDriver<'_> {
             perf,
         )
         .send_to_recipients(self.players, recipients, |id, player| {
-            let mapped_seat = branch_live_seat_by_connection.get(&id).copied();
-            let mut snapshot = if player.spectator {
-                game.snapshot_for_spectator(&spectator_visible_players)
+            let role = if player.spectator {
+                RecipientRole::Spectator
             } else {
-                game.snapshot_for(mapped_seat.unwrap_or(id))
+                RecipientRole::ActivePlayer
             };
-            if player.spectator {
-                snapshot.events.extend(full_vision_events.clone());
-            } else if let Some(mut events) = per_player_events.remove(&mapped_seat.unwrap_or(id)) {
-                snapshot.events.append(&mut events);
-            }
+            let projection = self.projection_policy.live_snapshot_for(
+                role,
+                id,
+                branch_live_seat_by_connection.get(&id).copied(),
+                &spectator_visible_players,
+            );
+            let snapshot =
+                projection.snapshot_with_events(game, per_player_events, &full_vision_events);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
     }
 
-    fn broadcast_observer_analysis_to_spectators(&self, game: &Game) {
+    fn broadcast_observer_analysis(&self, game: &Game) {
+        if self.projection_policy.observer_analysis_audience()
+            != ObserverAnalysisAudience::LiveSpectators
+        {
+            return;
+        }
         let spectator_ids: Vec<u32> = self
             .order
             .iter()
