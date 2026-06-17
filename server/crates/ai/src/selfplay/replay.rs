@@ -424,6 +424,7 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
             | WireCommand::Research { .. }
             | WireCommand::Cancel { .. }
             | WireCommand::Stop { .. }
+            | WireCommand::HoldPosition { .. }
             | WireCommand::SetRally { .. } => {}
         }
     }
@@ -572,7 +573,8 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         | rts_sim::game::command::SimCommand::RecastAbility { units, .. }
         | rts_sim::game::command::SimCommand::SetAutocast { units, .. }
         | rts_sim::game::command::SimCommand::Gather { units, .. }
-        | rts_sim::game::command::SimCommand::Stop { units } => Some(units),
+        | rts_sim::game::command::SimCommand::Stop { units }
+        | rts_sim::game::command::SimCommand::HoldPosition { units } => Some(units),
         rts_sim::game::command::SimCommand::Build { units, .. } => Some(units),
         rts_sim::game::command::SimCommand::Train { .. }
         | rts_sim::game::command::SimCommand::Research { .. }

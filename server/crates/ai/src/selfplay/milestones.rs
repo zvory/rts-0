@@ -489,6 +489,7 @@ impl PlayerMilestones {
             | Command::Research { .. }
             | Command::Cancel { .. }
             | Command::Stop { .. }
+            | Command::HoldPosition { .. }
             | Command::SetRally { .. }
             | Command::Rejected { .. } => None,
         };

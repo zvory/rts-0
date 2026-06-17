@@ -3175,7 +3175,7 @@ mod tests {
     }
 
     #[test]
-    fn stop_clears_active_order_and_queued_orders() {
+    fn stop_clears_orders_and_hold_position_enters_hold_stance() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let unit = entities
@@ -3196,15 +3196,7 @@ mod tests {
         let entity = entities.get(unit).expect("unit should exist");
         assert!(matches!(entity.order(), Order::Idle));
         assert!(entity.queued_orders().is_empty());
-    }
 
-    #[test]
-    fn hold_position_clears_orders_and_enters_hold_stance() {
-        let map = flat_map(24);
-        let mut entities = EntityStore::new();
-        let unit = entities
-            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-            .expect("rifleman should spawn");
         {
             let entity = entities.get_mut(unit).expect("unit should exist");
             entity.set_order(Order::move_to(300.0, 300.0));

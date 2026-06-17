@@ -362,7 +362,7 @@ impl CorePredictor {
                 y,
                 queued,
             } => self.apply_move(units, *x, *y, *queued, MoveOrderKind::AttackMove),
-            Command::Stop { units } => {
+            Command::Stop { units } | Command::HoldPosition { units } => {
                 for id in units {
                     if let Some(entity) = self.owned.get_mut(id) {
                         entity.active_order = None;
@@ -724,6 +724,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::Research { .. } => "research",
         Command::Cancel { .. } => "cancel",
         Command::Stop { .. } => "stop",
+        Command::HoldPosition { .. } => "holdPosition",
         Command::SetRally { .. } => "setRally",
     }
 }
