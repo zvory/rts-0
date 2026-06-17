@@ -11,6 +11,11 @@ const fixturesDir = path.join(__dirname, "fixtures/svg");
 
 const fixtures = [
   ["rig-worker.svg", KIND.WORKER, []],
+  ["rig-rifleman.svg", KIND.RIFLEMAN, ["muzzle"]],
+  ["rig-machine-gunner.svg", KIND.MACHINE_GUNNER, ["muzzle", "bipod"]],
+  ["rig-anti-tank-gun.svg", KIND.ANTI_TANK_GUN, ["muzzle", "wheel"]],
+  ["rig-mortar-team.svg", KIND.MORTAR_TEAM, ["muzzle", "bipod"]],
+  ["rig-artillery.svg", KIND.ARTILLERY, ["muzzle", "wheel"]],
   ["rig-infantry-weapon.svg", KIND.RIFLEMAN, ["muzzle"]],
   ["rig-crew-weapon.svg", KIND.MACHINE_GUNNER, ["muzzle", "bipod"]],
   ["rig-vehicle.svg", KIND.TANK, ["muzzle", "turret"]],

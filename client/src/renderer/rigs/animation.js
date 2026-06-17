@@ -1,5 +1,5 @@
 import { KIND, SETUP, STATE } from "../../protocol.js";
-import { clamp01, hexToInt, weaponRecoilOffset } from "../shared.js";
+import { angleLerp, clamp01, hexToInt, polar, smoothstep01, weaponRecoilOffset } from "../shared.js";
 
 const TRANSFORM_PROPERTIES = new Set([
   "transform.x",
@@ -8,6 +8,8 @@ const TRANSFORM_PROPERTIES = new Set([
   "transform.scaleX",
   "transform.scaleY",
 ]);
+const LOCAL_TRANSFORM_PROPERTIES = new Set(["transform.localX", "transform.localY"]);
+const GEOMETRY_SCALE_PROPERTIES = new Set(["geometry.scaleX", "geometry.scaleY"]);
 
 export function createRigRenderContext(entity, {
   state = {},
@@ -26,6 +28,11 @@ export function createRigRenderContext(entity, {
     ? clamp01(state.weaponRecoil(entity.id, entity.kind, now))
     : clamp01(entity.recoilProgress ?? 0);
   const recoilPx = weaponRecoilOffset(entity.kind, recoilProgress);
+  const setup = setupVisual ?? defaultSetupVisual(entity);
+  const deploy = clamp01(setup.prongFactor);
+  const weaponVisualFacing = visualWeaponFacing(entity.kind, facing, weaponFacing, deploy);
+  const carriageVisualFacing = visualCarriageFacing(entity.kind, facing, weaponFacing, deploy, weaponVisualFacing);
+  const weaponRecoil = recoilPx > 0 ? polar(weaponVisualFacing + Math.PI, recoilPx) : { x: 0, y: 0 };
   const recoilKickFactor = entity.kind === KIND.TANK
     ? 0.85
     : entity.kind === KIND.ARTILLERY
@@ -61,6 +68,17 @@ export function createRigRenderContext(entity, {
     mapTileSize: finite(map?.tileSize, 32),
     facing,
     weaponFacing,
+    weaponFacingCos: Math.cos(weaponFacing),
+    weaponFacingSin: Math.sin(weaponFacing),
+    weaponVisualFacing,
+    carriageVisualFacing,
+    weaponVisualDoubleCos: Math.cos(weaponVisualFacing * 2),
+    weaponVisualDoubleSin: Math.sin(weaponVisualFacing * 2),
+    weaponRecoilX: weaponRecoil.x,
+    weaponRecoilY: weaponRecoil.y,
+    setupVisible: deploy > 0.02,
+    setupMostlyDeployed: deploy > 0.55,
+    setupBarrelVisible: Boolean(setup.barrel || deploy > 0.75),
     busy: isBusy(entity),
     breakthroughTicks: finite(entity.breakthroughTicks, 0),
     lowOil,
@@ -79,6 +97,8 @@ export function sampleRigAnimation(definition, entity, renderContext = {}) {
     parts[part.id] = {
       id: part.id,
       transform: { ...part.transform },
+      localOffset: { x: 0, y: 0 },
+      geometryScale: { x: 1, y: 1 },
       pivot: { ...part.pivot },
       alpha: finite(part.paint?.opacity, 1),
       visible: true,
@@ -111,6 +131,12 @@ function applyBinding(sampled, binding, input) {
   if (TRANSFORM_PROPERTIES.has(binding.property)) {
     const key = binding.property.slice("transform.".length);
     sampled.transform[key] = sampled.transform[key] + value;
+  } else if (LOCAL_TRANSFORM_PROPERTIES.has(binding.property)) {
+    const key = binding.property === "transform.localX" ? "x" : "y";
+    sampled.localOffset[key] = sampled.localOffset[key] + value;
+  } else if (GEOMETRY_SCALE_PROPERTIES.has(binding.property)) {
+    const key = binding.property === "geometry.scaleX" ? "x" : "y";
+    sampled.geometryScale[key] = sampled.geometryScale[key] + value;
   } else if (binding.property === "alpha") {
     sampled.alpha = clamp01(value);
   }
@@ -130,11 +156,27 @@ function numericInput(value) {
 
 function defaultSetupVisual(entity) {
   if (entity.setupState === SETUP.DEPLOYED) return { prongFactor: 1, barrel: entity.state !== STATE.MOVE };
+  if (entity.setupState === SETUP.TEARING_DOWN) return { prongFactor: 1, barrel: false };
   return { prongFactor: 0, barrel: false };
 }
 
 function defaultVehicleMotion() {
   return { leftPhase: 0, rightPhase: 0, leftDir: 0, rightDir: 0, activity: 0, lowOil: false, oilStarved: false };
+}
+
+function visualWeaponFacing(kind, facing, weaponFacing, deploy) {
+  const t = smoothstep01(deploy);
+  if (kind === KIND.RIFLEMAN) return facing - 0.2;
+  if (kind === KIND.MACHINE_GUNNER) return angleLerp(facing + 0.86, weaponFacing, t);
+  if (kind === KIND.ANTI_TANK_GUN) return angleLerp(facing, weaponFacing, t);
+  if (kind === KIND.MORTAR_TEAM) return angleLerp(facing, weaponFacing + Math.PI / 4 - Math.PI * 0.22, t);
+  return weaponFacing;
+}
+
+function visualCarriageFacing(kind, facing, weaponFacing, deploy, fallback) {
+  if (kind === KIND.ARTILLERY) return deploy > 0.02 ? weaponFacing : facing;
+  if (kind === KIND.ANTI_TANK_GUN || kind === KIND.MORTAR_TEAM) return fallback;
+  return facing;
 }
 
 function isBusy(entity) {

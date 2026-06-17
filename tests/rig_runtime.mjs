@@ -20,6 +20,12 @@ import {
   renderLiveUnitRig,
   renderRigLegacyComparison,
 } from "../client/src/renderer/rigs/runtime.js";
+import { MACHINE_GUNNER_RIG_SVG, RIFLEMAN_RIG_SVG } from "../client/src/renderer/rigs/infantry_svg.js";
+import {
+  ANTI_TANK_GUN_RIG_SVG,
+  ARTILLERY_RIG_SVG,
+  MORTAR_TEAM_RIG_SVG,
+} from "../client/src/renderer/rigs/support_svg.js";
 import { TANK_RIG_SVG } from "../client/src/renderer/rigs/tank_svg.js";
 import { WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 
@@ -131,6 +137,38 @@ test("rig runtime can update one named part group for part-level fixtures", () =
   instance.destroy();
 });
 
+test("geometry-scale animation grows coordinates without scaling stroke width", () => {
+  const svg = `<svg viewBox="-12 -12 24 24" data-rts-rig-kind="${KIND.WORKER}" data-rts-rig-version="1" data-rts-origin="center">
+  <polygon id="part.flash" points="-1,0 2,-1 2,1" fill="#ffd84a" stroke="#d8d0b0" stroke-width="2.2" data-rts-animation="recoilProgress:geometry.scaleX:1:0;recoilProgress:geometry.scaleY:0.5:0" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.hp" cx="0" cy="-10" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-8" y="-8" width="16" height="16" fill="none" />
+  <rect id="bounds.hp" x="-8" y="-12" width="16" height="4" fill="none" />
+</svg>`;
+  const compiled = compileSvgRig(svg, { expectedKind: KIND.WORKER });
+  assert.equal(compiled.ok, true);
+  const instance = createUnitRigInstance(KIND.WORKER, compiled.definition, createInspectionPixiFactory());
+
+  instance.update({
+    id: 21,
+    kind: KIND.WORKER,
+    owner: 1,
+    x: 0,
+    y: 0,
+    recoilProgress: 0.4,
+  }, createRigRenderContext({ id: 21, kind: KIND.WORKER, owner: 1, recoilProgress: 0.4 }, {
+    now: fixedNow,
+    state: { weaponRecoil: () => 0.4 },
+    colorByOwner: new Map([[1, 0x778899]]),
+  }));
+
+  const commands = instance.parts.get("part.flash").display.commands;
+  assert.deepEqual(commands.find((cmd) => cmd.op === "lineStyle"), { op: "lineStyle", width: 2.2, color: 0xd8d0b0, alpha: 1 });
+  assert.deepEqual(commands.find((cmd) => cmd.op === "drawPolygon").points, [-1.4, 0, 2.8, -1.2, 2.8, 1.2]);
+  instance.destroy();
+});
+
 test("legacy Worker part capture records stable draw names and filters output", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = {
@@ -178,17 +216,62 @@ test("side-by-side comparison path is explicit and leaves default unit draw on l
 
 test("live rig definitions compile production SVG sources", () => {
   const workerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-worker.svg"), "utf8").trim();
+  const riflemanFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-rifleman.svg"), "utf8").trim();
+  const machineGunnerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-machine-gunner.svg"), "utf8").trim();
+  const antiTankGunFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-anti-tank-gun.svg"), "utf8").trim();
+  const mortarTeamFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-mortar-team.svg"), "utf8").trim();
+  const artilleryFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-artillery.svg"), "utf8").trim();
   const tankFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-vehicle.svg"), "utf8").trim();
   assert.equal(WORKER_RIG_SVG.trim(), workerFixtureText);
+  assert.equal(RIFLEMAN_RIG_SVG.trim(), riflemanFixtureText);
+  assert.equal(MACHINE_GUNNER_RIG_SVG.trim(), machineGunnerFixtureText);
+  assert.equal(ANTI_TANK_GUN_RIG_SVG.trim(), antiTankGunFixtureText);
+  assert.equal(MORTAR_TEAM_RIG_SVG.trim(), mortarTeamFixtureText);
+  assert.equal(ARTILLERY_RIG_SVG.trim(), artilleryFixtureText);
   assert.equal(TANK_RIG_SVG.trim(), tankFixtureText);
   const definitions = createLiveRigDefinitions();
+  assert.equal(definitions.has(KIND.ANTI_TANK_GUN), true);
+  assert.equal(definitions.get(KIND.ANTI_TANK_GUN).id, "anti-tank-gun.authored");
+  assert.equal(definitions.has(KIND.ARTILLERY), true);
+  assert.equal(definitions.get(KIND.ARTILLERY).id, "artillery.authored");
   assert.equal(definitions.has(KIND.WORKER), true);
   assert.equal(definitions.get(KIND.WORKER).id, "worker.authored");
+  assert.equal(definitions.has(KIND.RIFLEMAN), true);
+  assert.equal(definitions.get(KIND.RIFLEMAN).id, "rifleman.authored");
+  assert.equal(definitions.has(KIND.MACHINE_GUNNER), true);
+  assert.equal(definitions.get(KIND.MACHINE_GUNNER).id, "machine-gunner.authored");
+  assert.equal(definitions.has(KIND.MORTAR_TEAM), true);
+  assert.equal(definitions.get(KIND.MORTAR_TEAM).id, "mortar-team.authored");
   assert.equal(definitions.has(KIND.TANK), true);
   assert.equal(definitions.get(KIND.TANK).id, "tank.authored");
 });
 
 test("live rig routes expose kind-specific production part groups", () => {
+  const antiTankGunRoutes = liveRigRoutesFor(KIND.ANTI_TANK_GUN);
+  assert.deepEqual(antiTankGunRoutes[0].parts, ["part.shadow"]);
+  assert.equal(antiTankGunRoutes[1].parts.includes("part.at.barrel.packed"), true);
+  assert.equal(antiTankGunRoutes[1].parts.includes("part.at.trail.left.deployed"), true);
+
+  const artilleryRoutes = liveRigRoutesFor(KIND.ARTILLERY);
+  assert.deepEqual(artilleryRoutes[0].parts, ["part.shadow"]);
+  assert.equal(artilleryRoutes[1].parts.includes("part.art.barrel.packed"), true);
+  assert.equal(artilleryRoutes[1].parts.includes("part.art.flashCore"), true);
+
+  const riflemanRoutes = liveRigRoutesFor(KIND.RIFLEMAN);
+  assert.deepEqual(riflemanRoutes[0].parts, ["part.shadow"]);
+  assert.equal(riflemanRoutes[1].parts.includes("part.body"), true);
+  assert.equal(riflemanRoutes[1].parts.includes("part.rifle.barrel"), true);
+
+  const machineGunnerRoutes = liveRigRoutesFor(KIND.MACHINE_GUNNER);
+  assert.deepEqual(machineGunnerRoutes[0].parts, ["part.shadow"]);
+  assert.equal(machineGunnerRoutes[1].parts.includes("part.mg.receiver"), true);
+  assert.equal(machineGunnerRoutes[1].parts.includes("part.mg.bipod"), true);
+
+  const mortarTeamRoutes = liveRigRoutesFor(KIND.MORTAR_TEAM);
+  assert.deepEqual(mortarTeamRoutes[0].parts, ["part.shadow"]);
+  assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.tube.packed"), true);
+  assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.leg.left.deployed"), true);
+
   const workerRoutes = liveRigRoutesFor(KIND.WORKER);
   assert.deepEqual(workerRoutes[0].parts, ["part.shadow"]);
   assert.deepEqual(workerRoutes[1].parts, ["part.body", "part.busyIndicator", "part.facingTick"]);
@@ -247,7 +330,7 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
 
 test("non-routed units fall back to legacy procedural drawing", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
-  const entity = { id: 5, kind: KIND.RIFLEMAN, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+  const entity = { id: 5, kind: KIND.EKAT, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
   const renderer = makeComparisonRenderer(definition);
   renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
 
