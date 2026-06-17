@@ -12,9 +12,10 @@ If a server is already answering on the port it is reused and left running.
 This command is the portable local full gate. GitHub Actions runs the same coverage as split
 parallel jobs and keeps the required aggregate PR check named `./tests/run-all.sh`. Run focused local
 verification for the files or contracts you changed, then rely on that aggregate check before merge.
-The CI changed-file classifier keeps docs-only PRs cheap and lets conservative client-only PRs skip
-Rust format, nextest, lint, and Rust architecture work while still running server-build, live Node,
-and browser coverage. Contract-adjacent client files fall back to the full gate. The CI
+The CI changed-file classifier keeps docs-only PRs and post-merge `main` pushes cheap, and lets
+conservative client-only PRs and pushes skip Rust format, nextest, lint, and Rust architecture work
+while still running server-build, live Node, and browser coverage. Contract-adjacent client files
+fall back to the full gate. The CI
 Rust/architecture job installs `cargo-nextest` and invokes `tests/run-all.sh --only-rust`, so the
 required Rust path is the same nextest-backed runner developers use locally.
 Run `./scripts/install-hooks.sh` once per
@@ -54,8 +55,11 @@ The workspace currently has no Rust doctests, so `run-all.sh` does not run a sep
 For slow Rust runs, start with the context and timing already printed by the runner. The Rust-only
 path prints the Cargo target dir, Rust version, cargo version, cargo-nextest version, nextest
 per-test status/slow-test output, and the final command-level timing summary. In CI, the Rust job
-also prints the Cargo cache exact-hit result from Actions; use that plus the target dir to decide
-whether time is going into rebuilds, then use nextest's slow-test output to narrow test runtime.
+also prints the Cargo cache exact-hit result from Actions, shell timing details for the Rust
+top-level suites, and a slowest-testcase summary from nextest's JUnit XML. It also uploads
+`server/target/nextest/default/junit.xml` as the `nextest-junit` artifact with 7-day retention when
+the Rust lane runs. Use that plus the target dir to decide whether time is going into rebuilds, then
+use nextest's slow-test output and the JUnit summary to narrow test runtime.
 
 The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
 is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the
@@ -141,7 +145,7 @@ failure it writes normal `ReplayArtifactV1` replay artifacts under the Cargo tar
 artifact name; successful runs are then written under the target dir's
 `selfplay-artifacts/<name>/`.
 When you open a replay artifact in the browser, use the server instance that produced it, or
-start a fresh one on its own port before loading `/dev/selfplay?replay=<artifact_name>`.
+start a fresh one on its own port before loading `/dev/replay-artifact?replay=<artifact_name>`.
 
 ```bash
 RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \

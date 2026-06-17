@@ -66,6 +66,7 @@ export const CMD = Object.freeze({
   RESEARCH: "research",
   CANCEL: "cancel",
   STOP: "stop",
+  HOLD_POSITION: "holdPosition",
   SET_RALLY: "setRally",
 });
 
@@ -986,6 +987,7 @@ export const cmd = Object.freeze({
   research: (building, upgrade) => ({ c: CMD.RESEARCH, building, upgrade }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),
+  holdPosition: (units) => ({ c: CMD.HOLD_POSITION, units }),
   setRally: (building, x, y, queued = false, kind = ORDER_STAGE.MOVE) =>
     withQueued({ c: CMD.SET_RALLY, building, x, y, kind }, queued),
 });

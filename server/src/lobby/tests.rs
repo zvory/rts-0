@@ -2,8 +2,7 @@ use std::time::Duration;
 
 use super::connection::SnapshotSendStatus;
 use super::room_task::{
-    is_automated_match_history_room, match_history_participants_are_automated, DevSelfPlayConfig,
-    RoomMode, RoomTask,
+    is_automated_match_history_room, match_history_participants_are_automated, RoomMode, RoomTask,
 };
 use super::snapshots::compact_snapshot_for_wire;
 use super::*;
@@ -180,36 +179,28 @@ fn joining_after_earlier_player_leaves_reuses_open_color() {
 }
 
 #[test]
-fn saved_selfplay_replay_rooms_use_normal_tick_until_replay_viewer_starts() {
+fn saved_artifact_replay_rooms_use_normal_tick_until_replay_viewer_starts() {
     let normal = RoomTask::new("r".to_string(), RoomMode::Normal, None, false, test_drain());
-    let live = RoomTask::new(
-        "r".to_string(),
-        RoomMode::DevSelfPlay(DevSelfPlayConfig::Live),
-        None,
-        false,
-        test_drain(),
-    );
     let replay = RoomTask::new(
         "r".to_string(),
-        RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+        RoomMode::ReplayArtifact {
             artifact: "demo".to_string(),
-        }),
+        },
         None,
         false,
         test_drain(),
     );
     assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
-    assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
     assert_eq!(replay.current_tick_interval(), Duration::from_millis(33));
 }
 
 #[test]
-fn saved_selfplay_replay_speed_is_ignored_until_replay_viewer_starts() {
+fn saved_artifact_replay_speed_is_ignored_until_replay_viewer_starts() {
     let mut task = RoomTask::new(
         "r".to_string(),
-        RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+        RoomMode::ReplayArtifact {
             artifact: "demo".to_string(),
-        }),
+        },
         None,
         false,
         test_drain(),

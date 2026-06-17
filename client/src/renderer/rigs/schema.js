@@ -3,7 +3,7 @@ import { UNIT_KINDS } from "../../protocol.js";
 export const RIG_SCHEMA_VERSION = 1;
 
 export const REQUIRED_ANCHORS = Object.freeze(["origin", "selection", "hp"]);
-export const TINT_SLOTS = Object.freeze(["team", "team-light", "team-light-soft", "neutral", "fixed"]);
+export const TINT_SLOTS = Object.freeze(["team", "team-light", "team-light-soft", "team-light-strong", "team-stroke", "team-fill-stroke", "neutral", "fixed"]);
 export const GEOMETRY_TYPES = Object.freeze(["rect", "circle", "ellipse", "line", "polygon", "polyline", "path"]);
 export const ANIMATION_INPUTS = Object.freeze([
   "now",
@@ -21,6 +21,17 @@ export const ANIMATION_INPUTS = Object.freeze([
   "mapTileSize",
   "facing",
   "weaponFacing",
+  "weaponFacingCos",
+  "weaponFacingSin",
+  "weaponVisualFacing",
+  "carriageVisualFacing",
+  "weaponVisualDoubleCos",
+  "weaponVisualDoubleSin",
+  "weaponRecoilX",
+  "weaponRecoilY",
+  "setupVisible",
+  "setupMostlyDeployed",
+  "setupBarrelVisible",
   "busy",
   "breakthroughTicks",
   "lowOil",
@@ -33,6 +44,10 @@ export const ANIMATION_PROPERTIES = Object.freeze([
   "transform.rotation",
   "transform.scaleX",
   "transform.scaleY",
+  "transform.localX",
+  "transform.localY",
+  "geometry.scaleX",
+  "geometry.scaleY",
   "alpha",
   "visible",
   "tintSlot",

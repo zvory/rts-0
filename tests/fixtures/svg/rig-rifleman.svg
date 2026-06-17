@@ -1,0 +1,14 @@
+<svg viewBox="-24 -24 48 48" data-rts-rig-kind="rifleman" data-rts-rig-version="1" data-rts-origin="center" id="rifleman.authored">
+  <ellipse id="part.shadow" cx="0" cy="3.15" rx="9" ry="5.4" fill="#000000" opacity="0.28" />
+  <polygon id="part.body" points="6.48,0 1.98,-5.58 -5.22,-4.32 -7.02,0 -5.22,4.32 1.98,5.58" fill="#6d89b8" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.head" cx="6.48" cy="0" r="3.06" fill="#7b96c4" stroke="#1a1712" stroke-width="2" stroke-opacity="0.95" data-rts-tint="team-light-strong" data-rts-animation="facing:transform.rotation:1:0" />
+  <path id="part.shoulders" d="M -6.12 0 L 0.651 -4.271 M -6.12 0 L 0.651 4.271" fill="none" stroke="#1a1712" stroke-width="2" opacity="0.5" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rifle.barrel" x1="-1.62" y1="0" x2="16.38" y2="0" stroke="#2a2119" stroke-width="3" opacity="0.96" data-rts-animation="weaponVisualFacing:transform.rotation:1:0;weaponRecoilX:transform.x:1:0;weaponRecoilY:transform.y:1:0" />
+  <line id="part.rifle.hand" x1="4.95" y1="2.88" x2="4.95" y2="-2.88" stroke="#d8d0b0" stroke-width="2" opacity="0.85" data-rts-animation="weaponVisualFacing:transform.rotation:1:0;weaponRecoilX:transform.x:1:0;weaponRecoilY:transform.y:1:0" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.hp" cx="0" cy="-17" r="1" fill="#ffffff" />
+  <circle id="anchor.muzzle" cx="16.38" cy="0" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-13" y="-13" width="26" height="26" fill="none" />
+  <rect id="bounds.hp" x="-11" y="-18" width="22" height="6" fill="none" />
+</svg>

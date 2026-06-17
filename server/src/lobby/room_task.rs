@@ -6,6 +6,7 @@ use super::faction_validation::{
 };
 use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
+use super::session_policy::{ClockPolicy, SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
 use super::*;
@@ -113,7 +114,7 @@ fn live_ai_controllers(
 }
 
 /// The room's current mode. `InGame` owns the live simulation outright.
-enum Phase {
+pub(super) enum Phase {
     Lobby,
     InGame(Box<Game>),
     ReplayViewer(Box<ReplaySession>),
@@ -123,16 +124,10 @@ enum Phase {
 #[derive(Clone)]
 pub(super) enum RoomMode {
     Normal,
-    DevSelfPlay(DevSelfPlayConfig),
     DevScenario(DevScenarioConfig),
     Replay { artifact: ReplayArtifactV1 },
+    ReplayArtifact { artifact: String },
     ReplayBranch { seed: ReplayBranchSeed },
-}
-
-#[derive(Clone)]
-pub(super) enum DevSelfPlayConfig {
-    Live,
-    Replay { artifact: String },
 }
 
 #[derive(Clone)]
@@ -157,8 +152,15 @@ pub(super) enum DevScenarioId {
 }
 
 enum DevDriver {
-    Live(LiveSelfPlay),
     Scenario(DevScenarioDriver),
+}
+
+impl DevDriver {
+    fn enqueue_for_tick(&mut self, game: &mut Game) {
+        match self {
+            DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(game),
+        }
+    }
 }
 
 struct DevScenarioDriver {
@@ -344,25 +346,37 @@ impl RoomTask {
         if self.dev_watch_paused {
             return 1.0;
         }
-        match &self.phase {
-            Phase::ReplayViewer(session) if session.is_paused() => 1.0,
-            Phase::ReplayViewer(session) => session.speed(),
-            Phase::BranchStaging(_) => 1.0,
+        match self.session_policy().clock {
+            ClockPolicy::ReplayPlayback => match &self.phase {
+                Phase::ReplayViewer(session) if session.is_paused() => 1.0,
+                Phase::ReplayViewer(session) => session.speed(),
+                _ => self.replay_speed,
+            },
+            ClockPolicy::BranchStaging => 1.0,
             _ => self.replay_speed,
         }
     }
 
-    fn is_live_dev_watch(&self) -> bool {
-        matches!(
-            self.mode,
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) | RoomMode::DevScenario(_)
-        )
+    fn session_phase(&self) -> SessionPhase {
+        match &self.phase {
+            Phase::Lobby => SessionPhase::Lobby,
+            Phase::InGame(_) => SessionPhase::LiveMatch,
+            Phase::ReplayViewer(_) => SessionPhase::ReplayViewer,
+            Phase::BranchStaging(_) => SessionPhase::BranchStaging,
+        }
+    }
+
+    fn session_policy(&self) -> SessionPolicy {
+        SessionPolicy::for_room(&self.mode, self.session_phase())
+    }
+
+    fn is_dev_watch(&self) -> bool {
+        self.session_policy().is_dev_watch()
     }
 
     fn should_persist_match_history(&self) -> bool {
         self.match_player_count >= 1
-            && !self.is_live_dev_watch()
-            && !matches!(self.mode, RoomMode::ReplayBranch { .. })
+            && self.session_policy().allows_match_history()
             && !is_automated_match_history_room(&self.room)
             && !match_history_participants_are_automated(&self.match_participants)
     }
@@ -496,14 +510,12 @@ impl RoomTask {
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
-        if self.is_live_dev_watch() {
-            self.on_join_dev_selfplay(player_id, name, msg_tx, ack);
+        let policy = self.session_policy();
+        if policy.is_dev_watch() {
+            self.on_join_dev_watch(player_id, name, msg_tx, ack);
             return;
         }
-        if matches!(
-            self.mode,
-            RoomMode::Replay { .. } | RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
-        ) {
+        if policy.uses_replay_room_join() {
             if !replay_ok {
                 self.prompt_for_replay_join(player_id, &msg_tx, ack);
                 return;
@@ -511,9 +523,7 @@ impl RoomTask {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
-        if matches!(self.mode, RoomMode::ReplayBranch { .. })
-            || matches!(self.phase, Phase::BranchStaging(_))
-        {
+        if policy.uses_branch_staging_join() {
             self.on_join_branch_staging(player_id, name, msg_tx, ack);
             return;
         }
@@ -673,7 +683,7 @@ impl RoomTask {
     }
 
     pub(super) fn on_ready(&mut self, player_id: u32, ready: bool) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -691,7 +701,7 @@ impl RoomTask {
     }
 
     pub(super) fn on_start_request(&mut self, player_id: u32) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
@@ -730,7 +740,7 @@ impl RoomTask {
     }
 
     fn on_set_team_preset(&mut self, player_id: u32, preset: String) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -743,7 +753,7 @@ impl RoomTask {
     }
 
     fn on_set_team(&mut self, player_id: u32, target: u32, team_id: TeamId) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -782,7 +792,7 @@ impl RoomTask {
     /// Active humans can select their own playable faction in the lobby. The server validates and
     /// ignores unknown, fixture, spectator, countdown, and in-game requests.
     fn on_set_faction(&mut self, player_id: u32, faction_id: String) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -835,7 +845,7 @@ impl RoomTask {
         requested_team_id: Option<TeamId>,
         requested_profile_id: Option<String>,
     ) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -875,7 +885,7 @@ impl RoomTask {
 
     /// Host-only: select which supported live AI profile an AI opponent will use next match.
     fn on_set_ai_profile(&mut self, player_id: u32, target: u32, requested_profile_id: String) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -912,7 +922,7 @@ impl RoomTask {
     /// Host-only: remove a previously-added AI opponent by id. Ignored outside the lobby, from
     /// non-hosts, or for an unknown id.
     fn on_remove_ai(&mut self, player_id: u32, target: u32) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -931,7 +941,7 @@ impl RoomTask {
 
     /// Host-only: toggle the lobby's boosted opening resources.
     pub(super) fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -949,7 +959,7 @@ impl RoomTask {
 
     /// Host-only: select a map by name. Ignored outside the lobby or from non-hosts.
     fn on_select_map(&mut self, player_id: u32, map: String) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -966,7 +976,7 @@ impl RoomTask {
     }
 
     fn on_set_spectator(&mut self, player_id: u32, target: u32, spectator: bool) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if self.match_countdown_deadline.is_some() {
@@ -1207,7 +1217,7 @@ impl RoomTask {
     }
 
     fn on_command(&mut self, player_id: u32, client_seq: u32, cmd: SimCommand) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if client_seq == 0 {
@@ -1249,7 +1259,7 @@ impl RoomTask {
     }
 
     fn on_give_up(&mut self, player_id: u32) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             return;
         }
         if !self.live_connection_is_player(player_id) || self.outcome_sent.contains(&player_id) {
@@ -1302,7 +1312,7 @@ impl RoomTask {
 
     // -- Lobby phase ---------------------------------------------------------
 
-    fn on_join_dev_selfplay(
+    fn on_join_dev_watch(
         &mut self,
         player_id: u32,
         name: String,
@@ -1466,9 +1476,7 @@ impl RoomTask {
     fn replay_session_for_mode(&self) -> Result<ReplaySession, String> {
         let artifact = match &self.mode {
             RoomMode::Replay { artifact } => artifact.clone(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { artifact }) => {
-                load_replay_artifact(artifact)?
-            }
+            RoomMode::ReplayArtifact { artifact } => load_replay_artifact(artifact)?,
             RoomMode::ReplayBranch { .. } => {
                 return Err("room is not configured for replay playback".to_string());
             }
@@ -1498,7 +1506,9 @@ impl RoomTask {
     }
 
     fn should_skip_match_countdown(&self) -> bool {
-        self.quickstart || self.total_player_count() <= 1
+        !self.session_policy().countdown_eligible
+            || self.quickstart
+            || self.total_player_count() <= 1
     }
 
     /// Build and broadcast the current `lobby` message to everyone in the room.
@@ -1872,35 +1882,11 @@ impl RoomTask {
         match &self.mode {
             RoomMode::Normal => Err("room is not configured for a dev session".to_string()),
             RoomMode::Replay { .. } => Err("room is not configured for a dev session".to_string()),
-            RoomMode::ReplayBranch { .. } => {
+            RoomMode::ReplayArtifact { .. } => {
                 Err("room is not configured for a dev session".to_string())
             }
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => {
-                Err("saved self-play replays use the replay viewer".to_string())
-            }
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) => {
-                let driver = LiveSelfPlay::default_match();
-                let players = driver.players().to_vec();
-                for player in &players {
-                    if let FactionValidation::Rejected { requested, reason } =
-                        validate_faction_request(
-                            FactionRequestContext::SelfPlay,
-                            Some(&player.faction_id),
-                        )
-                    {
-                        return Err(format!(
-                            "self-play player {} has unsupported faction {:?}: {:?}",
-                            player.id, requested, reason
-                        ));
-                    }
-                }
-                let view_player_id = players
-                    .first()
-                    .map(|p| p.id)
-                    .ok_or_else(|| "live self-play configured with no players".to_string())?;
-                let seed = match_seed();
-                let game = Game::new_without_ai_controllers(&players, seed);
-                Ok((game, DevDriver::Live(driver), view_player_id))
+            RoomMode::ReplayBranch { .. } => {
+                Err("room is not configured for a dev session".to_string())
             }
             RoomMode::DevScenario(config) => {
                 let _scenario_faction_id =
@@ -2114,7 +2100,7 @@ impl RoomTask {
     }
 
     fn broadcast_dev_watch_state(&self) {
-        if !matches!(self.mode, RoomMode::DevScenario(_)) {
+        if !self.session_policy().is_dev_watch() {
             return;
         }
         let Phase::InGame(game) = &self.phase else {
@@ -2182,11 +2168,11 @@ impl RoomTask {
     /// One simulation step. No-op in the `Lobby` phase (the ticker keeps running so a room is
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
-        if self.is_live_dev_watch() {
+        if self.is_dev_watch() {
             if self.dev_watch_paused {
                 return;
             }
-            self.on_tick_dev_selfplay(scheduled);
+            self.on_tick_dev_watch(scheduled);
             return;
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
@@ -2256,7 +2242,7 @@ impl RoomTask {
         }
     }
 
-    fn on_tick_dev_selfplay(&mut self, scheduled: TokioInstant) {
+    fn on_tick_dev_watch(&mut self, scheduled: TokioInstant) {
         let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => return,
             Phase::InGame(game) => game,
@@ -2276,9 +2262,8 @@ impl RoomTask {
             self.phase = Phase::InGame(game);
             return;
         };
-        rts_sim::perf::timed(perf.as_mut(), "dev_driver_enqueue", || match &mut driver {
-            DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
-            DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(&mut game),
+        rts_sim::perf::timed(perf.as_mut(), "dev_driver_enqueue", || {
+            driver.enqueue_for_tick(&mut game)
         });
         let game_tick_start = StdInstant::now();
         let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -2319,24 +2304,6 @@ impl RoomTask {
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
 
-        let outcome_start = StdInstant::now();
-        let scenario_keeps_running = matches!(self.mode, RoomMode::DevScenario(_));
-        let alive = game.alive_players();
-        if !scenario_keeps_running && alive.len() <= 1 {
-            if let Some(perf) = perf.as_mut() {
-                perf.record_phase("outcome_checks", outcome_start.elapsed());
-            }
-            self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
-            self.phase = Phase::Lobby;
-            self.dev_driver = None;
-            self.dev_view_player_id = None;
-            self.start_dev_session();
-            return;
-        }
-
-        if let Some(perf) = perf.as_mut() {
-            perf.record_phase("outcome_checks", outcome_start.elapsed());
-        }
         self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
         self.dev_driver = Some(driver);
         self.phase = Phase::InGame(game);
@@ -2406,7 +2373,7 @@ impl RoomTask {
             self.broadcast(&ServerMessage::ReplayState(state));
             return;
         }
-        if !matches!(self.mode, RoomMode::DevScenario(_)) {
+        if !self.session_policy().is_dev_watch() {
             return;
         }
         if speed == 0.0 {
@@ -2424,11 +2391,11 @@ impl RoomTask {
     fn on_step_dev_tick(&mut self, player_id: u32) {
         if !self.players.contains_key(&player_id)
             || !self.dev_watch_paused
-            || !matches!(self.mode, RoomMode::DevScenario(_))
+            || !self.session_policy().is_dev_watch()
         {
             return;
         }
-        self.on_tick_dev_selfplay(TokioInstant::now());
+        self.on_tick_dev_watch(TokioInstant::now());
         self.broadcast_dev_watch_state();
     }
 
@@ -2751,7 +2718,7 @@ impl RoomTask {
             .map(|player| player.head_of_line_count)
             .max()
             .unwrap_or(0);
-        let replay_artifact = game.filter(|_| !self.is_live_dev_watch()).map(|game| {
+        let replay_artifact = game.filter(|_| !self.is_dev_watch()).map(|game| {
             ReplayArtifactV1::capture_from_game(game, server_build_sha(), winner_id, scores.clone())
         });
         let will_record_history = self.db.is_some()
@@ -2963,7 +2930,7 @@ impl RoomTask {
     }
 
     fn mark_match_started_for_drain(&mut self) {
-        if !self.match_tracked_for_drain && !self.is_live_dev_watch() {
+        if !self.match_tracked_for_drain && !self.is_dev_watch() {
             self.match_tracked_for_drain = true;
             self.drain.match_started();
         }
@@ -3606,6 +3573,84 @@ mod tests {
             snapshot_a.visible_tiles, snapshot_b.visible_tiles,
             "test setup should exercise different fog perspectives"
         );
+    }
+
+    #[test]
+    fn lobby_phase_ignores_gameplay_commands() {
+        let mut task = RoomTask::new(
+            "lobby-command-readonly-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 1, true);
+
+        task.on_command(
+            1,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(
+            task.players.get(&1).unwrap().last_received_client_seq,
+            0,
+            "lobby-phase commands must not consume client sequence state"
+        );
+    }
+
+    #[test]
+    fn normal_live_spectator_start_payload_is_read_only() {
+        let mut task = RoomTask::new(
+            "live-spectator-readonly-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer_player = add_test_room_player(&mut task, 1, true);
+        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+
+        task.start_match();
+        let start_messages: Vec<_> =
+            std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
+        assert!(start_messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::Start(payload)
+                    if payload.player_id == 99
+                        && payload.spectator
+                        && payload.prediction_build_id.is_none()
+                        && payload.prediction_version == 0
+                        && payload.replay.is_none()
+            )
+        }));
+
+        task.on_command(
+            99,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+        task.on_tick(TokioInstant::now());
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert!(game.command_log().is_empty());
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(task.players.get(&99).unwrap().last_received_client_seq, 0);
+        let snapshot = writer_spectator
+            .snapshots
+            .take()
+            .expect("spectator snapshot");
+        assert_eq!(snapshot.net_status.prediction_version, 0);
+        assert_eq!(snapshot.net_status.last_sim_consumed_client_seq, 0);
     }
 
     #[test]
@@ -4491,16 +4536,16 @@ mod tests {
     }
 
     #[test]
-    fn saved_selfplay_replay_join_uses_replay_viewer_runtime() {
+    fn saved_artifact_replay_join_uses_replay_viewer_runtime() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 3);
         let artifact_name = format!("room_task_saved_selfplay_{}", std::process::id());
         let artifact_dir = write_selfplay_replay_test_artifact(&artifact_name, &artifact);
         let mut task = RoomTask::new(
-            "saved-selfplay-replay-test".to_string(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+            "saved-artifact-replay-test".to_string(),
+            RoomMode::ReplayArtifact {
                 artifact: artifact_name,
-            }),
+            },
             None,
             false,
             DrainHandle::default(),
@@ -4512,7 +4557,7 @@ mod tests {
 
         assert_eq!(ack_rx.try_recv(), Ok(true));
         let Phase::ReplayViewer(session) = &task.phase else {
-            panic!("saved self-play replay should start the shared replay viewer runtime");
+            panic!("saved artifact replay should start the shared replay viewer runtime");
         };
         assert_eq!(session.artifact.command_log, artifact.command_log);
         assert_eq!(session.vision_player_ids_for(99), vec![1, 2]);

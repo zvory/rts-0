@@ -88,6 +88,7 @@ import {
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 import {
+  footprintPlacementBlocker,
   movementBodyClass,
   placementPolicyForBuilding,
 } from "../client/src/input/placement.js";
@@ -1254,6 +1255,36 @@ async function testDevWatchScenarioConfig() {
   }
 }
 
+async function testReplayArtifactLaunchConfig() {
+  const priorDocument = globalThis.document;
+  const priorWindow = globalThis.window;
+  globalThis.document = {
+    getElementById: () => null,
+  };
+  globalThis.window = {
+    location: new URL("http://localhost/?replayArtifact=manual_worker_rush_latest"),
+    localStorage: { getItem: () => null },
+  };
+  try {
+    const { replayLaunchConfig } = await import("../client/src/bootstrap.js");
+    let config = replayLaunchConfig();
+    assert(config, "replay artifact launch config should be recognized");
+    assert(
+      config.room === "__replay_artifact__:manual_worker_rush_latest",
+      "replay artifact launch should auto-join the neutral replay artifact room",
+    );
+
+    globalThis.window.location = new URL("http://localhost/?replayArtifact=bad/artifact");
+    config = replayLaunchConfig();
+    assert(config === null, "replay artifact launch rejects unsafe artifact names");
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  }
+}
+
 class FakeGraphics {
   constructor() {
     this.position = { set() {} };
@@ -1303,6 +1334,7 @@ class RecordingGraphics extends FakeGraphics {
 }
 
 await testDevWatchScenarioConfig();
+await testReplayArtifactLaunchConfig();
 
 assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
 assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");
@@ -2950,6 +2982,11 @@ function fakeAudioContext() {
     JSON.stringify(msg.command(cmd.stop([7]), 3)) ===
       JSON.stringify({ t: "command", clientSeq: 3, cmd: { c: "stop", units: [7] } }),
     "command message builder wraps gameplay commands with clientSeq",
+  );
+  assert(
+    JSON.stringify(msg.command(cmd.holdPosition([7]), 4)) ===
+      JSON.stringify({ t: "command", clientSeq: 4, cmd: { c: "holdPosition", units: [7] } }),
+    "holdPosition command builder emits the hold-position wire shape",
   );
   const pointFireCommand = cmd.pointFire([11, 12], 512, 640, true);
   assert(
@@ -4875,9 +4912,9 @@ function fakeAudioContext() {
     selection: [ownWorker, allyWorker],
     entities: [ownWorker, allyWorker],
   }));
-  const stopIntent = buttonByAction(mixedCard, "stop")?.intent;
+  const holdIntent = buttonByAction(mixedCard, "holdPosition")?.intent;
   assert(
-    stopIntent?.unitIds?.join(",") === String(ownWorker.id),
+    holdIntent?.unitIds?.join(",") === String(ownWorker.id),
     "mixed own/allied command card emits commands only for own entity ids",
   );
 
@@ -5095,6 +5132,38 @@ function fakeAudioContext() {
     input._footprintValid(1, 1, 1, 1, map, KIND.TANK_TRAP) === false,
     "Tank Trap input preview rejects vehicle-body units",
   );
+  const rockMap = { ...map, terrain: [...map.terrain] };
+  rockMap.terrain[2 * rockMap.width + 2] = TERRAIN.ROCK;
+  assert(
+    footprintPlacementBlocker([], new Set(), 2, 2, 1, 1, rockMap, placementPolicyForBuilding(KIND.TANK_TRAP)) === "terrain",
+    "Tank Trap placement blocker classifies impassable terrain",
+  );
+  assert(
+    footprintPlacementBlocker(
+      [{ id: 92, owner: 1, kind: KIND.BARRACKS, x: 80, y: 80 }],
+      new Set(),
+      2,
+      2,
+      1,
+      1,
+      map,
+      placementPolicyForBuilding(KIND.TANK_TRAP),
+    ) === "structure",
+    "Tank Trap placement blocker classifies buildings separately from units",
+  );
+  assert(
+    footprintPlacementBlocker(
+      [trapTank],
+      new Set(),
+      1,
+      1,
+      1,
+      1,
+      map,
+      placementPolicyForBuilding(KIND.TANK_TRAP),
+    ) === "unit",
+    "Tank Trap placement blocker classifies vehicle-body unit blockers",
+  );
 
   const pairs = (tiles) => tiles.map((site) => [site.tileX, site.tileY]);
   const exactTankTrapSpacing = (tiles) => tiles.every((site, index) => {
@@ -5142,6 +5211,41 @@ function fakeAudioContext() {
     pairs(validTankTrapLineSites(lineSites)),
     [[0, 0]],
     "Tank Trap dispatch preserves required spacing after invalid preview sites",
+  );
+  const terrainSkippedLineSites = buildTankTrapLineSites({
+    start: { tileX: 0, tileY: 0 },
+    end: { tileX: 4, tileY: 0 },
+    isValid: (tileX) => ({ valid: tileX !== 2, blockedBy: tileX === 2 ? "terrain" : null }),
+  });
+  assertDeepEqual(
+    terrainSkippedLineSites.map((site) => [site.tileX, site.tileY, site.valid, site.skipped]),
+    [[0, 0, true, false], [2, 0, false, true], [4, 0, true, false]],
+    "Tank Trap line preview skips impassable terrain and resumes on the other side",
+  );
+  assertDeepEqual(
+    pairs(validTankTrapLineSites(terrainSkippedLineSites)),
+    [[0, 0], [4, 0]],
+    "Tank Trap dispatch omits skipped terrain sites without stopping the line",
+  );
+  const structureSkippedLineSites = buildTankTrapLineSites({
+    start: { tileX: 0, tileY: 0 },
+    end: { tileX: 6, tileY: 0 },
+    isValid: (tileX) => ({ valid: tileX !== 2, blockedBy: tileX === 2 ? "structure" : null }),
+  });
+  assertDeepEqual(
+    pairs(validTankTrapLineSites(structureSkippedLineSites)),
+    [[0, 0], [4, 0], [6, 0]],
+    "Tank Trap dispatch resumes normal spacing after skipping a building",
+  );
+  const unitBlockedLineSites = buildTankTrapLineSites({
+    start: { tileX: 0, tileY: 0 },
+    end: { tileX: 4, tileY: 0 },
+    isValid: (tileX) => ({ valid: tileX !== 2, blockedBy: tileX === 2 ? "unit" : null }),
+  });
+  assertDeepEqual(
+    unitBlockedLineSites.map((site) => [site.tileX, site.tileY, site.valid, site.skipped]),
+    [[0, 0, true, false], [2, 0, false, false], [4, 0, false, false]],
+    "Tank Trap line preview keeps unit-blocked gaps as line-stopping invalid sites",
   );
   const diagonalGapSites = buildTankTrapLineSites({
     start: { tileX: 0, tileY: 0 },

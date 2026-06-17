@@ -107,7 +107,7 @@ A row is written when **all** of these are true:
 1. The lobby reached `Phase::InGame` (so `match_started_at` was captured).
 2. At least one active participant was present at match start. Solo, player-vs-AI, and AI-only
    deployed matches record when they resolve.
-3. `is_dev_watch()` is false — dev self-play, scenario, and replay rooms never record.
+3. `is_dev_watch()` is false — dev scenario rooms never record.
 4. The room/participants do not match automated smoke/integration/regression test fingerprints:
    `itest-*`, `ai-itest-*`, `client-smoke-*`, `reg-*`, `smoke`, or the `Alpha`/`Bravo`
    integration pair. `Computer *` participants are allowed so player-vs-AI matches record.

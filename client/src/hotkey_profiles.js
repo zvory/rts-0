@@ -18,6 +18,7 @@ const DEFAULT_EXPORT_BUILD = "unknown";
 const CORE_CLASSIC_BINDINGS = Object.freeze({
   "unit.move": "M",
   "unit.attack": "A",
+  "unit.holdPosition": "W",
   "unit.stop": "S",
   "worker.buildMenu": "B",
   "worker.return": "W",

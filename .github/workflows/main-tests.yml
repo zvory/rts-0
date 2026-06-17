@@ -41,9 +41,23 @@ jobs:
             done < <(git diff --name-only --no-renames \
               "${{ github.event.pull_request.base.sha }}" \
               "${{ github.event.pull_request.head.sha }}")
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [ -n "$base" ] && [[ ! "$base" =~ ^0+$ ]] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+              while IFS= read -r path; do
+                [ -n "$path" ] && changed+=("$path")
+              done < <(git diff --name-only --no-renames "$base" "$head")
+            else
+              printf 'Push base commit unavailable; using full CI policy.\n'
+            fi
+          fi
 
-            printf 'Changed files:\n'
+          printf 'Changed files:\n'
+          if [ "${#changed[@]}" -gt 0 ]; then
             printf '  %s\n' "${changed[@]}"
+          else
+            printf '  <none or unavailable>\n'
           fi
 
           policy_output="$(node tests/select-suites.mjs --ci-policy "${changed[@]}")"
@@ -153,7 +167,19 @@ jobs:
 
       - name: Run Rust and architecture suites
         if: needs.changed-files.outputs.run_rust == 'true'
+        env:
+          RTS_NEXTEST_JUNIT_SUMMARY: "1"
+          RTS_SUITE_TIMING_DETAILS: "1"
         run: ./tests/run-all.sh --only-rust
+
+      - name: Upload nextest JUnit report
+        if: always() && needs.changed-files.outputs.run_rust == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextest-junit
+          path: server/target/nextest/default/junit.xml
+          if-no-files-found: warn
+          retention-days: 7
 
   live-node:
     name: CI / live Node suites

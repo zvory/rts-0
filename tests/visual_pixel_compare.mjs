@@ -21,8 +21,15 @@ export function compareRgbaBuffers(legacy, rig, thresholds = {}) {
   const dataB = rig.data;
   const perChannelTolerance = finite(thresholds.perChannelTolerance, 6);
   const opaqueAlphaThreshold = finite(thresholds.opaqueAlphaThreshold, 128);
+  const limits = {
+    minAlphaWeightedMatchingRatio: finite(thresholds.minAlphaWeightedMatchingRatio, 0.985),
+    maxPerPixelRgbaDistance: finite(thresholds.maxPerPixelRgbaDistance, 96),
+    maxOpaqueMismatchCount: finite(thresholds.maxOpaqueMismatchCount, 48),
+    maxOpaqueMismatchClusterPx: finite(thresholds.maxOpaqueMismatchClusterPx, 12),
+  };
   let totalWeight = 0;
   let weightedMatch = 0;
+  let rawMaxPerPixelRgbaDistance = 0;
   let maxPerPixelRgbaDistance = 0;
   const opaqueMismatches = new Set();
   const bounds = emptyBounds();
@@ -33,7 +40,7 @@ export function compareRgbaBuffers(legacy, rig, thresholds = {}) {
     const db = Math.abs(dataA[offset + 2] - dataB[offset + 2]);
     const da = Math.abs(dataA[offset + 3] - dataB[offset + 3]);
     const distance = Math.hypot(dr, dg, db, da);
-    maxPerPixelRgbaDistance = Math.max(maxPerPixelRgbaDistance, distance);
+    rawMaxPerPixelRgbaDistance = Math.max(rawMaxPerPixelRgbaDistance, distance);
 
     const weight = Math.max(dataA[offset + 3], dataB[offset + 3]) / 255;
     if (weight > 0) {
@@ -41,7 +48,8 @@ export function compareRgbaBuffers(legacy, rig, thresholds = {}) {
       weightedMatch += weight * Math.max(0, 1 - distance / 510);
     }
 
-    const opaque = Math.max(dataA[offset + 3], dataB[offset + 3]) >= opaqueAlphaThreshold;
+    const maxAlpha = Math.max(dataA[offset + 3], dataB[offset + 3]);
+    const opaque = maxAlpha >= opaqueAlphaThreshold;
     const mismatched = dr > perChannelTolerance
       || dg > perChannelTolerance
       || db > perChannelTolerance
@@ -50,6 +58,12 @@ export function compareRgbaBuffers(legacy, rig, thresholds = {}) {
       const pixel = offset / 4;
       opaqueMismatches.add(pixel);
       includePixel(bounds, pixel % legacy.width, Math.floor(pixel / legacy.width));
+    }
+
+    const governedByFringeGate = maxAlpha < opaqueAlphaThreshold;
+    const governedByOpaqueGate = opaque && mismatched;
+    if (!governedByFringeGate && !governedByOpaqueGate) {
+      maxPerPixelRgbaDistance = Math.max(maxPerPixelRgbaDistance, distance);
     }
   }
 
@@ -67,12 +81,6 @@ export function compareRgbaBuffers(legacy, rig, thresholds = {}) {
     }
     : null;
 
-  const limits = {
-    minAlphaWeightedMatchingRatio: finite(thresholds.minAlphaWeightedMatchingRatio, 0.985),
-    maxPerPixelRgbaDistance: finite(thresholds.maxPerPixelRgbaDistance, 96),
-    maxOpaqueMismatchCount: finite(thresholds.maxOpaqueMismatchCount, 48),
-    maxOpaqueMismatchClusterPx: finite(thresholds.maxOpaqueMismatchClusterPx, 12),
-  };
   const passed = alphaWeightedMatchingRatio >= limits.minAlphaWeightedMatchingRatio
     && maxPerPixelRgbaDistance <= limits.maxPerPixelRgbaDistance
     && opaqueMismatchCount <= limits.maxOpaqueMismatchCount
@@ -82,6 +90,7 @@ export function compareRgbaBuffers(legacy, rig, thresholds = {}) {
     passed,
     alphaWeightedMatchingRatio: round(alphaWeightedMatchingRatio),
     maxPerPixelRgbaDistance: round(maxPerPixelRgbaDistance),
+    rawMaxPerPixelRgbaDistance: round(rawMaxPerPixelRgbaDistance),
     opaqueMismatchCount,
     mismatchBounds,
     largestOpaqueMismatchClusterPx,

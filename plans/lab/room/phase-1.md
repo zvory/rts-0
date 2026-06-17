@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Done.
+- [x] Done.
 
 ## Objective
 
@@ -33,12 +33,12 @@ moving.
 
 ## Implementation Checklist
 
-- [ ] Document the current mode matrix.
-- [ ] Identify behavior that is protected by tests before extraction.
-- [ ] Add focused characterization tests for unprotected high-risk paths where practical.
-- [ ] Record behavior still requiring manual smoke testing.
-- [ ] Confirm no protocol shape, gameplay rule, or visible client behavior changed.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Document the current mode matrix.
+- [x] Identify behavior that is protected by tests before extraction.
+- [x] Add focused characterization tests for unprotected high-risk paths where practical.
+- [x] Record behavior still requiring manual smoke testing.
+- [x] Confirm no protocol shape, gameplay rule, or visible client behavior changed.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

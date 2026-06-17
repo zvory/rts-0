@@ -35,7 +35,7 @@ use crate::protocol::{
     BranchStagingOccupant, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata,
     ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload, TeamId,
 };
-use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
+use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::replay::ReplayArtifactV1;
 use rts_sim::game::{Game, PlayerInit};
@@ -49,6 +49,7 @@ mod replay_branch;
 mod replay_session;
 mod replay_validation;
 mod room_task;
+mod session_policy;
 mod snapshot_fanout;
 mod snapshots;
 
@@ -76,8 +77,8 @@ const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
 /// Bound on a room's inbound event queue. Commands/joins past this are dropped rather than
 /// allowed to grow without limit; in practice the room drains this every tick.
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
-const DEV_SELFPLAY_ROOM_PREFIX: &str = "__dev_selfplay__";
 const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
+const REPLAY_ARTIFACT_ROOM_PREFIX: &str = "__replay_artifact__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
 const REPLAY_BRANCH_ROOM_PREFIX: &str = "__replay_branch__";
 const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";

@@ -71,6 +71,7 @@ assert.equal(nestedOptions.planName, "lab/room");
 assert.throws(() => validateOptions(parseArgs(["--plan", "../bad", "1", "--pr"])), /plan name/);
 assert.throws(() => validateOptions(parseArgs(["--plan", "bad//path", "1", "--pr"])), /plan name/);
 assert.throws(() => validateOptions(parseArgs(["--plan", "svg", "1"])), /PR-first/);
+assert.throws(() => parseArgs(["--plan", "svg", "1", "--executor", "agents-sdk", "--pr"]), /unknown option: --executor/);
 
 const prompt = renderPrompt({ planName: "svg", phaseId: "phase-2", branch: "zvorygin/svg-phase-2" });
 assert.match(prompt, /\$phase-runner/);

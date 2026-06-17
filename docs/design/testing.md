@@ -54,7 +54,9 @@ with:
 - `summary.log`: short human-readable failure summary and missing milestones.
 
 The replay artifact is meant to be enough to reproduce or inspect a failing run without manually
-playtesting first. By default successful runs do not write artifacts. For manual inspection,
+playtesting first. Load an artifact with
+`/dev/replay-artifact?replay=<artifact_name>` on a local server using the same Cargo target
+directory. By default successful runs do not write artifacts. For manual inspection,
 setting `RTS_SELFPLAY_SAVE_REPLAY=1` writes a successful run to
 `target/selfplay-artifacts/<test>-<pid>-<time>/`; setting `RTS_SELFPLAY_SAVE_REPLAY=<name>` uses
 that explicit safe artifact name instead.
@@ -145,11 +147,12 @@ It is an aggregate check over split coverage jobs for server binary build, Rust/
 Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
 The split jobs run `tests/run-all.sh` sub-modes so the required aggregate gate preserves the same
 coverage as the portable repo-root command without serializing every suite in one runner.
-Changed-file detection classifies PRs as `docs_only`, `client_only`, or `full`. `docs_only` keeps
-the same check contexts green but exits before expensive suites. `client_only` is limited to
-conservative `client/` paths and skips Rust format, nextest, lint, and Rust architecture work while
-still building the server and running live Node plus browser coverage. Contract-adjacent client
-paths such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
+Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
+from the PR base/head range or the push before/after range. `docs_only` keeps the same check
+contexts green but exits before expensive suites. `client_only` is limited to conservative
+`client/` paths and skips Rust format, nextest, lint, and Rust architecture work while still
+building the server and running live Node plus browser coverage. Contract-adjacent client paths
+such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
 `client/src/lobby_view.js`, and generated sim-WASM assets fall back to `full`. Branch protection
 should require this single aggregate full-gate check unless a plan phase explicitly changes the
 contract.

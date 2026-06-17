@@ -1344,6 +1344,55 @@ fn combat_no_longer_issues_retreat_orders() {
 }
 
 #[test]
+fn hold_position_does_not_chase_enemy_in_sight() {
+    let mut entities = EntityStore::new();
+    let holder = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, 260.0, 100.0)
+        .expect("enemy rifleman should spawn");
+    entities
+        .get_mut(holder)
+        .expect("holder should exist")
+        .hold_position();
+
+    run_combat_tick(&mut entities);
+
+    let holder = entities.get(holder).expect("holder should exist");
+    assert!(matches!(holder.order(), Order::HoldPosition));
+    assert_eq!(holder.target_id(), None);
+    assert_eq!(holder.path_goal(), None);
+    assert!(holder.path_is_empty());
+}
+
+#[test]
+fn hold_position_fires_at_enemy_in_weapon_range() {
+    let mut entities = EntityStore::new();
+    let holder = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy = entities
+        .spawn_unit(2, EntityKind::Rifleman, 130.0, 100.0)
+        .expect("enemy rifleman should spawn");
+    entities
+        .get_mut(holder)
+        .expect("holder should exist")
+        .hold_position();
+    let enemy_hp = entities.get(enemy).expect("enemy should exist").hp;
+
+    run_combat_tick(&mut entities);
+
+    let holder = entities.get(holder).expect("holder should exist");
+    assert!(matches!(holder.order(), Order::HoldPosition));
+    assert!(holder.path_is_empty());
+    assert!(
+        entities.get(enemy).expect("enemy should exist").hp < enemy_hp,
+        "held rifleman should fire once enemies enter weapon range"
+    );
+}
+
+#[test]
 fn direct_hits_do_not_pull_workers_off_active_construction() {
     let mut entities = EntityStore::new();
     let worker_id = entities

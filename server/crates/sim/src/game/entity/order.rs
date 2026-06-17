@@ -16,6 +16,9 @@ pub enum Order {
     /// No order: units hold position; idle army units and armed buildings may auto-acquire,
     /// but workers stay passive unless explicitly ordered.
     Idle,
+    /// Stand ground without chasing or walking to auto-acquire; fire only at enemies already in
+    /// weapon range.
+    HoldPosition,
     /// Move to a world point; stop on arrival. No engaging en route.
     Move(MoveOrder),
     /// Move to a world point while engaging enemies encountered along the way.

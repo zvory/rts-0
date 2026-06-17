@@ -35,9 +35,9 @@ Use when writing or debugging tests, or before claiming a change is done.
 - The stable required PR gate is the aggregate `./tests/run-all.sh` check from the `Main test gate`
   workflow. It depends on split jobs for server binary build, Rust/architecture, live Node, and
   browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`. Changed-file
-  detection emits a conservative CI class: `docs_only` skips expensive suites, `client_only` skips
-  Rust format/nextest/lint while keeping server-build, live Node, and browser coverage, and `full`
-  runs every split job.
+  detection uses the PR base/head range or the `main` push before/after range to emit a conservative
+  CI class: `docs_only` skips expensive suites, `client_only` skips Rust format/nextest/lint while
+  keeping server-build, live Node, and browser coverage, and `full` runs every split job.
 - `tests/run-all.sh` prints a timing summary for every measured suite, server build/boot, and
   client dependency hydration attempt. Its default Rust test phase is
   `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile
@@ -45,14 +45,17 @@ Use when writing or debugging tests, or before claiming a change is done.
   back to Cargo's built-in test runner.
 - Slow Rust investigation starts from the normal nextest-backed logs. Use the printed Rust context
   lines (Cargo target dir, Rust/cargo/nextest versions, and CI Cargo cache exact-hit result), the
-  final timing summary, and nextest's per-test status/slow-test output before running narrower
-  filtered nextest commands.
+  final timing summary, shell timing details, nextest's per-test status/slow-test output, and the
+  Nextest JUnit timing summary before running narrower filtered nextest commands.
 - The workspace currently has no Rust doctests, so the local gate does not run a separate
   `cargo test --doc` step. Add one beside nextest if doctests are introduced.
 - `CI / server binary`, `CI / rust and architecture`, `CI / live Node suites`, and
   `CI / browser and tri-state` are the auditable coverage jobs under the aggregate required check.
   The Rust/architecture job installs `cargo-nextest` and runs `./tests/run-all.sh --only-rust`, so
   CI uses the same nextest-backed Rust command path as local development.
+  The Rust/architecture job uploads `server/target/nextest/default/junit.xml` as the
+  `nextest-junit` artifact with 7-day retention when the Rust lane runs, including failed Rust
+  lanes when nextest produced the file.
   Branch protection should require the aggregate `./tests/run-all.sh` check unless rulesets are
   deliberately migrated to require every split coverage job directly. The split jobs also
   short-circuit as green checks when the CI class says that coverage lane is unnecessary.
@@ -112,9 +115,9 @@ Start a fresh server on its own port and use macOS `open` to load a spectation r
 user can inspect the failure state:
 
 ```
-open "http://localhost:<port>/dev/selfplay?replay=<artifact_name>"
+open "http://localhost:<port>/dev/replay-artifact?replay=<artifact_name>"
 # e.g.
-open "http://localhost:<port>/dev/selfplay?replay=manual_worker_rush_latest"
+open "http://localhost:<port>/dev/replay-artifact?replay=manual_worker_rush_latest"
 ```
 
 Do **not** use the Browser skill for this flow.

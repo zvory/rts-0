@@ -94,7 +94,7 @@ pub(super) fn begin_idle_deployed_weapon_setup(e: &mut Entity) {
     }
     if !matches!(
         e.order(),
-        Order::Idle | Order::Attack(_) | Order::AttackMove(_)
+        Order::Idle | Order::HoldPosition | Order::Attack(_) | Order::AttackMove(_)
     ) {
         return;
     }

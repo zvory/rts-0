@@ -36,7 +36,7 @@ active file instead.
 ## Executor runner
 
 For unattended executor passes, use `scripts/phase-runner.sh` from a clean checkout. That stable
-script is now a compatibility launcher for the maintained Agents SDK-capable runner in
+script is now a compatibility launcher for the maintained Node runner in
 `scripts/phase-runner-agents.mjs`; set `RTS_PHASERUNNER_BIN` only when testing an alternate local
 runner binary or script.
 The runner creates one `/tmp/rts-worktrees` worktree and one `zvorygin/` branch per phase, invokes
@@ -60,5 +60,10 @@ scripts/phase-runner.sh --plan ci --from 4 --to 6 --pr --wait
 the runner and by executor prompts. Keep the runner handoff validation and this schema in sync when
 the handoff shape changes. Intended follow-up extension points live in
 `scripts/phase-runner-agents.mjs`: prompt-section injection, an experimental local iteration mode
-that does not open PRs, repair/resume inspection for blocked worktrees, Agents SDK tracing, and
-sub-agent orchestration.
+that does not open PRs, repair/resume inspection for blocked worktrees, and sub-agent
+orchestration.
+
+We tried a live `--executor agents-sdk` canary for the phase runner and removed it because the
+OpenAI Agents SDK requires API credentials and bills through API usage. This repo's maintained
+executor path should stay on `codex exec`, which uses the developer's Codex CLI login instead of
+API-billed SDK calls.

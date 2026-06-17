@@ -87,6 +87,7 @@ test("public enum lists document the phase-2 contract", () => {
   assert.ok(GEOMETRY_TYPES.includes("path"));
   assert.ok(ANIMATION_INPUTS.includes("setupVisual"));
   assert.ok(ANIMATION_PROPERTIES.includes("transform.rotation"));
+  assert.ok(ANIMATION_PROPERTIES.includes("geometry.scaleX"));
 });
 
 test("missing required anchors fail closed", () => {

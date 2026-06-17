@@ -1083,7 +1083,7 @@ impl Entity {
             return states::IDLE;
         }
         match self.order() {
-            Order::Idle => states::IDLE,
+            Order::Idle | Order::HoldPosition => states::IDLE,
             Order::Move(_) => states::MOVE,
             Order::AttackMove(_) => {
                 if self.target_id().is_some() {
@@ -1108,6 +1108,20 @@ impl Entity {
             m.queued_orders.clear();
             m.path.clear();
             m.last_move_delta = (0.0, 0.0);
+        }
+        self.set_target_id(None);
+        self.reset_artillery_accuracy();
+    }
+
+    /// Clear active/queued movement and enter a no-chase hold-position stance.
+    pub fn hold_position(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.order = Order::HoldPosition;
+            m.queued_orders.clear();
+            m.path.clear();
+            m.path_goal = None;
+            m.last_move_delta = (0.0, 0.0);
+            m.scout_car_reverse_waypoint = None;
         }
         self.set_target_id(None);
         self.reset_artillery_accuracy();

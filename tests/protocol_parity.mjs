@@ -32,6 +32,7 @@ import {
   COMPACT_SNAPSHOT_VERSION,
   PREDICTION_PROTOCOL_VERSION,
   DEFAULT_FACTION_ID,
+  cmd,
   decodeServerMessage,
   msg,
 } from "../client/src/protocol.js";
@@ -193,6 +194,10 @@ assert(
 assert(
   JSON.stringify(msg.command({ c: "stop", units: [1] }, 9)) === JSON.stringify({ t: "command", clientSeq: 9, cmd: { c: "stop", units: [1] } }),
   "command builder must emit clientSeq envelope",
+);
+assert(
+  JSON.stringify(msg.command(cmd.holdPosition([1]), 10)) === JSON.stringify({ t: "command", clientSeq: 10, cmd: { c: "holdPosition", units: [1] } }),
+  "holdPosition command builder must emit clientSeq envelope",
 );
 assert(
   // Temporary source-text allowlist: start payload field-shape assertions are contract DTO checks,
