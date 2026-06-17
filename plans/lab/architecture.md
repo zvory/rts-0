@@ -4,6 +4,12 @@ This document is a planning artifact, not an approved implementation phase list.
 current product target and the architectural hypotheses that should be tested before cutting
 implementation phases.
 
+Related subplans:
+
+- [Room architecture requirements](room/requirements.md) defines the high-level goal that rooms,
+  replays, dev scenarios, and labs evolve toward shared room primitives with explicit policies
+  instead of duplicated special cases.
+
 ## Product Contract
 
 The lab is a privileged version of the real game. It should run a real map, a real `Game`, real
