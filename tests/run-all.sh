@@ -3,7 +3,7 @@
 # non-zero if anything failed. This is the canonical "is the build green?" command.
 #
 # What it runs, in order:
-#   1. Architecture/contract policy (crate boundaries + sim/client architecture + faction guardrails + test-selector self-check)
+#   1. Architecture/contract policy (crate boundaries + sim/client/lobby architecture + faction guardrails + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
 #   3. Rust nextest fast scripted tests (deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
@@ -574,6 +574,8 @@ run_rust_suites_bg() {
       cargo run --manifest-path "$SERVER_DIR/Cargo.toml" -p rts-archcheck -- check-sim-architecture
     run_suite_bg "Architecture: client modules" \
       node "$REPO_ROOT/scripts/check-client-architecture.mjs"
+    run_suite_bg "Architecture: lobby modules" \
+      node "$REPO_ROOT/scripts/check-lobby-architecture.mjs"
     run_suite_bg "Architecture: prediction guardrails" \
       node "$REPO_ROOT/scripts/check-prediction-guardrails.mjs"
     run_suite_bg "Architecture: faction assumptions" \

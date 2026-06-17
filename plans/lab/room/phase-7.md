@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Done.
+- [x] Done.
 
 ## Objective
 
@@ -35,12 +35,12 @@ guardrails after the composable room primitives exist.
 
 ## Implementation Checklist
 
-- [ ] Remove temporary shims that no longer have consumers.
-- [ ] Update room/lobby architecture docs to match the final module boundaries.
-- [ ] Add guardrails only where the boundary is stable and the check is precise.
-- [ ] Run the focused room tests carried forward from prior phases.
-- [ ] Run any architecture check touched by this phase.
-- [ ] Mark the phase as done in this file.
+- [x] Remove temporary shims that no longer have consumers.
+- [x] Update room/lobby architecture docs to match the final module boundaries.
+- [x] Add guardrails only where the boundary is stable and the check is precise.
+- [x] Run the focused room tests carried forward from prior phases.
+- [x] Run any architecture check touched by this phase.
+- [x] Mark the phase as done in this file.
 
 ## Verification
 
