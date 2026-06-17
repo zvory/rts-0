@@ -261,6 +261,7 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/setup.rs",
   "server/crates/sim/src/game/setup/dev_scenarios.rs",
   "server/crates/sim/src/game/setup/dev_scenarios/layouts.rs",
+  "server/crates/sim/src/game/setup/dev_scenarios/layouts/tank_traps.rs",
   "server/crates/sim/src/game/systems.rs",
   "server/crates/sim/src/game/upgrade.rs",
   "server/crates/sim/src/protocol.rs",
