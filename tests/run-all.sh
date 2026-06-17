@@ -154,6 +154,10 @@ SKIPPED=()       # suites we deliberately did not run
 TIMING_NAMES=()  # suite or phase names with measured durations
 TIMING_SECONDS=()
 TIMING_STATUS=()
+DETAIL_NAMES=()
+DETAIL_REAL=()
+DETAIL_USER=()
+DETAIL_SYS=()
 
 record_timing() {
   TIMING_NAMES+=("$1")
@@ -168,6 +172,28 @@ print_timing_summary() {
     printf '  %-7s %5ss  %s\n' "${TIMING_STATUS[$i]}" "${TIMING_SECONDS[$i]}" "${TIMING_NAMES[$i]}"
   done
   printf '  %-7s %5ss  %s\n' "TOTAL" "$((SECONDS - TOTAL_START))" "tests/run-all.sh"
+  if [ "${#DETAIL_NAMES[@]}" -gt 0 ]; then
+    printf '\nShell timing details:\n'
+    for i in "${!DETAIL_NAMES[@]}"; do
+      printf '  real=%7ss user=%7ss sys=%7ss  %s\n' \
+        "${DETAIL_REAL[$i]}" "${DETAIL_USER[$i]}" "${DETAIL_SYS[$i]}" "${DETAIL_NAMES[$i]}"
+    done
+  fi
+}
+
+record_detail_timing() {
+  local name="$1"
+  local timef="$2"
+  [ -f "$timef" ] || return 0
+  local real user sys
+  real="$(awk '$1 == "real" { value = $2 } END { print value }' "$timef" 2>/dev/null)"
+  user="$(awk '$1 == "user" { value = $2 } END { print value }' "$timef" 2>/dev/null)"
+  sys="$(awk '$1 == "sys" { value = $2 } END { print value }' "$timef" 2>/dev/null)"
+  [ -n "$real" ] || return 0
+  DETAIL_NAMES+=("$name")
+  DETAIL_REAL+=("$real")
+  DETAIL_USER+=("${user:-0.000}")
+  DETAIL_SYS+=("${sys:-0.000}")
 }
 
 # Run a suite, record pass/fail. Args: <name> <command...>
@@ -286,19 +312,31 @@ BG_RESULT_FILES=()
 
 run_suite_bg() {
   local name="$1"; shift
-  local logf resultf
+  local logf resultf timef
   logf="$(mktemp -t rts-suite.XXXXXX)"
   resultf="$(mktemp -t rts-result.XXXXXX)"
+  timef=""
+  if [ "${RTS_SUITE_TIMING_DETAILS:-0}" = "1" ]; then
+    timef="$(mktemp -t rts-time.XXXXXX)"
+  fi
   [ "$VERBOSE" = "1" ] && hdr "$name (bg)"
   (
     start=$SECONDS
-    if "$@" >"$logf" 2>&1; then
+    if [ -n "$timef" ]; then
+      TIMEFORMAT=$'real\t%3R\nuser\t%3U\nsys\t%3S'
+      if { time "$@" >"$logf" 2>&1; } 2>"$timef"; then
+        echo ok >"$resultf"
+      else
+        echo fail >"$resultf"
+      fi
+    elif "$@" >"$logf" 2>&1; then
       echo ok >"$resultf"
     else
       echo fail >"$resultf"
     fi
     echo "$logf" >>"$resultf"   # second line = log path
     echo "$((SECONDS - start))" >>"$resultf" # third line = elapsed seconds
+    echo "$timef" >>"$resultf" # fourth line = optional shell time path
   ) &
   BG_PIDS+=($!)
   BG_NAMES+=("$name")
@@ -311,20 +349,24 @@ collect_bg_results() {
     wait "${BG_PIDS[$i]}" 2>/dev/null || true
     local resultf="${BG_RESULT_FILES[$i]}"
     local name="${BG_NAMES[$i]}"
-    local status logf elapsed
+    local status logf elapsed timef
     status="$(head -1 "$resultf" 2>/dev/null)"
     logf="$(sed -n '2p' "$resultf" 2>/dev/null)"
     elapsed="$(sed -n '3p' "$resultf" 2>/dev/null)"
+    timef="$(sed -n '4p' "$resultf" 2>/dev/null)"
     [ -n "$elapsed" ] || elapsed=0
+    [ -n "$timef" ] && record_detail_timing "$name" "$timef"
     if [ "$status" = "ok" ]; then
       record_timing "$name" "$elapsed" "PASS"
       [ -n "$logf" ] && rm -f "$logf"
+      [ -n "$timef" ] && rm -f "$timef"
       rm -f "$resultf"
       [ "$VERBOSE" = "1" ] && info "${GRN}PASS${RST} $name (${elapsed}s)"
     else
       record_timing "$name" "$elapsed" "FAIL"
       warn "FAIL $name (${elapsed}s)"
       [ -n "$logf" ] && { cat "$logf"; rm -f "$logf"; }
+      [ -n "$timef" ] && rm -f "$timef"
       rm -f "$resultf"
       FAILED+=("$name")
     fi
@@ -482,6 +524,31 @@ EOF
 
 run_nextest_tests_full_ai() {
   RTS_FULL_AI_TESTS=1 run_nextest_tests
+}
+
+find_nextest_junit() {
+  local candidate
+  for candidate in \
+      "$CARGO_TARGET_DIR/nextest/default/junit.xml" \
+      "$SERVER_DIR/target/nextest/default/junit.xml" \
+      "$REPO_ROOT/target/nextest/default/junit.xml"; do
+    if [ -f "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+print_nextest_junit_summary() {
+  [ "${RTS_NEXTEST_JUNIT_SUMMARY:-0}" = "1" ] || return 0
+  local junit_path
+  if junit_path="$(find_nextest_junit)"; then
+    node "$SCRIPT_DIR/nextest_junit_summary.mjs" "$junit_path" --limit="${RTS_NEXTEST_JUNIT_LIMIT:-20}" || \
+      warn "could not summarize nextest JUnit timing at $junit_path"
+  else
+    warn "nextest JUnit timing summary requested, but junit.xml was not found"
+  fi
 }
 
 run_nextest_tests_bg() {
@@ -667,6 +734,7 @@ collect_bg_results
 # --- Summary --------------------------------------------------------------------------------
 hdr "Summary"
 for s in "${SKIPPED[@]:-}"; do [ -n "$s" ] && info "  ${YEL}SKIP${RST} $s"; done
+print_nextest_junit_summary
 print_timing_summary
 if [ "${#FAILED[@]}" -eq 0 ]; then
   info "  ${GRN}ALL SUITES PASSED ✅${RST}"

@@ -167,6 +167,9 @@ jobs:
 
       - name: Run Rust and architecture suites
         if: needs.changed-files.outputs.run_rust == 'true'
+        env:
+          RTS_NEXTEST_JUNIT_SUMMARY: "1"
+          RTS_SUITE_TIMING_DETAILS: "1"
         run: ./tests/run-all.sh --only-rust
 
   live-node:

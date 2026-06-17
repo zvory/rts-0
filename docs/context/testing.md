@@ -45,8 +45,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   back to Cargo's built-in test runner.
 - Slow Rust investigation starts from the normal nextest-backed logs. Use the printed Rust context
   lines (Cargo target dir, Rust/cargo/nextest versions, and CI Cargo cache exact-hit result), the
-  final timing summary, and nextest's per-test status/slow-test output before running narrower
-  filtered nextest commands.
+  final timing summary, shell timing details, nextest's per-test status/slow-test output, and the
+  Nextest JUnit timing summary before running narrower filtered nextest commands.
 - The workspace currently has no Rust doctests, so the local gate does not run a separate
   `cargo test --doc` step. Add one beside nextest if doctests are introduced.
 - `CI / server binary`, `CI / rust and architecture`, `CI / live Node suites`, and

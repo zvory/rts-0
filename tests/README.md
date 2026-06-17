@@ -55,8 +55,10 @@ The workspace currently has no Rust doctests, so `run-all.sh` does not run a sep
 For slow Rust runs, start with the context and timing already printed by the runner. The Rust-only
 path prints the Cargo target dir, Rust version, cargo version, cargo-nextest version, nextest
 per-test status/slow-test output, and the final command-level timing summary. In CI, the Rust job
-also prints the Cargo cache exact-hit result from Actions; use that plus the target dir to decide
-whether time is going into rebuilds, then use nextest's slow-test output to narrow test runtime.
+also prints the Cargo cache exact-hit result from Actions, shell timing details for the Rust
+top-level suites, and a slowest-testcase summary from nextest's JUnit XML. Use that plus the target
+dir to decide whether time is going into rebuilds, then use nextest's slow-test output and the JUnit
+summary to narrow test runtime.
 
 The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
 is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the
