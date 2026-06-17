@@ -136,7 +136,7 @@ jobs:
 
       - name: Install cargo-nextest
         if: needs.changed-files.outputs.run_rust == 'true'
-        run: cargo install cargo-nextest --locked
+        run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
       - name: Print Rust test context
         if: needs.changed-files.outputs.run_rust == 'true'
