@@ -468,6 +468,9 @@ multiple queued building placements; releasing Shift or losing window focus clea
 Tank Trap placement uses the same local placement intent, with optional `lineSites` preview data:
 the first valid sites dispatch as one immediate single-worker build per selected worker, and any
 remaining valid sites dispatch as queued standard build commands against the selected worker set.
+Line placement only offers vehicle-closing Tank Trap steps: exact diagonal adjacency `(1,1)` or
+one-tile orthogonal gaps `(2,0)` / `(0,2)`. Invalid intermediate sites break the line instead of
+letting dispatch skip ahead across a larger gap.
 
 `command_composer.js` owns command-target arming lifetime for command-card targets. HUD, input, and
 minimap receive `ClientIntent` from `Match`; input and minimap clicks call

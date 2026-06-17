@@ -5097,12 +5097,12 @@ function fakeAudioContext() {
   );
 
   const pairs = (tiles) => tiles.map((site) => [site.tileX, site.tileY]);
-  const noKnightSpacing = (tiles) => tiles.every((site, index) => {
+  const exactTankTrapSpacing = (tiles) => tiles.every((site, index) => {
     if (index === 0) return true;
     const prev = tiles[index - 1];
     const dx = Math.abs(site.tileX - prev.tileX);
     const dy = Math.abs(site.tileY - prev.tileY);
-    return !((dx === 2 && dy === 1) || (dx === 1 && dy === 2));
+    return (dx === 1 && dy === 1) || (dx === 2 && dy === 0) || (dx === 0 && dy === 2);
   });
   assertDeepEqual(
     pairs(tankTrapLineTiles({ tileX: 0, tileY: 0 }, { tileX: 5, tileY: 0 })),
@@ -5121,12 +5121,12 @@ function fakeAudioContext() {
   );
   const shallowLine = tankTrapLineTiles({ tileX: 0, tileY: 0 }, { tileX: 5, tileY: 2 });
   const steepLine = tankTrapLineTiles({ tileX: 0, tileY: 0 }, { tileX: 2, tileY: 5 });
-  assert(noKnightSpacing(shallowLine), "Tank Trap shallow line inserts bridges to avoid knight spacing");
-  assert(noKnightSpacing(steepLine), "Tank Trap steep line inserts bridges to avoid knight spacing");
+  assert(exactTankTrapSpacing(shallowLine), "Tank Trap shallow line uses only allowed vehicle-blocking spacing");
+  assert(exactTankTrapSpacing(steepLine), "Tank Trap steep line uses only allowed vehicle-blocking spacing");
   assertDeepEqual(
     pairs(shallowLine),
-    [[0, 0], [1, 1], [2, 1], [3, 2], [4, 2]],
-    "Tank Trap shallow bridge sites keep the line closed to vehicles",
+    [[0, 0], [1, 1], [3, 1], [4, 2]],
+    "Tank Trap shallow bridge sites avoid knight and two-by-two gaps",
   );
   const lineSites = buildTankTrapLineSites({
     start: { tileX: 0, tileY: 0 },
@@ -5135,30 +5135,49 @@ function fakeAudioContext() {
   });
   assertDeepEqual(
     lineSites.map((site) => [site.tileX, site.tileY, site.valid]),
-    [[0, 0, true], [2, 0, false], [4, 0, true]],
-    "Tank Trap line preview marks invalid sites without stopping later valid sites",
+    [[0, 0, true], [2, 0, false], [4, 0, false]],
+    "Tank Trap line preview marks sites invalid when skipping would create an oversized gap",
   );
   assertDeepEqual(
     pairs(validTankTrapLineSites(lineSites)),
-    [[0, 0], [4, 0]],
-    "Tank Trap dispatch skips invalid preview sites",
+    [[0, 0]],
+    "Tank Trap dispatch preserves required spacing after invalid preview sites",
+  );
+  const diagonalGapSites = buildTankTrapLineSites({
+    start: { tileX: 0, tileY: 0 },
+    end: { tileX: 2, tileY: 2 },
+    isValid: (tileX, tileY) => !(tileX === 1 && tileY === 1),
+  });
+  assertDeepEqual(
+    diagonalGapSites.map((site) => [site.tileX, site.tileY, site.valid]),
+    [[0, 0, true], [1, 1, false], [2, 2, false]],
+    "Tank Trap line preview forbids dispatching across a two-by-two diagonal gap",
   );
   const lineCommands = tankTrapBuildCommands([77, 88], [
     { tileX: 0, tileY: 0, valid: true },
     { tileX: 2, tileY: 0, valid: true },
-    { tileX: 4, tileY: 0, valid: false },
+    { tileX: 4, tileY: 0, valid: true },
     { tileX: 6, tileY: 0, valid: true },
-    { tileX: 8, tileY: 0, valid: true },
   ]);
   assertDeepEqual(
     lineCommands.map((command) => [command.units, command.tileX, command.tileY, command.queued === true]),
     [
       [[77], 0, 0, false],
       [[88], 2, 0, false],
+      [[77, 88], 4, 0, true],
       [[77, 88], 6, 0, true],
-      [[77, 88], 8, 0, true],
     ],
     "Tank Trap line dispatch assigns immediate single-worker builds then queued overflow builds",
+  );
+  const gapCommands = tankTrapBuildCommands([77, 88], [
+    { tileX: 0, tileY: 0, valid: true },
+    { tileX: 2, tileY: 0, valid: false },
+    { tileX: 4, tileY: 0, valid: true },
+  ]);
+  assertDeepEqual(
+    gapCommands.map((command) => [command.units, command.tileX, command.tileY, command.queued === true]),
+    [[[77], 0, 0, false]],
+    "Tank Trap line dispatch stops before valid-looking sites that would skip over a gap",
   );
   const lineDragInput = Object.create(Input.prototype);
   let dragRefreshes = 0;
@@ -5697,10 +5716,8 @@ function fakeAudioContext() {
     trapPlacementCommands.map((command) => [command.units, command.tileX, command.tileY, command.queued === true]),
     [
       [[77], 0, 0, false],
-      [[88], 4, 0, false],
-      [[77, 88], 6, 0, true],
     ],
-    "Tank Trap placement confirmation sends single-worker immediate builds and queued overflow",
+    "Tank Trap placement confirmation preserves spacing when preview sites contain a gap",
   );
   assert(trapPlacementEnded === 0, "Shift Tank Trap placement preserves placement mode without changing overflow queueing");
 
