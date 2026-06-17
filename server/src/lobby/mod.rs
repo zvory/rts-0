@@ -45,6 +45,7 @@ mod crash_replay;
 mod dev_replay;
 mod faction_validation;
 mod live_tick;
+mod participants;
 mod replay_branch;
 mod replay_session;
 mod replay_validation;

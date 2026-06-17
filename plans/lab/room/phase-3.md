@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Done.
+- [x] Done.
 
 ## Objective
 
@@ -32,13 +32,13 @@ lobby-owned helper that preserves existing player ids and command behavior.
 
 ## Implementation Checklist
 
-- [ ] Extract participant read helpers before moving mutation helpers.
-- [ ] Route live seat lookup and player/spectator command authority through the helper.
-- [ ] Preserve per-connection command sequence acknowledgement behavior.
-- [ ] Add tests for normal player command acceptance, spectator command rejection, branch live
+- [x] Extract participant read helpers before moving mutation helpers.
+- [x] Route live seat lookup and player/spectator command authority through the helper.
+- [x] Preserve per-connection command sequence acknowledgement behavior.
+- [x] Add tests for normal player command acceptance, spectator command rejection, branch live
       seat command aliasing, defeated-player blocking, and replay command rejection.
-- [ ] Confirm lobby display order, host fallback, and branch staging broadcasts remain unchanged.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Confirm lobby display order, host fallback, and branch staging broadcasts remain unchanged.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
