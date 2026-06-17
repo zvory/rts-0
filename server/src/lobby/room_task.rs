@@ -3460,6 +3460,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
+                case: None,
             }),
             None,
             false,
