@@ -35,13 +35,15 @@ active file instead.
 
 ## Executor runner
 
-For unattended executor passes, use `scripts/phase-runner.sh` from a clean checkout. The runner
-creates one `/tmp/rts-worktrees` worktree and one `zvorygin/` branch per phase, invokes Codex with
-the repo-local `$phase-runner` skill, saves a compact JSON handoff under the runner log directory,
-and commits completed phase work. Pass `--pr` to push the phase branch, open or update an owned PR
-with `scripts/agent-pr.sh`, and arm auto-merge. Add `--wait` for normal unattended completion; the
-runner will wait through `scripts/wait-pr.sh`, fetch `origin/main`, and verify the phase head is
-reachable there before reporting success or starting another phase.
+For unattended executor passes, use `scripts/phase-runner.sh` from a clean checkout. That stable
+script is now a compatibility launcher for the maintained Rust runner in
+`server/crates/phaserunner`; set `RTS_PHASERUNNER_BIN` only when testing a prebuilt local binary.
+The runner creates one `/tmp/rts-worktrees` worktree and one `zvorygin/` branch per phase, invokes
+Codex with the repo-local `$phase-runner` skill, saves a compact JSON handoff under the runner log
+directory, and commits completed phase work. Pass `--pr` to push the phase branch, open or update an
+owned PR with `scripts/agent-pr.sh`, and arm auto-merge. Add `--wait` for normal unattended
+completion; the runner will wait through `scripts/wait-pr.sh`, fetch `origin/main`, and verify the
+phase head is reachable there before reporting success or starting another phase.
 
 The runner is only for implementation phases that already have approved phase files. It does not
 create plans or perform final review. Without `--wait`, the runner stops after the first PR is
@@ -52,3 +54,9 @@ scripts/phase-runner.sh --plan ci 5 --pr
 scripts/phase-runner.sh --plan ci --from 4 --to 6 --pr
 scripts/phase-runner.sh --plan ci --from 4 --to 6 --pr --wait
 ```
+
+`scripts/phase-runner-result.schema.json` remains the committed structured-handoff contract used by
+the runner and by executor prompts. Keep the Rust handoff types and this schema in sync when the
+handoff shape changes. Intended follow-up extension points live in the Rust crate: prompt-section
+injection, an experimental local iteration mode that does not open PRs, and repair/resume
+inspection for blocked worktrees.

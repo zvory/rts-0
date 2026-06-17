@@ -77,6 +77,7 @@ Useful entry points:
 - `tests/` contains live-server integration and browser smoke tests.
 - [DESIGN.md](DESIGN.md) indexes the source-of-truth contract docs under `docs/design/`.
 - [tests/README.md](tests/README.md) explains the test suites in detail.
+- `scripts/phase-runner.sh` is the stable launcher for approved phased-plan executor passes.
 
 Common commands:
 

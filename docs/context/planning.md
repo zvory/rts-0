@@ -23,9 +23,10 @@ name is short, lowercase, and descriptive.
 - When a phase is complete, mark that phase document as done in the implementation commit for that
   phase.
 - For executor-only automation, `scripts/phase-runner.sh --pr` can run existing phase files in
-  isolated worktrees, push owned PRs, and arm auto-merge. Use `--pr --wait` for normal unattended
-  completion so the runner waits for each PR to merge before reporting success. Planning and final
-  review remain manual.
+  isolated worktrees, push owned PRs, and arm auto-merge. The script is the stable operator path and
+  launches the maintained Rust runner in `server/crates/phaserunner`. Use `--pr --wait` for normal
+  unattended completion so the runner waits for each PR to merge before reporting success. Planning
+  and final review remain manual.
 - Recovery, cleanup, canary, and alternate-runner procedures for PR-first phase work live in
   [docs/pr-first-workflow.md](../pr-first-workflow.md).
 
