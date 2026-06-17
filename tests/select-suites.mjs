@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const suiteOrder = [
   "crate-boundaries",
   "cargo-fmt",
-  "cargo-test-contract-protocol",
-  "cargo-test-rules",
-  "cargo-test-sim",
-  "cargo-test-ai",
-  "cargo-test-server",
+  "nextest-contract-protocol",
+  "nextest-rules",
+  "nextest-sim",
+  "nextest-ai",
+  "nextest-server",
   "cargo-clippy",
   "client-architecture",
   "faction-assumptions",
@@ -245,7 +249,7 @@ export function selectSuites(files) {
     }
 
     if (ciOrScript) {
-      addAll(suites, ["crate-boundaries", "cargo-fmt", "cargo-test-server", "cargo-clippy", "node-regression"]);
+      addAll(suites, ["crate-boundaries", "cargo-fmt", "nextest-server", "cargo-clippy", "node-regression"]);
     }
 
     if (clientArchitecturePolicy) {
@@ -256,25 +260,25 @@ export function selectSuites(files) {
 
     if (normalized.startsWith("server/crates/contract/") || isProtocolShape(normalized)) {
       addAll(suites, [
-        "cargo-test-contract-protocol",
+        "nextest-contract-protocol",
         "js-protocol-contracts",
         "node-server-integration",
       ]);
     }
 
     if (normalized.startsWith("server/crates/rules/") || isRulesVisibleBalance(normalized)) {
-      addAll(suites, ["cargo-test-rules", "cargo-test-sim"]);
+      addAll(suites, ["nextest-rules", "nextest-sim"]);
       if (isRulesVisibleBalance(normalized)) {
         suites.add("js-protocol-contracts");
       }
     }
 
     if (normalized.startsWith("server/crates/sim/")) {
-      addAll(suites, ["cargo-test-sim", "node-server-integration"]);
+      addAll(suites, ["nextest-sim", "node-server-integration"]);
     }
 
     if (normalized.startsWith("server/crates/ai/")) {
-      addAll(suites, ["cargo-test-ai", "node-ai-integration"]);
+      addAll(suites, ["nextest-ai", "node-ai-integration"]);
       if (
         normalized.includes("/ai_core/") ||
         normalized.includes("/selfplay/") ||
@@ -285,7 +289,7 @@ export function selectSuites(files) {
     }
 
     if (normalized.startsWith("server/src/")) {
-      addAll(suites, ["cargo-test-server", "node-server-integration", "node-regression"]);
+      addAll(suites, ["nextest-server", "node-server-integration", "node-regression"]);
       if (normalized.includes("lobby") || normalized.includes("main.rs")) {
         suites.add("node-ai-integration");
       }
@@ -314,11 +318,11 @@ export function selectSuites(files) {
 
     if (normalized === "server/Cargo.toml" || normalized === "server/Cargo.lock") {
       addAll(suites, [
-        "cargo-test-contract-protocol",
-        "cargo-test-rules",
-        "cargo-test-sim",
-        "cargo-test-ai",
-        "cargo-test-server",
+        "nextest-contract-protocol",
+        "nextest-rules",
+        "nextest-sim",
+        "nextest-ai",
+        "nextest-server",
       ]);
     }
   }
@@ -332,24 +336,71 @@ export function selectSuites(files) {
   return suiteOrder.filter((suite) => suites.has(suite));
 }
 
+const normalRustContractFiles = [
+  "CLAUDE.md",
+  ".github/workflows/main-tests.yml",
+  "docs/context/testing.md",
+  "docs/design/testing.md",
+  "docs/pr-first-workflow.md",
+  "server/Cargo.toml",
+  "tests/README.md",
+  "tests/run-all.sh",
+  "tools/context",
+  "runaireplay.sh",
+];
+
+function verifyNextestPolicy(failures) {
+  for (const suite of suiteOrder) {
+    if (suite.startsWith("cargo-test")) {
+      failures.push(`suite selector still exposes retired Rust suite name ${suite}`);
+    }
+  }
+
+  const retiredCargoTimingScript = ["cargo", "test", "timed"].join("-");
+  const retiredCargoTimingEnv = ["RTS", "CARGO", "PACKAGE", "TIMINGS"].join("_");
+  const retiredPackageTiming = ["package", "by", "package"].join("-");
+  const retiredPatterns = [
+    [retiredCargoTimingScript, new RegExp(retiredCargoTimingScript)],
+    [retiredCargoTimingEnv, new RegExp(retiredCargoTimingEnv)],
+    [`${retiredPackageTiming} timing`, /package[- ]by[- ]package/i],
+  ];
+  const cargoTest = ["cargo", "test"].join(" ");
+  const plainCargoTest = new RegExp(`(^|[^A-Za-z0-9_-])${cargoTest}(?!\\s+--doc\\b)`);
+
+  for (const file of normalRustContractFiles) {
+    const text = readFileSync(path.join(repoRoot, file), "utf8");
+    const lines = text.split("\n");
+    lines.forEach((line, index) => {
+      for (const [label, pattern] of retiredPatterns) {
+        if (pattern.test(line)) {
+          failures.push(`${file}:${index + 1} mentions retired ${label}`);
+        }
+      }
+      if (plainCargoTest.test(line)) {
+        failures.push(`${file}:${index + 1} mentions built-in Rust test command outside doctest guidance`);
+      }
+    });
+  }
+}
+
 function verify() {
   const cases = [
-    [["server/crates/protocol/src/lib.rs"], ["cargo-test-contract-protocol", "js-protocol-contracts", "node-server-integration", "node-team-integration"]],
-    [["server/crates/rules/src/balance.rs"], ["cargo-test-rules", "cargo-test-sim", "js-protocol-contracts"]],
-    [["server/crates/sim/src/game/systems.rs"], ["cargo-test-sim", "node-server-integration"]],
-    [["server/crates/sim/src/game/teams.rs"], ["cargo-test-sim", "node-server-integration", "node-team-integration"]],
-    [["server/crates/sim/src/game/map/authored/assignment.rs"], ["cargo-test-sim", "node-server-integration", "node-team-integration"]],
-    [["server/crates/ai/src/ai_core/profiles.rs"], ["cargo-test-ai", "node-ai-integration", "node-team-integration", "full-ai"]],
-    [["server/src/lobby/room_task.rs"], ["cargo-test-server", "node-server-integration", "node-regression", "node-ai-integration", "node-team-integration", "client-smoke"]],
+    [["server/crates/protocol/src/lib.rs"], ["nextest-contract-protocol", "js-protocol-contracts", "node-server-integration", "node-team-integration"]],
+    [["server/crates/rules/src/balance.rs"], ["nextest-rules", "nextest-sim", "js-protocol-contracts"]],
+    [["server/crates/sim/src/game/systems.rs"], ["nextest-sim", "node-server-integration"]],
+    [["server/crates/sim/src/game/teams.rs"], ["nextest-sim", "node-server-integration", "node-team-integration"]],
+    [["server/crates/sim/src/game/map/authored/assignment.rs"], ["nextest-sim", "node-server-integration", "node-team-integration"]],
+    [["server/crates/ai/src/ai_core/profiles.rs"], ["nextest-ai", "node-ai-integration", "node-team-integration", "full-ai"]],
+    [["server/src/lobby/room_task.rs"], ["nextest-server", "node-server-integration", "node-regression", "node-ai-integration", "node-team-integration", "client-smoke"]],
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["client/src/state.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "node-team-integration", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
     [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
     [["plans/teams/phase-1.md"], ["node-team-integration"]],
     [["tests/team_harness.mjs"], ["node-server-integration", "node-regression", "node-ai-integration", "node-team-integration"]],
-    [["server/crates/rules/src/faction.rs"], ["cargo-test-rules", "cargo-test-sim", "faction-assumptions", "faction-catalog-parity"]],
+    [["server/crates/rules/src/faction.rs"], ["nextest-rules", "nextest-sim", "faction-assumptions", "faction-catalog-parity"]],
     [["client/src/lobby_view.js"], ["client-architecture", "faction-assumptions", "faction-catalog-parity", "js-protocol-contracts"]],
-    [["server/src/lobby/faction_validation.rs"], ["cargo-test-server", "faction-assumptions", "node-server-integration", "node-regression", "node-ai-integration"]],
+    [["server/src/lobby/faction_validation.rs"], ["nextest-server", "faction-assumptions", "node-server-integration", "node-regression", "node-ai-integration"]],
     [["scripts/check-faction-assumptions.mjs"], ["faction-assumptions"]],
     [["scripts/check-faction-catalog-parity.mjs"], ["faction-assumptions", "faction-catalog-parity"]],
     [["docs/design/faction-architecture-inventory.md"], ["faction-assumptions"]],
@@ -405,6 +456,8 @@ function verify() {
       }
     }
   }
+
+  verifyNextestPolicy(failures);
 
   if (failures.length > 0) {
     console.error("test selector verification failed:");

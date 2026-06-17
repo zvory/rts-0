@@ -1,6 +1,6 @@
 # Phase 4 - Final Ratchets and Documentation
 
-Status: Draft.
+Status: Done.
 
 ## Goal
 
@@ -35,13 +35,15 @@ CI workflows, selector policy, and docs should all agree that nextest is require
 
 ## Implementation Checklist
 
-- [ ] Search for `cargo test`, `cargo-test-timed`, and `RTS_CARGO_PACKAGE_TIMINGS`.
-- [ ] Rewrite normal-gate references to nextest.
-- [ ] Preserve only intentional doctest or one-off developer examples.
-- [ ] Update selector or architecture guardrails if they expose suite names.
-- [ ] Add a small guard against retired timing routes if practical.
-- [ ] Inspect a post-merge `Main test gate` run for final CI log quality.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Search for `cargo test`, `cargo-test-timed`, and `RTS_CARGO_PACKAGE_TIMINGS`.
+- [x] Rewrite normal-gate references to nextest.
+- [x] Preserve only intentional doctest or one-off developer examples.
+- [x] Update selector or architecture guardrails if they expose suite names.
+- [x] Add a small guard against retired timing routes if practical.
+- [ ] Inspect a post-merge `Main test gate` run for final CI log quality. Executor note: this
+  requires the outer PR/merge pass; `gh run list --workflow "Main test gate" --branch main --limit
+  1` could not reach GitHub from this sandbox.
+- [x] Mark this phase done in the implementation commit.
 
 ## Focused Verification
 

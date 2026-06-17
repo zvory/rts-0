@@ -138,7 +138,8 @@ node tests/regression.mjs             # dep-free, hardening/DoS/robustness guard
 node tests/ai_integration.mjs         # dep-free, AI opponent lobby flow (add/remove/start)
 tests/run-all.sh --no-rust            # live Node suites + headless-Chrome smoke with shared deps
 
-# Simulation behavior, including scripted self-play (no running server needed): cd server && cargo test
+# Simulation behavior, including scripted self-play (no running server needed):
+cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default
 ```
 
 Do not run broad test bundles by default. Pick the smallest relevant target for the changed area
@@ -207,9 +208,9 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 
 - Debug builds have overflow checks **on** (a bad `Build` coord can panic in `cargo run` but
   silently wrap in `--release`) — that's why placement math is `checked_*`. Keep it that way.
-- Live Node tests need a **running** server on the test runner's private port; they are not
-  `cargo test` (they're Node scripts that drive the live server/client end to end). Run only the
-  suite that matches the changed area unless the user explicitly asks for broader local coverage.
+- Live Node tests need a **running** server on the test runner's private port; they are live
+  integration scripts, not Rust test binaries. Run only the suite that matches the changed area
+  unless the user explicitly asks for broader local coverage.
 - If a self-play test fails and the reason is not immediately obvious, do **not** sink time into
   speculative debugging first. Start a fresh server on its own port, then use
   the macOS `open` command to open a local self-play spectation replay so the user can inspect the

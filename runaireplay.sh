@@ -24,7 +24,15 @@ fi
 
 echo "Running real_ai_vs_real_ai test..."
 set +e
-(cd "$REPO_ROOT/server" && cargo test real_ai_vs_real_ai -- --nocapture) >"$LOG_FILE" 2>&1
+(
+    cd "$REPO_ROOT"
+    RTS_FULL_AI_TESTS=1 cargo nextest run \
+        --config-file .config/nextest.toml \
+        --manifest-path server/Cargo.toml \
+        --profile default \
+        --no-capture \
+        real_ai_vs_real_ai
+) >"$LOG_FILE" 2>&1
 TEST_STATUS=$?
 set -e
 cat "$LOG_FILE"
