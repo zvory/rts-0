@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  buildAgentsSdkMcpServerOptions,
   discoverPhases,
   ensurePrReady,
   enrichHandoffWithPr,
@@ -105,6 +106,13 @@ assert.deepEqual(enrichHandoffWithPr({ status: "completed" }, readyPr, "def", "m
 
 assert.equal(verificationSummary({ verification: ["node test", "", "git diff --check"] }), "node test; git diff --check");
 assert.equal(verificationSummary({ verification: [] }), "Focused verification not recorded by executor.");
+
+const mcpOptions = buildAgentsSdkMcpServerOptions("/tmp/rts-worktrees/example");
+assert.equal(mcpOptions.command, "codex");
+assert.deepEqual(mcpOptions.args, ["mcp-server"]);
+assert.equal(mcpOptions.cwd, "/tmp/rts-worktrees/example");
+assert.equal(mcpOptions.clientSessionTimeoutSeconds, 2 * 60 * 60);
+assert.equal(mcpOptions.timeout, 2 * 60 * 60 * 1000);
 
 const bodyPath = path.join(os.tmpdir(), `phase-runner-body-${process.pid}.md`);
 try {

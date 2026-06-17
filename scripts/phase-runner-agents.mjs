@@ -7,6 +7,8 @@ import process from "node:process";
 const DEFAULT_WORKTREE_ROOT = "/tmp/rts-worktrees";
 const DEFAULT_BASE_BRANCH = "main";
 const DEFAULT_GH_BIN = "gh";
+const AGENTS_SDK_CODEX_MCP_TIMEOUT_SECONDS = 2 * 60 * 60;
+const AGENTS_SDK_CODEX_MCP_TIMEOUT_MS = AGENTS_SDK_CODEX_MCP_TIMEOUT_SECONDS * 1000;
 const DONE_MARKERS = {
   singleLineStatus: /^Status:\s*Done\.?\s*$/im,
   headingStatus: /^##\s+Status\s*\n+\s*Done\.?\s*$/im,
@@ -374,6 +376,17 @@ export function writeJson(file, data) {
   fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
 }
 
+export function buildAgentsSdkMcpServerOptions(worktreePath) {
+  return {
+    name: "Codex CLI",
+    command: "codex",
+    args: ["mcp-server"],
+    cwd: worktreePath,
+    clientSessionTimeoutSeconds: AGENTS_SDK_CODEX_MCP_TIMEOUT_SECONDS,
+    timeout: AGENTS_SDK_CODEX_MCP_TIMEOUT_MS,
+  };
+}
+
 export class Runner {
   constructor({ env = process.env, stdout = process.stdout, stderr = process.stderr } = {}) {
     this.env = env;
@@ -542,13 +555,7 @@ export class Runner {
       );
     }
     const { Agent, MCPServerStdio, run } = agents;
-    const mcpServer = new MCPServerStdio({
-      name: "Codex CLI",
-      command: "codex",
-      args: ["mcp-server"],
-      cwd: worktreePath,
-      clientSessionTimeoutSeconds: 360000,
-    });
+    const mcpServer = new MCPServerStdio(buildAgentsSdkMcpServerOptions(worktreePath));
     const agent = new Agent({
       name: "RTS phase executor",
       model: model || undefined,
