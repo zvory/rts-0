@@ -35,6 +35,11 @@ export function _sweep() {
   if (this._iconPool) for (const id of this._iconPool.keys()) ids.add(id);
   if (this._queueLabelPool) for (const id of this._queueLabelPool.keys()) ids.add(id);
   if (this._rigComparisonPool) for (const id of this._rigComparisonPool.keys()) ids.add(id);
+  if (this._liveRigPools) {
+    for (const pool of Object.values(this._liveRigPools)) {
+      for (const id of pool.keys()) ids.add(id);
+    }
+  }
   for (const id of ids) {
     if (seenAny.has(id)) {
       this._unseen.delete(id);
@@ -95,6 +100,22 @@ export function _sweep() {
         this._rigComparisonPool.delete(id);
       } else {
         instance.container.visible = false;
+      }
+    }
+  }
+  if (this._liveRigPools) {
+    for (const route of Object.values(this._liveRigRoutes || {})) {
+      const pool = this._liveRigPools[route.poolName];
+      const seen = this._seen[route.poolName] || new Set();
+      for (const [id, instance] of pool) {
+        if (seen.has(id)) continue;
+        if (evict.has(id)) {
+          this.layers[route.layerName]?.removeChild?.(instance.container);
+          instance.destroy();
+          pool.delete(id);
+        } else {
+          instance.container.visible = false;
+        }
       }
     }
   }

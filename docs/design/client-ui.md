@@ -172,18 +172,21 @@ busy state, breakthrough ticks, and oil cue flags.
 ```js
 export function createDefaultPixiFactory(pixi?)
 export function createUnitRigInstance(kind, definition, pixiFactory?)
+export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definition, options?)
 export function renderRigLegacyComparison(renderer, entity, colorByOwner, state, definition)
 export class UnitRigInstance {
   update(entity, renderContext)
   destroy()
 }
 ```
-The Phase 4 rig runtime is dormant in live matches. `UnitRigInstance` owns one Pixi container and
-one graphics child per normalized rig part, redraws primitive geometry with sampled transforms and
-tint slots, and tears down all owned children through `destroy()`. `renderer/units.js` exposes only
-a test-gated side-by-side comparison seam: `_rigComparisonEnabled` must be set and a definition
-must exist in `_rigDefinitionsByKind`; otherwise normal gameplay continues to draw legacy
-procedural units.
+`UnitRigInstance` owns one Pixi container and one graphics child per normalized rig part, redraws
+primitive geometry with sampled transforms and tint slots, and tears down all owned children through
+`destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind` and currently enables
+Worker only; missing or invalid definitions fall back to legacy procedural drawing. Shadow and body
+parts route through separate live pools so normal unit and shot-reveal layer ordering stays intact.
+`renderer/units.js` also keeps a test-gated side-by-side comparison seam: `_rigComparisonEnabled`
+must be set and a definition must exist in `_rigDefinitionsByKind`; otherwise comparison rendering
+stays dormant.
 
 `renderer/feedback_view_model.js`
 ```js

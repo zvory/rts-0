@@ -56,6 +56,7 @@ import {
 import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
+import { createLiveRigDefinitions } from "./rigs/live_routing.js";
 import { _drawResource } from "./resources.js";
 import { buildStaticMap } from "./terrain.js";
 import {
@@ -147,6 +148,23 @@ export class Renderer {
     // Local visual-only track phase for tanks. The server owns movement; this
     // just turns interpolated distance/facing deltas into tread offsets.
     this._tankMotion = new Map();
+    // Live SVG rig instances are routed per unit kind and fall back to legacy
+    // drawing when a definition is absent or rejected by the importer.
+    this._liveRigDefinitionsByKind = createLiveRigDefinitions();
+    this._liveRigPools = {
+      liveUnitRigShadows: new Map(),
+      liveUnitRigs: new Map(),
+      liveShotRevealRigShadows: new Map(),
+      liveShotRevealRigs: new Map(),
+    };
+    this._liveRigRoutes = {
+      liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
+      liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
+      liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
+      liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
+    };
+    for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
+
     // Dormant SVG rig comparison instances. Tests opt in by enabling
     // _rigComparisonEnabled and providing _rigDefinitionsByKind.
     this._rigComparisonEnabled = false;
@@ -434,6 +452,12 @@ export class Renderer {
     if (this._rigComparisonPool) {
       for (const instance of this._rigComparisonPool.values()) instance.destroy();
       this._rigComparisonPool.clear();
+    }
+    if (this._liveRigPools) {
+      for (const pool of Object.values(this._liveRigPools)) {
+        for (const instance of pool.values()) instance.destroy();
+        pool.clear();
+      }
     }
     this._lineProjectileTrails.clear();
 
