@@ -111,12 +111,13 @@ setup/deploy animation, recoil, muzzle anchors, and special owner-only visual af
 outcome is broad coverage for strict top-down humanoid and crew-served rigs while manifest-backed
 equivalence tests continue to guard animation behavior.
 
-Phase 7 migrates the remaining vehicle-body units. Tank is already live-routed through an SVG rig
-with a Phase 5.4 manifest and passing pixel gates, so this phase should convert Scout Car and
-Command Car while keeping Tank's manifest-backed gates green. It preserves hull vs weapon-facing
-separation, track/wheel movement phases, recoil, fuel cues, breakthrough ring attachment, shadows,
-and selection/hp bounds. The outcome is full unit-kind coverage through the rig renderer while the
-legacy procedural implementation remains only for equivalence comparison.
+Phase 7 migrates the remaining vehicle-body units. Tank, Scout Car, and Command Car are now
+live-routed through SVG rigs with manifest-backed pixel gates. It preserves hull vs weapon-facing
+separation, recoil, fuel cues, breakthrough ring attachment, shadows, and selection/hp bounds; the
+current manifest gate covers static, weapon-facing, recoil, and breakthrough states, while
+movement-phase oracle labels remain available for future harness expansion. The outcome is full
+unit-kind coverage through the rig renderer while the legacy procedural implementation remains only
+for fallback and equivalence comparison.
 
 Phase 8 flips enforcement and removes the discarded migration scaffolding. It deletes legacy unit
 draw branches and the temporary pixel/measurement equivalence harness, keeps permanent schema,

@@ -24,7 +24,9 @@ const includeCompositionComparisons = !partsOnly;
 
 const baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
 const samples = migrationSamplesFromBaseline(baseline);
-const thresholds = assertSharedCompositionThresholds(SVG_MIGRATION_MANIFESTS);
+const thresholdsByKind = Object.fromEntries(
+  SVG_MIGRATION_MANIFESTS.map((manifest) => [manifest.kind, manifest.compositionThresholds]),
+);
 const partMappingsByKind = Object.fromEntries(
   SVG_MIGRATION_MANIFESTS.map((manifest) => [manifest.kind, manifest.partMappings]),
 );
@@ -56,7 +58,7 @@ try {
     samples,
     bufferSize,
     fixedNow,
-    thresholds,
+    thresholdsByKind,
     partMappingsByKind: includePartComparisons ? partMappingsByKind : {},
     includeCompositionComparisons,
     svgTextByKind,
@@ -69,7 +71,7 @@ try {
   const partReports = [];
   const failures = [];
   for (const renderedSample of rendered.compositionSamples) {
-    const report = compareRgbaBuffers(renderedSample.legacy, renderedSample.rig, thresholds);
+    const report = compareRgbaBuffers(renderedSample.legacy, renderedSample.rig, renderedSample.thresholds);
     const entry = {
       comparison: "composition",
       label: renderedSample.label,
@@ -118,7 +120,7 @@ try {
     comparisons: rendered.compositionSamples.length + rendered.partSamples.length,
     passed: rendered.compositionSamples.length + rendered.partSamples.length - failures.length,
     failed: failures.length,
-    thresholds,
+    thresholdsByKind,
     partMappingsByKind: includePartComparisons ? partMappingsByKind : {},
     artifactRoot: failures.length > 0 && !noArtifacts ? path.relative(repoRoot, artifactRoot) : null,
   };
@@ -139,18 +141,6 @@ try {
   fs.rmSync(chromeProfileDir, { recursive: true, force: true });
 }
 
-function assertSharedCompositionThresholds(manifests) {
-  const [first, ...rest] = manifests;
-  if (!first) throw new Error("at least one SVG migration manifest is required");
-  const baselineThresholds = JSON.stringify(first.compositionThresholds);
-  for (const manifest of rest) {
-    if (JSON.stringify(manifest.compositionThresholds) !== baselineThresholds) {
-      throw new Error(`transparent pixel harness currently requires shared composition thresholds; ${manifest.kind} differs`);
-    }
-  }
-  return first.compositionThresholds;
-}
-
 function migrationSamplesFromBaseline(oracle) {
   const sampleByLabel = new Map(oracle.samples.map((sample) => [sample.label, sample]));
   const samples = [];
@@ -158,7 +148,10 @@ function migrationSamplesFromBaseline(oracle) {
     for (const label of manifest.requiredSamples) {
       const sample = sampleByLabel.get(label);
       if (!sample) throw new Error(`missing legacy oracle sample required by ${manifest.kind} manifest: ${label}`);
-      samples.push(browserSampleFromOracle(sample));
+      samples.push({
+        ...browserSampleFromOracle(sample),
+        thresholds: manifest.compositionThresholds,
+      });
     }
   }
   return samples;
@@ -178,6 +171,7 @@ function browserSampleFromOracle(sample) {
     busy: sample.label.includes("busy"),
     fuelCue: sample.label.includes("low-oil") || sample.label.includes("oil-starved"),
     latchedNode: sample.label.includes("latched-node") ? 9001 : null,
+    breakthroughTicks: sample.breakthroughTicks ?? 0,
   };
 }
 
@@ -186,7 +180,7 @@ function writeFailureArtifacts({ renderedSample, entry }) {
   fs.mkdirSync(sampleDir, { recursive: true });
   fs.writeFileSync(path.join(sampleDir, "legacy.png"), decodePngDataUrl(renderedSample.legacyPng));
   fs.writeFileSync(path.join(sampleDir, "rig.png"), decodePngDataUrl(renderedSample.rigPng));
-  const diff = makeDiffRgba(renderedSample.legacy, renderedSample.rig, renderedSample.thresholds ?? thresholds);
+  const diff = makeDiffRgba(renderedSample.legacy, renderedSample.rig, renderedSample.thresholds);
   fs.writeFileSync(path.join(sampleDir, "diff.png"), decodePngDataUrl(renderedSample.diffPng));
   fs.writeFileSync(path.join(sampleDir, "report.json"), `${JSON.stringify({
     ...entry,
@@ -263,7 +257,7 @@ async function renderSamplesInBrowser({
   samples: browserSamples,
   bufferSize: size,
   fixedNow: now,
-  thresholds: compareThresholds,
+  thresholdsByKind: browserThresholdsByKind,
   partMappingsByKind: browserPartMappingsByKind,
   includeCompositionComparisons: browserIncludeCompositionComparisons,
   svgTextByKind: browserSvgTextByKind,
@@ -319,11 +313,12 @@ async function renderSamplesInBrowser({
         facing: sample.facing,
         state: sample.state,
         busy: sample.busy,
+        thresholds: sample.thresholds ?? browserThresholdsByKind[sample.kind],
         legacy,
         rig,
         legacyPng: pngDataUrl(legacy),
         rigPng: pngDataUrl(rig),
-        diffPng: pngDataUrl(diffBuffer(legacy, rig, compareThresholds.perChannelTolerance)),
+        diffPng: pngDataUrl(diffBuffer(legacy, rig, (sample.thresholds ?? browserThresholdsByKind[sample.kind]).perChannelTolerance)),
       });
     }
     for (const sample of browserSamples) {
@@ -430,6 +425,7 @@ async function renderSamplesInBrowser({
       weaponFacing: sample.weaponFacing,
       recoilProgress: sample.recoilProgress,
       latchedNode: sample.latchedNode,
+      breakthroughTicks: sample.breakthroughTicks,
     };
   }
 

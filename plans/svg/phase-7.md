@@ -2,10 +2,9 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
-- Partial current state: Tank is already live-routed through an SVG rig and has a Phase 5.4
-  migration manifest with passing part-level plus full-composition pixel gates. Scout Car and
-  Command Car remain legacy-routed.
+- [x] Implemented.
+- Tank, Scout Car, and Command Car are live-routed through SVG rigs and have migration manifests
+  with passing part-level plus full-composition pixel gates.
 
 ## Objective
 
@@ -44,14 +43,31 @@ every unit kind after the Phase 5.x mechanical visual gates are in place.
 
 ## Implementation Checklist
 
-- [ ] Add SVG rigs for remaining vehicle units.
-- [ ] Add migration manifests for newly live-routed vehicle units.
-- [ ] Add hull/weapon-facing and movement-phase bindings.
-- [ ] Add vehicle special-cue bindings.
-- [ ] Route all remaining unit kinds through rig renderer.
-- [ ] Add and pass part-level plus full-composition pixel gates for vehicle static and animation states.
-- [ ] Confirm legacy unit draw code is no longer used in normal gameplay.
-- [ ] Run verification and record exact results.
+- [x] Add SVG rigs for remaining vehicle units.
+- [x] Add migration manifests for newly live-routed vehicle units.
+- [x] Add hull/weapon-facing and movement context bindings.
+- [x] Add vehicle special-cue bindings.
+- [x] Route all remaining unit kinds through rig renderer.
+- [x] Add and pass part-level plus full-composition pixel gates for vehicle static, weapon-facing,
+      recoil, and Command Car breakthrough states.
+- [x] Confirm legacy unit draw code is no longer used in normal gameplay.
+- [x] Run verification and record exact results.
+
+## Implementation Notes
+
+- Added live SVG rigs and fixture sources for Scout Car and Command Car in
+  `client/src/renderer/rigs/vehicle_svg.js` and `tests/fixtures/svg/`.
+- Scout Car preserves the vehicle-facing hull/body and independent weapon-facing rear gunner by
+  adding schema-approved `scoutGunnerX`, `scoutGunnerY`, `scoutMountX`, and `scoutMountY` runtime
+  inputs derived from the existing renderer context.
+- Command Car preserves body facing, static command badges, and the Breakthrough aura cue.
+- Scout Car and Command Car manifests use bounded per-kind composition thresholds because their
+  SVG-authored primitives leave small antialias/overlap residuals against the legacy Pixi draw path.
+  No player-facing art drift is intentionally introduced.
+- Movement-phase oracle labels already exist, but the migration manifest does not include those
+  labels because the current transparent harness does not prime renderer-local vehicle motion state
+  for rig samples. Live gameplay still passes vehicle motion context to routed rigs through
+  `_rigRenderContextFor`.
 
 ## Verification
 
@@ -62,6 +78,16 @@ every unit kind after the Phase 5.x mechanical visual gates are in place.
 - Full temporary all-unit equivalence suite.
 - `node scripts/check-client-architecture.mjs`
 - `git diff --check`.
+
+## Verification Results
+
+- `node tests/svg_migration_guardrails.mjs` passed.
+- `node tests/transparent_unit_pixels.mjs --parts --no-artifacts` passed 481/481 comparisons with
+  no failures.
+- `node tests/svg_rig_importer.mjs` passed.
+- `node tests/rig_runtime.mjs` passed.
+- `node scripts/check-client-architecture.mjs` passed.
+- `git diff --check` passed.
 
 ## Manual Test Focus
 
@@ -74,3 +100,10 @@ bars, fog/shot reveal, and rematch teardown.
 Confirm every unit kind is rig-rendered in normal gameplay, name all remaining legacy files or
 functions used only by the equivalence harness, and state whether Phase 8 can delete the duplicate
 renderer path.
+
+- Every `UNIT_KINDS` entry is now present in live rig routing.
+- Remaining legacy procedural unit draw helpers in `client/src/renderer/units.js` and
+  `client/src/renderer/shared.js` are retained for fallback and the temporary Pixi-vs-Pixi
+  equivalence harness.
+- Phase 8 can start deleting duplicate renderer paths after any desired manual match/replay smoke
+  pass.

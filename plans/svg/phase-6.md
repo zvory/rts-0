@@ -65,7 +65,8 @@ Phase 5.x mechanical visual gates are in place.
 - `node tests/svg_rig_importer.mjs` passed.
 - `node tests/rig_runtime.mjs` passed.
 - `node tests/svg_migration_guardrails.mjs` passed.
-- `node tests/transparent_unit_pixels.mjs --parts --no-artifacts` passed 366/366 with no failures.
+- `node tests/transparent_unit_pixels.mjs --parts --no-artifacts` passed 481/481 with no failures
+  after the remaining Scout Car, Command Car, and Ekat manifests were added.
 - `node scripts/check-client-architecture.mjs` passed.
 - `git diff --check` passed.
 
@@ -85,9 +86,10 @@ changes, and manual visual issues that should be watched during vehicle migratio
 - Migrated live-routed Phase 6 unit kinds: Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team,
   and Artillery.
 - Previously live-routed SVG unit kinds still covered by guardrails: Worker and Tank.
-- Ekat remains explicitly deferred.
-- Remaining non-routed kinds stay on legacy renderer paths and are guarded by
-  `node tests/svg_migration_guardrails.mjs`.
+- Ekat has now been migrated from the generic fallback/procedural unit art to a live SVG rig that
+  preserves the fallback pentagon body plus facing tick.
+- No unit kind remains intentionally legacy-routed in normal gameplay; legacy draw code remains for
+  the temporary equivalence harness until Phase 8 removes it.
 - Part-level plus full-composition transparent pixel gates passed for all migration manifests.
 - No feedback API change was required; muzzle anchors remain available through the existing rig
   routing path.

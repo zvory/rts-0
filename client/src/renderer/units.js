@@ -167,6 +167,19 @@ export const TANK_LEGACY_PARTS = Object.freeze({
   fuelCue: "tank.fuelCue",
 });
 
+export const VEHICLE_HERO_LEGACY_PARTS = Object.freeze({
+  [KIND.SCOUT_CAR]: Object.freeze({
+    shadow: "scout_car.shadow",
+    body: "scout_car.body",
+  }),
+  [KIND.COMMAND_CAR]: Object.freeze({
+    shadow: "command_car.shadow",
+    body: "command_car.body",
+    badges: "command_car.badges",
+    breakthroughAura: "command_car.breakthroughAura",
+  }),
+});
+
 export const INFANTRY_SUPPORT_LEGACY_PARTS = Object.freeze({
   [KIND.RIFLEMAN]: Object.freeze({
     shadow: "rifleman.shadow",
@@ -209,6 +222,7 @@ export function createLegacyUnitPartCapture({ includeParts = null } = {}) {
 function legacyUnitPartName(kind, part) {
   if (kind === KIND.WORKER && WORKER_LEGACY_PARTS[part]) return WORKER_LEGACY_PARTS[part];
   if (kind === KIND.TANK && TANK_LEGACY_PARTS[part]) return TANK_LEGACY_PARTS[part];
+  if (VEHICLE_HERO_LEGACY_PARTS[kind]?.[part]) return VEHICLE_HERO_LEGACY_PARTS[kind][part];
   if (INFANTRY_SUPPORT_LEGACY_PARTS[kind]?.[part]) return INFANTRY_SUPPORT_LEGACY_PARTS[kind][part];
   return `${kind}.${part}`;
 }
@@ -476,17 +490,26 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
     if (e.kind === KIND.COMMAND_CAR) {
-      drawCommandCar(g, body, tint, facing, motion);
-      g.beginFill(0xd8c267, 0.95);
-      g.drawCircle(-body.halfLen * 0.1, -body.halfWidth * 0.32, 2.6);
-      g.drawCircle(-body.halfLen * 0.1, body.halfWidth * 0.32, 2.6);
-      g.endFill();
-      if (e.breakthroughTicks > 0) {
-        g.lineStyle(2, 0xf2d16b, 0.82);
-        g.drawCircle(0, 0, body.shadowRadius * 0.72);
-      }
+      drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "body"), partDetail, () => {
+        drawCommandCar(g, body, tint, facing, motion);
+      });
+      drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "badges"), partDetail, () => {
+        g.lineStyle(2, 0xd8d0b0, 0.74);
+        g.beginFill(0xd8c267, 0.95);
+        g.drawCircle(-body.halfLen * 0.1, -body.halfWidth * 0.32, 2.6);
+        g.drawCircle(-body.halfLen * 0.1, body.halfWidth * 0.32, 2.6);
+        g.endFill();
+      });
+      drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "breakthroughAura"), partDetail, () => {
+        if (e.breakthroughTicks > 0) {
+          g.lineStyle(2, 0xf2d16b, 0.82);
+          g.drawCircle(0, 0, body.shadowRadius * 0.72);
+        }
+      });
     } else {
-      drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil);
+      drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "body"), partDetail, () => {
+        drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil);
+      });
     }
   } else if (e.kind === KIND.TANK) {
     // Hull follows movement facing; turret/barrel follow weapon facing.

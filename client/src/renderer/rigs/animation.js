@@ -1,5 +1,6 @@
+import { STATS } from "../../config.js";
 import { KIND, SETUP, STATE } from "../../protocol.js";
-import { angleLerp, clamp01, hexToInt, polar, smoothstep01, weaponRecoilOffset } from "../shared.js";
+import { angleLerp, clamp01, hexToInt, polar, recoilVector, smoothstep01, tankBodyVisual, weaponRecoilOffset } from "../shared.js";
 
 const TRANSFORM_PROPERTIES = new Set([
   "transform.x",
@@ -33,6 +34,7 @@ export function createRigRenderContext(entity, {
   const weaponVisualFacing = visualWeaponFacing(entity.kind, facing, weaponFacing, deploy);
   const carriageVisualFacing = visualCarriageFacing(entity.kind, facing, weaponFacing, deploy, weaponVisualFacing);
   const weaponRecoil = recoilPx > 0 ? polar(weaponVisualFacing + Math.PI, recoilPx) : { x: 0, y: 0 };
+  const scoutGunner = scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx);
   const recoilKickFactor = entity.kind === KIND.TANK
     ? 0.85
     : entity.kind === KIND.ARTILLERY
@@ -76,6 +78,10 @@ export function createRigRenderContext(entity, {
     weaponVisualDoubleSin: Math.sin(weaponVisualFacing * 2),
     weaponRecoilX: weaponRecoil.x,
     weaponRecoilY: weaponRecoil.y,
+    scoutGunnerX: scoutGunner.gunner.x,
+    scoutGunnerY: scoutGunner.gunner.y,
+    scoutMountX: scoutGunner.mount.x,
+    scoutMountY: scoutGunner.mount.y,
     setupVisible: deploy > 0.02,
     setupMostlyDeployed: deploy > 0.55,
     setupBarrelVisible: Boolean(setup.barrel || deploy > 0.75),
@@ -84,6 +90,31 @@ export function createRigRenderContext(entity, {
     lowOil,
     oilStarved,
     fuelCueVisible: lowOil || oilStarved,
+  };
+}
+
+function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {
+  if (entity.kind !== KIND.SCOUT_CAR) {
+    return {
+      gunner: { x: 0, y: 0 },
+      mount: { x: 0, y: 0 },
+    };
+  }
+  const body = tankBodyVisual(STATS[entity.kind] || {});
+  const c = Math.cos(facing);
+  const s = Math.sin(facing);
+  const anchorX = -body.halfLen * 0.42;
+  const mountX = -body.halfLen * 0.32;
+  const recoil = recoilVector(weaponFacing, recoilPx);
+  return {
+    gunner: {
+      x: anchorX * c + recoil.x,
+      y: anchorX * s + recoil.y,
+    },
+    mount: {
+      x: mountX * c,
+      y: mountX * s,
+    },
   };
 }
 
