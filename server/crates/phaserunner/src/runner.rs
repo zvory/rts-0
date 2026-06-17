@@ -1,6 +1,9 @@
 use crate::completion::phase_marked_done;
-use crate::handoff::{ExecutorHandoff, HandoffError, HandoffStatus};
+use crate::handoff::{
+    AutoMergeState, ExecutorHandoff, HandoffError, HandoffStatus, MergeWaitState,
+};
 use crate::phase::{discover_phases, PhaseDiscoveryError, PhaseId, PhaseIdParseError};
+use crate::pr::{ensure_pr_ready, GitHubPullRequest, PrReadinessError};
 use crate::timing::{PhaseTiming, PhaseTimingSeconds};
 use std::env;
 use std::fmt;
@@ -181,7 +184,6 @@ pub enum CliError {
     InvalidPhase(PhaseIdParseError),
     MissingPhaseFile(PathBuf),
     PhaseDiscovery(PhaseDiscoveryError),
-    ExecuteRequiresSinglePhase,
     CurrentDir(String),
     Git(String),
 }
@@ -235,13 +237,19 @@ pub enum ExecutionError {
         phase: PhaseId,
         phase_file: PathBuf,
     },
+    PrReadiness {
+        branch: String,
+        error: PrReadinessError,
+    },
+    MergedHeadUnreachable {
+        pr_url: String,
+        phase_head: String,
+        base_branch: String,
+        worktree: PathBuf,
+    },
     Io {
         path: PathBuf,
         message: String,
-    },
-    PrLifecycleUnavailable {
-        branch: String,
-        phase_head: String,
     },
 }
 
@@ -533,9 +541,6 @@ where
             base_commit: None,
         }))
     } else {
-        if runs.len() != 1 {
-            return Err(CliError::ExecuteRequiresSinglePhase);
-        }
         Ok(CliAction::Execute(ExecutionPlan { runs, config }))
     }
 }
@@ -717,11 +722,123 @@ pub fn execute_plan(
             runner,
             CommandInvocation::new("git", ["rev-parse", "HEAD"], &run.layout.worktree_path),
         )?;
+        run_command(
+            runner,
+            CommandInvocation::new(
+                "git",
+                ["push", "-u", "origin", run.branch.as_str()],
+                &run.layout.worktree_path,
+            ),
+        )?;
+
+        let pr_start = Instant::now();
+        write_pr_body(&handoff, &run.layout.pr_body_file)?;
+        run_agent_pr(plan, run, &handoff.verification_summary(), runner)?;
+        let pr_json = get_pr_json(plan, &run.branch, runner)?;
+        let pr_ready =
+            ensure_pr_ready(&pr_json, &run.branch).map_err(|error| ExecutionError::PrReadiness {
+                branch: run.branch.clone(),
+                error,
+            });
+        if let Err(err) = pr_ready {
+            let pr = first_pr(&pr_json)?;
+            let _ = enrich_handoff_file(run, &pr, &phase_head, MergeWaitState::Blocked);
+            return Err(err);
+        }
+        let pr = first_pr(&pr_json)?.ok_or_else(|| ExecutionError::PrReadiness {
+            branch: run.branch.clone(),
+            error: PrReadinessError::MissingPr {
+                branch: run.branch.clone(),
+            },
+        })?;
+        let pr_seconds = pr_start.elapsed().as_secs();
+
+        let mut merge_wait_state = MergeWaitState::NotWaited;
+        let mut wait_seconds = 0;
+        if plan.config.pr_lifecycle == PrLifecycle::OpenAndWait {
+            let wait_start = Instant::now();
+            run_command(
+                runner,
+                CommandInvocation::new(
+                    "scripts/wait-pr.sh",
+                    [pr.url.as_str()],
+                    &run.layout.worktree_path,
+                ),
+            )
+            .map_err(|err| {
+                let _ = enrich_handoff_file(
+                    run,
+                    &Some(pr.clone()),
+                    &phase_head,
+                    MergeWaitState::Blocked,
+                );
+                err
+            })?;
+            run_command(
+                runner,
+                CommandInvocation::new(
+                    "git",
+                    ["fetch", "origin", plan.config.base_branch.as_str()],
+                    &plan.config.plan.plan_file,
+                ),
+            )?;
+            let reachable = runner
+                .run(&CommandInvocation::new(
+                    "git",
+                    [
+                        "merge-base",
+                        "--is-ancestor",
+                        phase_head.as_str(),
+                        &format!("origin/{}", plan.config.base_branch),
+                    ],
+                    &plan.config.plan.plan_file,
+                ))
+                .map_err(|err| command_err("git merge-base --is-ancestor", err))?;
+            if !reachable.success {
+                let _ = enrich_handoff_file(
+                    run,
+                    &Some(pr.clone()),
+                    &phase_head,
+                    MergeWaitState::Blocked,
+                );
+                return Err(ExecutionError::MergedHeadUnreachable {
+                    pr_url: pr.url.clone(),
+                    phase_head: phase_head.clone(),
+                    base_branch: plan.config.base_branch.clone(),
+                    worktree: run.layout.worktree_path.clone(),
+                });
+            }
+            run_command(
+                runner,
+                CommandInvocation::new(
+                    "git",
+                    [
+                        "merge",
+                        "--ff-only",
+                        &format!("origin/{}", plan.config.base_branch),
+                    ],
+                    &plan.config.plan.plan_file,
+                ),
+            )?;
+            merge_wait_state = MergeWaitState::Merged;
+            wait_seconds = wait_start.elapsed().as_secs();
+        }
+
+        enrich_handoff_file(
+            run,
+            &Some(pr.clone()),
+            &phase_head,
+            merge_wait_state.clone(),
+        )?;
         write_timing(
             run,
             &base_commit,
             &phase_head,
+            Some(&pr),
+            merge_wait_state.clone(),
             executor_seconds,
+            pr_seconds,
+            wait_seconds,
             phase_start.elapsed().as_secs(),
         )?;
         completed.push(LocalPhaseResult {
@@ -732,10 +849,9 @@ pub fn execute_plan(
             timing_file: run.layout.timing_file.clone(),
         });
 
-        return Err(ExecutionError::PrLifecycleUnavailable {
-            branch: run.branch.clone(),
-            phase_head,
-        });
+        if plan.config.pr_lifecycle == PrLifecycle::OpenAndStop {
+            break;
+        }
     }
 
     Ok(ExecutionReport { completed })
@@ -940,11 +1056,167 @@ fn write_active_marker(run: &PhaseRun) -> Result<(), ExecutionError> {
     .map_err(|err| io_err(&run.layout.active_marker, err))
 }
 
+fn write_pr_body(handoff: &ExecutorHandoff, body_file: &Path) -> Result<(), ExecutionError> {
+    fn list(items: &[String]) -> String {
+        if items.is_empty() {
+            "- Not recorded.".to_string()
+        } else {
+            items
+                .iter()
+                .map(|item| format!("- {item}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+    }
+
+    let text = [
+        "## Phase runner handoff".to_string(),
+        String::new(),
+        format!("Status: {}", status_name(&handoff.status)),
+        String::new(),
+        "### Summary".to_string(),
+        String::new(),
+        recorded(&handoff.summary),
+        String::new(),
+        "### Files changed".to_string(),
+        String::new(),
+        list(&handoff.files_changed),
+        String::new(),
+        "### Focused verification".to_string(),
+        String::new(),
+        list(&handoff.verification),
+        String::new(),
+        "### Gameplay impact".to_string(),
+        String::new(),
+        recorded(&handoff.gameplay_impact),
+        String::new(),
+        "### Next executor notes".to_string(),
+        String::new(),
+        recorded(&handoff.next_executor_notes),
+        String::new(),
+        "### Manual test notes".to_string(),
+        String::new(),
+        recorded(&handoff.manual_test_notes),
+        String::new(),
+    ]
+    .join("\n");
+    fs::write(body_file, text).map_err(|err| io_err(body_file, err))
+}
+
+fn recorded(text: &str) -> String {
+    if text.trim().is_empty() {
+        "Not recorded.".to_string()
+    } else {
+        text.to_string()
+    }
+}
+
+fn status_name(status: &HandoffStatus) -> &'static str {
+    match status {
+        HandoffStatus::Completed => "completed",
+        HandoffStatus::Blocked => "blocked",
+    }
+}
+
+fn run_agent_pr(
+    plan: &ExecutionPlan,
+    run: &PhaseRun,
+    verification_summary: &str,
+    runner: &mut dyn CommandRunner,
+) -> Result<(), ExecutionError> {
+    run_command(
+        runner,
+        CommandInvocation::new(
+            "scripts/agent-pr.sh",
+            [
+                "--base",
+                plan.config.base_branch.as_str(),
+                "--head",
+                run.branch.as_str(),
+                "--verification",
+                verification_summary,
+                "--body-file",
+                run.layout.pr_body_file.to_string_lossy().as_ref(),
+            ],
+            &run.layout.worktree_path,
+        ),
+    )
+}
+
+fn get_pr_json(
+    plan: &ExecutionPlan,
+    branch: &str,
+    runner: &mut dyn CommandRunner,
+) -> Result<String, ExecutionError> {
+    command_stdout(
+        runner,
+        CommandInvocation::new(
+            "gh",
+            [
+                "pr",
+                "list",
+                "--base",
+                plan.config.base_branch.as_str(),
+                "--head",
+                branch,
+                "--state",
+                "open",
+                "--limit",
+                "1",
+                "--json",
+                "number,url,state,headRefOid,headRefName,autoMergeRequest,mergeStateStatus,isDraft",
+            ],
+            &plan.config.plan.plan_file,
+        ),
+    )
+}
+
+fn first_pr(pr_json: &str) -> Result<Option<GitHubPullRequest>, ExecutionError> {
+    let prs: Vec<GitHubPullRequest> =
+        serde_json::from_str(pr_json).map_err(|err| ExecutionError::Command {
+            command: "parse gh PR JSON".to_string(),
+            message: err.to_string(),
+        })?;
+    Ok(prs.into_iter().next())
+}
+
+fn enrich_handoff_file(
+    run: &PhaseRun,
+    pr: &Option<GitHubPullRequest>,
+    phase_head: &str,
+    merge_wait_state: MergeWaitState,
+) -> Result<(), ExecutionError> {
+    let handoff_text = fs::read_to_string(&run.layout.handoff_file)
+        .map_err(|err| io_err(&run.layout.handoff_file, err))?;
+    let mut handoff =
+        ExecutorHandoff::parse_json(&handoff_text).map_err(ExecutionError::Handoff)?;
+    if let Some(pr) = pr {
+        handoff.pr_number = Some(pr.number);
+        handoff.pr_url = Some(pr.url.clone());
+        handoff.head_sha = Some(phase_head.to_string());
+        handoff.auto_merge_state = if pr.auto_merge_request.is_some() {
+            AutoMergeState::Armed
+        } else {
+            AutoMergeState::Missing
+        };
+    }
+    handoff.merge_wait_state = merge_wait_state;
+    let json = serde_json::to_string_pretty(&handoff).map_err(|err| ExecutionError::Command {
+        command: "serialize handoff".to_string(),
+        message: err.to_string(),
+    })? + "\n";
+    fs::write(&run.layout.handoff_file, json).map_err(|err| io_err(&run.layout.handoff_file, err))
+}
+
 fn write_timing(
     run: &PhaseRun,
     base_commit: &str,
     phase_head: &str,
+    pr: Option<&GitHubPullRequest>,
+    merge_wait_state: MergeWaitState,
     executor_seconds: u64,
+    pr_seconds: u64,
+    wait_seconds: u64,
     total_seconds: u64,
 ) -> Result<(), ExecutionError> {
     let timing = PhaseTiming {
@@ -952,14 +1224,17 @@ fn write_timing(
         branch: run.branch.clone(),
         base_ref: base_commit.to_string(),
         phase_head: phase_head.to_string(),
-        pr_number: None,
-        pr_url: None,
-        merge_wait_state: "not_waited".to_string(),
+        pr_number: pr.map(|pr| pr.number),
+        pr_url: pr.map(|pr| pr.url.clone()),
+        merge_wait_state: serde_json::to_value(merge_wait_state)
+            .ok()
+            .and_then(|value| value.as_str().map(ToString::to_string))
+            .unwrap_or_else(|| "unknown".to_string()),
         timings_seconds: PhaseTimingSeconds {
             total: total_seconds,
             executor: executor_seconds,
-            pr: 0,
-            wait: 0,
+            pr: pr_seconds,
+            wait: wait_seconds,
         },
     };
     let json = serde_json::to_string_pretty(&timing).map_err(|err| ExecutionError::Command {
@@ -1166,10 +1441,6 @@ impl fmt::Display for CliError {
             Self::InvalidPhase(err) => write!(f, "{err}"),
             Self::MissingPhaseFile(path) => write!(f, "missing phase file: {}", path.display()),
             Self::PhaseDiscovery(err) => write!(f, "{err}"),
-            Self::ExecuteRequiresSinglePhase => write!(
-                f,
-                "the Rust runner currently supports exactly one non-dry phase per invocation"
-            ),
             Self::CurrentDir(err) => write!(f, "failed to read current directory: {err}"),
             Self::Git(err) => write!(f, "git command failed: {err}"),
         }
@@ -1254,11 +1525,20 @@ impl fmt::Display for ExecutionError {
                 "{phase} reported completed but did not mark the phase document done: {}",
                 phase_file.display()
             ),
-            Self::Io { path, message } => write!(f, "{}: {message}", path.display()),
-            Self::PrLifecycleUnavailable { branch, phase_head } => write!(
+            Self::PrReadiness { branch, error } => {
+                write!(f, "PR lifecycle blocked for {branch}: {error}")
+            }
+            Self::MergedHeadUnreachable {
+                pr_url,
+                phase_head,
+                base_branch,
+                worktree,
+            } => write!(
                 f,
-                "local executor validation succeeded for {branch} at {phase_head}; branch push and PR lifecycle remain unavailable until Phase 4"
+                "PR {pr_url} merged, but {phase_head} is not reachable from origin/{base_branch}; leaving worktree for repair: {}",
+                worktree.display()
             ),
+            Self::Io { path, message } => write!(f, "{}: {message}", path.display()),
         }
     }
 }
@@ -1423,20 +1703,26 @@ mod tests {
     }
 
     #[test]
-    fn local_execution_validates_success_then_blocks_pr_lifecycle() {
+    fn local_execution_pushes_opens_pr_and_stops_without_wait() {
         let fixture = execution_fixture("phaserunner-local-success");
         let mut fake = FakeCommandRunner::new(FakeScenario::Success, fixture.run.clone());
 
-        let err = execute_plan(&fixture.plan, &mut fake).unwrap_err();
+        let report = execute_plan(&fixture.plan, &mut fake).unwrap();
 
-        assert!(matches!(
-            err,
-            ExecutionError::PrLifecycleUnavailable { branch, phase_head }
-                if branch == "zvorygin/phaserunner-phase-3" && phase_head == "head123"
-        ));
+        assert_eq!(report.completed.len(), 1);
+        assert_eq!(report.completed[0].phase_head, "head123");
         assert!(fixture.run.layout.timing_file.is_file());
         let timing = std::fs::read_to_string(&fixture.run.layout.timing_file).unwrap();
         assert!(timing.contains(r#""phase": "phase-3""#));
+        assert!(timing.contains(r#""prNumber": 42"#));
+        let handoff = std::fs::read_to_string(&fixture.run.layout.handoff_file).unwrap();
+        assert!(handoff.contains(r#""pr_number": 42"#));
+        assert!(handoff.contains(r#""auto_merge_state": "armed""#));
+        assert!(fixture.run.layout.pr_body_file.is_file());
+        let pr_body = std::fs::read_to_string(&fixture.run.layout.pr_body_file).unwrap();
+        assert!(pr_body.contains("## Phase runner handoff"));
+        assert!(pr_body.contains("### Focused verification"));
+        assert!(pr_body.contains("- fake verification"));
         let codex = fake
             .invocations
             .iter()
@@ -1448,9 +1734,86 @@ mod tests {
             .args
             .iter()
             .any(|arg| arg.contains("Current branch: zvorygin/phaserunner-phase-3")));
+        assert!(fake.invocations.iter().any(|call| call.program == "git"
+            && args_eq(
+                &call.args,
+                &["push", "-u", "origin", "zvorygin/phaserunner-phase-3"]
+            )));
+        assert!(fake
+            .invocations
+            .iter()
+            .any(|call| call.program == "scripts/agent-pr.sh"));
+        assert!(!fake
+            .invocations
+            .iter()
+            .any(|call| call.program == "scripts/wait-pr.sh"));
 
         let _ = std::fs::remove_dir_all(fixture.repo);
         let _ = std::fs::remove_dir_all(fixture.worktree_root);
+    }
+
+    #[test]
+    fn wait_lifecycle_waits_verifies_reachability_and_syncs_main() {
+        let mut fixture = execution_fixture("phaserunner-wait-success");
+        fixture.plan.config.pr_lifecycle = PrLifecycle::OpenAndWait;
+        let mut fake = FakeCommandRunner::new(FakeScenario::Success, fixture.run.clone());
+
+        let report = execute_plan(&fixture.plan, &mut fake).unwrap();
+
+        assert_eq!(report.completed.len(), 1);
+        let handoff = std::fs::read_to_string(&fixture.run.layout.handoff_file).unwrap();
+        assert!(handoff.contains(r#""merge_wait_state": "merged""#));
+        assert!(fake
+            .invocations
+            .iter()
+            .any(|call| call.program == "scripts/wait-pr.sh"
+                && args_eq(&call.args, &["https://example.test/pr/42"])));
+        assert!(fake.invocations.iter().any(|call| call.program == "git"
+            && args_eq(
+                &call.args,
+                &["merge-base", "--is-ancestor", "head123", "origin/main"]
+            )));
+        assert!(fake.invocations.iter().any(|call| call.program == "git"
+            && args_eq(&call.args, &["merge", "--ff-only", "origin/main"])));
+
+        let _ = std::fs::remove_dir_all(fixture.repo);
+        let _ = std::fs::remove_dir_all(fixture.worktree_root);
+    }
+
+    #[test]
+    fn pr_lifecycle_blocks_on_missing_auto_merge_wait_failure_and_unreachable_head() {
+        for (name, scenario, expected) in [
+            (
+                "missing-auto-merge",
+                FakeScenario::MissingAutoMerge,
+                "pr readiness",
+            ),
+            ("wait-failure", FakeScenario::WaitFailure, "command failed"),
+            (
+                "unreachable-head",
+                FakeScenario::UnreachableHead,
+                "unreachable",
+            ),
+        ] {
+            let mut fixture = execution_fixture(&format!("phaserunner-{name}"));
+            if !matches!(scenario, FakeScenario::MissingAutoMerge) {
+                fixture.plan.config.pr_lifecycle = PrLifecycle::OpenAndWait;
+            }
+            let mut fake = FakeCommandRunner::new(scenario, fixture.run.clone());
+            let err = execute_plan(&fixture.plan, &mut fake).unwrap_err();
+            match expected {
+                "pr readiness" => assert!(matches!(err, ExecutionError::PrReadiness { .. })),
+                "command failed" => assert!(matches!(err, ExecutionError::CommandFailed { .. })),
+                "unreachable" => {
+                    assert!(matches!(err, ExecutionError::MergedHeadUnreachable { .. }))
+                }
+                _ => unreachable!(),
+            }
+            let handoff = std::fs::read_to_string(&fixture.run.layout.handoff_file).unwrap();
+            assert!(handoff.contains(r#""merge_wait_state": "blocked""#));
+            let _ = std::fs::remove_dir_all(fixture.repo);
+            let _ = std::fs::remove_dir_all(fixture.worktree_root);
+        }
     }
 
     #[test]
@@ -1544,6 +1907,13 @@ mod tests {
         }
     }
 
+    fn args_eq(actual: &[String], expected: &[&str]) -> bool {
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied())
+    }
+
     struct ExecutionFixture {
         repo: PathBuf,
         worktree_root: PathBuf,
@@ -1590,6 +1960,9 @@ mod tests {
         DirtyWorktree,
         MissingCommit,
         MissingDoneMarker,
+        MissingAutoMerge,
+        WaitFailure,
+        UnreachableHead,
     }
 
     struct FakeCommandRunner {
@@ -1720,6 +2093,27 @@ mod tests {
                     _ => success("1\n"),
                 },
                 ("git", ["rev-parse", "HEAD"]) => success("head123\n"),
+                ("git", ["push", "-u", "origin", _]) => success(""),
+                ("scripts/agent-pr.sh", _) => success("agent-pr: PR 42 ready\n"),
+                ("gh", ["pr", "list", ..]) => {
+                    if matches!(self.scenario, FakeScenario::MissingAutoMerge) {
+                        success(
+                            r#"[{"number":42,"url":"https://example.test/pr/42","state":"OPEN","headRefOid":"head123","headRefName":"zvorygin/phaserunner-phase-3","autoMergeRequest":null,"mergeStateStatus":"CLEAN","isDraft":false}]"#,
+                        )
+                    } else {
+                        success(
+                            r#"[{"number":42,"url":"https://example.test/pr/42","state":"OPEN","headRefOid":"head123","headRefName":"zvorygin/phaserunner-phase-3","autoMergeRequest":{"enabledAt":"now"},"mergeStateStatus":"CLEAN","isDraft":false}]"#,
+                        )
+                    }
+                }
+                ("scripts/wait-pr.sh", [_]) => match self.scenario {
+                    FakeScenario::WaitFailure => failure("wait-pr failed"),
+                    _ => success("wait-pr merged\n"),
+                },
+                ("git", ["merge-base", "--is-ancestor", _, _]) => match self.scenario {
+                    FakeScenario::UnreachableHead => failure("not ancestor"),
+                    _ => success(""),
+                },
                 _ => panic!("unexpected command: {:?}", invocation),
             }
         }
