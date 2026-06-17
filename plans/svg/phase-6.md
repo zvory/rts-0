@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Implemented.
 
 ## Objective
 
@@ -49,31 +49,45 @@ Phase 5.x mechanical visual gates are in place.
 
 ## Implementation Checklist
 
-- [ ] Add SVG rigs for infantry/support units.
-- [ ] Add migration manifests for newly live-routed infantry/support units.
-- [ ] Add weapon-facing and setup/deploy bindings.
-- [ ] Route migrated kinds through the rig renderer.
-- [ ] Move feedback anchor lookup to the rig API if needed.
-- [ ] Add and pass part-level plus full-composition pixel gates for each migrated kind.
-- [ ] Keep legacy code only for comparison and unmigrated vehicles.
-- [ ] Run verification and record exact results.
+- [x] Add SVG rigs for infantry/support units.
+- [x] Add migration manifests for newly live-routed infantry/support units.
+- [x] Add weapon-facing and setup/deploy bindings.
+- [x] Route migrated kinds through the rig renderer.
+- [x] Move feedback anchor lookup to the rig API if needed; existing anchor lookup stayed sufficient.
+- [x] Add and pass part-level plus full-composition pixel gates for each migrated kind.
+- [x] Keep legacy code only for comparison and unmigrated vehicles.
+- [x] Run verification and record exact results.
 
 ## Verification
 
-- Rig schema and SVG importer tests.
-- `node tests/svg_migration_guardrails.mjs`
-- `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
-- Focused infantry/support equivalence tests.
-- Muzzle/feedback anchor tests if touched.
-- `node scripts/check-client-architecture.mjs`
-- `git diff --check`.
+- `node tests/visual_pixel_compare_test.mjs` passed.
+- `node tests/rig_schema.mjs` passed.
+- `node tests/svg_rig_importer.mjs` passed.
+- `node tests/rig_runtime.mjs` passed.
+- `node tests/svg_migration_guardrails.mjs` passed.
+- `node tests/transparent_unit_pixels.mjs --parts --no-artifacts` passed 366/366 with no failures.
+- `node scripts/check-client-architecture.mjs` passed.
+- `git diff --check` passed.
 
 ## Manual Test Focus
 
 Run a local match or replay with infantry and support weapons. Check facing, weapon-facing,
 setup/deploy transitions, recoil, muzzle flashes, selection, health bars, and shot-revealed units.
 
+Manual review was completed from a local server at `http://127.0.0.1:38106/`; lobby and unit
+visuals looked correct.
+
 ## Handoff Expectations
 
 List each migrated kind, remaining legacy-only unit kinds, equivalence results, any feedback API
 changes, and manual visual issues that should be watched during vehicle migration.
+
+- Migrated live-routed Phase 6 unit kinds: Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team,
+  and Artillery.
+- Previously live-routed SVG unit kinds still covered by guardrails: Worker and Tank.
+- Ekat remains explicitly deferred.
+- Remaining non-routed kinds stay on legacy renderer paths and are guarded by
+  `node tests/svg_migration_guardrails.mjs`.
+- Part-level plus full-composition transparent pixel gates passed for all migration manifests.
+- No feedback API change was required; muzzle anchors remain available through the existing rig
+  routing path.
