@@ -65,13 +65,20 @@ const options = parseArgs(["--plan", "svg", "--from", "1", "--to", "2", "--pr", 
 validateOptions(options);
 assert.equal(options.planName, "svg");
 assert.equal(options.waitForPr, true);
-assert.throws(() => validateOptions(parseArgs(["--plan", "bad/path", "1", "--pr"])), /plan name/);
+const nestedOptions = parseArgs(["--plan", "lab/room", "phase-0", "--pr", "--wait"]);
+validateOptions(nestedOptions);
+assert.equal(nestedOptions.planName, "lab/room");
+assert.throws(() => validateOptions(parseArgs(["--plan", "../bad", "1", "--pr"])), /plan name/);
+assert.throws(() => validateOptions(parseArgs(["--plan", "bad//path", "1", "--pr"])), /plan name/);
 assert.throws(() => validateOptions(parseArgs(["--plan", "svg", "1"])), /PR-first/);
 
 const prompt = renderPrompt({ planName: "svg", phaseId: "phase-2", branch: "zvorygin/svg-phase-2" });
 assert.match(prompt, /\$phase-runner/);
 assert.match(prompt, /Plan: plans\/svg\/plan.md/);
 assert.match(prompt, /Current branch: zvorygin\/svg-phase-2/);
+const nestedPrompt = renderPrompt({ planName: "lab/room", phaseId: "phase-0", branch: "zvorygin/lab/room-phase-0" });
+assert.match(nestedPrompt, /Plan: plans\/lab\/room\/plan.md/);
+assert.match(nestedPrompt, /Phase: plans\/lab\/room\/phase-0.md/);
 
 const readyPr = [
   {
@@ -138,5 +145,13 @@ const waitDryRunOutput = execFileSync(
 );
 assert.match(waitDryRunOutput, /phase-runner: discovered phases: phase-1/);
 assert.match(waitDryRunOutput, /would run scripts\/wait-pr.sh/);
+
+const nestedDryRunOutput = execFileSync(
+  "node",
+  ["scripts/phase-runner-agents.mjs", "--plan", "lab/room", "phase-0", "--pr", "--dry-run"],
+  { cwd: repoRoot, encoding: "utf8" },
+);
+assert.match(nestedDryRunOutput, /phase-runner: creating .*lab-room-phase-0/);
+assert.match(nestedDryRunOutput, /would push zvorygin\/lab\/room-phase-0 to origin/);
 
 console.log("phase runner agents tests passed");

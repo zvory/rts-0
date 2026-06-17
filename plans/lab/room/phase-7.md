@@ -15,7 +15,7 @@ guardrails after the composable room primitives exist.
   sequencing, as long as removal is clearly behavior-neutral.
 - Update `docs/design/server-sim.md` and `docs/context/server-sim.md` to describe the new lobby
   room modules and their responsibilities.
-- Update `plans/room/mode-matrix.md` if the final internal module names differ from the Phase 1
+- Update `plans/lab/room/mode-matrix.md` if the final internal module names differ from the Phase 1
   predictions.
 - Re-evaluate `/dev/scenario` after the shared participants, clock, projection, and launch helpers
   exist. If the scenario path can move onto those helpers without broadening behavior, migrate it;
@@ -30,7 +30,7 @@ guardrails after the composable room primitives exist.
 - `server/src/lobby/*.rs`
 - `docs/design/server-sim.md`
 - `docs/context/server-sim.md`
-- `plans/room/mode-matrix.md`
+- `plans/lab/room/mode-matrix.md`
 - `scripts/check-*.mjs` or `server/crates/archcheck` only if a clear guardrail is justified
 
 ## Implementation Checklist

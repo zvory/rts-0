@@ -21,6 +21,7 @@ Examples:
   scripts/phase-runner-agents.mjs --plan faction 4 --pr
   scripts/phase-runner-agents.mjs --plan faction 5.5 --pr
   scripts/phase-runner-agents.mjs --plan faction phase-4 phase-5 --pr --wait
+  scripts/phase-runner-agents.mjs --plan lab/room phase-0 --pr --wait
   scripts/phase-runner-agents.mjs --plan faction --from 5 --to 6 --pr --wait
   scripts/phase-runner-agents.mjs --plan ai 2 --model gpt-5.4-mini --pr
   scripts/phase-runner-agents.mjs --plan ai 2 --executor agents-sdk --pr
@@ -46,7 +47,7 @@ once every 5 minutes. Do not tail the executor log during normal progress; the
 runner prints the relevant tail on failure.
 
 Options:
-  --plan NAME          Plan directory name under plans/. Required.
+  --plan NAME          Plan directory under plans/. Nested subplans such as lab/room are allowed. Required.
   --base BRANCH        Must be main. Kept for compatibility with existing calls.
   --model MODEL        Optional model override for executor passes.
   --from PHASE         Discover phases after PHASE, up to --to. Example: --from 5.
@@ -153,8 +154,8 @@ export function validateOptions(options) {
   if (options.fromPhase && options.phases.length !== 0) {
     throw usageError("pass either explicit phases or --from/--to discovery, not both");
   }
-  if (!/^[a-z0-9_.-]+$/.test(options.planName) || options.planName === "." || options.planName === "..") {
-    throw usageError(`plan name must be a simple plans/ directory name: ${options.planName}`);
+  if (!isSafePlanName(options.planName)) {
+    throw usageError(`plan name must be a safe plans/ directory name: ${options.planName}`);
   }
   if (options.baseBranch !== DEFAULT_BASE_BRANCH) {
     throw usageError("phase-runner opens PRs against main; --base must be main");
@@ -222,9 +223,20 @@ export function phaseMarkedDone(phaseFile) {
   return phaseMarkedDoneText(fs.readFileSync(phaseFile, "utf8"));
 }
 
+function isSafePlanName(planName) {
+  return String(planName || "")
+    .split("/")
+    .every((segment) => /^[a-z0-9_.-]+$/.test(segment) && segment !== "." && segment !== "..");
+}
+
+function planSlug(planName) {
+  return planName.split("/").join("-");
+}
+
 export function buildLayout({ worktreeRoot, planName, phaseId, branch }) {
-  const worktreePath = path.join(worktreeRoot, `${planName}-${phaseId}`);
-  const logDir = path.join(worktreeRoot, "phase-runner-logs", planName);
+  const planDirSlug = planSlug(planName);
+  const worktreePath = path.join(worktreeRoot, `${planDirSlug}-${phaseId}`);
+  const logDir = path.join(worktreeRoot, "phase-runner-logs", planDirSlug);
   const handoffDir = path.join(logDir, "handoffs");
   return {
     branch,
