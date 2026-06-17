@@ -167,6 +167,31 @@ export const TANK_LEGACY_PARTS = Object.freeze({
   fuelCue: "tank.fuelCue",
 });
 
+export const INFANTRY_SUPPORT_LEGACY_PARTS = Object.freeze({
+  [KIND.RIFLEMAN]: Object.freeze({
+    shadow: "rifleman.shadow",
+    body: "rifleman.body",
+    weapon: "rifleman.weapon",
+  }),
+  [KIND.MACHINE_GUNNER]: Object.freeze({
+    shadow: "machine_gunner.shadow",
+    body: "machine_gunner.body",
+    weapon: "machine_gunner.weapon",
+  }),
+  [KIND.ANTI_TANK_GUN]: Object.freeze({
+    shadow: "anti_tank_gun.shadow",
+    weapon: "anti_tank_gun.weapon",
+  }),
+  [KIND.MORTAR_TEAM]: Object.freeze({
+    shadow: "mortar_team.shadow",
+    weapon: "mortar_team.weapon",
+  }),
+  [KIND.ARTILLERY]: Object.freeze({
+    shadow: "artillery.shadow",
+    weapon: "artillery.weapon",
+  }),
+});
+
 export function createLegacyUnitPartCapture({ includeParts = null } = {}) {
   const includeSet = includeParts == null ? null : new Set(Array.isArray(includeParts) ? includeParts : [includeParts]);
   const records = [];
@@ -184,6 +209,7 @@ export function createLegacyUnitPartCapture({ includeParts = null } = {}) {
 function legacyUnitPartName(kind, part) {
   if (kind === KIND.WORKER && WORKER_LEGACY_PARTS[part]) return WORKER_LEGACY_PARTS[part];
   if (kind === KIND.TANK && TANK_LEGACY_PARTS[part]) return TANK_LEGACY_PARTS[part];
+  if (INFANTRY_SUPPORT_LEGACY_PARTS[kind]?.[part]) return INFANTRY_SUPPORT_LEGACY_PARTS[kind][part];
   return `${kind}.${part}`;
 }
 
@@ -418,20 +444,32 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   g.lineStyle(2, 0x1a1712, 0.95);
 
   if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER) {
-    drawInfantryBase(g, r, tint, facing);
+    drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "body"), partDetail, () => {
+      drawInfantryBase(g, r, tint, facing);
+    });
     if (e.kind === KIND.RIFLEMAN) {
-      drawInfantryRifle(g, r, facing, recoil);
+      drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "weapon"), partDetail, () => {
+        drawInfantryRifle(g, r, facing, recoil);
+      });
     } else {
-      drawInfantryMachineGun(g, r, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+      drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "weapon"), partDetail, () => {
+        drawInfantryMachineGun(g, r, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+      });
     }
   } else if (e.kind === KIND.ANTI_TANK_GUN) {
-    drawAntiTankGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+    drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "weapon"), partDetail, () => {
+      drawAntiTankGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+    });
   } else if (e.kind === KIND.MORTAR_TEAM) {
-    drawMortarTeam(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+    drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "weapon"), partDetail, () => {
+      drawMortarTeam(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+    });
   } else if (e.kind === KIND.ARTILLERY) {
     const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
-    drawArtillery(g, body, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil, motion);
+    drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "weapon"), partDetail, () => {
+      drawArtillery(g, body, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil, motion);
+    });
   } else if (e.kind === KIND.SCOUT_CAR || e.kind === KIND.COMMAND_CAR) {
     // Scout cars currently use the tank-like vehicle movement model server-side.
     // Replace with truck/wheeled movement semantics once that model exists.

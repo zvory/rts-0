@@ -1,9 +1,23 @@
 import { KIND } from "../../protocol.js";
+import { MACHINE_GUNNER_RIG_SVG, RIFLEMAN_RIG_SVG } from "./infantry_svg.js";
 import { compileSvgRig } from "./svg_importer.js";
+import {
+  ANTI_TANK_GUN_PARTS,
+  ANTI_TANK_GUN_RIG_SVG,
+  ARTILLERY_PARTS,
+  ARTILLERY_RIG_SVG,
+  MORTAR_TEAM_PARTS,
+  MORTAR_TEAM_RIG_SVG,
+} from "./support_svg.js";
 import { TANK_RIG_SVG } from "./tank_svg.js";
 import { WORKER_RIG_SVG } from "./worker_svg.js";
 
 const LIVE_RIG_SOURCES = Object.freeze([
+  [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_RIG_SVG],
+  [KIND.ARTILLERY, ARTILLERY_RIG_SVG],
+  [KIND.MACHINE_GUNNER, MACHINE_GUNNER_RIG_SVG],
+  [KIND.MORTAR_TEAM, MORTAR_TEAM_RIG_SVG],
+  [KIND.RIFLEMAN, RIFLEMAN_RIG_SVG],
   [KIND.TANK, TANK_RIG_SVG],
   [KIND.WORKER, WORKER_RIG_SVG],
 ]);
@@ -47,7 +61,54 @@ const TANK_UNIT_PARTS = Object.freeze([
   "part.fuelCue.x2",
 ]);
 
+const RIFLEMAN_UNIT_PARTS = Object.freeze([
+  "part.body",
+  "part.head",
+  "part.shoulders",
+  "part.rifle.barrel",
+  "part.rifle.hand",
+]);
+
+const MACHINE_GUNNER_UNIT_PARTS = Object.freeze([
+  "part.body",
+  "part.head",
+  "part.shoulders",
+  "part.mg.main",
+  "part.mg.stock",
+  "part.mg.receiver",
+  "part.mg.topPlate",
+  "part.mg.shroud",
+  "part.mg.slot.0",
+  "part.mg.slot.1",
+  "part.mg.slot.2",
+  "part.mg.slot.3",
+  "part.mg.muzzleTick",
+  "part.mg.grip",
+  "part.mg.bipod",
+  "part.mg.muzzleCap",
+]);
+
 const LIVE_RIG_PARTS = Object.freeze({
+  [KIND.ANTI_TANK_GUN]: Object.freeze({
+    shadow: ANTI_TANK_GUN_PARTS.shadow,
+    unit: ANTI_TANK_GUN_PARTS.weapon,
+  }),
+  [KIND.ARTILLERY]: Object.freeze({
+    shadow: ARTILLERY_PARTS.shadow,
+    unit: ARTILLERY_PARTS.weapon,
+  }),
+  [KIND.MACHINE_GUNNER]: Object.freeze({
+    shadow: Object.freeze(["part.shadow"]),
+    unit: MACHINE_GUNNER_UNIT_PARTS,
+  }),
+  [KIND.MORTAR_TEAM]: Object.freeze({
+    shadow: MORTAR_TEAM_PARTS.shadow,
+    unit: MORTAR_TEAM_PARTS.weapon,
+  }),
+  [KIND.RIFLEMAN]: Object.freeze({
+    shadow: Object.freeze(["part.shadow"]),
+    unit: RIFLEMAN_UNIT_PARTS,
+  }),
   [KIND.TANK]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
     unit: TANK_UNIT_PARTS,

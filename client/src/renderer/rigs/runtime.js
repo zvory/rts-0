@@ -74,8 +74,8 @@ export class UnitRigInstance {
     setPoint(this.container.scale, 1, 1);
     this.container.rotation = 0;
 
-    const includeParts = normalizedPartSet(options.includeParts);
     const sampled = sampleRigAnimation(this.definition, entity, renderContext);
+    const includeParts = normalizedPartSet(options.includeParts);
     for (const [partId, rec] of this.parts) {
       const partState = sampled.parts[partId];
       if (!partState || (includeParts && !includeParts.has(partId))) {
@@ -99,46 +99,83 @@ export class UnitRigInstance {
 
 function applyPartState(display, part, state, context) {
   display.visible = state.visible;
-  display.alpha = state.alpha;
-  setPoint(display.position, state.transform.x, state.transform.y);
-  setPoint(display.pivot, state.pivot.x, state.pivot.y);
-  setPoint(display.scale, state.transform.scaleX, state.transform.scaleY);
-  display.rotation = state.transform.rotation;
-  redrawPart(display, part.geometry, part.paint, tintForSlot(state.tintSlot, context));
+  applyDisplayTransform(display, displayTransform(state));
+  display.clear?.();
+  drawPart(display, part.geometry, part.paint, tintForSlot(state.tintSlot, context), state.geometryScale);
 }
 
-function redrawPart(g, geometry, paint, tint) {
-  g.clear?.();
-  const fill = paint.fill == null ? null : tint ?? hexToInt(paint.fill);
-  const stroke = paint.stroke == null ? null : hexToInt(paint.stroke);
+function displayTransform(state) {
+  const localOffset = rotateOffset(state.localOffset, state.transform.rotation);
+  return {
+    x: state.transform.x + localOffset.x,
+    y: state.transform.y + localOffset.y,
+    pivotX: state.pivot.x,
+    pivotY: state.pivot.y,
+    scaleX: state.transform.scaleX,
+    scaleY: state.transform.scaleY,
+    rotation: state.transform.rotation,
+    alpha: state.alpha,
+  };
+}
+
+function applyDisplayTransform(display, transform) {
+  display.alpha = transform.alpha;
+  setPoint(display.position, transform.x, transform.y);
+  setPoint(display.pivot, transform.pivotX, transform.pivotY);
+  setPoint(display.scale, transform.scaleX, transform.scaleY);
+  display.rotation = transform.rotation;
+}
+
+function nearly(a, b) {
+  return Math.abs(a - b) <= 1e-9;
+}
+
+function rotateOffset(offset, rotation) {
+  if (!offset || (offset.x === 0 && offset.y === 0)) return { x: 0, y: 0 };
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  return {
+    x: offset.x * cos - offset.y * sin,
+    y: offset.x * sin + offset.y * cos,
+  };
+}
+
+function drawPart(g, geometry, paint, tint, geometryScale = null) {
+  const fill = paint.fill == null ? null : tint?.fill ?? hexToInt(paint.fill);
+  const stroke = paint.stroke == null ? null : tint?.stroke ?? hexToInt(paint.stroke);
   if (stroke !== null) g.lineStyle?.(paint.strokeWidth ?? 1, stroke, paint.strokeOpacity ?? 1);
+  else g.lineStyle?.(0, 0, 0);
   if (fill !== null) g.beginFill?.(fill, paint.fillOpacity ?? 1);
-  drawGeometry(g, geometry);
+  drawGeometry(g, geometry, geometryScale);
   if (fill !== null) g.endFill?.();
 }
 
-function drawGeometry(g, geometry) {
-  if (geometry.type === "rect") drawRectAsPolygon(g, geometry);
-  else if (geometry.type === "circle") g.drawCircle(geometry.cx, geometry.cy, geometry.r);
-  else if (geometry.type === "ellipse") g.drawEllipse(geometry.cx, geometry.cy, geometry.rx, geometry.ry);
+function drawGeometry(g, geometry, geometryScale = null) {
+  const sx = geometryScale?.x ?? 1;
+  const sy = geometryScale?.y ?? 1;
+  if (geometry.type === "rect") drawRectAsPolygon(g, geometry, sx, sy);
+  else if (geometry.type === "circle") {
+    if (nearly(sx, sy)) g.drawCircle(geometry.cx * sx, geometry.cy * sy, geometry.r * sx);
+    else g.drawEllipse(geometry.cx * sx, geometry.cy * sy, Math.abs(geometry.r * sx), Math.abs(geometry.r * sy));
+  } else if (geometry.type === "ellipse") g.drawEllipse(geometry.cx * sx, geometry.cy * sy, Math.abs(geometry.rx * sx), Math.abs(geometry.ry * sy));
   else if (geometry.type === "line") {
-    g.moveTo(geometry.from.x, geometry.from.y);
-    g.lineTo(geometry.to.x, geometry.to.y);
+    g.moveTo(geometry.from.x * sx, geometry.from.y * sy);
+    g.lineTo(geometry.to.x * sx, geometry.to.y * sy);
   } else if (geometry.type === "polygon" || geometry.type === "polyline") {
-    const points = geometry.points.flatMap((point) => [point.x, point.y]);
+    const points = geometry.points.flatMap((point) => [point.x * sx, point.y * sy]);
     if (geometry.type === "polygon") g.drawPolygon(points);
     else drawPolyline(g, points);
   } else if (geometry.type === "path") {
-    drawPath(g, geometry.commands);
+    drawPath(g, geometry.commands, sx, sy);
   }
 }
 
-function drawRectAsPolygon(g, geometry) {
+function drawRectAsPolygon(g, geometry, sx = 1, sy = 1) {
   g.drawPolygon([
-    geometry.x, geometry.y,
-    geometry.x + geometry.width, geometry.y,
-    geometry.x + geometry.width, geometry.y + geometry.height,
-    geometry.x, geometry.y + geometry.height,
+    geometry.x * sx, geometry.y * sy,
+    (geometry.x + geometry.width) * sx, geometry.y * sy,
+    (geometry.x + geometry.width) * sx, (geometry.y + geometry.height) * sy,
+    geometry.x * sx, (geometry.y + geometry.height) * sy,
   ]);
 }
 
@@ -148,9 +185,9 @@ function drawPolyline(g, points) {
   for (let i = 2; i < points.length; i += 2) g.lineTo(points[i], points[i + 1]);
 }
 
-function drawPath(g, commands) {
+function drawPath(g, commands, sx = 1, sy = 1) {
   for (const command of commands) {
-    const v = command.values;
+    const v = scalePathValues(command.values, sx, sy);
     if (command.command === "M") g.moveTo(v[0], v[1]);
     else if (command.command === "L") g.lineTo(v[0], v[1]);
     else if (command.command === "C") g.bezierCurveTo?.(v[0], v[1], v[2], v[3], v[4], v[5]);
@@ -159,11 +196,22 @@ function drawPath(g, commands) {
   }
 }
 
+function scalePathValues(values, sx, sy) {
+  if (sx === 1 && sy === 1) return values;
+  return values.map((value, index) => value * (index % 2 === 0 ? sx : sy));
+}
+
 function tintForSlot(slot, context) {
-  if (slot === "team") return hexToInt(context.teamColor);
-  if (slot === "team-light") return lightenColor(hexToInt(context.teamColor), 0.12);
-  if (slot === "team-light-soft") return lightenColor(hexToInt(context.teamColor), 0.06);
-  if (slot === "neutral") return 0x9aa0a8;
+  if (slot === "team") return { fill: hexToInt(context.teamColor) };
+  if (slot === "team-light") return { fill: lightenColor(hexToInt(context.teamColor), 0.12) };
+  if (slot === "team-light-soft") return { fill: lightenColor(hexToInt(context.teamColor), 0.06) };
+  if (slot === "team-light-strong") return { fill: lightenColor(hexToInt(context.teamColor), 0.16) };
+  if (slot === "team-stroke") return { stroke: hexToInt(context.teamColor) };
+  if (slot === "team-fill-stroke") {
+    const team = hexToInt(context.teamColor);
+    return { fill: team, stroke: team };
+  }
+  if (slot === "neutral") return { fill: 0x9aa0a8 };
   return null;
 }
 
