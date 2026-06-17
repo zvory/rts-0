@@ -144,7 +144,7 @@ failure it writes normal `ReplayArtifactV1` replay artifacts under the Cargo tar
 artifact name; successful runs are then written under the target dir's
 `selfplay-artifacts/<name>/`.
 When you open a replay artifact in the browser, use the server instance that produced it, or
-start a fresh one on its own port before loading `/dev/selfplay?replay=<artifact_name>`.
+start a fresh one on its own port before loading `/dev/replay-artifact?replay=<artifact_name>`.
 
 ```bash
 RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \

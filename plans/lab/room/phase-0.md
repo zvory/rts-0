@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Done.
+- [x] Done.
 
 ## Objective
 
@@ -46,14 +46,14 @@ AI self-play harness and leaving dev scenarios alone.
 
 ## Implementation Checklist
 
-- [ ] Remove live `/dev/selfplay` routing and client bootstrap support.
-- [ ] Remove `DevSelfPlay` live room mode and live self-play room-task branches.
-- [ ] Preserve AI self-play automated tests and artifact writing.
-- [ ] Provide a neutral saved-artifact replay inspection path or explicitly confirm that browser
+- [x] Remove live `/dev/selfplay` routing and client bootstrap support.
+- [x] Remove `DevSelfPlay` live room mode and live self-play room-task branches.
+- [x] Preserve AI self-play automated tests and artifact writing.
+- [x] Provide a neutral saved-artifact replay inspection path or explicitly confirm that browser
       artifact inspection is no longer required.
-- [ ] Update docs and tests that mention `/dev/selfplay`.
-- [ ] Confirm `/dev/scenario` and `watchScenario` behavior is unchanged.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Update docs and tests that mention `/dev/selfplay`.
+- [x] Confirm `/dev/scenario` and `watchScenario` behavior is unchanged.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

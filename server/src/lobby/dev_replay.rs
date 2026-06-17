@@ -1,16 +1,13 @@
-use super::room_task::{DevScenarioConfig, DevScenarioId, DevSelfPlayConfig, RoomMode};
+use super::room_task::{DevScenarioConfig, DevScenarioId, RoomMode};
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
 use rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
-    if room == format!("{DEV_SELFPLAY_ROOM_PREFIX}live") {
-        return RoomMode::DevSelfPlay(DevSelfPlayConfig::Live);
-    }
-    if let Some(artifact) = room.strip_prefix(&format!("{DEV_SELFPLAY_ROOM_PREFIX}replay:")) {
-        return RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+    if let Some(artifact) = room.strip_prefix(REPLAY_ARTIFACT_ROOM_PREFIX) {
+        return RoomMode::ReplayArtifact {
             artifact: artifact.to_string(),
-        });
+        };
     }
     if let Some(raw) = room.strip_prefix(DEV_SCENARIO_ROOM_PREFIX) {
         if let Some(launch) = parse_dev_scenario_room(raw) {

@@ -112,9 +112,9 @@ Start a fresh server on its own port and use macOS `open` to load a spectation r
 user can inspect the failure state:
 
 ```
-open "http://localhost:<port>/dev/selfplay?replay=<artifact_name>"
+open "http://localhost:<port>/dev/replay-artifact?replay=<artifact_name>"
 # e.g.
-open "http://localhost:<port>/dev/selfplay?replay=manual_worker_rush_latest"
+open "http://localhost:<port>/dev/replay-artifact?replay=manual_worker_rush_latest"
 ```
 
 Do **not** use the Browser skill for this flow.
