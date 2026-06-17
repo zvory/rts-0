@@ -57,7 +57,7 @@ impl TankTrapPathingLayout {
     pub(in crate::game::setup::dev_scenarios) fn trap_owner(self, index: usize) -> u32 {
         match self {
             Self::FriendlyVehicleReroute => {
-                if index % 2 == 0 {
+                if index.is_multiple_of(2) {
                     1
                 } else {
                     2
