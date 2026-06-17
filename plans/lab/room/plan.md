@@ -161,6 +161,6 @@ Once this plan is approved, run Phase 0 explicitly, then run the behavior-preser
 range that starts at zero so the runner does not skip or mis-handle the explicit phase-zero file:
 
 ```bash
-scripts/phase-runner.sh --plan room phase-0 --pr --wait
-scripts/phase-runner.sh --plan room --from 1 --to 7 --pr --wait
+scripts/phase-runner.sh --plan lab/room phase-0 --pr --wait
+scripts/phase-runner.sh --plan lab/room --from 1 --to 7 --pr --wait
 ```

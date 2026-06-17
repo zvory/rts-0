@@ -11,7 +11,7 @@ moving.
 
 ## Work
 
-- Create a current-state matrix under `plans/room/` that describes every existing room-hosted path:
+- Create a current-state matrix under `plans/lab/room/` that describes every existing room-hosted path:
   normal lobby/live match, spectator, post-match replay, persisted replay room, replay branch
   staging, replay branch live match, saved artifact replay inspection if Phase 0 preserved it, and
   dev scenario.
@@ -25,7 +25,7 @@ moving.
 
 ## Expected Touch Points
 
-- `plans/room/mode-matrix.md`
+- `plans/lab/room/mode-matrix.md`
 - `server/src/lobby/room_task.rs` tests
 - `server/src/lobby/tests.rs`
 - `server/src/lobby/replay_session.rs` tests if replay vision coverage needs tightening
