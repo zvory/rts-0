@@ -12,7 +12,7 @@ const ANCHOR_PREFIX = "anchor.";
 const BOUNDS_PREFIX = "bounds.";
 const TINT_ATTR = "data-rts-tint";
 const XMLNS_ATTRS = new Set(["xmlns", "xmlns:xlink"]);
-const PASS_THROUGH_ATTRS = new Set(["id", "transform", "fill", "stroke", "stroke-width", "opacity", "data-rts-pivot", "data-rts-animation", TINT_ATTR]);
+const PASS_THROUGH_ATTRS = new Set(["id", "transform", "fill", "stroke", "stroke-width", "opacity", "fill-opacity", "stroke-opacity", "data-rts-pivot", "data-rts-animation", TINT_ATTR]);
 const GEOMETRY_ATTRS = new Map(Object.entries({
   path: new Set(["d"]),
   polygon: new Set(["points"]),
@@ -230,10 +230,15 @@ function parsePaint(attrs, path, errors) {
   const stroke = parseColorAttr(attrs.stroke, `${path}.stroke`, errors);
   const strokeWidth = attrs["stroke-width"] == null ? null : parseFinite(attrs["stroke-width"], `${path}.stroke-width`, errors);
   const opacity = attrs.opacity == null ? 1 : parseFinite(attrs.opacity, `${path}.opacity`, errors);
-  if (Number.isFinite(opacity) && (opacity < 0 || opacity > 1)) {
-    errors.push(error("svg.invalidOpacity", `${path}.opacity`, "Opacity must be between zero and one."));
+  const fillOpacity = attrs["fill-opacity"] == null ? 1 : parseFinite(attrs["fill-opacity"], `${path}.fill-opacity`, errors);
+  const strokeOpacity = attrs["stroke-opacity"] == null ? 1 : parseFinite(attrs["stroke-opacity"], `${path}.stroke-opacity`, errors);
+  for (const [key, value] of Object.entries({ opacity, fillOpacity, strokeOpacity })) {
+    if (Number.isFinite(value) && (value < 0 || value > 1)) {
+      const attr = key === "fillOpacity" ? "fill-opacity" : key === "strokeOpacity" ? "stroke-opacity" : "opacity";
+      errors.push(error("svg.invalidOpacity", `${path}.${attr}`, "Opacity must be between zero and one."));
+    }
   }
-  return { fill, stroke, strokeWidth, opacity };
+  return { fill, stroke, strokeWidth, opacity, fillOpacity, strokeOpacity };
 }
 
 function parseColorAttr(value, path, errors) {

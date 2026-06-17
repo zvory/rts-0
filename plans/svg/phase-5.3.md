@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -73,3 +73,35 @@ teardown still does not leak rig instances if the implementation touched routing
 Report the Worker part-gate and composition-gate results, the exact thresholds, and any failure
 artifacts that were generated and then resolved. State whether Worker is ready to remain live and
 whether Phase 6 can use the same gates for infantry/support units.
+
+## Implementation Notes
+
+- Reworked `tests/fixtures/svg/rig-worker.svg` to match the legacy Worker exactly: static outlined
+  pentagon body, non-rotating body, rotating facing tick, matching shadow, and busy indicator shown
+  only when the Worker is mining/building.
+- Fixed rig paint semantics so `paint.opacity` is the overall part alpha and `fillOpacity` /
+  `strokeOpacity` are paint-specific alpha values. This removed the double-alpha error that the new
+  pixel gates exposed for shadow, facing tick, and busy indicator parts.
+- Worker part gate:
+  `node tests/transparent_unit_pixels.mjs --parts-only --no-artifacts` passed 32/32 comparisons
+  with 0 failures.
+- Worker composition gate:
+  `node tests/transparent_unit_pixels.mjs --no-artifacts` passed 10/10 samples with 0 failures.
+- Combined gate:
+  `node tests/transparent_unit_pixels.mjs --parts --no-artifacts` passed 42/42 comparisons with
+  exact pixel matches (`alphaWeightedMatchingRatio=1`, `maxPerPixelRgbaDistance=0`,
+  `opaqueMismatchCount=0`) for every Worker part and composition sample.
+- Thresholds remained strict and were not loosened: composition uses
+  `minAlphaWeightedMatchingRatio=0.985`, `maxPerPixelRgbaDistance=96`,
+  `maxOpaqueMismatchCount=48`, `maxOpaqueMismatchClusterPx=12`,
+  `perChannelTolerance=6`; part gates use `minAlphaWeightedMatchingRatio=0.996`,
+  `maxPerPixelRgbaDistance=64`, `perChannelTolerance=4`, with per-part mismatch caps from Phase
+  5.2.
+- Additional verification passed:
+  `node tests/rig_schema.mjs`,
+  `node tests/svg_rig_importer.mjs`,
+  `node tests/rig_runtime.mjs`,
+  `node scripts/check-client-architecture.mjs`,
+  and `git diff --check`.
+- No failure artifacts remain from the passing run because the verification used `--no-artifacts`.
+  Worker is ready to remain live-rigged, and Phase 6 can use the same part and composition gates.

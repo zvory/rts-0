@@ -91,8 +91,8 @@ function redrawPart(g, geometry, paint, tint) {
   g.clear?.();
   const fill = paint.fill == null ? null : tint ?? hexToInt(paint.fill);
   const stroke = paint.stroke == null ? null : hexToInt(paint.stroke);
-  if (stroke !== null) g.lineStyle?.(paint.strokeWidth ?? 1, stroke, paint.opacity ?? 1);
-  if (fill !== null) g.beginFill?.(fill, paint.opacity ?? 1);
+  if (stroke !== null) g.lineStyle?.(paint.strokeWidth ?? 1, stroke, paint.strokeOpacity ?? 1);
+  if (fill !== null) g.beginFill?.(fill, paint.fillOpacity ?? 1);
   drawGeometry(g, geometry);
   if (fill !== null) g.endFill?.();
 }

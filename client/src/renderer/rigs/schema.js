@@ -44,7 +44,7 @@ const ANIMATION_PROPERTY_SET = new Set(ANIMATION_PROPERTIES);
 /**
  * @typedef {{x: number, y: number}} RigPoint
  * @typedef {{x: number, y: number, rotation: number, scaleX: number, scaleY: number}} RigTransform
- * @typedef {{fill: string | null, stroke: string | null, strokeWidth: number | null, opacity: number}} RigPaint
+ * @typedef {{fill: string | null, stroke: string | null, strokeWidth: number | null, opacity: number, fillOpacity: number, strokeOpacity: number}} RigPaint
  * @typedef {{id: string, drawOrder: number, geometry: object, transform: RigTransform, pivot: RigPoint, tintSlot: string, paint: RigPaint}} RigPart
  * @typedef {{id: string, kind: string, schemaVersion: number, parts: RigPart[], anchors: Record<string, RigPoint>, bounds: object, animations: object[], requiredRuntimeInputs: string[]}} RigDefinition
  */
@@ -158,8 +158,10 @@ function normalizePaint(paint, path, errors) {
   const stroke = normalizePaintColor(source.stroke ?? null, `${path}.stroke`, errors);
   const strokeWidth = source.strokeWidth == null ? null : readPositiveNumber(source.strokeWidth, `${path}.strokeWidth`, errors);
   const opacity = readUnitNumber(source.opacity ?? 1, `${path}.opacity`, errors);
-  if ((fill === null || typeof fill === "string") && (stroke === null || typeof stroke === "string") && (strokeWidth === null || Number.isFinite(strokeWidth)) && Number.isFinite(opacity)) {
-    return { fill, stroke, strokeWidth, opacity };
+  const fillOpacity = readUnitNumber(source.fillOpacity ?? 1, `${path}.fillOpacity`, errors);
+  const strokeOpacity = readUnitNumber(source.strokeOpacity ?? 1, `${path}.strokeOpacity`, errors);
+  if ((fill === null || typeof fill === "string") && (stroke === null || typeof stroke === "string") && (strokeWidth === null || Number.isFinite(strokeWidth)) && Number.isFinite(opacity) && Number.isFinite(fillOpacity) && Number.isFinite(strokeOpacity)) {
+    return { fill, stroke, strokeWidth, opacity, fillOpacity, strokeOpacity };
   }
   return null;
 }

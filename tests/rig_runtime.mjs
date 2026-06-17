@@ -73,10 +73,31 @@ test("rig runtime creates one container child per part and updates transforms", 
   }));
 
   const body = instance.parts.get("part.body").display;
+  const facingTick = instance.parts.get("part.facingTick").display;
+  const busyIndicator = instance.parts.get("part.busyIndicator").display;
   assert.equal(instance.container.x, 24);
   assert.equal(instance.container.y, 32);
-  assert.equal(body.rotation, Math.PI / 4);
+  assert.equal(body.rotation, 0);
+  assert.equal(facingTick.rotation, Math.PI / 4);
+  assert.equal(busyIndicator.visible, false);
   assert.equal(body.commands.find((cmd) => cmd.op === "beginFill").color, 0x225588);
+  assert.deepEqual(body.commands.find((cmd) => cmd.op === "lineStyle"), { op: "lineStyle", width: 2, color: 0x1a1712, alpha: 0.95 });
+
+  instance.update({
+    id: 1,
+    kind: KIND.WORKER,
+    owner: 1,
+    x: 24,
+    y: 32,
+    facing: Math.PI / 4,
+    hp: 20,
+    maxHp: 30,
+    state: STATE.BUILD,
+  }, createRigRenderContext({ id: 1, kind: KIND.WORKER, owner: 1, facing: Math.PI / 4, state: STATE.BUILD }, {
+    now: fixedNow,
+    colorByOwner: new Map([[1, 0x225588]]),
+  }));
+  assert.equal(instance.parts.get("part.busyIndicator").display.visible, true);
 
   instance.destroy();
   assert.equal(instance._destroyed, true);
