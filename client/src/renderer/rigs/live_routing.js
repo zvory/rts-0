@@ -68,6 +68,10 @@ export function createLiveRigDefinitions() {
   return definitions;
 }
 
+export function liveRigKinds() {
+  return LIVE_RIG_SOURCES.map(([kind]) => kind);
+}
+
 export function liveRigDefinitionFor(definitions, kind) {
   return definitions?.get?.(kind) ?? null;
 }

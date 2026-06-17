@@ -183,28 +183,33 @@ node tests/client_smoke.mjs
 
 `transparent_unit_pixels.mjs` is temporary SVG migration scaffolding for `plans/svg` and should be
 deleted with the equivalence harness in Phase 8. It opens a minimal headless-browser fixture
-through a loopback static server, loads PixiJS, renders Worker legacy procedural output and the
-normalized Worker rig into fixed 96x96 transparent RGBA buffers, then compares the buffers
-mechanically. The default command is the future gate and exits non-zero on mismatches:
+through a loopback static server, loads PixiJS, renders manifest-listed legacy procedural output and
+normalized rigs into fixed 96x96 transparent RGBA buffers, then compares the buffers mechanically.
+The manifest source is `tests/fixtures/svg/unit_migration_manifests.mjs`. The default command exits
+non-zero on composition mismatches:
 
 ```bash
 node tests/transparent_unit_pixels.mjs
 ```
 
-Named Worker part comparisons can be run independently. They render only the legacy procedural part
-and the mapped rig part or part group before applying stricter per-part thresholds:
+Named part comparisons can be run independently. They render only the manifest-listed legacy
+procedural part and mapped rig part or part group before applying stricter per-part thresholds:
 
 ```bash
 node tests/transparent_unit_pixels.mjs --parts-only
 ```
 
-The current Worker rig is intentionally still treated as unaccepted art until the Phase 5.3
-re-migration. To verify the harness while that known drift exists, use:
+To run the full migration gate for every live-routed SVG unit, include both part and composition
+comparisons:
 
 ```bash
-node tests/transparent_unit_pixels.mjs --expect-failures
-node tests/transparent_unit_pixels.mjs --parts-only --expect-failures
+node tests/svg_migration_guardrails.mjs
+node tests/transparent_unit_pixels.mjs --parts --no-artifacts
 ```
+
+`scripts/dump-legacy-unit-parts.mjs` dumps JSON draw-command metadata for one legacy sample and is
+intended as a drafting aid for future manifests/SVGs, for example
+`node scripts/dump-legacy-unit-parts.mjs --kind tank --sample tank/tank-low-oil`.
 
 Failures write `legacy.png`, `rig.png`, `diff.png`, and `report.json` under
 `tests/artifacts/transparent-unit-pixels/<sample-or-sample-part>/`. The artifact directory is

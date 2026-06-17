@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -47,12 +47,12 @@ legacy geometry/style clues.
 
 ## Implementation Checklist
 
-- [ ] Add per-unit migration manifest format and Worker manifest.
-- [ ] Require passing visual gates for live-routed rig kinds.
-- [ ] Add legacy part metadata dump/debug tool for future conversions.
-- [ ] Update Phase 6 and Phase 7 docs to require manifests and visual gates.
-- [ ] Preserve no-build-step client constraints.
-- [ ] Run verification and record exact results.
+- [x] Add per-unit migration manifest format and Worker manifest.
+- [x] Require passing visual gates for live-routed rig kinds.
+- [x] Add legacy part metadata dump/debug tool for future conversions.
+- [x] Update Phase 6 and Phase 7 docs to require manifests and visual gates.
+- [x] Preserve no-build-step client constraints.
+- [x] Run verification and record exact results.
 
 ## Verification
 
@@ -72,3 +72,35 @@ unit kinds.
 
 Report the manifest format, the guardrail command, and the legacy metadata dump command. State the
 exact command future Phase 6/7 executors should run before enabling a new rigged unit kind.
+
+## Implementation Notes
+
+- Added `tests/fixtures/svg/unit_migration_manifests.mjs` as the migration manifest source for
+  live-routed SVG units. Each manifest names the unit kind, SVG source path, required legacy-oracle
+  sample labels, live route part groups, composition thresholds, part mappings, per-part
+  thresholds, and approved intentional drift.
+- Added manifests for Worker and Tank. Both list no approved intentional drift.
+- Refactored `tests/transparent_unit_pixels.mjs` so Worker and Tank sample selection, SVG source
+  paths, part mappings, and thresholds come from the manifests instead of hardcoded local arrays.
+- Added `tests/svg_migration_guardrails.mjs` as the static guardrail. It fails if live-routed rig
+  kinds and migration manifests diverge, if manifest sample labels are missing from the legacy
+  oracle, if thresholds are malformed, or if live route part groups do not match the manifest.
+- Added `scripts/dump-legacy-unit-parts.mjs` as the legacy metadata dump tool. Example commands:
+  `node scripts/dump-legacy-unit-parts.mjs --kind worker --sample worker/worker-busy-build-state`
+  and `node scripts/dump-legacy-unit-parts.mjs --kind tank --sample tank/tank-low-oil`.
+- Future Phase 6/7 executors should run
+  `node tests/svg_migration_guardrails.mjs && node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
+  before enabling any additional live-routed unit kind.
+- Verification passed:
+  `node --check tests/fixtures/svg/unit_migration_manifests.mjs`,
+  `node --check tests/transparent_unit_pixels.mjs`,
+  `node --check tests/svg_migration_guardrails.mjs`,
+  `node --check scripts/dump-legacy-unit-parts.mjs`,
+  `node tests/svg_migration_guardrails.mjs`,
+  `node scripts/dump-legacy-unit-parts.mjs --kind worker --sample worker/worker-busy-build-state`,
+  `node scripts/dump-legacy-unit-parts.mjs --kind tank --sample tank/tank-low-oil`,
+  `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`,
+  `node tests/rig_runtime.mjs`,
+  `node tests/svg_rig_importer.mjs`,
+  `node scripts/check-client-architecture.mjs`,
+  and `git diff --check`.
