@@ -6,12 +6,14 @@
 
 ## Objective
 
-Migrate strict top-down infantry and crew-served weapon visuals to SVG-authored rigs.
+Migrate strict top-down infantry and crew-served weapon visuals to SVG-authored rigs after the
+Phase 5.x mechanical visual gates are in place.
 
 ## Work
 
 - Author and validate SVG rigs for Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, and Ekat if Ekat still uses the generic fallback art at implementation time.
+- Add or update migration manifests for every newly live-routed unit kind.
 - Migrate in family gates: Rifleman and Machine Gunner first to prove shared infantry bindings,
   then Anti-Tank Gun, Mortar Team, and Artillery. Keep all previously migrated unit equivalence
   tests passing before adding the next family.
@@ -28,8 +30,8 @@ Migrate strict top-down infantry and crew-served weapon visuals to SVG-authored 
   parts rather than duplicated geometry.
 - Extend equivalence coverage for all migrated unit kinds across static, recoil, setup, deploy,
   weapon-facing, and shot-reveal samples.
-- Require both semantic anchor/bounds comparison and bounded pixel or command comparison for each
-  migrated kind; keeping the old legacy oracle passing is not enough by itself.
+- Require named part-level plus full-composition pixel gates for each migrated kind before enabling
+  live routing; keeping the old legacy oracle passing is not enough by itself.
 
 ## Expected Touch Points
 
@@ -44,10 +46,11 @@ Migrate strict top-down infantry and crew-served weapon visuals to SVG-authored 
 ## Implementation Checklist
 
 - [ ] Add SVG rigs for infantry/support units.
+- [ ] Add migration manifests for newly live-routed infantry/support units.
 - [ ] Add weapon-facing and setup/deploy bindings.
 - [ ] Route migrated kinds through the rig renderer.
 - [ ] Move feedback anchor lookup to the rig API if needed.
-- [ ] Add equivalence samples for each migrated kind.
+- [ ] Add and pass part-level plus full-composition pixel gates for each migrated kind.
 - [ ] Keep legacy code only for comparison and unmigrated vehicles.
 - [ ] Run verification and record exact results.
 
