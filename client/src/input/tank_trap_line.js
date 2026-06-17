@@ -43,22 +43,48 @@ export function tankTrapLineTiles(start, end) {
 export function buildTankTrapLineSites({ start, end, isValid }) {
   const validFn = typeof isValid === "function" ? isValid : () => true;
   let previousValid = null;
+  let gap = null;
   return tankTrapLineTiles(start, end).map((tile) => {
-    const locallyValid = !!validFn(tile.tileX, tile.tileY);
-    const valid = locallyValid && (!previousValid || allowedTankTrapStep(previousValid, tile));
-    if (valid) previousValid = tile;
-    return { ...tile, valid };
+    const placement = normalizePlacementResult(validFn(tile.tileX, tile.tileY));
+    const skipped = !placement.valid && skippableTankTrapBlocker(placement.blockedBy);
+    let valid = false;
+    if (placement.valid) {
+      valid = !previousValid || gap === "skipped" || allowedTankTrapStep(previousValid, tile);
+      if (valid) {
+        previousValid = tile;
+        gap = null;
+      } else {
+        gap = "blocked";
+      }
+    } else if (skipped && gap !== "blocked") {
+      gap = "skipped";
+    } else {
+      gap = "blocked";
+    }
+    return { ...tile, valid, skipped, blockedBy: placement.blockedBy };
   });
 }
 
 export function validTankTrapLineSites(sites) {
   const validSites = [];
+  let gap = null;
   for (const site of Array.isArray(sites) ? sites : []) {
-    if (!site?.valid) continue;
+    if (!site?.valid) {
+      if (site?.skipped && gap !== "blocked") {
+        gap = "skipped";
+      } else {
+        gap = "blocked";
+      }
+      continue;
+    }
     const tile = { tileX: site.tileX, tileY: site.tileY };
     const previous = validSites[validSites.length - 1];
-    if (previous && !allowedTankTrapStep(previous, tile)) continue;
+    if (previous && gap !== "skipped" && !allowedTankTrapStep(previous, tile)) {
+      gap = "blocked";
+      continue;
+    }
     validSites.push(tile);
+    gap = null;
   }
   return validSites;
 }
@@ -85,6 +111,17 @@ function allowedTankTrapStep(a, b) {
   const dx = Math.abs(b.tileX - a.tileX);
   const dy = Math.abs(b.tileY - a.tileY);
   return (dx === 1 && dy === 1) || (dx === 2 && dy === 0) || (dx === 0 && dy === 2);
+}
+
+function normalizePlacementResult(result) {
+  if (typeof result === "object" && result !== null) {
+    return { valid: !!result.valid, blockedBy: result.blockedBy ?? null };
+  }
+  return { valid: !!result, blockedBy: result ? null : "blocked" };
+}
+
+function skippableTankTrapBlocker(blockedBy) {
+  return blockedBy === "terrain" || blockedBy === "structure";
 }
 
 function finiteTile(value) {
