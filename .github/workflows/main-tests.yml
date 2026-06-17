@@ -41,9 +41,23 @@ jobs:
             done < <(git diff --name-only --no-renames \
               "${{ github.event.pull_request.base.sha }}" \
               "${{ github.event.pull_request.head.sha }}")
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [ -n "$base" ] && [[ ! "$base" =~ ^0+$ ]] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+              while IFS= read -r path; do
+                [ -n "$path" ] && changed+=("$path")
+              done < <(git diff --name-only --no-renames "$base" "$head")
+            else
+              printf 'Push base commit unavailable; using full CI policy.\n'
+            fi
+          fi
 
-            printf 'Changed files:\n'
+          printf 'Changed files:\n'
+          if [ "${#changed[@]}" -gt 0 ]; then
             printf '  %s\n' "${changed[@]}"
+          else
+            printf '  <none or unavailable>\n'
           fi
 
           policy_output="$(node tests/select-suites.mjs --ci-policy "${changed[@]}")"
