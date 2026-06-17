@@ -157,6 +157,10 @@ Current scenario ids:
   manually building a vertical Tank Trap line before the test units try to cross.
 - `tank_trap_line_diagonal` — Training Centre, engineers, one rifleman, and one vehicle for
   manually building a diagonal Tank Trap line before the test units try to cross.
+- `tank_trap_pathing_matrix` — one dropdown-backed matrix scenario with selectable cases:
+  `friendly_vehicle_reroute`, `enemy_vehicle_breach`, `infantry_pass_through`, and
+  `explicit_infantry_attack`. The matrix uses prebuilt Tank Trap walls so owner-aware pathing,
+  infantry pass-through, and direct-attack behavior can be inspected without manual construction.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one
@@ -165,6 +169,11 @@ authoritative tick while paused. Normal seek/reset controls are replay-only.
 Scenario setup is server-side only under `server/crates/sim/src/game/setup/dev_scenarios.rs`; do
 not expose arbitrary spawning or map editing through client commands. Scenario artifact recording
 under `target/scenario-artifacts/` is not currently implemented.
+
+The Tank Trap pathing matrix scenarios are Phase 1 harnesses. Current passing tests cover scenario
+construction, friendly vehicle blockers, infantry move-order pass-through, and explicit Rifleman
+attack orders. Phase 2 is expected to make enemy vehicle breach behavior and infantry attack-move
+auto-acquisition filtering mechanically pass.
 
 ## Gotchas
 - A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner.

@@ -138,6 +138,7 @@ pub(super) struct DevScenarioConfig {
     pub(super) unit: EntityKind,
     pub(super) count: usize,
     pub(super) blocker: Option<EntityKind>,
+    pub(super) case: Option<&'static str>,
 }
 
 #[derive(Clone)]
@@ -151,6 +152,7 @@ pub(super) enum DevScenarioId {
     TankTrapLineHorizontal,
     TankTrapLineVertical,
     TankTrapLineDiagonal,
+    TankTrapPathingMatrix,
 }
 
 enum DevDriver {
@@ -1992,6 +1994,25 @@ impl RoomTask {
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
                     }
+                    DevScenarioId::TankTrapPathingMatrix => {
+                        let scenario_case = config
+                            .case
+                            .ok_or_else(|| "missing Tank Trap pathing case".to_string())?;
+                        let setup = Game::new_tank_trap_pathing_scenario(
+                            scenario_case,
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
                 }
             }
         }
@@ -3459,6 +3480,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
+                case: None,
             }),
             None,
             false,
@@ -4542,6 +4564,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
+                case: None,
             }),
             None,
             false,

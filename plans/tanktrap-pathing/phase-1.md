@@ -1,6 +1,6 @@
 # Phase 1 - Scenario Matrix and Regression Harness
 
-Status: planned.
+Status: done.
 
 ## Goal
 
@@ -30,13 +30,12 @@ Add or extend game-backed dev scenarios under:
 - `server/src/main.rs` dev scenario route/index code if new ids or query parameters are needed
 - `docs/context/testing.md` if scenario ids change
 
-Prefer explicit ids over one highly parameterized scenario when that makes manual inspection
-clearer. Suggested ids:
+Use one matrix scenario id with explicit case values so manual inspection stays grouped on the dev
+scenario page:
 
-- `tank_trap_friendly_vehicle_reroute`
-- `tank_trap_enemy_vehicle_breach`
-- `tank_trap_infantry_pass_through`
-- `tank_trap_explicit_infantry_attack`
+- id: `tank_trap_pathing_matrix`
+- cases: `friendly_vehicle_reroute`, `enemy_vehicle_breach`, `infantry_pass_through`,
+  `explicit_infantry_attack`
 
 The scenarios should be no-fog watcher rooms like the existing Tank Trap line scenarios. They
 should spawn complete Tank Traps directly so Phase 2 can inspect pathing and combat behavior
@@ -105,3 +104,45 @@ needing to build traps manually.
 Mark this phase done in the implementation commit. The handoff must list the final scenario ids,
 the exact focused test commands and results, any expected failures intentionally left for Phase 2,
 and the core manual scenario URLs the Phase 2 agent should open after implementing behavior.
+
+## Phase 1 Handoff
+
+Final dev scenario matrix:
+
+- id: `tank_trap_pathing_matrix`
+- cases: `friendly_vehicle_reroute`, `enemy_vehicle_breach`, `infantry_pass_through`,
+  `explicit_infantry_attack`
+
+Focused verification added for scenario construction, `/dev/scenarios` index coverage, own/allied
+vehicle blocker occupancy, current enemy-trap vehicle blocker representation, infantry move-order
+pass-through without auto-attacks, and explicit Rifleman attack orders against visible enemy Tank
+Traps.
+
+Verification results:
+
+- `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default -E 'package(rts-sim) & test(dev_scenario)'` could not run locally because `cargo-nextest` is not installed.
+- `cargo test --manifest-path server/Cargo.toml -p rts-sim dev_scenario` passed: 24 tests.
+- `cargo test --manifest-path server/Cargo.toml -p rts-sim tank_trap` passed: 23 tests.
+- `cargo test --manifest-path server/Cargo.toml -p rts-server scenario` passed: 5 tests across the server lib and binary test targets.
+- `node tests/client_contracts.mjs` passed.
+
+Intentionally left for Phase 2:
+
+- Enemy Tank Traps are still in the vehicle static blocker layer, so vehicle breach/progress tests
+  remain a Phase 2 behavior target.
+- Infantry attack-move still uses current combat acquisition semantics; Phase 2 should add the
+  auto-acquisition filter and then make attack-move coverage pass for Riflemen, Machine Gunners,
+  Workers, and the applicable moving-fire case.
+- The legacy Charge command is currently a no-op in this branch, so charged Rifleman direct-order
+  behavior could not be represented as a distinct passing Phase 1 regression.
+
+Core manual URLs:
+
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=scout_car&count=1&case=friendly_vehicle_reroute`
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=tank&count=1&case=friendly_vehicle_reroute`
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=scout_car&count=1&case=enemy_vehicle_breach`
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=tank&count=1&case=enemy_vehicle_breach`
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=rifleman&count=1&case=infantry_pass_through`
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=machine_gunner&count=1&case=infantry_pass_through`
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=worker&count=1&case=infantry_pass_through`
+- `/dev/scenarios?id=tank_trap_pathing_matrix&unit=rifleman&count=1&case=explicit_infantry_attack`
