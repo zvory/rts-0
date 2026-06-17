@@ -10,8 +10,9 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { liveRigDefinitionFor } from "./rigs/live_routing.js";
 import { createRigRenderContext } from "./rigs/animation.js";
-import { renderRigLegacyComparison } from "./rigs/runtime.js";
+import { renderLiveUnitRig, renderRigLegacyComparison } from "./rigs/runtime.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
@@ -352,6 +353,18 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     const definition = this._rigDefinitionsByKind?.get(e.kind);
     return renderRigLegacyComparison(this, e, colorByOwner, state, definition);
   }
+  if (!pools.skipLiveRig) {
+    const definition = liveRigDefinitionFor(this._liveRigDefinitionsByKind, e.kind);
+    if (definition) {
+      return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+        routes: [
+          { poolName: pools.liveRigShadow || "liveUnitRigShadows", layerName: pools.shadow || "unitShadows", parts: ["part.shadow"] },
+          { poolName: pools.liveRigUnit || "liveUnitRigs", layerName: pools.unit || "units", parts: ["part.body", "part.busyIndicator", "part.facingTick"] },
+        ],
+        alpha: pools.alpha,
+      });
+    }
+  }
 
   const shadowPool = pools.shadow || "unitShadows";
   const unitPool = pools.unit || "units";
@@ -513,6 +526,9 @@ export function _drawShotRevealUnit(e, colorByOwner, state) {
   this._drawUnit(e, colorByOwner, state, {
     shadow: "shotRevealShadows",
     unit: "shotReveals",
+    liveRigShadow: "liveShotRevealRigShadows",
+    liveRigUnit: "liveShotRevealRigs",
+    alpha,
   });
   const sh = this._pools.shotRevealShadows.get(e.id);
   const g = this._pools.shotReveals.get(e.id);

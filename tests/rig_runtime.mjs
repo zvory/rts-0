@@ -11,13 +11,16 @@ import {
   createLegacyUnitPartCapture,
 } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
+import { createLiveRigDefinitions } from "../client/src/renderer/rigs/live_routing.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import { createRigRenderContext, sampleRigAnimation } from "../client/src/renderer/rigs/animation.js";
 import {
   UnitRigInstance,
   createUnitRigInstance,
+  renderLiveUnitRig,
   renderRigLegacyComparison,
 } from "../client/src/renderer/rigs/runtime.js";
+import { WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "fixtures/svg");
@@ -172,6 +175,65 @@ test("side-by-side comparison path is explicit and leaves default unit draw on l
   assert.equal(renderer._rigComparisonPool.get(entity.id).container.x, entity.x + 48);
 });
 
+test("live rig definitions compile Worker from the production SVG source", () => {
+  const fixtureText = fs.readFileSync(path.join(fixturesDir, "rig-worker.svg"), "utf8").trim();
+  assert.equal(WORKER_RIG_SVG.trim(), fixtureText);
+  const definitions = createLiveRigDefinitions();
+  assert.equal(definitions.has(KIND.WORKER), true);
+  assert.equal(definitions.get(KIND.WORKER).id, "worker.authored");
+});
+
+test("default Worker draw uses live SVG rig without enabling comparison", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = { id: 4, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: Math.PI / 2, state: STATE.IDLE };
+  const renderer = makeComparisonRenderer(definition);
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
+
+  assert.equal(renderer.legacyDraws, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
+  assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
+  assert.equal(renderer.layers.unitShadows.children.length, 1);
+  assert.equal(renderer.layers.units.children.length, 1);
+  assert.equal(renderer._liveRigPools.liveUnitRigShadows.get(entity.id).parts.get("part.shadow").display.visible, true);
+  assert.equal(renderer._liveRigPools.liveUnitRigs.get(entity.id).parts.get("part.shadow").display.visible, false);
+});
+
+test("non-routed units fall back to legacy procedural drawing", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = { id: 5, kind: KIND.RIFLEMAN, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+  const renderer = makeComparisonRenderer(definition);
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
+
+  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
+
+  assert.equal(renderer.legacyDraws, 1);
+  assert.equal(renderer._liveRigPools.liveUnitRigs.size, 0);
+  assert.equal(renderer._pools.units.has(entity.id), true);
+});
+
+test("live rig instances are destroyed through renderer-style sweep", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = { id: 6, kind: KIND.WORKER, owner: 1, x: 10, y: 12, facing: 0, state: STATE.IDLE };
+  const renderer = makeComparisonRenderer(definition);
+  renderLiveUnitRig(renderer, entity, new Map([[1, 0x112233]]), {}, definition, {
+    routes: [
+      { poolName: "liveUnitRigShadows", layerName: "unitShadows", parts: ["part.shadow"] },
+      { poolName: "liveUnitRigs", layerName: "units", parts: ["part.body", "part.busyIndicator", "part.facingTick"] },
+    ],
+  });
+  const shadowInstance = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+  const unitInstance = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  for (const seen of Object.values(renderer._seen)) seen.clear();
+  renderer._unseen = new Map([[entity.id, 999]]);
+  _sweep.call(renderer);
+  assert.equal(shadowInstance._destroyed, true);
+  assert.equal(unitInstance._destroyed, true);
+  assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigs.size, 0);
+});
+
 test("comparison instances are destroyed through renderer-style teardown and sweep", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 3, kind: KIND.WORKER, owner: 1, x: 10, y: 12, facing: 0, state: STATE.IDLE };
@@ -199,13 +261,43 @@ function makeComparisonRenderer(definition) {
     _rigComparisonEnabled: false,
     _rigDefinitionsByKind: new Map([[KIND.WORKER, definition]]),
     _rigComparisonPool: new Map(),
+    _liveRigDefinitionsByKind: new Map(),
+    _liveRigPools: {
+      liveUnitRigShadows: new Map(),
+      liveUnitRigs: new Map(),
+      liveShotRevealRigShadows: new Map(),
+      liveShotRevealRigs: new Map(),
+    },
+    _liveRigRoutes: {
+      liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
+      liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
+      liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
+      liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
+    },
     _rigPixiFactory: createInspectionPixiFactory(),
-    _pools: { unitShadows: new Map(), units: new Map() },
-    _seen: { unitShadows: new Set(), units: new Set(), rigComparisons: new Set() },
-    layers: { unitShadows: new FakeContainer(), units: new FakeContainer(), rigComparisons: new FakeContainer() },
+    _pools: { unitShadows: new Map(), units: new Map(), shotRevealShadows: new Map(), shotReveals: new Map() },
+    _seen: {
+      unitShadows: new Set(),
+      units: new Set(),
+      shotRevealShadows: new Set(),
+      shotReveals: new Set(),
+      rigComparisons: new Set(),
+      liveUnitRigShadows: new Set(),
+      liveUnitRigs: new Set(),
+      liveShotRevealRigShadows: new Set(),
+      liveShotRevealRigs: new Set(),
+    },
+    layers: {
+      unitShadows: new FakeContainer(),
+      units: new FakeContainer(),
+      shotRevealShadows: new FakeContainer(),
+      shotReveals: new FakeContainer(),
+      rigComparisons: new FakeContainer(),
+    },
     legacyDraws: 0,
     _drawUnit(_entity, _colorByOwner, _state, pools = {}) {
-      if (!this._rigComparisonEnabled || pools.skipRigComparison) this.legacyDraws += 1;
+      const liveRouted = !pools.skipLiveRig && this._liveRigDefinitionsByKind?.has(_entity.kind);
+      if ((!this._rigComparisonEnabled || pools.skipRigComparison) && !liveRouted) this.legacyDraws += 1;
       return _drawUnit.call(this, _entity, _colorByOwner, _state, pools);
     },
     _slot(poolName, id) {

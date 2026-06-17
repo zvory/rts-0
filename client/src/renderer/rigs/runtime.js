@@ -29,6 +29,26 @@ export function renderRigLegacyComparison(renderer, entity, colorByOwner, state,
   return instance;
 }
 
+export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
+  if (!definition) return null;
+  const context = renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
+  if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
+  const rendered = [];
+  for (const route of options.routes || []) {
+    const pool = renderer._liveRigPools?.[route.poolName];
+    if (!pool) continue;
+    const instance = pool.get(entity.id)
+      ?? createUnitRigInstance(entity.kind, definition, renderer._rigPixiFactory ?? createDefaultPixiFactory());
+    pool.set(entity.id, instance);
+    renderer._seen[route.poolName]?.add(entity.id);
+    const layer = renderer.layers[route.layerName];
+    if (!instance.container.parent && layer) layer.addChild(instance.container);
+    instance.update(entity, context, { includeParts: route.parts });
+    rendered.push(instance);
+  }
+  return rendered;
+}
+
 export class UnitRigInstance {
   constructor(kind, definition, pixiFactory) {
     this.kind = kind;
