@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Done.
 
 ## Objective
 
@@ -45,12 +45,20 @@ mechanical mismatch at a time.
 
 ## Implementation Checklist
 
-- [ ] Add stable Worker legacy part names for shadow, body, facing tick, and busy indicator.
-- [ ] Add rig-side single-part or part-group render support for tests.
-- [ ] Add Worker part mapping from legacy part names to rig part ids.
-- [ ] Add part-level pixel comparison tests with stricter per-part thresholds.
-- [ ] Preserve normal live renderer behavior outside test capture.
-- [ ] Run verification and record exact results.
+- [x] Add stable Worker legacy part names for shadow, body, facing tick, and busy indicator.
+- [x] Add rig-side single-part or part-group render support for tests.
+- [x] Add Worker part mapping from legacy part names to rig part ids.
+- [x] Add part-level pixel comparison tests with stricter per-part thresholds.
+- [x] Preserve normal live renderer behavior outside test capture.
+- [x] Run verification and record exact results.
+
+## Verification Results
+
+- `node tests/rig_runtime.mjs` passed.
+- `node scripts/check-client-architecture.mjs` passed.
+- `node --check tests/transparent_unit_pixels.mjs && node --check client/src/renderer/units.js && node --check client/src/renderer/rigs/runtime.js` passed.
+- `node tests/transparent_unit_pixels.mjs --parts-only --expect-failures --no-artifacts` was attempted after linking the exact lockfile-hash `tests/node_modules` cache; this sandbox blocked the fixture server with `listen EPERM 127.0.0.1` before the harness could run.
+- `node tests/transparent_unit_pixels.mjs --expect-failures --no-artifacts` hit the same sandbox `listen EPERM 127.0.0.1` fixture-server blocker.
 
 ## Verification
 

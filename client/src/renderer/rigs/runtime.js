@@ -46,7 +46,7 @@ export class UnitRigInstance {
     }
   }
 
-  update(entity, renderContext = {}) {
+  update(entity, renderContext = {}, options = {}) {
     if (this._destroyed) return;
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? 1;
@@ -54,10 +54,11 @@ export class UnitRigInstance {
     setPoint(this.container.scale, 1, 1);
     this.container.rotation = 0;
 
+    const includeParts = normalizedPartSet(options.includeParts);
     const sampled = sampleRigAnimation(this.definition, entity, renderContext);
     for (const [partId, rec] of this.parts) {
       const partState = sampled.parts[partId];
-      if (!partState) {
+      if (!partState || (includeParts && !includeParts.has(partId))) {
         rec.display.visible = false;
         continue;
       }
@@ -142,4 +143,11 @@ function setPoint(point, x, y) {
     point.x = x;
     point.y = y;
   }
+}
+
+function normalizedPartSet(includeParts) {
+  if (includeParts == null) return null;
+  if (typeof includeParts === "string") return new Set([includeParts]);
+  if (Array.isArray(includeParts)) return new Set(includeParts);
+  return new Set([...includeParts]);
 }

@@ -191,15 +191,24 @@ mechanically. The default command is the future gate and exits non-zero on misma
 node tests/transparent_unit_pixels.mjs
 ```
 
+Named Worker part comparisons can be run independently. They render only the legacy procedural part
+and the mapped rig part or part group before applying stricter per-part thresholds:
+
+```bash
+node tests/transparent_unit_pixels.mjs --parts-only
+```
+
 The current Worker rig is intentionally still treated as unaccepted art until the Phase 5.3
 re-migration. To verify the harness while that known drift exists, use:
 
 ```bash
 node tests/transparent_unit_pixels.mjs --expect-failures
+node tests/transparent_unit_pixels.mjs --parts-only --expect-failures
 ```
 
 Failures write `legacy.png`, `rig.png`, `diff.png`, and `report.json` under
-`tests/artifacts/transparent-unit-pixels/<sample>/`. The artifact directory is ignored by git.
+`tests/artifacts/transparent-unit-pixels/<sample-or-sample-part>/`. The artifact directory is
+ignored by git.
 
 > CI note: `Main test gate` uses `run-all.sh` sub-suite modes in parallel jobs, then reports the
 > required aggregate check as `./tests/run-all.sh`. In a headless CI image without Chrome, the

@@ -18,6 +18,9 @@ const fixedNow = 10_000;
 const bufferSize = { width: 96, height: 96 };
 const expectFailures = process.argv.includes("--expect-failures");
 const noArtifacts = process.argv.includes("--no-artifacts");
+const partsOnly = process.argv.includes("--parts-only");
+const includePartComparisons = partsOnly || process.argv.includes("--parts");
+const includeCompositionComparisons = !partsOnly;
 
 const baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
 const samples = workerSamplesFromBaseline(baseline);
@@ -29,6 +32,29 @@ const thresholds = {
   perChannelTolerance: 6,
   opaqueAlphaThreshold: 128,
 };
+const workerPartMappings = Object.freeze([
+  {
+    legacyPart: "worker.shadow",
+    rigParts: ["part.shadow"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 12, maxOpaqueMismatchClusterPx: 6 }),
+  },
+  {
+    legacyPart: "worker.body",
+    rigParts: ["part.body"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 16, maxOpaqueMismatchClusterPx: 8 }),
+  },
+  {
+    legacyPart: "worker.facingTick",
+    rigParts: ["part.facingTick"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
+  },
+  {
+    legacyPart: "worker.busyIndicator",
+    rigParts: ["part.busyIndicator"],
+    busyOnly: true,
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
+  },
+]);
 const workerSvgText = fs.readFileSync(workerSvgPath, "utf8");
 
 const staticServer = await startStaticServer(repoRoot);
@@ -56,17 +82,21 @@ try {
     bufferSize,
     fixedNow,
     thresholds,
+    workerPartMappings: includePartComparisons ? workerPartMappings : [],
+    includeCompositionComparisons,
     workerSvgText,
   });
   if (consoleErrors.length > 0) {
     throw new Error(`browser errors during transparent pixel harness:\n${consoleErrors.join("\n")}`);
   }
 
-  const reports = [];
+  const compositionReports = [];
+  const partReports = [];
   const failures = [];
-  for (const renderedSample of rendered.samples) {
+  for (const renderedSample of rendered.compositionSamples) {
     const report = compareRgbaBuffers(renderedSample.legacy, renderedSample.rig, thresholds);
     const entry = {
+      comparison: "composition",
       label: renderedSample.label,
       kind: renderedSample.kind,
       teamColor: renderedSample.teamColor,
@@ -75,7 +105,28 @@ try {
       busy: renderedSample.busy,
       ...report,
     };
-    reports.push(entry);
+    compositionReports.push(entry);
+    if (!report.passed) {
+      failures.push({ renderedSample, entry });
+    }
+  }
+  for (const renderedSample of rendered.partSamples) {
+    const report = compareRgbaBuffers(renderedSample.legacy, renderedSample.rig, renderedSample.thresholds);
+    const entry = {
+      comparison: "part",
+      label: renderedSample.label,
+      kind: renderedSample.kind,
+      unit: "worker",
+      part: renderedSample.legacyPart,
+      rigParts: renderedSample.rigParts,
+      missingRigParts: renderedSample.missingRigParts,
+      teamColor: renderedSample.teamColor,
+      facing: renderedSample.facing,
+      state: renderedSample.state,
+      busy: renderedSample.busy,
+      ...report,
+    };
+    partReports.push(entry);
     if (!report.passed) {
       failures.push({ renderedSample, entry });
     }
@@ -87,23 +138,42 @@ try {
   }
 
   const summary = {
-    samples: rendered.samples.length,
-    passed: rendered.samples.length - failures.length,
+    compositionSamples: rendered.compositionSamples.length,
+    partSamples: rendered.partSamples.length,
+    comparisons: rendered.compositionSamples.length + rendered.partSamples.length,
+    passed: rendered.compositionSamples.length + rendered.partSamples.length - failures.length,
     failed: failures.length,
     thresholds,
+    partMappings: includePartComparisons ? workerPartMappings : [],
     artifactRoot: failures.length > 0 && !noArtifacts ? path.relative(repoRoot, artifactRoot) : null,
   };
-  console.log(JSON.stringify({ summary, reports }, null, 2));
+  console.log(JSON.stringify({ summary, compositionReports, partReports }, null, 2));
 
   if (expectFailures) {
     if (failures.length === 0) throw new Error("expected current Worker rig mismatches, but every sample passed");
   } else if (failures.length > 0) {
-    throw new Error(`${failures.length} transparent pixel comparison sample(s) failed`);
+    const failedNames = failures.slice(0, 8).map(({ entry }) => {
+      const suffix = entry.comparison === "part" ? ` part=${entry.part}` : " composition";
+      return `${entry.kind}/${entry.label}${suffix}`;
+    }).join(", ");
+    throw new Error(`${failures.length} transparent pixel comparison sample(s) failed: ${failedNames}`);
   }
 } finally {
   await browser.close();
   await staticServer.close();
   fs.rmSync(chromeProfileDir, { recursive: true, force: true });
+}
+
+function partThresholds(overrides = {}) {
+  return {
+    minAlphaWeightedMatchingRatio: 0.996,
+    maxPerPixelRgbaDistance: 64,
+    maxOpaqueMismatchCount: 8,
+    maxOpaqueMismatchClusterPx: 4,
+    perChannelTolerance: 4,
+    opaqueAlphaThreshold: 128,
+    ...overrides,
+  };
 }
 
 function workerSamplesFromBaseline(oracle) {
@@ -134,11 +204,11 @@ function workerSamplesFromBaseline(oracle) {
 }
 
 function writeFailureArtifacts({ renderedSample, entry }) {
-  const sampleDir = path.join(artifactRoot, safeName(entry.label));
+  const sampleDir = path.join(artifactRoot, safeName(`${entry.label}/${entry.part || "composition"}`));
   fs.mkdirSync(sampleDir, { recursive: true });
   fs.writeFileSync(path.join(sampleDir, "legacy.png"), decodePngDataUrl(renderedSample.legacyPng));
   fs.writeFileSync(path.join(sampleDir, "rig.png"), decodePngDataUrl(renderedSample.rigPng));
-  const diff = makeDiffRgba(renderedSample.legacy, renderedSample.rig, thresholds);
+  const diff = makeDiffRgba(renderedSample.legacy, renderedSample.rig, renderedSample.thresholds ?? thresholds);
   fs.writeFileSync(path.join(sampleDir, "diff.png"), decodePngDataUrl(renderedSample.diffPng));
   fs.writeFileSync(path.join(sampleDir, "report.json"), `${JSON.stringify({
     ...entry,
@@ -216,6 +286,8 @@ async function renderSamplesInBrowser({
   bufferSize: size,
   fixedNow: now,
   thresholds: compareThresholds,
+  workerPartMappings: browserPartMappings,
+  includeCompositionComparisons: browserIncludeCompositionComparisons,
   workerSvgText: svgText,
 }) {
   const [
@@ -252,11 +324,13 @@ async function renderSamplesInBrowser({
   document.body.appendChild(app.view);
 
   try {
-    const out = [];
+    const compositionSamples = [];
+    const partSamples = [];
     for (const sample of browserSamples) {
+      if (!browserIncludeCompositionComparisons) continue;
       const legacy = renderLegacySample(sample);
       const rig = renderRigSample(sample);
-      out.push({
+      compositionSamples.push({
         label: sample.label,
         kind: sample.kind,
         teamColor: sample.teamColor,
@@ -270,24 +344,49 @@ async function renderSamplesInBrowser({
         diffPng: pngDataUrl(diffBuffer(legacy, rig, compareThresholds.perChannelTolerance)),
       });
     }
-    return { samples: out };
+    for (const sample of browserSamples) {
+      for (const mapping of browserPartMappings) {
+        if (mapping.busyOnly && !sample.busy) continue;
+        const legacy = renderLegacySample(sample, { legacyParts: [mapping.legacyPart] });
+        const rig = renderRigSample(sample, { rigParts: mapping.rigParts });
+        partSamples.push({
+          label: sample.label,
+          kind: sample.kind,
+          legacyPart: mapping.legacyPart,
+          rigParts: mapping.rigParts,
+          missingRigParts: mapping.rigParts.filter((partId) => !definition.parts.some((part) => part.id === partId)),
+          thresholds: mapping.thresholds,
+          teamColor: sample.teamColor,
+          facing: sample.facing,
+          state: sample.state,
+          busy: sample.busy,
+          legacy,
+          rig,
+          legacyPng: pngDataUrl(legacy),
+          rigPng: pngDataUrl(rig),
+          diffPng: pngDataUrl(diffBuffer(legacy, rig, mapping.thresholds.perChannelTolerance)),
+        });
+      }
+    }
+    return { compositionSamples, partSamples };
   } finally {
     app.destroy(true, { children: true });
   }
 
-  function renderLegacySample(sample) {
+  function renderLegacySample(sample, { legacyParts = null } = {}) {
     app.stage.removeChildren();
     const renderer = makeUnitRenderer();
     for (const name of ["unitShadows", "units"]) app.stage.addChild(renderer.layers[name]);
     const entity = makeEntity(sample);
     const colorByOwner = new Map([[entity.owner, parseInt(sample.teamColor.slice(1), 16)]]);
     const state = makeState(sample);
-    renderer._drawUnit(entity, colorByOwner, state);
+    const partCapture = legacyParts == null ? null : units.createLegacyUnitPartCapture({ includeParts: legacyParts });
+    renderer._drawUnit(entity, colorByOwner, state, partCapture ? { partCapture } : {});
     app.renderer.render(app.stage);
     return readPixels();
   }
 
-  function renderRigSample(sample) {
+  function renderRigSample(sample, { rigParts = null } = {}) {
     app.stage.removeChildren();
     const entity = makeEntity(sample);
     const colorByOwner = new Map([[entity.owner, parseInt(sample.teamColor.slice(1), 16)]]);
@@ -299,7 +398,7 @@ async function renderSamplesInBrowser({
       colorByOwner,
       map: { tileSize: 32 },
     });
-    instance.update(entity, context);
+    instance.update(entity, context, rigParts == null ? {} : { includeParts: rigParts });
     app.stage.addChild(instance.container);
     app.renderer.render(app.stage);
     const pixels = readPixels();

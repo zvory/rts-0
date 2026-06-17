@@ -4,7 +4,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIND, STATE } from "../client/src/protocol.js";
-import { _drawUnit, _rigRenderContextFor } from "../client/src/renderer/units.js";
+import {
+  WORKER_LEGACY_PARTS,
+  _drawUnit,
+  _rigRenderContextFor,
+  createLegacyUnitPartCapture,
+} from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import { createRigRenderContext, sampleRigAnimation } from "../client/src/renderer/rigs/animation.js";
@@ -77,6 +82,57 @@ test("rig runtime creates one container child per part and updates transforms", 
   assert.equal(instance._destroyed, true);
   assert.equal(instance.parts.size, 0);
   assert.equal(instance.container.destroyed, true);
+});
+
+test("rig runtime can update one named part group for part-level fixtures", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
+  instance.update({
+    id: 11,
+    kind: KIND.WORKER,
+    owner: 1,
+    x: 10,
+    y: 20,
+    facing: Math.PI / 2,
+  }, createRigRenderContext({ id: 11, kind: KIND.WORKER, owner: 1, facing: Math.PI / 2 }, {
+    now: fixedNow,
+    colorByOwner: new Map([[1, 0x778899]]),
+  }), { includeParts: ["part.facingTick"] });
+
+  assert.equal(instance.parts.get("part.facingTick").display.visible, true);
+  assert.equal(instance.parts.get("part.body").display.visible, false);
+  assert.equal(instance.parts.get("part.shadow").display.visible, false);
+  assert.equal(instance.parts.get("part.facingTick").display.commands.some((cmd) => cmd.op === "lineTo"), true);
+  instance.destroy();
+});
+
+test("legacy Worker part capture records stable draw names and filters output", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const entity = {
+    id: 12,
+    kind: KIND.WORKER,
+    owner: 1,
+    x: 30,
+    y: 36,
+    facing: Math.PI / 4,
+    state: STATE.BUILD,
+    latchedNode: 9001,
+  };
+  const renderer = makeComparisonRenderer(definition);
+  const capture = createLegacyUnitPartCapture({ includeParts: [WORKER_LEGACY_PARTS.facingTick] });
+
+  _drawUnit.call(renderer, entity, new Map([[1, 0x334455]]), { weaponRecoil: () => 0 }, { partCapture: capture });
+
+  assert.deepEqual(capture.records.map((record) => record.name), [
+    WORKER_LEGACY_PARTS.shadow,
+    WORKER_LEGACY_PARTS.body,
+    WORKER_LEGACY_PARTS.busyIndicator,
+    WORKER_LEGACY_PARTS.facingTick,
+  ]);
+  const unitCommands = renderer._pools.units.get(entity.id).commands;
+  assert.equal(unitCommands.some((cmd) => cmd.op === "drawPolygon"), false);
+  assert.equal(unitCommands.some((cmd) => cmd.op === "lineTo"), true);
+  assert.equal(renderer._pools.unitShadows.has(entity.id), false);
 });
 
 test("side-by-side comparison path is explicit and leaves default unit draw on legacy", () => {

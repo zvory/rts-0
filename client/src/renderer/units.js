@@ -149,6 +149,38 @@ function drawWorkerBusyIndicator(g, r) {
   g.lineTo(r * 0.55, -r * 1.15);
 }
 
+export const WORKER_LEGACY_PARTS = Object.freeze({
+  shadow: "worker.shadow",
+  body: "worker.body",
+  facingTick: "worker.facingTick",
+  busyIndicator: "worker.busyIndicator",
+});
+
+export function createLegacyUnitPartCapture({ includeParts = null } = {}) {
+  const includeSet = includeParts == null ? null : new Set(Array.isArray(includeParts) ? includeParts : [includeParts]);
+  const records = [];
+  return {
+    records,
+    record(name, detail = {}) {
+      records.push({ name, ...detail });
+    },
+    shouldDraw(name) {
+      return includeSet == null || includeSet.has(name);
+    },
+  };
+}
+
+function legacyUnitPartName(kind, part) {
+  if (kind === KIND.WORKER && WORKER_LEGACY_PARTS[part]) return WORKER_LEGACY_PARTS[part];
+  return `${kind}.${part}`;
+}
+
+function drawCapturedPart(capture, name, detail, draw) {
+  capture?.record?.(name, detail);
+  if (capture?.shouldDraw && !capture.shouldDraw(name)) return;
+  draw();
+}
+
 function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   const deploy = clamp01(setup.prongFactor);
   const travelA = facing;
@@ -342,17 +374,21 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
         ? recoilVector(weaponFacing, recoil * 0.28)
       : ZERO_OFFSET;
   const vehicleBody = unitVehicleBody(e.kind, stat);
+  const partCapture = pools.partCapture ?? null;
+  const partDetail = { kind: e.kind, entityId: e.id };
 
   // Shadow on its own layer (under all units).
-  const sh = this._slot(shadowPool, e.id);
-  sh.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
-  if (e.kind === KIND.ARTILLERY) {
-    this._shadow(sh, 0, 0, Math.max(r, vehicleBody?.shadowRadius || r) * 0.82);
-  } else if (vehicleBody) {
-    this._vehicleShadow(sh, 0, 0, vehicleBody, facing);
-  } else {
-    this._shadow(sh, 0, 0, r);
-  }
+  drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "shadow"), partDetail, () => {
+    const sh = this._slot(shadowPool, e.id);
+    sh.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
+    if (e.kind === KIND.ARTILLERY) {
+      this._shadow(sh, 0, 0, Math.max(r, vehicleBody?.shadowRadius || r) * 0.82);
+    } else if (vehicleBody) {
+      this._vehicleShadow(sh, 0, 0, vehicleBody, facing);
+    } else {
+      this._shadow(sh, 0, 0, r);
+    }
+  });
 
   // Body on the unit layer.
   const g = this._slot(unitPool, e.id);
@@ -416,16 +452,22 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     drawTankFuelCue(g, body, facing, motion);
   } else {
     // Engineer (and any other unit kind): compact tool-carrying block.
-    g.beginFill(tint);
-    g.drawPolygon([
-      0, -r,
-      r * 0.85, -r * 0.25,
-      r * 0.55, r * 0.9,
-      -r * 0.55, r * 0.9,
-      -r * 0.85, -r * 0.25,
-    ]);
-    g.endFill();
-    if (workerIsBusy(e)) drawWorkerBusyIndicator(g, r);
+    drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "body"), partDetail, () => {
+      g.beginFill(tint);
+      g.drawPolygon([
+        0, -r,
+        r * 0.85, -r * 0.25,
+        r * 0.55, r * 0.9,
+        -r * 0.55, r * 0.9,
+        -r * 0.85, -r * 0.25,
+      ]);
+      g.endFill();
+    });
+    if (workerIsBusy(e)) {
+      drawCapturedPart(partCapture, WORKER_LEGACY_PARTS.busyIndicator, partDetail, () => {
+        drawWorkerBusyIndicator(g, r);
+      });
+    }
   }
 
   // Facing indicator: a short pale tick from center outward.
@@ -439,10 +481,12 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     e.kind !== KIND.COMMAND_CAR &&
     e.kind !== KIND.TANK
   ) {
-    const fp = polar(facing, r + 3);
-    g.lineStyle(2, 0xd8d0b0, 0.85);
-    g.moveTo(0, 0);
-    g.lineTo(fp.x, fp.y);
+    drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "facingTick"), partDetail, () => {
+      const fp = polar(facing, r + 3);
+      g.lineStyle(2, 0xd8d0b0, 0.85);
+      g.moveTo(0, 0);
+      g.lineTo(fp.x, fp.y);
+    });
   }
 }
 
