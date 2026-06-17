@@ -310,10 +310,52 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
             0x5150_030d,
         ),
         Game::new_factory_zero_gap_perpendicular_scenario(EntityKind::Tank, 1, 0x5150_030d),
+        Game::new_tank_trap_horizontal_line_build_scenario(
+            EntityKind::ScoutCar,
+            1,
+            0x5150_030d,
+        ),
     ];
 
     for setup in scenarios {
         assert_dev_scenario_starts_as_kriegsia(&setup.expect("scenario setup should succeed"));
+    }
+}
+
+#[test]
+fn tank_trap_line_build_scenarios_start_with_builders_tech_and_test_units() {
+    let scenarios = [
+        Game::new_tank_trap_horizontal_line_build_scenario(
+            EntityKind::ScoutCar,
+            1,
+            0x5150_0011,
+        ),
+        Game::new_tank_trap_vertical_line_build_scenario(EntityKind::Tank, 1, 0x5150_0012),
+        Game::new_tank_trap_diagonal_line_build_scenario(EntityKind::Tank, 1, 0x5150_0013),
+    ];
+
+    for setup in scenarios {
+        let setup = setup.expect("Tank Trap line scenario setup should succeed");
+        assert_eq!(setup.issue_after_ticks, config::TICK_HZ * 30);
+        assert_eq!(setup.units.len(), 2);
+        assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Worker), 3);
+        assert_eq!(
+            owned_kind_count(&setup.game, 1, EntityKind::TrainingCentre),
+            1
+        );
+        assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Rifleman), 1);
+        assert!(
+            owned_kind_count(&setup.game, 1, EntityKind::ScoutCar) == 1
+                || owned_kind_count(&setup.game, 1, EntityKind::Tank) == 1
+        );
+        let player = setup
+            .game
+            .players
+            .iter()
+            .find(|p| p.id == setup.player_id)
+            .expect("scenario player should exist");
+        assert_eq!((player.steel, player.oil), (1_000, 1_000));
+        assert_dev_scenario_starts_as_kriegsia(&setup);
     }
 }
 

@@ -466,7 +466,52 @@ const FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES: [DevScenarioLaunch; 3] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 6] = [
+const TANK_TRAP_LINE_HORIZONTAL_LAUNCHES: [DevScenarioLaunch; 2] = [
+    DevScenarioLaunch {
+        id: "tank_trap_line_horizontal",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_line_horizontal",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+    },
+];
+
+const TANK_TRAP_LINE_VERTICAL_LAUNCHES: [DevScenarioLaunch; 2] = [
+    DevScenarioLaunch {
+        id: "tank_trap_line_vertical",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_line_vertical",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+    },
+];
+
+const TANK_TRAP_LINE_DIAGONAL_LAUNCHES: [DevScenarioLaunch; 2] = [
+    DevScenarioLaunch {
+        id: "tank_trap_line_diagonal",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_line_diagonal",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+    },
+];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 9] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -503,6 +548,24 @@ const DEV_SCENARIOS: [DevScenarioSpec; 6] = [
         title: "Factory Zero-Gap Perpendicular",
         description: "One vehicle starts flush against the east side of a factory, waits half a second, then moves ten tiles directly east.",
         launches: &FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "tank_trap_line_horizontal",
+        title: "Tank Trap Horizontal Line",
+        description: "Training Centre, engineers, one rifleman, and one vehicle start ready for a horizontal Tank Trap line build; after 30 seconds the test units try to cross.",
+        launches: &TANK_TRAP_LINE_HORIZONTAL_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "tank_trap_line_vertical",
+        title: "Tank Trap Vertical Line",
+        description: "Training Centre, engineers, one rifleman, and one vehicle start ready for a vertical Tank Trap line build; after 30 seconds the test units try to cross.",
+        launches: &TANK_TRAP_LINE_VERTICAL_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "tank_trap_line_diagonal",
+        title: "Tank Trap Diagonal Line",
+        description: "Training Centre, engineers, one rifleman, and one vehicle start ready for a diagonal Tank Trap line build; after 30 seconds the test units try to cross.",
+        launches: &TANK_TRAP_LINE_DIAGONAL_LAUNCHES,
     },
 ];
 
@@ -694,6 +757,33 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("tank_trap_line_horizontal:unit=scout_car:count=1"),
+            Some(DevScenarioLaunch {
+                id: "tank_trap_line_horizontal",
+                unit: EntityKind::ScoutCar,
+                count: 1,
+                blocker: None,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room("tank_trap_line_vertical:unit=tank:count=1"),
+            Some(DevScenarioLaunch {
+                id: "tank_trap_line_vertical",
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room("tank_trap_line_diagonal:unit=tank:count=1"),
+            Some(DevScenarioLaunch {
+                id: "tank_trap_line_diagonal",
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_launch(
                 "vehicle_small_block_baseline",
                 "scout_car",
@@ -761,6 +851,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("factory_zero_gap_perpendicular", "tank", "3", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("tank_trap_line_horizontal", "worker", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("tank_trap_line_vertical", "tank", "2", None),
             None
         );
         assert_eq!(

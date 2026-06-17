@@ -151,6 +151,9 @@ pub(super) enum DevScenarioId {
     VehicleCornerWall,
     VehicleSmallBlockBaseline,
     FactoryZeroGapPerpendicular,
+    TankTrapLineHorizontal,
+    TankTrapLineVertical,
+    TankTrapLineDiagonal,
 }
 
 enum DevDriver {
@@ -1981,6 +1984,51 @@ impl RoomTask {
                     }
                     DevScenarioId::FactoryZeroGapPerpendicular => {
                         let setup = Game::new_factory_zero_gap_perpendicular_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::TankTrapLineHorizontal => {
+                        let setup = Game::new_tank_trap_horizontal_line_build_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::TankTrapLineVertical => {
+                        let setup = Game::new_tank_trap_vertical_line_build_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::TankTrapLineDiagonal => {
+                        let setup = Game::new_tank_trap_diagonal_line_build_scenario(
                             config.unit,
                             config.count,
                             match_seed(),

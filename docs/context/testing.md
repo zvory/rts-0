@@ -148,6 +148,12 @@ Current scenario ids:
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.
 - `factory_zero_gap_perpendicular` — one vehicle starting flush against a factory and moving east.
+- `tank_trap_line_horizontal` — Training Centre, engineers, one rifleman, and one vehicle for
+  manually building a horizontal Tank Trap line before the test units try to cross.
+- `tank_trap_line_vertical` — Training Centre, engineers, one rifleman, and one vehicle for
+  manually building a vertical Tank Trap line before the test units try to cross.
+- `tank_trap_line_diagonal` — Training Centre, engineers, one rifleman, and one vehicle for
+  manually building a diagonal Tank Trap line before the test units try to cross.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one

@@ -1,6 +1,6 @@
 # Phase 6 - Regression Coverage, Docs, and Cleanup
 
-Status: Pending.
+Status: Done.
 
 ## Goal
 
@@ -89,3 +89,25 @@ the infantry test unit crosses the same layout.
 
 The final handoff must list tests run, manual testing performed or skipped, patch-note bullets,
 remaining rough edges, and whether the worktree branch was merged to `main` and pushed.
+
+## Implementation Notes
+
+- Existing earlier-phase coverage already covered the highest-risk server and client behavior:
+  vehicle-only standability, movement-class occupancy fingerprints, path-cache separation,
+  under-construction blocking, elimination exclusion, zero-sight fog behavior, build-card
+  visibility, advisory preview, line dispatch, bridge-site spacing, and Tank Trap rendering.
+- Phase 6 added a focused server pathing regression for a two-tile Tank Trap gap remaining
+  pathable for both infantry and vehicles, plus constructible horizontal, vertical, and diagonal
+  Tank Trap dev scenario launches.
+- The new dev scenarios start with a completed Training Centre, three engineers, 1000 steel/1000
+  oil, one rifleman, and one vehicle-body unit. They issue the crossing move after 30 seconds so a
+  human can build the intended Tank Trap line through normal worker build commands first.
+
+## Patch Notes
+
+- Engineers can build 15-steel Tank Traps after a completed Training Centre.
+- Tank Traps block vehicle-body units but allow infantry to path through and stand on their tile.
+- Tank Trap line placement distributes construction across selected engineers, queues overflow
+  sites, and avoids diagonal vehicle gaps in dragged lines.
+- Horizontal, vertical, and diagonal Tank Trap dev scenarios are available at `/dev/scenarios` for
+  manual blocker checks.
