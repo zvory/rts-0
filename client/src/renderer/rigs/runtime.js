@@ -98,7 +98,7 @@ function redrawPart(g, geometry, paint, tint) {
 }
 
 function drawGeometry(g, geometry) {
-  if (geometry.type === "rect") g.drawRect(geometry.x, geometry.y, geometry.width, geometry.height);
+  if (geometry.type === "rect") drawRectAsPolygon(g, geometry);
   else if (geometry.type === "circle") g.drawCircle(geometry.cx, geometry.cy, geometry.r);
   else if (geometry.type === "ellipse") g.drawEllipse(geometry.cx, geometry.cy, geometry.rx, geometry.ry);
   else if (geometry.type === "line") {
@@ -111,6 +111,15 @@ function drawGeometry(g, geometry) {
   } else if (geometry.type === "path") {
     drawPath(g, geometry.commands);
   }
+}
+
+function drawRectAsPolygon(g, geometry) {
+  g.drawPolygon([
+    geometry.x, geometry.y,
+    geometry.x + geometry.width, geometry.y,
+    geometry.x + geometry.width, geometry.y + geometry.height,
+    geometry.x, geometry.y + geometry.height,
+  ]);
 }
 
 function drawPolyline(g, points) {
@@ -133,6 +142,7 @@ function drawPath(g, commands) {
 function tintForSlot(slot, context) {
   if (slot === "team") return hexToInt(context.teamColor);
   if (slot === "team-light") return lightenColor(hexToInt(context.teamColor), 0.12);
+  if (slot === "team-light-soft") return lightenColor(hexToInt(context.teamColor), 0.06);
   if (slot === "neutral") return 0x9aa0a8;
   return null;
 }

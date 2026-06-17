@@ -3,13 +3,15 @@ import { UNIT_KINDS } from "../../protocol.js";
 export const RIG_SCHEMA_VERSION = 1;
 
 export const REQUIRED_ANCHORS = Object.freeze(["origin", "selection", "hp"]);
-export const TINT_SLOTS = Object.freeze(["team", "team-light", "neutral", "fixed"]);
+export const TINT_SLOTS = Object.freeze(["team", "team-light", "team-light-soft", "neutral", "fixed"]);
 export const GEOMETRY_TYPES = Object.freeze(["rect", "circle", "ellipse", "line", "polygon", "polyline", "path"]);
 export const ANIMATION_INPUTS = Object.freeze([
   "now",
   "teamColor",
   "recoilProgress",
   "recoilPx",
+  "recoilKickX",
+  "recoilKickY",
   "setupVisual",
   "vehicleMotion",
   "selected",
@@ -23,6 +25,7 @@ export const ANIMATION_INPUTS = Object.freeze([
   "breakthroughTicks",
   "lowOil",
   "oilStarved",
+  "fuelCueVisible",
 ]);
 export const ANIMATION_PROPERTIES = Object.freeze([
   "transform.x",
