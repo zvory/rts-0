@@ -56,9 +56,10 @@ For slow Rust runs, start with the context and timing already printed by the run
 path prints the Cargo target dir, Rust version, cargo version, cargo-nextest version, nextest
 per-test status/slow-test output, and the final command-level timing summary. In CI, the Rust job
 also prints the Cargo cache exact-hit result from Actions, shell timing details for the Rust
-top-level suites, and a slowest-testcase summary from nextest's JUnit XML. Use that plus the target
-dir to decide whether time is going into rebuilds, then use nextest's slow-test output and the JUnit
-summary to narrow test runtime.
+top-level suites, and a slowest-testcase summary from nextest's JUnit XML. It also uploads
+`server/target/nextest/default/junit.xml` as the `nextest-junit` artifact with 7-day retention when
+the Rust lane runs. Use that plus the target dir to decide whether time is going into rebuilds, then
+use nextest's slow-test output and the JUnit summary to narrow test runtime.
 
 The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
 is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the

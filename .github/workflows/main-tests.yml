@@ -172,6 +172,15 @@ jobs:
           RTS_SUITE_TIMING_DETAILS: "1"
         run: ./tests/run-all.sh --only-rust
 
+      - name: Upload nextest JUnit report
+        if: always() && needs.changed-files.outputs.run_rust == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextest-junit
+          path: server/target/nextest/default/junit.xml
+          if-no-files-found: warn
+          retention-days: 7
+
   live-node:
     name: CI / live Node suites
     runs-on: ubuntu-latest
