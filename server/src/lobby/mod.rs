@@ -33,7 +33,7 @@ use crate::config;
 use crate::db::Db;
 use crate::protocol::{
     BranchStagingOccupant, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata,
-    ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload, TeamId,
+    ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, TeamId,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
@@ -44,6 +44,7 @@ mod connection;
 mod crash_replay;
 mod dev_replay;
 mod faction_validation;
+mod launch;
 mod live_tick;
 mod participants;
 mod projection;
