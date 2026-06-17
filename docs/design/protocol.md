@@ -96,7 +96,8 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Upgrade ids: `methamphetamines` at the Training Centre; `anti_tank_gun_unlock`, `artillery_unlock`, `tank_unlock`, `command_car_unlock`, and `mortar_autocast` at the R&D Complex (`research_complex`). `artillery_unlock` requires completed `anti_tank_gun_unlock`; `command_car_unlock` requires completed `tank_unlock`. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
-| `stop`       | `units: u32[]` | Clear orders, hold position. |
+| `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
+| `holdPosition` | `units: u32[]` | Clear active and queued unit orders, then stand ground. Held units do not chase or path to auto-acquire enemies; they still fire at enemies already in weapon range and can still be pushed by collision resolution. |
 | `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre, research_complex), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
@@ -104,7 +105,7 @@ illegal placements, or unaffordable actions (fail silently or emit a `notice` ev
 For appendable unit commands, omitted `queued` is equivalent to `false`. Unit order queues are
 capped at 8 intents per unit. Queued intents are lightweight future intent only; active `Order`
 remains the per-tick execution state. Non-queued unit orders replace the active order and clear
-future unit intents; `stop` clears both active and queued unit orders.
+future unit intents; `stop` and `holdPosition` clear both active and queued unit orders.
 Production building rally plans are capped at four total stages. A non-queued rally replaces the
 whole plan; a queued rally appends if space remains and establishes the first stage when the plan is
 empty.

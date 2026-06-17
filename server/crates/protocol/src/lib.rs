@@ -337,6 +337,9 @@ pub enum Command {
     Stop {
         units: Vec<u32>,
     },
+    HoldPosition {
+        units: Vec<u32>,
+    },
     /// Set or append a unit-producing building rally stage. `kind` defaults to a plain move stage.
     SetRally {
         building: u32,
@@ -877,6 +880,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ("RESEARCH", "research"),
             ("CANCEL", "cancel"),
             ("STOP", "stop"),
+            ("HOLD_POSITION", "holdPosition"),
             ("SET_RALLY", "setRally"),
         ]),
         vocabularies: ProtocolVocabularies {

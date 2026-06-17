@@ -278,8 +278,8 @@ normalizeHotkey(value)
 
 Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
 `description`, `createdWithBuild`, `basePreset`, `bindings`, and `factionBindings`. Direct-mode
-`bindings` hold global commands such as `unit.move`, `unit.attack`, `unit.stop`,
-`worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Faction catalog
+`bindings` hold global commands such as `unit.move`, `unit.attack`, `unit.holdPosition`,
+`unit.stop`, `worker.buildMenu`, `worker.return`, support-weapon setup, and production cancel. Faction catalog
 actions are stored under `factionBindings[factionId]` with namespaced command ids shaped as
 `kriegsia.build.<kind>`, `kriegsia.train.<kind>`, `kriegsia.research.<upgrade>`, and
 `kriegsia.ability.<ability>`. Ekat uses the same `ekat.*` namespace for its exposed ability

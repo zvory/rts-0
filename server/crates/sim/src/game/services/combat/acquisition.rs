@@ -28,6 +28,7 @@ pub(super) enum CombatMode {
 pub(super) fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
+        Order::HoldPosition => CombatMode::Opportunistic,
         Order::AttackMove(_) => CombatMode::Aggressive,
         Order::Move(_) if can_fire_while_moving(e) => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,

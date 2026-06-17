@@ -74,14 +74,16 @@ const ALLOWED_PROTOTYPE_GRAFTS = new Set([
 const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Tank Trap Phase 5 extends placement feedback to draw multi-site line previews.
   "renderer/feedback.js": 46315,
-  "hud.js": 43923,
+  // Hold Position adds a distinct command-card intent dispatch while preserving legacy Stop.
+  "hud.js": 44080,
   "state.js": 38576,
   // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
   "input/index.js": 38854,
   "match.js": 38289,
-  // Tank Trap Phase 1 adds mirrored KIND, BUILDING_KINDS, and compact kind-code entries.
-  "protocol.js": 35989,
-  "hud_command_card.js": 29374,
+  // Hold Position adds the mirrored holdPosition command discriminator/builder.
+  "protocol.js": 36084,
+  // Hold Position moves the unit hold button to the W grid slot with a distinct command id.
+  "hud_command_card.js": 29393,
   "renderer/shared.js": 28113,
   "observer_analysis_overlay.js": 27903,
   "audio.js": 27339,

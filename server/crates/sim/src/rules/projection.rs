@@ -460,7 +460,7 @@ fn active_order_plan_marker(
             order.intent.x,
             order.intent.y,
         ),
-        Order::Idle => None,
+        Order::Idle | Order::HoldPosition => None,
     }
 }
 
