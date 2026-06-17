@@ -7,9 +7,10 @@ use super::faction_validation::{
 use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::participants::{CommandIssuer, Participants};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
-use super::session_policy::{ClockPolicy, SessionPhase, SessionPolicy};
+use super::session_policy::{SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
+use super::tick_control::{DevWatchSpeed, ReplayPlaybackClock, ScheduledTickAction, TickControl};
 use super::*;
 #[cfg(test)]
 use crate::protocol::SnapshotNetStatus;
@@ -340,22 +341,28 @@ impl RoomTask {
     pub(super) fn current_tick_interval(&self) -> Duration {
         let base =
             test_tick_interval_override().unwrap_or_else(|| Duration::from_millis(config::TICK_MS));
-        base.div_f32(self.current_speed_multiplier())
+        self.tick_control().tick_interval(base)
     }
 
     fn current_speed_multiplier(&self) -> f32 {
-        if self.dev_watch_paused {
-            return 1.0;
-        }
-        match self.session_policy().clock {
-            ClockPolicy::ReplayPlayback => match &self.phase {
-                Phase::ReplayViewer(session) if session.is_paused() => 1.0,
-                Phase::ReplayViewer(session) => session.speed(),
-                _ => self.replay_speed,
-            },
-            ClockPolicy::BranchStaging => 1.0,
-            _ => self.replay_speed,
-        }
+        self.tick_control().speed_multiplier()
+    }
+
+    fn tick_control(&self) -> TickControl {
+        let replay = match &self.phase {
+            Phase::ReplayViewer(session) => Some(ReplayPlaybackClock {
+                speed: session.speed(),
+                paused: session.is_paused(),
+            }),
+            _ => None,
+        };
+        TickControl::new(
+            self.session_policy().clock,
+            replay,
+            self.dev_watch_paused,
+            self.replay_speed,
+            self.match_countdown_deadline.is_some(),
+        )
     }
 
     fn session_phase(&self) -> SessionPhase {
@@ -2142,22 +2149,21 @@ impl RoomTask {
     /// One simulation step. No-op in the `Lobby` phase (the ticker keeps running so a room is
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
-        if self.is_dev_watch() {
-            if self.dev_watch_paused {
+        match self.tick_control().scheduled_action() {
+            ScheduledTickAction::Noop => return,
+            ScheduledTickAction::Countdown => {
+                self.finish_match_countdown_if_due();
                 return;
             }
-            self.on_tick_dev_watch(scheduled);
-            return;
-        }
-        if matches!(self.phase, Phase::ReplayViewer(_)) {
-            if matches!(&self.phase, Phase::ReplayViewer(session) if session.is_paused()) {
+            ScheduledTickAction::ReplayPlayback => {
+                self.on_tick_replay_viewer(scheduled);
                 return;
             }
-            self.on_tick_replay_viewer(scheduled);
-            return;
-        }
-        if self.finish_match_countdown_if_due() {
-            return;
+            ScheduledTickAction::DevWatch => {
+                self.on_tick_dev_watch(scheduled);
+                return;
+            }
+            ScheduledTickAction::LiveMatch => {}
         }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
@@ -2350,22 +2356,22 @@ impl RoomTask {
         if !self.session_policy().is_dev_watch() {
             return;
         }
-        if speed == 0.0 {
-            self.dev_watch_paused = true;
-            self.broadcast_dev_watch_state();
-            return;
+        match TickControl::dev_watch_speed(speed) {
+            DevWatchSpeed::Paused => {
+                self.dev_watch_paused = true;
+            }
+            DevWatchSpeed::Running(speed) => {
+                self.dev_watch_paused = false;
+                self.replay_speed = speed;
+            }
         }
-        self.dev_watch_paused = false;
-        // Clamp to sensible range matching the UI buttons (0.125× – 8×).
-        let clamped = speed.clamp(0.125, 8.0);
-        self.replay_speed = clamped;
         self.broadcast_dev_watch_state();
     }
 
     fn on_step_dev_tick(&mut self, player_id: u32) {
-        if !self.players.contains_key(&player_id)
-            || !self.dev_watch_paused
-            || !self.session_policy().is_dev_watch()
+        if !self
+            .tick_control()
+            .can_step_dev_tick(self.players.contains_key(&player_id))
         {
             return;
         }
@@ -3393,6 +3399,67 @@ mod tests {
         task.on_set_replay_speed(99, 1.0);
         task.on_tick(TokioInstant::now());
         assert_eq!(in_game_tick(&task), 1);
+    }
+
+    #[test]
+    fn room_task_tick_control_preserves_current_intervals_by_mode() {
+        let base = Duration::from_millis(config::TICK_MS);
+
+        let normal = RoomTask::new(
+            "tick-normal".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        assert_eq!(normal.current_tick_interval(), base);
+
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 3);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        replay.set_speed(99, 2.0);
+        let mut replay_task = RoomTask::new(
+            "tick-replay".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut replay_task, 99, true);
+        replay_task.phase = Phase::ReplayViewer(Box::new(replay));
+        assert_eq!(replay_task.current_tick_interval(), base.div_f32(2.0));
+
+        replay_task.on_set_replay_speed(99, 0.0);
+        assert_eq!(replay_task.current_tick_interval(), base);
+
+        let mut dev = RoomTask::new(
+            "tick-dev".to_string(),
+            RoomMode::DevScenario(DevScenarioConfig {
+                id: DevScenarioId::VehicleCornerWall,
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        dev.on_set_replay_speed(99, 2.0);
+        assert_eq!(dev.current_tick_interval(), base.div_f32(2.0));
+        dev.on_set_replay_speed(99, 0.0);
+        assert_eq!(dev.current_tick_interval(), base);
+
+        let seed = replay_branch_test_seed(&players, 1);
+        let mut branch = RoomTask::new(
+            "tick-branch".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        branch.replay_speed = 4.0;
+        branch.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+        assert_eq!(branch.current_tick_interval(), base);
     }
 
     #[test]
