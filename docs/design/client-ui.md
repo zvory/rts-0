@@ -115,15 +115,25 @@ disabled and clear this overlay instead of allocating gameplay prediction state.
 ```js
 export const RIG_SCHEMA_VERSION = 1
 export const REQUIRED_ANCHORS = ["origin", "selection", "hp"]
-export const TINT_SLOTS = ["team", "team-light", "neutral", "fixed"]
+export const TINT_SLOTS = [
+  "team", "team-light", "team-light-soft", "team-light-strong", "team-light-08",
+  "team-light-10", "team-light-14", "team-light-24", "team-stroke",
+  "team-fill-stroke", "neutral", "fixed",
+]
 export const GEOMETRY_TYPES = ["rect", "circle", "ellipse", "line", "polygon", "polyline", "path"]
 export const ANIMATION_INPUTS = [
-  "now", "teamColor", "recoilProgress", "recoilPx", "setupVisual", "vehicleMotion",
-  "selected", "damaged", "shotRevealAlpha", "visibility", "mapTileSize", "facing",
-  "weaponFacing", "busy", "breakthroughTicks", "lowOil", "oilStarved",
+  "now", "teamColor", "recoilProgress", "recoilPx", "recoilKickX", "recoilKickY",
+  "setupVisual", "vehicleMotion", "selected", "damaged", "shotRevealAlpha",
+  "visibility", "mapTileSize", "facing", "weaponFacing", "weaponFacingCos",
+  "weaponFacingSin", "weaponVisualFacing", "carriageVisualFacing",
+  "weaponVisualDoubleCos", "weaponVisualDoubleSin", "weaponRecoilX", "weaponRecoilY",
+  "scoutGunnerX", "scoutGunnerY", "scoutMountX", "scoutMountY", "setupVisible",
+  "setupMostlyDeployed", "setupBarrelVisible", "busy", "breakthroughTicks",
+  "lowOil", "oilStarved", "fuelCueVisible",
 ]
 export const ANIMATION_PROPERTIES = [
   "transform.x", "transform.y", "transform.rotation", "transform.scaleX", "transform.scaleY",
+  "transform.localX", "transform.localY", "geometry.scaleX", "geometry.scaleY",
   "alpha", "visible", "tintSlot",
 ]
 export function validateRigDefinition(definition, options?)
@@ -165,8 +175,8 @@ Rig animation sampling is pure data math: it derives a narrow render context fro
 entity state and renderer-local visual state, then applies normalized animation bindings to part
 transforms, alpha, visibility, and tint slots without creating Pixi objects. The sampler accepts
 only the schema-approved runtime inputs such as `facing`, `weaponFacing`, `recoilProgress`,
-`setupVisual`, `vehicleMotion`, selected/damaged flags, shot-reveal alpha, map tile size, worker
-busy state, breakthrough ticks, and oil cue flags.
+`setupVisual`, `vehicleMotion`, Scout Car gunner/mount offsets, selected/damaged flags,
+shot-reveal alpha, map tile size, worker busy state, breakthrough ticks, and oil cue flags.
 
 `renderer/rigs/runtime.js`
 ```js
@@ -182,7 +192,8 @@ export class UnitRigInstance {
 `UnitRigInstance` owns one Pixi container and one graphics child per normalized rig part, redraws
 primitive geometry with sampled transforms and tint slots, and tears down all owned children through
 `destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind` and currently enables
-Worker and Tank; missing or invalid definitions fall back to legacy procedural drawing. Temporary
+Worker, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank,
+Command Car, and Ekat; missing or invalid definitions fall back to legacy procedural drawing. Temporary
 SVG migration guardrails live in `tests/fixtures/svg/unit_migration_manifests.mjs` and
 `tests/svg_migration_guardrails.mjs`; a live-routed kind must have a manifest and passing
 part-level plus full-composition pixel gates before it is added. Shadow and body parts route

@@ -6,6 +6,11 @@ import {
   ARTILLERY_PARTS,
   MORTAR_TEAM_PARTS,
 } from "../../../client/src/renderer/rigs/support_svg.js";
+import {
+  COMMAND_CAR_PARTS,
+  EKAT_PARTS,
+  SCOUT_CAR_PARTS,
+} from "../../../client/src/renderer/rigs/vehicle_svg.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,6 +21,20 @@ const compositionThresholds = Object.freeze({
   maxOpaqueMismatchClusterPx: 12,
   perChannelTolerance: 6,
   opaqueAlphaThreshold: 128,
+});
+
+const scoutCarCompositionThresholds = Object.freeze({
+  ...compositionThresholds,
+  minAlphaWeightedMatchingRatio: 0.98,
+  maxOpaqueMismatchCount: 128,
+  maxOpaqueMismatchClusterPx: 40,
+});
+
+const commandCarCompositionThresholds = Object.freeze({
+  ...compositionThresholds,
+  minAlphaWeightedMatchingRatio: 0.97,
+  maxOpaqueMismatchCount: 96,
+  maxOpaqueMismatchClusterPx: 36,
 });
 
 function partThresholds(overrides = {}) {
@@ -57,6 +76,131 @@ const machineGunnerWeaponRigParts = Object.freeze([
 ]);
 
 export const SVG_MIGRATION_MANIFESTS = Object.freeze([
+  Object.freeze({
+    kind: KIND.COMMAND_CAR,
+    svgPath: path.join(__dirname, "rig-command-car.svg"),
+    approvedIntentionalDrift: Object.freeze([]),
+    liveRoutes: COMMAND_CAR_PARTS,
+    compositionThresholds: commandCarCompositionThresholds,
+    requiredSamples: Object.freeze([
+      "command_car/facing-0-#0072b2",
+      "command_car/facing-0-#e69f00",
+      "command_car/facing-1_571-#0072b2",
+      "command_car/facing-1_571-#e69f00",
+      "command_car/facing-3_142-#0072b2",
+      "command_car/facing-3_142-#e69f00",
+      "command_car/facing-4_712-#0072b2",
+      "command_car/facing-4_712-#e69f00",
+      "command_car/command-breakthrough-on",
+      "command_car/command-breakthrough-off",
+    ]),
+    partMappings: Object.freeze([
+      Object.freeze({
+        legacyPart: "command_car.shadow",
+        rigParts: COMMAND_CAR_PARTS.shadow,
+        thresholds: partThresholds({ maxOpaqueMismatchCount: 64, maxOpaqueMismatchClusterPx: 16 }),
+      }),
+      Object.freeze({
+        legacyPart: "command_car.body",
+        rigParts: Object.freeze([
+          "part.hull",
+          "part.sideGear.top.fill",
+          "part.sideGear.bottom.fill",
+          "part.cabin",
+          "part.darkNose",
+          "part.darkSlot.top",
+          "part.darkSlot.bottom",
+          "part.windshield",
+          "part.noseTick",
+        ]),
+        thresholds: partThresholds({
+          minAlphaWeightedMatchingRatio: 0.97,
+          maxOpaqueMismatchCount: 64,
+          maxOpaqueMismatchClusterPx: 36,
+        }),
+      }),
+      Object.freeze({
+        legacyPart: "command_car.badges",
+        rigParts: Object.freeze(["part.badge.top", "part.badge.bottom"]),
+        thresholds: partThresholds({ maxOpaqueMismatchCount: 40, maxOpaqueMismatchClusterPx: 12 }),
+      }),
+      Object.freeze({
+        legacyPart: "command_car.breakthroughAura",
+        rigParts: Object.freeze(["part.breakthroughAura"]),
+        thresholds: partThresholds({ maxOpaqueMismatchCount: 80, maxOpaqueMismatchClusterPx: 20 }),
+      }),
+    ]),
+  }),
+  Object.freeze({
+    kind: KIND.EKAT,
+    svgPath: path.join(__dirname, "rig-ekat.svg"),
+    approvedIntentionalDrift: Object.freeze([]),
+    liveRoutes: EKAT_PARTS,
+    compositionThresholds,
+    requiredSamples: Object.freeze([
+      "ekat/facing-0-#0072b2",
+      "ekat/facing-0-#e69f00",
+      "ekat/facing-1_571-#0072b2",
+      "ekat/facing-1_571-#e69f00",
+      "ekat/facing-3_142-#0072b2",
+      "ekat/facing-3_142-#e69f00",
+      "ekat/facing-4_712-#0072b2",
+      "ekat/facing-4_712-#e69f00",
+    ]),
+    partMappings: Object.freeze([
+      Object.freeze({
+        legacyPart: "ekat.shadow",
+        rigParts: EKAT_PARTS.shadow,
+        thresholds: partThresholds({ maxOpaqueMismatchCount: 12, maxOpaqueMismatchClusterPx: 6 }),
+      }),
+      Object.freeze({
+        legacyPart: "ekat.body",
+        rigParts: Object.freeze(["part.body"]),
+        thresholds: partThresholds({ maxOpaqueMismatchCount: 16, maxOpaqueMismatchClusterPx: 8 }),
+      }),
+      Object.freeze({
+        legacyPart: "ekat.facingTick",
+        rigParts: Object.freeze(["part.facingTick"]),
+        thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
+      }),
+    ]),
+  }),
+  Object.freeze({
+    kind: KIND.SCOUT_CAR,
+    svgPath: path.join(__dirname, "rig-scout-car.svg"),
+    approvedIntentionalDrift: Object.freeze([]),
+    liveRoutes: SCOUT_CAR_PARTS,
+    compositionThresholds: scoutCarCompositionThresholds,
+    requiredSamples: Object.freeze([
+      "scout_car/facing-0-#0072b2",
+      "scout_car/facing-0-#e69f00",
+      "scout_car/facing-1_571-#0072b2",
+      "scout_car/facing-1_571-#e69f00",
+      "scout_car/facing-3_142-#0072b2",
+      "scout_car/facing-3_142-#e69f00",
+      "scout_car/facing-4_712-#0072b2",
+      "scout_car/facing-4_712-#e69f00",
+      "scout_car/weapon-offset-0_785",
+      "scout_car/weapon-offset-neg_1_571",
+      "scout_car/recoil-0_35",
+    ]),
+    partMappings: Object.freeze([
+      Object.freeze({
+        legacyPart: "scout_car.shadow",
+        rigParts: SCOUT_CAR_PARTS.shadow,
+        thresholds: partThresholds({ maxOpaqueMismatchCount: 64, maxOpaqueMismatchClusterPx: 16 }),
+      }),
+      Object.freeze({
+        legacyPart: "scout_car.body",
+        rigParts: SCOUT_CAR_PARTS.unit,
+        thresholds: partThresholds({
+          minAlphaWeightedMatchingRatio: 0.98,
+          maxOpaqueMismatchCount: 128,
+          maxOpaqueMismatchClusterPx: 40,
+        }),
+      }),
+    ]),
+  }),
   Object.freeze({
     kind: KIND.MACHINE_GUNNER,
     svgPath: path.join(__dirname, "rig-machine-gunner.svg"),

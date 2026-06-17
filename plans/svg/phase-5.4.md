@@ -91,6 +91,10 @@ exact command future Phase 6/7 executors should run before enabling a new rigged
 - Future Phase 6/7 executors should run
   `node tests/svg_migration_guardrails.mjs && node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
   before enabling any additional live-routed unit kind.
+- The transparent pixel harness now reads composition thresholds per manifest. Exact migrations keep
+  the original strict thresholds, while Scout Car and Command Car document bounded residual
+  antialias/overlap tolerances in their manifests; `tests/svg_migration_guardrails.mjs` enforces
+  those tolerances stay explicit and within project caps.
 - Verification passed:
   `node --check tests/fixtures/svg/unit_migration_manifests.mjs`,
   `node --check tests/transparent_unit_pixels.mjs`,
@@ -104,3 +108,10 @@ exact command future Phase 6/7 executors should run before enabling a new rigged
   `node tests/svg_rig_importer.mjs`,
   `node scripts/check-client-architecture.mjs`,
   and `git diff --check`.
+
+## Follow-up Update
+
+- Added manifests for Scout Car, Command Car, and Ekat.
+- Current combined gate:
+  `node tests/transparent_unit_pixels.mjs --parts --no-artifacts` passed 481/481 comparisons with
+  no failures.
