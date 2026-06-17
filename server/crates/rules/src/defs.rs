@@ -465,7 +465,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             range_tiles: 0,
             cooldown: 0,
         },
-        armor_class: ArmorClass::Small,
+        armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: &[],
         build_requires: TRAINING_CENTRE_REQUIRED,
@@ -645,7 +645,7 @@ mod tests {
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
         assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);
         assert_eq!(def.stats.provides_supply, 0);
-        assert_eq!(def.armor_class, ArmorClass::Small);
+        assert_eq!(def.armor_class, ArmorClass::Armored);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());
         assert_eq!(def.build_requires, TRAINING_CENTRE_REQUIRED);

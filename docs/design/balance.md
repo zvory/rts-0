@@ -350,7 +350,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 6     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
-| tank_trap                  | Tank Trap          | 200 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; unarmored, no trains, no supply, no weapon, no sight/fog reveal, not an elimination building; requires a completed Training Centre |
+| tank_trap                  | Tank Trap          | 200 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; armored, no trains, no supply, no weapon, no sight/fog reveal, not an elimination building; requires a completed Training Centre |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends
