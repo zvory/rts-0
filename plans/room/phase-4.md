@@ -12,14 +12,14 @@ the only event/tick owner.
 ## Work
 
 - Add a lobby-local tick-control helper, for example `server/src/lobby/tick_control.rs`, that names
-  realtime ticking, speed-controlled ticking, paused playback, stepped dev ticks, branch staging,
-  countdown, and lobby no-op behavior.
+  realtime ticking, speed-controlled ticking, paused playback, stepped dev scenario ticks, branch
+  staging, countdown, and lobby no-op behavior.
 - Preserve `current_tick_interval()` behavior exactly, including replay speed, dev watch pause,
   replay pause, branch staging interval behavior, and test interval overrides.
 - Keep `RoomTask::run` and the Tokio interval in room ownership; this phase should only decide
   what the next tick should do and which speed multiplier applies.
-- Route `SetReplaySpeed`, `StepDevTick`, replay seek pause interactions, dev watch pause, and
-  countdown finishing through named tick-control methods only where doing so is narrow and
+- Route `SetReplaySpeed`, `StepDevTick`, replay seek pause interactions, dev scenario watch pause,
+  and countdown finishing through named tick-control methods only where doing so is narrow and
   behavior-equivalent.
 - Do not rename client messages or add generic room-control protocol.
 
@@ -51,7 +51,7 @@ the only event/tick owner.
 ## Manual Test Focus
 
 Normal match countdown start, live match ticking, replay speed controls, replay pause/seek, dev
-watch pause/resume, and dev single-step.
+scenario pause/resume, and dev scenario single-step.
 
 ## Handoff Expectations
 

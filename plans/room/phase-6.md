@@ -13,10 +13,10 @@ session starts.
 
 - Add a launch helper, for example `server/src/lobby/launch.rs`, that packages shared start
   bookkeeping without owning the `Game` long term.
-- Keep normal `start_match`, replay branch `start_branch_live`, and dev `start_dev_session` rules
-  intact, including map loading, seed selection, quickstart resources, AI controller setup, branch
-  seat mapping, dev drivers, match-history metadata, drain tracking, structured logs, and
-  prediction flags.
+- Keep normal `start_match`, replay branch `start_branch_live`, and dev scenario
+  `start_dev_session` rules intact, including map loading, seed selection, quickstart resources,
+  AI controller setup, branch seat mapping, dev scenario drivers, match-history metadata, drain
+  tracking, structured logs, and prediction flags.
 - Extract only the common pieces: recipient list construction, `StartPayload` stamping, prediction
   build/version choice, spectator flag choice, pending snapshot clearing, match metadata recording
   inputs, and common send loops.
