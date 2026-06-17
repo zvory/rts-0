@@ -15,6 +15,15 @@ visual path.
 - Delete temporary legacy baselines, pixel-diff fixtures, side-by-side comparison entrypoints,
   comparison flags/pools, update-only oracle paths, and migration-only test data created by Phases
   1 and 4-7.
+- Explicitly audit and either delete or replace all Phase 5.x migration artifacts:
+  `tests/fixtures/svg/unit_migration_manifests.mjs`, `tests/svg_migration_guardrails.mjs`,
+  `tests/transparent_unit_pixels.mjs`, `scripts/dump-legacy-unit-parts.mjs`,
+  `tests/fixtures/svg/legacy-unit-oracle.baseline.json`, and any remaining generated/fixture SVGs
+  that exist only to compare legacy procedural output against live rigs.
+- Treat the Phase 5.4 manifest/check workflow as temporary migration scaffolding. If any of its
+  invariants remain useful after every unit is rig-rendered, preserve them by moving the invariant
+  into permanent rig schema/importer/runtime tests or `scripts/check-client-architecture.mjs`, not by
+  keeping the migration manifest as a second source of truth.
 - Keep permanent coverage for:
   rig schema validation, SVG importer failure modes, required anchors, animation sampler behavior,
   renderer teardown, architecture boundaries, and a small smoke test that rigged units render.
@@ -31,7 +40,8 @@ visual path.
 - `client/src/renderer/units.js`
 - `client/src/renderer/shared.js`
 - `client/src/renderer/rigs/`
-- Temporary migration fixtures/tests from earlier phases.
+- Temporary migration fixtures/tests from earlier phases, including the Phase 5.x manifest, pixel
+  harness, static guardrail, and legacy metadata dump tool.
 - Permanent rig/schema/importer tests.
 - `scripts/check-client-architecture.mjs`
 - `docs/design/client-ui.md`
@@ -42,6 +52,10 @@ visual path.
 - [ ] Delete legacy procedural unit renderer code.
 - [ ] Delete temporary comparison flags, pools, baseline fixtures, update-only oracle paths, and
       equivalence fixtures.
+- [ ] Remove or replace Phase 5.x artifacts:
+      `unit_migration_manifests.mjs`, `svg_migration_guardrails.mjs`,
+      `transparent_unit_pixels.mjs`, `dump-legacy-unit-parts.mjs`, and
+      `legacy-unit-oracle.baseline.json`.
 - [ ] Keep permanent schema/importer/animation/render smoke coverage.
 - [ ] Enforce rig-only unit visual boundary in architecture checks or focused tests.
 - [ ] Update docs for future SVG-authored unit work.
@@ -54,6 +68,8 @@ visual path.
 - Permanent SVG importer tests.
 - Permanent animation sampler tests.
 - Permanent renderer smoke for rigged units.
+- Permanent replacement checks for any Phase 5.x invariant intentionally kept after removing the
+  migration manifest workflow.
 - `node scripts/check-client-architecture.mjs`
 - `git diff --check`.
 
@@ -66,5 +82,6 @@ vehicle motion, team tint, rematch teardown, and unit-lab preview workflow if do
 ## Handoff Expectations
 
 Confirm the temporary equivalence system has been removed, list the permanent tests that replace
-it, summarize the new SVG authoring workflow, and name any follow-up art-quality work that is now
-possible outside this migration.
+it, explicitly state what happened to the Phase 5.x manifest/pixel/dump artifacts, summarize the
+new SVG authoring workflow, and name any follow-up art-quality work that is now possible outside
+this migration.
