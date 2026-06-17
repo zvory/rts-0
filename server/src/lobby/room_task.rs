@@ -6,6 +6,7 @@ use super::faction_validation::{
 };
 use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
+use super::session_policy::{ClockPolicy, SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
 use super::*;
@@ -113,7 +114,7 @@ fn live_ai_controllers(
 }
 
 /// The room's current mode. `InGame` owns the live simulation outright.
-enum Phase {
+pub(super) enum Phase {
     Lobby,
     InGame(Box<Game>),
     ReplayViewer(Box<ReplaySession>),
@@ -345,22 +346,37 @@ impl RoomTask {
         if self.dev_watch_paused {
             return 1.0;
         }
-        match &self.phase {
-            Phase::ReplayViewer(session) if session.is_paused() => 1.0,
-            Phase::ReplayViewer(session) => session.speed(),
-            Phase::BranchStaging(_) => 1.0,
+        match self.session_policy().clock {
+            ClockPolicy::ReplayPlayback => match &self.phase {
+                Phase::ReplayViewer(session) if session.is_paused() => 1.0,
+                Phase::ReplayViewer(session) => session.speed(),
+                _ => self.replay_speed,
+            },
+            ClockPolicy::BranchStaging => 1.0,
             _ => self.replay_speed,
         }
     }
 
+    fn session_phase(&self) -> SessionPhase {
+        match &self.phase {
+            Phase::Lobby => SessionPhase::Lobby,
+            Phase::InGame(_) => SessionPhase::LiveMatch,
+            Phase::ReplayViewer(_) => SessionPhase::ReplayViewer,
+            Phase::BranchStaging(_) => SessionPhase::BranchStaging,
+        }
+    }
+
+    fn session_policy(&self) -> SessionPolicy {
+        SessionPolicy::for_room(&self.mode, self.session_phase())
+    }
+
     fn is_dev_watch(&self) -> bool {
-        matches!(self.mode, RoomMode::DevScenario(_))
+        self.session_policy().is_dev_watch()
     }
 
     fn should_persist_match_history(&self) -> bool {
         self.match_player_count >= 1
-            && !self.is_dev_watch()
-            && !matches!(self.mode, RoomMode::ReplayBranch { .. })
+            && self.session_policy().allows_match_history()
             && !is_automated_match_history_room(&self.room)
             && !match_history_participants_are_automated(&self.match_participants)
     }
@@ -494,14 +510,12 @@ impl RoomTask {
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
-        if self.is_dev_watch() {
+        let policy = self.session_policy();
+        if policy.is_dev_watch() {
             self.on_join_dev_watch(player_id, name, msg_tx, ack);
             return;
         }
-        if matches!(
-            self.mode,
-            RoomMode::Replay { .. } | RoomMode::ReplayArtifact { .. }
-        ) {
+        if policy.uses_replay_room_join() {
             if !replay_ok {
                 self.prompt_for_replay_join(player_id, &msg_tx, ack);
                 return;
@@ -509,9 +523,7 @@ impl RoomTask {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
-        if matches!(self.mode, RoomMode::ReplayBranch { .. })
-            || matches!(self.phase, Phase::BranchStaging(_))
-        {
+        if policy.uses_branch_staging_join() {
             self.on_join_branch_staging(player_id, name, msg_tx, ack);
             return;
         }
@@ -1494,7 +1506,9 @@ impl RoomTask {
     }
 
     fn should_skip_match_countdown(&self) -> bool {
-        self.quickstart || self.total_player_count() <= 1
+        !self.session_policy().countdown_eligible
+            || self.quickstart
+            || self.total_player_count() <= 1
     }
 
     /// Build and broadcast the current `lobby` message to everyone in the room.
@@ -2086,7 +2100,7 @@ impl RoomTask {
     }
 
     fn broadcast_dev_watch_state(&self) {
-        if !matches!(self.mode, RoomMode::DevScenario(_)) {
+        if !self.session_policy().is_dev_watch() {
             return;
         }
         let Phase::InGame(game) = &self.phase else {
@@ -2359,7 +2373,7 @@ impl RoomTask {
             self.broadcast(&ServerMessage::ReplayState(state));
             return;
         }
-        if !matches!(self.mode, RoomMode::DevScenario(_)) {
+        if !self.session_policy().is_dev_watch() {
             return;
         }
         if speed == 0.0 {
@@ -2377,7 +2391,7 @@ impl RoomTask {
     fn on_step_dev_tick(&mut self, player_id: u32) {
         if !self.players.contains_key(&player_id)
             || !self.dev_watch_paused
-            || !matches!(self.mode, RoomMode::DevScenario(_))
+            || !self.session_policy().is_dev_watch()
         {
             return;
         }
