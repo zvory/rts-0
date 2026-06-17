@@ -4,6 +4,7 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
+use super::launch::{LaunchPrediction, LaunchRecipient};
 use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::participants::{CommandIssuer, Participants};
 use super::projection::{ObserverAnalysisAudience, ProjectionPolicy};
@@ -12,9 +13,9 @@ use super::session_policy::{SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::tick_control::{DevWatchSpeed, ReplayPlaybackClock, ScheduledTickAction, TickControl};
 use super::*;
+use crate::protocol::ReplayPlaybackState;
 #[cfg(test)]
-use crate::protocol::SnapshotNetStatus;
-use crate::protocol::{ReplayPlaybackState, PREDICTION_PROTOCOL_VERSION};
+use crate::protocol::{SnapshotNetStatus, StartPayload, PREDICTION_PROTOCOL_VERSION};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -1704,29 +1705,25 @@ impl RoomTask {
         );
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
-        // Each player gets the shared static payload but stamped with their own id.
-        for &id in &self.order {
-            if let Some(player) = self.players.get(&id) {
-                let per_player = StartPayload {
-                    player_id: id,
+        let recipients: Vec<_> = self
+            .order
+            .iter()
+            .filter_map(|&id| {
+                self.players.get(&id).map(|player| LaunchRecipient {
+                    connection_id: id,
+                    payload_player_id: id,
                     spectator: player.spectator,
-                    prediction_build_id: (!player.spectator)
-                        .then(|| server_build_sha().to_string()),
-                    prediction_version: if player.spectator {
-                        0
+                    prediction: if player.spectator {
+                        LaunchPrediction::Disabled
                     } else {
-                        PREDICTION_PROTOCOL_VERSION
+                        LaunchPrediction::Enabled
                     },
-                    ..payload.clone()
-                };
-                send_or_log(
-                    &self.room,
-                    id,
-                    &player.msg_tx,
-                    ServerMessage::Start(per_player),
-                );
-            }
-        }
+                    clear_pending_snapshot: false,
+                    msg_tx: player.msg_tx.clone(),
+                })
+            })
+            .collect();
+        super::launch::send_start_payloads(&self.room, &payload, recipients);
 
         structured_log::log_match_started(MatchStartedLog {
             room: &self.room,
@@ -1793,6 +1790,7 @@ impl RoomTask {
         self.dev_driver = None;
         self.dev_view_player_id = None;
 
+        let mut recipients = Vec::new();
         for &connection_id in &self.order {
             let Some(player) = self.players.get_mut(&connection_id) else {
                 continue;
@@ -1803,26 +1801,20 @@ impl RoomTask {
                 .copied();
             player.spectator = mapped_seat.is_none();
             player.ready = false;
-            player.msg_tx.clear_pending_snapshot();
-            let per_player = StartPayload {
-                player_id: mapped_seat.unwrap_or(connection_id),
-                spectator: mapped_seat.is_none(),
-                prediction_build_id: mapped_seat.map(|_| server_build_sha().to_string()),
-                prediction_version: if mapped_seat.is_some() {
-                    PREDICTION_PROTOCOL_VERSION
-                } else {
-                    0
-                },
-                replay: None,
-                ..payload.clone()
-            };
-            send_or_log(
-                &self.room,
+            recipients.push(LaunchRecipient {
                 connection_id,
-                &player.msg_tx,
-                ServerMessage::Start(per_player),
-            );
+                payload_player_id: mapped_seat.unwrap_or(connection_id),
+                spectator: mapped_seat.is_none(),
+                prediction: if mapped_seat.is_some() {
+                    LaunchPrediction::Enabled
+                } else {
+                    LaunchPrediction::Disabled
+                },
+                clear_pending_snapshot: true,
+                msg_tx: player.msg_tx.clone(),
+            });
         }
+        super::launch::send_start_payloads(&self.room, &payload, recipients);
 
         structured_log::log_match_started(MatchStartedLog {
             room: &self.room,
@@ -2004,18 +1996,18 @@ impl RoomTask {
         let Some(player) = self.players.get(&watcher_id) else {
             return;
         };
-        let per_player = StartPayload {
-            player_id: self.dev_view_player_id.unwrap_or(watcher_id),
-            spectator: true,
-            prediction_build_id: None,
-            prediction_version: 0,
-            ..game.start_payload()
-        };
-        send_or_log(
+        let payload = game.start_payload();
+        super::launch::send_start_payloads(
             &self.room,
-            watcher_id,
-            &player.msg_tx,
-            ServerMessage::Start(per_player),
+            &payload,
+            [LaunchRecipient {
+                connection_id: watcher_id,
+                payload_player_id: self.dev_view_player_id.unwrap_or(watcher_id),
+                spectator: true,
+                prediction: LaunchPrediction::Disabled,
+                clear_pending_snapshot: false,
+                msg_tx: player.msg_tx.clone(),
+            }],
         );
     }
 
@@ -3358,6 +3350,15 @@ mod tests {
         writer
     }
 
+    fn start_payloads(writer: &mut ConnectionWriter) -> Vec<StartPayload> {
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .filter_map(|msg| match msg {
+                ServerMessage::Start(payload) => Some(payload),
+                _ => None,
+            })
+            .collect()
+    }
+
     fn branch_staging_messages(writer: &mut ConnectionWriter) -> Vec<ServerMessage> {
         std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
             .filter(|msg| matches!(msg, ServerMessage::BranchStaging { .. }))
@@ -3731,6 +3732,42 @@ mod tests {
         assert!(game.command_log().is_empty());
         assert!(task.pending_client_command_acks.is_empty());
         assert_eq!(task.players.get(&1).unwrap().last_received_client_seq, 0);
+    }
+
+    #[test]
+    fn normal_live_start_payloads_stamp_active_players_and_spectators() {
+        let mut task = RoomTask::new(
+            "live-start-payload-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_player = add_test_room_player(&mut task, 1, true);
+        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+
+        task.start_match();
+
+        let player_starts = start_payloads(&mut writer_player);
+        assert_eq!(player_starts.len(), 1);
+        let player_payload = &player_starts[0];
+        assert_eq!(player_payload.player_id, 1);
+        assert!(!player_payload.spectator);
+        assert!(player_payload.prediction_build_id.is_some());
+        assert_eq!(
+            player_payload.prediction_version,
+            PREDICTION_PROTOCOL_VERSION
+        );
+        assert!(player_payload.replay.is_none());
+
+        let spectator_starts = start_payloads(&mut writer_spectator);
+        assert_eq!(spectator_starts.len(), 1);
+        let spectator_payload = &spectator_starts[0];
+        assert_eq!(spectator_payload.player_id, 99);
+        assert!(spectator_payload.spectator);
+        assert!(spectator_payload.prediction_build_id.is_none());
+        assert_eq!(spectator_payload.prediction_version, 0);
+        assert!(spectator_payload.replay.is_none());
     }
 
     #[test]
@@ -4208,7 +4245,7 @@ mod tests {
     }
 
     #[test]
-    fn branch_start_countdown_promotes_to_live_start_payloads() {
+    fn branch_launch_countdown_promotes_to_live_start_payloads() {
         let players = replay_test_players(2);
         let seed = replay_branch_test_seed(&players, 3);
         let mut task = RoomTask::new(
@@ -4252,14 +4289,23 @@ mod tests {
             matches!(msg, ServerMessage::Start(payload)
                 if payload.player_id == players[1].id
                     && !payload.spectator
+                    && payload.prediction_build_id.is_some()
+                    && payload.prediction_version == PREDICTION_PROTOCOL_VERSION
                     && payload.replay.is_none()
                     && payload.players.iter().all(|player| player.faction_id == DEFAULT_FACTION_ID))
         }));
         let starts_spectator: Vec<_> =
             std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
         assert!(starts_spectator.iter().any(|msg| {
-            matches!(msg, ServerMessage::Start(payload)
-                if payload.player_id == 102 && payload.spectator && payload.replay.is_none())
+            matches!(
+                msg,
+                ServerMessage::Start(payload)
+                    if payload.player_id == 102
+                        && payload.spectator
+                        && payload.prediction_build_id.is_none()
+                        && payload.prediction_version == 0
+                        && payload.replay.is_none()
+            )
         }));
     }
 
@@ -4531,6 +4577,36 @@ mod tests {
         assert!(task.match_run_id.is_none());
         assert!(task.match_map_name.is_empty());
         assert!(task.match_participants.is_empty());
+    }
+
+    #[test]
+    fn dev_scenario_start_payload_is_read_only_viewer_payload() {
+        let mut task = RoomTask::new(
+            "dev-start-payload-test".to_string(),
+            RoomMode::DevScenario(DevScenarioConfig {
+                id: DevScenarioId::VehicleCornerWall,
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Viewer".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        let starts = start_payloads(&mut writer);
+        assert_eq!(starts.len(), 1);
+        let payload = &starts[0];
+        assert_eq!(payload.player_id, task.dev_view_player_id.unwrap());
+        assert!(payload.spectator);
+        assert!(payload.prediction_build_id.is_none());
+        assert_eq!(payload.prediction_version, 0);
+        assert!(payload.replay.is_none());
     }
 
     #[test]
