@@ -53,6 +53,7 @@ mod room_task;
 mod session_policy;
 mod snapshot_fanout;
 mod snapshots;
+mod tick_control;
 
 pub use connection::{ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
