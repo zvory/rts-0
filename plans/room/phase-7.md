@@ -17,6 +17,9 @@ guardrails after the composable room primitives exist.
   room modules and their responsibilities.
 - Update `plans/room/mode-matrix.md` if the final internal module names differ from the Phase 1
   predictions.
+- Re-evaluate `/dev/scenario` after the shared participants, clock, projection, and launch helpers
+  exist. If the scenario path can move onto those helpers without broadening behavior, migrate it;
+  otherwise document the remaining reason it stays mode-local.
 - Add or tighten a lightweight architecture check only for stable boundaries that are now worth
   enforcing, such as prohibiting new deep sim mutation from lobby or keeping projection decisions
   in the projection helper.
@@ -51,7 +54,7 @@ guardrails after the composable room primitives exist.
 ## Manual Test Focus
 
 Normal match lifecycle, spectator lifecycle, post-match replay, persisted replay join, replay
-branch staging and launch, dev self-play watch, and one dev scenario.
+branch staging and launch, saved artifact replay inspection if it exists, and one dev scenario.
 
 ## Handoff Expectations
 

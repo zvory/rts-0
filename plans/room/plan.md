@@ -4,10 +4,11 @@
 
 Refactor the existing room/lobby systems into small composable primitives that can support normal
 matches, replays, dev scenarios, replay branches, and future labs without adding another pile of
-mode-specific branches. This plan is behavior-preserving: every phase should keep current wire
-messages, gameplay rules, replay semantics, lobby behavior, and visible client behavior unchanged.
-The goal is to make policy choices explicit and reusable, not to add the lab, new protocol, or new
-room features.
+mode-specific branches. Phase 0 intentionally removes the obsolete live `/dev/selfplay` watch path;
+after that deletion, phases 1-7 are behavior-preserving and should keep current wire messages,
+gameplay rules, replay semantics, lobby behavior, and visible client behavior unchanged. The goal
+is to make policy choices explicit and reusable, not to add the lab, new protocol, or new room
+features.
 
 This plan follows the direction in `plans/lab/room/requirements.md` and
 `plans/lab/architecture.md`: rooms stay the shared authority and lifecycle boundary, while product
@@ -16,10 +17,16 @@ and UI/start affordances.
 
 ## Overall Constraints
 
-- No behavioral changes. If a phase finds that preserving current behavior is ambiguous, stop and
-  document the ambiguity instead of choosing new behavior silently.
+- Phase 0 is the only intentional behavior removal in this plan. It should retire live
+  `/dev/selfplay` because a normal lobby with AI players and spectator clients covers the same
+  product need with less special room machinery.
+- Phases 1-7 must make no behavioral changes. If a phase finds that preserving current behavior is
+  ambiguous, stop and document the ambiguity instead of choosing new behavior silently.
 - Do not add lab product behavior, lab protocol messages, privileged sim mutation APIs, or client
   lab panels in this plan.
+- Preserve the AI self-play harness and replay artifacts as test/debug assets. If browser
+  inspection of saved self-play artifacts is still useful, migrate it to a neutral replay-artifact
+  entry point rather than keeping `RoomMode::DevSelfPlay`.
 - Preserve the `Game` API boundary. Lobby code may continue to own one `Game`, but it must not
   reach deeper into sim internals as part of these extractions.
 - Preserve the mirrored wire protocol. If a phase accidentally needs a protocol shape change, split
@@ -29,8 +36,12 @@ and UI/start affordances.
 - Keep `RoomTask::run` as the single event and tick owner for a room. Do not add locks around
   `Game`, a shared room registry mutation path, or cross-room state.
 - Keep normal matches, spectators, post-match replay, persisted replay rooms, replay branch
-  staging, replay branch live play, dev self-play watch, dev scenarios, empty-room reset, drain,
-  and match-history decisions first-class in every phase.
+  staging, replay branch live play, dev scenarios, empty-room reset, drain, and match-history
+  decisions first-class in every phase after Phase 0.
+- Leave `/dev/scenario` and `watchScenario` alone until the shared primitives exist. Dev scenarios
+  are not conceptually hard, but they include scripted setup, full-world projection, pause/step
+  controls, and tri-state harness usage, so they should be migrated late instead of broadening
+  Phase 0.
 - Each phase must be implemented on its own `zvorygin/` branch, pushed as an owned PR with
   auto-merge armed, then waited on until GitHub reports the PR merged and the phase head is
   reachable from `origin/main`.
@@ -61,6 +72,14 @@ the lobby with named, boring internal units that can be recomposed later:
 - documentation and guardrails that make the boundaries understandable to future implementers.
 
 ## Phase Summaries
+
+### [Phase 0 - Retire Dev Self-Play Watch](phase-0.md)
+
+Remove the live `/dev/selfplay` watch path and its hidden `DevSelfPlay` room mode before the
+composable refactor starts. Preserve the AI self-play test harness and migrate any still-useful
+saved artifact inspection to a neutral replay-artifact path instead of another self-play mode.
+Leave `/dev/scenario` unchanged for now because its pause/step and scripted setup behavior is a
+better fit for the later shared clock, projection, and launch primitives.
 
 ### [Phase 1 - Baseline Mode Matrix](phase-1.md)
 
@@ -118,6 +137,8 @@ feature or behavior phase.
   lab client UI.
 - Do not redesign lobby host controls, replay controls, replay branch product behavior, dev
   scenario URLs, or match-history policy.
+- Do not remove or migrate `/dev/scenario` in Phase 0. Re-evaluate it in Phase 7 after the room
+  primitives exist.
 - Do not move transport, connection ownership, the room registry, database writes, or AI
   controller ownership into `rts-sim`.
 - Do not add a generic plugin framework, trait object registry, or dynamic capability negotiation
@@ -136,8 +157,10 @@ Each phase handoff must include:
 - the core manual test focus for the next agent;
 - whether the next phase can proceed or should pause for review.
 
-Once this plan is approved, the normal unattended implementation entry point is:
+Once this plan is approved, run Phase 0 explicitly, then run the behavior-preserving range. Avoid a
+range that starts at zero so the runner does not skip or mis-handle the explicit phase-zero file:
 
 ```bash
+scripts/phase-runner.sh --plan room phase-0 --pr --wait
 scripts/phase-runner.sh --plan room --from 1 --to 7 --pr --wait
 ```

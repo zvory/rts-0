@@ -13,8 +13,8 @@ moving.
 
 - Create a current-state matrix under `plans/room/` that describes every existing room-hosted path:
   normal lobby/live match, spectator, post-match replay, persisted replay room, replay branch
-  staging, replay branch live match, dev self-play live watch, saved self-play replay, and dev
-  scenario.
+  staging, replay branch live match, saved artifact replay inspection if Phase 0 preserved it, and
+  dev scenario.
 - For each path, record current choices for state source, join behavior, host/authority, command
   acceptance, clock, vision, mutation, persistence, start payload stamping, empty-room reset, and
   client-facing controls.
@@ -51,7 +51,8 @@ moving.
 ## Manual Test Focus
 
 Normal lobby start, spectator join before start, post-match replay prompt, persisted replay join,
-replay branch staging and launch, dev self-play watch, and one dev scenario URL.
+replay branch staging and launch, saved artifact replay inspection if it exists, and one dev
+scenario URL.
 
 ## Handoff Expectations
 

@@ -13,7 +13,8 @@ fog and visibility behavior.
 
 - Add a lobby-owned projection policy, for example `server/src/lobby/projection.rs`, that can answer
   what snapshot projection each connected recipient should receive for live, spectator, replay,
-  branch live, dev self-play, and dev scenario paths.
+  branch live, dev scenario paths, and any neutral saved-artifact replay inspection path preserved
+  by Phase 0.
 - Preserve normal player fog through `Game::snapshot_for_player`, live spectator union vision,
   branch live original-seat mapping, replay per-viewer vision, observer analysis delivery, dev
   full-world snapshots, compact snapshot fanout, and net-status/perf accounting.
@@ -54,7 +55,8 @@ fog and visibility behavior.
 ## Manual Test Focus
 
 Player fog in a normal match, spectator view in a live match, replay vision switching, branch live
-spectator/player views, dev scenario full-world view, and observer-analysis overlays.
+spectator/player views, saved artifact replay inspection if it exists, dev scenario full-world
+view, and observer-analysis overlays.
 
 ## Handoff Expectations
 
