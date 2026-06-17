@@ -76,3 +76,24 @@ through shared helpers:
 - Gameplay rules are unchanged.
 - Visible client behavior is intended to remain unchanged; this document and the added tests only
   characterize existing behavior.
+
+## Final Internal Primitive Map
+
+The final module names match the Phase 1 predictions closely, with the primitives kept
+lobby-local instead of becoming a generic room plugin system:
+
+- `server/src/lobby/session_policy.rs` names each mode/phase policy choice for state source,
+  joining, authority, clock, vision, mutation, persistence, and start payloads.
+- `server/src/lobby/participants.rs` centralizes connected users, host fallback, active seats,
+  spectator visible seats, branch-live seat aliases, and command issuer resolution.
+- `server/src/lobby/tick_control.rs` centralizes realtime, replay, dev-watch pause/step, countdown,
+  and non-ticking branch-staging decisions while `RoomTask` keeps owning the Tokio ticker.
+- `server/src/lobby/projection.rs` centralizes live player fog, spectator union fog, replay
+  per-viewer vision, branch-live original-seat aliases, dev full-world snapshots, and observer
+  analysis audience decisions.
+- `server/src/lobby/launch.rs` centralizes non-replay start-payload stamping and fanout for normal
+  live starts, replay branch live starts, and dev scenario watcher starts.
+
+Dev scenario setup remains mode-local because the shared primitives now cover clock, projection,
+and start payloads, but the scenario constructors and scripted drivers are still bespoke setup
+policy rather than reusable room launch behavior.
