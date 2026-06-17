@@ -1,5 +1,9 @@
 use super::*;
 
+mod tank_traps;
+
+pub(super) use tank_traps::*;
+
 const ZERO_GAP_STANDABLE_EPS_PX: f32 = 0.02;
 
 pub(super) fn flat_dev_map(player_count: usize) -> Map {

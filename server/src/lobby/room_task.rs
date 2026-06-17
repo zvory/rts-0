@@ -151,6 +151,9 @@ pub(super) enum DevScenarioId {
     VehicleCornerWall,
     VehicleSmallBlockBaseline,
     FactoryZeroGapPerpendicular,
+    TankTrapLineHorizontal,
+    TankTrapLineVertical,
+    TankTrapLineDiagonal,
 }
 
 enum DevDriver {
@@ -1981,6 +1984,30 @@ impl RoomTask {
                     }
                     DevScenarioId::FactoryZeroGapPerpendicular => {
                         let setup = Game::new_factory_zero_gap_perpendicular_scenario(
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
+                    DevScenarioId::TankTrapLineHorizontal
+                    | DevScenarioId::TankTrapLineVertical
+                    | DevScenarioId::TankTrapLineDiagonal => {
+                        let scenario_id = match config.id {
+                            DevScenarioId::TankTrapLineHorizontal => "tank_trap_line_horizontal",
+                            DevScenarioId::TankTrapLineVertical => "tank_trap_line_vertical",
+                            DevScenarioId::TankTrapLineDiagonal => "tank_trap_line_diagonal",
+                            _ => unreachable!("outer match selects Tank Trap line scenarios"),
+                        };
+                        let setup = Game::new_tank_trap_line_build_scenario(
+                            scenario_id,
                             config.unit,
                             config.count,
                             match_seed(),

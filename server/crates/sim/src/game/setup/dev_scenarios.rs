@@ -268,6 +268,64 @@ impl Game {
             issue_after_ticks: config::TICK_HZ / 2,
         })
     }
+
+    pub fn new_tank_trap_line_build_scenario(
+        scenario_id: &str,
+        vehicle: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        let layout = TankTrapLineLayout::from_scenario_id(scenario_id)
+            .ok_or_else(|| format!("unsupported Tank Trap line scenario {scenario_id}"))?;
+        if !matches!(
+            vehicle,
+            EntityKind::AntiTankGun
+                | EntityKind::MortarTeam
+                | EntityKind::Artillery
+                | EntityKind::ScoutCar
+                | EntityKind::Tank
+                | EntityKind::CommandCar
+        ) {
+            return Err(format!("unsupported Tank Trap line vehicle {vehicle}"));
+        }
+        if unit_count != 1 {
+            return Err(format!(
+                "unsupported Tank Trap line unit count {unit_count}"
+            ));
+        }
+
+        let (map, start_tile, training_pos, worker_starts, unit_starts, goal) =
+            tank_trap_line_build_map(layout, vehicle);
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_building(1, EntityKind::TrainingCentre, training_pos.0, training_pos.1, true)
+            .ok_or_else(|| "failed to spawn Training Centre".to_string())?;
+        spawn_tank_trap_line_workers(&mut entities, worker_starts)?;
+        let units = spawn_tank_trap_line_test_units(&mut entities, vehicle, unit_starts)?;
+        let player_id = 1;
+        let mut game =
+            build_dev_scenario_game(map, entities, player_id, start_tile, seed, layout.scenario_id());
+        if let Some(player) = game.players.iter_mut().find(|p| p.id == player_id) {
+            player.refund_resources(1_000, 0);
+            let _ = player.spend_resources(0, 9_000);
+        }
+        if let Some(loadout) = game
+            .starting_loadouts
+            .iter_mut()
+            .find(|loadout| loadout.player_id == player_id)
+        {
+            loadout.starting_steel = 1_000;
+            loadout.starting_oil = 1_000;
+        }
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units,
+            goal,
+            issue_after_ticks: config::TICK_HZ * 30,
+        })
+    }
 }
 
 pub struct DevScenarioSetup {

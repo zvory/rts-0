@@ -1262,6 +1262,47 @@ mod tests {
     }
 
     #[test]
+    fn two_tile_tank_trap_gap_remains_vehicle_pathable() {
+        let map = flat_test_map(14);
+        let mut entities = EntityStore::new();
+        for tile_x in [5, 8] {
+            let (x, y) = crate::game::services::occupancy::footprint_center(
+                &map,
+                EntityKind::TankTrap,
+                tile_x,
+                6,
+            );
+            entities
+                .spawn_building(1, EntityKind::TankTrap, x, y, true)
+                .expect("tank trap should spawn");
+        }
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        let start = (6, 2);
+        let goal = (6, 10);
+
+        for kind in [EntityKind::Worker, EntityKind::Tank] {
+            let path = service.request_tile_path(
+                &map,
+                &occ,
+                PathRequest {
+                    kind,
+                    start,
+                    goal,
+                    radius_tiles: config::unit_radius_tiles(kind),
+                    route_shape: RouteShape::Normal,
+                    budget: None,
+                },
+            );
+            assert_eq!(
+                path.last().copied(),
+                Some(goal),
+                "{kind:?} should path through a two-tile Tank Trap gap: {path:?}"
+            );
+        }
+    }
+
+    #[test]
     fn pivot_vehicle_turn_cost_respects_expansion_budget() {
         let map = flat_test_map(40);
         let entities = EntityStore::new();
