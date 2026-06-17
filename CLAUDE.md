@@ -109,7 +109,8 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 - For serial phase work, do not start the next phase from an assumed merge. Use the same
   `scripts/wait-pr.sh <pr>` gate after opening each PR; it exits successfully only after GitHub
   reports the PR merged and the phase head SHA is reachable from `origin/main`.
-- For unattended serial phase execution, use `scripts/phase-runner.sh --pr --wait`. Use
+- For unattended serial phase execution, use `scripts/phase-runner.sh --pr --wait`. That script is
+  the stable compatibility entrypoint for the Rust runner in `server/crates/phaserunner`. Use
   `scripts/phase-runner.sh --pr` only when intentionally stopping after the first owned PR is opened
   and auto-merge is armed; treat that result as a pending handoff until `scripts/wait-pr.sh <pr>`
   confirms the merge.

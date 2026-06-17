@@ -85,7 +85,7 @@ Before relying on a changed workflow broadly, run three canaries:
   gate.
 - A throwaway docs-only phased plan through
   `scripts/phase-runner.sh --plan <name> --from <start> --to <end> --pr --wait`
-  to prove the runner waits for each PR to merge before continuing.
+  to prove the Rust-backed runner waits for each PR to merge before continuing.
 
 After canaries, run `scripts/pr-sweep.sh` and confirm there are no unowned open
 `zvorygin/*` PRs and no unexpected stale, failed, conflicted, or missing

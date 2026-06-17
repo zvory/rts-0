@@ -424,14 +424,34 @@ fn command_dir(path: &Path) -> PathBuf {
 pub fn usage() -> &'static str {
     "\
 Usage:
-  rts-phaserunner --plan NAME PHASE [PHASE ...] [options]
+  scripts/phase-runner.sh --plan NAME PHASE [PHASE ...] [options]
 
 Examples:
-  rts-phaserunner --plan faction 4 --pr
-  rts-phaserunner --plan faction 5.5 --pr
-  rts-phaserunner --plan faction phase-4 phase-5 --pr --wait
-  rts-phaserunner --plan faction --from 5 --to 6 --pr --wait
-  rts-phaserunner --plan ai 2 --model gpt-5.4-mini --pr
+  scripts/phase-runner.sh --plan faction 4 --pr
+  scripts/phase-runner.sh --plan faction 5.5 --pr
+  scripts/phase-runner.sh --plan faction phase-4 phase-5 --pr --wait
+  scripts/phase-runner.sh --plan faction --from 5 --to 6 --pr --wait
+  scripts/phase-runner.sh --plan ai 2 --model gpt-5.4-mini --pr
+
+Runs executor passes only. Each phase gets a separate worktree and branch under
+/tmp/rts-worktrees. Each phase starts from the current local main, then the
+runner pushes the completed phase branch, opens or updates an owned PR, and
+arms auto-merge. With --wait, the runner waits for that PR to merge and verifies
+the phase head is reachable from origin/main before reporting success or
+starting the next phase.
+Without --wait, the runner stops after opening and arming the first phase PR so
+serial follow-up does not start from an assumed merge; treat that as a pending
+handoff, not completion.
+Phase ids may be numeric, decimal interstitials such as 5.5, or suffixed ids
+such as 3a. Use --from/--to to discover all phase files in that interval; for
+example --from 5 --to 6 runs phase-5.5 before phase-6 if both files exist.
+
+The runner never creates plans or performs final review. It never merges or
+pushes main; GitHub auto-merge and the required PR checks own that lifecycle.
+Calling agents should treat the inner Codex executor as a long-running job:
+wait for the command to finish, and if polling is unavoidable, poll no more than
+once every 5 minutes. Do not tail the executor log during normal progress; the
+runner prints the relevant tail on failure.
 
 Options:
   --plan NAME       Plan directory name under plans/. Required.
@@ -443,6 +463,11 @@ Options:
   --wait            With --pr, wait for each phase PR to merge before reporting success or continuing.
   --dry-run         Print worktrees, branches, and prompts without running Codex.
   -h, --help        Show this help.
+
+Environment:
+  RTS_WORKTREE_ROOT=/tmp/rts-worktrees
+  GH_BIN=gh
+  RTS_PHASERUNNER_BIN=/path/to/prebuilt/rts-phaserunner
 "
 }
 
