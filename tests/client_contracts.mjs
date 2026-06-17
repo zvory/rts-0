@@ -2951,6 +2951,11 @@ function fakeAudioContext() {
       JSON.stringify({ t: "command", clientSeq: 3, cmd: { c: "stop", units: [7] } }),
     "command message builder wraps gameplay commands with clientSeq",
   );
+  assert(
+    JSON.stringify(msg.command(cmd.holdPosition([7]), 4)) ===
+      JSON.stringify({ t: "command", clientSeq: 4, cmd: { c: "holdPosition", units: [7] } }),
+    "holdPosition command builder emits the hold-position wire shape",
+  );
   const pointFireCommand = cmd.pointFire([11, 12], 512, 640, true);
   assert(
     pointFireCommand.c === "useAbility" &&
@@ -4875,9 +4880,9 @@ function fakeAudioContext() {
     selection: [ownWorker, allyWorker],
     entities: [ownWorker, allyWorker],
   }));
-  const stopIntent = buttonByAction(mixedCard, "stop")?.intent;
+  const holdIntent = buttonByAction(mixedCard, "holdPosition")?.intent;
   assert(
-    stopIntent?.unitIds?.join(",") === String(ownWorker.id),
+    holdIntent?.unitIds?.join(",") === String(ownWorker.id),
     "mixed own/allied command card emits commands only for own entity ids",
   );
 

@@ -471,6 +471,22 @@ pub(crate) fn apply_commands(
                     }
                 }
             }
+            SimCommand::HoldPosition { units } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
+                for id in units {
+                    if owns_unit(entities, player, id) && !is_constructing(entities, id) {
+                        entities.release_miner(id);
+                        if let Some(e) = entities.get_mut(id) {
+                            e.hold_position();
+                            e.clear_worker_carry();
+                        }
+                    }
+                }
+            }
             SimCommand::SetRally {
                 building,
                 x,
@@ -605,7 +621,7 @@ fn planner_facts(
                 .any(|intent| matches!(intent, OrderIntent::PointFire(_)));
             facts.active_build = matches!(e.order(), Order::Build(_));
             facts.activity = match e.order() {
-                Order::Idle => planner::UnitActivity::Idle,
+                Order::Idle | Order::HoldPosition => planner::UnitActivity::Idle,
                 Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
                     planner::UnitActivity::Moving
                 }
@@ -3159,7 +3175,7 @@ mod tests {
     }
 
     #[test]
-    fn stop_clears_active_order_and_queued_orders() {
+    fn stop_clears_orders_and_hold_position_enters_hold_stance() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let unit = entities
@@ -3180,6 +3196,25 @@ mod tests {
         let entity = entities.get(unit).expect("unit should exist");
         assert!(matches!(entity.order(), Order::Idle));
         assert!(entity.queued_orders().is_empty());
+
+        {
+            let entity = entities.get_mut(unit).expect("unit should exist");
+            entity.set_order(Order::move_to(300.0, 300.0));
+            entity.append_queued_order(OrderIntent::move_to(400.0, 400.0));
+            entity.set_target_id(Some(99));
+        }
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(1, SimCommand::HoldPosition { units: vec![unit] })],
+        );
+
+        let entity = entities.get(unit).expect("unit should exist");
+        assert!(matches!(entity.order(), Order::HoldPosition));
+        assert!(entity.queued_orders().is_empty());
+        assert_eq!(entity.target_id(), None);
+        assert!(entity.path_is_empty());
     }
 
     #[test]

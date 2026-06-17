@@ -81,6 +81,9 @@ pub enum SimCommand {
     Stop {
         units: Vec<u32>,
     },
+    HoldPosition {
+        units: Vec<u32>,
+    },
     SetRally {
         building: u32,
         x: f32,
@@ -258,6 +261,7 @@ impl SimCommand {
             }
             protocol::Command::Cancel { building } => SimCommand::Cancel { building },
             protocol::Command::Stop { units } => SimCommand::Stop { units },
+            protocol::Command::HoldPosition { units } => SimCommand::HoldPosition { units },
             protocol::Command::SetRally {
                 building,
                 x,
@@ -393,6 +397,9 @@ impl SimCommand {
                 building: *building,
             },
             SimCommand::Stop { units } => protocol::Command::Stop {
+                units: units.clone(),
+            },
+            SimCommand::HoldPosition { units } => protocol::Command::HoldPosition {
                 units: units.clone(),
             },
             SimCommand::SetRally {

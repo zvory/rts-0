@@ -110,7 +110,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "M",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "B",
     },
   });
@@ -162,7 +162,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "A",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "B",
     },
   });
@@ -243,7 +243,7 @@ function workerBuildCard(factionId = "kriegsia") {
       "build.city_centre": "B",
       "unit.move": "M",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "W",
     },
   }, { activate: true });
@@ -272,7 +272,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "M",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "W",
     },
   }, { activate: true });
@@ -298,7 +298,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "M",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "W",
     },
   }, { activate: true });
@@ -365,7 +365,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "M",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "B",
       "unknown.command": "U",
     },
@@ -385,7 +385,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "1",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "B",
     },
   });
@@ -403,7 +403,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "A",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "B",
     },
   });
@@ -429,7 +429,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "M",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "B",
     },
   }, { activate: true });
@@ -454,7 +454,7 @@ function workerBuildCard(factionId = "kriegsia") {
     bindings: {
       "unit.move": "M",
       "unit.attack": "A",
-      "unit.stop": "S",
+      "unit.holdPosition": "S",
       "worker.buildMenu": "B",
     },
   });

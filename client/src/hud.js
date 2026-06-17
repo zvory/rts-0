@@ -688,6 +688,10 @@ export class HUD {
         this._issueCommand(cmd.stop(intent.unitIds || []));
         this._intent()?.endCommandTarget?.();
         return;
+      case "holdPosition":
+        this._issueCommand(cmd.holdPosition(intent.unitIds || []));
+        this._intent()?.endCommandTarget?.();
+        return;
       case "train":
         this._issueTrain(intent.unit);
         return;

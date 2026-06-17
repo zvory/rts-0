@@ -157,6 +157,7 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
         | Command::Research { .. }
         | Command::Cancel { .. }
         | Command::Stop { .. }
+        | Command::HoldPosition { .. }
         | Command::SetRally { .. }
         | Command::Rejected { .. } => false,
     }

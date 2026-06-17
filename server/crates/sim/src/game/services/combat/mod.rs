@@ -116,7 +116,9 @@ pub(crate) fn combat_system(
             // exception: they hold position and only auto-acquire enemies already in weapon
             // range. Buildings never move, so they only ever engage within their firing range.
             let aggro_px = if e.is_unit() {
-                if uses_stationary_weapon_aggro(e) && matches!(e.order(), Order::Idle) {
+                if matches!(e.order(), Order::HoldPosition)
+                    || (uses_stationary_weapon_aggro(e) && matches!(e.order(), Order::Idle))
+                {
                     range_px
                 } else {
                     (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
@@ -156,7 +158,11 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 if matches!(
                     e.order(),
-                    Order::Attack(_) | Order::AttackMove(_) | Order::Move(_) | Order::Idle
+                    Order::Attack(_)
+                        | Order::AttackMove(_)
+                        | Order::Move(_)
+                        | Order::Idle
+                        | Order::HoldPosition
                 ) {
                     e.set_target_id(None);
                     begin_idle_deployed_weapon_setup(e);
@@ -304,7 +310,7 @@ pub(crate) fn combat_system(
                     e.set_attack_cd(cd_reset);
                 }
             }
-        } else if is_unit {
+        } else if is_unit && mode != CombatMode::Opportunistic {
             // Out of weapon range but within aggro: chase. Tanks route to a standoff point
             // inside firing range; other units still route toward the target center.
             let chase_goal =

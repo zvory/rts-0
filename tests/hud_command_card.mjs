@@ -94,8 +94,8 @@ function buttonSlots(card) {
   });
   assert.deepEqual(buttonSlots(workerCard), [
     { commandId: "unit.move", slotIndex: 0, hotkey: "Q" },
+    { commandId: "unit.holdPosition", slotIndex: 1, hotkey: "W" },
     { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
-    { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
     { commandId: "worker.buildMenu", slotIndex: 6, hotkey: "Z" },
   ]);
 

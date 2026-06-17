@@ -241,10 +241,10 @@ export function buildUnitCard(ctx, selection) {
   if (workerSelected) {
     return card("unit", signature, [
         moveDescriptor(ctx, unitIds, 0),
-        null,
+        holdDescriptor(unitIds, 1),
         null,
         attackDescriptor(ctx, unitIds, 3),
-        holdDescriptor(unitIds, 4),
+        null,
         null,
         {
           id: "worker:build-menu",
@@ -264,8 +264,8 @@ export function buildUnitCard(ctx, selection) {
 
   const slots = new Array(9).fill(null);
   slots[0] = moveDescriptor(ctx, unitIds, 0);
+  slots[1] = holdDescriptor(unitIds, 1);
   slots[3] = attackDescriptor(ctx, unitIds, 3);
-  slots[4] = holdDescriptor(unitIds, 4);
 
   let sequentialSlot = 6;
   const claimSlot = (preferred) => {
@@ -462,13 +462,13 @@ function attackDescriptor(ctx, unitIds, slot) {
 function holdDescriptor(unitIds, slot) {
   return {
     id: "unit:hold",
-    commandId: "unit.stop",
+    commandId: "unit.holdPosition",
     kind: "button",
-    action: "stop",
-    intent: { type: "stop", unitIds },
-    icon: "ST",
-    label: "Stop",
-    title: "Stop selected units",
+    action: "holdPosition",
+    intent: { type: "holdPosition", unitIds },
+    icon: "HLD",
+    label: "Hold",
+    title: "Hold position",
     enabled: unitIds.length > 0,
   };
 }
