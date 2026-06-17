@@ -7,11 +7,12 @@
 ## Objective
 
 Migrate all vehicle-body units to SVG-authored rigs and make the rig renderer cover every unit
-kind.
+kind after the Phase 5.x mechanical visual gates are in place.
 
 ## Work
 
 - Author and validate SVG rigs for Scout Car, Command Car, and Tank.
+- Add or update migration manifests for every newly live-routed vehicle kind.
 - Implement hull-facing vs weapon-facing separation for vehicles.
 - Implement track or wheel phase animation bindings from the renderer-local movement visual state.
 - Implement recoil bindings for Tank and Scout Car weapons.
@@ -20,8 +21,8 @@ kind.
   vehicle shadow shape, selection bounds, and hp bar position.
 - Add equivalence samples for multiple facings, weapon-facing offsets, movement phase deltas,
   recoil values, low/oil-starved states, breakthrough ticks, and shot-reveal alpha.
-- Require both semantic anchor/bounds comparison and bounded pixel or command comparison for each
-  migrated vehicle kind.
+- Require named part-level plus full-composition pixel gates for each migrated vehicle kind before
+  enabling live routing.
 - Confirm there are no remaining live unit kinds routed through legacy procedural drawing.
 
 ## Expected Touch Points
@@ -36,10 +37,11 @@ kind.
 ## Implementation Checklist
 
 - [ ] Add SVG rigs for vehicle units.
+- [ ] Add migration manifests for newly live-routed vehicle units.
 - [ ] Add hull/weapon-facing and movement-phase bindings.
 - [ ] Add vehicle special-cue bindings.
 - [ ] Route all remaining unit kinds through rig renderer.
-- [ ] Add equivalence samples for vehicle static and animation states.
+- [ ] Add and pass part-level plus full-composition pixel gates for vehicle static and animation states.
 - [ ] Confirm legacy unit draw code is no longer used in normal gameplay.
 - [ ] Run verification and record exact results.
 
