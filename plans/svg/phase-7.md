@@ -3,15 +3,19 @@
 ## Phase Status
 
 - [ ] Not implemented.
+- Partial current state: Tank is already live-routed through an SVG rig and has a Phase 5.4
+  migration manifest with passing part-level plus full-composition pixel gates. Scout Car and
+  Command Car remain legacy-routed.
 
 ## Objective
 
-Migrate all vehicle-body units to SVG-authored rigs and make the rig renderer cover every unit
-kind after the Phase 5.x mechanical visual gates are in place.
+Migrate the remaining vehicle-body units to SVG-authored rigs and make the rig renderer cover
+every unit kind after the Phase 5.x mechanical visual gates are in place.
 
 ## Work
 
-- Author and validate SVG rigs for Scout Car, Command Car, and Tank.
+- Author and validate SVG rigs for Scout Car and Command Car. Tank should remain live-routed and
+  its manifest/gates must keep passing.
 - Add or update migration manifests for every newly live-routed vehicle kind.
 - Implement hull-facing vs weapon-facing separation for vehicles.
 - Implement track or wheel phase animation bindings from the renderer-local movement visual state.
@@ -23,6 +27,10 @@ kind after the Phase 5.x mechanical visual gates are in place.
   recoil values, low/oil-starved states, breakthrough ticks, and shot-reveal alpha.
 - Require named part-level plus full-composition pixel gates for each migrated vehicle kind before
   enabling live routing.
+- Before adding a kind to live routing, add its entry to
+  `tests/fixtures/svg/unit_migration_manifests.mjs`, run
+  `node tests/svg_migration_guardrails.mjs`, then run
+  `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`.
 - Confirm there are no remaining live unit kinds routed through legacy procedural drawing.
 
 ## Expected Touch Points
@@ -36,7 +44,7 @@ kind after the Phase 5.x mechanical visual gates are in place.
 
 ## Implementation Checklist
 
-- [ ] Add SVG rigs for vehicle units.
+- [ ] Add SVG rigs for remaining vehicle units.
 - [ ] Add migration manifests for newly live-routed vehicle units.
 - [ ] Add hull/weapon-facing and movement-phase bindings.
 - [ ] Add vehicle special-cue bindings.
@@ -48,6 +56,8 @@ kind after the Phase 5.x mechanical visual gates are in place.
 ## Verification
 
 - Rig schema and SVG importer tests.
+- `node tests/svg_migration_guardrails.mjs`
+- `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
 - Focused vehicle equivalence tests.
 - Full temporary all-unit equivalence suite.
 - `node scripts/check-client-architecture.mjs`

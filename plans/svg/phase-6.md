@@ -32,6 +32,10 @@ Phase 5.x mechanical visual gates are in place.
   weapon-facing, and shot-reveal samples.
 - Require named part-level plus full-composition pixel gates for each migrated kind before enabling
   live routing; keeping the old legacy oracle passing is not enough by itself.
+- Before adding a kind to live routing, add its entry to
+  `tests/fixtures/svg/unit_migration_manifests.mjs`, run
+  `node tests/svg_migration_guardrails.mjs`, then run
+  `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`.
 
 ## Expected Touch Points
 
@@ -57,6 +61,8 @@ Phase 5.x mechanical visual gates are in place.
 ## Verification
 
 - Rig schema and SVG importer tests.
+- `node tests/svg_migration_guardrails.mjs`
+- `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
 - Focused infantry/support equivalence tests.
 - Muzzle/feedback anchor tests if touched.
 - `node scripts/check-client-architecture.mjs`

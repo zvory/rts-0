@@ -5,14 +5,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
+import { SVG_MIGRATION_MANIFESTS } from "./fixtures/svg/unit_migration_manifests.mjs";
 import { compareRgbaBuffers, makeDiffRgba } from "./visual_pixel_compare.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const baselinePath = path.join(repoRoot, "tests/fixtures/svg/legacy-unit-oracle.baseline.json");
 const fixturePagePath = path.join(repoRoot, "tests/fixtures/svg/transparent-unit-pixels.html");
-const workerSvgPath = path.join(repoRoot, "tests/fixtures/svg/rig-worker.svg");
-const tankSvgPath = path.join(repoRoot, "tests/fixtures/svg/rig-vehicle.svg");
 const artifactRoot = path.join(repoRoot, "tests/artifacts/transparent-unit-pixels");
 const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const fixedNow = 10_000;
@@ -24,87 +23,14 @@ const includePartComparisons = partsOnly || process.argv.includes("--parts");
 const includeCompositionComparisons = !partsOnly;
 
 const baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
-const samples = [
-  ...workerSamplesFromBaseline(baseline),
-  ...tankSamplesFromBaseline(baseline),
-];
-const thresholds = {
-  minAlphaWeightedMatchingRatio: baseline.pixelDiffThresholds.staticMinAlphaWeightedIdenticalRatio,
-  maxPerPixelRgbaDistance: 96,
-  maxOpaqueMismatchCount: 48,
-  maxOpaqueMismatchClusterPx: baseline.pixelDiffThresholds.staticMaxOpaqueClusterPx,
-  perChannelTolerance: 6,
-  opaqueAlphaThreshold: 128,
-};
-const workerPartMappings = Object.freeze([
-  {
-    legacyPart: "worker.shadow",
-    rigParts: ["part.shadow"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 12, maxOpaqueMismatchClusterPx: 6 }),
-  },
-  {
-    legacyPart: "worker.body",
-    rigParts: ["part.body"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 16, maxOpaqueMismatchClusterPx: 8 }),
-  },
-  {
-    legacyPart: "worker.facingTick",
-    rigParts: ["part.facingTick"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
-  },
-  {
-    legacyPart: "worker.busyIndicator",
-    rigParts: ["part.busyIndicator"],
-    busyOnly: true,
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
-  },
-]);
-const tankTrackRigParts = Object.freeze([
-  "part.track.left",
-  "part.track.right",
-  ...Array.from({ length: 9 }, (_, i) => `part.tread.left.${i}`),
-  ...Array.from({ length: 9 }, (_, i) => `part.tread.right.${i}`),
-]);
-const tankPartMappings = Object.freeze([
-  {
-    legacyPart: "tank.shadow",
-    rigParts: ["part.shadow"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 32, maxOpaqueMismatchClusterPx: 8 }),
-  },
-  {
-    legacyPart: "tank.tracks",
-    rigParts: tankTrackRigParts,
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 64, maxOpaqueMismatchClusterPx: 16 }),
-  },
-  {
-    legacyPart: "tank.hull",
-    rigParts: ["part.hull", "part.hull.shadow", "part.hull.nose", "part.hull.noseShadow"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 64, maxOpaqueMismatchClusterPx: 16 }),
-  },
-  {
-    legacyPart: "tank.barrel",
-    rigParts: ["part.barrel"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 16, maxOpaqueMismatchClusterPx: 8 }),
-  },
-  {
-    legacyPart: "tank.turret",
-    rigParts: ["part.turret"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 24, maxOpaqueMismatchClusterPx: 8 }),
-  },
-  {
-    legacyPart: "tank.noseTick",
-    rigParts: ["part.noseTick"],
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
-  },
-  {
-    legacyPart: "tank.fuelCue",
-    rigParts: ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"],
-    fuelOnly: true,
-    thresholds: partThresholds({ maxOpaqueMismatchCount: 16, maxOpaqueMismatchClusterPx: 8 }),
-  },
-]);
-const workerSvgText = fs.readFileSync(workerSvgPath, "utf8");
-const tankSvgText = fs.readFileSync(tankSvgPath, "utf8");
+const samples = migrationSamplesFromBaseline(baseline);
+const thresholds = assertSharedCompositionThresholds(SVG_MIGRATION_MANIFESTS);
+const partMappingsByKind = Object.fromEntries(
+  SVG_MIGRATION_MANIFESTS.map((manifest) => [manifest.kind, manifest.partMappings]),
+);
+const svgTextByKind = Object.fromEntries(
+  SVG_MIGRATION_MANIFESTS.map((manifest) => [manifest.kind, fs.readFileSync(manifest.svgPath, "utf8")]),
+);
 
 const staticServer = await startStaticServer(repoRoot);
 const chromeProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-pixel-harness-chrome-"));
@@ -131,15 +57,9 @@ try {
     bufferSize,
     fixedNow,
     thresholds,
-    partMappingsByKind: includePartComparisons ? {
-      worker: workerPartMappings,
-      tank: tankPartMappings,
-    } : {},
+    partMappingsByKind: includePartComparisons ? partMappingsByKind : {},
     includeCompositionComparisons,
-    svgTextByKind: {
-      worker: workerSvgText,
-      tank: tankSvgText,
-    },
+    svgTextByKind,
   });
   if (consoleErrors.length > 0) {
     throw new Error(`browser errors during transparent pixel harness:\n${consoleErrors.join("\n")}`);
@@ -199,10 +119,7 @@ try {
     passed: rendered.compositionSamples.length + rendered.partSamples.length - failures.length,
     failed: failures.length,
     thresholds,
-    partMappingsByKind: includePartComparisons ? {
-      worker: workerPartMappings,
-      tank: tankPartMappings,
-    } : {},
+    partMappingsByKind: includePartComparisons ? partMappingsByKind : {},
     artifactRoot: failures.length > 0 && !noArtifacts ? path.relative(repoRoot, artifactRoot) : null,
   };
   console.log(JSON.stringify({ summary, compositionReports, partReports }, null, 2));
@@ -222,75 +139,46 @@ try {
   fs.rmSync(chromeProfileDir, { recursive: true, force: true });
 }
 
-function partThresholds(overrides = {}) {
+function assertSharedCompositionThresholds(manifests) {
+  const [first, ...rest] = manifests;
+  if (!first) throw new Error("at least one SVG migration manifest is required");
+  const baselineThresholds = JSON.stringify(first.compositionThresholds);
+  for (const manifest of rest) {
+    if (JSON.stringify(manifest.compositionThresholds) !== baselineThresholds) {
+      throw new Error(`transparent pixel harness currently requires shared composition thresholds; ${manifest.kind} differs`);
+    }
+  }
+  return first.compositionThresholds;
+}
+
+function migrationSamplesFromBaseline(oracle) {
+  const sampleByLabel = new Map(oracle.samples.map((sample) => [sample.label, sample]));
+  const samples = [];
+  for (const manifest of SVG_MIGRATION_MANIFESTS) {
+    for (const label of manifest.requiredSamples) {
+      const sample = sampleByLabel.get(label);
+      if (!sample) throw new Error(`missing legacy oracle sample required by ${manifest.kind} manifest: ${label}`);
+      samples.push(browserSampleFromOracle(sample));
+    }
+  }
+  return samples;
+}
+
+function browserSampleFromOracle(sample) {
   return {
-    minAlphaWeightedMatchingRatio: 0.996,
-    maxPerPixelRgbaDistance: 64,
-    maxOpaqueMismatchCount: 8,
-    maxOpaqueMismatchClusterPx: 4,
-    perChannelTolerance: 4,
-    opaqueAlphaThreshold: 128,
-    ...overrides,
+    label: sample.label,
+    kind: sample.kind,
+    teamColor: sample.teamColor,
+    facing: sample.facing,
+    weaponFacing: sample.weaponFacing,
+    recoilProgress: sample.recoilProgress,
+    state: sample.state,
+    setupState: sample.setupState,
+    resources: sample.resources,
+    busy: sample.label.includes("busy"),
+    fuelCue: sample.label.includes("low-oil") || sample.label.includes("oil-starved"),
+    latchedNode: sample.label.includes("latched-node") ? 9001 : null,
   };
-}
-
-function workerSamplesFromBaseline(oracle) {
-  const wanted = new Set([
-    "worker/facing-0-#0072b2",
-    "worker/facing-0-#e69f00",
-    "worker/facing-1_571-#0072b2",
-    "worker/facing-1_571-#e69f00",
-    "worker/facing-3_142-#0072b2",
-    "worker/facing-3_142-#e69f00",
-    "worker/facing-4_712-#0072b2",
-    "worker/facing-4_712-#e69f00",
-    "worker/worker-busy-latched-node",
-    "worker/worker-busy-build-state",
-  ]);
-  return oracle.samples
-    .filter((sample) => wanted.has(sample.label))
-    .map((sample) => ({
-      label: sample.label,
-      kind: sample.kind,
-      teamColor: sample.teamColor,
-      facing: sample.facing,
-      state: sample.state,
-      setupState: sample.setupState,
-      busy: sample.label.includes("busy"),
-      latchedNode: sample.label.includes("latched-node") ? 9001 : null,
-    }));
-}
-
-function tankSamplesFromBaseline(oracle) {
-  const wanted = new Set([
-    "tank/facing-0-#0072b2",
-    "tank/facing-0-#e69f00",
-    "tank/facing-1_571-#0072b2",
-    "tank/facing-1_571-#e69f00",
-    "tank/facing-3_142-#0072b2",
-    "tank/facing-3_142-#e69f00",
-    "tank/facing-4_712-#0072b2",
-    "tank/facing-4_712-#e69f00",
-    "tank/weapon-offset-0_785",
-    "tank/weapon-offset-neg_1_571",
-    "tank/recoil-0_35",
-    "tank/tank-low-oil",
-    "tank/tank-oil-starved",
-  ]);
-  return oracle.samples
-    .filter((sample) => wanted.has(sample.label))
-    .map((sample) => ({
-      label: sample.label,
-      kind: sample.kind,
-      teamColor: sample.teamColor,
-      facing: sample.facing,
-      weaponFacing: sample.weaponFacing,
-      recoilProgress: sample.recoilProgress,
-      state: sample.state,
-      setupState: sample.setupState,
-      resources: sample.resources,
-      fuelCue: sample.label.includes("low-oil") || sample.label.includes("oil-starved"),
-    }));
 }
 
 function writeFailureArtifacts({ renderedSample, entry }) {

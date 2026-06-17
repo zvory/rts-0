@@ -182,8 +182,11 @@ export class UnitRigInstance {
 `UnitRigInstance` owns one Pixi container and one graphics child per normalized rig part, redraws
 primitive geometry with sampled transforms and tint slots, and tears down all owned children through
 `destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind` and currently enables
-Worker only; missing or invalid definitions fall back to legacy procedural drawing. Shadow and body
-parts route through separate live pools so normal unit and shot-reveal layer ordering stays intact.
+Worker and Tank; missing or invalid definitions fall back to legacy procedural drawing. Temporary
+SVG migration guardrails live in `tests/fixtures/svg/unit_migration_manifests.mjs` and
+`tests/svg_migration_guardrails.mjs`; a live-routed kind must have a manifest and passing
+part-level plus full-composition pixel gates before it is added. Shadow and body parts route
+through separate live pools so normal unit and shot-reveal layer ordering stays intact.
 `renderer/units.js` also keeps a test-gated side-by-side comparison seam: `_rigComparisonEnabled`
 must be set and a definition must exist in `_rigDefinitionsByKind`; otherwise comparison rendering
 stays dormant.
