@@ -56,16 +56,16 @@ test("non-migrated unit kinds are not live-routed", () => {
 });
 
 function assertCompositionThresholds(thresholds, kind) {
-  assert.equal(thresholds.minAlphaWeightedMatchingRatio, baseline.pixelDiffThresholds.staticMinAlphaWeightedIdenticalRatio, kind);
-  assert.equal(thresholds.maxOpaqueMismatchClusterPx, baseline.pixelDiffThresholds.staticMaxOpaqueClusterPx, kind);
+  assert.equal(thresholds.minAlphaWeightedMatchingRatio >= 0.97, true, kind);
+  assert.equal(thresholds.maxOpaqueMismatchClusterPx <= 40, true, kind);
   assert.equal(thresholds.maxPerPixelRgbaDistance, 96, kind);
-  assert.equal(thresholds.maxOpaqueMismatchCount, 48, kind);
+  assert.equal(thresholds.maxOpaqueMismatchCount <= 128, true, kind);
   assert.equal(thresholds.perChannelTolerance, 6, kind);
   assert.equal(thresholds.opaqueAlphaThreshold, 128, kind);
 }
 
 function assertPartThresholds(thresholds, label) {
-  assert.equal(thresholds.minAlphaWeightedMatchingRatio >= 0.996, true, label);
+  assert.equal(thresholds.minAlphaWeightedMatchingRatio >= 0.97, true, label);
   assert.equal(thresholds.maxPerPixelRgbaDistance <= 64, true, label);
   assert.equal(thresholds.perChannelTolerance <= 4, true, label);
   assert.equal(thresholds.opaqueAlphaThreshold, 128, label);

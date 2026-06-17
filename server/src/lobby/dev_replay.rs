@@ -22,11 +22,13 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
                     "tank_trap_line_horizontal" => DevScenarioId::TankTrapLineHorizontal,
                     "tank_trap_line_vertical" => DevScenarioId::TankTrapLineVertical,
                     "tank_trap_line_diagonal" => DevScenarioId::TankTrapLineDiagonal,
+                    "tank_trap_pathing_matrix" => DevScenarioId::TankTrapPathingMatrix,
                     _ => return RoomMode::Normal,
                 },
                 unit: launch.unit,
                 count: launch.count,
                 blocker: launch.blocker,
+                case: launch.case,
             });
         }
     }

@@ -6,6 +6,7 @@ pub struct DevScenarioLaunch {
     pub unit: EntityKind,
     pub count: usize,
     pub blocker: Option<EntityKind>,
+    pub case: Option<&'static str>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,72 +23,84 @@ const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
         unit: EntityKind::Worker,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::Worker,
         count: 4,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::Rifleman,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::Rifleman,
         count: 4,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::MachineGunner,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::MachineGunner,
         count: 4,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::AntiTankGun,
         count: 4,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::ScoutCar,
         count: 4,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
         unit: EntityKind::Tank,
         count: 4,
         blocker: None,
+        case: None,
     },
 ];
 
@@ -97,18 +110,21 @@ const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
         unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "direct_reverse_order",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "direct_reverse_order",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
 ];
 
@@ -118,90 +134,105 @@ const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
         unit: EntityKind::AntiTankGun,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::AntiTankGun,
         count: 5,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::AntiTankGun,
         count: 6,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::AntiTankGun,
         count: 10,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::AntiTankGun,
         count: 15,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::ScoutCar,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::ScoutCar,
         count: 5,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::ScoutCar,
         count: 6,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::ScoutCar,
         count: 10,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::ScoutCar,
         count: 15,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::Tank,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::Tank,
         count: 5,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::Tank,
         count: 6,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::Tank,
         count: 10,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::Tank,
         count: 15,
         blocker: None,
+        case: None,
     },
 ];
 
@@ -211,54 +242,63 @@ const VEHICLE_CORNER_WALL_LAUNCHES: [DevScenarioLaunch; 9] = [
         unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::AntiTankGun,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::AntiTankGun,
         count: 5,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::ScoutCar,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::ScoutCar,
         count: 5,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::Tank,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_corner_wall",
         unit: EntityKind::Tank,
         count: 5,
         blocker: None,
+        case: None,
     },
 ];
 
@@ -268,180 +308,210 @@ const VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES: [DevScenarioLaunch; 30] = [
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 5,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: Some(EntityKind::Worker),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 3,
         blocker: Some(EntityKind::Worker),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 5,
         blocker: Some(EntityKind::Worker),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: Some(EntityKind::Rifleman),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 3,
         blocker: Some(EntityKind::Rifleman),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 5,
         blocker: Some(EntityKind::Rifleman),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: Some(EntityKind::MachineGunner),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 3,
         blocker: Some(EntityKind::MachineGunner),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 5,
         blocker: Some(EntityKind::MachineGunner),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: Some(EntityKind::AntiTankGun),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 3,
         blocker: Some(EntityKind::AntiTankGun),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::ScoutCar,
         count: 5,
         blocker: Some(EntityKind::AntiTankGun),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 3,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 5,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 1,
         blocker: Some(EntityKind::Worker),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 3,
         blocker: Some(EntityKind::Worker),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 5,
         blocker: Some(EntityKind::Worker),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 1,
         blocker: Some(EntityKind::Rifleman),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 3,
         blocker: Some(EntityKind::Rifleman),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 5,
         blocker: Some(EntityKind::Rifleman),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 1,
         blocker: Some(EntityKind::MachineGunner),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 3,
         blocker: Some(EntityKind::MachineGunner),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 5,
         blocker: Some(EntityKind::MachineGunner),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 1,
         blocker: Some(EntityKind::AntiTankGun),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 3,
         blocker: Some(EntityKind::AntiTankGun),
+        case: None,
     },
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
         unit: EntityKind::Tank,
         count: 5,
         blocker: Some(EntityKind::AntiTankGun),
+        case: None,
     },
 ];
 
@@ -451,18 +521,21 @@ const FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES: [DevScenarioLaunch; 3] = [
         unit: EntityKind::AntiTankGun,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "factory_zero_gap_perpendicular",
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "factory_zero_gap_perpendicular",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
 ];
 
@@ -472,12 +545,14 @@ const TANK_TRAP_LINE_HORIZONTAL_LAUNCHES: [DevScenarioLaunch; 2] = [
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "tank_trap_line_horizontal",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
 ];
 
@@ -487,12 +562,14 @@ const TANK_TRAP_LINE_VERTICAL_LAUNCHES: [DevScenarioLaunch; 2] = [
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "tank_trap_line_vertical",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
 ];
 
@@ -502,16 +579,103 @@ const TANK_TRAP_LINE_DIAGONAL_LAUNCHES: [DevScenarioLaunch; 2] = [
         unit: EntityKind::ScoutCar,
         count: 1,
         blocker: None,
+        case: None,
     },
     DevScenarioLaunch {
         id: "tank_trap_line_diagonal",
         unit: EntityKind::Tank,
         count: 1,
         blocker: None,
+        case: None,
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 9] = [
+pub const TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE: &str = "friendly_vehicle_reroute";
+pub const TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH: &str = "enemy_vehicle_breach";
+pub const TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH: &str = "infantry_pass_through";
+pub const TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK: &str = "explicit_infantry_attack";
+
+const TANK_TRAP_PATHING_MATRIX_LAUNCHES: [DevScenarioLaunch; 11] = [
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::AntiTankGun,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::MortarTeam,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::Artillery,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::Worker,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::Rifleman,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::MachineGunner,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH),
+    },
+    DevScenarioLaunch {
+        id: "tank_trap_pathing_matrix",
+        unit: EntityKind::Rifleman,
+        count: 1,
+        blocker: None,
+        case: Some(TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK),
+    },
+];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 10] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -567,6 +731,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 9] = [
         description: "Training Centre, engineers, one rifleman, and one vehicle start ready for a diagonal Tank Trap line build; after 30 seconds the test units try to cross.",
         launches: &TANK_TRAP_LINE_DIAGONAL_LAUNCHES,
     },
+    DevScenarioSpec {
+        id: "tank_trap_pathing_matrix",
+        title: "Tank Trap Pathing Matrix",
+        description: "Prebuilt Tank Trap walls with selectable owner/pathing and attack cases.",
+        launches: &TANK_TRAP_PATHING_MATRIX_LAUNCHES,
+    },
 ];
 
 pub fn all_dev_scenarios() -> &'static [DevScenarioSpec] {
@@ -579,12 +749,23 @@ pub fn parse_dev_scenario_launch(
     count: &str,
     blocker: Option<&str>,
 ) -> Option<DevScenarioLaunch> {
+    parse_dev_scenario_launch_with_case(id, unit, count, blocker, None)
+}
+
+pub fn parse_dev_scenario_launch_with_case(
+    id: &str,
+    unit: &str,
+    count: &str,
+    blocker: Option<&str>,
+    case: Option<&str>,
+) -> Option<DevScenarioLaunch> {
     let unit = unit.parse::<EntityKind>().ok()?;
     if !unit.is_unit() {
         return None;
     }
     let count = count.parse::<usize>().ok()?;
     let blocker = parse_dev_scenario_blocker(id, blocker)?;
+    let case = parse_dev_scenario_case(id, case)?;
     all_dev_scenarios()
         .iter()
         .flat_map(|scenario| scenario.launches.iter())
@@ -594,17 +775,31 @@ pub fn parse_dev_scenario_launch(
                 && launch.unit == unit
                 && launch.count == count
                 && launch.blocker == blocker
+                && launch.case == case
         })
 }
 
 pub fn parse_dev_scenario_room(raw: &str) -> Option<DevScenarioLaunch> {
     let (id, rest) = raw.split_once(":unit=")?;
     let (unit, count) = rest.split_once(":count=")?;
-    let (count, blocker) = match count.split_once(":blocker=") {
-        Some((count, blocker)) => (count, Some(blocker)),
+    let (count, suffix) = match count.split_once(':') {
+        Some((count, suffix)) => (count, Some(suffix)),
         None => (count, None),
     };
-    parse_dev_scenario_launch(id, unit, count, blocker)
+    let mut blocker = None;
+    let mut case = None;
+    if let Some(suffix) = suffix {
+        for part in suffix.split(':') {
+            if let Some(value) = part.strip_prefix("blocker=") {
+                blocker = Some(value);
+            } else if let Some(value) = part.strip_prefix("case=") {
+                case = Some(value);
+            } else {
+                return None;
+            }
+        }
+    }
+    parse_dev_scenario_launch_with_case(id, unit, count, blocker, case)
 }
 
 pub fn parse_dev_scenario_blocker(id: &str, blocker: Option<&str>) -> Option<Option<EntityKind>> {
@@ -628,12 +823,44 @@ pub fn parse_dev_scenario_blocker(id: &str, blocker: Option<&str>) -> Option<Opt
     }
 }
 
+pub fn parse_dev_scenario_case(id: &str, case: Option<&str>) -> Option<Option<&'static str>> {
+    match (id, case) {
+        ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE)) => {
+            Some(Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE))
+        }
+        ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH)) => {
+            Some(Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH))
+        }
+        ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH)) => {
+            Some(Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH))
+        }
+        ("tank_trap_pathing_matrix", Some(TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK)) => {
+            Some(Some(TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK))
+        }
+        ("tank_trap_pathing_matrix", _) => None,
+        (_, None) => Some(None),
+        (_, Some(_)) => None,
+    }
+}
+
+pub fn dev_scenario_case_label(case: &str) -> &'static str {
+    match case {
+        TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE => "friendly vehicle reroute",
+        TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH => "enemy vehicle breach",
+        TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH => "infantry pass-through",
+        TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK => "explicit infantry attack",
+        _ => "case",
+    }
+}
+
 pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
     match unit {
         EntityKind::Worker => "worker",
         EntityKind::Rifleman => "rifleman",
         EntityKind::MachineGunner => "machine gunner",
         EntityKind::AntiTankGun => "anti-tank gun",
+        EntityKind::MortarTeam => "mortar team",
+        EntityKind::Artillery => "artillery",
         EntityKind::ScoutCar => "scout car",
         EntityKind::Tank => "tank",
         _ => "unit",
@@ -664,6 +891,7 @@ mod tests {
                 unit: EntityKind::Worker,
                 count: 1,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -673,6 +901,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 4,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -682,6 +911,7 @@ mod tests {
                 unit: EntityKind::AntiTankGun,
                 count: 1,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -691,6 +921,7 @@ mod tests {
                 unit: EntityKind::AntiTankGun,
                 count: 15,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -700,6 +931,7 @@ mod tests {
                 unit: EntityKind::ScoutCar,
                 count: 15,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -709,6 +941,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 15,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -718,6 +951,7 @@ mod tests {
                 unit: EntityKind::AntiTankGun,
                 count: 5,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -727,6 +961,7 @@ mod tests {
                 unit: EntityKind::ScoutCar,
                 count: 5,
                 blocker: Some(EntityKind::Worker),
+                case: None,
             })
         );
         assert_eq!(
@@ -736,6 +971,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 5,
                 blocker: Some(EntityKind::Worker),
+                case: None,
             })
         );
         assert_eq!(
@@ -745,6 +981,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 5,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -754,6 +991,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -763,6 +1001,7 @@ mod tests {
                 unit: EntityKind::ScoutCar,
                 count: 1,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -772,6 +1011,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
+                case: None,
             })
         );
         assert_eq!(
@@ -781,6 +1021,55 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
+                case: None,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room(
+                "tank_trap_pathing_matrix:unit=scout_car:count=1:case=friendly_vehicle_reroute"
+            ),
+            Some(DevScenarioLaunch {
+                id: "tank_trap_pathing_matrix",
+                unit: EntityKind::ScoutCar,
+                count: 1,
+                blocker: None,
+                case: Some(TANK_TRAP_PATHING_CASE_FRIENDLY_VEHICLE_REROUTE),
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room(
+                "tank_trap_pathing_matrix:unit=mortar_team:count=1:case=enemy_vehicle_breach"
+            ),
+            Some(DevScenarioLaunch {
+                id: "tank_trap_pathing_matrix",
+                unit: EntityKind::MortarTeam,
+                count: 1,
+                blocker: None,
+                case: Some(TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_BREACH),
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room(
+                "tank_trap_pathing_matrix:unit=machine_gunner:count=1:case=infantry_pass_through"
+            ),
+            Some(DevScenarioLaunch {
+                id: "tank_trap_pathing_matrix",
+                unit: EntityKind::MachineGunner,
+                count: 1,
+                blocker: None,
+                case: Some(TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH),
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room(
+                "tank_trap_pathing_matrix:unit=rifleman:count=1:case=explicit_infantry_attack"
+            ),
+            Some(DevScenarioLaunch {
+                id: "tank_trap_pathing_matrix",
+                unit: EntityKind::Rifleman,
+                count: 1,
+                blocker: None,
+                case: Some(TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK),
             })
         );
         assert_eq!(
@@ -795,6 +1084,7 @@ mod tests {
                 unit: EntityKind::ScoutCar,
                 count: 3,
                 blocker: Some(EntityKind::MachineGunner),
+                case: None,
             })
         );
     }
@@ -859,6 +1149,50 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("tank_trap_line_vertical", "tank", "2", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch_with_case(
+                "tank_trap_pathing_matrix",
+                "rifleman",
+                "1",
+                None,
+                Some("friendly_vehicle_reroute")
+            ),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch_with_case(
+                "tank_trap_pathing_matrix",
+                "worker",
+                "1",
+                None,
+                Some("enemy_vehicle_breach")
+            ),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch_with_case(
+                "tank_trap_pathing_matrix",
+                "tank",
+                "1",
+                None,
+                Some("infantry_pass_through")
+            ),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch_with_case(
+                "tank_trap_pathing_matrix",
+                "rifleman",
+                "2",
+                None,
+                Some("explicit_infantry_attack")
+            ),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("tank_trap_pathing_matrix", "tank", "1", None),
             None
         );
         assert_eq!(

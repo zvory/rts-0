@@ -212,10 +212,10 @@ alive.
   `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
-  normal `Game`, drive authored scenario setup and optional scripted movement, and send watchers
-  `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Saved self-play artifacts
-  are normal `ReplayArtifactV1` files and load through `Phase::ReplayViewer` via the neutral
-  replay-artifact room path.
+  normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
+  projection and fanout helpers to send watchers full-world snapshots for the configured view
+  player. Saved self-play artifacts are normal `ReplayArtifactV1` files and load through
+  `Phase::ReplayViewer` via the neutral replay-artifact room path.
 - Replay viewer rooms use `Phase::ReplayViewer`, which owns a `ReplaySession`:
   the immutable `ReplayArtifactV1`, rebuilt `Game`, command cursor, shared playback speed, and
   per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
@@ -227,6 +227,23 @@ AI controllers, or Tokio coordination into `rts-sim`:
 - `room_task.rs` remains the room lifecycle owner: membership, lobby/ingame/replay/branch phase
   transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
   `Game`.
+- `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
+  names the state source, join, clock, authority, vision, mutation, persistence, and start-payload
+  choices used by the rest of the lobby helpers.
+- `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
+  human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
+  aliases, and command issuer resolution.
+- `tick_control.rs` maps the session clock policy, replay pause/speed, dev-watch pause state, and
+  countdown state to the room ticker interval and scheduled action. `RoomTask` still owns the Tokio
+  interval and remains the only task that advances a room.
+- `projection.rs` owns snapshot projection decisions for client fanout. Live active players get
+  player fog, live spectators get active-seat union fog, replay viewers get their per-viewer replay
+  vision, branch-live active players use original-seat aliases, and dev-watch viewers get
+  full-world scenario snapshots.
+- `launch.rs` owns common `StartPayload` stamping for live, replay-branch-live, and dev-watch
+  starts: player id, spectator flag, prediction build/version, pending snapshot clearing, and the
+  send loop. Replay viewer payloads remain in `replay_session.rs` because they also carry replay
+  metadata.
 - `live_tick.rs` runs one live simulation tick around the existing `Game` seam: AI command enqueue,
   `Game::tick`, snapshot fanout, observer analysis, defeat/game-over checks, and panic replay
   capture.
@@ -240,6 +257,15 @@ AI controllers, or Tokio coordination into `rts-sim`:
 - `connection.rs`, `dev_replay.rs`, `crash_replay.rs`, `faction_validation.rs`, and
   `replay_validation.rs` are lobby-local support modules for connection sinks, dev artifact
   loading, panic artifacts, and server-side lifecycle validation.
+
+`/dev/scenario` remains mode-local for scripted setup and driver selection: each scenario still
+chooses a dedicated `Game::new_*_scenario` constructor and optional tick driver before joining the
+shared clock, projection, and launch helpers. Moving those constructors into a generic launch path
+would either widen this behavior-preserving refactor or add scenario registration machinery, so
+future lab work should consume the extracted primitives first and migrate scenario setup only with a
+separate product-approved design. `scripts/check-lobby-architecture.mjs` guards the now-stable
+fanout boundary by failing new production lobby calls to `Game::snapshot_for*` outside
+`projection.rs`, except for the existing AI think context in `live_tick.rs`.
 
 ### 3.3 Rules layer (`rules/`)
 

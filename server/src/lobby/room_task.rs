@@ -4,15 +4,18 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
+use super::launch::{LaunchPrediction, LaunchRecipient};
 use super::live_tick::{LiveTickDriver, LiveTickResult};
+use super::participants::{CommandIssuer, Participants};
+use super::projection::{ObserverAnalysisAudience, ProjectionPolicy};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
-use super::session_policy::{ClockPolicy, SessionPhase, SessionPolicy};
+use super::session_policy::{SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
-use super::snapshots::union_events;
+use super::tick_control::{DevWatchSpeed, ReplayPlaybackClock, ScheduledTickAction, TickControl};
 use super::*;
+use crate::protocol::ReplayPlaybackState;
 #[cfg(test)]
-use crate::protocol::SnapshotNetStatus;
-use crate::protocol::{ReplayPlaybackState, PREDICTION_PROTOCOL_VERSION};
+use crate::protocol::{SnapshotNetStatus, StartPayload, PREDICTION_PROTOCOL_VERSION};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -136,6 +139,7 @@ pub(super) struct DevScenarioConfig {
     pub(super) unit: EntityKind,
     pub(super) count: usize,
     pub(super) blocker: Option<EntityKind>,
+    pub(super) case: Option<&'static str>,
 }
 
 #[derive(Clone)]
@@ -149,6 +153,7 @@ pub(super) enum DevScenarioId {
     TankTrapLineHorizontal,
     TankTrapLineVertical,
     TankTrapLineDiagonal,
+    TankTrapPathingMatrix,
 }
 
 enum DevDriver {
@@ -339,22 +344,28 @@ impl RoomTask {
     pub(super) fn current_tick_interval(&self) -> Duration {
         let base =
             test_tick_interval_override().unwrap_or_else(|| Duration::from_millis(config::TICK_MS));
-        base.div_f32(self.current_speed_multiplier())
+        self.tick_control().tick_interval(base)
     }
 
     fn current_speed_multiplier(&self) -> f32 {
-        if self.dev_watch_paused {
-            return 1.0;
-        }
-        match self.session_policy().clock {
-            ClockPolicy::ReplayPlayback => match &self.phase {
-                Phase::ReplayViewer(session) if session.is_paused() => 1.0,
-                Phase::ReplayViewer(session) => session.speed(),
-                _ => self.replay_speed,
-            },
-            ClockPolicy::BranchStaging => 1.0,
-            _ => self.replay_speed,
-        }
+        self.tick_control().speed_multiplier()
+    }
+
+    fn tick_control(&self) -> TickControl {
+        let replay = match &self.phase {
+            Phase::ReplayViewer(session) => Some(ReplayPlaybackClock {
+                speed: session.speed(),
+                paused: session.is_paused(),
+            }),
+            _ => None,
+        };
+        TickControl::new(
+            self.session_policy().clock,
+            replay,
+            self.dev_watch_paused,
+            self.replay_speed,
+            self.match_countdown_deadline.is_some(),
+        )
     }
 
     fn session_phase(&self) -> SessionPhase {
@@ -368,6 +379,10 @@ impl RoomTask {
 
     fn session_policy(&self) -> SessionPolicy {
         SessionPolicy::for_room(&self.mode, self.session_phase())
+    }
+
+    fn projection_policy(&self) -> ProjectionPolicy {
+        ProjectionPolicy::new(self.session_policy().vision)
     }
 
     fn is_dev_watch(&self) -> bool {
@@ -1029,23 +1044,16 @@ impl RoomTask {
     }
 
     fn active_human_count(&self) -> usize {
-        self.order
-            .iter()
-            .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
-            .count()
+        self.participants().active_human_count()
     }
 
     fn active_human_ids(&self) -> impl Iterator<Item = u32> + '_ {
-        self.order
-            .iter()
-            .copied()
-            .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
+        self.participants().active_human_ids().into_iter()
     }
 
     fn active_seat_ids(&self) -> Vec<u32> {
-        let mut ids: Vec<u32> = self.active_human_ids().collect();
-        ids.extend(self.ai_players.iter().map(|ai| ai.id));
-        ids
+        self.participants()
+            .active_seat_ids(self.ai_players.iter().map(|ai| ai.id))
     }
 
     fn team_id_for_active_seat(&self, id: u32) -> TeamId {
@@ -1142,49 +1150,34 @@ impl RoomTask {
     }
 
     fn spectator_visible_player_ids(&self) -> Vec<u32> {
-        if !self.branch_live_seat_by_connection.is_empty() {
-            return self
-                .branch_live_seat_by_connection
-                .values()
-                .copied()
-                .collect();
-        }
-        let mut ids: Vec<u32> = self.active_human_ids().collect();
-        ids.extend(self.ai_players.iter().map(|ai| ai.id));
-        ids
+        self.participants()
+            .spectator_visible_player_ids(self.ai_players.iter().map(|ai| ai.id))
     }
 
     fn live_seat_id_for_connection(&self, connection_id: u32) -> Option<u32> {
-        self.branch_live_seat_by_connection
-            .get(&connection_id)
-            .copied()
-            .or_else(|| {
-                self.players
-                    .contains_key(&connection_id)
-                    .then_some(connection_id)
-            })
+        self.participants()
+            .live_seat_id_for_connection(connection_id)
     }
 
     fn live_connection_is_player(&self, connection_id: u32) -> bool {
-        self.players
-            .get(&connection_id)
-            .map(|p| !p.spectator)
-            .unwrap_or(false)
-            && (self.branch_live_seat_by_connection.is_empty()
-                || self
-                    .branch_live_seat_by_connection
-                    .contains_key(&connection_id))
+        self.participants().live_connection_is_player(connection_id)
+    }
+
+    fn command_issuer_for_connection(&self, connection_id: u32) -> Option<CommandIssuer> {
+        self.participants()
+            .command_issuer_for_connection(connection_id, &self.outcome_sent)
     }
 
     fn reassign_host_if_needed(&mut self) {
-        if self
-            .host_id
-            .and_then(|id| self.players.get(&id).map(|_| id))
-            .is_some()
-        {
-            return;
-        }
-        self.host_id = self.order.first().copied();
+        self.host_id = self.participants().host_with_fallback(self.host_id);
+    }
+
+    fn participants(&self) -> Participants<'_> {
+        Participants::new(
+            &self.order,
+            &self.players,
+            &self.branch_live_seat_by_connection,
+        )
     }
 
     /// Pick the first palette color not currently held by a human player. Join order alone is
@@ -1224,16 +1217,11 @@ impl RoomTask {
             crate::log_debug!(room = %self.room, player_id, "ignoring command with reserved clientSeq 0");
             return;
         }
-        let live_seat_id = (self.live_connection_is_player(player_id)
-            && !self.outcome_sent.contains(&player_id))
-        .then(|| {
-            self.live_seat_id_for_connection(player_id)
-                .unwrap_or(player_id)
-        });
+        let issuer = self.command_issuer_for_connection(player_id);
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
-            if let Some(seat_id) = live_seat_id {
+            if let Some(issuer) = issuer {
                 let Some(player) = self.players.get_mut(&player_id) else {
                     return;
                 };
@@ -1248,10 +1236,10 @@ impl RoomTask {
                     return;
                 }
                 player.last_received_client_seq = client_seq;
-                game.enqueue(seat_id, cmd);
+                game.enqueue(issuer.seat_id, cmd);
                 self.pending_client_command_acks
                     .push(PendingClientCommandAck {
-                        connection_id: player_id,
+                        connection_id: issuer.connection_id,
                         client_seq,
                     });
             }
@@ -1719,29 +1707,25 @@ impl RoomTask {
         );
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
-        // Each player gets the shared static payload but stamped with their own id.
-        for &id in &self.order {
-            if let Some(player) = self.players.get(&id) {
-                let per_player = StartPayload {
-                    player_id: id,
+        let recipients: Vec<_> = self
+            .order
+            .iter()
+            .filter_map(|&id| {
+                self.players.get(&id).map(|player| LaunchRecipient {
+                    connection_id: id,
+                    payload_player_id: id,
                     spectator: player.spectator,
-                    prediction_build_id: (!player.spectator)
-                        .then(|| server_build_sha().to_string()),
-                    prediction_version: if player.spectator {
-                        0
+                    prediction: if player.spectator {
+                        LaunchPrediction::Disabled
                     } else {
-                        PREDICTION_PROTOCOL_VERSION
+                        LaunchPrediction::Enabled
                     },
-                    ..payload.clone()
-                };
-                send_or_log(
-                    &self.room,
-                    id,
-                    &player.msg_tx,
-                    ServerMessage::Start(per_player),
-                );
-            }
-        }
+                    clear_pending_snapshot: false,
+                    msg_tx: player.msg_tx.clone(),
+                })
+            })
+            .collect();
+        super::launch::send_start_payloads(&self.room, &payload, recipients);
 
         structured_log::log_match_started(MatchStartedLog {
             room: &self.room,
@@ -1808,6 +1792,7 @@ impl RoomTask {
         self.dev_driver = None;
         self.dev_view_player_id = None;
 
+        let mut recipients = Vec::new();
         for &connection_id in &self.order {
             let Some(player) = self.players.get_mut(&connection_id) else {
                 continue;
@@ -1818,26 +1803,20 @@ impl RoomTask {
                 .copied();
             player.spectator = mapped_seat.is_none();
             player.ready = false;
-            player.msg_tx.clear_pending_snapshot();
-            let per_player = StartPayload {
-                player_id: mapped_seat.unwrap_or(connection_id),
-                spectator: mapped_seat.is_none(),
-                prediction_build_id: mapped_seat.map(|_| server_build_sha().to_string()),
-                prediction_version: if mapped_seat.is_some() {
-                    PREDICTION_PROTOCOL_VERSION
-                } else {
-                    0
-                },
-                replay: None,
-                ..payload.clone()
-            };
-            send_or_log(
-                &self.room,
+            recipients.push(LaunchRecipient {
                 connection_id,
-                &player.msg_tx,
-                ServerMessage::Start(per_player),
-            );
+                payload_player_id: mapped_seat.unwrap_or(connection_id),
+                spectator: mapped_seat.is_none(),
+                prediction: if mapped_seat.is_some() {
+                    LaunchPrediction::Enabled
+                } else {
+                    LaunchPrediction::Disabled
+                },
+                clear_pending_snapshot: true,
+                msg_tx: player.msg_tx.clone(),
+            });
         }
+        super::launch::send_start_payloads(&self.room, &payload, recipients);
 
         structured_log::log_match_started(MatchStartedLog {
             room: &self.room,
@@ -2007,6 +1986,25 @@ impl RoomTask {
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
                     }
+                    DevScenarioId::TankTrapPathingMatrix => {
+                        let scenario_case = config
+                            .case
+                            .ok_or_else(|| "missing Tank Trap pathing case".to_string())?;
+                        let setup = Game::new_tank_trap_pathing_scenario(
+                            scenario_case,
+                            config.unit,
+                            config.count,
+                            match_seed(),
+                        )?;
+                        let driver = DevScenarioDriver {
+                            player_id: setup.player_id,
+                            units: setup.units,
+                            goal: setup.goal,
+                            issue_after_ticks: setup.issue_after_ticks,
+                            issued: false,
+                        };
+                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                    }
                 }
             }
         }
@@ -2019,18 +2017,18 @@ impl RoomTask {
         let Some(player) = self.players.get(&watcher_id) else {
             return;
         };
-        let per_player = StartPayload {
-            player_id: self.dev_view_player_id.unwrap_or(watcher_id),
-            spectator: true,
-            prediction_build_id: None,
-            prediction_version: 0,
-            ..game.start_payload()
-        };
-        send_or_log(
+        let payload = game.start_payload();
+        super::launch::send_start_payloads(
             &self.room,
-            watcher_id,
-            &player.msg_tx,
-            ServerMessage::Start(per_player),
+            &payload,
+            [LaunchRecipient {
+                connection_id: watcher_id,
+                payload_player_id: self.dev_view_player_id.unwrap_or(watcher_id),
+                spectator: true,
+                prediction: LaunchPrediction::Disabled,
+                clear_pending_snapshot: false,
+                msg_tx: player.msg_tx.clone(),
+            }],
         );
     }
 
@@ -2068,6 +2066,11 @@ impl RoomTask {
         let Phase::ReplayViewer(session) = &self.phase else {
             return;
         };
+        if self.projection_policy().observer_analysis_audience()
+            != ObserverAnalysisAudience::ReplayViewers
+        {
+            return;
+        }
         self.send_observer_analysis_to_ids(
             [watcher_id],
             ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
@@ -2080,6 +2083,11 @@ impl RoomTask {
     }
 
     fn broadcast_observer_analysis_for(&self, session: &ReplaySession) {
+        if self.projection_policy().observer_analysis_audience()
+            != ObserverAnalysisAudience::ReplayViewers
+        {
+            return;
+        }
         self.send_observer_analysis_to_ids(
             self.order.clone(),
             ServerMessage::ObserverAnalysis(session.game().observer_analysis()),
@@ -2124,13 +2132,14 @@ impl RoomTask {
     fn fanout_replay_snapshots(
         &mut self,
         session: &ReplaySession,
-        per_player_events: HashMap<u32, Vec<Event>>,
+        mut per_player_events: HashMap<u32, Vec<Event>>,
         scheduler_lag: Duration,
         tick_start: StdInstant,
         perf: Option<&mut rts_sim::perf::TickPerf>,
     ) {
         let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
+        let projection_policy = self.projection_policy();
         SnapshotFanout::new(
             &self.room,
             scheduler_lag,
@@ -2140,13 +2149,10 @@ impl RoomTask {
             perf,
         )
         .send_to_recipients(&mut self.players, recipients, |id, _player| {
-            let visible_players = session.vision_player_ids_for(id);
-            let mut snapshot = session.game().snapshot_for_spectator(&visible_players);
-            snapshot.events.extend(union_events(
-                visible_players
-                    .iter()
-                    .filter_map(|player_id| per_player_events.get(player_id)),
-            ));
+            let projection =
+                projection_policy.replay_snapshot_for(session.vision_player_ids_for(id));
+            let snapshot =
+                projection.snapshot_with_events(session.game(), &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, true))
         });
     }
@@ -2168,25 +2174,25 @@ impl RoomTask {
     /// One simulation step. No-op in the `Lobby` phase (the ticker keeps running so a room is
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
-        if self.is_dev_watch() {
-            if self.dev_watch_paused {
+        match self.tick_control().scheduled_action() {
+            ScheduledTickAction::Noop => return,
+            ScheduledTickAction::Countdown => {
+                self.finish_match_countdown_if_due();
                 return;
             }
-            self.on_tick_dev_watch(scheduled);
-            return;
-        }
-        if matches!(self.phase, Phase::ReplayViewer(_)) {
-            if matches!(&self.phase, Phase::ReplayViewer(session) if session.is_paused()) {
+            ScheduledTickAction::ReplayPlayback => {
+                self.on_tick_replay_viewer(scheduled);
                 return;
             }
-            self.on_tick_replay_viewer(scheduled);
-            return;
-        }
-        if self.finish_match_countdown_if_due() {
-            return;
+            ScheduledTickAction::DevWatch => {
+                self.on_tick_dev_watch(scheduled);
+                return;
+            }
+            ScheduledTickAction::LiveMatch => {}
         }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
+        let projection_policy = self.projection_policy();
         let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => {
                 // Stay in lobby; nothing to simulate.
@@ -2222,6 +2228,7 @@ impl RoomTask {
             pending_client_command_acks: &mut self.pending_client_command_acks,
             slow_tick_count: &mut self.slow_tick_count,
             spectator_visible_players,
+            projection_policy,
         }
         .run(game);
 
@@ -2288,6 +2295,7 @@ impl RoomTask {
         let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
+        let projection = self.projection_policy().dev_snapshot_for(view_player_id);
         SnapshotFanout::new(
             &self.room,
             scheduler_lag,
@@ -2297,10 +2305,7 @@ impl RoomTask {
             perf.as_mut(),
         )
         .send_to_recipients(&mut self.players, recipients, |_id, player| {
-            let mut snapshot = game.snapshot_full_for(view_player_id);
-            if let Some(mut events) = per_player_events.remove(&view_player_id) {
-                snapshot.events.append(&mut events);
-            }
+            let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
 
@@ -2376,22 +2381,22 @@ impl RoomTask {
         if !self.session_policy().is_dev_watch() {
             return;
         }
-        if speed == 0.0 {
-            self.dev_watch_paused = true;
-            self.broadcast_dev_watch_state();
-            return;
+        match TickControl::dev_watch_speed(speed) {
+            DevWatchSpeed::Paused => {
+                self.dev_watch_paused = true;
+            }
+            DevWatchSpeed::Running(speed) => {
+                self.dev_watch_paused = false;
+                self.replay_speed = speed;
+            }
         }
-        self.dev_watch_paused = false;
-        // Clamp to sensible range matching the UI buttons (0.125× – 8×).
-        let clamped = speed.clamp(0.125, 8.0);
-        self.replay_speed = clamped;
         self.broadcast_dev_watch_state();
     }
 
     fn on_step_dev_tick(&mut self, player_id: u32) {
-        if !self.players.contains_key(&player_id)
-            || !self.dev_watch_paused
-            || !self.session_policy().is_dev_watch()
+        if !self
+            .tick_control()
+            .can_step_dev_tick(self.players.contains_key(&player_id))
         {
             return;
         }
@@ -2400,6 +2405,8 @@ impl RoomTask {
     }
 
     fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
+        let send_analysis = self.projection_policy().observer_analysis_audience()
+            == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
             if !self.players.contains_key(&player_id) {
                 return;
@@ -2419,8 +2426,8 @@ impl RoomTask {
                 return;
             }
             session.set_vision(player_id, vision);
-            let analysis = session.game().observer_analysis();
-            if let Some(player) = self.players.get(&player_id) {
+            let analysis = send_analysis.then(|| session.game().observer_analysis());
+            if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
                 send_or_log(
                     &self.room,
                     player_id,
@@ -2547,6 +2554,8 @@ impl RoomTask {
     /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
     /// No-op outside replay rooms or when no game is active.
     fn on_seek_replay(&mut self, player_id: u32, ticks_back: u32) {
+        let send_analysis = self.projection_policy().observer_analysis_audience()
+            == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
             if !self.players.contains_key(&player_id) {
                 return;
@@ -2573,6 +2582,7 @@ impl RoomTask {
             let analysis = seek_result
                 .as_ref()
                 .ok()
+                .filter(|_| send_analysis)
                 .map(|_| session.game().observer_analysis());
             match seek_result {
                 Ok(_) => {
@@ -2596,6 +2606,8 @@ impl RoomTask {
 
     /// Seek a replay to an absolute tick. No-op outside replay rooms or when no game is active.
     fn on_seek_replay_to(&mut self, player_id: u32, tick: u32) {
+        let send_analysis = self.projection_policy().observer_analysis_audience()
+            == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
             if !self.players.contains_key(&player_id) {
                 return;
@@ -2622,6 +2634,7 @@ impl RoomTask {
             let analysis = seek_result
                 .as_ref()
                 .ok()
+                .filter(|_| send_analysis)
                 .map(|_| session.game().observer_analysis());
             match seek_result {
                 Ok(_) => {
@@ -3358,6 +3371,15 @@ mod tests {
         writer
     }
 
+    fn start_payloads(writer: &mut ConnectionWriter) -> Vec<StartPayload> {
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .filter_map(|msg| match msg {
+                ServerMessage::Start(payload) => Some(payload),
+                _ => None,
+            })
+            .collect()
+    }
+
     fn branch_staging_messages(writer: &mut ConnectionWriter) -> Vec<ServerMessage> {
         std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
             .filter(|msg| matches!(msg, ServerMessage::BranchStaging { .. }))
@@ -3419,6 +3441,68 @@ mod tests {
         task.on_set_replay_speed(99, 1.0);
         task.on_tick(TokioInstant::now());
         assert_eq!(in_game_tick(&task), 1);
+    }
+
+    #[test]
+    fn room_task_tick_control_preserves_current_intervals_by_mode() {
+        let base = Duration::from_millis(config::TICK_MS);
+
+        let normal = RoomTask::new(
+            "tick-normal".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        assert_eq!(normal.current_tick_interval(), base);
+
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 3);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        replay.set_speed(99, 2.0);
+        let mut replay_task = RoomTask::new(
+            "tick-replay".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut replay_task, 99, true);
+        replay_task.phase = Phase::ReplayViewer(Box::new(replay));
+        assert_eq!(replay_task.current_tick_interval(), base.div_f32(2.0));
+
+        replay_task.on_set_replay_speed(99, 0.0);
+        assert_eq!(replay_task.current_tick_interval(), base);
+
+        let mut dev = RoomTask::new(
+            "tick-dev".to_string(),
+            RoomMode::DevScenario(DevScenarioConfig {
+                id: DevScenarioId::VehicleCornerWall,
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+                case: None,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        dev.on_set_replay_speed(99, 2.0);
+        assert_eq!(dev.current_tick_interval(), base.div_f32(2.0));
+        dev.on_set_replay_speed(99, 0.0);
+        assert_eq!(dev.current_tick_interval(), base);
+
+        let seed = replay_branch_test_seed(&players, 1);
+        let mut branch = RoomTask::new(
+            "tick-branch".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        branch.replay_speed = 4.0;
+        branch.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+        assert_eq!(branch.current_tick_interval(), base);
     }
 
     #[test]
@@ -3601,6 +3685,111 @@ mod tests {
             0,
             "lobby-phase commands must not consume client sequence state"
         );
+    }
+
+    #[test]
+    fn normal_live_player_commands_use_connection_authority_and_ack_sequence() {
+        let mut task = RoomTask::new(
+            "live-command-authority-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 1, true);
+
+        task.start_match();
+        task.on_command(
+            1,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        assert_eq!(task.players.get(&1).unwrap().last_received_client_seq, 1);
+        assert_eq!(task.pending_client_command_acks.len(), 1);
+        assert_eq!(task.pending_client_command_acks[0].connection_id, 1);
+        assert_eq!(task.pending_client_command_acks[0].client_seq, 1);
+
+        task.on_tick(TokioInstant::now());
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert_eq!(game.command_log().len(), 1);
+        assert_eq!(game.command_log()[0].player_id, 1);
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(
+            task.players.get(&1).unwrap().last_sim_consumed_client_seq,
+            1
+        );
+    }
+
+    #[test]
+    fn defeated_live_players_cannot_issue_more_commands() {
+        let mut task = RoomTask::new(
+            "defeated-command-authority-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 1, true);
+        add_test_room_player(&mut task, 2, true);
+
+        task.start_match();
+        task.outcome_sent.insert(1);
+        task.on_command(
+            1,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert!(game.command_log().is_empty());
+        assert!(task.pending_client_command_acks.is_empty());
+        assert_eq!(task.players.get(&1).unwrap().last_received_client_seq, 0);
+    }
+
+    #[test]
+    fn normal_live_start_payloads_stamp_active_players_and_spectators() {
+        let mut task = RoomTask::new(
+            "live-start-payload-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_player = add_test_room_player(&mut task, 1, true);
+        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+
+        task.start_match();
+
+        let player_starts = start_payloads(&mut writer_player);
+        assert_eq!(player_starts.len(), 1);
+        let player_payload = &player_starts[0];
+        assert_eq!(player_payload.player_id, 1);
+        assert!(!player_payload.spectator);
+        assert!(player_payload.prediction_build_id.is_some());
+        assert_eq!(
+            player_payload.prediction_version,
+            PREDICTION_PROTOCOL_VERSION
+        );
+        assert!(player_payload.replay.is_none());
+
+        let spectator_starts = start_payloads(&mut writer_spectator);
+        assert_eq!(spectator_starts.len(), 1);
+        let spectator_payload = &spectator_starts[0];
+        assert_eq!(spectator_payload.player_id, 99);
+        assert!(spectator_payload.spectator);
+        assert!(spectator_payload.prediction_build_id.is_none());
+        assert_eq!(spectator_payload.prediction_version, 0);
+        assert!(spectator_payload.replay.is_none());
     }
 
     #[test]
@@ -4078,7 +4267,7 @@ mod tests {
     }
 
     #[test]
-    fn branch_start_countdown_promotes_to_live_start_payloads() {
+    fn branch_launch_countdown_promotes_to_live_start_payloads() {
         let players = replay_test_players(2);
         let seed = replay_branch_test_seed(&players, 3);
         let mut task = RoomTask::new(
@@ -4122,14 +4311,23 @@ mod tests {
             matches!(msg, ServerMessage::Start(payload)
                 if payload.player_id == players[1].id
                     && !payload.spectator
+                    && payload.prediction_build_id.is_some()
+                    && payload.prediction_version == PREDICTION_PROTOCOL_VERSION
                     && payload.replay.is_none()
                     && payload.players.iter().all(|player| player.faction_id == DEFAULT_FACTION_ID))
         }));
         let starts_spectator: Vec<_> =
             std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
         assert!(starts_spectator.iter().any(|msg| {
-            matches!(msg, ServerMessage::Start(payload)
-                if payload.player_id == 102 && payload.spectator && payload.replay.is_none())
+            matches!(
+                msg,
+                ServerMessage::Start(payload)
+                    if payload.player_id == 102
+                        && payload.spectator
+                        && payload.prediction_build_id.is_none()
+                        && payload.prediction_version == 0
+                        && payload.replay.is_none()
+            )
         }));
     }
 
@@ -4200,6 +4398,9 @@ mod tests {
                 units: vec![4, 5, 6],
             },
         );
+        assert_eq!(task.pending_client_command_acks.len(), 1);
+        assert_eq!(task.pending_client_command_acks[0].connection_id, 100);
+        assert_eq!(task.pending_client_command_acks[0].client_seq, 1);
         task.on_tick(TokioInstant::now());
 
         let snapshot_a = writer_a.snapshots.take().expect("claimed A snapshot");
@@ -4213,6 +4414,11 @@ mod tests {
         };
         assert_eq!(game.command_log().len(), 1);
         assert_eq!(game.command_log()[0].player_id, players[0].id);
+        assert_eq!(
+            task.players.get(&100).unwrap().last_sim_consumed_client_seq,
+            1
+        );
+        assert_eq!(task.players.get(&102).unwrap().last_received_client_seq, 0);
         assert_eq!(
             snapshot_a.visible_tiles,
             game.snapshot_for(players[0].id).visible_tiles
@@ -4396,6 +4602,37 @@ mod tests {
     }
 
     #[test]
+    fn dev_scenario_start_payload_is_read_only_viewer_payload() {
+        let mut task = RoomTask::new(
+            "dev-start-payload-test".to_string(),
+            RoomMode::DevScenario(DevScenarioConfig {
+                id: DevScenarioId::VehicleCornerWall,
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+                case: None,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Viewer".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        let starts = start_payloads(&mut writer);
+        assert_eq!(starts.len(), 1);
+        let payload = &starts[0];
+        assert_eq!(payload.player_id, task.dev_view_player_id.unwrap());
+        assert!(payload.spectator);
+        assert!(payload.prediction_build_id.is_none());
+        assert_eq!(payload.prediction_version, 0);
+        assert!(payload.replay.is_none());
+    }
+
+    #[test]
     fn paused_dev_scenario_steps_one_tick_at_a_time() {
         let mut task = RoomTask::new(
             "dev-scenario-step-test".to_string(),
@@ -4404,6 +4641,7 @@ mod tests {
                 unit: EntityKind::Tank,
                 count: 1,
                 blocker: None,
+                case: None,
             }),
             None,
             false,

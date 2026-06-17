@@ -279,7 +279,7 @@
     },
     {
       "path": "setup/dev_scenarios.rs",
-      "lines": 337
+      "lines": 492
     },
     {
       "path": "setup/dev_scenarios/layouts.rs",
@@ -287,7 +287,7 @@
     },
     {
       "path": "setup/dev_scenarios/tests.rs",
-      "lines": 812
+      "lines": 1093
     },
     {
       "path": "setup/tests.rs",

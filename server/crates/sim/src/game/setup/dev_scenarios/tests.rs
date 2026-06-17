@@ -11,9 +11,12 @@ fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
 
 fn assert_dev_scenario_starts_as_kriegsia(setup: &DevScenarioSetup) {
     let payload = setup.game.start_payload();
-    assert_eq!(payload.players.len(), 1);
-    assert_eq!(payload.players[0].id, setup.player_id);
-    assert_eq!(payload.players[0].faction_id, DEFAULT_FACTION_ID);
+    let player = payload
+        .players
+        .iter()
+        .find(|player| player.id == setup.player_id)
+        .expect("scenario player should be present in start payload");
+    assert_eq!(player.faction_id, DEFAULT_FACTION_ID);
 }
 
 #[derive(Debug)]
@@ -369,6 +372,230 @@ fn tank_trap_line_build_scenarios_start_with_builders_tech_and_test_units() {
         assert_eq!((player.steel, player.oil), (1_000, 1_000));
         assert_dev_scenario_starts_as_kriegsia(&setup);
     }
+}
+
+#[test]
+fn tank_trap_pathing_scenarios_spawn_prebuilt_walls_and_expected_units() {
+    let scenarios = [
+        (
+            "friendly_vehicle_reroute",
+            EntityKind::ScoutCar,
+            7usize,
+            7usize,
+        ),
+        (
+            "enemy_vehicle_breach",
+            EntityKind::Tank,
+            7usize,
+            8usize,
+        ),
+        (
+            "infantry_pass_through",
+            EntityKind::MachineGunner,
+            7usize,
+            8usize,
+        ),
+        (
+            "explicit_infantry_attack",
+            EntityKind::Rifleman,
+            1usize,
+            2usize,
+        ),
+    ];
+
+    for (scenario_id, unit, trap_count, expected_buildings) in scenarios {
+        let setup = Game::new_tank_trap_pathing_scenario(scenario_id, unit, 1, 0x5150_0101)
+            .expect("Tank Trap pathing scenario setup should succeed");
+        assert_eq!(setup.issue_after_ticks, config::TICK_HZ);
+        assert_eq!(setup.units.len(), 1);
+        assert_eq!(owned_kind_count(&setup.game, 1, unit), 1);
+        assert_eq!(
+            setup
+                .game
+                .entities
+                .iter()
+                .filter(|entity| entity.kind == EntityKind::TankTrap)
+                .count(),
+            trap_count,
+            "{scenario_id} should spawn a complete Tank Trap wall"
+        );
+        assert_eq!(
+            setup
+                .game
+                .entities
+                .iter()
+                .filter(|entity| entity.is_building())
+                .count(),
+            expected_buildings,
+            "{scenario_id} should only add the authored wall plus remote enemy base when needed"
+        );
+        assert_dev_scenario_starts_as_kriegsia(&setup);
+    }
+}
+
+#[test]
+fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
+    let setup = Game::new_tank_trap_pathing_scenario(
+        "friendly_vehicle_reroute",
+        EntityKind::Tank,
+        1,
+        0x5150_0102,
+    )
+    .expect("scenario setup should succeed");
+    assert_eq!(setup.game.team_of_player(1), Some(1));
+    assert_eq!(setup.game.team_of_player(2), Some(1));
+    assert!(owned_kind_count(&setup.game, 1, EntityKind::TankTrap) > 0);
+    assert!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap) > 0);
+
+    let occ = services::occupancy::Occupancy::build(&setup.game.map, &setup.game.entities);
+    let trap = setup
+        .game
+        .entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::TankTrap)
+        .expect("scenario should spawn Tank Traps");
+    let (tx, ty) = setup.game.map.tile_of(trap.pos_x, trap.pos_y);
+    assert!(
+        !occ.passable_for_kind(tx as i32, ty as i32, EntityKind::Tank),
+        "own/allied Tank Traps should be vehicle-body blockers before Phase 2"
+    );
+    assert!(
+        occ.passable_for_kind(tx as i32, ty as i32, EntityKind::Rifleman),
+        "Tank Traps should remain infantry-passable"
+    );
+}
+
+#[test]
+fn tank_trap_enemy_breach_scenario_represents_current_vehicle_blocker_layer() {
+    let setup = Game::new_tank_trap_pathing_scenario(
+        "enemy_vehicle_breach",
+        EntityKind::ScoutCar,
+        1,
+        0x5150_0103,
+    )
+    .expect("scenario setup should succeed");
+    assert_eq!(setup.game.team_of_player(1), Some(1));
+    assert_eq!(setup.game.team_of_player(2), Some(2));
+    assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 7);
+
+    let occ = services::occupancy::Occupancy::build(&setup.game.map, &setup.game.entities);
+    let enemy_trap = setup
+        .game
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
+        .expect("scenario should spawn enemy Tank Traps");
+    let (tx, ty) = setup.game.map.tile_of(enemy_trap.pos_x, enemy_trap.pos_y);
+    assert!(
+        !occ.passable_for_kind(tx as i32, ty as i32, EntityKind::ScoutCar),
+        "Phase 1 documents the current layer; Phase 2 should make enemy traps breachable for vehicle pathing"
+    );
+}
+
+#[test]
+fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
+    for unit in [
+        EntityKind::Worker,
+        EntityKind::Rifleman,
+        EntityKind::MachineGunner,
+    ] {
+        let setup = Game::new_tank_trap_pathing_scenario(
+            "infantry_pass_through",
+            unit,
+            1,
+            0x5150_0104,
+        )
+        .expect("scenario setup should succeed");
+        let mut game = setup.game;
+        let unit_id = setup.units[0];
+        let wall_x = game
+            .entities
+            .iter()
+            .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
+            .expect("enemy trap should exist")
+            .pos_x;
+        game.enqueue(
+            setup.player_id,
+            SimCommand::Move {
+                units: vec![unit_id],
+                x: setup.goal.0,
+                y: setup.goal.1,
+                queued: false,
+            },
+        );
+
+        let mut emitted_attack = false;
+        for _ in 0..900 {
+            let events = game.tick();
+            emitted_attack |= events
+                .iter()
+                .flat_map(|(_, events)| events.iter())
+                .any(|event| matches!(event, Event::Attack { from, .. } if *from == unit_id));
+            if game
+                .entities
+                .get(unit_id)
+                .is_some_and(|entity| entity.pos_x > wall_x + config::TILE_SIZE as f32)
+            {
+                break;
+            }
+        }
+
+        let entity = game.entities.get(unit_id).expect("unit should survive");
+        assert!(
+            entity.pos_x > wall_x + config::TILE_SIZE as f32,
+            "{unit} should cross the enemy Tank Trap wall on a normal move order"
+        );
+        assert_eq!(entity.target_id(), None);
+        assert!(!emitted_attack, "{unit} should not attack traps while moving");
+    }
+}
+
+#[test]
+fn tank_trap_explicit_rifleman_attack_order_remains_valid() {
+    let setup = Game::new_tank_trap_pathing_scenario(
+        "explicit_infantry_attack",
+        EntityKind::Rifleman,
+        1,
+        0x5150_0105,
+    )
+    .expect("scenario setup should succeed");
+    let mut game = setup.game;
+    let rifleman = setup.units[0];
+    let trap = game
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
+        .expect("enemy Tank Trap should exist")
+        .id;
+
+    game.enqueue(
+        setup.player_id,
+        SimCommand::Attack {
+            units: vec![rifleman],
+            target: trap,
+            queued: false,
+        },
+    );
+
+    let mut attacked = false;
+    for _ in 0..300 {
+        let events = game.tick();
+        attacked |= events
+            .iter()
+            .flat_map(|(_, events)| events.iter())
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == rifleman && *to == trap));
+        if attacked {
+            break;
+        }
+    }
+
+    let entity = game.entities.get(rifleman).expect("rifleman should survive");
+    assert_eq!(entity.order().attack_target(), Some(trap));
+    assert_eq!(entity.target_id(), Some(trap));
+    assert!(
+        attacked,
+        "direct Rifleman attack orders against visible enemy Tank Traps should still produce attacks"
+    );
 }
 
 #[test]

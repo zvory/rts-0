@@ -206,6 +206,10 @@ function tintForSlot(slot, context) {
   if (slot === "team-light") return { fill: lightenColor(hexToInt(context.teamColor), 0.12) };
   if (slot === "team-light-soft") return { fill: lightenColor(hexToInt(context.teamColor), 0.06) };
   if (slot === "team-light-strong") return { fill: lightenColor(hexToInt(context.teamColor), 0.16) };
+  if (slot === "team-light-08") return { fill: lightenColor(hexToInt(context.teamColor), 0.08) };
+  if (slot === "team-light-10") return { fill: lightenColor(hexToInt(context.teamColor), 0.10) };
+  if (slot === "team-light-14") return { fill: lightenColor(hexToInt(context.teamColor), 0.14) };
+  if (slot === "team-light-24") return { fill: lightenColor(hexToInt(context.teamColor), 0.24) };
   if (slot === "team-stroke") return { stroke: hexToInt(context.teamColor) };
   if (slot === "team-fill-stroke") {
     const team = hexToInt(context.teamColor);

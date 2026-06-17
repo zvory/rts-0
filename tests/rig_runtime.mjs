@@ -27,6 +27,11 @@ import {
   MORTAR_TEAM_RIG_SVG,
 } from "../client/src/renderer/rigs/support_svg.js";
 import { TANK_RIG_SVG } from "../client/src/renderer/rigs/tank_svg.js";
+import {
+  COMMAND_CAR_RIG_SVG,
+  EKAT_RIG_SVG,
+  SCOUT_CAR_RIG_SVG,
+} from "../client/src/renderer/rigs/vehicle_svg.js";
 import { WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -221,6 +226,9 @@ test("live rig definitions compile production SVG sources", () => {
   const antiTankGunFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-anti-tank-gun.svg"), "utf8").trim();
   const mortarTeamFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-mortar-team.svg"), "utf8").trim();
   const artilleryFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-artillery.svg"), "utf8").trim();
+  const scoutCarFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-scout-car.svg"), "utf8").trim();
+  const commandCarFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-command-car.svg"), "utf8").trim();
+  const ekatFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-ekat.svg"), "utf8").trim();
   const tankFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-vehicle.svg"), "utf8").trim();
   assert.equal(WORKER_RIG_SVG.trim(), workerFixtureText);
   assert.equal(RIFLEMAN_RIG_SVG.trim(), riflemanFixtureText);
@@ -228,6 +236,9 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(ANTI_TANK_GUN_RIG_SVG.trim(), antiTankGunFixtureText);
   assert.equal(MORTAR_TEAM_RIG_SVG.trim(), mortarTeamFixtureText);
   assert.equal(ARTILLERY_RIG_SVG.trim(), artilleryFixtureText);
+  assert.equal(SCOUT_CAR_RIG_SVG.trim(), scoutCarFixtureText);
+  assert.equal(COMMAND_CAR_RIG_SVG.trim(), commandCarFixtureText);
+  assert.equal(EKAT_RIG_SVG.trim(), ekatFixtureText);
   assert.equal(TANK_RIG_SVG.trim(), tankFixtureText);
   const definitions = createLiveRigDefinitions();
   assert.equal(definitions.has(KIND.ANTI_TANK_GUN), true);
@@ -242,6 +253,12 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(definitions.get(KIND.MACHINE_GUNNER).id, "machine-gunner.authored");
   assert.equal(definitions.has(KIND.MORTAR_TEAM), true);
   assert.equal(definitions.get(KIND.MORTAR_TEAM).id, "mortar-team.authored");
+  assert.equal(definitions.has(KIND.SCOUT_CAR), true);
+  assert.equal(definitions.get(KIND.SCOUT_CAR).id, "scout-car.authored");
+  assert.equal(definitions.has(KIND.COMMAND_CAR), true);
+  assert.equal(definitions.get(KIND.COMMAND_CAR).id, "command-car.authored");
+  assert.equal(definitions.has(KIND.EKAT), true);
+  assert.equal(definitions.get(KIND.EKAT).id, "ekat.authored");
   assert.equal(definitions.has(KIND.TANK), true);
   assert.equal(definitions.get(KIND.TANK).id, "tank.authored");
 });
@@ -271,6 +288,20 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.deepEqual(mortarTeamRoutes[0].parts, ["part.shadow"]);
   assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.tube.packed"), true);
   assert.equal(mortarTeamRoutes[1].parts.includes("part.mortar.leg.left.deployed"), true);
+
+  const scoutCarRoutes = liveRigRoutesFor(KIND.SCOUT_CAR);
+  assert.deepEqual(scoutCarRoutes[0].parts, ["part.shadow"]);
+  assert.equal(scoutCarRoutes[1].parts.includes("part.gunnerBarrel"), true);
+  assert.equal(scoutCarRoutes[1].parts.includes("part.noseTick"), true);
+
+  const commandCarRoutes = liveRigRoutesFor(KIND.COMMAND_CAR);
+  assert.deepEqual(commandCarRoutes[0].parts, ["part.shadow"]);
+  assert.equal(commandCarRoutes[1].parts.includes("part.badge.top"), true);
+  assert.equal(commandCarRoutes[1].parts.includes("part.breakthroughAura"), true);
+
+  const ekatRoutes = liveRigRoutesFor(KIND.EKAT);
+  assert.deepEqual(ekatRoutes[0].parts, ["part.shadow"]);
+  assert.deepEqual(ekatRoutes[1].parts, ["part.body", "part.facingTick"]);
 
   const workerRoutes = liveRigRoutesFor(KIND.WORKER);
   assert.deepEqual(workerRoutes[0].parts, ["part.shadow"]);
