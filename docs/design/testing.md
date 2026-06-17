@@ -54,7 +54,9 @@ with:
 - `summary.log`: short human-readable failure summary and missing milestones.
 
 The replay artifact is meant to be enough to reproduce or inspect a failing run without manually
-playtesting first. By default successful runs do not write artifacts. For manual inspection,
+playtesting first. Load an artifact with
+`/dev/replay-artifact?replay=<artifact_name>` on a local server using the same Cargo target
+directory. By default successful runs do not write artifacts. For manual inspection,
 setting `RTS_SELFPLAY_SAVE_REPLAY=1` writes a successful run to
 `target/selfplay-artifacts/<test>-<pid>-<time>/`; setting `RTS_SELFPLAY_SAVE_REPLAY=<name>` uses
 that explicit safe artifact name instead.

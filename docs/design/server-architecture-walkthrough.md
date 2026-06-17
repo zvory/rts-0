@@ -56,7 +56,7 @@ flag: changes there should be smaller and tested closer to the behavior.
 The executable starts in `server/src/main.rs`.
 
 It creates the Axum router, serves the JS client, exposes utility routes like
-`/version`, `/wiki`, `/dev/selfplay`, `/api/matches`, and upgrades `/ws` to a
+`/version`, `/wiki`, `/dev/scenarios`, `/dev/replay-artifact`, `/api/matches`, and upgrades `/ws` to a
 WebSocket. It also builds one shared `Lobby`.
 
 `main.rs` does not own a `Game`. It is the edge of the server, not the

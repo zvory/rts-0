@@ -482,6 +482,10 @@ impl SelfPlayDiagnostic {
     }
 }
 
+fn replay_artifact_url(name: &str) -> String {
+    format!("/dev/replay-artifact?replay={name}")
+}
+
 fn finalize_self_play_success(
     runner: &SelfPlayRunner,
     players: &[PlayerInit],
@@ -499,7 +503,7 @@ fn finalize_self_play_success(
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| p.display().to_string());
-                    format!("/dev/selfplay?replay={name}")
+                    replay_artifact_url(&name)
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
             panic!(
@@ -584,7 +588,7 @@ fn run_profile_matchup(config: MatchupConfig) {
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| p.display().to_string());
-                    format!("/dev/selfplay?replay={name}")
+                    replay_artifact_url(&name)
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
             panic!("matchup failed: {}; REPLAY={artifact}", failure.reason);
@@ -952,7 +956,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| p.display().to_string());
-                    format!("/dev/selfplay?replay={name}")
+                    replay_artifact_url(&name)
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
             panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
@@ -1559,7 +1563,7 @@ fn real_ai_vs_real_ai() {
                 let _ = std::fs::write(dir.join("replay.json"), json);
             }
         }
-        let url = format!("/dev/selfplay?replay={artifact_name}");
+        let url = replay_artifact_url(&artifact_name);
         println!("REPLAY_ARTIFACT={artifact_name}");
         eprintln!("real_ai_vs_real_ai failure: {reason}");
         eprintln!("view replay: {url}");
@@ -1857,7 +1861,7 @@ fn real_ai_vs_real_ai() {
         panic!("real_ai_vs_real_ai failed; view replay: {url}");
     }
 
-    // Write a replay artifact so the dev self-play viewer can load it.
+    // Write a replay artifact so the neutral replay artifact viewer can load it.
     let artifact =
         ReplayArtifactV1::capture_from_game(&game, super::server_build_sha(), None, game.scores());
     let ts = std::time::SystemTime::now()

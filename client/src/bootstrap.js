@@ -119,7 +119,6 @@ if (typeof window !== "undefined") window.__rtsDebug = diagnostics;
 
 export function devWatchConfig() {
   const params = new URLSearchParams(window.location.search);
-  const replay = (params.get("replay") || "").trim();
   if (window.location.pathname === "/dev/scenario" || params.has("watchScenario")) {
     const id = (params.get("id") || "").trim();
     const unit = (params.get("unit") || "").trim();
@@ -142,20 +141,16 @@ export function devWatchConfig() {
       banner: `local dev scenario no fog ${id} unit=${unit} count=${count}${blockerBannerPart}`,
     };
   }
-  if (window.location.pathname !== "/dev/selfplay" && !params.has("watchSelfplay")) return null;
-  const room = replay
-    ? `__dev_selfplay__replay:${replay}`
-    : "__dev_selfplay__live";
-  return {
-    room,
-    noFog: true,
-    kind: replay ? "replay" : "selfplay",
-    banner: replay ? `local dev  self-play replay  no fog  ${replay}` : "local dev  self-play  no fog",
-  };
+  return null;
 }
 
 export function replayLaunchConfig() {
   const params = new URLSearchParams(window.location.search);
+  const artifact = (params.get("replayArtifact") || "").trim();
+  if (artifact) {
+    if (!/^[A-Za-z0-9_-]+$/.test(artifact)) return null;
+    return { room: `__replay_artifact__:${artifact}` };
+  }
   const room = (params.get("replayRoom") || "").trim();
   if (!room) return null;
   if (!/^__match_replay__:[A-Za-z0-9_-]+$/.test(room)) return null;

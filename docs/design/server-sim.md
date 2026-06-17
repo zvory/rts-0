@@ -211,10 +211,11 @@ alive.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
   `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
-- Live dev self-play watch rooms are a special-case room mode inside the same task model: they own
-  a normal `Game`, feed it scripted commands from `rts_ai::selfplay`, and send watchers
+- Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
+  normal `Game`, drive authored scenario setup and optional scripted movement, and send watchers
   `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Saved self-play artifacts
-  are normal `ReplayArtifactV1` files and load through `Phase::ReplayViewer`.
+  are normal `ReplayArtifactV1` files and load through `Phase::ReplayViewer` via the neutral
+  replay-artifact room path.
 - Replay viewer rooms use `Phase::ReplayViewer`, which owns a `ReplaySession`:
   the immutable `ReplayArtifactV1`, rebuilt `Game`, command cursor, shared playback speed, and
   per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`

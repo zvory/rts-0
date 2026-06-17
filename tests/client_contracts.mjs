@@ -1254,6 +1254,36 @@ async function testDevWatchScenarioConfig() {
   }
 }
 
+async function testReplayArtifactLaunchConfig() {
+  const priorDocument = globalThis.document;
+  const priorWindow = globalThis.window;
+  globalThis.document = {
+    getElementById: () => null,
+  };
+  globalThis.window = {
+    location: new URL("http://localhost/?replayArtifact=manual_worker_rush_latest"),
+    localStorage: { getItem: () => null },
+  };
+  try {
+    const { replayLaunchConfig } = await import("../client/src/bootstrap.js");
+    let config = replayLaunchConfig();
+    assert(config, "replay artifact launch config should be recognized");
+    assert(
+      config.room === "__replay_artifact__:manual_worker_rush_latest",
+      "replay artifact launch should auto-join the neutral replay artifact room",
+    );
+
+    globalThis.window.location = new URL("http://localhost/?replayArtifact=bad/artifact");
+    config = replayLaunchConfig();
+    assert(config === null, "replay artifact launch rejects unsafe artifact names");
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  }
+}
+
 class FakeGraphics {
   constructor() {
     this.position = { set() {} };
@@ -1303,6 +1333,7 @@ class RecordingGraphics extends FakeGraphics {
 }
 
 await testDevWatchScenarioConfig();
+await testReplayArtifactLaunchConfig();
 
 assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
 assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");

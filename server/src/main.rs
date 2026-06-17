@@ -137,7 +137,7 @@ async fn main() {
         .route("/ws", get(ws_handler))
         .route("/dev/unit-lab", get(unit_design_lab_handler))
         .route("/api/unit-designs", get(unit_design_lab_list_handler))
-        .route("/dev/selfplay", get(dev_selfplay_handler))
+        .route("/dev/replay-artifact", get(dev_replay_artifact_handler))
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
         .route("/maps/catalog", get(map_catalog_handler))
@@ -445,15 +445,24 @@ async fn beta_redirect_handler() -> impl IntoResponse {
     )
 }
 
-async fn dev_selfplay_handler(
+async fn dev_replay_artifact_handler(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let mut target = "/?watchSelfplay=1".to_string();
-    if let Some(replay) = params.get("replay").filter(|s| !s.trim().is_empty()) {
-        target.push_str("&replay=");
-        target.push_str(replay);
-    }
-    Redirect::temporary(&target)
+    let Some(replay) = params.get("replay").map(|s| s.trim()).filter(|s| {
+        !s.is_empty()
+            && !s.contains('/')
+            && !s.contains('\\')
+            && !s.contains("..")
+            && s.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    }) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "expected /dev/replay-artifact?replay=<artifact_name>",
+        )
+            .into_response();
+    };
+    Redirect::temporary(&format!("/?replayArtifact={replay}")).into_response()
 }
 
 async fn unit_design_lab_handler() -> impl IntoResponse {
