@@ -7,8 +7,6 @@ import process from "node:process";
 const DEFAULT_WORKTREE_ROOT = "/tmp/rts-worktrees";
 const DEFAULT_BASE_BRANCH = "main";
 const DEFAULT_GH_BIN = "gh";
-const AGENTS_SDK_CODEX_MCP_TIMEOUT_SECONDS = 2 * 60 * 60;
-const AGENTS_SDK_CODEX_MCP_TIMEOUT_MS = AGENTS_SDK_CODEX_MCP_TIMEOUT_SECONDS * 1000;
 const DONE_MARKERS = {
   singleLineStatus: /^Status:\s*Done\.?\s*$/im,
   headingStatus: /^##\s+Status\s*\n+\s*Done\.?\s*$/im,
@@ -26,7 +24,6 @@ Examples:
   scripts/phase-runner-agents.mjs --plan lab/room phase-0 --pr --wait
   scripts/phase-runner-agents.mjs --plan faction --from 5 --to 6 --pr --wait
   scripts/phase-runner-agents.mjs --plan ai 2 --model gpt-5.4-mini --pr
-  scripts/phase-runner-agents.mjs --plan ai 2 --executor agents-sdk --pr
 
 Runs executor passes only. Each phase gets a separate worktree and branch under
 /tmp/rts-worktrees. Each phase starts from the current local main, then the
@@ -54,7 +51,6 @@ Options:
   --model MODEL        Optional model override for executor passes.
   --from PHASE         Discover phases after PHASE, up to --to. Example: --from 5.
   --to PHASE           Discover phases through PHASE. Requires --from.
-  --executor MODE      codex-cli or agents-sdk. Default: codex-cli.
   --pr                 Push the phase branch, open/update an owned PR, arm auto-merge, and stop pending merge.
   --wait               With --pr, wait for each phase PR to merge before reporting success or continuing.
   --dry-run            Print worktrees, branches, and prompts without running an executor.
@@ -78,7 +74,6 @@ export function parseArgs(argv) {
     fromPhase: "",
     toPhase: "",
     phases: [],
-    executor: "codex-cli",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -98,9 +93,6 @@ export function parseArgs(argv) {
         break;
       case "--to":
         options.toPhase = requireValue(argv, ++index, "--to");
-        break;
-      case "--executor":
-        options.executor = requireValue(argv, ++index, "--executor");
         break;
       case "--dry-run":
         options.dryRun = true;
@@ -161,9 +153,6 @@ export function validateOptions(options) {
   }
   if (options.baseBranch !== DEFAULT_BASE_BRANCH) {
     throw usageError("phase-runner opens PRs against main; --base must be main");
-  }
-  if (!["codex-cli", "agents-sdk"].includes(options.executor)) {
-    throw usageError("--executor must be codex-cli or agents-sdk");
   }
 }
 
@@ -376,17 +365,6 @@ export function writeJson(file, data) {
   fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
 }
 
-export function buildAgentsSdkMcpServerOptions(worktreePath) {
-  return {
-    name: "Codex CLI",
-    command: "codex",
-    args: ["mcp-server"],
-    cwd: worktreePath,
-    clientSessionTimeoutSeconds: AGENTS_SDK_CODEX_MCP_TIMEOUT_SECONDS,
-    timeout: AGENTS_SDK_CODEX_MCP_TIMEOUT_MS,
-  };
-}
-
 export class Runner {
   constructor({ env = process.env, stdout = process.stdout, stderr = process.stderr } = {}) {
     this.env = env;
@@ -464,11 +442,8 @@ export class Runner {
   }
 
   checkPrerequisites(options, repoRoot) {
-    if (!options.dryRun && options.executor === "codex-cli" && !this.commandExists("codex")) {
+    if (!options.dryRun && !this.commandExists("codex")) {
       throw usageError("codex CLI is not available on PATH");
-    }
-    if (!options.dryRun && options.executor === "agents-sdk" && !this.commandExists("codex")) {
-      throw usageError("codex CLI is not available on PATH for Codex MCP execution");
     }
     if (!options.dryRun && !this.commandExists(options.ghBin)) {
       throw usageError(`${options.ghBin} is required to open and inspect PRs`);
@@ -541,41 +516,6 @@ export class Runner {
       }
     } finally {
       fs.closeSync(logFd);
-    }
-  }
-
-  async runAgentsSdkExecutor({ worktreePath, handoffFile, model, prompt, codexLog }) {
-    let agents;
-    try {
-      agents = await import("@openai/agents");
-    } catch (error) {
-      throw new Error(
-        "@openai/agents is not installed. Run `npm install` from the repo root or use --executor codex-cli.",
-        { cause: error },
-      );
-    }
-    const { Agent, MCPServerStdio, run } = agents;
-    const mcpServer = new MCPServerStdio(buildAgentsSdkMcpServerOptions(worktreePath));
-    const agent = new Agent({
-      name: "RTS phase executor",
-      model: model || undefined,
-      instructions: [
-        "You run exactly one RTS repository phase by delegating implementation work to Codex MCP.",
-        "Call Codex MCP with the user prompt exactly as provided.",
-        "Return only the compact JSON handoff produced by the implementation run.",
-        "Do not add markdown fences or commentary.",
-      ].join("\n"),
-      mcpServers: [mcpServer],
-    });
-
-    await mcpServer.connect();
-    try {
-      const result = await run(agent, prompt);
-      const finalOutput = String(result.finalOutput ?? "").trim();
-      fs.writeFileSync(codexLog, `${finalOutput}\n`);
-      writeJson(handoffFile, parseJsonHandoff(finalOutput));
-    } finally {
-      await mcpServer.close();
     }
   }
 
@@ -663,8 +603,7 @@ export class Runner {
       }
 
       if (options.dryRun) {
-        const executorLabel = options.executor === "codex-cli" ? "Codex" : `${options.executor} executor`;
-        this.log(`phase-runner: would run ${executorLabel} in ${layout.worktreePath}`);
+        this.log(`phase-runner: would run Codex in ${layout.worktreePath}`);
         this.log(`phase-runner: would push ${branch} to origin`);
         this.log(
           `phase-runner: would run scripts/agent-pr.sh --base ${options.baseBranch} --head ${branch} --verification <executor verification>`,
@@ -682,31 +621,21 @@ export class Runner {
         continue;
       }
 
-      this.log(`phase-runner: running ${options.executor} executor for ${phaseId} (log: ${layout.codexLog})`);
+      this.log(`phase-runner: running Codex executor for ${phaseId} (log: ${layout.codexLog})`);
       this.log("phase-runner: inner executor may run for 10-20 minutes; calling agents should wait and poll no more than once every 5 minutes");
       const executorStart = Date.now();
       try {
-        if (options.executor === "agents-sdk") {
-          await this.runAgentsSdkExecutor({
-            worktreePath: layout.worktreePath,
-            handoffFile: layout.handoffFile,
-            model: options.model,
-            prompt,
-            codexLog: layout.codexLog,
-          });
-        } else {
-          await this.runCodexCliExecutor({
-            worktreePath: layout.worktreePath,
-            gitCommonDir,
-            schemaFile,
-            handoffFile: layout.handoffFile,
-            model: options.model,
-            prompt,
-            codexLog: layout.codexLog,
-          });
-        }
+        await this.runCodexCliExecutor({
+          worktreePath: layout.worktreePath,
+          gitCommonDir,
+          schemaFile,
+          handoffFile: layout.handoffFile,
+          model: options.model,
+          prompt,
+          codexLog: layout.codexLog,
+        });
       } catch (error) {
-        this.error(`phase-runner: ${options.executor} failed for ${phaseId}; leaving worktree at ${layout.worktreePath}`);
+        this.error(`phase-runner: Codex failed for ${phaseId}; leaving worktree at ${layout.worktreePath}`);
         this.error(`phase-runner: last 80 log lines from ${layout.codexLog}`);
         this.printLogTail(layout.codexLog);
         throw error;

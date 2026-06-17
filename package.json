@@ -2,9 +2,5 @@
   "name": "rts-agent-tools",
   "private": true,
   "type": "module",
-  "description": "Repo-local agent orchestration tools for RTS development workflows.",
-  "dependencies": {
-    "@openai/agents": "0.11.6",
-    "zod": "^4.0.0"
-  }
+  "description": "Repo-local agent orchestration tools for RTS development workflows."
 }
