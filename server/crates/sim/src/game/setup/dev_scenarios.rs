@@ -269,12 +269,14 @@ impl Game {
         })
     }
 
-    fn new_tank_trap_line_build_scenario(
-        layout: TankTrapLineLayout,
+    pub fn new_tank_trap_line_build_scenario(
+        scenario_id: &str,
         vehicle: EntityKind,
         unit_count: usize,
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
+        let layout = TankTrapLineLayout::from_scenario_id(scenario_id)
+            .ok_or_else(|| format!("unsupported Tank Trap line scenario {scenario_id}"))?;
         if !matches!(
             vehicle,
             EntityKind::AntiTankGun
@@ -301,16 +303,11 @@ impl Game {
         spawn_tank_trap_line_workers(&mut entities, worker_starts)?;
         let units = spawn_tank_trap_line_test_units(&mut entities, vehicle, unit_starts)?;
         let player_id = 1;
-        let metadata_name = match layout {
-            TankTrapLineLayout::Horizontal => "dev:tank_trap_line_horizontal",
-            TankTrapLineLayout::Vertical => "dev:tank_trap_line_vertical",
-            TankTrapLineLayout::Diagonal => "dev:tank_trap_line_diagonal",
-        };
         let mut game =
-            build_dev_scenario_game(map, entities, player_id, start_tile, seed, metadata_name);
+            build_dev_scenario_game(map, entities, player_id, start_tile, seed, layout.scenario_id());
         if let Some(player) = game.players.iter_mut().find(|p| p.id == player_id) {
-            player.steel = 1_000;
-            player.oil = 1_000;
+            player.refund_resources(1_000, 0);
+            let _ = player.spend_resources(0, 9_000);
         }
         if let Some(loadout) = game
             .starting_loadouts
@@ -328,45 +325,6 @@ impl Game {
             goal,
             issue_after_ticks: config::TICK_HZ * 30,
         })
-    }
-
-    pub fn new_tank_trap_horizontal_line_build_scenario(
-        vehicle: EntityKind,
-        unit_count: usize,
-        seed: u32,
-    ) -> Result<DevScenarioSetup, String> {
-        Self::new_tank_trap_line_build_scenario(
-            TankTrapLineLayout::Horizontal,
-            vehicle,
-            unit_count,
-            seed,
-        )
-    }
-
-    pub fn new_tank_trap_vertical_line_build_scenario(
-        vehicle: EntityKind,
-        unit_count: usize,
-        seed: u32,
-    ) -> Result<DevScenarioSetup, String> {
-        Self::new_tank_trap_line_build_scenario(
-            TankTrapLineLayout::Vertical,
-            vehicle,
-            unit_count,
-            seed,
-        )
-    }
-
-    pub fn new_tank_trap_diagonal_line_build_scenario(
-        vehicle: EntityKind,
-        unit_count: usize,
-        seed: u32,
-    ) -> Result<DevScenarioSetup, String> {
-        Self::new_tank_trap_line_build_scenario(
-            TankTrapLineLayout::Diagonal,
-            vehicle,
-            unit_count,
-            seed,
-        )
     }
 }
 

@@ -1997,38 +1997,17 @@ impl RoomTask {
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
                     }
-                    DevScenarioId::TankTrapLineHorizontal => {
-                        let setup = Game::new_tank_trap_horizontal_line_build_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
+                    DevScenarioId::TankTrapLineHorizontal
+                    | DevScenarioId::TankTrapLineVertical
+                    | DevScenarioId::TankTrapLineDiagonal => {
+                        let scenario_id = match config.id {
+                            DevScenarioId::TankTrapLineHorizontal => "tank_trap_line_horizontal",
+                            DevScenarioId::TankTrapLineVertical => "tank_trap_line_vertical",
+                            DevScenarioId::TankTrapLineDiagonal => "tank_trap_line_diagonal",
+                            _ => unreachable!("outer match selects Tank Trap line scenarios"),
                         };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::TankTrapLineVertical => {
-                        let setup = Game::new_tank_trap_vertical_line_build_scenario(
-                            config.unit,
-                            config.count,
-                            match_seed(),
-                        )?;
-                        let driver = DevScenarioDriver {
-                            player_id: setup.player_id,
-                            units: setup.units,
-                            goal: setup.goal,
-                            issue_after_ticks: setup.issue_after_ticks,
-                            issued: false,
-                        };
-                        Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
-                    }
-                    DevScenarioId::TankTrapLineDiagonal => {
-                        let setup = Game::new_tank_trap_diagonal_line_build_scenario(
+                        let setup = Game::new_tank_trap_line_build_scenario(
+                            scenario_id,
                             config.unit,
                             config.count,
                             match_seed(),
