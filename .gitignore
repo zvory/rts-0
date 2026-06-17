@@ -9,6 +9,7 @@ Cargo.lock.orig
 
 # Node (tests)
 **/node_modules
+tests/artifacts/
 
 # OS / editor
 .DS_Store

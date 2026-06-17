@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -69,3 +69,27 @@ images.
 Report the harness command, the Worker samples covered, the exact pixel thresholds used, and the
 artifact directory. State whether the harness compares Pixi-vs-Pixi runtime output and whether it
 is ready for named part-level comparison in Phase 5.2.
+
+## Implementation Notes
+
+- Added `node tests/transparent_unit_pixels.mjs` as the future Worker composition gate and
+  `node tests/transparent_unit_pixels.mjs --expect-failures` as the Phase 5.1 calibration command
+  while the known Worker rig mismatch still exists.
+- The harness serves a minimal fixture over loopback HTTP, loads PixiJS, and renders both legacy
+  procedural Worker output and the normalized Worker rig runtime into fixed 96x96 transparent RGBA
+  buffers.
+- Worker coverage is 10 samples from the Phase 1 baseline: four facings across two team tints plus
+  latched-node and build-state busy indicators.
+- Pixel thresholds are:
+  `minAlphaWeightedMatchingRatio=0.985`, `maxPerPixelRgbaDistance=96`,
+  `maxOpaqueMismatchCount=48`, `maxOpaqueMismatchClusterPx=12`,
+  `perChannelTolerance=6`, and `opaqueAlphaThreshold=128`.
+- Failure artifacts are written only on comparison failure under
+  `tests/artifacts/transparent-unit-pixels/<sample>/` as `legacy.png`, `rig.png`, `diff.png`, and
+  `report.json`; `tests/artifacts/` is ignored by git.
+- Verification run:
+  `node --check tests/transparent_unit_pixels.mjs`,
+  `node --check tests/visual_pixel_compare.mjs`,
+  `node tests/legacy_unit_visual_oracle.mjs`,
+  `node tests/transparent_unit_pixels.mjs --expect-failures`,
+  and `git diff --check`.

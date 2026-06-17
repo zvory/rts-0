@@ -1,0 +1,405 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import puppeteer from "puppeteer-core";
+import { compareRgbaBuffers, makeDiffRgba } from "./visual_pixel_compare.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "..");
+const baselinePath = path.join(repoRoot, "tests/fixtures/svg/legacy-unit-oracle.baseline.json");
+const fixturePagePath = path.join(repoRoot, "tests/fixtures/svg/transparent-unit-pixels.html");
+const workerSvgPath = path.join(repoRoot, "tests/fixtures/svg/rig-worker.svg");
+const artifactRoot = path.join(repoRoot, "tests/artifacts/transparent-unit-pixels");
+const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const fixedNow = 10_000;
+const bufferSize = { width: 96, height: 96 };
+const expectFailures = process.argv.includes("--expect-failures");
+const noArtifacts = process.argv.includes("--no-artifacts");
+
+const baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
+const samples = workerSamplesFromBaseline(baseline);
+const thresholds = {
+  minAlphaWeightedMatchingRatio: baseline.pixelDiffThresholds.staticMinAlphaWeightedIdenticalRatio,
+  maxPerPixelRgbaDistance: 96,
+  maxOpaqueMismatchCount: 48,
+  maxOpaqueMismatchClusterPx: baseline.pixelDiffThresholds.staticMaxOpaqueClusterPx,
+  perChannelTolerance: 6,
+  opaqueAlphaThreshold: 128,
+};
+const workerSvgText = fs.readFileSync(workerSvgPath, "utf8");
+
+const staticServer = await startStaticServer(repoRoot);
+const chromeProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-pixel-harness-chrome-"));
+const browser = await puppeteer.launch({
+  executablePath: CHROME,
+  headless: "new",
+  args: ["--no-sandbox", "--window-size=320,320", `--user-data-dir=${chromeProfileDir}`],
+  defaultViewport: { width: 320, height: 320, deviceScaleFactor: 1 },
+});
+
+try {
+  const page = await browser.newPage();
+  const consoleErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
+  page.on("requestfailed", (request) => consoleErrors.push(`request failed: ${request.url()} ${request.failure()?.errorText || ""}`));
+
+  await page.goto(new URL("/tests/fixtures/svg/transparent-unit-pixels.html", staticServer.url).href, { waitUntil: "networkidle2", timeout: 20_000 });
+  await page.waitForFunction(() => !!window.PIXI, { timeout: 10_000 });
+  const rendered = await page.evaluate(renderSamplesInBrowser, {
+    samples,
+    bufferSize,
+    fixedNow,
+    thresholds,
+    workerSvgText,
+  });
+  if (consoleErrors.length > 0) {
+    throw new Error(`browser errors during transparent pixel harness:\n${consoleErrors.join("\n")}`);
+  }
+
+  const reports = [];
+  const failures = [];
+  for (const renderedSample of rendered.samples) {
+    const report = compareRgbaBuffers(renderedSample.legacy, renderedSample.rig, thresholds);
+    const entry = {
+      label: renderedSample.label,
+      kind: renderedSample.kind,
+      teamColor: renderedSample.teamColor,
+      facing: renderedSample.facing,
+      state: renderedSample.state,
+      busy: renderedSample.busy,
+      ...report,
+    };
+    reports.push(entry);
+    if (!report.passed) {
+      failures.push({ renderedSample, entry });
+    }
+  }
+
+  if (failures.length > 0 && !noArtifacts) {
+    fs.rmSync(artifactRoot, { recursive: true, force: true });
+    for (const failure of failures) writeFailureArtifacts(failure);
+  }
+
+  const summary = {
+    samples: rendered.samples.length,
+    passed: rendered.samples.length - failures.length,
+    failed: failures.length,
+    thresholds,
+    artifactRoot: failures.length > 0 && !noArtifacts ? path.relative(repoRoot, artifactRoot) : null,
+  };
+  console.log(JSON.stringify({ summary, reports }, null, 2));
+
+  if (expectFailures) {
+    if (failures.length === 0) throw new Error("expected current Worker rig mismatches, but every sample passed");
+  } else if (failures.length > 0) {
+    throw new Error(`${failures.length} transparent pixel comparison sample(s) failed`);
+  }
+} finally {
+  await browser.close();
+  await staticServer.close();
+  fs.rmSync(chromeProfileDir, { recursive: true, force: true });
+}
+
+function workerSamplesFromBaseline(oracle) {
+  const wanted = new Set([
+    "worker/facing-0-#0072b2",
+    "worker/facing-0-#e69f00",
+    "worker/facing-1_571-#0072b2",
+    "worker/facing-1_571-#e69f00",
+    "worker/facing-3_142-#0072b2",
+    "worker/facing-3_142-#e69f00",
+    "worker/facing-4_712-#0072b2",
+    "worker/facing-4_712-#e69f00",
+    "worker/worker-busy-latched-node",
+    "worker/worker-busy-build-state",
+  ]);
+  return oracle.samples
+    .filter((sample) => wanted.has(sample.label))
+    .map((sample) => ({
+      label: sample.label,
+      kind: sample.kind,
+      teamColor: sample.teamColor,
+      facing: sample.facing,
+      state: sample.state,
+      setupState: sample.setupState,
+      busy: sample.label.includes("busy"),
+      latchedNode: sample.label.includes("latched-node") ? 9001 : null,
+    }));
+}
+
+function writeFailureArtifacts({ renderedSample, entry }) {
+  const sampleDir = path.join(artifactRoot, safeName(entry.label));
+  fs.mkdirSync(sampleDir, { recursive: true });
+  fs.writeFileSync(path.join(sampleDir, "legacy.png"), decodePngDataUrl(renderedSample.legacyPng));
+  fs.writeFileSync(path.join(sampleDir, "rig.png"), decodePngDataUrl(renderedSample.rigPng));
+  const diff = makeDiffRgba(renderedSample.legacy, renderedSample.rig, thresholds);
+  fs.writeFileSync(path.join(sampleDir, "diff.png"), decodePngDataUrl(renderedSample.diffPng));
+  fs.writeFileSync(path.join(sampleDir, "report.json"), `${JSON.stringify({
+    ...entry,
+    diffPixelCount: diff.data.reduce((count, value, index) => index % 4 === 3 && value > 0 ? count + 1 : count, 0),
+  }, null, 2)}\n`);
+}
+
+function decodePngDataUrl(value) {
+  const marker = "base64,";
+  const index = value.indexOf(marker);
+  if (index < 0) throw new Error("invalid PNG data URL");
+  return Buffer.from(value.slice(index + marker.length), "base64");
+}
+
+function safeName(label) {
+  return label.replace(/[^a-z0-9_.-]+/gi, "_").replace(/^_+|_+$/g, "");
+}
+
+function startStaticServer(root) {
+  const server = http.createServer((request, response) => {
+    const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
+    const decoded = decodeURIComponent(requestUrl.pathname);
+    if (decoded === "/favicon.ico") {
+      response.writeHead(204).end();
+      return;
+    }
+    const relative = decoded.replace(/^\/+/, "") || "tests/fixtures/svg/transparent-unit-pixels.html";
+    const filePath = path.resolve(root, relative);
+    if (!filePath.startsWith(`${root}${path.sep}`)) {
+      response.writeHead(403).end("Forbidden");
+      return;
+    }
+    fs.stat(filePath, (statError, stat) => {
+      if (statError || !stat.isFile()) {
+        response.writeHead(404).end("Not found");
+        return;
+      }
+      response.writeHead(200, { "Content-Type": contentType(filePath) });
+      fs.createReadStream(filePath).pipe(response);
+    });
+  });
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      const address = server.address();
+      resolve({
+        url: `http://127.0.0.1:${address.port}/`,
+        close: () => new Promise((closeResolve, closeReject) => {
+          server.close((error) => error ? closeReject(error) : closeResolve());
+        }),
+      });
+    });
+  });
+}
+
+function contentType(filePath) {
+  switch (path.extname(filePath)) {
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".js":
+    case ".mjs":
+      return "text/javascript; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+async function renderSamplesInBrowser({
+  samples: browserSamples,
+  bufferSize: size,
+  fixedNow: now,
+  thresholds: compareThresholds,
+  workerSvgText: svgText,
+}) {
+  const [
+    protocol,
+    entities,
+    units,
+    importer,
+    runtime,
+    animation,
+  ] = await Promise.all([
+    import(new URL("../../../client/src/protocol.js", window.location.href).href),
+    import(new URL("../../../client/src/renderer/entities.js", window.location.href).href),
+    import(new URL("../../../client/src/renderer/units.js", window.location.href).href),
+    import(new URL("../../../client/src/renderer/rigs/svg_importer.js", window.location.href).href),
+    import(new URL("../../../client/src/renderer/rigs/runtime.js", window.location.href).href),
+    import(new URL("../../../client/src/renderer/rigs/animation.js", window.location.href).href),
+  ]);
+  const compiled = importer.compileSvgRig(svgText, { expectedKind: protocol.KIND.WORKER });
+  if (!compiled.ok) throw new Error(`failed to compile Worker rig: ${JSON.stringify(compiled.errors)}`);
+  const definition = compiled.definition;
+
+  const app = new PIXI.Application({
+    width: size.width,
+    height: size.height,
+    antialias: false,
+    resolution: 1,
+    autoDensity: false,
+    backgroundAlpha: 0,
+    preserveDrawingBuffer: true,
+    clearBeforeRender: true,
+  });
+  PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+  app.renderer.roundPixels = false;
+  document.body.appendChild(app.view);
+
+  try {
+    const out = [];
+    for (const sample of browserSamples) {
+      const legacy = renderLegacySample(sample);
+      const rig = renderRigSample(sample);
+      out.push({
+        label: sample.label,
+        kind: sample.kind,
+        teamColor: sample.teamColor,
+        facing: sample.facing,
+        state: sample.state,
+        busy: sample.busy,
+        legacy,
+        rig,
+        legacyPng: pngDataUrl(legacy),
+        rigPng: pngDataUrl(rig),
+        diffPng: pngDataUrl(diffBuffer(legacy, rig, compareThresholds.perChannelTolerance)),
+      });
+    }
+    return { samples: out };
+  } finally {
+    app.destroy(true, { children: true });
+  }
+
+  function renderLegacySample(sample) {
+    app.stage.removeChildren();
+    const renderer = makeUnitRenderer();
+    for (const name of ["unitShadows", "units"]) app.stage.addChild(renderer.layers[name]);
+    const entity = makeEntity(sample);
+    const colorByOwner = new Map([[entity.owner, parseInt(sample.teamColor.slice(1), 16)]]);
+    const state = makeState(sample);
+    renderer._drawUnit(entity, colorByOwner, state);
+    app.renderer.render(app.stage);
+    return readPixels();
+  }
+
+  function renderRigSample(sample) {
+    app.stage.removeChildren();
+    const entity = makeEntity(sample);
+    const colorByOwner = new Map([[entity.owner, parseInt(sample.teamColor.slice(1), 16)]]);
+    const state = makeState(sample);
+    const instance = runtime.createUnitRigInstance(protocol.KIND.WORKER, definition);
+    const context = animation.createRigRenderContext(entity, {
+      now,
+      state,
+      colorByOwner,
+      map: { tileSize: 32 },
+    });
+    instance.update(entity, context);
+    app.stage.addChild(instance.container);
+    app.renderer.render(app.stage);
+    const pixels = readPixels();
+    instance.destroy();
+    return pixels;
+  }
+
+  function makeUnitRenderer() {
+    const layers = {
+      unitShadows: new PIXI.Container(),
+      units: new PIXI.Container(),
+    };
+    return {
+      _pools: { unitShadows: new Map(), units: new Map() },
+      _seen: { unitShadows: new Set(), units: new Set() },
+      _setupVisuals: new Map(),
+      _tankMotion: new Map(),
+      _map: { tileSize: 32 },
+      layers,
+      _slot: entities._slot,
+      _shadow: entities._shadow,
+      _vehicleShadow: entities._vehicleShadow,
+      _tintFor: entities._tintFor,
+      _deployedWeaponSetupVisual: units._deployedWeaponSetupVisual,
+      _tankMotionVisual: units._tankMotionVisual,
+      _rigRenderContextFor: units._rigRenderContextFor,
+      _drawUnit: units._drawUnit,
+    };
+  }
+
+  function makeEntity(sample) {
+    return {
+      id: 100 + Math.abs(hashLabel(sample.label) % 10_000),
+      kind: protocol.KIND.WORKER,
+      owner: 1,
+      teamColor: sample.teamColor,
+      x: size.width / 2,
+      y: size.height / 2,
+      hp: 32,
+      maxHp: 50,
+      state: sample.state,
+      setupState: sample.setupState,
+      facing: sample.facing,
+      latchedNode: sample.latchedNode,
+    };
+  }
+
+  function makeState(_sample) {
+    return {
+      playerId: 1,
+      resources: { oil: 40 },
+      weaponRecoil: () => 0,
+      isOwnOwner: (owner) => owner === 1,
+      isAllyOwner: () => false,
+      isNeutralOwner: (owner) => owner === 0,
+    };
+  }
+
+  function readPixels() {
+    const gl = app.renderer.gl;
+    const raw = new Uint8Array(size.width * size.height * 4);
+    gl.readPixels(0, 0, size.width, size.height, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+    const flipped = new Uint8Array(raw.length);
+    const rowBytes = size.width * 4;
+    for (let y = 0; y < size.height; y += 1) {
+      const sourceStart = (size.height - 1 - y) * rowBytes;
+      flipped.set(raw.subarray(sourceStart, sourceStart + rowBytes), y * rowBytes);
+    }
+    return { width: size.width, height: size.height, data: Array.from(flipped) };
+  }
+
+  function pngDataUrl(buffer) {
+    const canvas = document.createElement("canvas");
+    canvas.width = buffer.width;
+    canvas.height = buffer.height;
+    const ctx = canvas.getContext("2d");
+    ctx.putImageData(new ImageData(new Uint8ClampedArray(buffer.data), buffer.width, buffer.height), 0, 0);
+    return canvas.toDataURL("image/png");
+  }
+
+  function diffBuffer(legacy, rig, tolerance) {
+    const out = new Uint8Array(legacy.data.length);
+    for (let i = 0; i < out.length; i += 4) {
+      const dr = Math.abs(legacy.data[i] - rig.data[i]);
+      const dg = Math.abs(legacy.data[i + 1] - rig.data[i + 1]);
+      const db = Math.abs(legacy.data[i + 2] - rig.data[i + 2]);
+      const da = Math.abs(legacy.data[i + 3] - rig.data[i + 3]);
+      if (dr > tolerance || dg > tolerance || db > tolerance || da > tolerance) {
+        out[i] = 255;
+        out[i + 1] = Math.min(255, Math.max(dr, dg, db) * 3);
+        out[i + 2] = 0;
+        out[i + 3] = Math.max(160, da);
+      }
+    }
+    return { width: legacy.width, height: legacy.height, data: Array.from(out) };
+  }
+
+  function hashLabel(label) {
+    let hash = 0;
+    for (let i = 0; i < label.length; i += 1) hash = ((hash << 5) - hash + label.charCodeAt(i)) | 0;
+    return hash;
+  }
+}

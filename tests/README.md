@@ -179,6 +179,28 @@ node tests/client_smoke.mjs
 # env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to Chrome/Chromium)
 ```
 
+## Transparent unit pixel harness
+
+`transparent_unit_pixels.mjs` is temporary SVG migration scaffolding for `plans/svg` and should be
+deleted with the equivalence harness in Phase 8. It opens a minimal headless-browser fixture
+through a loopback static server, loads PixiJS, renders Worker legacy procedural output and the
+normalized Worker rig into fixed 96x96 transparent RGBA buffers, then compares the buffers
+mechanically. The default command is the future gate and exits non-zero on mismatches:
+
+```bash
+node tests/transparent_unit_pixels.mjs
+```
+
+The current Worker rig is intentionally still treated as unaccepted art until the Phase 5.3
+re-migration. To verify the harness while that known drift exists, use:
+
+```bash
+node tests/transparent_unit_pixels.mjs --expect-failures
+```
+
+Failures write `legacy.png`, `rig.png`, `diff.png`, and `report.json` under
+`tests/artifacts/transparent-unit-pixels/<sample>/`. The artifact directory is ignored by git.
+
 > CI note: `Main test gate` uses `run-all.sh` sub-suite modes in parallel jobs, then reports the
 > required aggregate check as `./tests/run-all.sh`. In a headless CI image without Chrome, the
 > client smoke test self-skips; pass `CHROME=...` to include it. If Chrome is present but dependency
