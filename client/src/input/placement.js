@@ -13,12 +13,34 @@ export function footprintValidAgainstEntities(
   map,
   policy = placementPolicyForBuilding(null),
 ) {
-  if (tileX < 0 || tileY < 0) return false;
-  if (tileX + footW > map.width || tileY + footH > map.height) return false;
+  return footprintPlacementBlocker(
+    entities,
+    allowedOverlapIds,
+    tileX,
+    tileY,
+    footW,
+    footH,
+    map,
+    policy,
+  ) == null;
+}
+
+export function footprintPlacementBlocker(
+  entities,
+  allowedOverlapIds,
+  tileX,
+  tileY,
+  footW,
+  footH,
+  map,
+  policy = placementPolicyForBuilding(null),
+) {
+  if (tileX < 0 || tileY < 0) return "terrain";
+  if (tileX + footW > map.width || tileY + footH > map.height) return "terrain";
   for (let ty = tileY; ty < tileY + footH; ty++) {
     for (let tx = tileX; tx < tileX + footW; tx++) {
       const code = map.terrain[ty * map.width + tx];
-      if (!PASSABLE[code]) return false;
+      if (!PASSABLE[code]) return "terrain";
     }
   }
   const ts = map.tileSize;
@@ -30,9 +52,11 @@ export function footprintValidAgainstEntities(
     if (e.shotReveal || e.visionOnly) continue;
     if (allowedOverlapIds?.has(e.id)) continue;
     if (!entityBlocksPlacement(e, policy)) continue;
-    if (entityIntersectsRect(e, minX, minY, maxX, maxY, ts)) return false;
+    if (entityIntersectsRect(e, minX, minY, maxX, maxY, ts)) {
+      return isBuilding(e.kind) || isResource(e.kind) ? "structure" : "unit";
+    }
   }
-  return true;
+  return null;
 }
 
 export function placementPolicyForBuilding(kind) {
@@ -95,7 +119,10 @@ export function _refreshPlacement() {
     const lineSites = buildTankTrapLineSites({
       start: this._placementDrag,
       end: { tileX, tileY },
-      isValid: (siteX, siteY) => this._footprintValid(siteX, siteY, footW, footH, map, place.building),
+      isValid: (siteX, siteY) => {
+        const blockedBy = inputFootprintPlacementBlocker(this, siteX, siteY, footW, footH, map, place.building);
+        return { valid: blockedBy == null, blockedBy };
+      },
     });
     const firstValid = lineSites.find((site) => site.valid) || lineSites[0] || { tileX, tileY, valid: false };
     intent?.updatePlacement?.(firstValid.tileX, firstValid.tileY, !!lineSites.some((site) => site.valid), {
@@ -110,10 +137,14 @@ export function _refreshPlacement() {
 }
 
 export function _footprintValid(tileX, tileY, footW, footH, map, buildingKind = null) {
-  const chosenWorker = this._selectedWorkerIds()[0];
+  return inputFootprintPlacementBlocker(this, tileX, tileY, footW, footH, map, buildingKind) == null;
+}
+
+function inputFootprintPlacementBlocker(input, tileX, tileY, footW, footH, map, buildingKind = null) {
+  const chosenWorker = input._selectedWorkerIds()[0];
   const allowed = chosenWorker === undefined ? new Set() : new Set([chosenWorker]);
-  return footprintValidAgainstEntities(
-    this.state.entitiesInterpolated(1),
+  return footprintPlacementBlocker(
+    input.state.entitiesInterpolated(1),
     allowed,
     tileX,
     tileY,
