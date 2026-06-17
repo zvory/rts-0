@@ -157,6 +157,16 @@ export const WORKER_LEGACY_PARTS = Object.freeze({
   busyIndicator: "worker.busyIndicator",
 });
 
+export const TANK_LEGACY_PARTS = Object.freeze({
+  shadow: "tank.shadow",
+  tracks: "tank.tracks",
+  hull: "tank.hull",
+  barrel: "tank.barrel",
+  turret: "tank.turret",
+  noseTick: "tank.noseTick",
+  fuelCue: "tank.fuelCue",
+});
+
 export function createLegacyUnitPartCapture({ includeParts = null } = {}) {
   const includeSet = includeParts == null ? null : new Set(Array.isArray(includeParts) ? includeParts : [includeParts]);
   const records = [];
@@ -173,6 +183,7 @@ export function createLegacyUnitPartCapture({ includeParts = null } = {}) {
 
 function legacyUnitPartName(kind, part) {
   if (kind === KIND.WORKER && WORKER_LEGACY_PARTS[part]) return WORKER_LEGACY_PARTS[part];
+  if (kind === KIND.TANK && TANK_LEGACY_PARTS[part]) return TANK_LEGACY_PARTS[part];
   return `${kind}.${part}`;
 }
 
@@ -445,24 +456,37 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     // Hull follows movement facing; turret/barrel follow weapon facing.
     const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
-    drawTankTracks(g, body, facing, motion);
-    drawTankHull(g, body, tint, facing);
+    drawCapturedPart(partCapture, TANK_LEGACY_PARTS.tracks, partDetail, () => {
+      drawTankTracks(g, body, facing, motion);
+    });
+    drawCapturedPart(partCapture, TANK_LEGACY_PARTS.hull, partDetail, () => {
+      g.lineStyle(1.5, 0x100d0a, 0.95);
+      drawTankHull(g, body, tint, facing);
+    });
 
     const barrel = polar(weaponFacing, Math.max(body.halfLen * 0.8, body.halfLen + 8 - recoil));
-    g.lineStyle(5, 0x241d17, 0.95);
-    g.moveTo(0, 0);
-    g.lineTo(barrel.x, barrel.y);
+    drawCapturedPart(partCapture, TANK_LEGACY_PARTS.barrel, partDetail, () => {
+      g.lineStyle(5, 0x241d17, 0.95);
+      g.moveTo(0, 0);
+      g.lineTo(barrel.x, barrel.y);
+    });
 
-    g.lineStyle(2, 0x1a1712, 0.95);
-    g.beginFill(lightenColor(tint, 0.12));
-    drawRotatedRect(g, 1, 0, body.halfLen * 0.72, body.halfWidth * 0.9, weaponFacing);
-    g.endFill();
+    drawCapturedPart(partCapture, TANK_LEGACY_PARTS.turret, partDetail, () => {
+      g.lineStyle(2, 0x1a1712, 0.95);
+      g.beginFill(lightenColor(tint, 0.12));
+      drawRotatedRect(g, 1, 0, body.halfLen * 0.72, body.halfWidth * 0.9, weaponFacing);
+      g.endFill();
+    });
 
     const nose = polar(facing, body.halfLen - 2);
-    g.lineStyle(2, 0xd8d0b0, 0.75);
-    g.moveTo(nose.x - Math.cos(facing) * 5, nose.y - Math.sin(facing) * 5);
-    g.lineTo(nose.x, nose.y);
-    drawTankFuelCue(g, body, facing, motion);
+    drawCapturedPart(partCapture, TANK_LEGACY_PARTS.noseTick, partDetail, () => {
+      g.lineStyle(2, 0xd8d0b0, 0.75);
+      g.moveTo(nose.x - Math.cos(facing) * 5, nose.y - Math.sin(facing) * 5);
+      g.lineTo(nose.x, nose.y);
+    });
+    drawCapturedPart(partCapture, TANK_LEGACY_PARTS.fuelCue, partDetail, () => {
+      drawTankFuelCue(g, body, facing, motion);
+    });
   } else {
     // Engineer (and any other unit kind): compact tool-carrying block.
     drawCapturedPart(partCapture, legacyUnitPartName(e.kind, "body"), partDetail, () => {

@@ -12,6 +12,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const baselinePath = path.join(repoRoot, "tests/fixtures/svg/legacy-unit-oracle.baseline.json");
 const fixturePagePath = path.join(repoRoot, "tests/fixtures/svg/transparent-unit-pixels.html");
 const workerSvgPath = path.join(repoRoot, "tests/fixtures/svg/rig-worker.svg");
+const tankSvgPath = path.join(repoRoot, "tests/fixtures/svg/rig-vehicle.svg");
 const artifactRoot = path.join(repoRoot, "tests/artifacts/transparent-unit-pixels");
 const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const fixedNow = 10_000;
@@ -23,7 +24,10 @@ const includePartComparisons = partsOnly || process.argv.includes("--parts");
 const includeCompositionComparisons = !partsOnly;
 
 const baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
-const samples = workerSamplesFromBaseline(baseline);
+const samples = [
+  ...workerSamplesFromBaseline(baseline),
+  ...tankSamplesFromBaseline(baseline),
+];
 const thresholds = {
   minAlphaWeightedMatchingRatio: baseline.pixelDiffThresholds.staticMinAlphaWeightedIdenticalRatio,
   maxPerPixelRgbaDistance: 96,
@@ -55,7 +59,52 @@ const workerPartMappings = Object.freeze([
     thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
   },
 ]);
+const tankTrackRigParts = Object.freeze([
+  "part.track.left",
+  "part.track.right",
+  ...Array.from({ length: 9 }, (_, i) => `part.tread.left.${i}`),
+  ...Array.from({ length: 9 }, (_, i) => `part.tread.right.${i}`),
+]);
+const tankPartMappings = Object.freeze([
+  {
+    legacyPart: "tank.shadow",
+    rigParts: ["part.shadow"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 32, maxOpaqueMismatchClusterPx: 8 }),
+  },
+  {
+    legacyPart: "tank.tracks",
+    rigParts: tankTrackRigParts,
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 64, maxOpaqueMismatchClusterPx: 16 }),
+  },
+  {
+    legacyPart: "tank.hull",
+    rigParts: ["part.hull", "part.hull.shadow", "part.hull.nose", "part.hull.noseShadow"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 64, maxOpaqueMismatchClusterPx: 16 }),
+  },
+  {
+    legacyPart: "tank.barrel",
+    rigParts: ["part.barrel"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 16, maxOpaqueMismatchClusterPx: 8 }),
+  },
+  {
+    legacyPart: "tank.turret",
+    rigParts: ["part.turret"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 24, maxOpaqueMismatchClusterPx: 8 }),
+  },
+  {
+    legacyPart: "tank.noseTick",
+    rigParts: ["part.noseTick"],
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 8, maxOpaqueMismatchClusterPx: 4 }),
+  },
+  {
+    legacyPart: "tank.fuelCue",
+    rigParts: ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"],
+    fuelOnly: true,
+    thresholds: partThresholds({ maxOpaqueMismatchCount: 16, maxOpaqueMismatchClusterPx: 8 }),
+  },
+]);
 const workerSvgText = fs.readFileSync(workerSvgPath, "utf8");
+const tankSvgText = fs.readFileSync(tankSvgPath, "utf8");
 
 const staticServer = await startStaticServer(repoRoot);
 const chromeProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-pixel-harness-chrome-"));
@@ -82,9 +131,15 @@ try {
     bufferSize,
     fixedNow,
     thresholds,
-    workerPartMappings: includePartComparisons ? workerPartMappings : [],
+    partMappingsByKind: includePartComparisons ? {
+      worker: workerPartMappings,
+      tank: tankPartMappings,
+    } : {},
     includeCompositionComparisons,
-    workerSvgText,
+    svgTextByKind: {
+      worker: workerSvgText,
+      tank: tankSvgText,
+    },
   });
   if (consoleErrors.length > 0) {
     throw new Error(`browser errors during transparent pixel harness:\n${consoleErrors.join("\n")}`);
@@ -116,7 +171,7 @@ try {
       comparison: "part",
       label: renderedSample.label,
       kind: renderedSample.kind,
-      unit: "worker",
+      unit: renderedSample.kind,
       part: renderedSample.legacyPart,
       rigParts: renderedSample.rigParts,
       missingRigParts: renderedSample.missingRigParts,
@@ -144,7 +199,10 @@ try {
     passed: rendered.compositionSamples.length + rendered.partSamples.length - failures.length,
     failed: failures.length,
     thresholds,
-    partMappings: includePartComparisons ? workerPartMappings : [],
+    partMappingsByKind: includePartComparisons ? {
+      worker: workerPartMappings,
+      tank: tankPartMappings,
+    } : {},
     artifactRoot: failures.length > 0 && !noArtifacts ? path.relative(repoRoot, artifactRoot) : null,
   };
   console.log(JSON.stringify({ summary, compositionReports, partReports }, null, 2));
@@ -200,6 +258,38 @@ function workerSamplesFromBaseline(oracle) {
       setupState: sample.setupState,
       busy: sample.label.includes("busy"),
       latchedNode: sample.label.includes("latched-node") ? 9001 : null,
+    }));
+}
+
+function tankSamplesFromBaseline(oracle) {
+  const wanted = new Set([
+    "tank/facing-0-#0072b2",
+    "tank/facing-0-#e69f00",
+    "tank/facing-1_571-#0072b2",
+    "tank/facing-1_571-#e69f00",
+    "tank/facing-3_142-#0072b2",
+    "tank/facing-3_142-#e69f00",
+    "tank/facing-4_712-#0072b2",
+    "tank/facing-4_712-#e69f00",
+    "tank/weapon-offset-0_785",
+    "tank/weapon-offset-neg_1_571",
+    "tank/recoil-0_35",
+    "tank/tank-low-oil",
+    "tank/tank-oil-starved",
+  ]);
+  return oracle.samples
+    .filter((sample) => wanted.has(sample.label))
+    .map((sample) => ({
+      label: sample.label,
+      kind: sample.kind,
+      teamColor: sample.teamColor,
+      facing: sample.facing,
+      weaponFacing: sample.weaponFacing,
+      recoilProgress: sample.recoilProgress,
+      state: sample.state,
+      setupState: sample.setupState,
+      resources: sample.resources,
+      fuelCue: sample.label.includes("low-oil") || sample.label.includes("oil-starved"),
     }));
 }
 
@@ -286,9 +376,9 @@ async function renderSamplesInBrowser({
   bufferSize: size,
   fixedNow: now,
   thresholds: compareThresholds,
-  workerPartMappings: browserPartMappings,
+  partMappingsByKind: browserPartMappingsByKind,
   includeCompositionComparisons: browserIncludeCompositionComparisons,
-  workerSvgText: svgText,
+  svgTextByKind: browserSvgTextByKind,
 }) {
   const [
     protocol,
@@ -305,9 +395,13 @@ async function renderSamplesInBrowser({
     import(new URL("../../../client/src/renderer/rigs/runtime.js", window.location.href).href),
     import(new URL("../../../client/src/renderer/rigs/animation.js", window.location.href).href),
   ]);
-  const compiled = importer.compileSvgRig(svgText, { expectedKind: protocol.KIND.WORKER });
-  if (!compiled.ok) throw new Error(`failed to compile Worker rig: ${JSON.stringify(compiled.errors)}`);
-  const definition = compiled.definition;
+  const definitionsByKind = new Map();
+  for (const [kind, svgText] of Object.entries(browserSvgTextByKind)) {
+    const expectedKind = protocol.KIND[kind.toUpperCase()];
+    const compiled = importer.compileSvgRig(svgText, { expectedKind });
+    if (!compiled.ok) throw new Error(`failed to compile ${kind} rig: ${JSON.stringify(compiled.errors)}`);
+    definitionsByKind.set(kind, compiled.definition);
+  }
 
   const app = new PIXI.Application({
     width: size.width,
@@ -345,8 +439,10 @@ async function renderSamplesInBrowser({
       });
     }
     for (const sample of browserSamples) {
-      for (const mapping of browserPartMappings) {
+      const definition = definitionsByKind.get(sample.kind);
+      for (const mapping of browserPartMappingsByKind[sample.kind] || []) {
         if (mapping.busyOnly && !sample.busy) continue;
+        if (mapping.fuelOnly && !sample.fuelCue) continue;
         const legacy = renderLegacySample(sample, { legacyParts: [mapping.legacyPart] });
         const rig = renderRigSample(sample, { rigParts: mapping.rigParts });
         partSamples.push({
@@ -391,7 +487,8 @@ async function renderSamplesInBrowser({
     const entity = makeEntity(sample);
     const colorByOwner = new Map([[entity.owner, parseInt(sample.teamColor.slice(1), 16)]]);
     const state = makeState(sample);
-    const instance = runtime.createUnitRigInstance(protocol.KIND.WORKER, definition);
+    const definition = definitionsByKind.get(sample.kind);
+    const instance = runtime.createUnitRigInstance(sample.kind, definition);
     const context = animation.createRigRenderContext(entity, {
       now,
       state,
@@ -432,7 +529,7 @@ async function renderSamplesInBrowser({
   function makeEntity(sample) {
     return {
       id: 100 + Math.abs(hashLabel(sample.label) % 10_000),
-      kind: protocol.KIND.WORKER,
+      kind: protocol.KIND[sample.kind.toUpperCase()],
       owner: 1,
       teamColor: sample.teamColor,
       x: size.width / 2,
@@ -442,15 +539,17 @@ async function renderSamplesInBrowser({
       state: sample.state,
       setupState: sample.setupState,
       facing: sample.facing,
+      weaponFacing: sample.weaponFacing,
+      recoilProgress: sample.recoilProgress,
       latchedNode: sample.latchedNode,
     };
   }
 
-  function makeState(_sample) {
+  function makeState(sample) {
     return {
       playerId: 1,
-      resources: { oil: 40 },
-      weaponRecoil: () => 0,
+      resources: sample.resources ?? { oil: 40 },
+      weaponRecoil: () => sample.recoilProgress ?? 0,
       isOwnOwner: (owner) => owner === 1,
       isAllyOwner: () => false,
       isNeutralOwner: (owner) => owner === 0,
