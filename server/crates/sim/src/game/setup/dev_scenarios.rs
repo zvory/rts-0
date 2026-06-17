@@ -326,6 +326,75 @@ impl Game {
             issue_after_ticks: config::TICK_HZ * 30,
         })
     }
+
+    pub fn new_tank_trap_pathing_scenario(
+        scenario_case: &str,
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        let layout = TankTrapPathingLayout::from_case(scenario_case)
+            .ok_or_else(|| format!("unsupported Tank Trap pathing case {scenario_case}"))?;
+        let supported = match layout {
+            TankTrapPathingLayout::FriendlyVehicleReroute => {
+                matches!(unit, EntityKind::ScoutCar | EntityKind::Tank)
+            }
+            TankTrapPathingLayout::EnemyVehicleBreach => matches!(
+                unit,
+                EntityKind::AntiTankGun
+                    | EntityKind::MortarTeam
+                    | EntityKind::Artillery
+                    | EntityKind::ScoutCar
+                    | EntityKind::Tank
+            ),
+            TankTrapPathingLayout::InfantryPassThrough => {
+                matches!(
+                    unit,
+                    EntityKind::Worker | EntityKind::Rifleman | EntityKind::MachineGunner
+                )
+            }
+            TankTrapPathingLayout::ExplicitInfantryAttack => unit == EntityKind::Rifleman,
+        };
+        if !supported {
+            return Err(format!(
+                "unsupported Tank Trap pathing unit {unit} for {scenario_case}"
+            ));
+        }
+        if unit_count != 1 {
+            return Err(format!(
+                "unsupported Tank Trap pathing unit count {unit_count}"
+            ));
+        }
+
+        let (map, start_tile, unit_start, traps, enemy_base, goal) =
+            tank_trap_pathing_map(layout, unit);
+        let mut entities = EntityStore::new();
+        spawn_tank_trap_pathing_wall(&mut entities, traps)?;
+        if let Some((x, y)) = enemy_base {
+            entities
+                .spawn_building(2, EntityKind::CityCentre, x, y, true)
+                .ok_or_else(|| "failed to spawn remote enemy City Centre".to_string())?;
+        }
+        let units = spawn_tank_trap_pathing_unit(&mut entities, unit, unit_start)?;
+        let player_id = 1;
+        let game = build_dev_scenario_game_with_teams(
+            map,
+            entities,
+            layout.player_teams(),
+            player_id,
+            start_tile,
+            seed,
+            &format!("dev:tank_trap_pathing_matrix:{}", layout.scenario_case()),
+        );
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units,
+            goal,
+            issue_after_ticks: config::TICK_HZ,
+        })
+    }
 }
 
 pub struct DevScenarioSetup {
@@ -344,14 +413,39 @@ fn build_dev_scenario_game(
     seed: u32,
     metadata_name: &str,
 ) -> Game {
-    let players = [PlayerInit {
-        id: player_id,
-        team_id: player_id,
-        faction_id: "kriegsia".to_string(),
-        name: "Scenario".to_string(),
-        color: "#4878c8".to_string(),
-        is_ai: false,
-    }];
+    build_dev_scenario_game_with_teams(
+        map,
+        entities,
+        [(player_id, player_id)],
+        player_id,
+        start_tile,
+        seed,
+        metadata_name,
+    )
+}
+
+fn build_dev_scenario_game_with_teams<const N: usize>(
+    map: Map,
+    entities: EntityStore,
+    teams: [(u32, u32); N],
+    player_id: u32,
+    start_tile: (u32, u32),
+    seed: u32,
+    metadata_name: &str,
+) -> Game {
+    let colors = ["#4878c8", "#c84848", "#48a868", "#c8a848"];
+    let players: Vec<PlayerInit> = teams
+        .into_iter()
+        .enumerate()
+        .map(|(index, (id, team_id))| PlayerInit {
+            id,
+            team_id,
+            faction_id: "kriegsia".to_string(),
+            name: format!("Scenario {id}"),
+            color: colors[index % colors.len()].to_string(),
+            is_ai: false,
+        })
+        .collect();
     let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
     let pathing = services::pathing::PathingService::new(65_536, 256);
     let rng = SmallRng::seed_from_u64(seed as u64);
@@ -366,19 +460,22 @@ fn build_dev_scenario_game(
     game.pathing = pathing;
     game.lingering_sight.clear();
     game.smokes = SmokeCloudStore::new();
-    game.starting_loadouts = vec![PlayerStartingLoadout {
-        player_id,
-        faction_id: DEFAULT_FACTION_ID.to_string(),
-        loadout_id: "dev_scenario".to_string(),
-        starting_steel: 0,
-        starting_oil: 0,
-    }];
+    game.starting_loadouts = players
+        .iter()
+        .map(|player| PlayerStartingLoadout {
+            player_id: player.id,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            loadout_id: "dev_scenario".to_string(),
+            starting_steel: 0,
+            starting_oil: 0,
+        })
+        .collect();
     game.map_metadata = super::dev_map_metadata(metadata_name);
     game.debug_path_overlays = true;
     game.active_construction_sites.clear();
     game.starting_loadout = StartingLoadout::DebugHuman;
     game.rng = rng;
-    if let Some(player) = game.players.first_mut() {
+    if let Some(player) = game.players.iter_mut().find(|player| player.id == player_id) {
         player.reset_for_dev_scenario(start_tile);
     }
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();

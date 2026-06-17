@@ -124,21 +124,25 @@ export function devWatchConfig() {
     const unit = (params.get("unit") || "").trim();
     const count = (params.get("count") || "").trim();
     const blocker = (params.get("blocker") || "").trim();
+    const scenarioCase = (params.get("case") || "").trim();
     if (
       !/^[a-z0-9_]+$/.test(id) ||
       !/^[a-z0-9_]+$/.test(unit) ||
       !/^[1-9][0-9]*$/.test(count) ||
-      (blocker && !/^[a-z0-9_]+$/.test(blocker))
+      (blocker && !/^[a-z0-9_]+$/.test(blocker)) ||
+      (scenarioCase && !/^[a-z0-9_]+$/.test(scenarioCase))
     ) {
       return null;
     }
     const blockerRoomPart = blocker ? `:blocker=${blocker}` : "";
     const blockerBannerPart = blocker ? ` blocker=${blocker}` : "";
+    const caseRoomPart = scenarioCase ? `:case=${scenarioCase}` : "";
+    const caseBannerPart = scenarioCase ? ` case=${scenarioCase}` : "";
     return {
-      room: `__dev_scenario__:${id}:unit=${unit}:count=${count}${blockerRoomPart}`,
+      room: `__dev_scenario__:${id}:unit=${unit}:count=${count}${blockerRoomPart}${caseRoomPart}`,
       noFog: true,
       kind: "scenario",
-      banner: `local dev scenario no fog ${id} unit=${unit} count=${count}${blockerBannerPart}`,
+      banner: `local dev scenario no fog ${id} unit=${unit} count=${count}${blockerBannerPart}${caseBannerPart}`,
     };
   }
   return null;
