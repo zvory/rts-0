@@ -3248,6 +3248,59 @@ fn moving_unit_steers_around_braced_unit_when_space_exists() {
 }
 
 #[test]
+fn moving_infantry_skirting_tank_trap_line_gets_small_lateral_bias() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(8, 12);
+    let (trap_x, _) = map.tile_center(12, 12);
+    for dy in [-1.0_f32, 0.0, 1.0] {
+        entities
+            .spawn_building(
+                2,
+                EntityKind::TankTrap,
+                trap_x,
+                sy + dy * config::TILE_SIZE as f32,
+                true,
+            )
+            .expect("tank trap spawn");
+    }
+    let mover = entities
+        .spawn_unit(1, EntityKind::Rifleman, sx, sy)
+        .expect("mover spawn");
+    let goal = (sx + config::TILE_SIZE as f32 * 8.0, sy);
+    set_path_direct(&mut entities, mover, vec![goal]);
+    if let Some(e) = entities.get_mut(mover) {
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+
+    let mut max_lateral = 0.0_f32;
+    for tick in 0..120 {
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        let after = pos(&entities, mover);
+        max_lateral = max_lateral.max((after.1 - sy).abs());
+        if after.0 > trap_x + config::TILE_SIZE as f32 {
+            break;
+        }
+    }
+
+    let after = pos(&entities, mover);
+    assert!(
+        after.0 > trap_x + config::TILE_SIZE as f32,
+        "infantry should still pass through the vehicle-only trap line, pos={after:?}"
+    );
+    assert!(
+        max_lateral > 1.0,
+        "infantry should visibly skirt the tank trap line, max lateral {max_lateral:.3}px"
+    );
+    assert!(
+        max_lateral < config::TILE_SIZE as f32,
+        "tank trap steering should stay cosmetic, max lateral {max_lateral:.3}px"
+    );
+}
+
+#[test]
 fn choke_still_clogs_when_no_space_exists() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();

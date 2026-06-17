@@ -12,6 +12,8 @@ use super::STEERING_MAX_NEIGHBORS;
 const STEERING_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 1.5;
 const STEERING_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.5;
 const STEERING_STRENGTH: f32 = 0.65;
+const TANK_TRAP_STEERING_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.0;
+const TANK_TRAP_STEERING_STRENGTH: f32 = 0.35;
 
 pub(super) fn steering_path_dir(e: &Entity, x: f32, y: f32, fallback: (f32, f32)) -> (f32, f32) {
     let Some(path) = e.movement.as_ref().map(|m| &m.path) else {
@@ -137,18 +139,95 @@ fn local_steering_dir(
         sep_y += away_y * weight;
     }
 
+    let trap_bias = tank_trap_steering_bias(entities, spatial, id, x, y, path_dir);
     let sep_len = (sep_x * sep_x + sep_y * sep_y).sqrt();
-    if sep_len <= 1e-4 {
+    let trap_bias_len = (trap_bias.0 * trap_bias.0 + trap_bias.1 * trap_bias.1).sqrt();
+    if sep_len <= 1e-4 && trap_bias_len <= 1e-4 {
         return path_dir;
     }
 
-    let desired_x = path_dir.0 + (sep_x / sep_len) * STEERING_STRENGTH;
-    let desired_y = path_dir.1 + (sep_y / sep_len) * STEERING_STRENGTH;
+    let mut desired_x = path_dir.0;
+    let mut desired_y = path_dir.1;
+    if sep_len > 1e-4 {
+        desired_x += (sep_x / sep_len) * STEERING_STRENGTH;
+        desired_y += (sep_y / sep_len) * STEERING_STRENGTH;
+    }
+    desired_x += trap_bias.0 * TANK_TRAP_STEERING_STRENGTH;
+    desired_y += trap_bias.1 * TANK_TRAP_STEERING_STRENGTH;
     let desired_len = (desired_x * desired_x + desired_y * desired_y).sqrt();
     if desired_len <= 1e-4 {
         path_dir
     } else {
         (desired_x / desired_len, desired_y / desired_len)
+    }
+}
+
+fn tank_trap_steering_bias(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    id: u32,
+    x: f32,
+    y: f32,
+    path_dir: (f32, f32),
+) -> (f32, f32) {
+    if !path_dir.0.is_finite() || !path_dir.1.is_finite() {
+        return (0.0, 0.0);
+    }
+    let perp = (-path_dir.1, path_dir.0);
+
+    let mut traps: Vec<u32> = spatial
+        .ids_in_circle_bbox(x, y, TANK_TRAP_STEERING_RADIUS_PX)
+        .filter(|&trap_id| {
+            entities
+                .get(trap_id)
+                .is_some_and(|trap| trap.hp > 0 && trap.kind == EntityKind::TankTrap)
+        })
+        .collect();
+    traps.sort_unstable();
+    traps.truncate(STEERING_MAX_NEIGHBORS);
+
+    let mut bias_x = 0.0_f32;
+    let mut bias_y = 0.0_f32;
+    for trap_id in traps {
+        let Some(trap) = entities.get(trap_id) else {
+            continue;
+        };
+        let rel_x = x - trap.pos_x;
+        let rel_y = y - trap.pos_y;
+        let d2 = rel_x * rel_x + rel_y * rel_y;
+        if !d2.is_finite() || d2 > TANK_TRAP_STEERING_RADIUS_PX * TANK_TRAP_STEERING_RADIUS_PX {
+            continue;
+        }
+        let d = d2.sqrt();
+
+        let along = (trap.pos_x - x) * path_dir.0 + (trap.pos_y - y) * path_dir.1;
+        let forward = ((along + config::TILE_SIZE as f32 * 0.5)
+            / (TANK_TRAP_STEERING_RADIUS_PX + config::TILE_SIZE as f32 * 0.5))
+            .clamp(0.0, 1.0);
+        if forward <= 0.0 {
+            continue;
+        }
+
+        let lateral = rel_x * perp.0 + rel_y * perp.1;
+        let side = if lateral.abs() > 1.0 {
+            lateral.signum()
+        } else if id < trap_id {
+            1.0
+        } else {
+            -1.0
+        };
+        let proximity = ((TANK_TRAP_STEERING_RADIUS_PX - d) / TANK_TRAP_STEERING_RADIUS_PX)
+            .clamp(0.0, 1.0);
+        let weight = proximity * proximity * forward;
+        bias_x += perp.0 * side * weight;
+        bias_y += perp.1 * side * weight;
+    }
+
+    let bias_len = (bias_x * bias_x + bias_y * bias_y).sqrt();
+    if bias_len <= 1e-4 {
+        (0.0, 0.0)
+    } else {
+        (bias_x / bias_len, bias_y / bias_len)
     }
 }
 
