@@ -10,7 +10,7 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
-import { liveRigDefinitionFor } from "./rigs/live_routing.js";
+import { liveRigDefinitionFor, liveRigRoutesFor } from "./rigs/live_routing.js";
 import { createRigRenderContext } from "./rigs/animation.js";
 import { renderLiveUnitRig, renderRigLegacyComparison } from "./rigs/runtime.js";
 import {
@@ -366,12 +366,10 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   }
   if (!pools.skipLiveRig) {
     const definition = liveRigDefinitionFor(this._liveRigDefinitionsByKind, e.kind);
-    if (definition) {
+    const routes = liveRigRoutesFor(e.kind, pools);
+    if (definition && routes.length > 0) {
       return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-        routes: [
-          { poolName: pools.liveRigShadow || "liveUnitRigShadows", layerName: pools.shadow || "unitShadows", parts: ["part.shadow"] },
-          { poolName: pools.liveRigUnit || "liveUnitRigs", layerName: pools.unit || "units", parts: ["part.body", "part.busyIndicator", "part.facingTick"] },
-        ],
+        routes,
         alpha: pools.alpha,
       });
     }
