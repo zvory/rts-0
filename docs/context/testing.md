@@ -35,9 +35,9 @@ Use when writing or debugging tests, or before claiming a change is done.
 - The stable required PR gate is the aggregate `./tests/run-all.sh` check from the `Main test gate`
   workflow. It depends on split jobs for server binary build, Rust/architecture, live Node, and
   browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`. Changed-file
-  detection emits a conservative CI class: `docs_only` skips expensive suites, `client_only` skips
-  Rust format/nextest/lint while keeping server-build, live Node, and browser coverage, and `full`
-  runs every split job.
+  detection uses the PR base/head range or the `main` push before/after range to emit a conservative
+  CI class: `docs_only` skips expensive suites, `client_only` skips Rust format/nextest/lint while
+  keeping server-build, live Node, and browser coverage, and `full` runs every split job.
 - `tests/run-all.sh` prints a timing summary for every measured suite, server build/boot, and
   client dependency hydration attempt. Its default Rust test phase is
   `cargo nextest run --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile

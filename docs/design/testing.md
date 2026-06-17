@@ -145,11 +145,12 @@ It is an aggregate check over split coverage jobs for server binary build, Rust/
 Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
 The split jobs run `tests/run-all.sh` sub-modes so the required aggregate gate preserves the same
 coverage as the portable repo-root command without serializing every suite in one runner.
-Changed-file detection classifies PRs as `docs_only`, `client_only`, or `full`. `docs_only` keeps
-the same check contexts green but exits before expensive suites. `client_only` is limited to
-conservative `client/` paths and skips Rust format, nextest, lint, and Rust architecture work while
-still building the server and running live Node plus browser coverage. Contract-adjacent client
-paths such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
+Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
+from the PR base/head range or the push before/after range. `docs_only` keeps the same check
+contexts green but exits before expensive suites. `client_only` is limited to conservative
+`client/` paths and skips Rust format, nextest, lint, and Rust architecture work while still
+building the server and running live Node plus browser coverage. Contract-adjacent client paths
+such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
 `client/src/lobby_view.js`, and generated sim-WASM assets fall back to `full`. Branch protection
 should require this single aggregate full-gate check unless a plan phase explicitly changes the
 contract.

@@ -12,9 +12,10 @@ If a server is already answering on the port it is reused and left running.
 This command is the portable local full gate. GitHub Actions runs the same coverage as split
 parallel jobs and keeps the required aggregate PR check named `./tests/run-all.sh`. Run focused local
 verification for the files or contracts you changed, then rely on that aggregate check before merge.
-The CI changed-file classifier keeps docs-only PRs cheap and lets conservative client-only PRs skip
-Rust format, nextest, lint, and Rust architecture work while still running server-build, live Node,
-and browser coverage. Contract-adjacent client files fall back to the full gate. The CI
+The CI changed-file classifier keeps docs-only PRs and post-merge `main` pushes cheap, and lets
+conservative client-only PRs and pushes skip Rust format, nextest, lint, and Rust architecture work
+while still running server-build, live Node, and browser coverage. Contract-adjacent client files
+fall back to the full gate. The CI
 Rust/architecture job installs `cargo-nextest` and invokes `tests/run-all.sh --only-rust`, so the
 required Rust path is the same nextest-backed runner developers use locally.
 Run `./scripts/install-hooks.sh` once per
