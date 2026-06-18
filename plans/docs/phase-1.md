@@ -1,6 +1,6 @@
 # Phase 1 - Advisory Routing Map
 
-Status: planned.
+Status: done.
 
 ## Goal
 
