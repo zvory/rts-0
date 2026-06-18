@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -57,13 +57,13 @@ earlier phases.
 
 ## Implementation Checklist
 
-- [ ] Finish persistence/export capability coverage and tests.
-- [ ] Remove remaining obsolete replay/dev/debug compatibility names from generic room and client
+- [x] Finish persistence/export capability coverage and tests.
+- [x] Remove remaining obsolete replay/dev/debug compatibility names from generic room and client
       surfaces.
-- [ ] Update design docs, context capsules, and the capability matrix.
-- [ ] Add precise lobby/client/protocol guardrails for stable boundaries.
-- [ ] Run focused server, protocol, client, and architecture checks.
-- [ ] Mark this phase as done in this file.
+- [x] Update design docs, context capsules, and the capability matrix.
+- [x] Add precise lobby/client/protocol guardrails for stable boundaries.
+- [x] Run focused server, protocol, client, and architecture checks.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

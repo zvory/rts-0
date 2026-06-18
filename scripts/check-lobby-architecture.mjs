@@ -41,6 +41,9 @@ for (const file of listRustFiles(lobbySrc)) {
       );
     }
   }
+
+  checkGenericRoomHelperModeShortcuts(file, stripped);
+  if (file === "room_task.rs") checkEndMatchPersistencePolicy(stripped);
 }
 
 if (failures.length > 0) {
@@ -105,6 +108,46 @@ function stripCfgTestModules(source) {
   }
 
   return output.join("\n");
+}
+
+function checkGenericRoomHelperModeShortcuts(file, source) {
+  const genericHelpers = new Set([
+    "launch.rs",
+    "live_tick.rs",
+    "projection.rs",
+    "snapshot_fanout.rs",
+  ]);
+  if (!genericHelpers.has(file)) return;
+  if (source.includes("RoomMode::") || source.includes("SessionMode::")) {
+    failures.push(
+      `${path.posix.join("server/src/lobby", file)}: generic room helper must consume SessionPolicy/projection/capability metadata instead of product-mode names`,
+    );
+  }
+}
+
+function checkEndMatchPersistencePolicy(source) {
+  const endMatch = source.match(/fn end_match\([\s\S]*?\n    fn transition_to_replay_viewer/);
+  if (!endMatch) {
+    failures.push("server/src/lobby/room_task.rs: missing end_match persistence guardrail target");
+    return;
+  }
+  const body = endMatch[0];
+  if (
+    body.includes("ReplayArtifactV1::capture_from_game") &&
+    !body.includes("should_capture_post_match_replay")
+  ) {
+    failures.push(
+      "server/src/lobby/room_task.rs: end_match replay capture must be gated by persistence policy",
+    );
+  }
+  if (
+    body.includes("MatchReplayRecord::from_artifact") &&
+    !body.includes("should_attach_match_history_replay_artifact")
+  ) {
+    failures.push(
+      "server/src/lobby/room_task.rs: match-history replay attachment must be gated by persistence policy",
+    );
+  }
 }
 
 function braceDelta(line) {

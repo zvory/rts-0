@@ -23,17 +23,12 @@ const EMPTY_COMMANDS = Object.freeze({
   gameplay: false,
 });
 
-export function createRoomCapabilities({ startPayload, devWatch = null, replayViewer = false } = {}) {
+export function createRoomCapabilities({ startPayload } = {}) {
+  const source = startPayload?.capabilities || {};
   const diagnostics = normalizeDiagnostics(startPayload?.diagnostics);
-  const roomTime = roomTimeCapabilities({ startPayload, devWatch });
-  const visibility = {
-    ...EMPTY_VISIBILITY,
-    replayVision: !!startPayload?.replay,
-  };
-  const commands = {
-    ...EMPTY_COMMANDS,
-    gameplay: !replayViewer && startPayload?.spectator !== true,
-  };
+  const roomTime = roomTimeCapabilities(source.roomTime);
+  const visibility = normalizeVisibility(source.visibility);
+  const commands = normalizeCommands(source.commands);
   return Object.freeze({
     roomTime,
     diagnostics,
@@ -42,28 +37,32 @@ export function createRoomCapabilities({ startPayload, devWatch = null, replayVi
   });
 }
 
-function roomTimeCapabilities({ startPayload, devWatch }) {
-  if (startPayload?.replay) {
-    return Object.freeze({
-      ...EMPTY_ROOM_TIME,
-      available: true,
-      setSpeed: true,
-      pause: true,
-      seekRelative: true,
-      seekAbsolute: true,
-      timeline: true,
-    });
-  }
-  if (devWatch?.kind === "scenario") {
-    return Object.freeze({
-      ...EMPTY_ROOM_TIME,
-      available: true,
-      setSpeed: true,
-      pause: true,
-      step: true,
-    });
-  }
-  return EMPTY_ROOM_TIME;
+function roomTimeCapabilities(roomTime) {
+  if (!roomTime?.available) return EMPTY_ROOM_TIME;
+  return Object.freeze({
+    ...EMPTY_ROOM_TIME,
+    available: true,
+    setSpeed: roomTime.setSpeed === true,
+    pause: roomTime.pause === true,
+    step: roomTime.step === true,
+    seekRelative: roomTime.seekRelative === true,
+    seekAbsolute: roomTime.seekAbsolute === true,
+    timeline: roomTime.timeline === true,
+  });
+}
+
+function normalizeVisibility(visibility) {
+  return Object.freeze({
+    ...EMPTY_VISIBILITY,
+    replayVision: visibility?.replayVision === true,
+  });
+}
+
+function normalizeCommands(commands) {
+  return Object.freeze({
+    ...EMPTY_COMMANDS,
+    gameplay: commands?.gameplay === true,
+  });
 }
 
 function normalizeDiagnostics(diagnostics) {

@@ -2764,8 +2764,18 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     capabilities: createRoomCapabilities({
       startPayload: {
         replay: { durationTicks: 1_000 },
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+            seekRelative: true,
+            seekAbsolute: true,
+            timeline: true,
+          },
+          visibility: { replayVision: true },
+        },
       },
-      replayViewer: true,
     }),
   });
   assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
@@ -2853,8 +2863,17 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     state: roomTimeState,
     replayViewer: false,
     capabilities: createRoomCapabilities({
-      startPayload: { spectator: true },
-      devWatch: { kind: "scenario" },
+      startPayload: {
+        spectator: true,
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+            step: true,
+          },
+        },
+      },
     }),
   });
   assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
@@ -2871,7 +2890,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     net: replayNet,
     state: roomTimeState,
     replayViewer: true,
-    capabilities: createRoomCapabilities({ startPayload: { spectator: true }, replayViewer: true }),
+    capabilities: createRoomCapabilities({ startPayload: { spectator: true, replay: {} } }),
   });
   assert(!noCapabilityControls._listeners.has("click"), "room-time controls need an advertised capability");
   assert(
@@ -2881,13 +2900,17 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   noCapabilityUi.destroy();
 
   const normalCapabilities = createRoomCapabilities({
-    startPayload: { spectator: false },
+    startPayload: { spectator: false, capabilities: { commands: { gameplay: true } } },
   });
   assert(!normalCapabilities.roomTime.available, "normal matches do not mount room-time controls");
   assert(normalCapabilities.commands.gameplay, "active players keep gameplay command affordances");
 
   const spectatorCapabilities = createRoomCapabilities({
-    startPayload: { spectator: true, diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL } },
+    startPayload: {
+      spectator: true,
+      diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
+      capabilities: { commands: { gameplay: false } },
+    },
   });
   assert(!spectatorCapabilities.commands.gameplay, "spectators get read-only command affordances");
   assert(
@@ -7196,7 +7219,6 @@ withFakeDocument(() => {
     shouldMountObserverAnalysisOverlay({
       capabilities: createRoomCapabilities({
         startPayload: { replay: {}, spectator: true, diagnostics: { observerAnalysis: true } },
-        replayViewer: true,
       }),
     }),
     "observer analysis mounts when the start payload advertises it for replay viewers",
@@ -7221,7 +7243,6 @@ withFakeDocument(() => {
     !shouldMountObserverAnalysisOverlay({
       capabilities: createRoomCapabilities({
         startPayload: { replay: {}, spectator: true },
-        replayViewer: true,
       }),
     }),
     "observer analysis does not mount from replay identity alone",

@@ -228,6 +228,19 @@ Sent once when the match begins. Carries everything static for the whole match.
   spectator: bool,               // true when this connection is observing only
   predictionBuildId?: string,    // live active players only; server/client bundle id
   predictionVersion?: u32,       // live active players only; currently 1
+  capabilities?: {               // explicit recipient-scoped shared room affordances
+    roomTime?: {
+      available?: bool,
+      setSpeed?: bool,
+      pause?: bool,
+      step?: bool,
+      seekRelative?: bool,
+      seekAbsolute?: bool,
+      timeline?: bool
+    },
+    visibility?: { replayVision?: bool },
+    commands?: { gameplay?: bool }
+  },
   diagnostics?: {                // explicit recipient-scoped diagnostic affordances
     movementPaths?: "ownerOnly"|"all",
     observerAnalysis?: bool
@@ -276,6 +289,12 @@ do not receive that movement-path diagnostic affordance. Dev scenario start payl
 `diagnostics.movementPaths: "all"` because those rooms intentionally use full-world diagnostic
 projection. Replay viewers and live spectators receive `diagnostics.observerAnalysis: true` only
 when room projection policy will send observer-analysis payloads to that recipient.
+`capabilities` is the neutral control/affordance contract. Live active players receive
+`commands.gameplay: true`; spectators, replay viewers, dev-watch viewers, and lab viewers do not.
+Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
+`visibility.replayVision: true`. Dev scenario watch rooms advertise speed/pause/step room-time
+controls without replay seek or replay-vision controls. Clients must not infer these shared
+affordances from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
 

@@ -271,12 +271,13 @@ buildGiveUpAction({ visible, onOpen })
 
 `room_capabilities.js`
 ```js
-createRoomCapabilities({ startPayload, devWatch, replayViewer })
+createRoomCapabilities({ startPayload })
 ```
-`Match` and app-shell controls consume this parsed capability record for room-time controls,
-diagnostic settings, observer analysis, vision controls, and read-only/gameplay command affordances.
-Product shells may still use product metadata for launch/routing and owned controls such as replay
-branch creation or lab scenario tools.
+`Match` and app-shell controls consume this parsed `startPayload.capabilities` and
+`startPayload.diagnostics` record for room-time controls, diagnostic settings, observer analysis,
+vision controls, and read-only/gameplay command affordances. Product shells may still use product
+metadata for launch/routing and owned controls such as replay branch creation or lab scenario tools,
+but shared affordances must not be inferred from replay/dev/lab identity.
 
 `lab_client.js`
 ```js

@@ -25,6 +25,8 @@ pub struct StartPayload {
     /// Prediction protocol version supported by this live match. Omitted for spectators/replays.
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub prediction_version: u32,
+    #[serde(default, skip_serializing_if = "RoomCapabilities::is_empty")]
+    pub capabilities: RoomCapabilities,
     #[serde(default, skip_serializing_if = "DiagnosticCapabilities::is_empty")]
     pub diagnostics: DiagnosticCapabilities,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -34,6 +36,80 @@ pub struct StartPayload {
     pub tick: u32,
     pub map: MapInfo,
     pub players: Vec<PlayerStart>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomCapabilities {
+    #[serde(default, skip_serializing_if = "RoomTimeCapabilities::is_empty")]
+    pub room_time: RoomTimeCapabilities,
+    #[serde(default, skip_serializing_if = "VisibilityCapabilities::is_empty")]
+    pub visibility: VisibilityCapabilities,
+    #[serde(default, skip_serializing_if = "CommandCapabilities::is_empty")]
+    pub commands: CommandCapabilities,
+}
+
+impl RoomCapabilities {
+    pub fn is_empty(&self) -> bool {
+        self.room_time.is_empty() && self.visibility.is_empty() && self.commands.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomTimeCapabilities {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub available: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub set_speed: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pause: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub step: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub seek_relative: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub seek_absolute: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub timeline: bool,
+}
+
+impl RoomTimeCapabilities {
+    pub fn is_empty(&self) -> bool {
+        !self.available
+            && !self.set_speed
+            && !self.pause
+            && !self.step
+            && !self.seek_relative
+            && !self.seek_absolute
+            && !self.timeline
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct VisibilityCapabilities {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub replay_vision: bool,
+}
+
+impl VisibilityCapabilities {
+    pub fn is_empty(&self) -> bool {
+        !self.replay_vision
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandCapabilities {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub gameplay: bool,
+}
+
+impl CommandCapabilities {
+    pub fn is_empty(&self) -> bool {
+        !self.gameplay
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
