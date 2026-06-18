@@ -192,8 +192,9 @@ authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons).
-- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_SHELL_DELAY_TICKS = 68`
-  (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`, `MORTAR_INNER_RADIUS_TILES = 0.5`,
+- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_RANGE_TILES = 12`,
+  `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
+  `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 30`, `MORTAR_INNER_DAMAGE = 60`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
   The inner radius uses semi-armor-piercing damage against armored targets: it applies half of the
   normal non-AP armor reduction instead of the full reduction. Manual Fire uses hotkey `X`; autocast
@@ -330,7 +331,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 50  | 30 outer / 60 inner AOE | 9 | 60 | 1.12 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| mortar_team     | 50  | 30 outer / 60 inner AOE | 12 | 60 | 1.12 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 60 deployed / 45 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 0.922 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |

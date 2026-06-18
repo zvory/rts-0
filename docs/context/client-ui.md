@@ -10,9 +10,10 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - §4.2 Rendering & look (PixiJS, procedural art)
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `frame_recovery.js`, `match_health.js`,
   `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
-  `lab_control_policy.js` — app lifecycle, dependency injection, replay/spectator/lab shell.
+  `lab_control_policy.js` — app lifecycle, dependency injection, frame-loop recovery,
+  replay/spectator/lab shell.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js` — client snapshot state, browser-local intent, command-budget admission,

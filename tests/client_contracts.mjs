@@ -3,7 +3,8 @@
 // constructors and pure methods documented in docs/design/client-ui.md §4.1.
 //
 // This does NOT spin up a browser or a server. Modules that require DOM / Pixi
-// (Renderer, Input, HUD, Minimap, Lobby) are not instantiated here.
+// (Input, HUD, Minimap, Lobby) are not instantiated here; renderer resilience
+// is covered with a tiny fake Pixi harness.
 
 import fs from "node:fs";
 import { Net } from "../client/src/net.js";
@@ -114,6 +115,7 @@ import {
   installedAppRuntime,
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
+import { Renderer } from "../client/src/renderer/index.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
 import { _drawBuilding } from "../client/src/renderer/buildings.js";
 import { buildRendererFeedbackView } from "../client/src/renderer/feedback_view_model.js";
@@ -1402,11 +1404,251 @@ class RecordingGraphics extends FakeGraphics {
   arc(x, y, radius, start, end, anticlockwise) {
     this.calls.push(["arc", x, y, radius, start, end, anticlockwise]);
   }
+  drawRect(x, y, width, height) {
+    this.calls.push(["drawRect", x, y, width, height]);
+  }
   drawPolygon(points) {
     this.calls.push(["drawPolygon", points]);
   }
   drawRoundedRect(x, y, width, height, radius) {
     this.calls.push(["drawRoundedRect", x, y, width, height, radius]);
+  }
+}
+
+function installFakePixi() {
+  const priorPixi = globalThis.PIXI;
+  const priorWindow = globalThis.window;
+
+  class FakeContainer {
+    constructor() {
+      this.children = [];
+      this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
+      this.scale = { set: (value = 1) => { this.scaleValue = value; } };
+      this.visible = true;
+    }
+    addChild(child) {
+      this.children.push(child);
+      child.parent = this;
+      return child;
+    }
+    removeChild(child) {
+      this.children = this.children.filter((item) => item !== child);
+      child.parent = null;
+    }
+    destroy() {}
+  }
+
+  class PixiGraphics extends RecordingGraphics {
+    constructor() {
+      super();
+      this.visible = true;
+      this.alpha = 1;
+    }
+    destroy() {
+      this.destroyed = true;
+    }
+  }
+
+  class FakeApplication {
+    constructor(options = {}) {
+      this.options = options;
+      this.stage = new FakeContainer();
+      this.view = { style: {}, parentNode: null };
+      this.renderer = {
+        roundPixels: false,
+        resize: (w, h) => {
+          this.width = w;
+          this.height = h;
+        },
+      };
+    }
+    destroy() {
+      this.destroyed = true;
+    }
+  }
+
+  globalThis.window = {
+    ...(priorWindow || {}),
+    devicePixelRatio: 1,
+    innerWidth: 800,
+    innerHeight: 600,
+  };
+  globalThis.PIXI = {
+    Application: FakeApplication,
+    Container: FakeContainer,
+    Graphics: PixiGraphics,
+    SCALE_MODES: { NEAREST: "nearest" },
+    settings: {},
+  };
+
+  return () => {
+    if (priorPixi === undefined) delete globalThis.PIXI;
+    else globalThis.PIXI = priorPixi;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  };
+}
+
+{
+  const restorePixi = installFakePixi();
+  const priorConsoleError = console.error;
+  const consoleErrors = [];
+  console.error = (...args) => consoleErrors.push(args);
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._drawUnit = () => {
+      throw new Error("broken worker art");
+    };
+    renderer._drawMortarImpacts = () => {
+      throw new Error("broken mortar overlay");
+    };
+
+    let placementDraws = 0;
+    const noOpOverlay = () => {};
+    for (const name of [
+      "_drawAbilityObjects",
+      "_drawSmokes",
+      "_drawFog",
+      "_drawSmokeCanisters",
+      "_drawCommandFeedback",
+      "_drawMortarTargets",
+      "_drawMortarLaunches",
+      "_drawMortarShells",
+      "_drawArtilleryLaunches",
+      "_drawArtilleryTargets",
+      "_drawArtilleryImpacts",
+      "_drawSelectedMortarRanges",
+      "_drawBreakthroughAuras",
+      "_drawAbilityTargetPreview",
+      "_drawAntiTankGunSetupPreview",
+      "_drawOrderPlan",
+      "_drawDebugPathOverlay",
+      "_drawRallyPoints",
+      "_drawResourceMiningPreview",
+      "_drawMuzzleFlashes",
+    ]) {
+      renderer[name] = noOpOverlay;
+    }
+    renderer._drawPlacement = () => {
+      placementDraws += 1;
+    };
+
+    renderer.render(
+      {
+        playerId: 1,
+        players: [{ id: 1, color: "#4878c8" }],
+        selection: new Set(),
+        rememberedBuildings: [],
+        map: { tileSize: 32 },
+        entitiesInterpolated: () => [
+          { id: 101, owner: 1, kind: KIND.WORKER, x: 100, y: 120, facing: 0 },
+        ],
+      },
+      {
+        x: 0,
+        y: 0,
+        zoom: 1,
+      },
+      null,
+      1,
+    );
+
+    const fallback = renderer._pools.units.get(101);
+    assert(placementDraws === 1, "renderer continues later overlays after a render helper throws");
+    assert(renderer._renderErrors.get("unit:worker")?.count === 1, "renderer records entity render errors by kind");
+    assert(renderer._renderErrors.get("mortarImpacts")?.count === 1, "renderer records overlay render errors by label");
+    assert(fallback?.calls.some((call) => call[0] === "drawRect"), "broken entity art draws a checkerboard fallback");
+    assert(
+      consoleErrors.some((args) => String(args[0]).includes("[RTS_RENDER] skipped unit:worker")),
+      "renderer logs recovered render errors",
+    );
+    assert(globalThis.__rtsRenderErrors?.latest?.label === "mortarImpacts", "renderer exposes latest render error diagnostics");
+  } finally {
+    console.error = priorConsoleError;
+    restorePixi();
+    delete globalThis.__rtsRenderErrors;
+  }
+}
+
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const priorRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const priorConsoleError = console.error;
+  const consoleErrors = [];
+  const tickFn = () => {};
+  console.error = (...args) => consoleErrors.push(args);
+  globalThis.window = {
+    ...(priorWindow || {}),
+    location: { protocol: "http:", host: "localhost", search: "" },
+    localStorage: { getItem() { return null; } },
+  };
+  globalThis.document = {
+    hidden: false,
+    getElementById: () => null,
+  };
+  globalThis.requestAnimationFrame = (fn) => {
+    assert(fn === tickFn, "frame recovery schedules the match tick callback");
+    return 77;
+  };
+  try {
+    const { Match } = await import("../client/src/match.js");
+    const match = Object.create(Match.prototype);
+    Object.assign(match, {
+      running: true,
+      lastFrame: 1000,
+      tickFn,
+      frameErrors: { count: 0, lastLogAt: -Infinity },
+      health: {
+        noteFrameGap() {},
+        refreshLatency() {},
+        publish() {},
+      },
+      computeAlpha: () => 1,
+      camera: {
+        update() {
+          throw new Error("camera update failed");
+        },
+      },
+      input: { update() {} },
+      advancePredictionVisual() {},
+      fog: { update() {} },
+      ownEntities: () => [],
+      state: { map: { tileSize: 32 }, visibleTiles: null },
+      renderer: { render() {} },
+      hud: { update() {} },
+      minimap: { render() {} },
+      observerAnalysisOverlay: null,
+    });
+
+    match.frame(1016);
+
+    assert(match.rafId === 77, "match frame schedules the next frame after a client error");
+    assert(match.frameErrors.count === 1, "match frame records recovered client errors");
+    assert(
+      consoleErrors.some((args) => String(args[0]).includes("[RTS_FRAME] recovered")),
+      "match frame logs recovered client errors",
+    );
+    assert(globalThis.__rtsFrameErrors?.count === 1, "match frame exposes recovered frame diagnostics");
+  } finally {
+    if (priorRequestAnimationFrame === undefined) delete globalThis.requestAnimationFrame;
+    else globalThis.requestAnimationFrame = priorRequestAnimationFrame;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    console.error = priorConsoleError;
+    delete globalThis.__rtsFrameErrors;
   }
 }
 
