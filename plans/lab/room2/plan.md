@@ -10,23 +10,23 @@ The first room refactor gave us useful shared helpers: session policy, participa
 projection, and launch payload code. It did not fully finish the architecture goal from
 `plans/lab/room/requirements.md`, because some behavior is still attached to product-mode names like
 replay, dev watch, or Debug mode. That means a future feature can still end up asking "am I a replay
-or a dev scenario?" when the real question is narrower, such as "may this room pause time?" or "may
-this viewer receive movement debug path details?"
+or a dev scenario?" when the real question is narrower, such as "does this room run realtime or does
+the room control time?" or "does this viewer get normal actor vision or room-controlled vision?"
 
 This follow-up should make those reusable behaviors explicit capabilities. Normal matches, replays,
 dev scenarios, replay branches, and labs can stay named product workflows, but downstream code should
-mostly consume neutral policy choices: clock control, command authority, snapshot visibility,
-snapshot detail, UI affordances, and persistence. The end state should be easy to explain: a room is
-the common runtime shell, a session mode picks a supported bundle of policies, and lower-level code
-does not infer behavior from mode names unless the behavior is genuinely unique to that product mode.
+mostly consume neutral policy choices: clock ownership, command authority, snapshot visibility,
+diagnostic affordances, and persistence. The end state should be easy to explain: a room is the
+common runtime shell, a session mode picks a supported bundle of policies, and lower-level code does
+not infer behavior from mode names unless the behavior is genuinely unique to that product mode.
 
 ## Why This Exists
 
 `plans/lab/room/` was deliberately behavior-preserving. That was the right first step, but it left
 compatibility-shaped names and policy holes that are now visible:
 
-- `SessionPolicy` centralizes high-level axes, but it does not yet describe snapshot detail
-  capabilities such as movement debug path projection.
+- `SessionPolicy` centralizes high-level axes, but it does not yet describe whether diagnostic
+  overlays are available for a room.
 - `tick_control.rs` centralizes timing decisions, but reusable time behavior still appears through
   replay/dev-watch names in several places.
 - `Game` decides whether entity snapshots include debug path data from `debug_path_overlays`, which
@@ -59,9 +59,10 @@ Keep these concepts separate:
 - `SessionPhase`: where the room is in its lifecycle, such as lobby, live game, replay viewer, or
   branch staging.
 - `SessionPolicy`: the complete policy bundle selected by mode plus phase.
-- `Capability`: a specific behavior a policy may expose, such as speed control, step, seek, full
-  world vision, movement debug paths, observer analysis, issue-as commands, scenario export, or match
-  history recording.
+- `Capability`: a specific coarse behavior a policy may expose, such as room-controlled time,
+  room-controlled vision, diagnostics, issue-as commands, scenario export, or match history
+  recording. Fine-grained operations such as pause, speed, step, seek, selected-player vision, and
+  movement paths live under those capabilities; they are not separate policy axes by default.
 - `Affordance`: the UI or protocol surface that lets a user operate a capability.
 
 A product mode may still have bespoke setup. Dev scenario construction, replay artifact loading,
@@ -86,19 +87,19 @@ connection ownership should continue moving through room-owned helpers.
 
 ### Clock Capability
 
-Represent time behavior in neutral terms:
+Represent active simulation time with two coarse choices:
 
-- no simulation ticking;
 - fixed realtime ticking;
-- speed-controlled ticking;
-- paused ticking;
-- single-step ticking;
-- seekable playback;
-- countdown before ticking starts.
+- room-controlled time.
+
+Room-controlled time means the room owns the allowed operations for that session, such as pause,
+speed, step, or seek when they make sense for the state source. Those operations should not become
+separate top-level policies unless a later design proves that distinction is useful. Countdown and
+branch staging are lifecycle/start states around the clock, not clock capabilities themselves.
 
 Downstream tick code should not need to ask whether a room is a replay or dev watch merely to decide
-whether speed, pause, or step is allowed. Product-specific action names can remain at the protocol
-edge until a separate protocol migration is worth the compatibility cost.
+whether the room owns time. Product-specific action names can remain at the protocol edge until a
+separate protocol migration is worth the compatibility cost.
 
 ### Authority Capability
 
@@ -119,38 +120,44 @@ operator privileges.
 
 ### Snapshot Visibility
 
-Represent what world state a recipient may see:
+Represent visibility with two coarse choices:
 
-- player fog;
-- team or selected-player union fog;
-- replay viewer-selected fog;
-- full-world vision;
-- branch live aliased player fog;
-- lab selected vision.
+- normal actor vision;
+- room-controlled vision.
 
-Visibility must stay server-authoritative. Full-world vision is a privileged projection policy, not a
-side effect of being a dev scenario or lab.
+Normal actor vision means the recipient receives the view their current role is ordinarily entitled
+to, such as a player's own fog or a spectator projection allowed by the room. Room-controlled vision
+means the room can choose the projection for that recipient, such as full world, selected players,
+teams, or unions. Authority decides who may change that projection; the visibility policy only says
+whether the room is allowed to control it.
 
-### Snapshot Detail
+Visibility must stay server-authoritative. Full-world and selected-player vision are privileged
+projection choices under room-controlled vision, not side effects of being a dev scenario or lab.
 
-Add an explicit detail policy for data that is not just visibility:
+### Diagnostic Detail
 
-- movement debug path details;
-- observer analysis audience;
-- private order/rally detail;
-- player resource detail for spectator or full-world views;
-- any future diagnostic overlays.
+Add an explicit diagnostic policy for data that is not just visibility:
 
-Movement debug paths are the current forcing function. A room should be able to say whether movement
-debug paths are unavailable, owner-only, operator-visible, or full-world diagnostic detail without
-encoding that choice in `Game::debug_path_overlays`, `StartingLoadout::DebugHuman`, or
-`devWatch.kind`.
+- diagnostics disabled;
+- diagnostics enabled.
+
+Movement debug paths are one diagnostic overlay, not the policy itself. A room should be able to say
+whether diagnostic overlays are available without encoding that choice in `Game::debug_path_overlays`,
+`StartingLoadout::DebugHuman`, or `devWatch.kind`.
+
+The server-side data scope and the client-side display scope are separate decisions. For example, a
+server may include movement path diagnostics only for entities visible under the recipient's
+projection, while the client may choose to draw only selected units. Dev scenarios may choose a
+full-world diagnostic projection, while normal Debug mode may still display only selected owned units
+from the data it receives. The phase plan should preserve those behaviors without turning every draw
+mode into a policy variant.
 
 ### Start Payload And UI Affordances
 
-Start payloads should advertise supported capabilities and UI affordances in terms the client can
-consume directly. The client should not infer debug path availability from dev scenario identity, and
-future lab controls should not need to masquerade as replay controls just to reuse pause or speed UI.
+Start payloads should advertise the small set of supported capabilities and UI affordances the client
+actually needs. This should not become a broad capability manifest or dynamic UI registry. The client
+should not infer debug overlay availability from dev scenario identity, and future lab controls should
+not need to masquerade as replay controls just to reuse room-controlled time UI.
 
 This does not require renaming every existing wire field immediately. It does require a migration
 story where compatibility fields are produced from the policy bundle, and new client code reads
@@ -168,14 +175,15 @@ must remain room-local and environment-safe.
 `SessionPhase` to the full policy bundle. It should include neutral capabilities where behavior is
 shared, while still naming product-specific state sources and lifecycle variants when those are real.
 
-`server/src/lobby/tick_control.rs` should consume clock capability, pause state, speed state, replay
-seek state, and countdown state. Its public outputs should describe generic scheduled work such as
-advance live game, advance scripted live game, advance playback, step once, countdown, or no-op. If
-product-specific tick drivers remain, route to them from those neutral decisions.
+`server/src/lobby/tick_control.rs` should consume the coarse clock policy, current room-controlled
+time state, and lifecycle state around countdown or staging. Its public outputs should stay modest:
+effective tick interval plus the next scheduled room action. Pause, speed, step, and seek handlers
+can remain explicit operations, but their permission should come from room-controlled time rather than
+from replay/dev identity.
 
-`server/src/lobby/projection.rs` should own both visibility policy and snapshot detail policy. It
+`server/src/lobby/projection.rs` should own both visibility policy and diagnostic policy. It
 should be the place that says which recipient gets player fog, union fog, full-world vision, replay
-vision, observer analysis, and diagnostic detail.
+vision, observer analysis, and diagnostic data.
 
 `server/crates/sim/src/game/snapshot.rs` should expose snapshot construction through neutral options
 instead of reading durable product-mode state to decide optional diagnostic fields. The `Game` can
@@ -196,9 +204,10 @@ know whether debug path overlays are available.
 Add guardrails only when the boundary is stable and mechanically checkable. Good candidates:
 
 - prevent new snapshot fanout paths that bypass `server/src/lobby/projection.rs`;
-- prevent new direct uses of `RoomMode::DevScenario` or replay mode names inside generic clock,
-  projection, launch, or client setting logic unless explicitly allowlisted;
-- prevent new `Game` snapshot detail flags that are driven by starting loadout or product mode
+- prevent generic clock, projection, launch, or client setting logic from deriving shared behavior
+  directly from replay/dev/lab mode names when a neutral policy applies;
+- allow product-mode references at setup and routing edges where product identity is real;
+- prevent new `Game` snapshot diagnostic flags that are driven by starting loadout or product mode
   instead of projection options;
 - keep lab mutation through public `Game` lab APIs and never through lobby-side sim internals;
 - keep protocol mirrors and docs synchronized when capability metadata changes wire shape.
@@ -212,9 +221,9 @@ The later multi-phase plan should probably decompose this by risk, not by module
 
 - Inventory mode-shaped behavior and add characterization tests before moving code.
 - Extend `SessionPolicy` with the missing neutral capabilities and document supported bundles.
-- Move movement debug path inclusion behind snapshot detail policy.
-- Neutralize tick-control decisions enough that speed, pause, and step are capabilities rather than
-  replay/dev identities.
+- Move movement debug path inclusion behind diagnostic policy.
+- Neutralize tick-control decisions enough that realtime vs room-controlled time is the policy, with
+  pause, speed, step, and seek treated as operations under that policy.
 - Move client debug overlay availability and future lab/replay control affordances to capability
   metadata.
 - Clean up remaining compatibility names where safe, and document the names that intentionally remain
@@ -230,7 +239,8 @@ focused test proving no normal, replay, branch, dev, or lab behavior changed uni
 - Do not remove existing replay/dev protocol messages just for naming purity.
 - Do not turn every possible capability combination into a supported product mode.
 - Do not move room lifecycle, transport, database writes, or AI ownership into `rts-sim`.
-- Do not weaken fog or client-trust boundaries while adding full-world or debug detail capability.
+- Do not weaken fog or client-trust boundaries while adding full-world vision or diagnostic
+  capability.
 - Do not replace simple enums and structs with a dynamic plugin system.
 
 ## Acceptance Criteria
@@ -240,11 +250,11 @@ This follow-up is complete when:
 - A future engineer can describe each room mode as a product identity plus an explicit policy bundle.
 - Generic helpers no longer attach shared behavior to replay/dev/lab names when a neutral capability
   would describe the behavior.
-- Movement debug path detail is controlled by room projection/detail policy and reflected to the
-  client as a capability, not inferred from `DebugHuman` or dev scenario identity.
-- Time controls are internally represented as reusable clock capabilities even if compatibility
-  protocol names remain.
-- Client settings and overlays consume explicit capability metadata for debug and lab/replay
+- Diagnostics are controlled by room projection/diagnostic policy and reflected to the client as a
+  capability, not inferred from `DebugHuman` or dev scenario identity.
+- Clock behavior is internally represented as fixed realtime ticking or room-controlled time, even if
+  compatibility protocol names remain.
+- Client settings and overlays consume explicit capability metadata for diagnostics and lab/replay
   affordances.
 - The docs name which compatibility terms remain intentionally and why.
 - Focused tests cover normal match, spectator, replay viewer, replay branch live, dev scenario, and
