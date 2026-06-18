@@ -79,7 +79,58 @@ server/Cargo.toml --profile default`
 for the long regression gate and the CLI for balance exploration, seed sweeps, and strategy result
 sampling.
 
-## 10. Package-aware test selection policy
+## 10. Dev scenario inspection
+
+Game-backed dev scenarios are live, no-fog watcher rooms for inspecting authored simulation
+situations through the normal Pixi client. Start a local server, then open the index:
+
+```bash
+open "http://localhost:<port>/dev/scenarios"
+```
+
+The index lists every supported launch and links to the current URL shape:
+
+```text
+/dev/scenarios?id=<scenario_id>&unit=<unit>&count=<count>[&blocker=<unit|none>]
+```
+
+The handler redirects into the normal client with `watchScenario=1`; the client auto-joins a
+reserved spectator room named:
+
+```text
+__dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>]
+```
+
+Current scenario ids:
+
+- `scout_car_snaking_corridor` — movement/pathing through the snaking stone corridor.
+- `direct_reverse_order` — one vehicle ordered directly behind its current facing.
+- `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
+- `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
+- `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.
+- `factory_zero_gap_perpendicular` — one vehicle starting flush against a factory and moving east.
+- `tank_trap_line_horizontal` — Training Centre, engineers, one rifleman, and one vehicle for
+  manually building a horizontal Tank Trap line before the test units try to cross.
+- `tank_trap_line_vertical` — Training Centre, engineers, one rifleman, and one vehicle for
+  manually building a vertical Tank Trap line before the test units try to cross.
+- `tank_trap_line_diagonal` — Training Centre, engineers, one rifleman, and one vehicle for
+  manually building a diagonal Tank Trap line before the test units try to cross.
+- `tank_trap_pathing_matrix` — one dropdown-backed matrix scenario with selectable cases:
+  `friendly_vehicle_reroute`, `enemy_vehicle_breach`, `infantry_pass_through`, and
+  `explicit_infantry_attack`.
+
+The watcher shows movement debug path overlays by default. Replay speed controls are reused for
+dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one
+authoritative tick while paused. Normal seek/reset controls are replay-only.
+
+Scenario setup is server-side only under `server/crates/sim/src/game/setup/dev_scenarios.rs`; do
+not expose arbitrary spawning or map editing through client commands. Scenario artifact recording
+under `target/scenario-artifacts/` is not currently implemented.
+
+The Tank Trap pathing matrix scenarios are harnesses for owner-aware pathing, infantry
+pass-through, explicit infantry attacks, and attack-move acquisition filtering.
+
+## 11. Package-aware test selection policy
 
 The authoritative full gate is the PR `./tests/run-all.sh` check from the `Main test gate` workflow. Local runs should
 usually be narrower and selected by the changed files or contracts. Use
@@ -140,7 +191,7 @@ path. `tests/select-suites.mjs --verify` keeps the changed file mapping itself c
 examples. CI comments document any intentionally skipped suite; that skip becomes invalid when the
 changed-file mapping selects the skipped behavior.
 
-## 11. PR CI contract
+## 12. PR CI contract
 
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
 It is an aggregate check over split coverage jobs for server binary build, Rust/architecture, live
@@ -156,6 +207,10 @@ such as `client/src/config.js`, `client/src/protocol.js`, `client/src/net.js`,
 `client/src/lobby_view.js`, and generated sim-WASM assets fall back to `full`. Branch protection
 should require this single aggregate full-gate check unless a plan phase explicitly changes the
 contract.
+
+`node scripts/check-docs-health.mjs` runs in the early changed-files CI lane before expensive split
+jobs. It validates `docs/doc-map.json`, enforces the 5 KiB `docs/context/*.md` capsule cap, and
+checks local Markdown links in `docs/` and `plans/`.
 
 The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
 live Node, and browser coverage is owned by the split `Main test gate` jobs under the required

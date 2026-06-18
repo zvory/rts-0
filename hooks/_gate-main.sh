@@ -20,3 +20,6 @@ cd "$repo_root"
 
 echo "$hook: running cheap staged diff checks (git diff --cached --check)"
 git diff --cached --check
+
+echo "$hook: running docs health check"
+node scripts/check-docs-health.mjs

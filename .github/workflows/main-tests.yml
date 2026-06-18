@@ -63,6 +63,9 @@ jobs:
           policy_output="$(node tests/select-suites.mjs --ci-policy "${changed[@]}")"
           printf '%s\n' "$policy_output" | tee -a "$GITHUB_OUTPUT"
 
+      - name: Run docs health check
+        run: node scripts/check-docs-health.mjs
+
   server-build:
     name: CI / server binary
     runs-on: ubuntu-latest
