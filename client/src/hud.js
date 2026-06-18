@@ -12,15 +12,20 @@ import { cmd } from "./protocol.js";
 import { ABILITY, KIND, STATE, isBuilding } from "./protocol.js";
 import {
   ABILITIES,
-  BASE_COMMAND_SUPPLY_CAP,
-  COMMAND_CAR_SUPPLY_CAP_BONUS,
   PLAYER_PALETTE,
   STATS,
   TICK_HZ,
   UPGRADES,
 } from "./config.js";
 import { buildCommandCardDescriptors } from "./hud_command_card.js";
+import { HudSelectionPanel } from "./hud_selection_panel.js";
 import { resourceIconHtml } from "./resource_icons.js";
+export {
+  formatTankOilUsed,
+  selectionBudgetBlockShape,
+  selectionBudgetGridModel,
+} from "./hud_selection_panel.js";
+
 const BREAKTHROUGH_VOICE_IDS = Object.freeze([
   "unit_breakthrough_todes_rit_01",
   "unit_breakthrough_koste_es_01",
@@ -32,14 +37,6 @@ export function playerHasCompletedKind(entities, playerId, kind) {
     if (e.owner === playerId && e.kind === kind && e.buildProgress == null) return true;
   }
   return false;
-}
-
-/** Format tank lifetime movement oil for the selected-entity detail panel. */
-export function formatTankOilUsed(value) {
-  const oilUsed = typeof value === "number" && Number.isFinite(value)
-    ? Math.max(0, value)
-    : 0;
-  return oilUsed >= 10 ? `${Math.round(oilUsed)}` : oilUsed.toFixed(1);
 }
 
 /**
@@ -89,95 +86,6 @@ export function groupCooldownClocks(
   });
 }
 
-const SELECTION_BUDGET_ROWS = 2;
-const SELECTION_OVERFLOW_FLASH_MS = 1400;
-
-export function selectionBudgetBlockShape(weight) {
-  const safeWeight = Math.max(1, Math.ceil(Number.isFinite(weight) ? weight : 1));
-  if (safeWeight === 1) return { cols: 1, rows: 1 };
-  if (safeWeight === 2) return { cols: 2, rows: 1 };
-  if (safeWeight === 3) return { cols: 3, rows: 1 };
-  if (safeWeight === 4) return { cols: 2, rows: 2 };
-  if (safeWeight === 5) return { cols: 3, rows: 2, reservedCells: 1 };
-  if (safeWeight === 6) return { cols: 3, rows: 2 };
-  return { cols: Math.ceil(safeWeight / SELECTION_BUDGET_ROWS), rows: SELECTION_BUDGET_ROWS };
-}
-
-export function selectionBudgetGridModel(entities, overflow = null) {
-  const budget = selectionBudgetForHudEntities(entities);
-  const cols = Math.max(1, Math.ceil(budget.cap / SELECTION_BUDGET_ROWS));
-  const occupied = Array.from({ length: SELECTION_BUDGET_ROWS }, () => Array(cols).fill(false));
-  const blocks = [];
-
-  for (const entity of entities || []) {
-    const weight = commandWeight(entity?.kind);
-    const shape = selectionBudgetBlockShape(weight);
-    const placed = placeSelectionBudgetBlock(occupied, cols, shape);
-    const st = STATS[entity?.kind] || {};
-    blocks.push({
-      id: entity?.id,
-      kind: entity?.kind,
-      icon: st.icon || "",
-      label: st.label || entity?.kind || "",
-      weight,
-      cols: shape.cols,
-      rows: shape.rows,
-      reservedCells: shape.reservedCells || 0,
-      col: placed?.col ?? 1,
-      row: placed?.row ?? 1,
-      placed: !!placed,
-    });
-  }
-
-  return {
-    used: budget.used,
-    cap: budget.cap,
-    cols,
-    blocks,
-    overflow: overflow || null,
-  };
-}
-
-function selectionBudgetForHudEntities(entities) {
-  let used = 0;
-  let cap = BASE_COMMAND_SUPPLY_CAP;
-  for (const entity of entities || []) {
-    if (!entity) continue;
-    const weight = commandWeight(entity.kind);
-    used += weight;
-    if (entity.kind === KIND.COMMAND_CAR) cap += COMMAND_CAR_SUPPLY_CAP_BONUS + weight;
-  }
-  return { used, cap, over: used > cap };
-}
-
-function commandWeight(kind) {
-  const supply = STATS[kind]?.supply;
-  return Number.isFinite(supply) && supply > 0 ? supply : 1;
-}
-
-function placeSelectionBudgetBlock(occupied, maxCols, shape) {
-  for (let row = 0; row <= SELECTION_BUDGET_ROWS - shape.rows; row++) {
-    for (let col = 0; col <= maxCols - shape.cols; col++) {
-      if (selectionBudgetSpaceFree(occupied, row, col, shape)) {
-        for (let dy = 0; dy < shape.rows; dy++) {
-          for (let dx = 0; dx < shape.cols; dx++) occupied[row + dy][col + dx] = true;
-        }
-        return { row: row + 1, col: col + 1 };
-      }
-    }
-  }
-  return null;
-}
-
-function selectionBudgetSpaceFree(occupied, row, col, shape) {
-  for (let dy = 0; dy < shape.rows; dy++) {
-    for (let dx = 0; dx < shape.cols; dx++) {
-      if (occupied[row + dy]?.[col + dx]) return false;
-    }
-  }
-  return true;
-}
-
 /**
  * The bottom/top DOM HUD: resources, selected panel, and the command card.
  *
@@ -217,6 +125,7 @@ export class HUD {
     this.elSelected = rootEl.querySelector("#selected-panel");
     this.elControlGroups = rootEl.querySelector("#control-group-tabs");
     this.elCommand = rootEl.querySelector("#command-card");
+    this.selectionPanel = new HudSelectionPanel(this.elSelected, this.state);
 
     // Signature of the last-rendered command card so we only rebuild its buttons when
     // the relevant selection/affordability actually changes (keeps DOM + hotkeys stable).
@@ -230,8 +139,6 @@ export class HUD {
     this._resSig = null;
     // Signature for the inert control-group tabs.
     this._controlGroupSig = null;
-    this._selectionOverflowSig = null;
-    this._selectionOverflowUntil = 0;
   }
 
   /**
@@ -247,9 +154,7 @@ export class HUD {
 
   /** Clear DOM-owned HUD state between matches. */
   destroy() {
-    if (this.elSelected) {
-      this.elSelected.innerHTML = "";
-    }
+    this.selectionPanel?.destroy();
     if (this.elControlGroups) {
       this.elControlGroups.innerHTML = "";
       this.elControlGroups.classList.add("empty");
@@ -443,126 +348,8 @@ export class HUD {
     return true;
   }
 
-  /** Render the selection summary: single-entity detail or multi-entity command budget grid. */
   _renderSelectedPanel() {
-    const panel = this.elSelected;
-    if (!panel) return;
-
-    const sel = this.state.selectedEntities();
-    if (!sel || sel.length === 0) {
-      panel.innerHTML = "";
-      return;
-    }
-
-    if (sel.length === 1) {
-      panel.innerHTML = "";
-      panel.appendChild(this._singleSelectionNode(sel[0]));
-      return;
-    }
-
-    const overflow = this._visibleSelectionOverflow();
-    const model = selectionBudgetGridModel(sel, overflow);
-    const frag = document.createDocumentFragment();
-    const header = document.createElement("div");
-    header.className = "sel-header";
-    const count = document.createElement("span");
-    count.className = "sel-count-label";
-    count.textContent = `${sel.length} selected`;
-    const budget = document.createElement("span");
-    budget.className = "sel-budget-counter" + (overflow ? " overflow" : "");
-    budget.textContent = `${model.used} / ${model.cap}`;
-    header.appendChild(count);
-    header.appendChild(budget);
-    frag.appendChild(header);
-
-    const grid = document.createElement("div");
-    grid.className = "sel-budget-grid";
-    grid.style.setProperty("--sel-budget-cols", String(model.cols));
-    grid.setAttribute("aria-label", `Command supply ${model.used} of ${model.cap}`);
-    for (const block of model.blocks) {
-      const cell = document.createElement("div");
-      cell.className = [
-        "sel-budget-block",
-        `weight-${block.weight}`,
-        block.reservedCells ? "has-reserved-cell" : "",
-        block.placed ? "" : "unplaced",
-      ].filter(Boolean).join(" ");
-      cell.style.gridColumn = `${block.col} / span ${block.cols}`;
-      cell.style.gridRow = `${block.row} / span ${block.rows}`;
-      cell.title = `${block.label}: ${block.weight} command supply`;
-      cell.textContent = block.icon;
-      grid.appendChild(cell);
-    }
-    frag.appendChild(grid);
-    if (overflow) {
-      const notice = document.createElement("div");
-      notice.className = "sel-budget-overflow";
-      notice.textContent = "Selection limit reached";
-      frag.appendChild(notice);
-    }
-
-    panel.innerHTML = "";
-    panel.appendChild(frag);
-  }
-
-  _visibleSelectionOverflow() {
-    const overflow = this.state.selectionBudgetOverflow;
-    if (!overflow) {
-      this._selectionOverflowSig = null;
-      this._selectionOverflowUntil = 0;
-      return null;
-    }
-
-    const now = Date.now();
-    const sig = `${overflow.used}/${overflow.cap}/${overflow.seq ?? ""}`;
-    if (sig !== this._selectionOverflowSig) {
-      this._selectionOverflowSig = sig;
-      this._selectionOverflowUntil = now + SELECTION_OVERFLOW_FLASH_MS;
-    }
-    return now <= this._selectionOverflowUntil ? overflow : null;
-  }
-
-  /** Build the detail node for a single selected entity (icon, name, HP bar). */
-  _singleSelectionNode(e) {
-    const st = STATS[e.kind] || {};
-    const node = document.createElement("div");
-    node.className = "sel-single";
-
-    const hp = e.hp ?? 0;
-    const maxHp = e.maxHp ?? hp ?? 1;
-    const frac = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
-    const hpClass = frac > 0.5 ? "good" : frac > 0.25 ? "mid" : "low";
-
-    let prodHtml = "";
-    const queue = e.prodQueue ?? 0;
-    if (queue > 0) {
-      const pct = Math.round((e.prodProgress ?? 0) * 100);
-      const kindLabel = (e.prodUpgrade && UPGRADES[e.prodUpgrade]?.label) ||
-        (e.prodKind && STATS[e.prodKind] && STATS[e.prodKind].label) ||
-        e.prodKind ||
-        "";
-      const queued = queue > 1 ? ` (+${queue - 1})` : "";
-      const pending = e.optimisticProduction ? ` <span class="sel-prod-pending">pending</span>` : "";
-      prodHtml =
-        `<div class="sel-prod-label">${kindLabel}${queued}${pending}</div>` +
-        `<div class="sel-prod-bar${e.optimisticProduction ? " optimistic" : ""}">` +
-        `<div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
-    }
-
-    const tankOilHtml = e.kind === KIND.TANK
-      ? `<div class="sel-stat"><span>Oil Used:</span>` +
-        `<strong>${formatTankOilUsed(e.oilUsed)}</strong></div>`
-      : "";
-
-    node.innerHTML =
-      `<div class="sel-name"><span class="sel-icon">${st.icon || ""}</span>` +
-      `${st.label || e.kind}</div>` +
-      `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
-      `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
-      `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
-      tankOilHtml +
-      prodHtml;
-    return node;
+    this.selectionPanel?.render();
   }
 
   // --- Command card ----------------------------------------------------------
