@@ -160,6 +160,13 @@ export class LabPanel {
       )),
     ]));
 
+    root.appendChild(this.fieldset("Scenario", [
+      this.inputField("scenario-name", "Name", "text", this.defaultScenarioName()),
+      this.textAreaField("scenario-json", "JSON", ""),
+      this.button("Export JSON", () => this.exportScenario()),
+      this.button("Import JSON", () => this.importScenario()),
+    ]));
+
     return root;
   }
 
@@ -227,6 +234,16 @@ export class LabPanel {
     return wrap;
   }
 
+  textAreaField(id, label, value) {
+    const wrap = this.fieldWrap(label);
+    const input = document.createElement("textarea");
+    input.value = String(value ?? "");
+    input.rows = 5;
+    this.fields.set(id, input);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
   selectField(id, label, values, labels = {}) {
     const wrap = this.fieldWrap(label);
     const select = document.createElement("select");
@@ -267,6 +284,35 @@ export class LabPanel {
       y: this.num("spawn-y"),
       completed: this.bool("spawn-completed"),
     });
+  }
+
+  async exportScenario() {
+    const result = await this.labClient.exportScenario(this.value("scenario-name"));
+    const scenario = result?.outcome?.scenario;
+    if (!result?.ok || !scenario) return result;
+    const text = `${JSON.stringify(scenario, null, 2)}\n`;
+    const field = this.fields.get("scenario-json");
+    if (field) field.value = text;
+    this.downloadScenarioJson(scenario, text);
+    return result;
+  }
+
+  importScenario() {
+    const text = this.value("scenario-json").trim();
+    if (!text) return Promise.resolve(null);
+    let scenario;
+    try {
+      scenario = JSON.parse(text);
+    } catch (err) {
+      this.lastResult = {
+        ok: false,
+        op: "importScenario",
+        error: `Invalid JSON: ${err.message || err}`,
+      };
+      this.render();
+      return Promise.resolve(this.lastResult);
+    }
+    return this.labClient.importScenario(scenario);
   }
 
   batchSelected(request) {
@@ -346,6 +392,12 @@ export class LabPanel {
     return this.launch?.map || this.startPayload?.map?.name || "Default";
   }
 
+  defaultScenarioName() {
+    const room = this.publicRoomName();
+    const map = this.mapName();
+    return `${room}-${map}`;
+  }
+
   teamIds() {
     const ids = new Set();
     for (const player of this.startPayload?.players || []) {
@@ -371,6 +423,17 @@ export class LabPanel {
       target.removeEventListener?.(type, handler);
     }
     this.listeners = [];
+  }
+
+  downloadScenarioJson(scenario, text) {
+    if (typeof Blob !== "function" || !globalThis.URL?.createObjectURL) return;
+    const anchor = document.createElement("a");
+    if (typeof anchor.click !== "function") return;
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    anchor.href = url;
+    anchor.download = `${slugifyScenarioName(scenario?.name || "lab-scenario")}.json`;
+    anchor.click();
+    URL.revokeObjectURL?.(url);
   }
 
   destroy() {
@@ -412,4 +475,12 @@ function labVisionLabel(vision) {
   if (vision.mode === "team") return `Team ${vision.teamId}`;
   if (vision.mode === "teams") return `Teams ${(vision.teamIds || []).join(", ")}`;
   return String(vision.mode || "-");
+}
+
+function slugifyScenarioName(name) {
+  const slug = String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "lab-scenario";
 }

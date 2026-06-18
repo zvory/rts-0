@@ -3310,6 +3310,14 @@ function fakeAudioContext() {
   assert(sent[0].clientSeq === 7, "Net.command sends the provided clientSeq");
   net.lab(12, { op: "setVision", vision: msg.labVisionFullWorld() });
   assert(sent[1].t === "lab" && sent[1].requestId === 12, "Net.lab sends lab request envelopes");
+  assert(
+    msg.labExportScenario(13, "saved").op.name === "saved",
+    "lab export builder includes a scenario name",
+  );
+  assert(
+    msg.labImportScenario(14, { schemaVersion: 1 }).op.scenario.schemaVersion === 1,
+    "lab import builder includes a scenario payload",
+  );
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(
     msg.join("A", "main", false, true).replayOk === true,
@@ -3386,6 +3394,10 @@ function fakeAudioContext() {
   assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.kind === KIND.RIFLEMAN, "LabClient sends spawn operations");
   void labClient.setCompletedResearch(1, UPGRADE.TANK_UNLOCK, true);
   assert(sent.at(-1).op.op === "setCompletedResearch" && sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK, "LabClient sends research operations");
+  void labClient.exportScenario("saved setup");
+  assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabClient sends scenario export requests");
+  void labClient.importScenario({ schemaVersion: 1, kind: "labScenario" });
+  assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.kind === "labScenario", "LabClient sends scenario import requests");
   assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
   labClient.destroy();
 }
@@ -3462,6 +3474,17 @@ withFakeDocument(() => {
   panel.fields.get("resource-oil").value = "300";
   void labClient.setPlayerResources(panel.int("resource-player"), panel.uint("resource-steel"), panel.uint("resource-oil"));
   assert(sent.at(-1).op.op === "setPlayerResources" && sent.at(-1).op.steel === 900, "LabPanel resource fields normalize player state edits");
+  panel.fields.get("scenario-name").value = "saved setup";
+  void labClient.exportScenario(panel.value("scenario-name"));
+  assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabPanel scenario name feeds export requests");
+  panel.fields.get("scenario-json").value = JSON.stringify({
+    schemaVersion: 1,
+    kind: "labScenario",
+    name: "saved setup",
+    metadata: { exportedTick: 0, lab: { vision: labVision.fullWorld() } },
+  });
+  void panel.importScenario();
+  assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted scenario JSON");
   panel.destroy();
   labClient.destroy();
   assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");

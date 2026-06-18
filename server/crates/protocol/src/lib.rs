@@ -374,6 +374,13 @@ pub enum ReplayVisionRequest {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum LabClientOp {
+    ExportScenario {
+        #[serde(default)]
+        name: Option<String>,
+    },
+    ImportScenario {
+        scenario: LabScenarioV1,
+    },
     SpawnEntity {
         owner: u32,
         kind: String,
@@ -411,6 +418,69 @@ pub enum LabClientOp {
         player_id: u32,
         cmd: Command,
     },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioV1 {
+    pub schema_version: u32,
+    pub kind: String,
+    pub name: String,
+    pub seed: u32,
+    pub map: LabScenarioMap,
+    pub players: Vec<LabScenarioPlayer>,
+    pub entities: Vec<LabScenarioEntity>,
+    pub metadata: LabScenarioMetadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioMap {
+    pub name: String,
+    pub schema_version: u32,
+    pub content_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioPlayer {
+    pub id: u32,
+    pub team_id: u32,
+    pub faction_id: String,
+    pub name: String,
+    pub color: String,
+    pub is_ai: bool,
+    pub steel: u32,
+    pub oil: u32,
+    pub upgrades: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioEntity {
+    pub id: u32,
+    pub owner: u32,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    pub hp: u32,
+    pub completed: bool,
+    pub construction_progress: Option<u32>,
+    pub construction_total: Option<u32>,
+    pub resource_remaining: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioMetadata {
+    pub exported_tick: u32,
+    pub lab: LabScenarioLabMetadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioLabMetadata {
+    pub vision: LabVisionMode,
 }
 
 // ---------------------------------------------------------------------------

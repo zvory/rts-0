@@ -187,9 +187,12 @@ backdoor: entity mutations validate known unit/building kinds, real players, fin
 positions, placement/collision legality, and stale ids before changing the world. Accepted lab
 mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
 fog, and building memory before returning. `LabScenarioV1` is setup data keyed by map identity,
-player state, and entity records; restore loads the named map, validates faction/research/kind data,
-recreates entities with fresh ids, and returns the id remap for callers that need to reconcile UI
-selection.
+player state, entity records, and small lab metadata such as scenario name and exported tick;
+room-owned protocol export adds current lab vision metadata before sending JSON to the browser.
+Restore loads the named map, validates faction/research/kind data, recreates entities with fresh
+ids, repairs derived state, and returns the id remap for callers that need to reconcile UI
+selection. Snapshot-only projections, transient events, projectile runtime state, and command logs
+are not part of the scenario format.
 
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with

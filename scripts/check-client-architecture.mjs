@@ -84,8 +84,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "input/index.js": 38854,
   // Lab MVP Phase 5 routes lab gameplay commands through the injected control policy.
   "match.js": 38795,
-  // Lab MVP Phase 3 adds mirrored lab request/result tags, vision modes, and typed request builders.
-  "protocol.js": 37805,
+  // Lab MVP Phase 6 adds mirrored LabScenarioV1 import/export request builders.
+  "protocol.js": 38113,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,

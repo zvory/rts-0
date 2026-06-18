@@ -233,6 +233,23 @@ assert(
   "lab issue-as builder must emit the exact wire shape",
 );
 assert(
+  JSON.stringify(msg.labExportScenario(14, "saved setup")) ===
+    JSON.stringify({ t: "lab", requestId: 14, op: { op: "exportScenario", name: "saved setup" } }),
+  "lab scenario export builder must emit the exact wire shape",
+);
+assert(
+  JSON.stringify(msg.labImportScenario(15, { schemaVersion: 1, kind: "labScenario" })) ===
+    JSON.stringify({ t: "lab", requestId: 15, op: { op: "importScenario", scenario: { schemaVersion: 1, kind: "labScenario" } } }),
+  "lab scenario import builder must emit the exact wire shape",
+);
+assert(
+  rust.includes("ExportScenario") &&
+    rust.includes("ImportScenario") &&
+    rust.includes("LabScenarioV1") &&
+    protocolDoc.includes("LabScenarioV1"),
+  "lab scenario import/export protocol surface must be documented and mirrored",
+);
+assert(
   rustContract.includes("DEFAULT_FACTION_ID") &&
     rustContract.includes("faction_id") &&
     DEFAULT_FACTION_ID === "kriegsia",
