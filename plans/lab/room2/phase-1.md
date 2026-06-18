@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -45,12 +45,12 @@ bundles before changing runtime code. This phase should turn the architectural d
 
 ## Implementation Checklist
 
-- [ ] Add the capability matrix with all current product paths.
-- [ ] Add an inventory section for mode-shaped leaks and the phase expected to remove each leak.
-- [ ] Add focused tests for lab mutation classification or policy coverage if missing.
-- [ ] Add focused tests for diagnostic availability if missing.
-- [ ] Add focused tests for current replay/dev time-control behavior if missing.
-- [ ] Mark this phase as done in this file.
+- [x] Add the capability matrix with all current product paths.
+- [x] Add an inventory section for mode-shaped leaks and the phase expected to remove each leak.
+- [x] Add focused tests for lab mutation classification or policy coverage if missing.
+- [x] Add focused tests for diagnostic availability if missing.
+- [x] Add focused tests for current replay/dev time-control behavior if missing.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
