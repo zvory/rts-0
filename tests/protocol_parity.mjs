@@ -213,8 +213,24 @@ assert(
     rustContract.includes("operation_count") &&
     LAB_ROLE.OPERATOR === "operator" &&
     LAB_ROLE.READ_ONLY === "readOnly" &&
-    LAB_VISION.FULL_WORLD === "fullWorld",
+    LAB_VISION.FULL_WORLD === "fullWorld" &&
+    LAB_VISION.TEAM === "team" &&
+    LAB_VISION.TEAMS === "teams",
   "start payload must expose mirrored lab metadata",
+);
+assert(
+  C.LAB === "lab" && S.LAB_STATE === "labState" && S.LAB_RESULT === "labResult",
+  "lab protocol tags must be mirrored",
+);
+assert(
+  JSON.stringify(msg.labSetVision(12, msg.labVisionTeam(2))) ===
+    JSON.stringify({ t: "lab", requestId: 12, op: { op: "setVision", vision: { mode: "team", teamId: 2 } } }),
+  "lab vision builder must emit the exact wire shape",
+);
+assert(
+  JSON.stringify(msg.labIssueCommandAs(13, 1, cmd.stop([7]))) ===
+    JSON.stringify({ t: "lab", requestId: 13, op: { op: "issueCommandAs", playerId: 1, cmd: { c: "stop", units: [7] } } }),
+  "lab issue-as builder must emit the exact wire shape",
 );
 assert(
   rustContract.includes("DEFAULT_FACTION_ID") &&

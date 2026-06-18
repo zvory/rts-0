@@ -1419,6 +1419,8 @@ async fn send_server_message(
         ServerMessage::ReplayState(_) => "replay_state",
         ServerMessage::ObserverAnalysis(_) => "observer_analysis",
         ServerMessage::JoinReplayPrompt { .. } => "join_replay_prompt",
+        ServerMessage::LabState(_) => "lab_state",
+        ServerMessage::LabResult(_) => "lab_result",
         ServerMessage::ShutdownWarning { .. } => "shutdown_warning",
         ServerMessage::Error { .. } => "error",
         ServerMessage::GameOver { .. } => "game_over",
@@ -1733,6 +1735,18 @@ async fn handle_client_message(
                 player_id,
                 current_room,
                 RoomEvent::SetReplayVision { player_id, vision },
+            )
+            .await;
+        }
+        ClientMessage::Lab { request_id, op } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::Lab {
+                    player_id,
+                    request_id,
+                    op,
+                },
             )
             .await;
         }
