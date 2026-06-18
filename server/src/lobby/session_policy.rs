@@ -297,6 +297,220 @@ impl From<&RoomMode> for SessionMode {
 mod tests {
     use super::*;
 
+    struct CapabilityCase {
+        product_path: &'static str,
+        mode: SessionMode,
+        phase: SessionPhase,
+        state_source: StateSource,
+        join: JoinPolicy,
+        clock: ClockPolicy,
+        authority: AuthorityPolicy,
+        vision: VisionPolicy,
+        mutation: MutationPolicy,
+        persistence: PersistencePolicy,
+        start_payload: StartPayloadPolicy,
+        countdown_eligible: bool,
+    }
+
+    fn assert_capability_case(case: CapabilityCase) {
+        let policy = SessionPolicy::new(case.mode, case.phase);
+        assert_eq!(
+            policy.state_source, case.state_source,
+            "{} state source",
+            case.product_path
+        );
+        assert_eq!(policy.join, case.join, "{} join", case.product_path);
+        assert_eq!(policy.clock, case.clock, "{} clock", case.product_path);
+        assert_eq!(
+            policy.authority, case.authority,
+            "{} authority",
+            case.product_path
+        );
+        assert_eq!(policy.vision, case.vision, "{} vision", case.product_path);
+        assert_eq!(
+            policy.mutation, case.mutation,
+            "{} mutation",
+            case.product_path
+        );
+        assert_eq!(
+            policy.persistence, case.persistence,
+            "{} persistence",
+            case.product_path
+        );
+        assert_eq!(
+            policy.start_payload, case.start_payload,
+            "{} start payload",
+            case.product_path
+        );
+        assert_eq!(
+            policy.countdown_eligible, case.countdown_eligible,
+            "{} countdown eligibility",
+            case.product_path
+        );
+    }
+
+    #[test]
+    fn session_policy_capability_baseline_covers_room2_product_paths() {
+        for case in [
+            CapabilityCase {
+                product_path: "normal lobby",
+                mode: SessionMode::Normal,
+                phase: SessionPhase::Lobby,
+                state_source: StateSource::LobbyState,
+                join: JoinPolicy::NormalLobby,
+                clock: ClockPolicy::RoomTicker,
+                authority: AuthorityPolicy::LobbyHost,
+                vision: VisionPolicy::LobbyState,
+                mutation: MutationPolicy::LobbyState,
+                persistence: PersistencePolicy::None,
+                start_payload: StartPayloadPolicy::None,
+                countdown_eligible: true,
+            },
+            CapabilityCase {
+                product_path: "normal live match",
+                mode: SessionMode::Normal,
+                phase: SessionPhase::LiveMatch,
+                state_source: StateSource::LiveGame,
+                join: JoinPolicy::RejectMidMatch,
+                clock: ClockPolicy::LiveMatch,
+                authority: AuthorityPolicy::LivePlayers,
+                vision: VisionPolicy::LiveFog,
+                mutation: MutationPolicy::LiveGame,
+                persistence: PersistencePolicy::MatchHistoryEligible,
+                start_payload: StartPayloadPolicy::LiveMatch,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "live spectator",
+                mode: SessionMode::Normal,
+                phase: SessionPhase::LiveMatch,
+                state_source: StateSource::LiveGame,
+                join: JoinPolicy::RejectMidMatch,
+                clock: ClockPolicy::LiveMatch,
+                authority: AuthorityPolicy::LivePlayers,
+                vision: VisionPolicy::LiveFog,
+                mutation: MutationPolicy::LiveGame,
+                persistence: PersistencePolicy::MatchHistoryEligible,
+                start_payload: StartPayloadPolicy::LiveMatch,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "post-match replay",
+                mode: SessionMode::Normal,
+                phase: SessionPhase::ReplayViewer,
+                state_source: StateSource::PostMatchReplaySession,
+                join: JoinPolicy::ReplayPromptOrAttach,
+                clock: ClockPolicy::ReplayPlayback,
+                authority: AuthorityPolicy::ReplayViewers,
+                vision: VisionPolicy::ReplayVision,
+                mutation: MutationPolicy::ReplayPlayback,
+                persistence: PersistencePolicy::None,
+                start_payload: StartPayloadPolicy::ReplayViewer,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "persisted replay room",
+                mode: SessionMode::Replay,
+                phase: SessionPhase::Lobby,
+                state_source: StateSource::PersistedReplayArtifact,
+                join: JoinPolicy::ReplayPromptOrAttach,
+                clock: ClockPolicy::RoomTicker,
+                authority: AuthorityPolicy::ReplayViewers,
+                vision: VisionPolicy::ReplayVision,
+                mutation: MutationPolicy::ReplayPlayback,
+                persistence: PersistencePolicy::None,
+                start_payload: StartPayloadPolicy::ReplayViewer,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "saved replay artifact",
+                mode: SessionMode::ReplayArtifact,
+                phase: SessionPhase::Lobby,
+                state_source: StateSource::SavedReplayArtifact,
+                join: JoinPolicy::ReplayPromptOrAttach,
+                clock: ClockPolicy::RoomTicker,
+                authority: AuthorityPolicy::ReplayViewers,
+                vision: VisionPolicy::ReplayVision,
+                mutation: MutationPolicy::ReplayPlayback,
+                persistence: PersistencePolicy::None,
+                start_payload: StartPayloadPolicy::ReplayViewer,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "replay branch staging",
+                mode: SessionMode::ReplayBranch,
+                phase: SessionPhase::BranchStaging,
+                state_source: StateSource::ReplayBranchSeed,
+                join: JoinPolicy::BranchStaging,
+                clock: ClockPolicy::BranchStaging,
+                authority: AuthorityPolicy::BranchStagingHost,
+                vision: VisionPolicy::BranchStagingState,
+                mutation: MutationPolicy::BranchStagingClaims,
+                persistence: PersistencePolicy::Suppressed,
+                start_payload: StartPayloadPolicy::None,
+                countdown_eligible: true,
+            },
+            CapabilityCase {
+                product_path: "replay branch live",
+                mode: SessionMode::ReplayBranch,
+                phase: SessionPhase::LiveMatch,
+                state_source: StateSource::BranchLiveGame,
+                join: JoinPolicy::BranchStaging,
+                clock: ClockPolicy::LiveMatch,
+                authority: AuthorityPolicy::BranchLiveSeatAliases,
+                vision: VisionPolicy::LiveFog,
+                mutation: MutationPolicy::BranchLiveGame,
+                persistence: PersistencePolicy::Suppressed,
+                start_payload: StartPayloadPolicy::ReplayBranchLive,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "dev scenario",
+                mode: SessionMode::DevScenario,
+                phase: SessionPhase::LiveMatch,
+                state_source: StateSource::DevScenario,
+                join: JoinPolicy::DevWatch,
+                clock: ClockPolicy::DevWatch,
+                authority: AuthorityPolicy::DevWatchControls,
+                vision: VisionPolicy::DevFullWorld,
+                mutation: MutationPolicy::DevScenarioGame,
+                persistence: PersistencePolicy::Suppressed,
+                start_payload: StartPayloadPolicy::DevWatch,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "lab operator",
+                mode: SessionMode::Lab,
+                phase: SessionPhase::LiveMatch,
+                state_source: StateSource::LabGame,
+                join: JoinPolicy::LabRoom,
+                clock: ClockPolicy::LiveMatch,
+                authority: AuthorityPolicy::LabOperator,
+                vision: VisionPolicy::LabFullWorld,
+                mutation: MutationPolicy::LabReadOnly,
+                persistence: PersistencePolicy::Suppressed,
+                start_payload: StartPayloadPolicy::Lab,
+                countdown_eligible: false,
+            },
+            CapabilityCase {
+                product_path: "lab read-only viewer",
+                mode: SessionMode::Lab,
+                phase: SessionPhase::LiveMatch,
+                state_source: StateSource::LabGame,
+                join: JoinPolicy::LabRoom,
+                clock: ClockPolicy::LiveMatch,
+                authority: AuthorityPolicy::LabOperator,
+                vision: VisionPolicy::LabFullWorld,
+                mutation: MutationPolicy::LabReadOnly,
+                persistence: PersistencePolicy::Suppressed,
+                start_payload: StartPayloadPolicy::Lab,
+                countdown_eligible: false,
+            },
+        ] {
+            assert_capability_case(case);
+        }
+    }
+
     #[test]
     fn session_policy_classifies_normal_lobby_live_and_post_match_replay() {
         let lobby = SessionPolicy::new(SessionMode::Normal, SessionPhase::Lobby);
