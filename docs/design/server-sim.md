@@ -578,10 +578,12 @@ checked without adding any wire-protocol fields.
 body `facing`, configured length/width, and a small clearance margin, building bodies are
 axis-aligned rectangles derived from footprint tiles, and resource node bodies are circles for
 build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, and
-vehicle-body-only static blockers; movement and standability choose the combined static layer from
-the routed unit's rules-level `MovementBodyClass`, and path-cache fingerprints are computed for the
-same blocker layer. `services::standability` owns reusable legality predicates for unit bodies and
-building sites. Production spawn exits, construction/build intent, movement landing, steering
+vehicle-body-only static blockers; Tank Trap pairs exactly two tiles apart close the single tile
+between them on the vehicle-body-only layer while remaining infantry-passable. Movement and
+standability choose the combined static layer from the routed unit's rules-level
+`MovementBodyClass`, and path-cache fingerprints are computed for the same blocker layer.
+`services::standability` owns reusable legality predicates for unit bodies and building sites.
+Production spawn exits, construction/build intent, movement landing, steering
 candidates, collision push targets, and formation goal selection all use this shared standability
 layer for static/body legality. Swept segment checks sample the same body shape along a straight
 segment, and broad-phase queries use each body's conservative bounding radius. Movement separates

@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use crate::config;
 use crate::game::entity::{
@@ -28,6 +28,7 @@ impl<'a> Occupancy<'a> {
         let size = map.size;
         let mut all_ground_blocked = vec![false; (size * size) as usize];
         let mut vehicle_body_blocked = vec![false; (size * size) as usize];
+        let mut tank_trap_tiles = HashSet::new();
         for e in entities.iter() {
             if !e.is_building() {
                 continue;
@@ -40,9 +41,13 @@ impl<'a> Occupancy<'a> {
                         StaticBlockerClass::VehicleBodyOnly => vehicle_body_blocked[idx] = true,
                         StaticBlockerClass::None => {}
                     }
+                    if e.kind == EntityKind::TankTrap {
+                        tank_trap_tiles.insert((tx, ty));
+                    }
                 }
             }
         }
+        close_tank_trap_vehicle_gaps(size, &tank_trap_tiles, &mut vehicle_body_blocked);
         let mut all_ground_static_blocked = vec![false; (size * size) as usize];
         let mut vehicle_body_static_blocked = vec![false; (size * size) as usize];
         for ty in 0..size {
@@ -195,6 +200,27 @@ impl<'a> Occupancy<'a> {
         match movement_body_class {
             MovementBodyClass::InfantryLike => true,
             MovementBodyClass::VehicleBody => !self.vehicle_body_blocked[idx],
+        }
+    }
+}
+
+fn close_tank_trap_vehicle_gaps(
+    size: u32,
+    tank_trap_tiles: &HashSet<(u32, u32)>,
+    vehicle_body_blocked: &mut [bool],
+) {
+    for &(tx, ty) in tank_trap_tiles {
+        for (target, midpoint) in [
+            ((tx.saturating_add(2), ty), (tx.saturating_add(1), ty)),
+            ((tx, ty.saturating_add(2)), (tx, ty.saturating_add(1))),
+        ] {
+            if target.0 >= size || target.1 >= size || midpoint.0 >= size || midpoint.1 >= size {
+                continue;
+            }
+            if tank_trap_tiles.contains(&target) {
+                let idx = (midpoint.1 * size + midpoint.0) as usize;
+                vehicle_body_blocked[idx] = true;
+            }
         }
     }
 }
@@ -383,6 +409,34 @@ mod tests {
 
         assert!(occ.passable_for_kind(5, 5, EntityKind::Worker));
         assert!(!occ.passable_for_kind(5, 5, EntityKind::Tank));
+    }
+
+    #[test]
+    fn tank_trap_pairs_close_one_tile_vehicle_gap_only() {
+        let map = flat_test_map(12);
+        let mut entities = EntityStore::new();
+        for (tile_x, tile_y) in [(5, 5), (5, 7), (8, 4), (10, 4)] {
+            let (x, y) = footprint_center(&map, EntityKind::TankTrap, tile_x, tile_y);
+            entities
+                .spawn_building(1, EntityKind::TankTrap, x, y, true)
+                .expect("tank trap should spawn");
+        }
+        let occ = Occupancy::build(&map, &entities);
+
+        for (gap_x, gap_y) in [(5, 6), (9, 4)] {
+            assert!(
+                occ.passable_for_kind(gap_x, gap_y, EntityKind::Worker),
+                "infantry should still pass through Tank Trap pair gap"
+            );
+            assert!(
+                !occ.passable_for_kind(gap_x, gap_y, EntityKind::ScoutCar),
+                "Scout Car should not pass through Tank Trap pair gap"
+            );
+            assert!(
+                !occ.passable_for_kind(gap_x, gap_y, EntityKind::Tank),
+                "Tank should not pass through Tank Trap pair gap"
+            );
+        }
     }
 
     #[test]

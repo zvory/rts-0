@@ -1262,6 +1262,64 @@ mod tests {
     }
 
     #[test]
+    fn one_tile_tank_trap_gap_blocks_vehicle_pathing_but_not_infantry() {
+        let map = flat_test_map(12);
+        let mut entities = EntityStore::new();
+        for tile_y in [4, 6] {
+            let (x, y) = crate::game::services::occupancy::footprint_center(
+                &map,
+                EntityKind::TankTrap,
+                5,
+                tile_y,
+            );
+            entities
+                .spawn_building(1, EntityKind::TankTrap, x, y, true)
+                .expect("tank trap should spawn");
+        }
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        let start = (2, 5);
+        let goal = (8, 5);
+
+        let infantry_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Rifleman,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+        assert!(
+            infantry_path.contains(&(5, 5)),
+            "infantry should still path through the one-tile Tank Trap gap: {infantry_path:?}"
+        );
+
+        for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
+            let path = service.request_tile_path(
+                &map,
+                &occ,
+                PathRequest {
+                    kind,
+                    start,
+                    goal,
+                    radius_tiles: config::unit_radius_tiles(kind),
+                    route_shape: RouteShape::Normal,
+                    budget: None,
+                },
+            );
+            assert_eq!(path.last().copied(), Some(goal));
+            assert!(
+                !path.contains(&(5, 5)),
+                "{kind:?} should route around the closed Tank Trap pair gap: {path:?}"
+            );
+        }
+    }
+
+    #[test]
     fn two_tile_tank_trap_gap_remains_vehicle_pathable() {
         let map = flat_test_map(14);
         let mut entities = EntityStore::new();
