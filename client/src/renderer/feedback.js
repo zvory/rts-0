@@ -376,7 +376,9 @@ export function _drawAbilityTargetPreview(view) {
   if (!finiteNumber(preview.mouseX) || !finiteNumber(preview.mouseY)) return;
   const rangeColor = FIELD_OF_FIRE_COLOR;
   const minRangeColor = 0x8f2d2a;
-  const rangeOrigins = Array.isArray(preview.rangeOrigins) ? preview.rangeOrigins : preview.carriers;
+  const rangeOrigins = preview.ability === ABILITY.POINT_FIRE
+    ? preview.carriers
+    : Array.isArray(preview.rangeOrigins) ? preview.rangeOrigins : preview.carriers;
 
   for (const carrier of rangeOrigins) {
     if (!finiteNumber(carrier.x) || !finiteNumber(carrier.y)) continue;

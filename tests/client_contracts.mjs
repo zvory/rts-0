@@ -1401,6 +1401,9 @@ class RecordingGraphics extends FakeGraphics {
   drawCircle(x, y, radius) {
     this.calls.push(["drawCircle", x, y, radius]);
   }
+  arc(x, y, radius, start, end, anticlockwise) {
+    this.calls.push(["arc", x, y, radius, start, end, anticlockwise]);
+  }
   drawRect(x, y, width, height) {
     this.calls.push(["drawRect", x, y, width, height]);
   }
@@ -6312,7 +6315,15 @@ withFakeDocument(() => {
 
   const artilleryCommands = [];
   const artilleryFeedback = [];
-  const selectedArtillery = { id: 44, owner: 1, kind: KIND.ARTILLERY, x: 100, y: 100 };
+  const selectedArtillery = {
+    id: 44,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: Math.PI,
+  };
   const pointFireInput = Object.create(Input.prototype);
   pointFireInput.mouse = { x: 900, y: 100 };
   pointFireInput.state = {
@@ -6349,10 +6360,47 @@ withFakeDocument(() => {
     pointFireInput.clientIntent.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32,
     "Point Fire preview exposes minimum range in pixels",
   );
+  assert(
+    ARTILLERY_MIN_RANGE_TILES === 15 && ARTILLERY_MAX_RANGE_TILES === 60,
+    "Artillery point-fire range mirrors the 15-60 tile balance band",
+  );
+  const deployedArtillery = {
+    ...selectedArtillery,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const artilleryConeGfx = new RecordingGraphics();
+  _drawAntiTankGunSetupPreview.call(
+    { _feedbackGfx: artilleryConeGfx, _map: { tileSize: 32 } },
+    { playerId: 1, selectedEntities: () => [deployedArtillery] },
+  );
+  const artilleryConeArcs = artilleryConeGfx.calls.filter((call) => call[0] === "arc");
+  assert(
+    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MAX_RANGE_TILES * 32),
+    "Artillery field-of-fire cone preview uses the mirrored maximum range",
+  );
+  assert(
+    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MIN_RANGE_TILES * 32 && call[6] === true),
+    "Artillery field-of-fire cone preview cuts out the mirrored minimum range",
+  );
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
   assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview clears minimum range invalidity outside the dead zone");
+  const targetingConeGfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: targetingConeGfx, _map: { tileSize: 32 } },
+    { abilityTargetPreview: pointFireInput.clientIntent.abilityTargetPreview },
+  );
+  const targetingConeArcs = targetingConeGfx.calls.filter((call) => call[0] === "arc");
+  assert(
+    targetingConeArcs.some((call) => call[3] === ARTILLERY_MAX_RANGE_TILES * 32),
+    "Point Fire targeting cone uses the mirrored maximum range",
+  );
+  assert(
+    targetingConeArcs.some((call) => call[3] === ARTILLERY_MIN_RANGE_TILES * 32 && call[6] === true),
+    "Point Fire targeting cone cuts out the mirrored minimum range",
+  );
 
   const previewGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
