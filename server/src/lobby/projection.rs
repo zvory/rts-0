@@ -1,4 +1,4 @@
-use super::session_policy::VisionPolicy;
+use super::session_policy::{DiagnosticPolicy, VisibilityPolicy};
 use super::snapshots::union_events;
 use crate::protocol::{Event, Snapshot};
 use rts_sim::game::Game;
@@ -66,12 +66,16 @@ pub(super) enum ObserverAnalysisAudience {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ProjectionPolicy {
-    vision: VisionPolicy,
+    visibility: VisibilityPolicy,
+    diagnostics: DiagnosticPolicy,
 }
 
 impl ProjectionPolicy {
-    pub(super) fn new(vision: VisionPolicy) -> Self {
-        Self { vision }
+    pub(super) fn new(visibility: VisibilityPolicy, diagnostics: DiagnosticPolicy) -> Self {
+        Self {
+            visibility,
+            diagnostics,
+        }
     }
 
     pub(super) fn live_snapshot_for(
@@ -81,7 +85,7 @@ impl ProjectionPolicy {
         seat_id: Option<u32>,
         spectator_visible_player_ids: &[u32],
     ) -> SnapshotProjection {
-        if self.vision == VisionPolicy::LabFullWorld {
+        if self.visibility == VisibilityPolicy::LabFullWorld {
             return SnapshotProjection::FullWorld {
                 player_id: seat_id.unwrap_or(connection_id),
             };
@@ -109,13 +113,14 @@ impl ProjectionPolicy {
     }
 
     pub(super) fn observer_analysis_audience(self) -> ObserverAnalysisAudience {
-        match self.vision {
-            VisionPolicy::LiveFog => ObserverAnalysisAudience::LiveSpectators,
-            VisionPolicy::ReplayVision => ObserverAnalysisAudience::ReplayViewers,
-            VisionPolicy::LobbyState
-            | VisionPolicy::BranchStagingState
-            | VisionPolicy::DevFullWorld
-            | VisionPolicy::LabFullWorld => ObserverAnalysisAudience::None,
+        match self.diagnostics {
+            DiagnosticPolicy::LiveSpectatorObserverAnalysis => {
+                ObserverAnalysisAudience::LiveSpectators
+            }
+            DiagnosticPolicy::ReplayObserverAnalysis => ObserverAnalysisAudience::ReplayViewers,
+            DiagnosticPolicy::None | DiagnosticPolicy::DevMovementPaths => {
+                ObserverAnalysisAudience::None
+            }
         }
     }
 }
@@ -126,7 +131,10 @@ mod tests {
 
     #[test]
     fn projection_policy_classifies_live_players_spectators_and_branch_aliases() {
-        let policy = ProjectionPolicy::new(VisionPolicy::LiveFog);
+        let policy = ProjectionPolicy::new(
+            VisibilityPolicy::LiveFog,
+            DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+        );
 
         assert_eq!(
             policy.live_snapshot_for(RecipientRole::ActivePlayer, 10, None, &[1, 2]),
@@ -150,7 +158,10 @@ mod tests {
 
     #[test]
     fn projection_policy_classifies_replay_and_dev_snapshots() {
-        let replay = ProjectionPolicy::new(VisionPolicy::ReplayVision);
+        let replay = ProjectionPolicy::new(
+            VisibilityPolicy::ReplayVision,
+            DiagnosticPolicy::ReplayObserverAnalysis,
+        );
         assert_eq!(
             replay.replay_snapshot_for(vec![2]),
             SnapshotProjection::ReplayVision {
@@ -162,7 +173,7 @@ mod tests {
             ObserverAnalysisAudience::ReplayViewers
         );
 
-        let dev = ProjectionPolicy::new(VisionPolicy::DevFullWorld);
+        let dev = ProjectionPolicy::new(VisibilityPolicy::DevFullWorld, DiagnosticPolicy::None);
         assert_eq!(
             dev.dev_snapshot_for(7),
             SnapshotProjection::FullWorld { player_id: 7 }
@@ -175,7 +186,7 @@ mod tests {
 
     #[test]
     fn projection_policy_classifies_lab_as_full_world_without_analysis() {
-        let lab = ProjectionPolicy::new(VisionPolicy::LabFullWorld);
+        let lab = ProjectionPolicy::new(VisibilityPolicy::LabFullWorld, DiagnosticPolicy::None);
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::Spectator, 99, Some(1), &[1, 2]),
             SnapshotProjection::FullWorld { player_id: 1 }

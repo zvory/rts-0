@@ -37,6 +37,7 @@ pub(super) enum JoinPolicy {
     RejectMidMatch,
     ReplayPromptOrAttach,
     BranchStaging,
+    BranchLiveAttach,
     DevWatch,
     LabRoom,
 }
@@ -62,7 +63,19 @@ pub(super) enum AuthorityPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum VisionPolicy {
+pub(super) enum MutationPolicy {
+    None,
+    LobbyState,
+    LiveGameplayCommands,
+    ReplayPlaybackCursor,
+    ReplayBranchStagingClaims,
+    BranchLiveSeatAliasGameplay,
+    DevScenarioDriver,
+    LabPrivilegedOps,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum VisibilityPolicy {
     LobbyState,
     LiveFog,
     ReplayVision,
@@ -72,21 +85,24 @@ pub(super) enum VisionPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum MutationPolicy {
-    LobbyState,
-    LiveGame,
-    ReplayPlayback,
-    BranchStagingClaims,
-    BranchLiveGame,
-    DevScenarioGame,
-    LabReadOnly,
+pub(super) enum DiagnosticPolicy {
+    None,
+    LiveSpectatorObserverAnalysis,
+    ReplayObserverAnalysis,
+    DevMovementPaths,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PersistencePolicy {
-    MatchHistoryEligible,
+    MatchHistoryAndReplayArtifacts,
     Suppressed,
     None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ExportPolicy {
+    None,
+    LabScenario,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,6 +116,17 @@ pub(super) enum StartPayloadPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AffordancePolicy {
+    Lobby,
+    LiveMatch,
+    ReplayViewer,
+    BranchStaging,
+    BranchLive,
+    DevWatch,
+    Lab,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct SessionPolicy {
     pub(super) mode: SessionMode,
     pub(super) phase: SessionPhase,
@@ -107,8 +134,11 @@ pub(super) struct SessionPolicy {
     pub(super) join: JoinPolicy,
     pub(super) clock: ClockPolicy,
     pub(super) authority: AuthorityPolicy,
-    pub(super) vision: VisionPolicy,
     pub(super) mutation: MutationPolicy,
+    pub(super) visibility: VisibilityPolicy,
+    pub(super) diagnostics: DiagnosticPolicy,
+    pub(super) export: ExportPolicy,
+    pub(super) affordance: AffordancePolicy,
     pub(super) persistence: PersistencePolicy,
     pub(super) start_payload: StartPayloadPolicy,
     pub(super) countdown_eligible: bool,
@@ -124,8 +154,11 @@ impl SessionPolicy {
                 join: JoinPolicy::NormalLobby,
                 clock: ClockPolicy::RoomTicker,
                 authority: AuthorityPolicy::LobbyHost,
-                vision: VisionPolicy::LobbyState,
                 mutation: MutationPolicy::LobbyState,
+                visibility: VisibilityPolicy::LobbyState,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::Lobby,
                 persistence: PersistencePolicy::None,
                 start_payload: StartPayloadPolicy::None,
                 countdown_eligible: true,
@@ -137,9 +170,12 @@ impl SessionPolicy {
                 join: JoinPolicy::RejectMidMatch,
                 clock: ClockPolicy::LiveMatch,
                 authority: AuthorityPolicy::LivePlayers,
-                vision: VisionPolicy::LiveFog,
-                mutation: MutationPolicy::LiveGame,
-                persistence: PersistencePolicy::MatchHistoryEligible,
+                mutation: MutationPolicy::LiveGameplayCommands,
+                visibility: VisibilityPolicy::LiveFog,
+                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::LiveMatch,
+                persistence: PersistencePolicy::MatchHistoryAndReplayArtifacts,
                 start_payload: StartPayloadPolicy::LiveMatch,
                 countdown_eligible: false,
             },
@@ -150,8 +186,11 @@ impl SessionPolicy {
                 join: JoinPolicy::ReplayPromptOrAttach,
                 clock: ClockPolicy::ReplayPlayback,
                 authority: AuthorityPolicy::ReplayViewers,
-                vision: VisionPolicy::ReplayVision,
-                mutation: MutationPolicy::ReplayPlayback,
+                mutation: MutationPolicy::ReplayPlaybackCursor,
+                visibility: VisibilityPolicy::ReplayVision,
+                diagnostics: DiagnosticPolicy::ReplayObserverAnalysis,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
                 start_payload: StartPayloadPolicy::ReplayViewer,
                 countdown_eligible: false,
@@ -163,8 +202,11 @@ impl SessionPolicy {
                 join: JoinPolicy::BranchStaging,
                 clock: ClockPolicy::BranchStaging,
                 authority: AuthorityPolicy::BranchStagingHost,
-                vision: VisionPolicy::BranchStagingState,
-                mutation: MutationPolicy::BranchStagingClaims,
+                mutation: MutationPolicy::ReplayBranchStagingClaims,
+                visibility: VisibilityPolicy::BranchStagingState,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::BranchStaging,
                 persistence: PersistencePolicy::Suppressed,
                 start_payload: StartPayloadPolicy::None,
                 countdown_eligible: true,
@@ -178,8 +220,11 @@ impl SessionPolicy {
                 policy.join = JoinPolicy::DevWatch;
                 policy.clock = ClockPolicy::DevWatch;
                 policy.authority = AuthorityPolicy::DevWatchControls;
-                policy.vision = VisionPolicy::DevFullWorld;
-                policy.mutation = MutationPolicy::DevScenarioGame;
+                policy.mutation = MutationPolicy::DevScenarioDriver;
+                policy.visibility = VisibilityPolicy::DevFullWorld;
+                policy.diagnostics = DiagnosticPolicy::DevMovementPaths;
+                policy.export = ExportPolicy::None;
+                policy.affordance = AffordancePolicy::DevWatch;
                 policy.persistence = PersistencePolicy::Suppressed;
                 policy.start_payload = StartPayloadPolicy::DevWatch;
                 policy.countdown_eligible = false;
@@ -188,11 +233,14 @@ impl SessionPolicy {
                 if phase == SessionPhase::Lobby {
                     policy.state_source = StateSource::PersistedReplayArtifact;
                     policy.clock = ClockPolicy::RoomTicker;
+                    policy.mutation = MutationPolicy::None;
+                    policy.visibility = VisibilityPolicy::LobbyState;
+                    policy.diagnostics = DiagnosticPolicy::None;
                 }
                 policy.join = JoinPolicy::ReplayPromptOrAttach;
                 policy.authority = AuthorityPolicy::ReplayViewers;
-                policy.vision = VisionPolicy::ReplayVision;
-                policy.mutation = MutationPolicy::ReplayPlayback;
+                policy.export = ExportPolicy::None;
+                policy.affordance = AffordancePolicy::ReplayViewer;
                 policy.persistence = PersistencePolicy::None;
                 policy.start_payload = StartPayloadPolicy::ReplayViewer;
                 policy.countdown_eligible = false;
@@ -201,11 +249,14 @@ impl SessionPolicy {
                 if phase == SessionPhase::Lobby {
                     policy.state_source = StateSource::SavedReplayArtifact;
                     policy.clock = ClockPolicy::RoomTicker;
+                    policy.mutation = MutationPolicy::None;
+                    policy.visibility = VisibilityPolicy::LobbyState;
+                    policy.diagnostics = DiagnosticPolicy::None;
                 }
                 policy.join = JoinPolicy::ReplayPromptOrAttach;
                 policy.authority = AuthorityPolicy::ReplayViewers;
-                policy.vision = VisionPolicy::ReplayVision;
-                policy.mutation = MutationPolicy::ReplayPlayback;
+                policy.export = ExportPolicy::None;
+                policy.affordance = AffordancePolicy::ReplayViewer;
                 policy.persistence = PersistencePolicy::None;
                 policy.start_payload = StartPayloadPolicy::ReplayViewer;
                 policy.countdown_eligible = false;
@@ -215,7 +266,10 @@ impl SessionPolicy {
                     SessionPhase::LiveMatch => StateSource::BranchLiveGame,
                     _ => StateSource::ReplayBranchSeed,
                 };
-                policy.join = JoinPolicy::BranchStaging;
+                policy.join = match phase {
+                    SessionPhase::LiveMatch => JoinPolicy::BranchLiveAttach,
+                    _ => JoinPolicy::BranchStaging,
+                };
                 policy.clock = match phase {
                     SessionPhase::LiveMatch => ClockPolicy::LiveMatch,
                     _ => ClockPolicy::BranchStaging,
@@ -224,13 +278,22 @@ impl SessionPolicy {
                     SessionPhase::LiveMatch => AuthorityPolicy::BranchLiveSeatAliases,
                     _ => AuthorityPolicy::BranchStagingHost,
                 };
-                policy.vision = match phase {
-                    SessionPhase::LiveMatch => VisionPolicy::LiveFog,
-                    _ => VisionPolicy::BranchStagingState,
-                };
                 policy.mutation = match phase {
-                    SessionPhase::LiveMatch => MutationPolicy::BranchLiveGame,
-                    _ => MutationPolicy::BranchStagingClaims,
+                    SessionPhase::LiveMatch => MutationPolicy::BranchLiveSeatAliasGameplay,
+                    _ => MutationPolicy::ReplayBranchStagingClaims,
+                };
+                policy.visibility = match phase {
+                    SessionPhase::LiveMatch => VisibilityPolicy::LiveFog,
+                    _ => VisibilityPolicy::BranchStagingState,
+                };
+                policy.diagnostics = match phase {
+                    SessionPhase::LiveMatch => DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                    _ => DiagnosticPolicy::None,
+                };
+                policy.export = ExportPolicy::None;
+                policy.affordance = match phase {
+                    SessionPhase::LiveMatch => AffordancePolicy::BranchLive,
+                    _ => AffordancePolicy::BranchStaging,
                 };
                 policy.persistence = PersistencePolicy::Suppressed;
                 policy.start_payload = match phase {
@@ -244,8 +307,11 @@ impl SessionPolicy {
                 policy.join = JoinPolicy::LabRoom;
                 policy.clock = ClockPolicy::LiveMatch;
                 policy.authority = AuthorityPolicy::LabOperator;
-                policy.vision = VisionPolicy::LabFullWorld;
-                policy.mutation = MutationPolicy::LabReadOnly;
+                policy.mutation = MutationPolicy::LabPrivilegedOps;
+                policy.visibility = VisibilityPolicy::LabFullWorld;
+                policy.diagnostics = DiagnosticPolicy::None;
+                policy.export = ExportPolicy::LabScenario;
+                policy.affordance = AffordancePolicy::Lab;
                 policy.persistence = PersistencePolicy::Suppressed;
                 policy.start_payload = StartPayloadPolicy::Lab;
                 policy.countdown_eligible = false;
@@ -267,8 +333,11 @@ impl SessionPolicy {
         self.join == JoinPolicy::ReplayPromptOrAttach
     }
 
-    pub(super) fn uses_branch_staging_join(self) -> bool {
-        self.join == JoinPolicy::BranchStaging
+    pub(super) fn uses_branch_room_join(self) -> bool {
+        matches!(
+            self.join,
+            JoinPolicy::BranchStaging | JoinPolicy::BranchLiveAttach
+        )
     }
 
     pub(super) fn uses_lab_room_join(self) -> bool {
@@ -276,7 +345,11 @@ impl SessionPolicy {
     }
 
     pub(super) fn allows_match_history(self) -> bool {
-        self.mode == SessionMode::Normal
+        self.persistence == PersistencePolicy::MatchHistoryAndReplayArtifacts
+    }
+
+    pub(super) fn has_authoritative_mutation(self) -> bool {
+        !matches!(self.mutation, MutationPolicy::None)
     }
 }
 
@@ -305,8 +378,11 @@ mod tests {
         join: JoinPolicy,
         clock: ClockPolicy,
         authority: AuthorityPolicy,
-        vision: VisionPolicy,
+        visibility: VisibilityPolicy,
         mutation: MutationPolicy,
+        diagnostics: DiagnosticPolicy,
+        export: ExportPolicy,
+        affordance: AffordancePolicy,
         persistence: PersistencePolicy,
         start_payload: StartPayloadPolicy,
         countdown_eligible: bool,
@@ -326,10 +402,25 @@ mod tests {
             "{} authority",
             case.product_path
         );
-        assert_eq!(policy.vision, case.vision, "{} vision", case.product_path);
+        assert_eq!(
+            policy.visibility, case.visibility,
+            "{} visibility",
+            case.product_path
+        );
         assert_eq!(
             policy.mutation, case.mutation,
             "{} mutation",
+            case.product_path
+        );
+        assert_eq!(
+            policy.diagnostics, case.diagnostics,
+            "{} diagnostics",
+            case.product_path
+        );
+        assert_eq!(policy.export, case.export, "{} export", case.product_path);
+        assert_eq!(
+            policy.affordance, case.affordance,
+            "{} affordance",
             case.product_path
         );
         assert_eq!(
@@ -360,8 +451,11 @@ mod tests {
                 join: JoinPolicy::NormalLobby,
                 clock: ClockPolicy::RoomTicker,
                 authority: AuthorityPolicy::LobbyHost,
-                vision: VisionPolicy::LobbyState,
+                visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::LobbyState,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::Lobby,
                 persistence: PersistencePolicy::None,
                 start_payload: StartPayloadPolicy::None,
                 countdown_eligible: true,
@@ -374,9 +468,12 @@ mod tests {
                 join: JoinPolicy::RejectMidMatch,
                 clock: ClockPolicy::LiveMatch,
                 authority: AuthorityPolicy::LivePlayers,
-                vision: VisionPolicy::LiveFog,
-                mutation: MutationPolicy::LiveGame,
-                persistence: PersistencePolicy::MatchHistoryEligible,
+                visibility: VisibilityPolicy::LiveFog,
+                mutation: MutationPolicy::LiveGameplayCommands,
+                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::LiveMatch,
+                persistence: PersistencePolicy::MatchHistoryAndReplayArtifacts,
                 start_payload: StartPayloadPolicy::LiveMatch,
                 countdown_eligible: false,
             },
@@ -388,9 +485,12 @@ mod tests {
                 join: JoinPolicy::RejectMidMatch,
                 clock: ClockPolicy::LiveMatch,
                 authority: AuthorityPolicy::LivePlayers,
-                vision: VisionPolicy::LiveFog,
-                mutation: MutationPolicy::LiveGame,
-                persistence: PersistencePolicy::MatchHistoryEligible,
+                visibility: VisibilityPolicy::LiveFog,
+                mutation: MutationPolicy::LiveGameplayCommands,
+                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::LiveMatch,
+                persistence: PersistencePolicy::MatchHistoryAndReplayArtifacts,
                 start_payload: StartPayloadPolicy::LiveMatch,
                 countdown_eligible: false,
             },
@@ -402,8 +502,11 @@ mod tests {
                 join: JoinPolicy::ReplayPromptOrAttach,
                 clock: ClockPolicy::ReplayPlayback,
                 authority: AuthorityPolicy::ReplayViewers,
-                vision: VisionPolicy::ReplayVision,
-                mutation: MutationPolicy::ReplayPlayback,
+                visibility: VisibilityPolicy::ReplayVision,
+                mutation: MutationPolicy::ReplayPlaybackCursor,
+                diagnostics: DiagnosticPolicy::ReplayObserverAnalysis,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
                 start_payload: StartPayloadPolicy::ReplayViewer,
                 countdown_eligible: false,
@@ -416,8 +519,11 @@ mod tests {
                 join: JoinPolicy::ReplayPromptOrAttach,
                 clock: ClockPolicy::RoomTicker,
                 authority: AuthorityPolicy::ReplayViewers,
-                vision: VisionPolicy::ReplayVision,
-                mutation: MutationPolicy::ReplayPlayback,
+                visibility: VisibilityPolicy::LobbyState,
+                mutation: MutationPolicy::None,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
                 start_payload: StartPayloadPolicy::ReplayViewer,
                 countdown_eligible: false,
@@ -430,8 +536,11 @@ mod tests {
                 join: JoinPolicy::ReplayPromptOrAttach,
                 clock: ClockPolicy::RoomTicker,
                 authority: AuthorityPolicy::ReplayViewers,
-                vision: VisionPolicy::ReplayVision,
-                mutation: MutationPolicy::ReplayPlayback,
+                visibility: VisibilityPolicy::LobbyState,
+                mutation: MutationPolicy::None,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
                 start_payload: StartPayloadPolicy::ReplayViewer,
                 countdown_eligible: false,
@@ -444,8 +553,11 @@ mod tests {
                 join: JoinPolicy::BranchStaging,
                 clock: ClockPolicy::BranchStaging,
                 authority: AuthorityPolicy::BranchStagingHost,
-                vision: VisionPolicy::BranchStagingState,
-                mutation: MutationPolicy::BranchStagingClaims,
+                visibility: VisibilityPolicy::BranchStagingState,
+                mutation: MutationPolicy::ReplayBranchStagingClaims,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::BranchStaging,
                 persistence: PersistencePolicy::Suppressed,
                 start_payload: StartPayloadPolicy::None,
                 countdown_eligible: true,
@@ -455,11 +567,14 @@ mod tests {
                 mode: SessionMode::ReplayBranch,
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::BranchLiveGame,
-                join: JoinPolicy::BranchStaging,
+                join: JoinPolicy::BranchLiveAttach,
                 clock: ClockPolicy::LiveMatch,
                 authority: AuthorityPolicy::BranchLiveSeatAliases,
-                vision: VisionPolicy::LiveFog,
-                mutation: MutationPolicy::BranchLiveGame,
+                visibility: VisibilityPolicy::LiveFog,
+                mutation: MutationPolicy::BranchLiveSeatAliasGameplay,
+                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::BranchLive,
                 persistence: PersistencePolicy::Suppressed,
                 start_payload: StartPayloadPolicy::ReplayBranchLive,
                 countdown_eligible: false,
@@ -472,8 +587,11 @@ mod tests {
                 join: JoinPolicy::DevWatch,
                 clock: ClockPolicy::DevWatch,
                 authority: AuthorityPolicy::DevWatchControls,
-                vision: VisionPolicy::DevFullWorld,
-                mutation: MutationPolicy::DevScenarioGame,
+                visibility: VisibilityPolicy::DevFullWorld,
+                mutation: MutationPolicy::DevScenarioDriver,
+                diagnostics: DiagnosticPolicy::DevMovementPaths,
+                export: ExportPolicy::None,
+                affordance: AffordancePolicy::DevWatch,
                 persistence: PersistencePolicy::Suppressed,
                 start_payload: StartPayloadPolicy::DevWatch,
                 countdown_eligible: false,
@@ -486,8 +604,11 @@ mod tests {
                 join: JoinPolicy::LabRoom,
                 clock: ClockPolicy::LiveMatch,
                 authority: AuthorityPolicy::LabOperator,
-                vision: VisionPolicy::LabFullWorld,
-                mutation: MutationPolicy::LabReadOnly,
+                visibility: VisibilityPolicy::LabFullWorld,
+                mutation: MutationPolicy::LabPrivilegedOps,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::LabScenario,
+                affordance: AffordancePolicy::Lab,
                 persistence: PersistencePolicy::Suppressed,
                 start_payload: StartPayloadPolicy::Lab,
                 countdown_eligible: false,
@@ -500,8 +621,11 @@ mod tests {
                 join: JoinPolicy::LabRoom,
                 clock: ClockPolicy::LiveMatch,
                 authority: AuthorityPolicy::LabOperator,
-                vision: VisionPolicy::LabFullWorld,
-                mutation: MutationPolicy::LabReadOnly,
+                visibility: VisibilityPolicy::LabFullWorld,
+                mutation: MutationPolicy::LabPrivilegedOps,
+                diagnostics: DiagnosticPolicy::None,
+                export: ExportPolicy::LabScenario,
+                affordance: AffordancePolicy::Lab,
                 persistence: PersistencePolicy::Suppressed,
                 start_payload: StartPayloadPolicy::Lab,
                 countdown_eligible: false,
@@ -518,7 +642,7 @@ mod tests {
         assert_eq!(lobby.join, JoinPolicy::NormalLobby);
         assert_eq!(lobby.clock, ClockPolicy::RoomTicker);
         assert_eq!(lobby.authority, AuthorityPolicy::LobbyHost);
-        assert_eq!(lobby.vision, VisionPolicy::LobbyState);
+        assert_eq!(lobby.visibility, VisibilityPolicy::LobbyState);
         assert_eq!(lobby.mutation, MutationPolicy::LobbyState);
         assert_eq!(lobby.persistence, PersistencePolicy::None);
         assert_eq!(lobby.start_payload, StartPayloadPolicy::None);
@@ -529,9 +653,12 @@ mod tests {
         assert_eq!(live.join, JoinPolicy::RejectMidMatch);
         assert_eq!(live.clock, ClockPolicy::LiveMatch);
         assert_eq!(live.authority, AuthorityPolicy::LivePlayers);
-        assert_eq!(live.vision, VisionPolicy::LiveFog);
-        assert_eq!(live.mutation, MutationPolicy::LiveGame);
-        assert_eq!(live.persistence, PersistencePolicy::MatchHistoryEligible);
+        assert_eq!(live.visibility, VisibilityPolicy::LiveFog);
+        assert_eq!(live.mutation, MutationPolicy::LiveGameplayCommands);
+        assert_eq!(
+            live.persistence,
+            PersistencePolicy::MatchHistoryAndReplayArtifacts
+        );
         assert_eq!(live.start_payload, StartPayloadPolicy::LiveMatch);
         assert!(!live.countdown_eligible);
         assert!(live.allows_match_history());
@@ -541,12 +668,13 @@ mod tests {
         assert_eq!(replay.join, JoinPolicy::ReplayPromptOrAttach);
         assert_eq!(replay.clock, ClockPolicy::ReplayPlayback);
         assert_eq!(replay.authority, AuthorityPolicy::ReplayViewers);
-        assert_eq!(replay.vision, VisionPolicy::ReplayVision);
-        assert_eq!(replay.mutation, MutationPolicy::ReplayPlayback);
+        assert_eq!(replay.visibility, VisibilityPolicy::ReplayVision);
+        assert_eq!(replay.mutation, MutationPolicy::ReplayPlaybackCursor);
         assert_eq!(replay.persistence, PersistencePolicy::None);
         assert_eq!(replay.start_payload, StartPayloadPolicy::ReplayViewer);
         assert!(!replay.countdown_eligible);
-        assert!(replay.allows_match_history());
+        assert!(!replay.allows_match_history());
+        assert!(replay.has_authoritative_mutation());
     }
 
     #[test]
@@ -556,20 +684,21 @@ mod tests {
         assert_eq!(persisted.join, JoinPolicy::ReplayPromptOrAttach);
         assert_eq!(persisted.clock, ClockPolicy::RoomTicker);
         assert_eq!(persisted.authority, AuthorityPolicy::ReplayViewers);
-        assert_eq!(persisted.vision, VisionPolicy::ReplayVision);
-        assert_eq!(persisted.mutation, MutationPolicy::ReplayPlayback);
+        assert_eq!(persisted.visibility, VisibilityPolicy::LobbyState);
+        assert_eq!(persisted.mutation, MutationPolicy::None);
         assert_eq!(persisted.persistence, PersistencePolicy::None);
         assert_eq!(persisted.start_payload, StartPayloadPolicy::ReplayViewer);
         assert!(!persisted.countdown_eligible);
         assert!(!persisted.allows_match_history());
+        assert!(!persisted.has_authoritative_mutation());
 
         let saved = SessionPolicy::new(SessionMode::ReplayArtifact, SessionPhase::Lobby);
         assert_eq!(saved.state_source, StateSource::SavedReplayArtifact);
         assert_eq!(saved.join, JoinPolicy::ReplayPromptOrAttach);
         assert_eq!(saved.clock, ClockPolicy::RoomTicker);
         assert_eq!(saved.authority, AuthorityPolicy::ReplayViewers);
-        assert_eq!(saved.vision, VisionPolicy::ReplayVision);
-        assert_eq!(saved.mutation, MutationPolicy::ReplayPlayback);
+        assert_eq!(saved.visibility, VisibilityPolicy::LobbyState);
+        assert_eq!(saved.mutation, MutationPolicy::None);
         assert_eq!(saved.persistence, PersistencePolicy::None);
         assert_eq!(saved.start_payload, StartPayloadPolicy::ReplayViewer);
         assert!(!saved.countdown_eligible);
@@ -586,8 +715,8 @@ mod tests {
         assert_eq!(staging.join, JoinPolicy::BranchStaging);
         assert_eq!(staging.clock, ClockPolicy::BranchStaging);
         assert_eq!(staging.authority, AuthorityPolicy::BranchStagingHost);
-        assert_eq!(staging.vision, VisionPolicy::BranchStagingState);
-        assert_eq!(staging.mutation, MutationPolicy::BranchStagingClaims);
+        assert_eq!(staging.visibility, VisibilityPolicy::BranchStagingState);
+        assert_eq!(staging.mutation, MutationPolicy::ReplayBranchStagingClaims);
         assert_eq!(staging.persistence, PersistencePolicy::Suppressed);
         assert_eq!(staging.start_payload, StartPayloadPolicy::None);
         assert!(staging.countdown_eligible);
@@ -595,11 +724,11 @@ mod tests {
 
         let live = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);
         assert_eq!(live.state_source, StateSource::BranchLiveGame);
-        assert_eq!(live.join, JoinPolicy::BranchStaging);
+        assert_eq!(live.join, JoinPolicy::BranchLiveAttach);
         assert_eq!(live.clock, ClockPolicy::LiveMatch);
         assert_eq!(live.authority, AuthorityPolicy::BranchLiveSeatAliases);
-        assert_eq!(live.vision, VisionPolicy::LiveFog);
-        assert_eq!(live.mutation, MutationPolicy::BranchLiveGame);
+        assert_eq!(live.visibility, VisibilityPolicy::LiveFog);
+        assert_eq!(live.mutation, MutationPolicy::BranchLiveSeatAliasGameplay);
         assert_eq!(live.persistence, PersistencePolicy::Suppressed);
         assert_eq!(live.start_payload, StartPayloadPolicy::ReplayBranchLive);
         assert!(!live.countdown_eligible);
@@ -612,8 +741,8 @@ mod tests {
         assert_eq!(dev.join, JoinPolicy::DevWatch);
         assert_eq!(dev.clock, ClockPolicy::DevWatch);
         assert_eq!(dev.authority, AuthorityPolicy::DevWatchControls);
-        assert_eq!(dev.vision, VisionPolicy::DevFullWorld);
-        assert_eq!(dev.mutation, MutationPolicy::DevScenarioGame);
+        assert_eq!(dev.visibility, VisibilityPolicy::DevFullWorld);
+        assert_eq!(dev.mutation, MutationPolicy::DevScenarioDriver);
         assert_eq!(dev.persistence, PersistencePolicy::Suppressed);
         assert_eq!(dev.start_payload, StartPayloadPolicy::DevWatch);
         assert!(!dev.countdown_eligible);
@@ -628,8 +757,8 @@ mod tests {
         assert_eq!(lab_lobby.join, JoinPolicy::LabRoom);
         assert_eq!(lab_lobby.clock, ClockPolicy::LiveMatch);
         assert_eq!(lab_lobby.authority, AuthorityPolicy::LabOperator);
-        assert_eq!(lab_lobby.vision, VisionPolicy::LabFullWorld);
-        assert_eq!(lab_lobby.mutation, MutationPolicy::LabReadOnly);
+        assert_eq!(lab_lobby.visibility, VisibilityPolicy::LabFullWorld);
+        assert_eq!(lab_lobby.mutation, MutationPolicy::LabPrivilegedOps);
         assert_eq!(lab_lobby.persistence, PersistencePolicy::Suppressed);
         assert_eq!(lab_lobby.start_payload, StartPayloadPolicy::Lab);
         assert!(!lab_lobby.countdown_eligible);
@@ -639,7 +768,7 @@ mod tests {
         let lab_live = SessionPolicy::new(SessionMode::Lab, SessionPhase::LiveMatch);
         assert_eq!(lab_live.state_source, StateSource::LabGame);
         assert_eq!(lab_live.join, JoinPolicy::LabRoom);
-        assert_eq!(lab_live.vision, VisionPolicy::LabFullWorld);
+        assert_eq!(lab_live.visibility, VisibilityPolicy::LabFullWorld);
         assert_eq!(lab_live.start_payload, StartPayloadPolicy::Lab);
     }
 }

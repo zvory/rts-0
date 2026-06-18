@@ -25,7 +25,8 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/lobby/room_task.rs` — room-owned lifecycle, membership, phase transitions, match
   history, drain bookkeeping, and `Game` ownership
 - `server/src/lobby/session_policy.rs` — names the room mode/phase policy choices for state
-  source, joining, clocking, authority, vision, mutation, persistence, and start payloads
+  source, joining, clocking, authority, mutation, visibility, diagnostics, persistence/export, start
+  payloads, and UI affordances
 - `server/src/lobby/participants.rs` — host fallback, active seats, spectator visibility seats,
   branch-live seat aliases, and command issuer resolution
 - `server/src/lobby/tick_control.rs` — maps session clock policy plus replay/dev pause state to
