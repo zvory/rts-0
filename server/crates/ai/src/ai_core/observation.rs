@@ -403,7 +403,7 @@ mod tests {
             spectator: false,
             prediction_build_id: None,
             prediction_version: 0,
-            debug_mode: false,
+            diagnostics: Default::default(),
             replay: None,
             lab: None,
             tick: 0,

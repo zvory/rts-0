@@ -228,7 +228,10 @@ Sent once when the match begins. Carries everything static for the whole match.
   spectator: bool,               // true when this connection is observing only
   predictionBuildId?: string,    // live active players only; server/client bundle id
   predictionVersion?: u32,       // live active players only; currently 1
-  debugMode?: bool,              // true when movement path diagnostics are available
+  diagnostics?: {                // explicit recipient-scoped diagnostic affordances
+    movementPaths?: "ownerOnly"|"all",
+    observerAnalysis?: bool
+  },
   replay?: {                     // present for production replay playback
     artifactSchemaVersion: u32,
     serverBuildSha: string,
@@ -267,9 +270,12 @@ resources, and each human player also starts with five supply depots, one Gun Wo
 two Vehicle Works (`factory` kind), and five of each unit kind including Command Cars. Debug mode also adds one inert enemy player in the clockwise-adjacent
 corner from the first human start, with five deployed Mortar Teams clumped around one Scout Car
 and four enemy Supply Depots five tiles north/east/south/west of the clump. It also sets
-`debugMode: true`,
-which lets the client expose local movement-waypoint overlay controls for the owner-only
-`debugPath` fields in snapshots.
+`diagnostics.movementPaths: "ownerOnly"` for active players, which lets the client expose local
+movement-waypoint overlay controls for the owner-only `debugPath` fields in snapshots. Spectators
+do not receive that movement-path diagnostic affordance. Dev scenario start payloads may advertise
+`diagnostics.movementPaths: "all"` because those rooms intentionally use full-world diagnostic
+projection. Replay viewers and live spectators receive `diagnostics.observerAnalysis: true` only
+when room projection policy will send observer-analysis payloads to that recipient.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
 
@@ -482,12 +488,14 @@ clients render them below the fog overlay and must not select or issue targeted 
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
-`debugPath` is present only in lobby Debug mode matches, only for the owner, and only while the unit
-has remaining movement waypoints. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
-staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
-points in traversal order and `waypoints[0]` is the current movement target. The compact slot
-encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`,
-with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
+`debugPath` is present only when the room's projection policy enables movement-path diagnostics for
+that recipient and only while the unit has remaining movement waypoints. Lobby Debug mode enables
+owner-only movement paths for active players. Dev scenario rooms may enable full projected movement
+paths. It carries `{ waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks,
+totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path points in traversal
+order and `waypoints[0]` is the current movement target. The compact slot encodes this as
+`[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`, with points
+encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `AbilityObject`: `{ id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState? }`.
 The compact `ao` slot uses ability ids from the existing ability code table and
@@ -564,7 +572,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   breakthroughTicks?: u16,       // active Breakthrough speed status; visible only with the entity
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
-  debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner
+  debugPath?: {                  // diagnostic policy only; remaining movement path; owner-only unless policy says full projected diagnostics
     waypoints: { x: f32, y: f32 }[],
     goal?: { x: f32, y: f32 },
     lastRepathTick: u32,

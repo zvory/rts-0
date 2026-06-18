@@ -21,7 +21,6 @@ await init({ module_or_path: fs.readFileSync(wasmPath) });
 const start = {
   playerId: 1,
   spectator: false,
-  debugMode: false,
   tick: 0,
   map: {
     width: 64,

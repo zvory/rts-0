@@ -25,8 +25,8 @@ pub struct StartPayload {
     /// Prediction protocol version supported by this live match. Omitted for spectators/replays.
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub prediction_version: u32,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub debug_mode: bool,
+    #[serde(default, skip_serializing_if = "DiagnosticCapabilities::is_empty")]
+    pub diagnostics: DiagnosticCapabilities,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replay: Option<ReplayStartMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -34,6 +34,36 @@ pub struct StartPayload {
     pub tick: u32,
     pub map: MapInfo,
     pub players: Vec<PlayerStart>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticCapabilities {
+    #[serde(default, skip_serializing_if = "MovementPathDiagnosticScope::is_none")]
+    pub movement_paths: MovementPathDiagnosticScope,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub observer_analysis: bool,
+}
+
+impl DiagnosticCapabilities {
+    pub fn is_empty(&self) -> bool {
+        self.movement_paths.is_none() && !self.observer_analysis
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum MovementPathDiagnosticScope {
+    #[default]
+    None,
+    OwnerOnly,
+    All,
+}
+
+impl MovementPathDiagnosticScope {
+    fn is_none(&self) -> bool {
+        *self == Self::None
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

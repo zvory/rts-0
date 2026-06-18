@@ -18,6 +18,7 @@ import {
   KIND_CODE,
   LAB_ROLE,
   LAB_VISION,
+  MOVEMENT_PATH_DIAGNOSTICS,
   NOTICE_SEVERITY,
   NOTICE_SEVERITY_CODE,
   ORDER_STAGE,
@@ -217,6 +218,14 @@ assert(
     LAB_VISION.TEAM === "team" &&
     LAB_VISION.TEAMS === "teams",
   "start payload must expose mirrored lab metadata",
+);
+assert(
+  rustContract.includes("DiagnosticCapabilities") &&
+    rustContract.includes("movement_paths") &&
+    !rustContract.includes("debug_mode") &&
+    MOVEMENT_PATH_DIAGNOSTICS.OWNER_ONLY === "ownerOnly" &&
+    MOVEMENT_PATH_DIAGNOSTICS.ALL === "all",
+  "start payload must expose diagnostic capability metadata instead of debugMode",
 );
 assert(
   C.LAB === "lab" && S.LAB_STATE === "labState" && S.LAB_RESULT === "labResult",

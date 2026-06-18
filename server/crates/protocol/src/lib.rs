@@ -12,11 +12,11 @@ use std::collections::BTreeMap;
 
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
-    DebugPathPoint, DebugPathView, EntityView, Event, LabStartMetadata, LabStartRole,
-    LabVisionMode, MapInfo, NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
-    PlayerStart, RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode,
-    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
-    DEFAULT_FACTION_ID,
+    DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event, LabStartMetadata,
+    LabStartRole, LabVisionMode, MapInfo, MovementPathDiagnosticScope, NoticeSeverity,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
+    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomTimeState, SmokeCloudView, Snapshot,
+    SnapshotNetStatus, StartPayload, TeamId, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
