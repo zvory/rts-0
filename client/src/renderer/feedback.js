@@ -49,6 +49,7 @@ import {
   drawTankHull,
   drawTankTracks,
   finiteNumber,
+  hash2,
   hexToInt,
   isImpassableAt,
   isVehicleBodyKind,

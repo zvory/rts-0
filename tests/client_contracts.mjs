@@ -119,6 +119,7 @@ import {
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
+  _drawMortarImpacts,
   _drawPlacement,
   _drawResourceMiningPreview,
 } from "../client/src/renderer/feedback.js";
@@ -1460,6 +1461,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     facing: 0,
     setupState: SETUP.DEPLOYED,
   }];
+  const mortarImpact = {
+    x: 192,
+    y: 208,
+    radiusTiles: 3,
+    seed: 91,
+    createdAt: performance.now(),
+  };
   const feedbackState = {
     playerId: 1,
     map: {
@@ -1483,7 +1491,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     liveMortarLaunches() { return []; },
     liveMortarShells() { return []; },
     liveMortarTargets() { return []; },
-    liveMortarImpacts() { return []; },
+    liveMortarImpacts() { return [mortarImpact]; },
     liveArtilleryTargets() { return []; },
     liveArtilleryLaunches() { return []; },
     liveArtilleryImpacts() { return []; },
@@ -1559,10 +1567,12 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   _drawAbilityTargetPreview.call(renderer, feedbackView);
   _drawAbilityObjects.call(renderer, feedbackView);
   _drawResourceMiningPreview.call(renderer, feedbackView);
+  _drawMortarImpacts.call(renderer, feedbackView);
 
   assert(placementGfx.calls.some((call) => call[0] === "drawRoundedRect"), "renderer feedback reads placement through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
+  assert(feedbackGfx.calls.some((call) => call[0] === "drawPolygon"), "renderer feedback draws live mortar impacts without missing helper references");
   assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
 }
 
