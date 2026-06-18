@@ -88,6 +88,7 @@ export const SMOKE_ABILITY_COOLDOWN_TICKS = 600;
 export const SCOUT_CAR_SMOKE_USES = 2;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
 export const MORTAR_SHELL_DELAY_TICKS = Math.round(TICK_HZ * 2.25);
+export const MORTAR_RANGE_TILES = 12;
 export const MORTAR_OUTER_RADIUS_TILES = 1.5;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
@@ -137,7 +138,7 @@ export const STATS = Object.freeze({
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 7,
-    rangeTiles: 9, cost: { steel: 100, oil: 50 }, supply: 3, buildTicks: 460,
+    rangeTiles: MORTAR_RANGE_TILES, cost: { steel: 100, oil: 50 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 4, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
@@ -221,7 +222,7 @@ export const ABILITIES = Object.freeze({
     title: "Target mortar fire",
     carriers: Object.freeze([KIND.MORTAR_TEAM]),
     targetMode: "worldPoint",
-    rangeTiles: 9,
+    rangeTiles: MORTAR_RANGE_TILES,
     cooldownTicks: MORTAR_FIRE_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: MORTAR_OUTER_RADIUS_TILES,
