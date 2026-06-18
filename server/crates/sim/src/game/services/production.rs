@@ -138,6 +138,14 @@ fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bo
     }
 }
 
+pub(crate) fn sync_owned_autocast_from_upgrades(
+    entities: &mut EntityStore,
+    owner: u32,
+    upgrades: &std::collections::BTreeSet<UpgradeKind>,
+) {
+    set_owned_mortar_autocast(entities, owner, upgrades.contains(&UpgradeKind::MortarAutocast));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,7 +4,7 @@
 //! repair pass after accepted mutations so room/client code never reaches into entity stores,
 //! player state, fog, spatial indexes, or derived economy state directly.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use crate::game::services::geometry::{
 };
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::standability;
+use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
 use crate::rules;
 
@@ -417,13 +417,10 @@ impl Game {
     }
 
     fn lab_delete_entity(&mut self, entity_id: u32) -> Result<LabOpOutcome, LabError> {
-        let removed = self
-            .entities
+        self.entities
             .remove(entity_id)
             .ok_or(LabError::StaleEntity { entity_id })?;
-        if removed.kind == EntityKind::Worker {
-            self.entities.release_miner(entity_id);
-        }
+        self.entities.release_miner(entity_id);
         self.cleanup_entity_references(entity_id);
         self.repair_lab_state();
         Ok(LabOpOutcome::Deleted { entity_id })
@@ -530,7 +527,11 @@ impl Game {
         } else {
             player.upgrades.remove(&input.upgrade);
         }
-        repair_mortar_autocast_for_owner(&mut self.entities, input.player_id, &player.upgrades);
+        production::sync_owned_autocast_from_upgrades(
+            &mut self.entities,
+            input.player_id,
+            &player.upgrades,
+        );
         Ok(LabOpOutcome::CompletedResearchSet {
             player_id: input.player_id,
             upgrade: input.upgrade,
@@ -713,7 +714,11 @@ impl Game {
 
     fn repair_mortar_autocast_state(&mut self) {
         for player in &self.players {
-            repair_mortar_autocast_for_owner(&mut self.entities, player.id, &player.upgrades);
+            production::sync_owned_autocast_from_upgrades(
+                &mut self.entities,
+                player.id,
+                &player.upgrades,
+            );
         }
     }
 }
@@ -820,21 +825,6 @@ fn validate_upgrade_for_player(
             player_id: player.id,
             upgrade: upgrade_id.to_string(),
         })
-    }
-}
-
-fn repair_mortar_autocast_for_owner(
-    entities: &mut EntityStore,
-    owner: u32,
-    upgrades: &BTreeSet<UpgradeKind>,
-) {
-    let enabled = upgrades.contains(&UpgradeKind::MortarAutocast);
-    for id in entities.ids() {
-        if let Some(entity) = entities.get_mut(id) {
-            if entity.owner == owner && entity.kind == EntityKind::MortarTeam {
-                entity.set_autocast_enabled(crate::game::ability::AbilityKind::MortarFire, enabled);
-            }
-        }
     }
 }
 
