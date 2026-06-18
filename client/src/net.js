@@ -257,6 +257,16 @@ export class Net {
     this._send(msg.setReplayVision(vision));
   }
 
+  /**
+   * Send a privileged lab operation envelope. The server replies with labResult.
+   * @param {number} requestId positive request id allocated by LabClient
+   * @param {object} op lab operation payload
+   * @returns {boolean} true when the frame was sent
+   */
+  lab(requestId, op) {
+    return this._send(msg.lab(requestId, op));
+  }
+
   /** Request a practice branch room from the current authoritative replay tick. */
   requestReplayBranch() {
     this._send(msg.requestReplayBranch());

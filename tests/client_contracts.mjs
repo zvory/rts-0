@@ -101,6 +101,9 @@ import {
 import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
+import { LabClient, labVision, labVisionLabel } from "../client/src/lab_client.js";
+import { createDefaultControlPolicy, createLabControlPolicy } from "../client/src/lab_control_policy.js";
+import { LabPanel } from "../client/src/lab_panel.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
@@ -242,6 +245,27 @@ function withFakeDocument(fn) {
         style: { setProperty() {} },
         addEventListener(type, handler) {
           this.listeners[type] = handler;
+        },
+        removeEventListener(type, handler) {
+          if (this.listeners[type] === handler) delete this.listeners[type];
+        },
+        append(...children) {
+          this.children = this.children || [];
+          this.children.push(...children);
+        },
+        appendChild(child) {
+          this.children = this.children || [];
+          this.children.push(child);
+          return child;
+        },
+        replaceChildren(...children) {
+          this.children = [...children];
+        },
+        setAttribute(name, value) {
+          this[name] = String(value);
+        },
+        remove() {
+          this.removed = true;
         },
         querySelectorAll() {
           return [];
@@ -1296,6 +1320,44 @@ async function testReplayArtifactLaunchConfig() {
   }
 }
 
+async function testLabLaunchConfig() {
+  const priorDocument = globalThis.document;
+  const priorWindow = globalThis.window;
+  globalThis.document = {
+    getElementById: () => null,
+  };
+  globalThis.window = {
+    location: new URL("http://localhost/lab?room=sandbox&map=low-econ&seed=1234"),
+    localStorage: { getItem: () => null },
+  };
+  try {
+    const { labLaunchConfig } = await import("../client/src/bootstrap.js");
+    let config = labLaunchConfig();
+    assert(config, "lab route launch config should be recognized");
+    assert(config.publicRoom === "sandbox", "lab launch keeps public room label");
+    assert(config.map === "low-econ", "lab launch keeps map label");
+    assert(
+      config.room === "__lab__:sandbox:map=low-econ:seed=1234",
+      "lab launch should build the server lab room id",
+    );
+
+    globalThis.window.location = new URL("http://localhost/lab?room=bad/room&map=bad map");
+    config = labLaunchConfig();
+    assert(
+      config.room === "__lab__:default:map=Default",
+      "lab launch falls back for unsafe room and map tokens",
+    );
+
+    globalThis.window.location = new URL("http://localhost/?room=sandbox");
+    assert(labLaunchConfig() === null, "non-lab route does not auto-join a lab");
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  }
+}
+
 class FakeGraphics {
   constructor() {
     this.position = { set() {} };
@@ -1346,6 +1408,7 @@ class RecordingGraphics extends FakeGraphics {
 
 await testDevWatchScenarioConfig();
 await testReplayArtifactLaunchConfig();
+await testLabLaunchConfig();
 
 assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
 assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");
@@ -3229,6 +3292,7 @@ function fakeAudioContext() {
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
+  assertHasMethod(net, "lab", "Net");
   assertHasMethod(net, "requestReplayBranch", "Net");
   assertHasMethod(net, "claimBranchSeat", "Net");
   assertHasMethod(net, "releaseBranchSeat", "Net");
@@ -3244,6 +3308,8 @@ function fakeAudioContext() {
   assertThrows(() => net.command(cmd.stop([1])), "Net.command requires controller-provided clientSeq");
   net.command(cmd.stop([1]), 7);
   assert(sent[0].clientSeq === 7, "Net.command sends the provided clientSeq");
+  net.lab(12, { op: "setVision", vision: msg.labVisionFullWorld() });
+  assert(sent[1].t === "lab" && sent[1].requestId === 12, "Net.lab sends lab request envelopes");
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(
     msg.join("A", "main", false, true).replayOk === true,
@@ -3276,6 +3342,96 @@ function fakeAudioContext() {
     "replay subset vision builder payload",
   );
 }
+
+// ---------------------------------------------------------------------------
+// Lab client and panel
+// ---------------------------------------------------------------------------
+{
+  const sent = [];
+  const net = new Net("ws://example.test/ws");
+  net.ws = {
+    readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
+    send(json) {
+      sent.push(JSON.parse(json));
+    },
+  };
+  const labClient = new LabClient(net, { timeoutMs: 1000 });
+  let observedState = null;
+  let observedResult = null;
+  labClient.subscribeState((state) => {
+    observedState = state;
+  });
+  labClient.subscribeResult((result) => {
+    observedResult = result;
+  });
+  labClient.setInitialState({
+    room: "__lab__:sandbox:map=Default",
+    operatorId: 1,
+    role: "operator",
+    vision: labVision.fullWorld(),
+    dirty: false,
+    operationCount: 0,
+  });
+  assert(observedState.role === "operator", "LabClient publishes initial lab state");
+  const resultPromise = labClient.setVision(labVision.team(2));
+  assert(
+    sent.at(-1).op.vision.mode === "team" && sent.at(-1).requestId === 1,
+    "LabClient allocates request ids for vision operations",
+  );
+  net._emit("labResult", { t: "labResult", requestId: 1, ok: true, op: "setVision" });
+  const result = await resultPromise;
+  assert(result.ok && observedResult.ok, "LabClient resolves matching labResult messages");
+  assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
+  labClient.destroy();
+}
+
+{
+  const policy = createLabControlPolicy({ metadata: { role: "operator" } });
+  assert(policy.kind === "lab" && policy.canIssueAs(1), "lab control policy gates issue-as to operator");
+  assert(!createDefaultControlPolicy().canIssueAs(1), "default control policy does not issue-as");
+}
+
+withFakeDocument(() => {
+  const sent = [];
+  const net = new Net("ws://example.test/ws");
+  net.ws = {
+    readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
+    send(json) {
+      sent.push(JSON.parse(json));
+    },
+  };
+  const root = document.createElement("div");
+  const labClient = new LabClient(net);
+  labClient.setInitialState({
+    room: "__lab__:sandbox:map=Default",
+    operatorId: 1,
+    role: "operator",
+    vision: labVision.fullWorld(),
+    dirty: false,
+    operationCount: 0,
+  });
+  const panel = new LabPanel({
+    root,
+    labClient,
+    launch: { publicRoom: "sandbox", map: "Default" },
+    startPayload: {
+      map: { name: "Default" },
+      players: [{ id: 1, teamId: 1 }, { id: 2, teamId: 2 }],
+    },
+  });
+  assert(root.children.length === 1, "LabPanel mounts inside the app-owned root");
+  assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
+  const teamButton = root.children[0].children
+    .flatMap((child) => child.children || [])
+    .find((child) => child.textContent === "Team 2");
+  teamButton.listeners.click();
+  assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
+  panel.destroy();
+  labClient.destroy();
+  assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");
+});
 
 // ---------------------------------------------------------------------------
 // Command Budget

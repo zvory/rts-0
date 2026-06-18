@@ -11,17 +11,18 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 
 ## Code map
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
-  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js` — app lifecycle,
-  dependency injection, replay/spectator analysis shell.
+  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
+  `lab_control_policy.js` — app lifecycle, dependency injection, replay/spectator/lab shell.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js` — client snapshot state, browser-local intent, command-budget admission,
   progress display extrapolation, and prediction bookkeeping/adapters.
-- `transport`: `net.js`, `protocol.js` — WebSocket wrapper and wire mirror.
+- `transport`: `net.js`, `protocol.js`, `lab_client.js` — WebSocket wrapper, lab request
+  service, and wire mirror.
 - `rules-mirror`: `config.js` — UI/render/fog subset of mirrored balance.
 - `ui`: `hud.js`, `hud_command_card.js`, `hotkey_editor.js`, `hotkey_profiles.js`, `lobby.js`,
   `lobby_view.js`, `match_history.js`, `resource_icons.js`, `scoreboard.js`, `status_badge.js`,
-  `minimap.js`, `branch_staging.js`, `settings_container.js`, `settings_panels.js` —
+  `minimap.js`, `branch_staging.js`, `lab_panel.js`, `settings_container.js`, `settings_panels.js` —
   DOM/HUD/lobby/minimap/settings and shared display helpers.
 - `input`: `input/` plus `replay_camera_input.js` — input facade, shared camera navigation, and
   area-local collaborators.

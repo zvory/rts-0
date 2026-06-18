@@ -1478,6 +1478,7 @@ input[type="text"]:focus {
 #selection-area,
 #game-menu,
 #command-card,
+#lab-panel,
 #toast {
   position: absolute;
   z-index: var(--hud-z);
@@ -1488,10 +1489,110 @@ input[type="text"]:focus {
 #hud,
 #minimap-wrap,
 #selected-panel,
-#command-card {
+#command-card,
+#lab-panel {
   background: rgba(39, 37, 31, 0.94);
   border: 1px solid var(--panel-edge);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --- Lab shell controls --- */
+#lab-panel {
+  top: 58px;
+  right: 12px;
+  width: min(320px, calc(100vw - 24px));
+  max-height: calc(100vh - 82px);
+  overflow: auto;
+  pointer-events: auto;
+  padding: 10px;
+  color: var(--ink);
+}
+.lab-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.lab-panel header span,
+.lab-status-grid dt {
+  color: var(--ink-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.lab-panel h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.1;
+}
+.lab-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.lab-status-grid > div {
+  min-width: 0;
+  padding: 6px;
+  background: rgba(15, 17, 18, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.lab-status-grid dt,
+.lab-status-grid dd {
+  margin: 0;
+}
+.lab-status-grid dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.lab-vision-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lab-btn {
+  appearance: none;
+  min-height: 30px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 22, 24, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.lab-btn:hover,
+.lab-btn:focus-visible {
+  border-color: var(--accent);
+}
+.lab-team-union {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+.lab-team-union label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+.lab-result {
+  margin: 10px 0 0;
+  min-height: 18px;
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+.lab-result[data-state="error"] {
+  color: #ffb4a6;
+}
+.lab-result[data-state="ok"] {
+  color: #bde6ba;
 }
 
 /* --- Settings menu --- */
