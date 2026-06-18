@@ -219,34 +219,28 @@ export class Net {
     return this.ws?.bufferedAmount || 0;
   }
 
-  /**
-   * Set replay/dev-watch playback speed. 0 pauses playback.
-   * @param {number} speed multiplier, e.g. 0.5, 1, 2, 4, 8
-   */
-  setReplaySpeed(speed) {
-    this._send(msg.setReplaySpeed(speed));
+  /** Set room-controlled time speed. 0 pauses rooms whose clock allows pause. */
+  setRoomTimeSpeed(speed) {
+    this._send(msg.setRoomTimeSpeed(speed));
   }
 
-  /** Advance a paused dev scenario by one authoritative simulation tick. */
-  stepDevTick() {
-    this._send(msg.stepDevTick());
+  /** Advance room-controlled time by one authoritative simulation tick where allowed. */
+  stepRoomTime() {
+    this._send(msg.stepRoomTime());
   }
 
   /**
-   * Rewind a replay by `ticksBack` ticks (replay rooms only). Pass a large value
+   * Rewind room-controlled time by `ticksBack` ticks. Pass a large value
    * (e.g. 2**31 - 1) to reset to the start.
    * @param {number} ticksBack
    */
-  seekReplay(ticksBack) {
-    this._send(msg.seekReplay(ticksBack));
+  seekRoomTime(ticksBack) {
+    this._send(msg.seekRoomTime(ticksBack));
   }
 
-  /**
-   * Seek a replay to an absolute simulation tick (replay rooms only).
-   * @param {number} tick
-   */
-  seekReplayTo(tick) {
-    this._send(msg.seekReplayTo(tick));
+  /** Seek room-controlled time to an absolute simulation tick where allowed. */
+  seekRoomTimeTo(tick) {
+    this._send(msg.seekRoomTimeTo(tick));
   }
 
   /**

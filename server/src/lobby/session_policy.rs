@@ -43,12 +43,97 @@ pub(super) enum JoinPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ClockPolicy {
+pub(super) enum ClockTickSource {
     RoomTicker,
     LiveMatch,
-    ReplayPlayback,
     BranchStaging,
-    DevWatch,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RoomTimeSource {
+    ReplayPlayback,
+    DevScenario,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RoomTimeOperation {
+    SetSpeed,
+    Step,
+    SeekRelative,
+    SeekAbsolute,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct RoomTimeOperations {
+    set_speed: bool,
+    step: bool,
+    seek_relative: bool,
+    seek_absolute: bool,
+}
+
+impl RoomTimeOperations {
+    pub(super) const NONE: Self = Self {
+        set_speed: false,
+        step: false,
+        seek_relative: false,
+        seek_absolute: false,
+    };
+
+    pub(super) const REPLAY_PLAYBACK: Self = Self {
+        set_speed: true,
+        step: false,
+        seek_relative: true,
+        seek_absolute: true,
+    };
+
+    pub(super) const DEV_SCENARIO: Self = Self {
+        set_speed: true,
+        step: true,
+        seek_relative: false,
+        seek_absolute: false,
+    };
+
+    pub(super) fn allows(self, operation: RoomTimeOperation) -> bool {
+        match operation {
+            RoomTimeOperation::SetSpeed => self.set_speed,
+            RoomTimeOperation::Step => self.step,
+            RoomTimeOperation::SeekRelative => self.seek_relative,
+            RoomTimeOperation::SeekAbsolute => self.seek_absolute,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct RoomTimeCapability {
+    pub(super) source: RoomTimeSource,
+    pub(super) operations: RoomTimeOperations,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ClockCapability {
+    FixedRealtime(ClockTickSource),
+    RoomControlled(RoomTimeCapability),
+}
+
+impl ClockCapability {
+    pub(super) const ROOM_TICKER: Self = Self::FixedRealtime(ClockTickSource::RoomTicker);
+    pub(super) const LIVE_MATCH: Self = Self::FixedRealtime(ClockTickSource::LiveMatch);
+    pub(super) const BRANCH_STAGING: Self = Self::FixedRealtime(ClockTickSource::BranchStaging);
+    pub(super) const REPLAY_PLAYBACK: Self = Self::RoomControlled(RoomTimeCapability {
+        source: RoomTimeSource::ReplayPlayback,
+        operations: RoomTimeOperations::REPLAY_PLAYBACK,
+    });
+    pub(super) const DEV_SCENARIO: Self = Self::RoomControlled(RoomTimeCapability {
+        source: RoomTimeSource::DevScenario,
+        operations: RoomTimeOperations::DEV_SCENARIO,
+    });
+
+    pub(super) fn room_time_source(self) -> Option<RoomTimeSource> {
+        match self {
+            ClockCapability::RoomControlled(capability) => Some(capability.source),
+            ClockCapability::FixedRealtime(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,7 +217,7 @@ pub(super) struct SessionPolicy {
     pub(super) phase: SessionPhase,
     pub(super) state_source: StateSource,
     pub(super) join: JoinPolicy,
-    pub(super) clock: ClockPolicy,
+    pub(super) clock: ClockCapability,
     pub(super) authority: AuthorityPolicy,
     pub(super) mutation: MutationPolicy,
     pub(super) visibility: VisibilityPolicy,
@@ -152,7 +237,7 @@ impl SessionPolicy {
                 phase,
                 state_source: StateSource::LobbyState,
                 join: JoinPolicy::NormalLobby,
-                clock: ClockPolicy::RoomTicker,
+                clock: ClockCapability::ROOM_TICKER,
                 authority: AuthorityPolicy::LobbyHost,
                 mutation: MutationPolicy::LobbyState,
                 visibility: VisibilityPolicy::LobbyState,
@@ -168,7 +253,7 @@ impl SessionPolicy {
                 phase,
                 state_source: StateSource::LiveGame,
                 join: JoinPolicy::RejectMidMatch,
-                clock: ClockPolicy::LiveMatch,
+                clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LivePlayers,
                 mutation: MutationPolicy::LiveGameplayCommands,
                 visibility: VisibilityPolicy::LiveFog,
@@ -184,7 +269,7 @@ impl SessionPolicy {
                 phase,
                 state_source: StateSource::PostMatchReplaySession,
                 join: JoinPolicy::ReplayPromptOrAttach,
-                clock: ClockPolicy::ReplayPlayback,
+                clock: ClockCapability::REPLAY_PLAYBACK,
                 authority: AuthorityPolicy::ReplayViewers,
                 mutation: MutationPolicy::ReplayPlaybackCursor,
                 visibility: VisibilityPolicy::ReplayVision,
@@ -200,7 +285,7 @@ impl SessionPolicy {
                 phase,
                 state_source: StateSource::ReplayBranchSeed,
                 join: JoinPolicy::BranchStaging,
-                clock: ClockPolicy::BranchStaging,
+                clock: ClockCapability::BRANCH_STAGING,
                 authority: AuthorityPolicy::BranchStagingHost,
                 mutation: MutationPolicy::ReplayBranchStagingClaims,
                 visibility: VisibilityPolicy::BranchStagingState,
@@ -218,7 +303,7 @@ impl SessionPolicy {
             SessionMode::DevScenario => {
                 policy.state_source = StateSource::DevScenario;
                 policy.join = JoinPolicy::DevWatch;
-                policy.clock = ClockPolicy::DevWatch;
+                policy.clock = ClockCapability::DEV_SCENARIO;
                 policy.authority = AuthorityPolicy::DevWatchControls;
                 policy.mutation = MutationPolicy::DevScenarioDriver;
                 policy.visibility = VisibilityPolicy::DevFullWorld;
@@ -232,7 +317,7 @@ impl SessionPolicy {
             SessionMode::Replay => {
                 if phase == SessionPhase::Lobby {
                     policy.state_source = StateSource::PersistedReplayArtifact;
-                    policy.clock = ClockPolicy::RoomTicker;
+                    policy.clock = ClockCapability::ROOM_TICKER;
                     policy.mutation = MutationPolicy::None;
                     policy.visibility = VisibilityPolicy::LobbyState;
                     policy.diagnostics = DiagnosticPolicy::None;
@@ -248,7 +333,7 @@ impl SessionPolicy {
             SessionMode::ReplayArtifact => {
                 if phase == SessionPhase::Lobby {
                     policy.state_source = StateSource::SavedReplayArtifact;
-                    policy.clock = ClockPolicy::RoomTicker;
+                    policy.clock = ClockCapability::ROOM_TICKER;
                     policy.mutation = MutationPolicy::None;
                     policy.visibility = VisibilityPolicy::LobbyState;
                     policy.diagnostics = DiagnosticPolicy::None;
@@ -271,8 +356,8 @@ impl SessionPolicy {
                     _ => JoinPolicy::BranchStaging,
                 };
                 policy.clock = match phase {
-                    SessionPhase::LiveMatch => ClockPolicy::LiveMatch,
-                    _ => ClockPolicy::BranchStaging,
+                    SessionPhase::LiveMatch => ClockCapability::LIVE_MATCH,
+                    _ => ClockCapability::BRANCH_STAGING,
                 };
                 policy.authority = match phase {
                     SessionPhase::LiveMatch => AuthorityPolicy::BranchLiveSeatAliases,
@@ -305,7 +390,7 @@ impl SessionPolicy {
             SessionMode::Lab => {
                 policy.state_source = StateSource::LabGame;
                 policy.join = JoinPolicy::LabRoom;
-                policy.clock = ClockPolicy::LiveMatch;
+                policy.clock = ClockCapability::LIVE_MATCH;
                 policy.authority = AuthorityPolicy::LabOperator;
                 policy.mutation = MutationPolicy::LabPrivilegedOps;
                 policy.visibility = VisibilityPolicy::LabFullWorld;
@@ -376,7 +461,7 @@ mod tests {
         phase: SessionPhase,
         state_source: StateSource,
         join: JoinPolicy,
-        clock: ClockPolicy,
+        clock: ClockCapability,
         authority: AuthorityPolicy,
         visibility: VisibilityPolicy,
         mutation: MutationPolicy,
@@ -449,7 +534,7 @@ mod tests {
                 phase: SessionPhase::Lobby,
                 state_source: StateSource::LobbyState,
                 join: JoinPolicy::NormalLobby,
-                clock: ClockPolicy::RoomTicker,
+                clock: ClockCapability::ROOM_TICKER,
                 authority: AuthorityPolicy::LobbyHost,
                 visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::LobbyState,
@@ -466,7 +551,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LiveGame,
                 join: JoinPolicy::RejectMidMatch,
-                clock: ClockPolicy::LiveMatch,
+                clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LivePlayers,
                 visibility: VisibilityPolicy::LiveFog,
                 mutation: MutationPolicy::LiveGameplayCommands,
@@ -483,7 +568,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LiveGame,
                 join: JoinPolicy::RejectMidMatch,
-                clock: ClockPolicy::LiveMatch,
+                clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LivePlayers,
                 visibility: VisibilityPolicy::LiveFog,
                 mutation: MutationPolicy::LiveGameplayCommands,
@@ -500,7 +585,7 @@ mod tests {
                 phase: SessionPhase::ReplayViewer,
                 state_source: StateSource::PostMatchReplaySession,
                 join: JoinPolicy::ReplayPromptOrAttach,
-                clock: ClockPolicy::ReplayPlayback,
+                clock: ClockCapability::REPLAY_PLAYBACK,
                 authority: AuthorityPolicy::ReplayViewers,
                 visibility: VisibilityPolicy::ReplayVision,
                 mutation: MutationPolicy::ReplayPlaybackCursor,
@@ -517,7 +602,7 @@ mod tests {
                 phase: SessionPhase::Lobby,
                 state_source: StateSource::PersistedReplayArtifact,
                 join: JoinPolicy::ReplayPromptOrAttach,
-                clock: ClockPolicy::RoomTicker,
+                clock: ClockCapability::ROOM_TICKER,
                 authority: AuthorityPolicy::ReplayViewers,
                 visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::None,
@@ -534,7 +619,7 @@ mod tests {
                 phase: SessionPhase::Lobby,
                 state_source: StateSource::SavedReplayArtifact,
                 join: JoinPolicy::ReplayPromptOrAttach,
-                clock: ClockPolicy::RoomTicker,
+                clock: ClockCapability::ROOM_TICKER,
                 authority: AuthorityPolicy::ReplayViewers,
                 visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::None,
@@ -551,7 +636,7 @@ mod tests {
                 phase: SessionPhase::BranchStaging,
                 state_source: StateSource::ReplayBranchSeed,
                 join: JoinPolicy::BranchStaging,
-                clock: ClockPolicy::BranchStaging,
+                clock: ClockCapability::BRANCH_STAGING,
                 authority: AuthorityPolicy::BranchStagingHost,
                 visibility: VisibilityPolicy::BranchStagingState,
                 mutation: MutationPolicy::ReplayBranchStagingClaims,
@@ -568,7 +653,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::BranchLiveGame,
                 join: JoinPolicy::BranchLiveAttach,
-                clock: ClockPolicy::LiveMatch,
+                clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::BranchLiveSeatAliases,
                 visibility: VisibilityPolicy::LiveFog,
                 mutation: MutationPolicy::BranchLiveSeatAliasGameplay,
@@ -585,7 +670,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::DevScenario,
                 join: JoinPolicy::DevWatch,
-                clock: ClockPolicy::DevWatch,
+                clock: ClockCapability::DEV_SCENARIO,
                 authority: AuthorityPolicy::DevWatchControls,
                 visibility: VisibilityPolicy::DevFullWorld,
                 mutation: MutationPolicy::DevScenarioDriver,
@@ -602,7 +687,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LabGame,
                 join: JoinPolicy::LabRoom,
-                clock: ClockPolicy::LiveMatch,
+                clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LabOperator,
                 visibility: VisibilityPolicy::LabFullWorld,
                 mutation: MutationPolicy::LabPrivilegedOps,
@@ -619,7 +704,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LabGame,
                 join: JoinPolicy::LabRoom,
-                clock: ClockPolicy::LiveMatch,
+                clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LabOperator,
                 visibility: VisibilityPolicy::LabFullWorld,
                 mutation: MutationPolicy::LabPrivilegedOps,
@@ -640,7 +725,7 @@ mod tests {
         let lobby = SessionPolicy::new(SessionMode::Normal, SessionPhase::Lobby);
         assert_eq!(lobby.state_source, StateSource::LobbyState);
         assert_eq!(lobby.join, JoinPolicy::NormalLobby);
-        assert_eq!(lobby.clock, ClockPolicy::RoomTicker);
+        assert_eq!(lobby.clock, ClockCapability::ROOM_TICKER);
         assert_eq!(lobby.authority, AuthorityPolicy::LobbyHost);
         assert_eq!(lobby.visibility, VisibilityPolicy::LobbyState);
         assert_eq!(lobby.mutation, MutationPolicy::LobbyState);
@@ -651,7 +736,7 @@ mod tests {
         let live = SessionPolicy::new(SessionMode::Normal, SessionPhase::LiveMatch);
         assert_eq!(live.state_source, StateSource::LiveGame);
         assert_eq!(live.join, JoinPolicy::RejectMidMatch);
-        assert_eq!(live.clock, ClockPolicy::LiveMatch);
+        assert_eq!(live.clock, ClockCapability::LIVE_MATCH);
         assert_eq!(live.authority, AuthorityPolicy::LivePlayers);
         assert_eq!(live.visibility, VisibilityPolicy::LiveFog);
         assert_eq!(live.mutation, MutationPolicy::LiveGameplayCommands);
@@ -666,7 +751,7 @@ mod tests {
         let replay = SessionPolicy::new(SessionMode::Normal, SessionPhase::ReplayViewer);
         assert_eq!(replay.state_source, StateSource::PostMatchReplaySession);
         assert_eq!(replay.join, JoinPolicy::ReplayPromptOrAttach);
-        assert_eq!(replay.clock, ClockPolicy::ReplayPlayback);
+        assert_eq!(replay.clock, ClockCapability::REPLAY_PLAYBACK);
         assert_eq!(replay.authority, AuthorityPolicy::ReplayViewers);
         assert_eq!(replay.visibility, VisibilityPolicy::ReplayVision);
         assert_eq!(replay.mutation, MutationPolicy::ReplayPlaybackCursor);
@@ -682,7 +767,7 @@ mod tests {
         let persisted = SessionPolicy::new(SessionMode::Replay, SessionPhase::Lobby);
         assert_eq!(persisted.state_source, StateSource::PersistedReplayArtifact);
         assert_eq!(persisted.join, JoinPolicy::ReplayPromptOrAttach);
-        assert_eq!(persisted.clock, ClockPolicy::RoomTicker);
+        assert_eq!(persisted.clock, ClockCapability::ROOM_TICKER);
         assert_eq!(persisted.authority, AuthorityPolicy::ReplayViewers);
         assert_eq!(persisted.visibility, VisibilityPolicy::LobbyState);
         assert_eq!(persisted.mutation, MutationPolicy::None);
@@ -695,7 +780,7 @@ mod tests {
         let saved = SessionPolicy::new(SessionMode::ReplayArtifact, SessionPhase::Lobby);
         assert_eq!(saved.state_source, StateSource::SavedReplayArtifact);
         assert_eq!(saved.join, JoinPolicy::ReplayPromptOrAttach);
-        assert_eq!(saved.clock, ClockPolicy::RoomTicker);
+        assert_eq!(saved.clock, ClockCapability::ROOM_TICKER);
         assert_eq!(saved.authority, AuthorityPolicy::ReplayViewers);
         assert_eq!(saved.visibility, VisibilityPolicy::LobbyState);
         assert_eq!(saved.mutation, MutationPolicy::None);
@@ -705,7 +790,7 @@ mod tests {
 
         let playing = SessionPolicy::new(SessionMode::Replay, SessionPhase::ReplayViewer);
         assert_eq!(playing.state_source, StateSource::PostMatchReplaySession);
-        assert_eq!(playing.clock, ClockPolicy::ReplayPlayback);
+        assert_eq!(playing.clock, ClockCapability::REPLAY_PLAYBACK);
     }
 
     #[test]
@@ -713,7 +798,7 @@ mod tests {
         let staging = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::BranchStaging);
         assert_eq!(staging.state_source, StateSource::ReplayBranchSeed);
         assert_eq!(staging.join, JoinPolicy::BranchStaging);
-        assert_eq!(staging.clock, ClockPolicy::BranchStaging);
+        assert_eq!(staging.clock, ClockCapability::BRANCH_STAGING);
         assert_eq!(staging.authority, AuthorityPolicy::BranchStagingHost);
         assert_eq!(staging.visibility, VisibilityPolicy::BranchStagingState);
         assert_eq!(staging.mutation, MutationPolicy::ReplayBranchStagingClaims);
@@ -725,7 +810,7 @@ mod tests {
         let live = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);
         assert_eq!(live.state_source, StateSource::BranchLiveGame);
         assert_eq!(live.join, JoinPolicy::BranchLiveAttach);
-        assert_eq!(live.clock, ClockPolicy::LiveMatch);
+        assert_eq!(live.clock, ClockCapability::LIVE_MATCH);
         assert_eq!(live.authority, AuthorityPolicy::BranchLiveSeatAliases);
         assert_eq!(live.visibility, VisibilityPolicy::LiveFog);
         assert_eq!(live.mutation, MutationPolicy::BranchLiveSeatAliasGameplay);
@@ -739,7 +824,7 @@ mod tests {
         let dev = SessionPolicy::new(SessionMode::DevScenario, SessionPhase::LiveMatch);
         assert_eq!(dev.state_source, StateSource::DevScenario);
         assert_eq!(dev.join, JoinPolicy::DevWatch);
-        assert_eq!(dev.clock, ClockPolicy::DevWatch);
+        assert_eq!(dev.clock, ClockCapability::DEV_SCENARIO);
         assert_eq!(dev.authority, AuthorityPolicy::DevWatchControls);
         assert_eq!(dev.visibility, VisibilityPolicy::DevFullWorld);
         assert_eq!(dev.mutation, MutationPolicy::DevScenarioDriver);
@@ -755,7 +840,7 @@ mod tests {
         let lab_lobby = SessionPolicy::new(SessionMode::Lab, SessionPhase::Lobby);
         assert_eq!(lab_lobby.state_source, StateSource::LabGame);
         assert_eq!(lab_lobby.join, JoinPolicy::LabRoom);
-        assert_eq!(lab_lobby.clock, ClockPolicy::LiveMatch);
+        assert_eq!(lab_lobby.clock, ClockCapability::LIVE_MATCH);
         assert_eq!(lab_lobby.authority, AuthorityPolicy::LabOperator);
         assert_eq!(lab_lobby.visibility, VisibilityPolicy::LabFullWorld);
         assert_eq!(lab_lobby.mutation, MutationPolicy::LabPrivilegedOps);

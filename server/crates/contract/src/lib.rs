@@ -55,7 +55,11 @@ pub enum LabStartRole {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "mode", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "mode",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum LabVisionMode {
     FullWorld,
     Team { team_id: TeamId },
@@ -76,7 +80,7 @@ pub struct ReplayStartMetadata {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplayPlaybackState {
+pub struct RoomTimeState {
     pub current_tick: u32,
     pub duration_ticks: u32,
     pub keyframe_ticks: Vec<u32>,

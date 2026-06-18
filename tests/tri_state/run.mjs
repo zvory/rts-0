@@ -477,21 +477,21 @@ async function executeStep(context, step) {
       requireClientLane(lanes, step.op);
       artifacts.timeline({ event: "client.expireCommands", result: await lanes.client.expireCommands(step.elapsedMs) });
       break;
-    case "setReplaySpeed":
-      await lanes.client?.setReplaySpeed(step.speed);
+    case "setRoomTimeSpeed":
+      await lanes.client?.setRoomTimeSpeed(step.speed);
       break;
-    case "stepDevTick": {
+    case "stepRoomTime": {
       const before = await lanes.client.currentTick();
-      await lanes.client.stepDevTick();
+      await lanes.client.stepRoomTime();
       await lanes.client.waitForSnapshot({ minTickDelta: 1, timeoutMs: 8000 });
       const after = await lanes.client.currentTick();
       context.tickMarks.push({ before, after });
-      artifacts.diff({ assertion: "stepDevTick", before, after, delta: after - before });
+      artifacts.diff({ assertion: "stepRoomTime", before, after, delta: after - before });
       break;
     }
     case "assertTickAdvanced": {
       const mark = context.tickMarks.at(-1);
-      if (!mark) throw new Error("assertTickAdvanced requires a preceding stepDevTick");
+      if (!mark) throw new Error("assertTickAdvanced requires a preceding stepRoomTime");
       const delta = mark.after - mark.before;
       artifacts.diff({ assertion: step.op, expected: step.delta, actual: delta, mark });
       if (delta !== step.delta) throw new Error(`expected tick delta ${step.delta}, got ${delta}`);

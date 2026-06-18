@@ -14,8 +14,8 @@ pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
     DebugPathPoint, DebugPathView, EntityView, Event, LabStartMetadata, LabStartRole,
     LabVisionMode, MapInfo, NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
-    PlayerStart, RememberedBuildingView, ReplayPlaybackState, ReplayStartMetadata, ResourceDelta,
-    ResourceNode, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
+    PlayerStart, RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode,
+    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
     DEFAULT_FACTION_ID,
 };
 
@@ -177,17 +177,17 @@ pub enum ClientMessage {
     Ping { ts: f64 },
     /// Client-observed network/render health aggregate for server logs.
     NetReport { report: ClientNetReport },
-    /// Set replay/dev-watch playback speed multiplier. `0` pauses replay and dev-watch playback.
-    SetReplaySpeed { speed: f32 },
-    /// Advance a paused dev-watch room by one simulation tick. Ignored outside dev watch.
-    StepDevTick,
-    /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
-    SeekReplay {
+    /// Set room-controlled time speed. `0` pauses rooms whose clock supports pause.
+    SetRoomTimeSpeed { speed: f32 },
+    /// Advance room-controlled time by one simulation tick where the clock allows stepping.
+    StepRoomTime,
+    /// Rewind room-controlled time by `ticks_back` ticks where relative seek is allowed.
+    SeekRoomTime {
         #[serde(rename = "ticksBack")]
         ticks_back: u32,
     },
-    /// Seek a replay to an absolute simulation tick (replay rooms only; clamped to duration).
-    SeekReplayTo { tick: u32 },
+    /// Seek room-controlled time to an absolute simulation tick where absolute seek is allowed.
+    SeekRoomTimeTo { tick: u32 },
     /// Select which players' fog to use while viewing a replay. Per-viewer only.
     SetReplayVision { vision: ReplayVisionRequest },
     /// Privileged lab request envelope. Only lab rooms route these requests.
@@ -558,8 +558,8 @@ pub enum ServerMessage {
     Start(StartPayload),
     /// Per-player, fog-filtered world state.
     Snapshot(Snapshot),
-    /// Shared replay playback cursor/state. Sent reliably outside snapshot cadence.
-    ReplayState(ReplayPlaybackState),
+    /// Shared room-controlled time cursor/state. Sent reliably outside snapshot cadence.
+    RoomTimeState(RoomTimeState),
     /// Authoritative observer analysis data for replay viewers and live spectators. The wire tag
     /// remains `replayAnalysis` for compatibility while live delivery is gated by the room task.
     #[serde(rename = "replayAnalysis")]
@@ -982,10 +982,10 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("RETURN_TO_LOBBY", "returnToLobby"),
                 ("PING", "ping"),
                 ("NET_REPORT", "netReport"),
-                ("SET_REPLAY_SPEED", "setReplaySpeed"),
-                ("STEP_DEV_TICK", "stepDevTick"),
-                ("SEEK_REPLAY", "seekReplay"),
-                ("SEEK_REPLAY_TO", "seekReplayTo"),
+                ("SET_ROOM_TIME_SPEED", "setRoomTimeSpeed"),
+                ("STEP_ROOM_TIME", "stepRoomTime"),
+                ("SEEK_ROOM_TIME", "seekRoomTime"),
+                ("SEEK_ROOM_TIME_TO", "seekRoomTimeTo"),
                 ("SET_REPLAY_VISION", "setReplayVision"),
                 ("LAB", "lab"),
                 ("REQUEST_REPLAY_BRANCH", "requestReplayBranch"),
@@ -1000,7 +1000,7 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("MATCH_COUNTDOWN", "matchCountdown"),
                 ("START", "start"),
                 ("SNAPSHOT", "snapshot"),
-                ("REPLAY_STATE", "replayState"),
+                ("ROOM_TIME_STATE", "roomTimeState"),
                 ("REPLAY_ANALYSIS", "replayAnalysis"),
                 ("JOIN_REPLAY_PROMPT", "joinReplayPrompt"),
                 ("REPLAY_BRANCH_CREATED", "replayBranchCreated"),
@@ -2205,12 +2205,12 @@ mod tests {
 
     #[test]
     fn seek_replay_to_deserializes_absolute_tick() {
-        let msg: ClientMessage = serde_json::from_str(r#"{"t":"seekReplayTo","tick":4100}"#)
-            .expect("seekReplayTo should deserialize");
+        let msg: ClientMessage = serde_json::from_str(r#"{"t":"seekRoomTimeTo","tick":4100}"#)
+            .expect("seekRoomTimeTo should deserialize");
 
         match msg {
-            ClientMessage::SeekReplayTo { tick } => assert_eq!(tick, 4_100),
-            other => panic!("expected seekReplayTo, got {other:?}"),
+            ClientMessage::SeekRoomTimeTo { tick } => assert_eq!(tick, 4_100),
+            other => panic!("expected seekRoomTimeTo, got {other:?}"),
         }
     }
 
