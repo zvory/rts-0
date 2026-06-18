@@ -16,9 +16,9 @@ audit has already produced a usable trace map from repo surfaces to likely autho
   may be many-to-many and imperfect; it is a routing hint, not a proof obligation.
 - A single reviewed checkpoint ref or tag exists, representing the latest `origin/main` commit that
   the sweeper has fully processed.
-- The OpenAI model invocation path is decided before implementation begins. Model names,
-  credentials, rate limits, and local environment variables must stay configurable rather than
-  hard-coded.
+- The model invocation path must use Codex CLI authentication, for example `codex exec` or an
+  equivalent repo-approved Codex surface. Do not use the OpenAI Agents SDK, direct OpenAI API keys,
+  or any path that bills through API usage.
 
 ## Operating Model
 
@@ -45,7 +45,7 @@ audit has already produced a usable trace map from repo surfaces to likely autho
 - Do not tag every source commit. Track only the latest reviewed checkpoint.
 - Do not let generated docs rewrite broad prose, reorganize design docs, or update capsules unless
   the authoritative design doc structure actually changed.
-- Do not read or print model credentials, Fly tokens, or other local secrets.
+- Do not read or print Codex auth state, Fly tokens, or other local secrets.
 
 ## Phase Summaries
 
@@ -59,19 +59,19 @@ not call a model or edit docs yet; the value is a deterministic, cheap operator 
 
 ### [Phase 2 - Cheap Commit Classifier](phase-2.md)
 
-Add the model-backed classification pass that decides, per commit, whether to move on or request a
-doc update. The classifier should receive only commit metadata, changed paths, compact diff stats,
-docs touched, and trace-map candidates, then emit a small structured decision record that can be
-cached and replayed. It should avoid manual-review states; ambiguous cases should be resolved by
-the classifier's best judgment and recorded as either move-on or update-docs.
+Add the Codex-backed classification pass that decides, per commit, whether to move on or request a
+doc update. The classifier should invoke Codex CLI with only commit metadata, changed paths, compact
+diff stats, docs touched, and trace-map candidates, then emit a small structured decision record
+that can be cached and replayed. It should avoid manual-review states; ambiguous cases should be
+resolved by the classifier's best judgment and recorded as either move-on or update-docs.
 
 ### [Phase 3 - Doc Patch Generator](phase-3.md)
 
-Add the stronger model pass that turns update-docs decisions into minimal edits to authoritative
-design docs. This phase should feed the model only the selected decision records, relevant design
-doc sections, and compact commit evidence, then apply patches into one sweep branch. It is done
-when a local dry run can generate a clean docs diff, rerun idempotently, and pass focused docs
-verification.
+Add the stronger Codex-backed pass that turns update-docs decisions into minimal edits to
+authoritative design docs. This phase should feed Codex only the selected decision records,
+relevant design doc sections, and compact commit evidence, then apply patches into one sweep
+branch. It is done when a local dry run can generate a clean docs diff, rerun idempotently, and
+pass focused docs verification.
 
 ### [Phase 4 - PR Lifecycle, Checkpoint, and Daily Runner](phase-4.md)
 
@@ -93,10 +93,13 @@ making the scheduled job mandatory for other developers.
 - Preserve the repo's existing source-of-truth rule: `docs/design/*.md` are authoritative, while
   `docs/context/*.md` are pointers. Update capsules only when section lists or entry points change.
 - Keep the trace map advisory. It should route attention, but a commit can still update a doc that
-  was not the first trace-map hit when the model's evidence points elsewhere.
+  was not the first trace-map hit when Codex's evidence points elsewhere.
+- Keep all model-assisted reasoning on the Codex CLI path. The implementation must not introduce
+  the OpenAI Agents SDK, direct API client calls, API-key environment variables, or API-billed
+  fallback routes.
 - Keep the tool token-bounded by default. Prefer commit metadata, path lists, stats, trace-map
   routing, and targeted doc section reads over full commit diffs or full design-doc reads.
-- Keep all model inputs and outputs logged enough to audit decisions without storing secrets.
+- Keep all Codex inputs and outputs logged enough to audit decisions without storing secrets.
 - Make the sweeper restartable. Cached classifier decisions and generated patch attempts should let
   a failed run resume without reprocessing every prior commit.
 - Keep generated documentation factual and evidence-backed. When impact is uncertain, document the

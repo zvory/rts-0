@@ -4,7 +4,7 @@ Status: draft.
 
 ## Goal
 
-Add the stronger model pass that turns `update_docs` decisions into minimal authoritative design-doc
+Add the stronger Codex pass that turns `update_docs` decisions into minimal authoritative design-doc
 patches. The output should be one clean docs branch for the sweep, with edits that are factual,
 scoped, and useful to future agents.
 
@@ -14,13 +14,14 @@ scoped, and useful to future agents.
 - For each decision, select relevant authoritative design docs using the trace map and classifier
   targets.
 - Load only targeted doc sections when possible, not entire large docs by default.
-- Provide the stronger model with:
+- Provide the stronger Codex invocation with:
   - selected decision record
   - compact commit metadata and evidence note
   - relevant doc sections
   - repo documentation rules
   - instruction to make factual minimal updates
-- Apply model patches to `docs/design/*.md` first.
+- Forbid OpenAI Agents SDK, direct OpenAI API clients, API keys, and any API-billed fallback path.
+- Apply Codex-generated patches to `docs/design/*.md` first.
 - Update `docs/context/*.md` only when the authoritative doc's section structure or entry points
   change.
 - Accumulate all doc edits into one sweep branch.
@@ -37,7 +38,7 @@ source commit SHAs or report path when practical.
 ## Expected Touch Points
 
 - `scripts/` for patch generation and branch preparation.
-- `tests/` for patch parsing, idempotency fixtures, doc-section selection, and no-model fixture
+- `tests/` for patch parsing, idempotency fixtures, doc-section selection, and no-Codex fixture
   mode.
 - `docs/design/*` only in generated sweep runs, not as part of this phase implementation unless
   documenting the new sweeper behavior itself requires it.
@@ -58,13 +59,14 @@ Run fixture-backed patch generation first:
 
 ```bash
 node tests/docdrift_sweeper.mjs
-node scripts/docdrift-sweep.mjs --generate-docs --no-model --fixture <fixture-name>
+node scripts/docdrift-sweep.mjs --generate-docs --no-codex --fixture <fixture-name>
 node scripts/check-wiki.mjs
 git diff --check
 ```
 
-If credentials are configured, run a live generation smoke test on a tiny throwaway range and
-inspect the resulting docs diff before committing.
+If Codex CLI is available on the operator machine, run a live generation smoke test on a tiny
+throwaway range and inspect the resulting docs diff before committing. Do not use an API-key-backed
+smoke test.
 
 ## Manual Testing Focus
 

@@ -26,7 +26,7 @@ after the merged head is reachable from `origin/main`.
 - Store run reports and generated decisions in an ignored local output directory.
 - Add a local `launchd`-friendly wrapper or documented command for a daily 8 p.m. MacBook run.
 - Add recovery behavior for failed PR creation, failed checks, closed PRs, stale branches, and
-  model/API failures.
+  Codex CLI failures.
 - Ensure checkpoint updates are atomic enough that an interrupted run does not skip commits.
 
 ## Checkpoint Rules

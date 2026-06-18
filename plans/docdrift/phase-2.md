@@ -4,13 +4,14 @@ Status: draft.
 
 ## Goal
 
-Add the token-cheap model pass that decides whether each considered commit should be ignored or
+Add the token-cheap Codex pass that decides whether each considered commit should be ignored or
 sent to the doc patch generator. The classifier should make a best-effort probabilistic decision,
 not create a human triage queue.
 
 ## Scope
 
-- Add configurable model invocation for the cheap classifier.
+- Add configurable Codex CLI invocation for the cheap classifier.
+- Forbid OpenAI Agents SDK, direct OpenAI API clients, API keys, and any API-billed fallback path.
 - Feed the classifier only bounded inputs from Phase 1:
   - commit subject and body
   - changed paths
@@ -23,7 +24,7 @@ not create a human triage queue.
   - decision: `move_on` or `update_docs`
   - likely authoritative docs to inspect or edit
   - short evidence note
-  - prompt/model version metadata
+  - prompt and Codex invocation metadata
 - Cache classifier outputs so reruns do not spend tokens for unchanged inputs.
 - Add a strict token and commit-count budget for one run, with clear failure output when the range
   is too large.
@@ -40,9 +41,9 @@ not independently browse broad diffs for every commit.
 
 - `scripts/` for classifier orchestration.
 - `tests/` for prompt input construction, decision parsing, cache-key stability, budget failures,
-  and no-model fixture mode.
+  and no-Codex fixture mode.
 - Local ignored runtime output paths for classifier caches and reports.
-- Documentation for required environment variables and safe dry-run usage.
+- Documentation for required Codex CLI availability and safe dry-run usage.
 
 ## Out of Scope
 
@@ -55,16 +56,16 @@ not independently browse broad diffs for every commit.
 
 ## Verification
 
-Run focused tests with fixture model responses before any live model call:
+Run focused tests with fixture Codex responses before any live Codex call:
 
 ```bash
 node tests/docdrift_sweeper.mjs
-node scripts/docdrift-sweep.mjs --classify --no-model --fixture <fixture-name>
+node scripts/docdrift-sweep.mjs --classify --no-codex --fixture <fixture-name>
 git diff --check
 ```
 
-If a live model smoke test is available and credentials are configured, run it on a tiny bounded
-range and record the cost/range in the handoff.
+If a live Codex CLI smoke test is available on the operator machine, run it on a tiny bounded range
+and record the range in the handoff. Do not use an API-key-backed smoke test.
 
 ## Manual Testing Focus
 
@@ -75,5 +76,5 @@ change, and a mechanical refactor. Confirm that the output is easy to audit and 
 ## Handoff Expectations
 
 Mark this phase done in the implementation commit. The handoff must include the classifier command,
-cache path, prompt/model version, fixture coverage, any live model smoke result, and examples of
+cache path, prompt/Codex invocation version, fixture coverage, any live Codex smoke result, and examples of
 both `move_on` and `update_docs` records for the Phase 3 agent.
