@@ -153,6 +153,7 @@ for (const file of files) {
   });
   checkLargeFileBaseline(file, source);
   checkForbiddenGameStateIntentShims(file, source);
+  checkRoomCapabilityParser(file, source);
 }
 
 for (const mod of modules.values()) {
@@ -249,6 +250,22 @@ function checkForbiddenGameStateIntentShims(file, source) {
     const directStateRe = new RegExp(`(?:\\bstate|\\bthis\\.state)(?:\\.${name}\\b|\\?\\.${name}\\b)`);
     if (directStateRe.test(source)) {
       failures.push(`${file}: forbidden GameState intent shim reference ${name}; use injected ClientIntent or a narrow view model`);
+    }
+  }
+}
+
+function checkRoomCapabilityParser(file, source) {
+  if (file !== "room_capabilities.js") return;
+  const forbidden = [
+    ["devWatch", "dev-watch route identity"],
+    ["replayViewer", "replay-viewer shell identity"],
+    ["startPayload?.replay", "replay start metadata"],
+    ["startPayload.replay", "replay start metadata"],
+    ["debugMode", "legacy debug-mode flag"],
+  ];
+  for (const [needle, label] of forbidden) {
+    if (source.includes(needle)) {
+      failures.push(`${file}: room capabilities must read startPayload.capabilities/diagnostics, not ${label}`);
     }
   }
 }

@@ -103,11 +103,7 @@ export class Match {
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
     this.replayViewer = !!options.replayViewer;
-    this.capabilities = options.capabilities || createRoomCapabilities({
-      startPayload: payload,
-      devWatch: this.devWatch,
-      replayViewer: this.replayViewer,
-    });
+    this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
     this.missingCombatSoundKinds = new Set();

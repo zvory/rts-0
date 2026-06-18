@@ -38,6 +38,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   `ALLOWED_CROSS_AREA_IMPORTS` with a reason.
 - **Lab UI stays app-owned.** `App` owns `LabClient` and `LabPanel`; `Match` receives injected lab
   metadata/control policy and must not import the lab transport or panel modules directly.
+- **Room affordances are metadata-driven.** `room_capabilities.js` parses `startPayload.capabilities`
+  and `startPayload.diagnostics`; shared controls must not be inferred from replay/dev/lab identity.
 - **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,
   minimap, and renderer feedback. Do not read or write placement, command targeting, command-card
   mode, previews, or command feedback through `GameState` shims.

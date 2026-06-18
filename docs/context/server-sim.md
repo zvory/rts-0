@@ -23,12 +23,13 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   and fog-gated projection policy.
 - `server/crates/ai/src/` — AI opponents and self-play harnesses.
 - `server/src/lobby/room_task.rs`, `session_policy.rs`, `participants.rs`, and `tick_control.rs` —
-  room ownership, lifecycle policy, seat/issuer resolution, and clocking.
+  room ownership, lifecycle policy, persistence/export policy, seat/issuer resolution, and clocking.
 - `server/src/lobby/projection.rs`, `snapshot_fanout.rs`, and `snapshots.rs` — per-recipient
   visibility, fanout, compacting, and diagnostic snapshot options such as movement-path inclusion.
 - `server/src/lobby/launch.rs`, `live_tick.rs`, `replay_session.rs`, `replay_branch.rs`,
-  `connection.rs`, `dev_replay.rs`, and `crash_replay.rs` — launch payloads, live/replay/branch
-  execution, connection delivery, dev replay loading, and panic artifacts.
+  `connection.rs`, `dev_replay.rs`, and `crash_replay.rs` — launch payloads with recipient
+  capabilities, live/replay/branch execution, connection delivery, dev replay loading, and panic
+  artifacts.
 - `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deployment drain coordination.
 - Guardrails: `scripts/check-lobby-architecture.mjs`, `scripts/check-crate-boundaries.mjs`, and
   `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`.

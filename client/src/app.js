@@ -259,11 +259,7 @@ export class App {
     });
     const startsReplay = !!payload?.replay;
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
-    const capabilities = createRoomCapabilities({
-      startPayload: payload,
-      devWatch: this.devWatch,
-      replayViewer: startsReplay,
-    });
+    const capabilities = createRoomCapabilities({ startPayload: payload });
 
     const carriedCamera = this.takeMatchCameraView() || this.pendingCameraView;
     this.pendingCameraView = null;
