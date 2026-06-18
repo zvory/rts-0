@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -46,13 +46,13 @@ prepare the feature for normal use without broadening scope.
 
 ## Implementation Checklist
 
-- [ ] Complete manual MVP smoke and record the exact flow in the handoff.
-- [ ] Update design docs and context capsules for the shipped lab boundaries.
-- [ ] Add precise guardrails for stable lab boundaries.
-- [ ] Remove temporary debug routes, compatibility shims, or broad checker allowlists.
-- [ ] Re-run focused lab, protocol, room, client, and scenario tests.
-- [ ] Re-run focused non-lab baselines touched by lab work.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Complete manual MVP smoke and record the exact flow in the handoff.
+- [x] Update design docs and context capsules for the shipped lab boundaries.
+- [x] Add precise guardrails for stable lab boundaries.
+- [x] Remove temporary debug routes, compatibility shims, or broad checker allowlists.
+- [x] Re-run focused lab, protocol, room, client, and scenario tests.
+- [x] Re-run focused non-lab baselines touched by lab work.
+- [x] Mark this phase done in the implementation commit.
 
 ## Verification
 

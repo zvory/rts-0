@@ -710,6 +710,11 @@ Reliable lab server messages:
 | `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Room-local lab control metadata. World state still travels through `snapshot`. |
 | `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
 
+Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timeline/keyframes,
+lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
+multi-operator conflict semantics, visual iteration hot reload, and `/dev/scenario` migration.
+Those require separate typed messages instead of overloading `LabClientOp`.
+
 ### 2.7 Observer analysis state
 
 `replayAnalysis` is the compatibility wire tag for reliable observer analysis overlay/tab data that

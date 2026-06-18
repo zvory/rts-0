@@ -42,7 +42,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/lobby/snapshot_fanout.rs`, `snapshots.rs`, `connection.rs`, `dev_replay.rs`, and
   `crash_replay.rs` — lobby-local delivery, compacting, dev replay loading, and panic artifacts
 - `scripts/check-lobby-architecture.mjs` — lightweight guardrail that keeps lobby snapshot fanout
-  routed through `projection.rs`
+  routed through `projection.rs` and keeps lab mutation routing centralized in `room_task.rs`
 - `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deployment drain coordination
 - `scripts/check-crate-boundaries.mjs` — enforces Cargo package dependency direction
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
