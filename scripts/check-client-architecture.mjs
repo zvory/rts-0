@@ -17,6 +17,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "replay_controls.js": "app-shell",
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",
+  "room_capabilities.js": "app-shell",
 
   "state.js": "model",
   "client_intent.js": "model",

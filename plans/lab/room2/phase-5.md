@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -49,13 +49,13 @@ neutral capability answers the actual question.
 
 ## Implementation Checklist
 
-- [ ] Add a narrow client capability parser/model.
-- [ ] Route time controls through clock/time capability metadata.
-- [ ] Route diagnostic settings through diagnostic capability metadata.
-- [ ] Remove old mode-name fallback behavior for room-time and diagnostics.
-- [ ] Preserve product-owned controls for replay branch and lab setup tools.
-- [ ] Add or update client contract and architecture tests.
-- [ ] Mark this phase as done in this file.
+- [x] Add a narrow client capability parser/model.
+- [x] Route time controls through clock/time capability metadata.
+- [x] Route diagnostic settings through diagnostic capability metadata.
+- [x] Remove old mode-name fallback behavior for room-time and diagnostics.
+- [x] Preserve product-owned controls for replay branch and lab setup tools.
+- [x] Add or update client contract and architecture tests.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

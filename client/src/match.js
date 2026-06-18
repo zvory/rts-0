@@ -17,12 +17,13 @@ import { Renderer } from "./renderer/index.js";
 import { ObserverAnalysisOverlay, shouldMountObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
+import { createRoomCapabilities } from "./room_capabilities.js";
 import { predictionBlockedReason, predictionCompatibility } from "./prediction_compatibility.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { ClientIntent } from "./client_intent.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, KIND, NOTICE_SEVERITY, S } from "./protocol.js";
+import { EVENT, KIND, MOVEMENT_PATH_DIAGNOSTICS, NOTICE_SEVERITY, S } from "./protocol.js";
 import {
   UNDER_ATTACK_ID,
   VIEWPORT_ALERT_MARGIN_PX,
@@ -102,6 +103,11 @@ export class Match {
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
     this.replayViewer = !!options.replayViewer;
+    this.capabilities = options.capabilities || createRoomCapabilities({
+      startPayload: payload,
+      devWatch: this.devWatch,
+      replayViewer: this.replayViewer,
+    });
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
     this.missingCombatSoundKinds = new Set();
@@ -179,7 +185,7 @@ export class Match {
     this.minimap = this._timeInit(
       "match.minimap",
       () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandIssuer, this.inputRouter, {
-        commandsEnabled: !this.replayViewer,
+        commandsEnabled: !!this.capabilities.commands.gameplay,
         clientIntent: this.clientIntent,
       }),
     );
@@ -264,19 +270,15 @@ export class Match {
     this.health.publish();
     if (this.prediction.enabled) this.initPredictionAdapter();
 
-    // Show speed controls for replay and scenario dev-watch rooms.
-    const isReplay = !!payload?.replay;
-    const isScenario = this.devWatch?.kind === "scenario";
-    if ((isReplay || isScenario) && dom.replaySpeed) {
+    if (this.capabilities.roomTime.available && dom.replaySpeed) {
       this.replayControls = new ReplayControls({
         net: this.net,
         state: this.state,
         replayViewer: this.replayViewer,
-        isReplay,
-        isScenario,
+        capabilities: this.capabilities,
       });
     }
-    if (shouldMountObserverAnalysisOverlay({ payload, replayViewer: this.replayViewer })) {
+    if (shouldMountObserverAnalysisOverlay({ capabilities: this.capabilities })) {
       this.observerAnalysisOverlay = new ObserverAnalysisOverlay({
         root: dom.gameScreen,
         preferences: this.observerAnalysisOverlayPreferences || undefined,
@@ -587,7 +589,7 @@ export class Match {
   }
 
   toggleDebugPathOverlays() {
-    if (!this.state?.debugPathOverlaysAvailable) {
+    if (this.capabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE) {
       this.syncDebugPathUi();
       return;
     }
@@ -686,9 +688,9 @@ export class Match {
           },
         },
         debug: {
-          available: !!this.state?.debugPathOverlaysAvailable,
+          available: this.capabilities.diagnostics.movementPaths !== MOVEMENT_PATH_DIAGNOSTICS.NONE,
           state: () => ({
-            available: !!this.state?.debugPathOverlaysAvailable,
+            available: this.capabilities.diagnostics.movementPaths !== MOVEMENT_PATH_DIAGNOSTICS.NONE,
             enabled: !!this.state?.debugPathOverlaysEnabled,
           }),
           onToggle: this.onDebugPathToggle,

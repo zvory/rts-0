@@ -45,6 +45,7 @@ src/
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
+  room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
 ```
@@ -231,7 +232,7 @@ export class BranchStaging {
 `observer_analysis_overlay.js`
 ```js
 export const OBSERVER_ANALYSIS_TABS
-shouldMountObserverAnalysisOverlay({ payload, replayViewer })
+shouldMountObserverAnalysisOverlay({ capabilities })
 createObserverAnalysisOverlayPreferences(storage?)
 export class ObserverAnalysisOverlay {
   constructor({ root, preferences, getEntities, getCameraBounds, getPlayers, stats })
@@ -267,6 +268,15 @@ export class SettingsContainer {
 buildSettingsTabs({ audio, hotkeyProfiles, game, debug })
 buildGiveUpAction({ visible, onOpen })
 ```
+
+`room_capabilities.js`
+```js
+createRoomCapabilities({ startPayload, devWatch, replayViewer })
+```
+`Match` and app-shell controls consume this parsed capability record for room-time controls,
+diagnostic settings, observer analysis, vision controls, and read-only/gameplay command affordances.
+Product shells may still use product metadata for launch/routing and owned controls such as replay
+branch creation or lab scenario tools.
 
 `lab_client.js`
 ```js
@@ -784,7 +794,7 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
   `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
-  `lab_control_policy.js`.
+  `lab_control_policy.js`, `room_capabilities.js`.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js`.
