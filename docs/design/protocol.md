@@ -669,12 +669,39 @@ default is the union of all replay players.
 { op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
 { op: "setVision", vision: LabVisionMode }
 { op: "issueCommandAs", playerId: u32, cmd: Command }
+{ op: "exportScenario", name?: string }
+{ op: "importScenario", scenario: LabScenarioV1 }
 ```
 `LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
 `{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
 room task before snapshot projection; unknown, empty, or duplicate team selections are rejected.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned.
+
+`LabScenarioV1` is versioned setup JSON, not a saved snapshot:
+```
+{
+  schemaVersion: 1,
+  kind: "labScenario",
+  name: string,
+  seed: u32,
+  map: { name: string, schemaVersion: u32, contentHash: string },
+  players: [{
+    id: u32, teamId: u32, factionId: string, name: string, color: string, isAi: bool,
+    steel: u32, oil: u32, upgrades: string[]
+  }],
+  entities: [{
+    id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
+    constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32
+  }],
+  metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
+}
+```
+Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome`. Import validates the schema,
+map metadata, player/team/resource/research/entity fields, restores through the public lab `Game`
+API, applies lab vision metadata, and returns an entity id remap in `outcome.entityIdMap`.
+Transient snapshot fields, fog recipient projections, events, projectile runtime state, command
+logs, interpolation state, and lab operation result metadata are intentionally omitted.
 
 Reliable lab server messages:
 

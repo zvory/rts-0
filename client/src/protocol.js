@@ -944,6 +944,16 @@ export const msg = Object.freeze({
   seekReplayTo: (tick) => ({ t: C.SEEK_REPLAY_TO, tick }),
   setReplayVision: (vision) => ({ t: C.SET_REPLAY_VISION, vision }),
   lab: (requestId, op) => ({ t: C.LAB, requestId, op }),
+  labExportScenario: (requestId, name = undefined) => {
+    const op = { op: "exportScenario" };
+    if (name != null) op.name = name;
+    return { t: C.LAB, requestId, op };
+  },
+  labImportScenario: (requestId, scenario) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "importScenario", scenario },
+  }),
   labSpawnEntity: (requestId, { owner, kind, x, y, completed = false }) => ({
     t: C.LAB,
     requestId,

@@ -25,6 +25,11 @@ use crate::rules;
 use super::{systems, Game, MapMetadata, PlayerInit};
 
 pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
+const LAB_SCENARIO_KIND: &str = "labScenario";
+const MAX_LAB_SCENARIO_NAME_LEN: usize = 80;
+const MAX_LAB_SCENARIO_PLAYERS: usize = 8;
+const MAX_LAB_SCENARIO_ENTITIES: usize = 2000;
+const MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER: usize = 32;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {
@@ -150,10 +155,19 @@ pub enum LabError {
 #[serde(rename_all = "camelCase")]
 pub struct LabScenarioV1 {
     pub schema_version: u32,
+    pub kind: String,
+    pub name: String,
     pub seed: u32,
     pub map: LabScenarioMap,
     pub players: Vec<LabScenarioPlayer>,
     pub entities: Vec<LabScenarioEntity>,
+    pub metadata: LabScenarioMetadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioMetadata {
+    pub exported_tick: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -302,6 +316,8 @@ impl Game {
 
         LabScenarioV1 {
             schema_version: LAB_SCENARIO_V1_SCHEMA_VERSION,
+            kind: LAB_SCENARIO_KIND.to_string(),
+            name: "Untitled lab scenario".to_string(),
             seed: self.seed,
             map: LabScenarioMap {
                 name: self.map_metadata.name.clone(),
@@ -310,6 +326,9 @@ impl Game {
             },
             players,
             entities,
+            metadata: LabScenarioMetadata {
+                exported_tick: self.tick_count(),
+            },
         }
     }
 
@@ -322,9 +341,37 @@ impl Game {
                 version: scenario.schema_version,
             });
         }
+        if scenario.kind != LAB_SCENARIO_KIND {
+            return Err(LabError::InvalidScenario {
+                reason: "scenario kind must be labScenario".to_string(),
+            });
+        }
+        if scenario.name.trim().is_empty() || scenario.name.len() > MAX_LAB_SCENARIO_NAME_LEN {
+            return Err(LabError::InvalidScenario {
+                reason: "scenario name must be non-empty and at most 80 bytes".to_string(),
+            });
+        }
         if scenario.players.is_empty() {
             return Err(LabError::InvalidScenario {
                 reason: "scenario must contain at least one player".to_string(),
+            });
+        }
+        if scenario.players.len() > MAX_LAB_SCENARIO_PLAYERS {
+            return Err(LabError::InvalidScenario {
+                reason: format!(
+                    "scenario has too many players: {} > {}",
+                    scenario.players.len(),
+                    MAX_LAB_SCENARIO_PLAYERS
+                ),
+            });
+        }
+        if scenario.entities.len() > MAX_LAB_SCENARIO_ENTITIES {
+            return Err(LabError::InvalidScenario {
+                reason: format!(
+                    "scenario has too many entities: {} > {}",
+                    scenario.entities.len(),
+                    MAX_LAB_SCENARIO_ENTITIES
+                ),
             });
         }
 
@@ -339,6 +386,16 @@ impl Game {
             if rules::faction::catalog_for_or_default_empty(&player.faction_id).is_none() {
                 return Err(LabError::InvalidScenario {
                     reason: format!("unknown faction {:?}", player.faction_id),
+                });
+            }
+            if player.name.len() > 48 || player.color.len() > 32 {
+                return Err(LabError::InvalidScenario {
+                    reason: format!("player {} has invalid display metadata", player.id),
+                });
+            }
+            if player.upgrades.len() > MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER {
+                return Err(LabError::InvalidScenario {
+                    reason: format!("player {} has too many upgrades", player.id),
                 });
             }
             inits.push(PlayerInit {
@@ -1351,6 +1408,24 @@ mod tests {
         assert!(matches!(
             game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
             Err(LabError::InvalidResearch { player_id: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn lab_scenario_restore_rejects_invalid_schema_fields() {
+        let mut game = default_map_game();
+        let mut scenario = game.export_lab_scenario();
+        scenario.kind = "snapshot".to_string();
+        assert!(matches!(
+            game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
+            Err(LabError::InvalidScenario { .. })
+        ));
+
+        let mut scenario = game.export_lab_scenario();
+        scenario.name.clear();
+        assert!(matches!(
+            game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
+            Err(LabError::InvalidScenario { .. })
         ));
     }
 }

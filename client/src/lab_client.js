@@ -41,6 +41,16 @@ export class LabClient {
     return this.request({ op: "setVision", vision });
   }
 
+  exportScenario(name = "") {
+    const op = { op: "exportScenario" };
+    if (name) op.name = name;
+    return this.request(op);
+  }
+
+  importScenario(scenario) {
+    return this.request({ op: "importScenario", scenario });
+  }
+
   spawnEntity({ owner, kind, x, y, completed = true }) {
     return this.request({ op: "spawnEntity", owner, kind, x, y, completed: !!completed });
   }

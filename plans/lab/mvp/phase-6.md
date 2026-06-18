@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -45,16 +45,17 @@ reloaded, and shared without server-side public storage.
 
 ## Implementation Checklist
 
-- [ ] Define `LabScenarioV1` with schema version and stable, legible JSON fields.
-- [ ] Export authoritative setup state without snapshot-only projection data.
-- [ ] Import and validate scenario JSON with bounded size, names, ids, kinds, coordinates, players,
+- [x] Define `LabScenarioV1` with schema version and stable, legible JSON fields.
+- [x] Export authoritative setup state without snapshot-only projection data.
+- [x] Import and validate scenario JSON with bounded size, names, ids, kinds, coordinates, players,
       teams, resources, upgrades, and entity state.
-- [ ] Restore a coherent lab `Game` and lab metadata through public APIs.
-- [ ] Return clear import errors and useful remap/result summaries.
-- [ ] Add browser export/download and import/upload controls.
-- [ ] Add optional bundled read-only scenarios only through a typed store with safe paths.
-- [ ] Add scenario round-trip and invalid-schema tests.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Restore a coherent lab `Game` and lab metadata through public APIs.
+- [x] Return clear import errors and useful remap/result summaries.
+- [x] Add browser export/download and import/upload controls.
+- [x] Skip optional bundled read-only scenarios for the MVP; browser JSON import/export is the
+      scenario store for this phase.
+- [x] Add scenario round-trip and invalid-schema tests.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 
