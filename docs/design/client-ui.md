@@ -35,6 +35,9 @@ src/
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   match_health.js # match network/render health reporter
   branch_staging.js # replay branch staging panel
+  lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
+  lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
+  lab_control_policy.js # Lab control collaborator placeholder injected into Match
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
@@ -75,6 +78,7 @@ export class Net {
   seekReplay(ticksBack)                  // replay rooms; pass huge N for full reset
   seekReplayTo(tick)
   setReplayVision(vision)
+  lab(requestId, op)                     // lab rooms only; request id allocated by LabClient
   requestReplayBranch()
   claimBranchSeat(playerId)
   releaseBranchSeat(playerId)
@@ -262,6 +266,41 @@ export class SettingsContainer {
 buildSettingsTabs({ audio, hotkeyProfiles, game, debug })
 buildGiveUpAction({ visible, onOpen })
 ```
+
+`lab_client.js`
+```js
+export class LabClient {
+  constructor(net, options?)
+  setInitialState(state)
+  subscribeState(handler)                // returns unsubscribe
+  subscribeResult(handler)               // returns unsubscribe
+  setVision(vision)                      // sends {op:"setVision", vision}
+  request(op, options?)                  // allocates requestId, resolves with labResult/timeout
+  destroy()
+}
+export function labVisionLabel(vision)
+export const labVision                   // fullWorld(), team(teamId), teams(teamIds)
+```
+
+`lab_panel.js`
+```js
+export class LabPanel {
+  constructor({ root, labClient, launch, startPayload })
+  destroy()
+}
+```
+
+`lab_control_policy.js`
+```js
+export function createLabControlPolicy({ labClient, metadata })
+export function createDefaultControlPolicy()
+```
+
+`App` owns `LabClient`, `LabPanel`, and lab control policy lifetimes when a `start` payload carries
+`lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
+constructor options only; renderer, HUD, input, and minimap do not import lab modules. Phase 4 only
+ships vision controls and status/result display, leaving setup tools and issue-as policy to later
+lab phases.
 
 `hotkey_profiles.js`
 ```js

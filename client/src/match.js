@@ -97,6 +97,9 @@ export class Match {
     this.hotkeyProfiles = options.hotkeyProfiles || null;
     this.settings = options.settings || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
+    this.labMetadata = options.labMetadata || null;
+    this.labClient = options.labClient || null;
+    this.labControlPolicy = options.labControlPolicy || null;
     this.replayViewer = !!options.replayViewer;
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;

@@ -15,6 +15,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "observer_analysis_overlay.js": "app-shell",
   "replay_controls.js": "app-shell",
   "replay_viewer.js": "app-shell",
+  "lab_control_policy.js": "app-shell",
 
   "state.js": "model",
   "client_intent.js": "model",
@@ -28,6 +29,7 @@ const AREA_BY_FILE = new Map(Object.entries({
 
   "net.js": "transport",
   "protocol.js": "transport",
+  "lab_client.js": "transport",
 
   "config.js": "rules-mirror",
 
@@ -42,6 +44,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "status_badge.js": "ui",
   "minimap.js": "ui",
   "branch_staging.js": "ui",
+  "lab_panel.js": "ui",
   "settings_container.js": "ui",
   "settings_panels.js": "ui",
   "scoreboard.js": "ui",
@@ -79,7 +82,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "state.js": 38576,
   // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
   "input/index.js": 38854,
-  "match.js": 38289,
+  // Lab MVP Phase 4 stores injected lab collaborators without letting Match import lab modules.
+  "match.js": 38451,
   // Lab MVP Phase 3 adds mirrored lab request/result tags, vision modes, and typed request builders.
   "protocol.js": 37805,
   // Hold Position moves the unit hold button to the W grid slot with a distinct command id.
