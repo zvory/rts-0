@@ -85,6 +85,7 @@ const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
 const REPLAY_ARTIFACT_ROOM_PREFIX: &str = "__replay_artifact__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
 const REPLAY_BRANCH_ROOM_PREFIX: &str = "__replay_branch__";
+const LAB_ROOM_PREFIX: &str = "__lab__:";
 const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).

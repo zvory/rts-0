@@ -188,6 +188,9 @@ export const REPLAY_VISION = Object.freeze({
   PLAYERS: "players",
 });
 
+export const LAB_ROLE = Object.freeze({ OPERATOR: "operator", READ_ONLY: "readOnly" });
+export const LAB_VISION = Object.freeze({ FULL_WORLD: "fullWorld" });
+
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";

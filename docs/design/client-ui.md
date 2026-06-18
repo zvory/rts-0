@@ -42,7 +42,7 @@ src/
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
-  bootstrap.js    # DOM lookup, ws/dev-watch config, startup helpers
+  bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
 ```
 
 ### 4.1 Module export contracts

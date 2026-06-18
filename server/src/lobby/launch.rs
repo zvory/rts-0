@@ -1,5 +1,5 @@
 use super::connection::{send_or_log, ConnectionSink};
-use crate::protocol::{ServerMessage, StartPayload, PREDICTION_PROTOCOL_VERSION};
+use crate::protocol::{LabStartMetadata, ServerMessage, StartPayload, PREDICTION_PROTOCOL_VERSION};
 
 #[derive(Clone, Copy)]
 pub(super) enum LaunchPrediction {
@@ -13,6 +13,7 @@ pub(super) struct LaunchRecipient {
     pub(super) spectator: bool,
     pub(super) prediction: LaunchPrediction,
     pub(super) clear_pending_snapshot: bool,
+    pub(super) lab: Option<LabStartMetadata>,
     pub(super) msg_tx: ConnectionSink,
 }
 
@@ -48,6 +49,7 @@ fn start_payload_for(base_payload: &StartPayload, recipient: &LaunchRecipient) -
         prediction_build_id,
         prediction_version,
         replay: None,
+        lab: recipient.lab.clone().or_else(|| base_payload.lab.clone()),
         ..base_payload.clone()
     }
 }

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -50,15 +50,15 @@ metadata, and renders through the existing match screen with server-owned full-w
 
 ## Implementation Checklist
 
-- [ ] Add lab room config and session state without adding privileged mutations.
-- [ ] Add lab session policy values and tests for policy classification.
-- [ ] Add lab route/join parsing with bounded names and map selection.
-- [ ] Start a real `Game` with a default two-team template and selected map.
-- [ ] Add mirrored `StartPayload.lab` metadata and update protocol docs.
-- [ ] Send lab viewers through shared launch and projection helpers.
-- [ ] Confirm lab rooms do not write match history or expose themselves as normal rooms.
-- [ ] Keep `/dev/scenario`, replay, replay branch, and normal lobby behavior unchanged.
-- [ ] Run verification and record exact results in the handoff.
+- [x] Add lab room config and session state without adding privileged mutations.
+- [x] Add lab session policy values and tests for policy classification.
+- [x] Add lab route/join parsing with bounded names and map selection.
+- [x] Start a real `Game` with a default two-team template and selected map.
+- [x] Add mirrored `StartPayload.lab` metadata and update protocol docs.
+- [x] Send lab viewers through shared launch and projection helpers.
+- [x] Confirm lab rooms do not write match history or expose themselves as normal rooms.
+- [x] Keep `/dev/scenario`, replay, replay branch, and normal lobby behavior unchanged.
+- [x] Run verification and record exact results in the handoff.
 
 ## Verification
 

@@ -30,9 +30,10 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/lobby/tick_control.rs` — maps session clock policy plus replay/dev pause state to
   tick interval, countdown, live, replay, dev-watch, or no-op actions
 - `server/src/lobby/projection.rs` — maps live, spectator, replay, branch-live, and dev-watch
-  recipients to the appropriate `Game` snapshot API and event visibility
+  recipients to the appropriate `Game` snapshot API and event visibility; lab recipients use an
+  explicit full-world projection
 - `server/src/lobby/launch.rs` — shared start-payload stamping and send loop for live, branch-live,
-  and dev-watch starts
+  dev-watch, and lab starts
 - `server/src/lobby/live_tick.rs` — live-match tick driver for AI enqueue, `Game::tick`,
   projection-backed snapshot fanout, observer analysis, and outcome detection
 - `server/src/lobby/replay_session.rs` and `server/src/lobby/replay_branch.rs` — replay playback
