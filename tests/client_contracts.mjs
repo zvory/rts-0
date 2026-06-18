@@ -3543,7 +3543,7 @@ function fakeAudioContext() {
       JSON.stringify({ c: "move", units: [1], x: 100, y: 200, queued: true }),
     "queued move command builder emits the queued flag only when requested",
   );
-  assert(ANTI_TANK_GUN_DEPLOYED_RANGE_TILES === 12, "client mirrors deployed anti-tank gun range");
+  assert(ANTI_TANK_GUN_DEPLOYED_RANGE_TILES === 14, "client mirrors deployed anti-tank gun range");
   assertApprox(
     ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
     45 * Math.PI / 180,
