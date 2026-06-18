@@ -5946,6 +5946,17 @@ function fakeAudioContext() {
     ekatInput.clientIntent.abilityTargetPreview.pathOrigins.some((origin) => origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR),
     "Ekat line preview marks anchor origin kind",
   );
+  const ekatPreviewGfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: ekatPreviewGfx },
+    { abilityTargetPreview: ekatInput.clientIntent.abilityTargetPreview },
+  );
+  assert(
+    ekatPreviewGfx.calls.some(
+      (call) => call[0] === "lineStyle" && call[2] === 0xc7d07a,
+    ),
+    "Ekat line preview draws Magic Anchor origins without crashing",
+  );
 
   const returnInput = Object.create(Input.prototype);
   returnInput.mouse = { x: 420, y: 260 };

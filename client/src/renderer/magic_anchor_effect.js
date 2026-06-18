@@ -1,20 +1,20 @@
 import { hash2 } from "./shared.js";
 
-const ANCHOR_COLOR = 0xc7d07a;
+export const MAGIC_ANCHOR_COLOR = 0xc7d07a;
 const PARTICLE_COLOR = 0xe7f0a8;
 const PARTICLE_SPOKES = 18;
 
 export function drawMagicAnchor(g, object, radius) {
   const coreRadius = Math.max(8, Math.min(18, radius * 0.16));
-  g.lineStyle(1.8, ANCHOR_COLOR, 0.6);
-  g.beginFill(ANCHOR_COLOR, 0.055);
+  g.lineStyle(1.8, MAGIC_ANCHOR_COLOR, 0.6);
+  g.beginFill(MAGIC_ANCHOR_COLOR, 0.055);
   g.drawCircle(object.x, object.y, radius);
   g.endFill();
-  g.lineStyle(1.2, ANCHOR_COLOR, 0.28);
+  g.lineStyle(1.2, MAGIC_ANCHOR_COLOR, 0.28);
   g.drawCircle(object.x, object.y, radius * 0.66);
   drawMagicAnchorParticles(g, object, radius, coreRadius);
-  g.lineStyle(2.2, ANCHOR_COLOR, 0.88);
-  g.beginFill(ANCHOR_COLOR, 0.18);
+  g.lineStyle(2.2, MAGIC_ANCHOR_COLOR, 0.88);
+  g.beginFill(MAGIC_ANCHOR_COLOR, 0.18);
   g.moveTo(object.x, object.y - coreRadius);
   g.lineTo(object.x + coreRadius * 0.8, object.y);
   g.lineTo(object.x, object.y + coreRadius);
