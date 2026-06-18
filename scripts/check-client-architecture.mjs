@@ -77,17 +77,17 @@ const ALLOWED_PROTOTYPE_GRAFTS = new Set([
 const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Tank Trap Phase 5 extends placement feedback to draw multi-site line previews.
   "renderer/feedback.js": 46315,
-  // Hold Position adds a distinct command-card intent dispatch while preserving legacy Stop.
-  "hud.js": 44080,
+  // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
+  "hud.js": 44208,
   "state.js": 38576,
   // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
   "input/index.js": 38854,
-  // Lab MVP Phase 4 stores injected lab collaborators without letting Match import lab modules.
-  "match.js": 38451,
+  // Lab MVP Phase 5 routes lab gameplay commands through the injected control policy.
+  "match.js": 38795,
   // Lab MVP Phase 3 adds mirrored lab request/result tags, vision modes, and typed request builders.
   "protocol.js": 37805,
-  // Hold Position moves the unit hold button to the W grid slot with a distinct command id.
-  "hud_command_card.js": 29393,
+  // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
+  "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,
   "observer_analysis_overlay.js": 27903,
   "audio.js": 27339,

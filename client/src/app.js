@@ -315,6 +315,7 @@ export class App {
         labClient: this.labClient,
         launch: this.labLaunch,
         startPayload: payload,
+        match: this.match,
       });
     }
     diagnostics.mark("app.onStart.end");
