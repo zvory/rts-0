@@ -136,9 +136,10 @@ export function _drawBuilding(e, colorByOwner, state) {
 
 function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {
   const base = tankTrapRotation(id);
-  const length = tileSize * 0.82;
-  const beamW = tileSize * 0.16;
-  const lipW = tileSize * 0.055;
+  const visualScale = 1.5;
+  const length = tileSize * 0.82 * visualScale;
+  const beamW = tileSize * 0.16 * visualScale;
+  const lipW = tileSize * 0.055 * visualScale;
   const beamAngles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3];
 
   for (const a of beamAngles) {
@@ -147,11 +148,15 @@ function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {
 
   g.lineStyle(1.2, 0x1a1712, bodyAlpha * 0.75);
   g.beginFill(0x817b6f, bodyAlpha * 0.96);
-  g.drawCircle(cx, cy, tileSize * 0.105);
+  g.drawCircle(cx, cy, tileSize * 0.105 * visualScale);
   g.endFill();
   g.lineStyle(0);
   g.beginFill(0xd7d2c1, bodyAlpha * 0.5);
-  g.drawCircle(cx - tileSize * 0.025, cy - tileSize * 0.025, tileSize * 0.035);
+  g.drawCircle(
+    cx - tileSize * 0.025 * visualScale,
+    cy - tileSize * 0.025 * visualScale,
+    tileSize * 0.035 * visualScale,
+  );
   g.endFill();
 }
 

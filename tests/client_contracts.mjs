@@ -6076,11 +6076,18 @@ function fakeAudioContext() {
   assert(!trapColors.includes(0x4878c8), "Tank Trap renderer avoids owner/team coloring");
   assert(tintCalls === 0, "Tank Trap renderer does not request owner tint");
   assert(iconCalls === 0, "Tank Trap renderer uses geometry instead of the generic building stencil");
+  const firstBeam = trapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
+  const firstBeamXs = firstBeam.filter((_, index) => index % 2 === 0);
+  const firstBeamYs = firstBeam.filter((_, index) => index % 2 === 1);
+  const firstBeamSpan = Math.max(
+    Math.max(...firstBeamXs) - Math.min(...firstBeamXs),
+    Math.max(...firstBeamYs) - Math.min(...firstBeamYs),
+  );
+  assert(firstBeamSpan > 32, "Tank Trap renderer scales beams larger than the 1x1 footprint");
 
   const secondTrapEntity = { ...tankTrapEntity, id: 721 };
   _drawBuilding.call(fakeRenderer, secondTrapEntity, new Map([[1, 0x4878c8]]), {});
   const secondTrapGraphics = fakePools.get("buildings:721");
-  const firstBeam = trapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
   const secondBeam = secondTrapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
   assert(
     firstBeam?.some((value, index) => Math.abs(value - secondBeam[index]) > 0.1),
