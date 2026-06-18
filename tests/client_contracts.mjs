@@ -4479,7 +4479,8 @@ function fakeAudioContext() {
     events: [{ e: "death", id: 200, x: 64, y: 96, kind: KIND.STEEL }],
   });
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
-  assert(state.entityById(200).remaining === 0, "visible resource death tombstones known resource");
+  assert(state.resourceById.get(200).remaining === 0, "visible resource death tombstones known resource");
+  assert(state.entityById(200) === undefined, "depleted resources are not exposed as local entities");
   assert(state.entityById(201).remaining === 3333, "untouched resources keep their last-known amount");
   const artilleryState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   artilleryState.applySnapshot({
@@ -4535,7 +4536,8 @@ function fakeAudioContext() {
   const entsOver = state.entitiesInterpolated(1.5);
   const entsMid = state.entitiesInterpolated(0.5);
   const midWorker = entsMid.find((e) => e.id === 1);
-  assert(entsMid.length === 3 && midWorker, "entitiesInterpolated returns units and known resources");
+  assert(entsMid.length === 2 && midWorker, "entitiesInterpolated returns units and live known resources");
+  assert(!entsMid.some((e) => e.id === 200), "entitiesInterpolated omits depleted resources");
   assert(midWorker.x >= 10 && midWorker.x <= 15, "interpolation works for moving units");
   assert(!("facing" in midWorker), "entitiesInterpolated does not add missing facing");
 

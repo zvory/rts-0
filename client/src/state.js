@@ -64,7 +64,7 @@ export class GameState {
         this._normalizeResource(node, index),
       ),
     };
-    /** @type {Map<number, object>} id -> static resource node with last-known remaining. */
+    /** @type {Map<number, object>} id -> resource node state. */
     this.resourceById = new Map();
     for (const node of this.map.resources) this.resourceById.set(node.id, node);
     /** @type {Array<{id:number,teamId:number,factionId:string,name:string,color:string,startTileX:number,startTileY:number}>} */
@@ -853,7 +853,7 @@ export class GameState {
   }
 
   _resourceEntityViews() {
-    return (this.map.resources || []).map((node) => ({ ...node }));
+    return (this.map.resources || []).flatMap((n) => (n.remaining === 0 ? [] : [{ ...n }]));
   }
 
   // --- selection (client-only) -------------------------------------------
