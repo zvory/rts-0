@@ -1487,7 +1487,7 @@ fn artillery_point_fire_queue_is_terminal() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(22, 10);
+    let target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -1529,7 +1529,7 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(22, 10);
+    let target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -1614,7 +1614,7 @@ fn packed_artillery_point_fire_does_not_auto_setup_or_fire() {
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(22, 10);
+    let target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -1652,7 +1652,7 @@ fn manually_deployed_artillery_can_point_fire() {
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
     let setup_target = game.map.tile_center(18, 10);
-    let fire_target = game.map.tile_center(22, 10);
+    let fire_target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
