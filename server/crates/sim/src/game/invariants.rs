@@ -5,6 +5,7 @@
 
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, Order, NEUTRAL};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, circle_intersects_rect, segment_intersects_rect,
@@ -354,7 +355,7 @@ impl Game {
         // ------------------------------------------------------------------
         for &pid in &player_ids {
             let snap = self.snapshot_for(pid);
-            let live_fog = self.team_current_fog_for(pid, &self.fog);
+            let live_fog = self.invariant_team_current_fog_for(pid, &self.fog);
             for v in &snap.entities {
                 if v.owner == pid || v.owner == NEUTRAL || self.same_team_owner(pid, v.owner) {
                     continue;
@@ -398,6 +399,14 @@ impl Game {
                 }
             }
         }
+    }
+
+    fn invariant_team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
+        let mut visible_players = self.living_team_player_ids_for_vision(player);
+        if visible_players.is_empty() {
+            visible_players.push(player);
+        }
+        fog.union_for(player, &visible_players)
     }
 }
 

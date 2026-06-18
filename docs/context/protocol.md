@@ -30,6 +30,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   rows). Replay start metadata separately uses `mapName`.
 - Lab start payloads carry `lab` metadata with the public lab id, operator id, role, full-world
   vision mode, dirty flag, and operation count.
+- Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
+  movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?`, and `isSpectator`; spectators are
   lobby members but not active match players.
 

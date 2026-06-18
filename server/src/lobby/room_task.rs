@@ -7,7 +7,7 @@ use super::faction_validation::{
 use super::launch::{LaunchPrediction, LaunchRecipient};
 use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::participants::{CommandIssuer, Participants};
-use super::projection::{ObserverAnalysisAudience, ProjectionPolicy};
+use super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
 use super::session_policy::{RoomTimeOperation, RoomTimeSource, SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
@@ -18,7 +18,9 @@ use crate::protocol::{
     LabState, LabVisionMode, RoomTimeState, DEFAULT_FACTION_ID,
 };
 #[cfg(test)]
-use crate::protocol::{SnapshotNetStatus, StartPayload, PREDICTION_PROTOCOL_VERSION};
+use crate::protocol::{
+    MovementPathDiagnosticScope, SnapshotNetStatus, StartPayload, PREDICTION_PROTOCOL_VERSION,
+};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -712,8 +714,26 @@ impl RoomTask {
     }
 
     fn projection_policy(&self) -> ProjectionPolicy {
+        self.projection_policy_for_phase(self.session_phase())
+    }
+
+    fn projection_policy_for_phase(&self, phase: SessionPhase) -> ProjectionPolicy {
         let policy = self.session_policy();
-        ProjectionPolicy::new(policy.visibility, policy.diagnostics)
+        let policy = if policy.phase == phase {
+            policy
+        } else {
+            SessionPolicy::for_room(&self.mode, phase)
+        };
+        let projection = ProjectionPolicy::new(policy.visibility, policy.diagnostics);
+        if self.owner_movement_diagnostics_enabled_for_phase(phase) {
+            projection.with_owner_movement_paths()
+        } else {
+            projection
+        }
+    }
+
+    fn owner_movement_diagnostics_enabled_for_phase(&self, phase: SessionPhase) -> bool {
+        matches!(self.mode, RoomMode::Normal) && phase == SessionPhase::LiveMatch && self.quickstart
     }
 
     fn is_dev_watch(&self) -> bool {
@@ -2110,10 +2130,18 @@ impl RoomTask {
         );
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
+        let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let recipients: Vec<_> = self
             .order
             .iter()
             .filter_map(|&id| {
+                let role = self.players.get(&id).map(|player| {
+                    if player.spectator {
+                        RecipientRole::Spectator
+                    } else {
+                        RecipientRole::ActivePlayer
+                    }
+                })?;
                 self.players.get(&id).map(|player| LaunchRecipient {
                     connection_id: id,
                     payload_player_id: id,
@@ -2123,6 +2151,7 @@ impl RoomTask {
                     } else {
                         LaunchPrediction::Enabled
                     },
+                    diagnostics: projection_policy.diagnostic_capabilities_for(role),
                     clear_pending_snapshot: false,
                     lab: None,
                     msg_tx: player.msg_tx.clone(),
@@ -2196,6 +2225,7 @@ impl RoomTask {
         self.dev_driver = None;
         self.dev_view_player_id = None;
 
+        let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let mut recipients = Vec::new();
         for &connection_id in &self.order {
             let Some(player) = self.players.get_mut(&connection_id) else {
@@ -2205,6 +2235,11 @@ impl RoomTask {
                 .branch_live_seat_by_connection
                 .get(&connection_id)
                 .copied();
+            let role = if mapped_seat.is_some() {
+                RecipientRole::ActivePlayer
+            } else {
+                RecipientRole::Spectator
+            };
             player.spectator = mapped_seat.is_none();
             player.ready = false;
             recipients.push(LaunchRecipient {
@@ -2216,6 +2251,7 @@ impl RoomTask {
                 } else {
                     LaunchPrediction::Disabled
                 },
+                diagnostics: projection_policy.diagnostic_capabilities_for(role),
                 clear_pending_snapshot: true,
                 lab: None,
                 msg_tx: player.msg_tx.clone(),
@@ -2294,6 +2330,7 @@ impl RoomTask {
         self.dev_driver = None;
         self.dev_view_player_id = None;
 
+        let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let recipients: Vec<_> = self
             .order
             .iter()
@@ -2307,6 +2344,8 @@ impl RoomTask {
                         .unwrap_or(LAB_PLAYER_ONE_ID),
                     spectator: true,
                     prediction: LaunchPrediction::Disabled,
+                    diagnostics: projection_policy
+                        .diagnostic_capabilities_for(RecipientRole::Spectator),
                     clear_pending_snapshot: false,
                     lab: self.lab_start_metadata_for(id),
                     msg_tx: player.msg_tx.clone(),
@@ -2542,6 +2581,9 @@ impl RoomTask {
             return;
         };
         let payload = game.start_payload();
+        let diagnostics = self
+            .projection_policy()
+            .diagnostic_capabilities_for(RecipientRole::Spectator);
         super::launch::send_start_payloads(
             &self.room,
             &payload,
@@ -2550,6 +2592,7 @@ impl RoomTask {
                 payload_player_id: self.dev_view_player_id.unwrap_or(watcher_id),
                 spectator: true,
                 prediction: LaunchPrediction::Disabled,
+                diagnostics,
                 clear_pending_snapshot: false,
                 lab: None,
                 msg_tx: player.msg_tx.clone(),
@@ -2565,6 +2608,9 @@ impl RoomTask {
             return;
         };
         let payload = game.start_payload();
+        let diagnostics = self
+            .projection_policy()
+            .diagnostic_capabilities_for(RecipientRole::Spectator);
         super::launch::send_start_payloads(
             &self.room,
             &payload,
@@ -2577,6 +2623,7 @@ impl RoomTask {
                     .unwrap_or(LAB_PLAYER_ONE_ID),
                 spectator: true,
                 prediction: LaunchPrediction::Disabled,
+                diagnostics,
                 clear_pending_snapshot: false,
                 lab: self.lab_start_metadata_for(watcher_id),
                 msg_tx: player.msg_tx.clone(),
@@ -2613,11 +2660,15 @@ impl RoomTask {
         let Some(player) = self.players.get(&watcher_id) else {
             return;
         };
+        let mut payload = session.start_payload_for(watcher_id);
+        payload.diagnostics = self
+            .projection_policy()
+            .diagnostic_capabilities_for(RecipientRole::Spectator);
         send_or_log(
             &self.room,
             watcher_id,
             &player.msg_tx,
-            ServerMessage::Start(session.start_payload_for(watcher_id)),
+            ServerMessage::Start(payload),
         );
     }
 
@@ -3413,6 +3464,9 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
+        let start_diagnostics = self
+            .projection_policy()
+            .diagnostic_capabilities_for(RecipientRole::Spectator);
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
             let seek_result = session.seek_back(&self.room, viewer_count, player_id, ticks_back);
@@ -3421,11 +3475,9 @@ impl RoomTask {
                     .iter()
                     .filter_map(|viewer_id| {
                         self.players.get(viewer_id).map(|player| {
-                            (
-                                *viewer_id,
-                                player.msg_tx.clone(),
-                                session.start_payload_for(*viewer_id),
-                            )
+                            let mut start = session.start_payload_for(*viewer_id);
+                            start.diagnostics = start_diagnostics;
+                            (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
                     .collect::<Vec<_>>()
@@ -3469,6 +3521,9 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
+        let start_diagnostics = self
+            .projection_policy()
+            .diagnostic_capabilities_for(RecipientRole::Spectator);
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
             let seek_result = session.seek_to(&self.room, viewer_count, player_id, tick);
@@ -3477,11 +3532,9 @@ impl RoomTask {
                     .iter()
                     .filter_map(|viewer_id| {
                         self.players.get(viewer_id).map(|player| {
-                            (
-                                *viewer_id,
-                                player.msg_tx.clone(),
-                                session.start_payload_for(*viewer_id),
-                            )
+                            let mut start = session.start_payload_for(*viewer_id);
+                            start.diagnostics = start_diagnostics;
+                            (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
                     .collect::<Vec<_>>()
@@ -4659,6 +4712,7 @@ mod tests {
         );
         assert!(player_payload.replay.is_none());
         assert!(player_payload.lab.is_none());
+        assert!(player_payload.diagnostics.is_empty());
 
         let spectator_starts = start_payloads(&mut writer_spectator);
         assert_eq!(spectator_starts.len(), 1);
@@ -4669,6 +4723,46 @@ mod tests {
         assert_eq!(spectator_payload.prediction_version, 0);
         assert!(spectator_payload.replay.is_none());
         assert!(spectator_payload.lab.is_none());
+        assert_eq!(
+            spectator_payload.diagnostics.movement_paths,
+            MovementPathDiagnosticScope::None
+        );
+        assert!(spectator_payload.diagnostics.observer_analysis);
+    }
+
+    #[test]
+    fn debug_mode_start_payloads_advertise_owner_only_movement_diagnostics() {
+        let mut task = RoomTask::new(
+            "debug-diagnostics-start-payload-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_player = add_test_room_player(&mut task, 1, true);
+        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+        task.host_id = Some(1);
+        task.on_set_quickstart(1, true);
+
+        task.start_match();
+
+        let player_payload = start_payloads(&mut writer_player)
+            .pop()
+            .expect("active player should receive start");
+        assert_eq!(
+            player_payload.diagnostics.movement_paths,
+            MovementPathDiagnosticScope::OwnerOnly
+        );
+        assert!(!player_payload.diagnostics.observer_analysis);
+
+        let spectator_payload = start_payloads(&mut writer_spectator)
+            .pop()
+            .expect("spectator should receive start");
+        assert_eq!(
+            spectator_payload.diagnostics.movement_paths,
+            MovementPathDiagnosticScope::None
+        );
+        assert!(spectator_payload.diagnostics.observer_analysis);
     }
 
     #[test]
@@ -5970,6 +6064,11 @@ mod tests {
         assert!(payload.prediction_build_id.is_none());
         assert_eq!(payload.prediction_version, 0);
         assert!(payload.replay.is_none());
+        assert_eq!(
+            payload.diagnostics.movement_paths,
+            MovementPathDiagnosticScope::All
+        );
+        assert!(!payload.diagnostics.observer_analysis);
     }
 
     #[test]
@@ -6090,7 +6189,10 @@ mod tests {
         assert!(task.players.get(&99).is_some_and(|p| p.spectator));
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::Start(payload) if payload.spectator && payload.replay.is_some()
+            ServerMessage::Start(payload)
+                if payload.spectator
+                    && payload.replay.is_some()
+                    && payload.diagnostics.observer_analysis
         ));
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
@@ -6142,7 +6244,10 @@ mod tests {
         assert!(task.players.get(&99).is_some_and(|p| p.spectator));
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::Start(payload) if payload.spectator && payload.replay.is_some()
+            ServerMessage::Start(payload)
+                if payload.spectator
+                    && payload.replay.is_some()
+                    && payload.diagnostics.observer_analysis
         ));
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),

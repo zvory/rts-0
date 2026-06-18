@@ -73,6 +73,7 @@ import {
   EVENT_CODE,
   KIND,
   KIND_CODE,
+  MOVEMENT_PATH_DIAGNOSTICS,
   NOTICE_SEVERITY,
   ORDER_STAGE,
   ORDER_STAGE_CODE,
@@ -4900,6 +4901,10 @@ withFakeDocument(() => {
   assert(!("antiTankGunSetupPreview" in state), "GameState no longer exposes support preview shims");
   assert(!("updateResourceMiningPreview" in state), "GameState no longer exposes preview update shims");
   assert(state.selection instanceof Set, "GameState.selection");
+  assert(
+    state.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE,
+    "GameState defaults movement path diagnostics to none",
+  );
   assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
   assert(state.debugPathOverlaysEnabled === false, "GameState leaves waypoint diagnostics off by default");
   assertHasMethod(state, "setSelection", "GameState");
@@ -4914,14 +4919,25 @@ withFakeDocument(() => {
 
   const debugState = new GameState({
     ...start,
-    debugMode: true,
+    diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.OWNER_ONLY },
     map: {
       ...start.map,
       resources: start.map.resources.map((resource) => ({ ...resource })),
     },
   });
-  assert(debugState.debugPathOverlaysAvailable === true, "GameState exposes waypoint diagnostics in debug mode");
-  assert(debugState.debugPathOverlaysEnabled === true, "GameState enables waypoint diagnostics in debug mode");
+  assert(debugState.debugPathOverlaysAvailable === true, "GameState exposes advertised waypoint diagnostics");
+  assert(debugState.debugPathOverlaysEnabled === true, "GameState enables advertised waypoint diagnostics");
+  assert(debugState.showAllDebugPathOverlays === false, "owner-only waypoint diagnostics stay selection scoped");
+
+  const fullDiagnosticState = new GameState({
+    ...start,
+    diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
+    map: {
+      ...start.map,
+      resources: start.map.resources.map((resource) => ({ ...resource })),
+    },
+  });
+  assert(fullDiagnosticState.showAllDebugPathOverlays === true, "full waypoint diagnostics may draw every projected path");
 
   // Snapshot buffering
   const t0 = performance.now();
@@ -6990,20 +7006,32 @@ withFakeDocument(() => {
   );
 
   assert(
-    shouldMountObserverAnalysisOverlay({ payload: { replay: true, spectator: true }, replayViewer: true }),
-    "observer analysis mounts for replay viewers",
+    shouldMountObserverAnalysisOverlay({
+      payload: { replay: true, spectator: true, diagnostics: { observerAnalysis: true } },
+      replayViewer: true,
+    }),
+    "observer analysis mounts when the start payload advertises it for replay viewers",
   );
   assert(
-    shouldMountObserverAnalysisOverlay({ payload: { spectator: true }, replayViewer: false }),
-    "observer analysis mounts for live spectators",
+    shouldMountObserverAnalysisOverlay({
+      payload: { spectator: true, diagnostics: { observerAnalysis: true } },
+      replayViewer: false,
+    }),
+    "observer analysis mounts when the start payload advertises it for live spectators",
   );
   assert(
-    !shouldMountObserverAnalysisOverlay({ payload: { spectator: false }, replayViewer: false }),
-    "observer analysis stays hidden for active players",
+    !shouldMountObserverAnalysisOverlay({
+      payload: { spectator: false, diagnostics: { observerAnalysis: false } },
+      replayViewer: false,
+    }),
+    "observer analysis stays hidden without diagnostic metadata",
   );
   assert(
-    !shouldMountObserverAnalysisOverlay({ payload: { replay: true, spectator: true }, replayViewer: false }),
-    "observer analysis does not mount for non-viewer replay start payloads",
+    !shouldMountObserverAnalysisOverlay({
+      payload: { replay: true, spectator: true },
+      replayViewer: true,
+    }),
+    "observer analysis does not mount from replay identity alone",
   );
 
   withFakeOverlayDocument(({ FakeElement }) => {

@@ -170,11 +170,52 @@ pub(super) enum VisibilityPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DiagnosticPolicy {
+pub(super) enum ObserverAnalysisPolicy {
     None,
-    LiveSpectatorObserverAnalysis,
-    ReplayObserverAnalysis,
-    DevMovementPaths,
+    LiveSpectators,
+    ReplayViewers,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MovementPathDiagnosticPolicy {
+    None,
+    OwnerOnly,
+    AllProjected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct DiagnosticPolicy {
+    pub(super) observer_analysis: ObserverAnalysisPolicy,
+    pub(super) movement_paths: MovementPathDiagnosticPolicy,
+}
+
+impl DiagnosticPolicy {
+    pub(super) const NONE: Self = Self {
+        observer_analysis: ObserverAnalysisPolicy::None,
+        movement_paths: MovementPathDiagnosticPolicy::None,
+    };
+
+    pub(super) const LIVE_SPECTATOR_OBSERVER_ANALYSIS: Self = Self {
+        observer_analysis: ObserverAnalysisPolicy::LiveSpectators,
+        movement_paths: MovementPathDiagnosticPolicy::None,
+    };
+
+    pub(super) const REPLAY_OBSERVER_ANALYSIS: Self = Self {
+        observer_analysis: ObserverAnalysisPolicy::ReplayViewers,
+        movement_paths: MovementPathDiagnosticPolicy::None,
+    };
+
+    pub(super) const DEV_MOVEMENT_PATHS: Self = Self {
+        observer_analysis: ObserverAnalysisPolicy::None,
+        movement_paths: MovementPathDiagnosticPolicy::AllProjected,
+    };
+
+    pub(super) fn with_owner_movement_paths(self) -> Self {
+        Self {
+            movement_paths: MovementPathDiagnosticPolicy::OwnerOnly,
+            ..self
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -241,7 +282,7 @@ impl SessionPolicy {
                 authority: AuthorityPolicy::LobbyHost,
                 mutation: MutationPolicy::LobbyState,
                 visibility: VisibilityPolicy::LobbyState,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::Lobby,
                 persistence: PersistencePolicy::None,
@@ -257,7 +298,7 @@ impl SessionPolicy {
                 authority: AuthorityPolicy::LivePlayers,
                 mutation: MutationPolicy::LiveGameplayCommands,
                 visibility: VisibilityPolicy::LiveFog,
-                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                diagnostics: DiagnosticPolicy::LIVE_SPECTATOR_OBSERVER_ANALYSIS,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::LiveMatch,
                 persistence: PersistencePolicy::MatchHistoryAndReplayArtifacts,
@@ -273,7 +314,7 @@ impl SessionPolicy {
                 authority: AuthorityPolicy::ReplayViewers,
                 mutation: MutationPolicy::ReplayPlaybackCursor,
                 visibility: VisibilityPolicy::ReplayVision,
-                diagnostics: DiagnosticPolicy::ReplayObserverAnalysis,
+                diagnostics: DiagnosticPolicy::REPLAY_OBSERVER_ANALYSIS,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
@@ -289,7 +330,7 @@ impl SessionPolicy {
                 authority: AuthorityPolicy::BranchStagingHost,
                 mutation: MutationPolicy::ReplayBranchStagingClaims,
                 visibility: VisibilityPolicy::BranchStagingState,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::BranchStaging,
                 persistence: PersistencePolicy::Suppressed,
@@ -307,7 +348,7 @@ impl SessionPolicy {
                 policy.authority = AuthorityPolicy::DevWatchControls;
                 policy.mutation = MutationPolicy::DevScenarioDriver;
                 policy.visibility = VisibilityPolicy::DevFullWorld;
-                policy.diagnostics = DiagnosticPolicy::DevMovementPaths;
+                policy.diagnostics = DiagnosticPolicy::DEV_MOVEMENT_PATHS;
                 policy.export = ExportPolicy::None;
                 policy.affordance = AffordancePolicy::DevWatch;
                 policy.persistence = PersistencePolicy::Suppressed;
@@ -320,7 +361,7 @@ impl SessionPolicy {
                     policy.clock = ClockCapability::ROOM_TICKER;
                     policy.mutation = MutationPolicy::None;
                     policy.visibility = VisibilityPolicy::LobbyState;
-                    policy.diagnostics = DiagnosticPolicy::None;
+                    policy.diagnostics = DiagnosticPolicy::NONE;
                 }
                 policy.join = JoinPolicy::ReplayPromptOrAttach;
                 policy.authority = AuthorityPolicy::ReplayViewers;
@@ -336,7 +377,7 @@ impl SessionPolicy {
                     policy.clock = ClockCapability::ROOM_TICKER;
                     policy.mutation = MutationPolicy::None;
                     policy.visibility = VisibilityPolicy::LobbyState;
-                    policy.diagnostics = DiagnosticPolicy::None;
+                    policy.diagnostics = DiagnosticPolicy::NONE;
                 }
                 policy.join = JoinPolicy::ReplayPromptOrAttach;
                 policy.authority = AuthorityPolicy::ReplayViewers;
@@ -372,8 +413,8 @@ impl SessionPolicy {
                     _ => VisibilityPolicy::BranchStagingState,
                 };
                 policy.diagnostics = match phase {
-                    SessionPhase::LiveMatch => DiagnosticPolicy::LiveSpectatorObserverAnalysis,
-                    _ => DiagnosticPolicy::None,
+                    SessionPhase::LiveMatch => DiagnosticPolicy::LIVE_SPECTATOR_OBSERVER_ANALYSIS,
+                    _ => DiagnosticPolicy::NONE,
                 };
                 policy.export = ExportPolicy::None;
                 policy.affordance = match phase {
@@ -394,7 +435,7 @@ impl SessionPolicy {
                 policy.authority = AuthorityPolicy::LabOperator;
                 policy.mutation = MutationPolicy::LabPrivilegedOps;
                 policy.visibility = VisibilityPolicy::LabFullWorld;
-                policy.diagnostics = DiagnosticPolicy::None;
+                policy.diagnostics = DiagnosticPolicy::NONE;
                 policy.export = ExportPolicy::LabScenario;
                 policy.affordance = AffordancePolicy::Lab;
                 policy.persistence = PersistencePolicy::Suppressed;
@@ -538,7 +579,7 @@ mod tests {
                 authority: AuthorityPolicy::LobbyHost,
                 visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::LobbyState,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::Lobby,
                 persistence: PersistencePolicy::None,
@@ -555,7 +596,7 @@ mod tests {
                 authority: AuthorityPolicy::LivePlayers,
                 visibility: VisibilityPolicy::LiveFog,
                 mutation: MutationPolicy::LiveGameplayCommands,
-                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                diagnostics: DiagnosticPolicy::LIVE_SPECTATOR_OBSERVER_ANALYSIS,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::LiveMatch,
                 persistence: PersistencePolicy::MatchHistoryAndReplayArtifacts,
@@ -572,7 +613,7 @@ mod tests {
                 authority: AuthorityPolicy::LivePlayers,
                 visibility: VisibilityPolicy::LiveFog,
                 mutation: MutationPolicy::LiveGameplayCommands,
-                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                diagnostics: DiagnosticPolicy::LIVE_SPECTATOR_OBSERVER_ANALYSIS,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::LiveMatch,
                 persistence: PersistencePolicy::MatchHistoryAndReplayArtifacts,
@@ -589,7 +630,7 @@ mod tests {
                 authority: AuthorityPolicy::ReplayViewers,
                 visibility: VisibilityPolicy::ReplayVision,
                 mutation: MutationPolicy::ReplayPlaybackCursor,
-                diagnostics: DiagnosticPolicy::ReplayObserverAnalysis,
+                diagnostics: DiagnosticPolicy::REPLAY_OBSERVER_ANALYSIS,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
@@ -606,7 +647,7 @@ mod tests {
                 authority: AuthorityPolicy::ReplayViewers,
                 visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::None,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
@@ -623,7 +664,7 @@ mod tests {
                 authority: AuthorityPolicy::ReplayViewers,
                 visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::None,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::None,
@@ -640,7 +681,7 @@ mod tests {
                 authority: AuthorityPolicy::BranchStagingHost,
                 visibility: VisibilityPolicy::BranchStagingState,
                 mutation: MutationPolicy::ReplayBranchStagingClaims,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::BranchStaging,
                 persistence: PersistencePolicy::Suppressed,
@@ -657,7 +698,7 @@ mod tests {
                 authority: AuthorityPolicy::BranchLiveSeatAliases,
                 visibility: VisibilityPolicy::LiveFog,
                 mutation: MutationPolicy::BranchLiveSeatAliasGameplay,
-                diagnostics: DiagnosticPolicy::LiveSpectatorObserverAnalysis,
+                diagnostics: DiagnosticPolicy::LIVE_SPECTATOR_OBSERVER_ANALYSIS,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::BranchLive,
                 persistence: PersistencePolicy::Suppressed,
@@ -674,7 +715,7 @@ mod tests {
                 authority: AuthorityPolicy::DevWatchControls,
                 visibility: VisibilityPolicy::DevFullWorld,
                 mutation: MutationPolicy::DevScenarioDriver,
-                diagnostics: DiagnosticPolicy::DevMovementPaths,
+                diagnostics: DiagnosticPolicy::DEV_MOVEMENT_PATHS,
                 export: ExportPolicy::None,
                 affordance: AffordancePolicy::DevWatch,
                 persistence: PersistencePolicy::Suppressed,
@@ -691,7 +732,7 @@ mod tests {
                 authority: AuthorityPolicy::LabOperator,
                 visibility: VisibilityPolicy::LabFullWorld,
                 mutation: MutationPolicy::LabPrivilegedOps,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::LabScenario,
                 affordance: AffordancePolicy::Lab,
                 persistence: PersistencePolicy::Suppressed,
@@ -708,7 +749,7 @@ mod tests {
                 authority: AuthorityPolicy::LabOperator,
                 visibility: VisibilityPolicy::LabFullWorld,
                 mutation: MutationPolicy::LabPrivilegedOps,
-                diagnostics: DiagnosticPolicy::None,
+                diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::LabScenario,
                 affordance: AffordancePolicy::Lab,
                 persistence: PersistencePolicy::Suppressed,

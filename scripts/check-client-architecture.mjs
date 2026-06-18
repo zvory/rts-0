@@ -85,13 +85,14 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "renderer/feedback.js": 46315,
   // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
   "hud.js": 44208,
-  "state.js": 38576,
+  // Room2 Phase 4 adds recipient diagnostic affordance parsing to GameState.
+  "state.js": 39267,
   // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
   "input/index.js": 38854,
   // Room2 Phase 3 renames replay/dev time wiring to neutral room-time handlers.
   "match.js": 38818,
-  // Room2 Phase 3 mirrors neutral room-time wire tags/builders.
-  "protocol.js": 38152,
+  // Room2 Phase 4 mirrors start-payload diagnostic capability constants.
+  "protocol.js": 38269,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,

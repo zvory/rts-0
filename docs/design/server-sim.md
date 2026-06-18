@@ -128,11 +128,21 @@ impl Game {
     /// visibleTiles use the union of living teammates' current fog; resources/upgrades stay local.
     pub fn snapshot_for(&self, player: u32) -> Snapshot;
 
+    /// Same projection as `snapshot_for`, with explicit room-projection diagnostic options such as
+    /// owner-only movement paths. The default `snapshot_for` includes no movement diagnostics.
+    pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot;
+
     /// Build a spectator snapshot from the union of all active players' current fog.
     pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot;
 
+    /// Same projection as `snapshot_for_spectator`, with explicit room-projection diagnostic options.
+    pub fn snapshot_for_spectator_with_options(&self, visible_players: &[u32], options: SnapshotOptions) -> Snapshot;
+
     /// Build a full-world snapshot for a dev watch client. Normal gameplay must not use this.
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot;
+
+    /// Same full-world projection, with explicit room-projection diagnostic options.
+    pub fn snapshot_full_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot;
 
     /// Player ids still alive. Humans need at least one building; AI players also need a unit.
     pub fn alive_players(&self) -> Vec<u32>;
@@ -167,6 +177,10 @@ impl Game {
 pub type TeamId = u32;
 pub struct PlayerInit { pub id: u32, pub team_id: TeamId, pub faction_id: String, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
+pub struct SnapshotOptions {
+    pub include_movement_paths: bool,
+    pub movement_paths_for_all_projected: bool
+}
 ```
 `SimCommand` is the internal command enum from `game::command`; live `ClientMessage::Command`
 envelopes and replay artifacts are translated into it at the boundary. Live transport metadata

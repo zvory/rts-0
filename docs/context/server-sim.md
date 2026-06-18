@@ -33,7 +33,8 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   tick interval, countdown, live, replay, dev-watch, or no-op actions
 - `server/src/lobby/projection.rs` — maps live, spectator, replay, branch-live, and dev-watch
   recipients to the appropriate `Game` snapshot API and event visibility; lab recipients use an
-  explicit full-world projection
+  explicit full-world projection. It also owns diagnostic snapshot options such as movement-path
+  inclusion.
 - `server/src/lobby/launch.rs` — shared start-payload stamping and send loop for live, branch-live,
   dev-watch, and lab starts
 - `server/src/lobby/live_tick.rs` — live-match tick driver for AI enqueue, `Game::tick`,

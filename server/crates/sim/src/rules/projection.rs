@@ -28,12 +28,29 @@ pub struct EntityProjectionContext<'a> {
     pub fogged: bool,
     pub entities: &'a EntityStore,
     pub target: Option<&'a Entity>,
-    pub include_debug_path: bool,
+    pub debug_path_projection: DebugPathProjection,
     pub active_construction_sites: Option<&'a BTreeSet<u32>>,
     pub teams: Option<&'a TeamRelations>,
     pub owner_faction_id: Option<&'a str>,
     pub ability_runtime: Option<&'a AbilityRuntime>,
     pub tick: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DebugPathProjection {
+    None,
+    OwnerOnly,
+    AllProjected,
+}
+
+impl DebugPathProjection {
+    fn includes(self, viewer: u32, entity: &Entity) -> bool {
+        match self {
+            Self::None => false,
+            Self::OwnerOnly => entity.owner == viewer,
+            Self::AllProjected => true,
+        }
+    }
 }
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
@@ -307,9 +324,6 @@ pub fn project_entity(
             private_detail_fog,
             context.smokes,
         );
-        if context.include_debug_path {
-            view.debug_path = debug_path_view(entity);
-        }
         let catalog = context
             .owner_faction_id
             .and_then(crate::rules::faction::catalog_for);
@@ -363,6 +377,10 @@ pub fn project_entity(
                 });
             }
         }
+    }
+
+    if context.debug_path_projection.includes(viewer, entity) {
+        view.debug_path = debug_path_view(entity);
     }
 
     if entity.breakthrough_ticks() > 0 {
@@ -650,6 +668,30 @@ mod tests {
         target: Option<&Entity>,
         include_debug_path: bool,
     ) -> Option<EntityView> {
+        project_for_test_with_debug_projection(
+            viewer,
+            entity,
+            fog,
+            fogged,
+            entities,
+            target,
+            if include_debug_path {
+                DebugPathProjection::OwnerOnly
+            } else {
+                DebugPathProjection::None
+            },
+        )
+    }
+
+    fn project_for_test_with_debug_projection(
+        viewer: u32,
+        entity: &Entity,
+        fog: &Fog,
+        fogged: bool,
+        entities: &EntityStore,
+        target: Option<&Entity>,
+        debug_path_projection: DebugPathProjection,
+    ) -> Option<EntityView> {
         project_for_test_with_active_sites(
             viewer,
             entity,
@@ -657,7 +699,7 @@ mod tests {
             fogged,
             entities,
             target,
-            include_debug_path,
+            debug_path_projection,
             None,
         )
     }
@@ -669,7 +711,7 @@ mod tests {
         fogged: bool,
         entities: &EntityStore,
         target: Option<&Entity>,
-        include_debug_path: bool,
+        debug_path_projection: DebugPathProjection,
         active_construction_sites: Option<&BTreeSet<u32>>,
     ) -> Option<EntityView> {
         project_entity(
@@ -683,7 +725,7 @@ mod tests {
                 fogged,
                 entities,
                 target,
-                include_debug_path,
+                debug_path_projection,
                 active_construction_sites,
                 teams: None,
                 owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),
@@ -963,6 +1005,21 @@ mod tests {
         let enemy_view = project_for_test(2, unit, &fog, false, &entities, None, true)
             .expect("full view should include unit");
         assert_eq!(enemy_view.debug_path, None);
+
+        let full_world_view = project_for_test_with_debug_projection(
+            2,
+            unit,
+            &fog,
+            false,
+            &entities,
+            None,
+            DebugPathProjection::AllProjected,
+        )
+        .expect("full-world diagnostics should include projected units");
+        assert!(
+            full_world_view.debug_path.is_some(),
+            "full-world diagnostic policy may expose movement paths for every projected entity"
+        );
     }
 
     #[test]
@@ -1014,7 +1071,7 @@ mod tests {
             true,
             &entities,
             None,
-            false,
+            DebugPathProjection::None,
             Some(&active_sites),
         )
         .expect("owner should see scaffold");
@@ -1028,7 +1085,7 @@ mod tests {
             false,
             &entities,
             None,
-            false,
+            DebugPathProjection::None,
             Some(&active_sites),
         )
         .expect("non-owner visible scaffold should project");

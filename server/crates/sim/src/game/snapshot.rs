@@ -6,23 +6,50 @@ impl Game {
     /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
+        self.snapshot_for_with_options(player, SnapshotOptions::default())
+    }
+
+    pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot {
         let live_fog = self.team_current_fog_for(player, &self.fog);
         if self.lingering_sight.is_empty() {
-            return self.snapshot_for_mode(player, &live_fog, Some(&live_fog), true, false);
+            return self.snapshot_for_mode(player, &live_fog, Some(&live_fog), true, false, options);
         }
         let snapshot_fog = self.snapshot_fog();
         let team_snapshot_fog = self.team_current_fog_for(player, &snapshot_fog);
-        self.snapshot_for_mode(player, &team_snapshot_fog, Some(&live_fog), true, false)
+        self.snapshot_for_mode(
+            player,
+            &team_snapshot_fog,
+            Some(&live_fog),
+            true,
+            false,
+            options,
+        )
     }
 
     /// Build a full-world snapshot for a viewer. Used only by dev watch flows where fog is
     /// intentionally disabled; normal gameplay must keep using [`snapshot_for`].
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot {
-        self.snapshot_for_mode(player, &self.fog, None, false, true)
+        self.snapshot_full_for_with_options(player, SnapshotOptions::default())
+    }
+
+    pub fn snapshot_full_for_with_options(
+        &self,
+        player: u32,
+        options: SnapshotOptions,
+    ) -> Snapshot {
+        self.snapshot_for_mode(player, &self.fog, None, false, true, options)
     }
 
     /// Build a spectator snapshot from the union of all active players' current fog.
     pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot {
+        self.snapshot_for_spectator_with_options(visible_players, SnapshotOptions::default())
+    }
+
+    pub fn snapshot_for_spectator_with_options(
+        &self,
+        visible_players: &[u32],
+        options: SnapshotOptions,
+    ) -> Snapshot {
         let actionable_fog = self
             .fog
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
@@ -33,6 +60,7 @@ impl Game {
                 Some(&actionable_fog),
                 true,
                 true,
+                options,
             );
         }
         let snapshot_fog = self
@@ -44,6 +72,7 @@ impl Game {
             Some(&actionable_fog),
             true,
             true,
+            options,
         )
     }
 
@@ -63,6 +92,7 @@ impl Game {
         actionable_fog: Option<&Fog>,
         fogged: bool,
         include_player_resources: bool,
+        options: SnapshotOptions,
     ) -> Snapshot {
         let ps = self.player(player);
         let teams = self.team_relations();
@@ -99,7 +129,7 @@ impl Game {
                     fogged,
                     entities: &self.entities,
                     target,
-                    include_debug_path: self.debug_path_overlays,
+                    debug_path_projection: options.debug_path_projection(),
                     active_construction_sites: Some(&self.active_construction_sites),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
@@ -227,7 +257,7 @@ impl Game {
                             fogged: true,
                             entities: &self.entities,
                             target: None,
-                            include_debug_path: false,
+                            debug_path_projection: projection::DebugPathProjection::None,
                             active_construction_sites: Some(&self.active_construction_sites),
                             teams: Some(teams),
                             owner_faction_id: self
@@ -254,7 +284,7 @@ impl Game {
         views
     }
 
-    pub(crate) fn team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
+    fn team_current_fog_for(&self, player: u32, fog: &Fog) -> Fog {
         let mut visible_players = self.living_team_player_ids_for_vision(player);
         if visible_players.is_empty() {
             visible_players.push(player);
