@@ -359,6 +359,9 @@ export function _nearestOwnCompletedCityCentre(x, y) {
 }
 
 function ownOwner(state, owner) {
+  if (state?.controlPolicy?.kind === "lab") {
+    return state.controlPolicy.canControlOwner(owner, state);
+  }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;

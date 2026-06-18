@@ -97,6 +97,9 @@ export class Match {
     this.hotkeyProfiles = options.hotkeyProfiles || null;
     this.settings = options.settings || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
+    this.labMetadata = options.labMetadata || null;
+    this.labClient = options.labClient || null;
+    this.labControlPolicy = options.labControlPolicy || null;
     this.replayViewer = !!options.replayViewer;
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
@@ -125,6 +128,12 @@ export class Match {
     }
     this.commandIssuer = {
       issueCommand: (command, options = {}) => {
+        if (this.labControlPolicy?.kind === "lab") {
+          return this.labControlPolicy.issueCommand(command, {
+            state: this.state,
+            toast: this.toast,
+          });
+        }
         const budget = commandWithinBudget(this.state, command);
         if (!budget.ok) {
           this.toast?.(COMMAND_BUDGET_OVERFLOW_NOTICE);
@@ -139,6 +148,7 @@ export class Match {
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
+    this.state.controlPolicy = this.labControlPolicy;
     this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
     this.state.debugPathOverlaysAvailable =
       this.state.debugPathOverlaysAvailable || this.devWatch?.kind === "scenario";
@@ -153,7 +163,15 @@ export class Match {
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = this._timeInit(
       "match.hud",
-      () => new HUD(dom.gameScreen, this.state, this.commandIssuer, this.audio, this.hotkeyProfiles, this.clientIntent),
+      () => new HUD(
+        dom.gameScreen,
+        this.state,
+        this.commandIssuer,
+        this.audio,
+        this.hotkeyProfiles,
+        this.clientIntent,
+        this.labControlPolicy,
+      ),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.hudInputZone = this._timeInit(

@@ -106,8 +106,7 @@ export function _commitBoxSelection(drag, additive) {
   const buildings = [];
   for (const e of entities) {
     if (e.shotReveal || e.visionOnly) continue;
-    if (!spectator && !ownOwner(this.state, e.owner)) continue;
-    if (spectator && e.owner === 0) continue;
+    if (!selectableEntity(this.state, e, spectator)) continue;
     if (!this._entityIntersectsRect(e, minX, minY, maxX, maxY)) continue;
     if (isUnit(e.kind)) units.push(e.id);
     else if (isBuilding(e.kind)) buildings.push(e.id);
@@ -161,9 +160,18 @@ export function _entityAtWorld(wx, wy, ownPreferred) {
 }
 
 function ownOwner(state, owner) {
+  if (state?.controlPolicy?.kind === "lab") {
+    return state.controlPolicy.canControlOwner(owner, state);
+  }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;
+}
+
+function selectableEntity(state, entity, spectator) {
+  if (state?.controlPolicy?.kind === "lab") return state.controlPolicy.canSelectEntity(entity, state);
+  if (!spectator) return ownOwner(state, entity.owner);
+  return entity.owner !== 0;
 }
 
 function closeCommandCardMenu(input) {

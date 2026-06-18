@@ -14,6 +14,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 
 ## Code map
 - `server/crates/sim/src/game/mod.rs` — public `Game` API
+- `server/crates/sim/src/game/lab.rs` — typed lab-only `Game` mutation and scenario setup API
 - `server/crates/sim/src/game/systems.rs` — thin tick orchestrator
 - `server/crates/sim/src/game/services/` — small pure helpers, called in order by `systems.rs`
 - `server/crates/sim/src/game/services/order_planner.rs` — pure command/queue planning policy
@@ -24,15 +25,17 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/lobby/room_task.rs` — room-owned lifecycle, membership, phase transitions, match
   history, drain bookkeeping, and `Game` ownership
 - `server/src/lobby/session_policy.rs` — names the room mode/phase policy choices for state
-  source, joining, clocking, authority, vision, mutation, persistence, and start payloads
+  source, joining, clocking, authority, mutation, visibility, diagnostics, persistence/export, start
+  payloads, and UI affordances
 - `server/src/lobby/participants.rs` — host fallback, active seats, spectator visibility seats,
   branch-live seat aliases, and command issuer resolution
 - `server/src/lobby/tick_control.rs` — maps session clock policy plus replay/dev pause state to
   tick interval, countdown, live, replay, dev-watch, or no-op actions
 - `server/src/lobby/projection.rs` — maps live, spectator, replay, branch-live, and dev-watch
-  recipients to the appropriate `Game` snapshot API and event visibility
+  recipients to the appropriate `Game` snapshot API and event visibility; lab recipients use an
+  explicit full-world projection
 - `server/src/lobby/launch.rs` — shared start-payload stamping and send loop for live, branch-live,
-  and dev-watch starts
+  dev-watch, and lab starts
 - `server/src/lobby/live_tick.rs` — live-match tick driver for AI enqueue, `Game::tick`,
   projection-backed snapshot fanout, observer analysis, and outcome detection
 - `server/src/lobby/replay_session.rs` and `server/src/lobby/replay_branch.rs` — replay playback
@@ -40,7 +43,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/lobby/snapshot_fanout.rs`, `snapshots.rs`, `connection.rs`, `dev_replay.rs`, and
   `crash_replay.rs` — lobby-local delivery, compacting, dev replay loading, and panic artifacts
 - `scripts/check-lobby-architecture.mjs` — lightweight guardrail that keeps lobby snapshot fanout
-  routed through `projection.rs`
+  routed through `projection.rs` and keeps lab mutation routing centralized in `room_task.rs`
 - `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deployment drain coordination
 - `scripts/check-crate-boundaries.mjs` — enforces Cargo package dependency direction
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —

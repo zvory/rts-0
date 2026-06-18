@@ -39,6 +39,8 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) pending_client_command_acks: &'a mut Vec<PendingClientCommandAck>,
     pub(super) slow_tick_count: &'a mut u32,
     pub(super) spectator_visible_players: Vec<u32>,
+    pub(super) full_world_view_player_id: Option<u32>,
+    pub(super) lab_visible_player_ids: Option<Vec<u32>>,
     pub(super) projection_policy: ProjectionPolicy,
 }
 
@@ -173,6 +175,8 @@ impl LiveTickDriver<'_> {
             .collect();
         let branch_live_seat_by_connection = self.branch_live_seat_by_connection;
         let spectator_visible_players = self.spectator_visible_players.clone();
+        let full_world_view_player_id = self.full_world_view_player_id;
+        let lab_visible_player_ids = self.lab_visible_player_ids.clone();
 
         SnapshotFanout::new(
             self.room,
@@ -188,12 +192,19 @@ impl LiveTickDriver<'_> {
             } else {
                 RecipientRole::ActivePlayer
             };
-            let projection = self.projection_policy.live_snapshot_for(
-                role,
-                id,
-                branch_live_seat_by_connection.get(&id).copied(),
-                &spectator_visible_players,
-            );
+            let projection = if let Some(player_ids) = lab_visible_player_ids.clone() {
+                self.projection_policy.replay_snapshot_for(player_ids)
+            } else {
+                self.projection_policy.live_snapshot_for(
+                    role,
+                    id,
+                    branch_live_seat_by_connection
+                        .get(&id)
+                        .copied()
+                        .or(full_world_view_player_id),
+                    &spectator_visible_players,
+                )
+            };
             let snapshot =
                 projection.snapshot_with_events(game, per_player_events, &full_vision_events);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))

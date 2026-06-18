@@ -65,6 +65,7 @@ lobby/config dump replaces the source scrape.
 | `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. Compatibility wrapper around absolute replay seek. |
 | `seekReplayTo` | `tick: u32` | Seek a replay to an absolute simulation tick, clamped to the replay duration. Ignored outside replay rooms. The room rate-limits accepted seeks. Accepted seeks restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `replayState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
+| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operators with `labResult`. Accepted setup mutations, issue-as commands, and vision changes are room-local and append to the lab operation log. |
 | `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
@@ -237,6 +238,14 @@ Sent once when the match begins. Carries everything static for the whole match.
     seed: u32,
     durationTicks: u32
   },
+  lab?: {                        // present for lab room starts
+    room: string,                // safe public lab id, not the hidden internal room prefix
+    operatorId: u32,
+    role: "operator"|"readOnly",
+    vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] },
+    dirty: bool,
+    operationCount: u32
+  },
   tick: u32,                     // starting tick (usually 0)
   map: {
     width: u32, height: u32,     // in tiles
@@ -263,6 +272,11 @@ which lets the client expose local movement-waypoint overlay controls for the ow
 `debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
+
+Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
+metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and
+server-owned projection. `role` names the room-owned operator/read-only viewer classification; only
+the operator may send privileged lab operations in the MVP.
 
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
@@ -579,10 +593,10 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
 gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
 or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged enemy
-unit's position to the victim owner and same-team recipients that pass team-current event
-visibility. Same-team friendly-fire damage does not emit under-attack alerts. Unit attack events
-are sent to the attacker's team and to enemy recipients whose team can currently see the shooter or
-target point. They include `reveal` so a shooter
+unit's position to the victim owner only; same-team recipients may still see the attack event through
+shared vision, but they do not receive teammate under-attack alerts. Same-team friendly-fire damage
+does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy
+recipients whose team can currently see the shooter or target point. They include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Death events are sent to the dead entity's team and to enemy recipients whose team can currently see
@@ -644,6 +658,62 @@ The server rejects unknown player ids, empty subsets, and duplicate subset ids. 
 not shared between viewers unless a later protocol explicitly adds shared-view control. Replay
 snapshots are spectator-style authoritative fog snapshots from the selected real player ids; the
 default is the union of all replay players.
+
+`LabClientOp` is tagged by `op`:
+```
+{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
+{ op: "deleteEntity", entityId: u32 }
+{ op: "moveEntity", entityId: u32, x: f32, y: f32 }
+{ op: "setEntityOwner", entityId: u32, owner: u32 }
+{ op: "setPlayerResources", playerId: u32, steel: u32, oil: u32 }
+{ op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
+{ op: "setVision", vision: LabVisionMode }
+{ op: "issueCommandAs", playerId: u32, cmd: Command }
+{ op: "exportScenario", name?: string }
+{ op: "importScenario", scenario: LabScenarioV1 }
+```
+`LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
+`{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
+room task before snapshot projection; unknown, empty, or duplicate team selections are rejected.
+`issueCommandAs` queues a normal gameplay command as the selected player only when all selected
+units belong to that player; mixed-owner selections are rejected instead of partitioned.
+
+`LabScenarioV1` is versioned setup JSON, not a saved snapshot:
+```
+{
+  schemaVersion: 1,
+  kind: "labScenario",
+  name: string,
+  seed: u32,
+  map: { name: string, schemaVersion: u32, contentHash: string },
+  players: [{
+    id: u32, teamId: u32, factionId: string, name: string, color: string, isAi: bool,
+    steel: u32, oil: u32, upgrades: string[]
+  }],
+  entities: [{
+    id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
+    constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32
+  }],
+  metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
+}
+```
+Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome`. Import validates the schema,
+map metadata, player/team/resource/research/entity fields, restores through the public lab `Game`
+API, applies lab vision metadata, and returns an entity id remap in `outcome.entityIdMap`.
+Transient snapshot fields, fog recipient projections, events, projectile runtime state, command
+logs, interpolation state, and lab operation result metadata are intentionally omitted.
+
+Reliable lab server messages:
+
+| `t` | Fields | Meaning |
+|-----|--------|---------|
+| `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Room-local lab control metadata. World state still travels through `snapshot`. |
+| `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
+
+Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timeline/keyframes,
+lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
+multi-operator conflict semantics, visual iteration hot reload, and `/dev/scenario` migration.
+Those require separate typed messages instead of overloading `LabClientOp`.
 
 ### 2.7 Observer analysis state
 

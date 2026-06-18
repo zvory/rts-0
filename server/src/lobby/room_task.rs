@@ -13,7 +13,10 @@ use super::session_policy::{SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::tick_control::{DevWatchSpeed, ReplayPlaybackClock, ScheduledTickAction, TickControl};
 use super::*;
-use crate::protocol::ReplayPlaybackState;
+use crate::protocol::{
+    Command, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
+    LabState, LabVisionMode, ReplayPlaybackState, DEFAULT_FACTION_ID,
+};
 #[cfg(test)]
 use crate::protocol::{SnapshotNetStatus, StartPayload, PREDICTION_PROTOCOL_VERSION};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
@@ -21,8 +24,14 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rts_ai::{AiController, DEFAULT_LIVE_PROFILE_ID};
 use rts_sim::game::entity::EntityKind;
+use rts_sim::game::lab::{
+    LabError, LabMoveEntity, LabOp, LabOpOutcome, LabScenarioV1 as SimLabScenarioV1,
+    LabSetCompletedResearch, LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity,
+};
 use rts_sim::game::map::Map;
 use rts_sim::game::replay::ReplayArtifactV1;
+use rts_sim::game::upgrade::UpgradeKind;
+use std::str::FromStr;
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
 
@@ -60,6 +69,8 @@ const MAX_LOBBY_TEAMS: TeamId = 4;
 const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
     ["itest-", "ai-itest-", "client-smoke-", "reg-"];
 const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
+const LAB_PLAYER_ONE_ID: u32 = 1;
+const LAB_PLAYER_TWO_ID: u32 = 2;
 
 fn match_countdown_duration() -> Duration {
     #[cfg(test)]
@@ -131,6 +142,14 @@ pub(super) enum RoomMode {
     Replay { artifact: ReplayArtifactV1 },
     ReplayArtifact { artifact: String },
     ReplayBranch { seed: ReplayBranchSeed },
+    Lab(LabRoomConfig),
+}
+
+#[derive(Clone)]
+pub(super) struct LabRoomConfig {
+    pub(super) public_id: String,
+    pub(super) map_name: String,
+    pub(super) seed: Option<u32>,
 }
 
 #[derive(Clone)]
@@ -165,6 +184,309 @@ impl DevDriver {
         match self {
             DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(game),
         }
+    }
+}
+
+struct LabSession {
+    public_id: String,
+    operator_id: u32,
+    viewer_roles: HashMap<u32, LabStartRole>,
+    dirty: bool,
+    operation_log: Vec<LabOperationLogEntry>,
+    vision_mode: LabVisionMode,
+    view_player_id: u32,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+struct LabOperationLogEntry {
+    tick: u32,
+    request_id: u32,
+    operator_id: u32,
+    op: String,
+    result: String,
+}
+
+impl LabSession {
+    fn new(config: &LabRoomConfig, operator_id: u32) -> Self {
+        let mut viewer_roles = HashMap::new();
+        viewer_roles.insert(operator_id, LabStartRole::Operator);
+        Self {
+            public_id: config.public_id.clone(),
+            operator_id,
+            viewer_roles,
+            dirty: false,
+            operation_log: Vec::new(),
+            vision_mode: LabVisionMode::FullWorld,
+            view_player_id: LAB_PLAYER_ONE_ID,
+        }
+    }
+
+    fn add_viewer(&mut self, player_id: u32) {
+        let role = if player_id == self.operator_id {
+            LabStartRole::Operator
+        } else {
+            LabStartRole::ReadOnly
+        };
+        self.viewer_roles.insert(player_id, role);
+    }
+
+    fn remove_viewer(&mut self, player_id: u32) {
+        self.viewer_roles.remove(&player_id);
+    }
+
+    fn role_for(&self, player_id: u32) -> LabStartRole {
+        self.viewer_roles
+            .get(&player_id)
+            .copied()
+            .unwrap_or(LabStartRole::ReadOnly)
+    }
+
+    fn metadata_for(&self, player_id: u32) -> LabStartMetadata {
+        LabStartMetadata {
+            room: self.public_id.clone(),
+            operator_id: self.operator_id,
+            role: self.role_for(player_id),
+            vision: self.vision_mode.clone(),
+            dirty: self.dirty,
+            operation_count: self.operation_log.len() as u32,
+        }
+    }
+
+    fn state_for(&self, player_id: u32) -> LabState {
+        LabState {
+            room: self.public_id.clone(),
+            operator_id: self.operator_id,
+            role: self.role_for(player_id),
+            vision: self.vision_mode.clone(),
+            dirty: self.dirty,
+            operation_count: self.operation_log.len() as u32,
+        }
+    }
+}
+
+fn players_on_teams(game: &Game, team_ids: impl IntoIterator<Item = TeamId>) -> Vec<u32> {
+    let teams: HashSet<_> = team_ids.into_iter().collect();
+    game.start_payload()
+        .players
+        .into_iter()
+        .filter(|player| teams.contains(&player.team_id))
+        .map(|player| player.id)
+        .collect()
+}
+
+fn lab_op_kind(op: &LabClientOp) -> &'static str {
+    match op {
+        LabClientOp::ExportScenario { .. } => "exportScenario",
+        LabClientOp::ImportScenario { .. } => "importScenario",
+        LabClientOp::SpawnEntity { .. } => "spawnEntity",
+        LabClientOp::DeleteEntity { .. } => "deleteEntity",
+        LabClientOp::MoveEntity { .. } => "moveEntity",
+        LabClientOp::SetEntityOwner { .. } => "setEntityOwner",
+        LabClientOp::SetPlayerResources { .. } => "setPlayerResources",
+        LabClientOp::SetCompletedResearch { .. } => "setCompletedResearch",
+        LabClientOp::SetVision { .. } => "setVision",
+        LabClientOp::IssueCommandAs { .. } => "issueCommandAs",
+    }
+}
+
+fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
+    match op {
+        LabClientOp::ImportScenario { scenario } => {
+            validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
+            let scenario: SimLabScenarioV1 = serde_json::from_value(
+                serde_json::to_value(scenario)
+                    .map_err(|err| format!("invalid scenario payload: {err}"))?,
+            )
+            .map_err(|err| format!("invalid scenario payload: {err}"))?;
+            Ok(LabOp::RestoreScenario(Box::new(scenario)))
+        }
+        LabClientOp::SpawnEntity {
+            owner,
+            kind,
+            x,
+            y,
+            completed,
+        } => {
+            let kind =
+                EntityKind::from_str(&kind).map_err(|_| "unknown entity kind".to_string())?;
+            Ok(LabOp::SpawnEntity(LabSpawnEntity {
+                owner,
+                kind,
+                x,
+                y,
+                completed,
+            }))
+        }
+        LabClientOp::DeleteEntity { entity_id } => Ok(LabOp::DeleteEntity { entity_id }),
+        LabClientOp::MoveEntity { entity_id, x, y } => {
+            Ok(LabOp::MoveEntity(LabMoveEntity { entity_id, x, y }))
+        }
+        LabClientOp::SetEntityOwner { entity_id, owner } => {
+            Ok(LabOp::SetEntityOwner(LabSetEntityOwner {
+                entity_id,
+                owner,
+            }))
+        }
+        LabClientOp::SetPlayerResources {
+            player_id,
+            steel,
+            oil,
+        } => Ok(LabOp::SetPlayerResources(LabSetPlayerResources {
+            player_id,
+            steel,
+            oil,
+        })),
+        LabClientOp::SetCompletedResearch {
+            player_id,
+            upgrade,
+            completed,
+        } => {
+            let upgrade =
+                UpgradeKind::from_str(&upgrade).map_err(|_| "unknown research id".to_string())?;
+            Ok(LabOp::SetCompletedResearch(LabSetCompletedResearch {
+                player_id,
+                upgrade,
+                completed,
+            }))
+        }
+        LabClientOp::ExportScenario { .. }
+        | LabClientOp::SetVision { .. }
+        | LabClientOp::IssueCommandAs { .. } => Err("not a lab mutation".to_string()),
+    }
+}
+
+fn validate_lab_vision(game: &Game, vision: &LabVisionMode) -> Result<(), String> {
+    let players = game.start_payload().players;
+    match vision {
+        LabVisionMode::FullWorld => Ok(()),
+        LabVisionMode::Team { team_id } => {
+            if players.iter().any(|player| player.team_id == *team_id) {
+                Ok(())
+            } else {
+                Err("unknown lab team id".to_string())
+            }
+        }
+        LabVisionMode::Teams { team_ids } => {
+            if team_ids.is_empty() {
+                return Err("teamIds must not be empty".to_string());
+            }
+            let mut seen = HashSet::new();
+            for team_id in team_ids {
+                if !seen.insert(*team_id) {
+                    return Err("teamIds must not contain duplicates".to_string());
+                }
+                if !players.iter().any(|player| player.team_id == *team_id) {
+                    return Err("unknown lab team id".to_string());
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+fn truncate_lab_scenario_name(name: &str) -> String {
+    let mut out = String::new();
+    for ch in name.chars() {
+        if out.len() + ch.len_utf8() > 80 {
+            break;
+        }
+        out.push(ch);
+    }
+    out
+}
+
+fn validate_lab_scenario_vision(
+    vision: &LabVisionMode,
+    players: &[crate::protocol::LabScenarioPlayer],
+) -> Result<(), String> {
+    match vision {
+        LabVisionMode::FullWorld => Ok(()),
+        LabVisionMode::Team { team_id } => {
+            if players.iter().any(|player| player.team_id == *team_id) {
+                Ok(())
+            } else {
+                Err("unknown scenario lab team id".to_string())
+            }
+        }
+        LabVisionMode::Teams { team_ids } => {
+            if team_ids.is_empty() {
+                return Err("teamIds must not be empty".to_string());
+            }
+            let mut seen = HashSet::new();
+            for team_id in team_ids {
+                if !seen.insert(*team_id) {
+                    return Err("teamIds must not contain duplicates".to_string());
+                }
+                if !players.iter().any(|player| player.team_id == *team_id) {
+                    return Err("unknown scenario lab team id".to_string());
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+fn lab_result_error(request_id: u32, op: String, error: &str) -> LabResult {
+    LabResult {
+        request_id,
+        ok: false,
+        op,
+        error: Some(error.to_string()),
+        outcome: None,
+    }
+}
+
+fn lab_error_text(err: &LabError) -> String {
+    match err {
+        LabError::StaleEntity { entity_id } => format!("stale entity id {entity_id}"),
+        LabError::InvalidKind { kind, operation } => {
+            format!("invalid kind {kind:?} for {operation}")
+        }
+        LabError::InvalidPlayer { player_id } => format!("invalid player id {player_id}"),
+        LabError::InvalidOwner { owner } => format!("invalid owner id {owner}"),
+        LabError::InvalidPosition { x, y, reason } => {
+            format!("invalid position ({x}, {y}): {reason}")
+        }
+        LabError::OccupiedPosition { x, y } => format!("occupied position ({x}, {y})"),
+        LabError::InvalidResearch { player_id, upgrade } => {
+            format!("invalid research {upgrade:?} for player {player_id}")
+        }
+        LabError::InvalidScenarioVersion { version } => {
+            format!("unsupported scenario version {version}")
+        }
+        LabError::InvalidScenario { reason } => reason.clone(),
+        LabError::InvalidMap { name, reason } => format!("invalid map {name:?}: {reason}"),
+        LabError::InvalidCommand { reason } => reason.clone(),
+    }
+}
+
+fn lab_outcome_json(outcome: &LabOpOutcome) -> serde_json::Value {
+    match outcome {
+        LabOpOutcome::Spawned { entity_id } => serde_json::json!({ "entityId": entity_id }),
+        LabOpOutcome::Deleted { entity_id } => serde_json::json!({ "entityId": entity_id }),
+        LabOpOutcome::Moved { entity_id, x, y } => {
+            serde_json::json!({ "entityId": entity_id, "x": x, "y": y })
+        }
+        LabOpOutcome::OwnerSet { entity_id, owner } => {
+            serde_json::json!({ "entityId": entity_id, "owner": owner })
+        }
+        LabOpOutcome::PlayerResourcesSet {
+            player_id,
+            steel,
+            oil,
+        } => serde_json::json!({ "playerId": player_id, "steel": steel, "oil": oil }),
+        LabOpOutcome::CompletedResearchSet {
+            player_id,
+            upgrade,
+            completed,
+        } => serde_json::json!({
+            "playerId": player_id,
+            "upgrade": upgrade.to_protocol_str(),
+            "completed": completed
+        }),
+        LabOpOutcome::ScenarioRestored(restore) => serde_json::to_value(restore)
+            .unwrap_or_else(|_| serde_json::json!({ "scenarioRestored": true })),
     }
 }
 
@@ -229,6 +551,7 @@ pub(super) struct RoomTask {
     outcome_sent: HashSet<u32>,
     /// In replay branch live matches, connected ids differ from original replay player ids.
     branch_live_seat_by_connection: HashMap<u32, u32>,
+    lab_session: Option<LabSession>,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
     ai_controllers: Vec<AiController>,
@@ -282,6 +605,7 @@ impl RoomTask {
             match_human_count: 0,
             outcome_sent: HashSet::new(),
             branch_live_seat_by_connection: HashMap::new(),
+            lab_session: None,
             dev_driver: None,
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
@@ -382,7 +706,8 @@ impl RoomTask {
     }
 
     fn projection_policy(&self) -> ProjectionPolicy {
-        ProjectionPolicy::new(self.session_policy().vision)
+        let policy = self.session_policy();
+        ProjectionPolicy::new(policy.visibility, policy.diagnostics)
     }
 
     fn is_dev_watch(&self) -> bool {
@@ -390,8 +715,10 @@ impl RoomTask {
     }
 
     fn should_persist_match_history(&self) -> bool {
+        let match_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
         self.match_player_count >= 1
-            && self.session_policy().allows_match_history()
+            && match_policy.has_authoritative_mutation()
+            && match_policy.allows_match_history()
             && !is_automated_match_history_room(&self.room)
             && !match_history_participants_are_automated(&self.match_participants)
     }
@@ -461,6 +788,11 @@ impl RoomTask {
             RoomEvent::SetReplayVision { player_id, vision } => {
                 self.on_set_replay_vision(player_id, vision)
             }
+            RoomEvent::Lab {
+                player_id,
+                request_id,
+                op,
+            } => self.on_lab_request(player_id, request_id, op),
             RoomEvent::RequestReplayBranch { player_id, reply } => {
                 let _ = reply.send(self.on_request_replay_branch(player_id));
             }
@@ -538,8 +870,12 @@ impl RoomTask {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
-        if policy.uses_branch_staging_join() {
+        if policy.uses_branch_room_join() {
             self.on_join_branch_staging(player_id, name, msg_tx, ack);
+            return;
+        }
+        if policy.uses_lab_room_join() {
+            self.on_join_lab(player_id, name, msg_tx, ack);
             return;
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
@@ -656,6 +992,9 @@ impl RoomTask {
         self.order.retain(|&id| id != player_id);
         self.human_team_assignments.remove(&player_id);
         self.human_faction_assignments.remove(&player_id);
+        if let Some(session) = &mut self.lab_session {
+            session.remove_viewer(player_id);
+        }
         self.outcome_sent.remove(&player_id);
         self.reassign_host_if_needed();
         crate::log_debug!(room = %self.room, player_id, "left");
@@ -1461,11 +1800,67 @@ impl RoomTask {
         self.broadcast_branch_staging();
     }
 
+    fn on_join_lab(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby | Phase::InGame(_)) {
+            let _ = ack.send(false);
+            return;
+        }
+        let config = match &self.mode {
+            RoomMode::Lab(config) => config.clone(),
+            _ => {
+                let _ = ack.send(false);
+                return;
+            }
+        };
+        if self.lab_session.is_none() {
+            self.lab_session = Some(LabSession::new(&config, player_id));
+        } else if let Some(session) = &mut self.lab_session {
+            session.add_viewer(player_id);
+        }
+        self.order.push(player_id);
+        self.players.insert(
+            player_id,
+            RoomPlayer {
+                name,
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
+            },
+        );
+        self.reassign_host_if_needed();
+        let _ = ack.send(true);
+        self.send_current_shutdown_warning_to(player_id);
+
+        if matches!(self.phase, Phase::Lobby) {
+            self.start_lab_session();
+        } else {
+            self.send_lab_start_to(player_id);
+        }
+    }
+
     fn replay_session_for_mode(&self) -> Result<ReplaySession, String> {
         let artifact = match &self.mode {
             RoomMode::Replay { artifact } => artifact.clone(),
             RoomMode::ReplayArtifact { artifact } => load_replay_artifact(artifact)?,
             RoomMode::ReplayBranch { .. } => {
+                return Err("room is not configured for replay playback".to_string());
+            }
+            RoomMode::Lab(_) => {
                 return Err("room is not configured for replay playback".to_string());
             }
             _ => return Err("room is not configured for replay playback".to_string()),
@@ -1721,6 +2116,7 @@ impl RoomTask {
                         LaunchPrediction::Enabled
                     },
                     clear_pending_snapshot: false,
+                    lab: None,
                     msg_tx: player.msg_tx.clone(),
                 })
             })
@@ -1813,6 +2209,7 @@ impl RoomTask {
                     LaunchPrediction::Disabled
                 },
                 clear_pending_snapshot: true,
+                lab: None,
                 msg_tx: player.msg_tx.clone(),
             });
         }
@@ -1832,6 +2229,124 @@ impl RoomTask {
         });
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
+    }
+
+    fn start_lab_session(&mut self) {
+        self.prepare_live_match_launch();
+        let config = match &self.mode {
+            RoomMode::Lab(config) => config.clone(),
+            _ => return,
+        };
+        if self.lab_session.is_none() {
+            if let Some(operator_id) = self.order.first().copied() {
+                self.lab_session = Some(LabSession::new(&config, operator_id));
+            }
+        }
+        let seed = config.seed.unwrap_or_else(match_seed);
+        let inits = self.default_lab_player_template();
+        let start_players: Vec<_> = inits
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    normalize_start_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map_metadata = match Map::metadata_for_name(&config.map_name) {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                self.send_lab_error(format!(
+                    "Cannot load lab map \"{}\": {err}",
+                    config.map_name
+                ));
+                return;
+            }
+        };
+        let map = match Map::load_for_players(&config.map_name, &start_players, seed) {
+            Ok(map) => map,
+            Err(err) => {
+                self.send_lab_error(format!(
+                    "Cannot load lab map \"{}\": {err}",
+                    config.map_name
+                ));
+                return;
+            }
+        };
+        let game =
+            Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata);
+        let payload = game.start_payload();
+        self.record_live_match_started(
+            inits.len(),
+            0,
+            config.map_name.clone(),
+            inits.iter().map(|player| player.name.clone()).collect(),
+        );
+        self.ai_controllers.clear();
+        self.dev_driver = None;
+        self.dev_view_player_id = None;
+
+        let recipients: Vec<_> = self
+            .order
+            .iter()
+            .filter_map(|&id| {
+                self.players.get(&id).map(|player| LaunchRecipient {
+                    connection_id: id,
+                    payload_player_id: self
+                        .lab_session
+                        .as_ref()
+                        .map(|session| session.view_player_id)
+                        .unwrap_or(LAB_PLAYER_ONE_ID),
+                    spectator: true,
+                    prediction: LaunchPrediction::Disabled,
+                    clear_pending_snapshot: false,
+                    lab: self.lab_start_metadata_for(id),
+                    msg_tx: player.msg_tx.clone(),
+                })
+            })
+            .collect();
+        super::launch::send_start_payloads(&self.room, &payload, recipients);
+
+        structured_log::log_match_started(MatchStartedLog {
+            room: &self.room,
+            match_run_id: self.match_run_id.as_deref().unwrap_or(""),
+            mode: "lab",
+            map: &self.match_map_name,
+            seed,
+            players: self.match_player_count,
+            humans: self.match_human_count,
+            ai: 0,
+            quickstart: false,
+            participants: &self.match_participants,
+        });
+        self.mark_match_started_for_drain();
+        self.phase = Phase::InGame(Box::new(game));
+    }
+
+    fn default_lab_player_template(&self) -> Vec<PlayerInit> {
+        vec![
+            PlayerInit {
+                id: LAB_PLAYER_ONE_ID,
+                team_id: 1,
+                faction_id: DEFAULT_FACTION_ID.to_string(),
+                name: "Lab Alpha".to_string(),
+                color: PLAYER_PALETTE[0].to_string(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: LAB_PLAYER_TWO_ID,
+                team_id: 2,
+                faction_id: DEFAULT_FACTION_ID.to_string(),
+                name: "Lab Bravo".to_string(),
+                color: PLAYER_PALETTE[1].to_string(),
+                is_ai: false,
+            },
+        ]
+    }
+
+    fn send_lab_error(&self, msg: String) {
+        let error = ServerMessage::Error { msg };
+        self.broadcast(&error);
     }
 
     fn start_dev_session(&mut self) {
@@ -1867,6 +2382,7 @@ impl RoomTask {
             RoomMode::ReplayBranch { .. } => {
                 Err("room is not configured for a dev session".to_string())
             }
+            RoomMode::Lab(_) => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevScenario(config) => {
                 let _scenario_faction_id =
                     default_faction_id_for(FactionRequestContext::DevScenario);
@@ -2027,9 +2543,59 @@ impl RoomTask {
                 spectator: true,
                 prediction: LaunchPrediction::Disabled,
                 clear_pending_snapshot: false,
+                lab: None,
                 msg_tx: player.msg_tx.clone(),
             }],
         );
+    }
+
+    fn send_lab_start_to(&self, watcher_id: u32) {
+        let Some(Phase::InGame(game)) = Some(&self.phase) else {
+            return;
+        };
+        let Some(player) = self.players.get(&watcher_id) else {
+            return;
+        };
+        let payload = game.start_payload();
+        super::launch::send_start_payloads(
+            &self.room,
+            &payload,
+            [LaunchRecipient {
+                connection_id: watcher_id,
+                payload_player_id: self
+                    .lab_session
+                    .as_ref()
+                    .map(|session| session.view_player_id)
+                    .unwrap_or(LAB_PLAYER_ONE_ID),
+                spectator: true,
+                prediction: LaunchPrediction::Disabled,
+                clear_pending_snapshot: false,
+                lab: self.lab_start_metadata_for(watcher_id),
+                msg_tx: player.msg_tx.clone(),
+            }],
+        );
+    }
+
+    fn lab_start_metadata_for(&self, player_id: u32) -> Option<LabStartMetadata> {
+        self.lab_session
+            .as_ref()
+            .map(|session| session.metadata_for(player_id))
+    }
+
+    fn lab_snapshot_projection_inputs(&self, game: &Game) -> (Option<u32>, Option<Vec<u32>>) {
+        let Some(session) = &self.lab_session else {
+            return (None, None);
+        };
+        match &session.vision_mode {
+            LabVisionMode::FullWorld => (Some(session.view_player_id), None),
+            LabVisionMode::Team { team_id } => (
+                None,
+                Some(players_on_teams(game, std::iter::once(*team_id))),
+            ),
+            LabVisionMode::Teams { team_ids } => {
+                (None, Some(players_on_teams(game, team_ids.iter().copied())))
+            }
+        }
     }
 
     fn send_replay_start_to(&self, watcher_id: u32) {
@@ -2213,6 +2779,8 @@ impl RoomTask {
         let match_run_id = self.match_run_id.as_deref();
         let ai_player_count = self.ai_players.len();
         let spectator_visible_players = self.spectator_visible_player_ids();
+        let (full_world_view_player_id, lab_visible_player_ids) =
+            self.lab_snapshot_projection_inputs(&game);
         let result = LiveTickDriver {
             room: &self.room,
             scheduled,
@@ -2228,6 +2796,8 @@ impl RoomTask {
             pending_client_command_acks: &mut self.pending_client_command_acks,
             slow_tick_count: &mut self.slow_tick_count,
             spectator_visible_players,
+            full_world_view_player_id,
+            lab_visible_player_ids,
             projection_policy,
         }
         .run(game);
@@ -2435,6 +3005,268 @@ impl RoomTask {
                     ServerMessage::ObserverAnalysis(analysis),
                 );
             }
+        }
+    }
+
+    fn on_lab_request(&mut self, player_id: u32, request_id: u32, op: LabClientOp) {
+        let op_kind = lab_op_kind(&op).to_string();
+        if request_id == 0 {
+            self.send_lab_result_to(
+                player_id,
+                LabResult {
+                    request_id,
+                    ok: false,
+                    op: op_kind,
+                    error: Some("requestId must be nonzero".to_string()),
+                    outcome: None,
+                },
+            );
+            return;
+        }
+        if !matches!(self.mode, RoomMode::Lab(_)) {
+            self.send_lab_result_to(
+                player_id,
+                LabResult {
+                    request_id,
+                    ok: false,
+                    op: op_kind,
+                    error: Some("lab requests are only valid in lab rooms".to_string()),
+                    outcome: None,
+                },
+            );
+            return;
+        }
+        if self
+            .lab_session
+            .as_ref()
+            .map(|session| session.operator_id != player_id)
+            .unwrap_or(true)
+        {
+            self.send_lab_result_to(
+                player_id,
+                LabResult {
+                    request_id,
+                    ok: false,
+                    op: op_kind,
+                    error: Some("only the lab operator can send lab requests".to_string()),
+                    outcome: None,
+                },
+            );
+            return;
+        }
+
+        let result = match op {
+            LabClientOp::SetVision { vision } => {
+                self.apply_lab_vision(player_id, request_id, vision)
+            }
+            LabClientOp::ExportScenario { name } => self.export_lab_scenario(request_id, name),
+            LabClientOp::IssueCommandAs { player_id, cmd } => {
+                self.apply_lab_issue_command(request_id, player_id, cmd)
+            }
+            op => self.apply_lab_mutation(request_id, op),
+        };
+        self.send_lab_result_to(player_id, result);
+    }
+
+    fn apply_lab_vision(
+        &mut self,
+        operator_id: u32,
+        request_id: u32,
+        vision: LabVisionMode,
+    ) -> LabResult {
+        let op = "setVision".to_string();
+        let Some(game) = self.live_game() else {
+            return lab_result_error(request_id, op, "lab game is not running");
+        };
+        if let Err(err) = validate_lab_vision(game, &vision) {
+            return lab_result_error(request_id, op, &err);
+        }
+        let tick = game.tick_count();
+        if let Some(session) = &mut self.lab_session {
+            session.vision_mode = vision;
+            session.operation_log.push(LabOperationLogEntry {
+                tick,
+                request_id,
+                operator_id,
+                op: op.clone(),
+                result: "accepted".to_string(),
+            });
+        }
+        self.broadcast_lab_state();
+        LabResult {
+            request_id,
+            ok: true,
+            op,
+            error: None,
+            outcome: None,
+        }
+    }
+
+    fn apply_lab_issue_command(
+        &mut self,
+        request_id: u32,
+        command_player_id: u32,
+        cmd: Command,
+    ) -> LabResult {
+        let op = "issueCommandAs".to_string();
+        let tick = {
+            let Some(game) = self.live_game_mut() else {
+                return lab_result_error(request_id, op, "lab game is not running");
+            };
+            if let Err(err) = game.issue_lab_command_as(command_player_id, cmd) {
+                return lab_result_error(request_id, op, &lab_error_text(&err));
+            }
+            game.tick_count()
+        };
+        if let Some(session) = &mut self.lab_session {
+            session.dirty = true;
+            session.operation_log.push(LabOperationLogEntry {
+                tick,
+                request_id,
+                operator_id: session.operator_id,
+                op: op.clone(),
+                result: format!("playerId={command_player_id}"),
+            });
+        }
+        self.broadcast_lab_state();
+        LabResult {
+            request_id,
+            ok: true,
+            op,
+            error: None,
+            outcome: None,
+        }
+    }
+
+    fn export_lab_scenario(&self, request_id: u32, name: Option<String>) -> LabResult {
+        let op = "exportScenario".to_string();
+        let Some(game) = self.live_game() else {
+            return lab_result_error(request_id, op, "lab game is not running");
+        };
+        let Some(session) = &self.lab_session else {
+            return lab_result_error(request_id, op, "lab session is not running");
+        };
+        let mut scenario = match serde_json::to_value(game.export_lab_scenario()) {
+            Ok(value) => value,
+            Err(err) => {
+                return lab_result_error(request_id, op, &format!("scenario export failed: {err}"));
+            }
+        };
+        if let Some(object) = scenario.as_object_mut() {
+            let scenario_name = name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("Untitled lab scenario");
+            object.insert(
+                "name".to_string(),
+                serde_json::Value::String(truncate_lab_scenario_name(scenario_name)),
+            );
+            if let Some(metadata) = object
+                .get_mut("metadata")
+                .and_then(|value| value.as_object_mut())
+            {
+                metadata.insert(
+                    "lab".to_string(),
+                    serde_json::to_value(LabScenarioLabMetadata {
+                        vision: session.vision_mode.clone(),
+                    })
+                    .unwrap_or_else(|_| serde_json::json!({ "vision": { "mode": "fullWorld" } })),
+                );
+            }
+        }
+        LabResult {
+            request_id,
+            ok: true,
+            op,
+            error: None,
+            outcome: Some(serde_json::json!({ "scenario": scenario })),
+        }
+    }
+
+    fn apply_lab_mutation(&mut self, request_id: u32, op: LabClientOp) -> LabResult {
+        let op_kind = lab_op_kind(&op).to_string();
+        let imported_vision = match &op {
+            LabClientOp::ImportScenario { scenario } => Some(scenario.metadata.lab.vision.clone()),
+            _ => None,
+        };
+        let lab_op = match lab_client_op_to_game_op(op) {
+            Ok(op) => op,
+            Err(err) => return lab_result_error(request_id, op_kind, &err),
+        };
+        let (tick, outcome_json) = {
+            let Some(game) = self.live_game_mut() else {
+                return lab_result_error(request_id, op_kind, "lab game is not running");
+            };
+            let outcome = match game.apply_lab_op(lab_op) {
+                Ok(outcome) => outcome,
+                Err(err) => return lab_result_error(request_id, op_kind, &lab_error_text(&err)),
+            };
+            (game.tick_count(), lab_outcome_json(&outcome))
+        };
+        if let Some(session) = &mut self.lab_session {
+            session.dirty = true;
+            if let Some(vision) = imported_vision {
+                session.vision_mode = vision;
+            }
+            session.operation_log.push(LabOperationLogEntry {
+                tick,
+                request_id,
+                operator_id: session.operator_id,
+                op: op_kind.clone(),
+                result: outcome_json.to_string(),
+            });
+        }
+        self.broadcast_lab_state();
+        LabResult {
+            request_id,
+            ok: true,
+            op: op_kind,
+            error: None,
+            outcome: Some(outcome_json),
+        }
+    }
+
+    fn live_game(&self) -> Option<&Game> {
+        match &self.phase {
+            Phase::InGame(game) => Some(game),
+            _ => None,
+        }
+    }
+
+    fn live_game_mut(&mut self) -> Option<&mut Game> {
+        match &mut self.phase {
+            Phase::InGame(game) => Some(game),
+            _ => None,
+        }
+    }
+
+    fn send_lab_result_to(&self, player_id: u32, result: LabResult) {
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            player_id,
+            &player.msg_tx,
+            ServerMessage::LabResult(result),
+        );
+    }
+
+    fn broadcast_lab_state(&self) {
+        let Some(session) = &self.lab_session else {
+            return;
+        };
+        for &id in &self.order {
+            let Some(player) = self.players.get(&id) else {
+                continue;
+            };
+            send_or_log(
+                &self.room,
+                id,
+                &player.msg_tx,
+                ServerMessage::LabState(session.state_for(id)),
+            );
         }
     }
 
@@ -2926,6 +3758,7 @@ impl RoomTask {
         self.match_human_count = 0;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
+        self.lab_session = None;
         self.host_id = None;
         // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
         // joiner under this room name should start from a clean lobby.
@@ -3134,6 +3967,14 @@ mod tests {
             },
         );
         writer
+    }
+
+    fn lab_config() -> LabRoomConfig {
+        LabRoomConfig {
+            public_id: "sandbox".to_string(),
+            map_name: "Default".to_string(),
+            seed: Some(0x1A2B_3C4D),
+        }
     }
 
     #[test]
@@ -3375,6 +4216,15 @@ mod tests {
         std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
             .filter_map(|msg| match msg {
                 ServerMessage::Start(payload) => Some(payload),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn lab_results(writer: &mut ConnectionWriter) -> Vec<LabResult> {
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .filter_map(|msg| match msg {
+                ServerMessage::LabResult(result) => Some(result),
                 _ => None,
             })
             .collect()
@@ -3781,6 +4631,7 @@ mod tests {
             PREDICTION_PROTOCOL_VERSION
         );
         assert!(player_payload.replay.is_none());
+        assert!(player_payload.lab.is_none());
 
         let spectator_starts = start_payloads(&mut writer_spectator);
         assert_eq!(spectator_starts.len(), 1);
@@ -3790,6 +4641,468 @@ mod tests {
         assert!(spectator_payload.prediction_build_id.is_none());
         assert_eq!(spectator_payload.prediction_version, 0);
         assert!(spectator_payload.replay.is_none());
+        assert!(spectator_payload.lab.is_none());
+    }
+
+    #[test]
+    fn lab_room_join_launches_real_game_with_lab_start_metadata() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert!(matches!(task.phase, Phase::InGame(_)));
+        assert_eq!(task.match_player_count, 2);
+        assert_eq!(task.match_human_count, 0);
+        assert!(!task.session_policy().allows_match_history());
+        let session = task.lab_session.as_ref().expect("lab session");
+        assert_eq!(session.operator_id, 99);
+        assert_eq!(session.role_for(99), LabStartRole::Operator);
+
+        let starts = start_payloads(&mut writer);
+        assert_eq!(starts.len(), 1);
+        let payload = &starts[0];
+        assert_eq!(payload.player_id, LAB_PLAYER_ONE_ID);
+        assert!(payload.spectator);
+        assert!(payload.prediction_build_id.is_none());
+        assert_eq!(payload.prediction_version, 0);
+        assert!(payload.replay.is_none());
+        assert_eq!(payload.players.len(), 2);
+        assert_eq!(payload.players[0].team_id, 1);
+        assert_eq!(payload.players[1].team_id, 2);
+        let lab = payload.lab.as_ref().expect("lab metadata");
+        assert_eq!(lab.room, "sandbox");
+        assert_eq!(lab.operator_id, 99);
+        assert_eq!(lab.role, LabStartRole::Operator);
+        assert_eq!(lab.vision, LabVisionMode::FullWorld);
+        assert!(!lab.dirty);
+        assert_eq!(lab.operation_count, 0);
+    }
+
+    #[test]
+    fn lab_room_additional_joiner_gets_read_only_lab_start() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, _operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+
+        let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
+        let (viewer_ack, mut viewer_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Viewer".to_string(),
+            true,
+            false,
+            viewer_tx,
+            viewer_ack,
+        );
+
+        assert_eq!(viewer_ack_rx.try_recv(), Ok(true));
+        let starts = start_payloads(&mut viewer_writer);
+        assert_eq!(starts.len(), 1);
+        let lab = starts[0].lab.as_ref().expect("lab metadata");
+        assert_eq!(lab.operator_id, 99);
+        assert_eq!(lab.role, LabStartRole::ReadOnly);
+        assert_eq!(lab.vision, LabVisionMode::FullWorld);
+    }
+
+    #[test]
+    fn lab_room_snapshot_uses_full_world_projection() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+        while writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_tick(TokioInstant::now());
+
+        let snapshot = writer.snapshots.take().expect("lab snapshot");
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should remain live");
+        };
+        let mut expected = game.snapshot_full_for(LAB_PLAYER_ONE_ID);
+        compact_snapshot_for_wire(&mut expected);
+        assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
+        assert!(snapshot.visible_tiles.is_empty());
+        assert_eq!(snapshot.entities.len(), expected.entities.len());
+        assert_eq!(snapshot.player_resources, expected.player_resources);
+        assert_eq!(snapshot.net_status.prediction_version, 0);
+    }
+
+    #[test]
+    fn lab_operator_mutation_returns_result_broadcasts_state_and_logs() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+        while writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_lab_request(
+            99,
+            7,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 1234,
+                oil: 55,
+            },
+        );
+
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        let results: Vec<_> = messages
+            .iter()
+            .filter_map(|msg| match msg {
+                ServerMessage::LabResult(result) => Some(result),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].ok);
+        assert_eq!(results[0].request_id, 7);
+        assert_eq!(results[0].op, "setPlayerResources");
+        let states: Vec<_> = messages
+            .iter()
+            .filter_map(|msg| match msg {
+                ServerMessage::LabState(state) => Some(state),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(states.len(), 1);
+        assert!(states[0].dirty);
+        assert_eq!(states[0].operation_count, 1);
+        let session = task.lab_session.as_ref().unwrap();
+        assert_eq!(session.operation_log.len(), 1);
+        assert_eq!(session.operation_log[0].request_id, 7);
+        assert_eq!(session.operation_log[0].operator_id, 99);
+        assert_eq!(session.operation_log[0].tick, 0);
+        assert_eq!(session.operation_log[0].op, "setPlayerResources");
+        assert!(session.operation_log[0].result.contains("playerId"));
+    }
+
+    #[test]
+    fn lab_scenario_export_and_import_round_trip_through_room_ops() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+        while writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_lab_request(
+            99,
+            20,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 777,
+                oil: 66,
+            },
+        );
+        assert!(lab_results(&mut writer)[0].ok);
+
+        task.on_lab_request(
+            99,
+            21,
+            LabClientOp::SetVision {
+                vision: LabVisionMode::Team { team_id: 2 },
+            },
+        );
+        assert!(lab_results(&mut writer)[0].ok);
+
+        task.on_lab_request(
+            99,
+            22,
+            LabClientOp::ExportScenario {
+                name: Some("saved setup".to_string()),
+            },
+        );
+        let export_result = lab_results(&mut writer).pop().expect("export result");
+        assert!(export_result.ok);
+        let scenario: crate::protocol::LabScenarioV1 = serde_json::from_value(
+            export_result
+                .outcome
+                .as_ref()
+                .and_then(|outcome| outcome.get("scenario"))
+                .cloned()
+                .expect("scenario outcome"),
+        )
+        .expect("scenario JSON");
+        assert_eq!(scenario.kind, "labScenario");
+        assert_eq!(scenario.name, "saved setup");
+        assert_eq!(
+            scenario.metadata.lab.vision,
+            LabVisionMode::Team { team_id: 2 }
+        );
+        assert!(scenario.players.iter().any(|player| {
+            player.id == LAB_PLAYER_ONE_ID && player.steel == 777 && player.oil == 66
+        }));
+
+        task.on_lab_request(
+            99,
+            23,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 1,
+                oil: 1,
+            },
+        );
+        assert!(lab_results(&mut writer)[0].ok);
+
+        task.on_lab_request(99, 24, LabClientOp::ImportScenario { scenario });
+        let import_result = lab_results(&mut writer).pop().expect("import result");
+        assert!(import_result.ok);
+        assert_eq!(import_result.op, "importScenario");
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should still be live after import");
+        };
+        let snapshot = game.snapshot_full_for(LAB_PLAYER_ONE_ID);
+        assert!(snapshot.player_resources.iter().any(|player| {
+            player.id == LAB_PLAYER_ONE_ID && player.steel == 777 && player.oil == 66
+        }));
+        assert_eq!(
+            task.lab_session.as_ref().unwrap().vision_mode,
+            LabVisionMode::Team { team_id: 2 }
+        );
+    }
+
+    #[test]
+    fn lab_viewer_cannot_mutate_and_normal_room_rejects_lab_request() {
+        let mut lab_task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, _operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        lab_task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
+        let (viewer_ack, _viewer_ack_rx) = tokio::sync::oneshot::channel();
+        lab_task.on_join(
+            100,
+            "Viewer".to_string(),
+            true,
+            false,
+            viewer_tx,
+            viewer_ack,
+        );
+        while viewer_writer.reliable_rx.try_recv().is_ok() {}
+
+        lab_task.on_lab_request(
+            100,
+            8,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 1,
+                oil: 1,
+            },
+        );
+
+        let rejected = lab_results(&mut viewer_writer);
+        assert_eq!(rejected.len(), 1);
+        assert!(!rejected[0].ok);
+        assert!(rejected[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("only the lab operator"));
+        assert_eq!(
+            lab_task.lab_session.as_ref().unwrap().operation_log.len(),
+            0
+        );
+
+        let mut normal = RoomTask::new(
+            "normal-lab-reject-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut normal_writer = add_test_room_player(&mut normal, 1, true);
+        normal.on_lab_request(
+            1,
+            9,
+            LabClientOp::SetVision {
+                vision: LabVisionMode::FullWorld,
+            },
+        );
+        let normal_results = lab_results(&mut normal_writer);
+        assert_eq!(normal_results.len(), 1);
+        assert!(!normal_results[0].ok);
+        assert!(normal_results[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("lab rooms"));
+    }
+
+    #[test]
+    fn lab_issue_as_accepts_single_owner_and_rejects_mixed_owner_commands() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+        while writer.reliable_rx.try_recv().is_ok() {}
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should be running");
+        };
+        let snapshot = game.snapshot_full_for(LAB_PLAYER_ONE_ID);
+        let unit_one = snapshot
+            .entities
+            .iter()
+            .find(|entity| {
+                entity.owner == LAB_PLAYER_ONE_ID && entity.kind == crate::protocol::kinds::WORKER
+            })
+            .unwrap()
+            .id;
+        let unit_two = snapshot
+            .entities
+            .iter()
+            .find(|entity| {
+                entity.owner == LAB_PLAYER_TWO_ID && entity.kind == crate::protocol::kinds::WORKER
+            })
+            .unwrap()
+            .id;
+
+        task.on_lab_request(
+            99,
+            10,
+            LabClientOp::IssueCommandAs {
+                player_id: LAB_PLAYER_ONE_ID,
+                cmd: Command::Stop {
+                    units: vec![unit_one],
+                },
+            },
+        );
+        task.on_lab_request(
+            99,
+            11,
+            LabClientOp::IssueCommandAs {
+                player_id: LAB_PLAYER_ONE_ID,
+                cmd: Command::Stop {
+                    units: vec![unit_one, unit_two],
+                },
+            },
+        );
+
+        let results = lab_results(&mut writer);
+        assert_eq!(results.len(), 2);
+        assert!(results[0].ok);
+        assert!(!results[1].ok);
+        task.on_tick(TokioInstant::now());
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should remain running");
+        };
+        assert_eq!(game.command_log().len(), 1);
+        assert_eq!(game.command_log()[0].player_id, LAB_PLAYER_ONE_ID);
+    }
+
+    #[test]
+    fn lab_team_vision_uses_server_projection() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+        while writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_lab_request(
+            99,
+            12,
+            LabClientOp::SetVision {
+                vision: LabVisionMode::Team { team_id: 2 },
+            },
+        );
+        assert!(lab_results(&mut writer)[0].ok);
+        while writer.reliable_rx.try_recv().is_ok() {}
+        task.on_tick(TokioInstant::now());
+
+        let snapshot = writer.snapshots.take().expect("lab team snapshot");
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should remain running");
+        };
+        let mut expected = game.snapshot_for_spectator(&[LAB_PLAYER_TWO_ID]);
+        compact_snapshot_for_wire(&mut expected);
+        assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
+        assert_eq!(snapshot.entities.len(), expected.entities.len());
+    }
+
+    #[test]
+    fn empty_lab_room_resets_session_without_changing_lab_mode() {
+        let drain = DrainHandle::default();
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            drain.clone(),
+        );
+        let (msg_tx, _writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+        task.on_leave(99);
+
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert!(task.players.is_empty());
+        assert!(task.lab_session.is_none());
+        assert_eq!(drain.active_matches(), 0);
+        assert!(matches!(task.mode, RoomMode::Lab(_)));
     }
 
     #[test]

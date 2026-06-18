@@ -753,6 +753,7 @@ mod tests {
             prediction_version: 0,
             debug_mode: false,
             replay: None,
+            lab: None,
             tick: 10,
             map: MapInfo {
                 width: 64,

@@ -32,7 +32,7 @@ import {
   WEAPON_RECOIL_PX,
   ZERO_OFFSET,
 } from "./palette.js";
-import { drawMagicAnchor } from "./magic_anchor_effect.js";
+import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
 import {
   angleDelta,
   clamp01,
@@ -49,6 +49,7 @@ import {
   drawTankHull,
   drawTankTracks,
   finiteNumber,
+  hash2,
   hexToInt,
   isImpassableAt,
   isVehicleBodyKind,
@@ -432,7 +433,7 @@ export function _drawAbilityTargetPreview(view) {
     for (const origin of preview.pathOrigins) {
       if (!finiteNumber(origin.x) || !finiteNumber(origin.y)) continue;
       const color = origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR
-        ? ABILITY_ANCHOR_COLOR
+        ? MAGIC_ANCHOR_COLOR
         : FIELD_OF_FIRE_COLOR;
       g.lineStyle(2, color, origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR ? 0.72 : 0.55);
       dashedLine(g, origin.x, origin.y, preview.mouseX, preview.mouseY, 10, 5);

@@ -90,7 +90,9 @@ pub(super) fn push_under_attack_notices_for_visible_attack(
         ) {
             continue;
         }
-        push_under_attack_notice(events, teams, pid, victim_owner, attacker_owner, vx, vy);
+        if pid == victim_owner {
+            push_under_attack_notice(events, teams, pid, victim_owner, attacker_owner, vx, vy);
+        }
     }
 }
 
@@ -105,7 +107,7 @@ pub(super) fn push_under_attack_notice(
 ) {
     if victim_owner == 0
         || !teams.is_enemy_owner(attacker_owner, victim_owner)
-        || !teams.same_team_or_same_owner(recipient, victim_owner)
+        || recipient != victim_owner
     {
         return;
     }

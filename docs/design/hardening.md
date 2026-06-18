@@ -82,12 +82,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   intentional friendly-fire surfaces: they can damage owned and allied entities in the blast radius,
   but same-team splash stays unattributed.
 - **Shot blocking and overpenetration**: ranged attacks first resolve against the first enemy tank
-  body or building footprint intersecting the line from attacker to intended target. That blocker
-  takes the shot damage and the intended target behind it is unharmed. Shots that hit ordinary
-  enemy units still overpenetrate past the primary target, but any enemy tank body or enemy building
-  footprint hit by that carry-through damage absorbs the shot and stops further overpenetration.
-  Allied entities behind the primary target are ignored by overpenetration. Stone blocks target
-  acquisition and primary fire.
+  body or non-Tank-Trap building footprint intersecting the line from attacker to intended target.
+  That blocker takes the shot damage and the intended target behind it is unharmed. Tank Traps are
+  targetable buildings and still block vehicle movement, but they do not intercept shots; attacks
+  aimed at a unit behind a Tank Trap continue to that unit. Shots that hit ordinary enemy units
+  still overpenetrate past the primary target, but any enemy tank body or enemy non-Tank-Trap
+  building footprint hit by that carry-through damage absorbs the shot and stops further
+  overpenetration. Allied entities behind the primary target are ignored by overpenetration. Stone
+  blocks target acquisition and primary fire.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate (`TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.035`) on
   movement paths; badly misaligned tanks pivot in place instead of sliding sideways at full speed.

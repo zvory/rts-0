@@ -89,6 +89,29 @@ impl Game {
         map_metadata: MapMetadata,
     ) -> Game;
 
+    /// Create a lab match around an already validated map/player setup. Lab rooms still use the
+    /// normal `Game` simulation; the lab constructor only names the mode-specific setup seam.
+    pub fn new_lab(players: &[PlayerInit], seed: u32, map: Map, map_metadata: MapMetadata) -> Game;
+
+    /// Apply one typed, validated lab mutation and repair derived sim state before returning.
+    /// Accepted operations can spawn, delete, move, reassign, set resources, set completed
+    /// research, or restore a versioned lab scenario. Bad lab input returns `LabError`; room code
+    /// must not mutate entity stores or player state directly.
+    pub fn apply_lab_op(&mut self, op: lab::LabOp) -> Result<lab::LabOpOutcome, lab::LabError>;
+
+    /// Export authoritative lab setup data as versioned JSON-friendly scenario state, without
+    /// treating snapshots, fog, transient events, command logs, or room-owned lab metadata as the
+    /// scenario format.
+    pub fn export_lab_scenario(&self) -> lab::LabScenarioV1;
+
+    /// Restore a versioned lab scenario through the same validation/repair path used by
+    /// `apply_lab_op(LabOp::RestoreScenario(...))`, remapping scenario entity ids to fresh
+    /// authoritative ids.
+    pub fn restore_lab_scenario(
+        &mut self,
+        scenario: lab::LabScenarioV1,
+    ) -> Result<lab::LabOpOutcome, lab::LabError>;
+
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
 
@@ -159,6 +182,18 @@ win/elimination); the only difference is they have no socket. `Game` does not ow
 the room task or tool harness asks `rts-ai` controllers for ordinary `SimCommand`s and enqueues
 them through this API before ticking — see §8.
 
+Lab mutation types live under `game::lab`. `LabOp` is intentionally narrow rather than a debug
+backdoor: entity mutations validate known unit/building kinds, real players, finite in-map
+positions, placement/collision legality, and stale ids before changing the world. Accepted lab
+mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
+fog, and building memory before returning. `LabScenarioV1` is setup data keyed by map identity,
+player state, entity records, and small lab metadata such as scenario name and exported tick;
+room-owned protocol export adds current lab vision metadata before sending JSON to the browser.
+Restore loads the named map, validates faction/research/kind data, recreates entities with fresh
+ids, repairs derived state, and returns the id remap for callers that need to reconcile UI
+selection. Snapshot-only projections, transient events, projectile runtime state, and command logs
+are not part of the scenario format.
+
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with
 `team_id == 0` are normalized to `team_id = id` when constructing a `Game`. Relationship helpers
@@ -204,13 +239,19 @@ alive.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`,
-  `GiveUp`, `SetReplaySpeed`, `SeekReplay`, `SetReplayVision`). The room task is the single writer
-  of game state — no locks around `Game`.
+  `GiveUp`, `SetReplaySpeed`, `SeekReplay`, `SetReplayVision`, `Lab`). The room task is the single
+  writer of game state — no locks around `Game`.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
   connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
   `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
+- Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
+  room-owned operator/read-only viewer session record. They use the shared launch helper with
+  `StartPayload.lab` metadata and prediction disabled. Lab setup mutations call `Game::apply_lab_op`;
+  issue-as commands call `Game::issue_lab_command_as`, which rejects mixed-owner selections before
+  queuing a normal command. Lab state, dirty flags, viewer roles, selected vision, and append-only
+  operation log records stay in the room task rather than in `Game`.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -228,18 +269,21 @@ AI controllers, or Tokio coordination into `rts-sim`:
   transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
   `Game`.
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
-  names the state source, join, clock, authority, vision, mutation, persistence, and start-payload
-  choices used by the rest of the lobby helpers.
+  names the state source, join, clock, authority, mutation, visibility, diagnostics,
+  persistence/export, start-payload, and UI-affordance choices used by the rest of the lobby
+  helpers. Product identity still selects real setup paths such as replay-artifact loading, dev
+  scenario construction, replay-branch seeding, and lab room initialization; lower-level helpers
+  should consume the explicit policy fields when the behavior is shared.
 - `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
   human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
   aliases, and command issuer resolution.
 - `tick_control.rs` maps the session clock policy, replay pause/speed, dev-watch pause state, and
   countdown state to the room ticker interval and scheduled action. `RoomTask` still owns the Tokio
   interval and remains the only task that advances a room.
-- `projection.rs` owns snapshot projection decisions for client fanout. Live active players get
-  player fog, live spectators get active-seat union fog, replay viewers get their per-viewer replay
-  vision, branch-live active players use original-seat aliases, and dev-watch viewers get
-  full-world scenario snapshots.
+- `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
+  active players get player fog, live spectators get active-seat union fog, replay viewers get their
+  per-viewer replay vision, branch-live active players use original-seat aliases, and dev-watch
+  viewers get full-world scenario snapshots.
 - `launch.rs` owns common `StartPayload` stamping for live, replay-branch-live, and dev-watch
   starts: player id, spectator flag, prediction build/version, pending snapshot clearing, and the
   send loop. Replay viewer payloads remain in `replay_session.rs` because they also carry replay
@@ -265,7 +309,9 @@ would either widen this behavior-preserving refactor or add scenario registratio
 future lab work should consume the extracted primitives first and migrate scenario setup only with a
 separate product-approved design. `scripts/check-lobby-architecture.mjs` guards the now-stable
 fanout boundary by failing new production lobby calls to `Game::snapshot_for*` outside
-`projection.rs`, except for the existing AI think context in `live_tick.rs`.
+`projection.rs`, except for the existing AI think context in `live_tick.rs`. The same guardrail
+keeps accepted lab mutation and issue-as calls centralized in `room_task.rs`, where operator
+authorization, result routing, dirty state, and the append-only operation log live.
 
 ### 3.3 Rules layer (`rules/`)
 
@@ -550,9 +596,10 @@ blocking stone tile itself and the visible edge of a smoke cloud, but not tiles 
 Units inside smoke do not stamp vision; friendly units inside smoke remain owner-visible through
 projection, while enemy units inside smoke are withheld and cannot be targeted. Combat
 auto-acquisition and firing both use the smoke-aware LOS query; explicit attack orders may chase
-toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Future forest
-visibility/cover rules should extend the terrain rules and this service instead of adding ad hoc
-checks to fog or combat.
+toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Direct-fire shot
+projection also checks hard entity blockers: tanks and non-Tank-Trap building footprints intercept
+shots, while Tank Traps do not. Future forest visibility/cover rules should extend the terrain rules
+and this service instead of adding ad hoc checks to fog or combat.
 
 `Game` still recomputes raw live fog per player after each tick, because command validation and
 combat targeting depend on owner-local current vision. Event visibility and building-memory
@@ -578,10 +625,13 @@ checked without adding any wire-protocol fields.
 body `facing`, configured length/width, and a small clearance margin, building bodies are
 axis-aligned rectangles derived from footprint tiles, and resource node bodies are circles for
 build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, and
-vehicle-body-only static blockers; movement and standability choose the combined static layer from
-the routed unit's rules-level `MovementBodyClass`, and path-cache fingerprints are computed for the
-same blocker layer. `services::standability` owns reusable legality predicates for unit bodies and
-building sites. Production spawn exits, construction/build intent, movement landing, steering
+vehicle-body-only static blockers; Tank Trap pairs exactly two tiles apart close the single tile
+between them on the vehicle-body-only layer while remaining infantry-passable and shot-transparent.
+Movement and
+standability choose the combined static layer from the routed unit's rules-level
+`MovementBodyClass`, and path-cache fingerprints are computed for the same blocker layer.
+`services::standability` owns reusable legality predicates for unit bodies and building sites.
+Production spawn exits, construction/build intent, movement landing, steering
 candidates, collision push targets, and formation goal selection all use this shared standability
 layer for static/body legality. Swept segment checks sample the same body shape along a straight
 segment, and broad-phase queries use each body's conservative bounding radius. Movement separates

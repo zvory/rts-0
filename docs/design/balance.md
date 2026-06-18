@@ -66,7 +66,7 @@ This is an inventory only; it does not change balance, gameplay, or client rende
 | Terrain, health, selection, placement, and drag colors | None in Rust; rendering-only choices | `client/src/config.js` `COLORS` except resource identity colors that should stay consistent with Steel/Oil presentation | UI-only presentation data | None | Exclusion list in future config parity check | Client owns visual palette; it does not affect simulation, wire DTO shape, or authoritative fog | No compact impact |
 | Fog overlay alpha | Authoritative fog visibility is in sim snapshots; alpha is not a Rust value | `client/src/config.js` `FOG_EXPLORED_ALPHA`, `FOG_UNEXPLORED_ALPHA` | UI-only presentation data | None | Exclusion list in future config parity check | Client owns opacity; Rust owns which tiles/entities are visible | No compact impact |
 | Camera defaults | None in Rust | `client/src/config.js` `CAMERA` | UI-only presentation data | None | Exclusion list in future config parity check | Client-only input/render affordance | No compact impact |
-| Anti-tank gun field-of-fire preview | `server/crates/rules/src/balance.rs` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` is authoritative at 40 degrees total | `client/src/config.js` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` | balance scalar / advisory UI mirror | `scripts/check-faction-catalog-parity.mjs` checks the client preview against the Rust field-of-fire constant | Keep the preview Rust-owned because it represents the authoritative deployed firing arc | Not client-only: the client preview represents an authoritative firing arc | No compact impact |
+| Anti-tank gun field-of-fire preview | `server/crates/rules/src/balance.rs` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` is authoritative at 45 degrees total | `client/src/config.js` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` | balance scalar / advisory UI mirror | `scripts/check-faction-catalog-parity.mjs` checks the client preview against the Rust field-of-fire constant | Keep the preview Rust-owned because it represents the authoritative deployed firing arc | Not client-only: the client preview represents an authoritative firing arc | No compact impact |
 
 ### Phase 4 parity exclusions
 
@@ -203,7 +203,7 @@ authoritative `rules::defs` records.
   unrestricted.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 12`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
-  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 40 degrees total`.
+  `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 45 degrees total`.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 15`, `ARTILLERY_MAX_RANGE_TILES = 60`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
@@ -350,7 +350,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 6     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
-| tank_trap                  | Tank Trap          | 200 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; armored, no trains, no supply, no weapon, no sight/fog reveal, not an elimination building; requires a completed Training Centre |
+| tank_trap                  | Tank Trap          | 200 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no sight/fog reveal, not an elimination building; requires a completed Training Centre |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

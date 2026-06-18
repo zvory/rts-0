@@ -29,9 +29,37 @@ pub struct StartPayload {
     pub debug_mode: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replay: Option<ReplayStartMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lab: Option<LabStartMetadata>,
     pub tick: u32,
     pub map: MapInfo,
     pub players: Vec<PlayerStart>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabStartMetadata {
+    pub room: String,
+    pub operator_id: u32,
+    pub role: LabStartRole,
+    pub vision: LabVisionMode,
+    pub dirty: bool,
+    pub operation_count: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum LabStartRole {
+    Operator,
+    ReadOnly,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "mode", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum LabVisionMode {
+    FullWorld,
+    Team { team_id: TeamId },
+    Teams { team_ids: Vec<TeamId> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
