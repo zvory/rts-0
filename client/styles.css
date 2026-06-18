@@ -2284,20 +2284,32 @@ input[type="text"]:focus {
   overflow-y: hidden;
 }
 #selected-panel .sel-budget-block {
+  appearance: none;
   position: relative;
   min-width: 0;
   min-height: 0;
+  padding: 0;
   display: grid;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: linear-gradient(180deg, rgba(126, 231, 255, 0.28), rgba(44, 86, 96, 0.72));
   color: #f3fbff;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
   text-align: center;
+  cursor: pointer;
   overflow: hidden;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+#selected-panel .sel-single[data-selection-entity-id] {
+  cursor: pointer;
+}
+#selected-panel .sel-budget-block:focus-visible,
+#selected-panel .sel-single[data-selection-entity-id]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 #selected-panel .sel-budget-block.weight-1,
 #selected-panel .sel-budget-block.weight-2 {

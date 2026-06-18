@@ -36,6 +36,7 @@ const AREA_BY_FILE = new Map(Object.entries({
 
   "hud.js": "ui",
   "hud_command_card.js": "ui",
+  "hud_selection_panel.js": "ui",
   "hud_unit_commands.js": "ui",
   "hotkey_editor.js": "ui",
   "hotkey_profiles.js": "ui",

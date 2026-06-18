@@ -340,11 +340,14 @@ function withFakeHudDocument(fn) {
   class FakeElement {
     constructor(tagName) {
       this.tagName = String(tagName).toUpperCase();
+      this.type = "";
       this.className = "";
       this.textContent = "";
-      this.innerHTML = "";
       this.title = "";
       this.children = [];
+      this.parentNode = null;
+      this.dataset = {};
+      this.listeners = {};
       this.attributes = new Map();
       this.style = {
         values: new Map(),
@@ -352,8 +355,20 @@ function withFakeHudDocument(fn) {
           this.style.values.set(name, String(value));
         },
       };
+      this._innerHTML = "";
+    }
+    set innerHTML(value) {
+      this._innerHTML = String(value);
+      if (value === "") {
+        for (const child of this.children || []) child.parentNode = null;
+        this.children = [];
+      }
+    }
+    get innerHTML() {
+      return this._innerHTML;
     }
     appendChild(child) {
+      child.parentNode = this;
       this.children.push(child);
       return child;
     }
@@ -363,13 +378,28 @@ function withFakeHudDocument(fn) {
     getAttribute(name) {
       return this.attributes.get(name) || null;
     }
+    addEventListener(type, handler) {
+      this.listeners[type] = handler;
+    }
+    removeEventListener(type, handler) {
+      if (this.listeners[type] === handler) delete this.listeners[type];
+    }
+    contains(node) {
+      for (let cur = node; cur; cur = cur.parentNode) {
+        if (cur === this) return true;
+      }
+      return false;
+    }
+    closest(selector) {
+      for (let cur = this; cur; cur = cur.parentNode) {
+        if (matches(cur, selector)) return cur;
+      }
+      return null;
+    }
     querySelectorAll(selector) {
       const results = [];
-      const matches = (node) => selector.startsWith(".")
-        ? node.className.split(/\s+/).includes(selector.slice(1))
-        : false;
       const visit = (node) => {
-        if (matches(node)) results.push(node);
+        if (matches(node, selector)) results.push(node);
         for (const child of node.children || []) visit(child);
       };
       visit(this);
@@ -378,6 +408,12 @@ function withFakeHudDocument(fn) {
     querySelector(selector) {
       return this.querySelectorAll(selector)[0] || null;
     }
+  }
+  function matches(node, selector) {
+    if (!node) return false;
+    if (selector.startsWith(".")) return node.className.split(/\s+/).includes(selector.slice(1));
+    if (selector.startsWith("[")) return node.attributes.has(selector.slice(1, -1));
+    return node.tagName === selector.toUpperCase();
   }
   globalThis.document = {
     createElement(tagName) {
@@ -749,6 +785,72 @@ function hotkeyService() {
     assert(blocks.length === 2 && blocks.every((block) => block.className.includes("weight-12")),
       "HUD renders two Tank budget blocks into selected panel DOM");
     assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const selectedEntities = [
+      { id: 2100, owner: 1, kind: KIND.WORKER },
+      { id: 2101, owner: 1, kind: KIND.WORKER },
+      { id: 2102, owner: 1, kind: KIND.RIFLEMAN },
+      { id: 2103, owner: 1, kind: KIND.TANK },
+    ];
+    const byId = new Map(selectedEntities.map((entity) => [entity.id, entity]));
+    let selectedIds = selectedEntities.map((entity) => entity.id);
+    const state = {
+      selectionBudgetOverflow: null,
+      selectedEntities() {
+        return selectedIds.map((id) => byId.get(id)).filter(Boolean);
+      },
+      entityById(id) {
+        return byId.get(id) || null;
+      },
+      setSelection(ids) {
+        selectedIds = Array.from(ids);
+      },
+      removeFromSelection(ids) {
+        const removed = new Set(ids);
+        selectedIds = selectedIds.filter((id) => !removed.has(id));
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    const blockFor = (id) => panel.querySelectorAll(".sel-budget-block")
+      .find((block) => block.getAttribute("data-selection-entity-id") === String(id));
+    const clickBlock = (id, modifiers = {}) => {
+      panel.listeners.click({
+        target: blockFor(id),
+        preventDefault() {},
+        ...modifiers,
+      });
+    };
+
+    clickBlock(2100, { shiftKey: true });
+    assert(selectedIds.join(",") === "2101,2102,2103", "HUD selection panel shift-click removes that unit");
+
+    selectedIds = selectedEntities.map((entity) => entity.id);
+    clickBlock(2102);
+    assert(selectedIds.join(",") === "2102", "HUD selection panel left-click selects only that unit");
+
+    selectedIds = selectedEntities.map((entity) => entity.id);
+    clickBlock(2100, { ctrlKey: true });
+    assert(selectedIds.join(",") === "2100,2101", "HUD selection panel ctrl-click filters selection to that unit kind");
+
+    selectedIds = selectedEntities.map((entity) => entity.id);
+    panel.listeners.contextmenu({
+      target: blockFor(2103),
+      ctrlKey: true,
+      preventDefault() {},
+    });
+    assert(selectedIds.join(",") === "2103", "HUD selection panel control context-click filters selection to that unit kind");
+
+    hud.destroy();
+    assert(!panel.listeners.click && !panel.listeners.contextmenu, "HUD selection panel listeners are removed on destroy");
   });
 }
 
