@@ -238,7 +238,6 @@ impl ReplaySession {
         StartPayload {
             player_id: viewer_id,
             spectator: true,
-            debug_mode: true,
             replay: Some(self.artifact.start_metadata()),
             ..self.game.start_payload()
         }
@@ -619,22 +618,6 @@ mod tests {
         assert!(
             full.resource_deltas.len() > union.resource_deltas.len(),
             "default replay spectator fog should not expose every resource node"
-        );
-    }
-
-    #[test]
-    fn replay_start_payload_advertises_waypoint_debug_toggle() {
-        let players = replay_test_players(2);
-        let (_live, artifact) = replay_test_artifact(&players, 0);
-        let replay = ReplaySession::new(artifact).unwrap();
-
-        let start = replay.start_payload_for(100);
-
-        assert!(start.spectator);
-        assert!(start.replay.is_some());
-        assert!(
-            start.debug_mode,
-            "replay viewers should see the movement waypoint Debug setting"
         );
     }
 

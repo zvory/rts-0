@@ -244,8 +244,7 @@ export function _drawDebugPathOverlay(state, entities = null) {
     : state.selectedEntities();
 
   for (const e of candidates) {
-    if (!state.showAllDebugPathOverlays && e.owner !== state.playerId) continue;
-    if (!isUnit(e.kind) || e.state !== STATE.MOVE) continue;
+    if (e.owner !== state.playerId || !isUnit(e.kind) || e.state !== STATE.MOVE) continue;
     const debugPath = e.debugPath;
     const waypoints = Array.isArray(debugPath?.waypoints)
       ? debugPath.waypoints.filter((p) => finiteNumber(p?.x) && finiteNumber(p?.y))

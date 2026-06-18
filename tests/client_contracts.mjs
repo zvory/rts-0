@@ -119,7 +119,6 @@ import {
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
-  _drawDebugPathOverlay,
   _drawPlacement,
   _drawResourceMiningPreview,
 } from "../client/src/renderer/feedback.js";
@@ -1565,30 +1564,6 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
   assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
-
-  const replayWaypointGfx = new RecordingGraphics();
-  _drawDebugPathOverlay.call({ _feedbackGfx: replayWaypointGfx }, {
-    playerId: 100,
-    debugPathOverlaysEnabled: true,
-    showAllDebugPathOverlays: true,
-    selectedEntities() { return []; },
-  }, [{
-    id: 8,
-    owner: 1,
-    kind: KIND.RIFLEMAN,
-    state: STATE.MOVE,
-    x: 64,
-    y: 64,
-    debugPath: {
-      waypoints: [{ x: 96, y: 64 }, { x: 128, y: 96 }],
-      goal: { x: 128, y: 96 },
-      totalWaypoints: 2,
-    },
-  }]);
-  assert(
-    replayWaypointGfx.calls.some((call) => call[0] === "lineTo"),
-    "replay waypoint overlay can draw visible non-owned movement paths",
-  );
 }
 
 {

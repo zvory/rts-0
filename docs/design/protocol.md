@@ -260,8 +260,7 @@ corner from the first human start, with five deployed Mortar Teams clumped aroun
 and four enemy Supply Depots five tiles north/east/south/west of the clump. It also sets
 `debugMode: true`,
 which lets the client expose local movement-waypoint overlay controls for the owner-only
-`debugPath` fields in live snapshots. Replay playback also sets `debugMode: true` so viewers can
-opt into the same local overlay for replay-visible movement paths.
+`debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
 
@@ -469,15 +468,12 @@ clients render them below the fog overlay and must not select or issue targeted 
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
-`debugPath` is present only while the server has enabled movement-path diagnostics and the unit has
-remaining movement waypoints. Live player and live spectator snapshots expose it only to the owning
-player in lobby Debug mode. Replay snapshots expose it for moving entities visible through the
-viewer's selected replay vision so the local Debug setting can draw historical movement waypoints.
-It carries `{ waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints }`,
-where `waypoints` are remaining `{x, y}` world-pixel path points in traversal order and
-`waypoints[0]` is the current movement target. The compact slot encodes this as
-`[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`, with points
-encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
+`debugPath` is present only in lobby Debug mode matches, only for the owner, and only while the unit
+has remaining movement waypoints. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
+staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
+points in traversal order and `waypoints[0]` is the current movement target. The compact slot
+encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`,
+with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `AbilityObject`: `{ id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState? }`.
 The compact `ao` slot uses ability ids from the existing ability code table and

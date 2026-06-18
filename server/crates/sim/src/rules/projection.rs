@@ -29,7 +29,6 @@ pub struct EntityProjectionContext<'a> {
     pub entities: &'a EntityStore,
     pub target: Option<&'a Entity>,
     pub include_debug_path: bool,
-    pub include_visible_debug_path: bool,
     pub active_construction_sites: Option<&'a BTreeSet<u32>>,
     pub teams: Option<&'a TeamRelations>,
     pub owner_faction_id: Option<&'a str>,
@@ -308,6 +307,9 @@ pub fn project_entity(
             private_detail_fog,
             context.smokes,
         );
+        if context.include_debug_path {
+            view.debug_path = debug_path_view(entity);
+        }
         let catalog = context
             .owner_faction_id
             .and_then(crate::rules::faction::catalog_for);
@@ -361,10 +363,6 @@ pub fn project_entity(
                 });
             }
         }
-    }
-
-    if context.include_debug_path && (exact_owner || context.include_visible_debug_path) {
-        view.debug_path = debug_path_view(entity);
     }
 
     if entity.breakthrough_ticks() > 0 {
@@ -686,7 +684,6 @@ mod tests {
                 entities,
                 target,
                 include_debug_path,
-                include_visible_debug_path: false,
                 active_construction_sites,
                 teams: None,
                 owner_faction_id: Some(crate::rules::faction::DEFAULT_FACTION_ID),

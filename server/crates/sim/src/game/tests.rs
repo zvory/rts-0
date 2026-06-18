@@ -4194,49 +4194,6 @@ fn lobby_debug_mode_snapshot_shows_runtime_movement_debug_path() {
 }
 
 #[test]
-fn replay_snapshot_exposes_visible_runtime_movement_debug_paths() {
-    let (mut game, unit, first, _, _) = queued_move_fixture();
-
-    game.enqueue(
-        1,
-        Command::Move {
-            units: vec![unit],
-            x: first.0,
-            y: first.1,
-            queued: false,
-        },
-    );
-    game.tick();
-
-    let spectator_view = game
-        .snapshot_for_spectator(&[1, 2])
-        .entities
-        .into_iter()
-        .find(|entity| entity.id == unit)
-        .expect("moving unit should be visible through owner replay vision");
-    assert_eq!(
-        spectator_view.debug_path, None,
-        "ordinary live spectator snapshots should keep movement debug paths hidden"
-    );
-
-    let replay_view = game
-        .snapshot_for_replay(&[1, 2])
-        .entities
-        .into_iter()
-        .find(|entity| entity.id == unit)
-        .expect("moving unit should be visible through replay vision");
-    let debug_path = replay_view
-        .debug_path
-        .expect("replay snapshots should expose visible movement debug paths");
-    assert_eq!(
-        debug_path.waypoints.first().map(|point| (point.x, point.y)),
-        game.entities
-            .get(unit)
-            .and_then(|entity| entity.next_waypoint())
-    );
-}
-
-#[test]
 fn dev_scenario_snapshot_shows_runtime_movement_debug_path() {
     let setup = Game::new_snaking_corridor_scenario(EntityKind::ScoutCar, 1, 0x5150_0002)
         .expect("scenario setup should succeed");

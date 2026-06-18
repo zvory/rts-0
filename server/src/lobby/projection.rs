@@ -27,10 +27,10 @@ impl SnapshotProjection {
     ) -> Snapshot {
         let mut snapshot = match self {
             SnapshotProjection::PlayerFog { player_id } => game.snapshot_for(*player_id),
-            SnapshotProjection::SpectatorUnion { player_ids } => {
+            SnapshotProjection::SpectatorUnion { player_ids }
+            | SnapshotProjection::ReplayVision { player_ids } => {
                 game.snapshot_for_spectator(player_ids)
             }
-            SnapshotProjection::ReplayVision { player_ids } => game.snapshot_for_replay(player_ids),
             SnapshotProjection::FullWorld { player_id } => game.snapshot_full_for(*player_id),
         };
 

@@ -8,36 +8,21 @@ impl Game {
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
         let live_fog = self.team_current_fog_for(player, &self.fog);
         if self.lingering_sight.is_empty() {
-            return self.snapshot_for_mode(player, &live_fog, Some(&live_fog), true, false, false);
+            return self.snapshot_for_mode(player, &live_fog, Some(&live_fog), true, false);
         }
         let snapshot_fog = self.snapshot_fog();
         let team_snapshot_fog = self.team_current_fog_for(player, &snapshot_fog);
-        self.snapshot_for_mode(player, &team_snapshot_fog, Some(&live_fog), true, false, false)
+        self.snapshot_for_mode(player, &team_snapshot_fog, Some(&live_fog), true, false)
     }
 
     /// Build a full-world snapshot for a viewer. Used only by dev watch flows where fog is
     /// intentionally disabled; normal gameplay must keep using [`snapshot_for`].
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot {
-        self.snapshot_for_mode(player, &self.fog, None, false, true, false)
+        self.snapshot_for_mode(player, &self.fog, None, false, true)
     }
 
     /// Build a spectator snapshot from the union of all active players' current fog.
     pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot {
-        self.snapshot_for_observer(visible_players, false)
-    }
-
-    /// Build a replay viewer snapshot from the selected replay vision. Replay viewers can opt into
-    /// movement waypoint diagnostics for every visible moving entity without changing live-match
-    /// owner-only debug-path projection.
-    pub fn snapshot_for_replay(&self, visible_players: &[u32]) -> Snapshot {
-        self.snapshot_for_observer(visible_players, true)
-    }
-
-    fn snapshot_for_observer(
-        &self,
-        visible_players: &[u32],
-        include_visible_debug_path: bool,
-    ) -> Snapshot {
         let actionable_fog = self
             .fog
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
@@ -48,7 +33,6 @@ impl Game {
                 Some(&actionable_fog),
                 true,
                 true,
-                include_visible_debug_path,
             );
         }
         let snapshot_fog = self
@@ -60,7 +44,6 @@ impl Game {
             Some(&actionable_fog),
             true,
             true,
-            include_visible_debug_path,
         )
     }
 
@@ -80,7 +63,6 @@ impl Game {
         actionable_fog: Option<&Fog>,
         fogged: bool,
         include_player_resources: bool,
-        include_visible_debug_path: bool,
     ) -> Snapshot {
         let ps = self.player(player);
         let teams = self.team_relations();
@@ -117,8 +99,7 @@ impl Game {
                     fogged,
                     entities: &self.entities,
                     target,
-                    include_debug_path: self.debug_path_overlays || include_visible_debug_path,
-                    include_visible_debug_path,
+                    include_debug_path: self.debug_path_overlays,
                     active_construction_sites: Some(&self.active_construction_sites),
                     teams: Some(&teams),
                     owner_faction_id: self.player(e.owner).map(|p| p.faction_id.as_str()),
@@ -247,7 +228,6 @@ impl Game {
                             entities: &self.entities,
                             target: None,
                             include_debug_path: false,
-                            include_visible_debug_path: false,
                             active_construction_sites: Some(&self.active_construction_sites),
                             teams: Some(teams),
                             owner_faction_id: self
