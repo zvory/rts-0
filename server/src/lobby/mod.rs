@@ -32,8 +32,8 @@ use tokio::time::{interval, MissedTickBehavior};
 use crate::config;
 use crate::db::Db;
 use crate::protocol::{
-    BranchStagingOccupant, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata,
-    ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, TeamId,
+    BranchStagingOccupant, Event, LabClientOp, LobbyPlayer, PlayerScore, ReplayBranchSeat,
+    ReplayStartMetadata, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, TeamId,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
@@ -85,6 +85,7 @@ const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
 const REPLAY_ARTIFACT_ROOM_PREFIX: &str = "__replay_artifact__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
 const REPLAY_BRANCH_ROOM_PREFIX: &str = "__replay_branch__";
+const LAB_ROOM_PREFIX: &str = "__lab__:";
 const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).
@@ -177,18 +178,24 @@ pub enum RoomEvent {
     GiveUp { player_id: u32 },
     /// A replay viewer asked to leave playback and return their connection to the lobby screen.
     ReturnToLobby { player_id: u32 },
-    /// Set replay/dev-watch playback speed multiplier; ignored outside replay/dev watch rooms.
-    SetReplaySpeed { player_id: u32, speed: f32 },
-    /// Advance a paused dev-watch room by one simulation tick.
-    StepDevTick { player_id: u32 },
-    /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
-    SeekReplay { player_id: u32, ticks_back: u32 },
-    /// Seek a replay to an absolute simulation tick (replay rooms only; clamped to duration).
-    SeekReplayTo { player_id: u32, tick: u32 },
+    /// Set room-controlled time speed where the session clock capability allows it.
+    SetRoomTimeSpeed { player_id: u32, speed: f32 },
+    /// Advance room-controlled time by one simulation tick where the clock allows stepping.
+    StepRoomTime { player_id: u32 },
+    /// Rewind room-controlled time by `ticks_back` ticks where the clock allows relative seek.
+    SeekRoomTime { player_id: u32, ticks_back: u32 },
+    /// Seek room-controlled time to an absolute tick where the clock allows absolute seek.
+    SeekRoomTimeTo { player_id: u32, tick: u32 },
     /// Select replay vision for this viewer only. Ignored outside replay rooms in phase 1.
     SetReplayVision {
         player_id: u32,
         vision: ReplayVisionRequest,
+    },
+    /// Privileged lab request routed only by lab rooms.
+    Lab {
+        player_id: u32,
+        request_id: u32,
+        op: LabClientOp,
     },
     /// A replay viewer requested a frozen practice branch seed from the current replay tick.
     RequestReplayBranch {

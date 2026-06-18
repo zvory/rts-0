@@ -205,7 +205,7 @@ fn saved_artifact_replay_speed_is_ignored_until_replay_viewer_starts() {
         false,
         test_drain(),
     );
-    task.on_set_replay_speed(1, 2.0);
+    task.on_set_room_time_speed(1, 2.0);
     assert_eq!(task.current_tick_interval(), Duration::from_millis(33));
 }
 

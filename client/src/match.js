@@ -6,6 +6,7 @@ import {
   machineGunSoundKey,
 } from "./combat_audio.js";
 import { Fog } from "./fog.js";
+import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
@@ -97,6 +98,9 @@ export class Match {
     this.hotkeyProfiles = options.hotkeyProfiles || null;
     this.settings = options.settings || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
+    this.labMetadata = options.labMetadata || null;
+    this.labClient = options.labClient || null;
+    this.labControlPolicy = options.labControlPolicy || null;
     this.replayViewer = !!options.replayViewer;
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
@@ -125,6 +129,12 @@ export class Match {
     }
     this.commandIssuer = {
       issueCommand: (command, options = {}) => {
+        if (this.labControlPolicy?.kind === "lab") {
+          return this.labControlPolicy.issueCommand(command, {
+            state: this.state,
+            toast: this.toast,
+          });
+        }
         const budget = commandWithinBudget(this.state, command);
         if (!budget.ok) {
           this.toast?.(COMMAND_BUDGET_OVERFLOW_NOTICE);
@@ -139,6 +149,7 @@ export class Match {
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
+    this.state.controlPolicy = this.labControlPolicy;
     this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
     this.state.debugPathOverlaysAvailable =
       this.state.debugPathOverlaysAvailable || this.devWatch?.kind === "scenario";
@@ -153,7 +164,15 @@ export class Match {
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = this._timeInit(
       "match.hud",
-      () => new HUD(dom.gameScreen, this.state, this.commandIssuer, this.audio, this.hotkeyProfiles, this.clientIntent),
+      () => new HUD(
+        dom.gameScreen,
+        this.state,
+        this.commandIssuer,
+        this.audio,
+        this.hotkeyProfiles,
+        this.clientIntent,
+        this.labControlPolicy,
+      ),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.hudInputZone = this._timeInit(
@@ -201,6 +220,7 @@ export class Match {
     this.lastFrame = performance.now();
     this.tickFn = this.frame.bind(this);
     this.rafId = undefined;
+    this.frameErrors = createFrameErrorState();
 
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => {
@@ -216,7 +236,7 @@ export class Match {
       this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
     };
-    this.onReplayState = (m) => this.applyReplayState(m);
+    this.onRoomTimeState = (m) => this.applyRoomTimeState(m);
     this.onObserverAnalysis = (m) => this.observerAnalysisOverlay?.applyObserverAnalysis(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
@@ -232,7 +252,7 @@ export class Match {
       this.input.onPointerLockError = this.onPointerLockError;
     }
     this.net.on(S.SNAPSHOT, this.onSnapshot);
-    this.net.on(S.REPLAY_STATE, this.onReplayState);
+    this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
@@ -914,38 +934,7 @@ export class Match {
    * @param {number} now high-res timestamp from rAF
    */
   frame(now) {
-    if (!this.running) return;
-
-    const dt = (now - this.lastFrame) / 1000; // seconds since last frame
-    const frameGapMs = now - this.lastFrame;
-    this.lastFrame = now;
-    if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
-      this.health.noteFrameGap(frameGapMs);
-    }
-    this.health.refreshLatency();
-
-    const alpha = this.computeAlpha();
-
-    this.camera.update(dt, this.input);
-    if (this.audio) {
-      this.audio.setListener(
-        this.camera.x + this.camera.viewW / (2 * this.camera.zoom),
-        this.camera.y + this.camera.viewH / (2 * this.camera.zoom),
-        this.camera.zoom,
-        this.camera.viewW,
-      );
-    }
-    this.input.update(dt);
-    this.advancePredictionVisual();
-    this.fog.update(this.ownEntities(), this.state.map.tileSize, this.state.visibleTiles);
-
-    this.renderer.render(this.state, this.camera, this.fog, alpha, { clientIntent: this.clientIntent });
-    this.hud.update();
-    this.minimap.render();
-    this.observerAnalysisOverlay?.update();
-    this.health.publish();
-
-    this.rafId = requestAnimationFrame(this.tickFn);
+    runMatchFrameSafely(this, now);
   }
 
   /**
@@ -990,7 +979,7 @@ export class Match {
     this.stopNetReports();
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
-    this.net.off(S.REPLAY_STATE, this.onReplayState);
+    this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     this.replayControls?.destroy();
@@ -1005,8 +994,8 @@ export class Match {
     }
   }
 
-  applyReplayState(state) {
-    this.replayControls?.applyReplayState(state);
+  applyRoomTimeState(state) {
+    this.replayControls?.applyRoomTimeState(state);
   }
 
   /**
@@ -1021,7 +1010,7 @@ export class Match {
     this.stopNetReports();
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
-    this.net.off(S.REPLAY_STATE, this.onReplayState);
+    this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);

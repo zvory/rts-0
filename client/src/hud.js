@@ -193,13 +193,14 @@ export class HUD {
    * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
    * @param {import("./client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    */
-  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null) {
+  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null) {
     this.root = rootEl;
     this.state = state;
     this.commandIssuer = commandIssuer;
     this.audio = audio;
     this.hotkeyProfiles = hotkeyProfiles;
     this.clientIntent = clientIntent;
+    this.controlPolicy = controlPolicy;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -607,6 +608,7 @@ export class HUD {
   _commandDescriptorContext() {
     return {
       spectator: this.state.spectator,
+      state: this.state,
       playerId: this.state.playerId,
       factionId: this.state.localFactionId,
       selection: this.state.selectedEntities() || [],
@@ -615,6 +617,7 @@ export class HUD {
       upgrades: this.state.upgrades || [],
       commandCardMode: this._intent()?.commandCardMode,
       commandTarget: this._intent()?.commandTarget,
+      controlPolicy: this.controlPolicy,
       groupCooldownClocks,
       playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind),
     };

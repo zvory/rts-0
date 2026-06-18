@@ -148,6 +148,28 @@ export function devWatchConfig() {
   return null;
 }
 
+function safeLabToken(value, fallback, maxLen) {
+  const raw = (value || "").trim() || fallback;
+  if (!/^[A-Za-z0-9_-]+$/.test(raw) || raw.length > maxLen) return fallback;
+  return raw;
+}
+
+export function labLaunchConfig() {
+  if (window.location.pathname !== "/lab" && window.location.pathname !== "/lab/") return null;
+  const params = new URLSearchParams(window.location.search);
+  const room = safeLabToken(params.get("room"), "default", 40);
+  const map = safeLabToken(params.get("map"), "Default", 48);
+  const rawSeed = (params.get("seed") || "").trim();
+  const seed = /^[0-9]+$/.test(rawSeed) && Number(rawSeed) <= 0xffffffff ? rawSeed : "";
+  const seedPart = seed ? `:seed=${seed}` : "";
+  return {
+    room: `__lab__:${room}:map=${map}${seedPart}`,
+    publicRoom: room,
+    map,
+    banner: `lab ${room} map=${map}`,
+  };
+}
+
 export function replayLaunchConfig() {
   const params = new URLSearchParams(window.location.search);
   const artifact = (params.get("replayArtifact") || "").trim();

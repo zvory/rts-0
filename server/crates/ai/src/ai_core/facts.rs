@@ -426,6 +426,7 @@ mod tests {
             prediction_version: 0,
             debug_mode: false,
             replay: None,
+            lab: None,
             tick: 0,
             map: MapInfo {
                 width: 64,

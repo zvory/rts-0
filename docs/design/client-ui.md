@@ -35,14 +35,18 @@ src/
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   match_health.js # match network/render health reporter
   branch_staging.js # replay branch staging panel
+  lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
+  lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
+  lab_control_policy.js # Lab control collaborator placeholder injected into Match
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
+  frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
-  bootstrap.js    # DOM lookup, ws/dev-watch config, startup helpers
+  bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
 ```
 
 ### 4.1 Module export contracts
@@ -70,11 +74,12 @@ export class Net {
   returnToLobby()
   ping()
   netReport(report)
-  setReplaySpeed(speed)                  // replay rooms and dev-watch scenarios
-  stepDevTick()                          // paused dev scenarios
-  seekReplay(ticksBack)                  // replay rooms; pass huge N for full reset
-  seekReplayTo(tick)
+  setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario time
+  stepRoomTime()                         // paused dev-scenario room time
+  seekRoomTime(ticksBack)                // room-controlled replay time; pass huge N for full reset
+  seekRoomTimeTo(tick)
   setReplayVision(vision)
+  lab(requestId, op)                     // lab rooms only; request id allocated by LabClient
   requestReplayBranch()
   claimBranchSeat(playerId)
   releaseBranchSeat(playerId)
@@ -262,6 +267,41 @@ export class SettingsContainer {
 buildSettingsTabs({ audio, hotkeyProfiles, game, debug })
 buildGiveUpAction({ visible, onOpen })
 ```
+
+`lab_client.js`
+```js
+export class LabClient {
+  constructor(net, options?)
+  setInitialState(state)
+  subscribeState(handler)                // returns unsubscribe
+  subscribeResult(handler)               // returns unsubscribe
+  setVision(vision)                      // sends {op:"setVision", vision}
+  request(op, options?)                  // allocates requestId, resolves with labResult/timeout
+  destroy()
+}
+export function labVisionLabel(vision)
+export const labVision                   // fullWorld(), team(teamId), teams(teamIds)
+```
+
+`lab_panel.js`
+```js
+export class LabPanel {
+  constructor({ root, labClient, launch, startPayload })
+  destroy()
+}
+```
+
+`lab_control_policy.js`
+```js
+export function createLabControlPolicy({ labClient, metadata })
+export function createDefaultControlPolicy()
+```
+
+`App` owns `LabClient`, `LabPanel`, and lab control policy lifetimes when a `start` payload carries
+`lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
+constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
+MVP exposes room-local vision, setup mutations, issue-as commands, and scenario import/export
+through those collaborators while keeping the normal match screen authentic.
 
 `hotkey_profiles.js`
 ```js
@@ -487,7 +527,8 @@ the first valid sites dispatch as one immediate single-worker build per selected
 remaining valid sites dispatch as queued standard build commands against the selected worker set.
 Line placement only offers vehicle-closing Tank Trap steps: exact diagonal adjacency `(1,1)` or
 one-tile orthogonal gaps `(2,0)` / `(0,2)`. Invalid intermediate sites break the line instead of
-letting dispatch skip ahead across a larger gap.
+letting dispatch skip ahead across a larger gap. The renderer draws Tank Traps larger than their
+1x1 build footprint so these sparse vehicle-blocking gaps read as closed barrier segments.
 
 `command_composer.js` owns command-target arming lifetime for command-card targets. HUD, input, and
 minimap receive `ClientIntent` from `Match`; input and minimap clicks call
@@ -722,6 +763,10 @@ and unit layer):
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
+- Renderer failures must fail soft: one broken entity or feedback effect should log a throttled
+  `[RTS_RENDER]` error, skip that visual path, and let the rest of the frame continue. Broken
+  entity art draws a magenta/black checkerboard fallback instead of stopping the match loop; the
+  frame loop also reschedules after unexpected client errors and logs `[RTS_FRAME]`.
 - Keep a cohesive muted palette; define colors in `config.js`.
 - Art must stay faction-agnostic: no Soviet, German, Nazi, imperial, national, or unit-branch
   iconography. Avoid flags, stars, crosses, eagles, skulls, sickles, hammers, and historically
@@ -738,14 +783,15 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
-  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`.
+  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
+  `lab_control_policy.js`.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js`.
-- `transport`: `net.js`, `protocol.js`.
+- `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card, lobby controller/view, match history, minimap, resource icons,
-  scoreboard, status badge, branch staging, settings.
+  scoreboard, status badge, branch staging, lab panel, settings.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
@@ -756,6 +802,8 @@ Import rules:
 - Files in the same area may import each other.
 - `app-shell` files may compose other areas; prefer adding new cross-area wiring in `match.js` or
   `app.js` instead of importing collaborators from feature modules.
+- Lab UI and transport lifetimes stay in `App`: `match.js` may receive lab metadata/control policy,
+  but must not import `lab_client.js` or `lab_panel.js`.
 - Non-shell cross-area imports should normally become dependency injection through `Match`, `App`,
   or a facade. If one is intentional, update `ALLOWED_CROSS_AREA_IMPORTS` in
   `scripts/check-client-architecture.mjs` with a reason.

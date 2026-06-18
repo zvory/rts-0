@@ -138,6 +138,14 @@ fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bo
     }
 }
 
+pub(crate) fn sync_owned_autocast_from_upgrades(
+    entities: &mut EntityStore,
+    owner: u32,
+    upgrades: &std::collections::BTreeSet<UpgradeKind>,
+) {
+    set_owned_mortar_autocast(entities, owner, upgrades.contains(&UpgradeKind::MortarAutocast));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405,6 +413,49 @@ mod tests {
     }
 
     #[test]
+    fn same_tile_machine_gunner_rally_resolves_after_path_request() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let barracks = spawn_building_training(
+            &map,
+            &mut entities,
+            10,
+            10,
+            EntityKind::Barracks,
+            EntityKind::MachineGunner,
+        );
+        let rally = current_spawn_point_for(&map, &entities, barracks, EntityKind::MachineGunner)
+            .expect("barracks should have an MG spawn exit");
+        entities
+            .get_mut(barracks)
+            .expect("barracks")
+            .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
+        let mut players = vec![player(1)];
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut events = HashMap::new();
+
+        production_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut coordinator,
+            &mut events,
+        );
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let machine_gunner = entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::MachineGunner && e.hp > 0)
+            .expect("machine gunner should spawn");
+        assert!(matches!(machine_gunner.order(), Order::Idle));
+        assert_eq!(machine_gunner.move_phase(), None);
+        assert!(machine_gunner.path_is_empty());
+    }
+
+    #[test]
     fn rally_spawn_facing_falls_back_when_oriented_body_would_clip() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
@@ -601,6 +652,19 @@ mod tests {
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
         coordinator.find_spawn_point(entities, factory, EntityKind::Tank, None)
+    }
+
+    fn current_spawn_point_for(
+        map: &Map,
+        entities: &EntityStore,
+        producer: u32,
+        unit: EntityKind,
+    ) -> Option<(f32, f32)> {
+        let occ = Occupancy::build(map, entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
+        coordinator.find_spawn_point(entities, producer, unit, None)
     }
 
     fn block_all_spawn_points(map: &Map, entities: &mut EntityStore, factory: u32) -> Vec<u32> {

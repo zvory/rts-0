@@ -242,7 +242,7 @@ export class ClientLane {
     url.searchParams.set("rtsNoAutoPointerLock", "1");
     await this.page.goto(url.href, { waitUntil: "domcontentloaded", timeout: 30000 });
     await this.waitForMatch();
-    await this.setReplaySpeed(1);
+    await this.setRoomTimeSpeed(1);
     await this.waitForSnapshot({ minTickDelta: 0 });
     await this.capture("initial");
   }
@@ -439,20 +439,20 @@ export class ClientLane {
     return this.page.evaluate(() => window.__rtsTriStateNetwork || null);
   }
 
-  async setReplaySpeed(speed) {
-    await this.page.evaluate((speed) => window.__rts.match.net.setReplaySpeed(speed), speed);
+  async setRoomTimeSpeed(speed) {
+    await this.page.evaluate((speed) => window.__rts.match.net.setRoomTimeSpeed(speed), speed);
     if (speed === 0) {
       await this.page.waitForFunction(
-        () => window.__rts?.match?.replayControls?.replayState?.paused === true,
+        () => window.__rts?.match?.replayControls?.roomTimeState?.paused === true,
         { timeout: 5000 },
       );
     }
-    this.artifacts.client({ event: "setReplaySpeed", speed });
+    this.artifacts.client({ event: "setRoomTimeSpeed", speed });
   }
 
-  async stepDevTick() {
-    await this.page.evaluate(() => window.__rts.match.net.stepDevTick());
-    this.artifacts.client({ event: "stepDevTick" });
+  async stepRoomTime() {
+    await this.page.evaluate(() => window.__rts.match.net.stepRoomTime());
+    this.artifacts.client({ event: "stepRoomTime" });
   }
 
   async capture(label) {
@@ -563,7 +563,7 @@ export class ClientLane {
 
   async currentTick() {
     return this.page.evaluate(() => {
-      const replayTick = window.__rts?.match?.replayControls?.replayState?.currentTick;
+      const replayTick = window.__rts?.match?.replayControls?.roomTimeState?.currentTick;
       if (Number.isFinite(replayTick)) return replayTick;
       return window.__rts?.match?.state?._cur?.tick ?? null;
     });

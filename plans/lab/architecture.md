@@ -507,9 +507,9 @@ new Match(net, payload, toast, devWatch, audio, statusBadge, diagnostics, {
 This keeps lab orchestration in the app shell while allowing selection, command composition, HUD
 affordances, and input routing to consult the same lab control policy.
 
-## MVP Implementation Slice Hypothesis
+## MVP Implementation Status
 
-This is not a phase plan, but it is the likely first slice to validate the architecture:
+The MVP slice validated these architecture choices:
 
 1. Add a `RoomMode::Lab` that creates a real `Game` from a selected map and a default two-team
    player template.
@@ -521,8 +521,13 @@ This is not a phase plan, but it is the likely first slice to validate the archi
 6. Add JSON import/export for scenarios with map, players, teams, resources, upgrades, and
    entities.
 
-This slice would already replace the most important debug-mode workflows: set up a map, stage two
+This slice replaces the most important debug-mode workflows: set up a map, stage two
 sides, issue real orders, observe with chosen fog, and save the setup.
+
+The MVP still deliberately excludes timeline pause/step/seek for labs, tick-perfect rewind,
+keyframes, persisted public scenario libraries, multi-operator editing, visual hot reload, lab
+simulation flags, and `/dev/scenario` migration. Those should each get a follow-up design rather
+than broadening the current lab operation envelope.
 
 ## Verification Strategy
 

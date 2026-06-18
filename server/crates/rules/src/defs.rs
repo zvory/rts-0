@@ -166,7 +166,7 @@ pub const UNITS: &[UnitDef] = &[
         stats: balance::UnitStats {
             hp: 50,
             dmg: balance::MORTAR_OUTER_DAMAGE,
-            range_tiles: 9,
+            range_tiles: balance::MORTAR_RANGE_TILES,
             cooldown: 60,
             speed: 1.6,
             sight_tiles: 7,

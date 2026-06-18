@@ -191,12 +191,13 @@ export class Minimap {
     }
   }
 
-  /** Draw static resource blips after fog so they are always visible. */
+  /** Draw non-depleted static resource blips after fog so they are always visible. */
   _drawResources() {
     const map = this.state.map;
     const ctx = this.ctx;
     const r = 2.2;
     for (const node of map.resources || []) {
+      if (node.remaining === 0) continue;
       const p = this._worldToCanvas(node.x, node.y);
       if (node.kind === "oil") {
         ctx.fillStyle = hex(COLORS.oil);
@@ -527,6 +528,9 @@ export class Minimap {
 }
 
 function ownOwner(state, owner) {
+  if (state?.controlPolicy?.kind === "lab") {
+    return state.controlPolicy.canControlOwner(owner, state);
+  }
   return typeof state?.isOwnOwner === "function"
     ? state.isOwnOwner(owner)
     : Number(owner) === state?.playerId;

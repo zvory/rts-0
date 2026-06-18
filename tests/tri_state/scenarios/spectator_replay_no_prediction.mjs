@@ -2,7 +2,7 @@ import {
   assertClientPrediction,
   capture,
   scenario,
-  setReplaySpeed,
+  setRoomTimeSpeed,
 } from "../dsl.mjs";
 
 export default scenario("spectator_replay_no_prediction", {
@@ -17,7 +17,7 @@ export default scenario("spectator_replay_no_prediction", {
   },
   network: { mode: "direct", name: "spectator-direct" },
   steps: [
-    setReplaySpeed(0),
+    setRoomTimeSpeed(0),
     capture("spectator-watch"),
     assertClientPrediction({ enabled: false, mode: "disabled" }),
   ],

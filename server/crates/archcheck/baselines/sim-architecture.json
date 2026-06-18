@@ -1,5 +1,5 @@
 {
-  "reason": "Tank Trap Phase 2 movement-class blockers",
+  "reason": "add authoritative lab mutation API",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -80,6 +80,10 @@
     {
       "path": "invariants.rs",
       "lines": 894
+    },
+    {
+      "path": "lab.rs",
+      "lines": 1309
     },
     {
       "path": "map.rs",
@@ -826,6 +830,11 @@
   ],
   "player_state_usages": [
     {
+      "path": "lab.rs",
+      "line": 810,
+      "code": "player: &super::PlayerState,"
+    },
+    {
       "path": "mod.rs",
       "line": 132,
       "code": "players: Vec<PlayerState>,"
@@ -1133,6 +1142,30 @@
   ],
   "player_state_field_writes": [
     {
+      "path": "lab.rs",
+      "line": 508,
+      "field": "oil",
+      "code": "player.oil = input.oil;"
+    },
+    {
+      "path": "lab.rs",
+      "line": 359,
+      "field": "oil",
+      "code": "state.oil = player.oil;"
+    },
+    {
+      "path": "lab.rs",
+      "line": 507,
+      "field": "steel",
+      "code": "player.steel = input.steel;"
+    },
+    {
+      "path": "lab.rs",
+      "line": 358,
+      "field": "steel",
+      "code": "state.steel = player.steel;"
+    },
+    {
       "path": "services/movement/tests.rs",
       "line": 2615,
       "field": "oil",
@@ -1152,6 +1185,24 @@
     }
   ],
   "entity_field_writes": [
+    {
+      "path": "lab.rs",
+      "line": 566,
+      "field": "hp",
+      "code": "restored.hp = entity.hp.min(restored.max_hp).max(1);"
+    },
+    {
+      "path": "lab.rs",
+      "line": 600,
+      "field": "hp",
+      "code": "restored.hp = entity.hp.min(restored.max_hp).max(1);"
+    },
+    {
+      "path": "lab.rs",
+      "line": 483,
+      "field": "owner",
+      "code": "entity.owner = input.owner;"
+    },
     {
       "path": "services/combat/tests.rs",
       "line": 1049,
@@ -1349,6 +1400,10 @@
     {
       "path": "invariants.rs",
       "count": 1
+    },
+    {
+      "path": "lab.rs",
+      "count": 19
     },
     {
       "path": "map.rs",
