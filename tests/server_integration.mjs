@@ -152,10 +152,10 @@ const { ok } = assertions;
      "REPLAY: connected humans become replay spectators");
   ok(replayStartA.replay.durationTicks > 0,
      `REPLAY: artifact metadata carries duration (${replayStartA.replay.durationTicks})`);
-  const replayStateA = await A.waitFor((m) => m.t === "replayState" && m.currentTick === 0, 4000, "A replay state");
-  const replayStateB = await B.waitFor((m) => m.t === "replayState" && m.currentTick === 0, 4000, "B replay state");
-  ok(replayStateA.speed === 2 && replayStateB.speed === 2,
-     `REPLAY: playback defaults to 2x (${replayStateA.speed}/${replayStateB.speed})`);
+  const roomTimeStateA = await A.waitFor((m) => m.t === "roomTimeState" && m.currentTick === 0, 4000, "A replay state");
+  const roomTimeStateB = await B.waitFor((m) => m.t === "roomTimeState" && m.currentTick === 0, 4000, "B replay state");
+  ok(roomTimeStateA.speed === 2 && roomTimeStateB.speed === 2,
+     `REPLAY: playback defaults to 2x (${roomTimeStateA.speed}/${roomTimeStateB.speed})`);
 
   A.send({ t: "returnToLobby" });
   const lobbyAfterReplay = await A.waitFor((m) => m.t === "lobby" && m.players.length === 3, 4000, "lobby after replay");

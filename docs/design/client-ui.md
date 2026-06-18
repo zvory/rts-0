@@ -74,10 +74,10 @@ export class Net {
   returnToLobby()
   ping()
   netReport(report)
-  setReplaySpeed(speed)                  // replay rooms and dev-watch scenarios
-  stepDevTick()                          // paused dev scenarios
-  seekReplay(ticksBack)                  // replay rooms; pass huge N for full reset
-  seekReplayTo(tick)
+  setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario time
+  stepRoomTime()                         // paused dev-scenario room time
+  seekRoomTime(ticksBack)                // room-controlled replay time; pass huge N for full reset
+  seekRoomTimeTo(tick)
   setReplayVision(vision)
   lab(requestId, op)                     // lab rooms only; request id allocated by LabClient
   requestReplayBranch()

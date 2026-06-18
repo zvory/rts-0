@@ -88,10 +88,10 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "state.js": 38576,
   // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
   "input/index.js": 38854,
-  // Lab MVP Phase 5 routes lab gameplay commands through the injected control policy.
-  "match.js": 38795,
-  // Lab MVP Phase 6 adds mirrored LabScenarioV1 import/export request builders.
-  "protocol.js": 38113,
+  // Room2 Phase 3 renames replay/dev time wiring to neutral room-time handlers.
+  "match.js": 38818,
+  // Room2 Phase 3 mirrors neutral room-time wire tags/builders.
+  "protocol.js": 38152,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,

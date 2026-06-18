@@ -9,13 +9,13 @@ use super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::participants::{CommandIssuer, Participants};
 use super::projection::{ObserverAnalysisAudience, ProjectionPolicy};
 use super::replay_branch::{BranchLaunchError, BranchStagingState};
-use super::session_policy::{SessionPhase, SessionPolicy};
+use super::session_policy::{RoomTimeOperation, RoomTimeSource, SessionPhase, SessionPolicy};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
-use super::tick_control::{DevWatchSpeed, ReplayPlaybackClock, ScheduledTickAction, TickControl};
+use super::tick_control::{RoomTimeClock, RoomTimeSpeed, ScheduledTickAction, TickControl};
 use super::*;
 use crate::protocol::{
     Command, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
-    LabState, LabVisionMode, ReplayPlaybackState, DEFAULT_FACTION_ID,
+    LabState, LabVisionMode, RoomTimeState, DEFAULT_FACTION_ID,
 };
 #[cfg(test)]
 use crate::protocol::{SnapshotNetStatus, StartPayload, PREDICTION_PROTOCOL_VERSION};
@@ -555,11 +555,11 @@ pub(super) struct RoomTask {
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
     ai_controllers: Vec<AiController>,
-    /// Replay speed multiplier; 1.0 = real-time, 2.0 = 2× faster, etc.
-    replay_speed: f32,
-    /// Dev-watch pause flag. Kept separate from replay_speed so interval creation never divides
+    /// Room-time speed multiplier; 1.0 = real-time, 2.0 = 2x faster, etc.
+    room_time_speed: f32,
+    /// Room-time pause flag. Kept separate from room_time_speed so interval creation never divides
     /// by zero and resume can restore the previous non-zero multiplier.
-    dev_watch_paused: bool,
+    room_time_paused: bool,
     slow_tick_count: u32,
     pending_client_command_acks: Vec<PendingClientCommandAck>,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
@@ -609,8 +609,8 @@ impl RoomTask {
             dev_driver: None,
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
-            replay_speed: 1.0,
-            dev_watch_paused: false,
+            room_time_speed: 1.0,
+            room_time_paused: false,
             slow_tick_count: 0,
             pending_client_command_acks: Vec::new(),
             db,
@@ -676,18 +676,24 @@ impl RoomTask {
     }
 
     fn tick_control(&self) -> TickControl {
-        let replay = match &self.phase {
-            Phase::ReplayViewer(session) => Some(ReplayPlaybackClock {
-                speed: session.speed(),
-                paused: session.is_paused(),
+        let policy = self.session_policy();
+        let room_time = match (&self.phase, policy.clock.room_time_source()) {
+            (Phase::ReplayViewer(session), Some(RoomTimeSource::ReplayPlayback)) => {
+                Some(RoomTimeClock {
+                    speed: session.speed(),
+                    paused: session.is_paused(),
+                })
+            }
+            (_, Some(RoomTimeSource::DevScenario)) => Some(RoomTimeClock {
+                speed: self.room_time_speed,
+                paused: self.room_time_paused,
             }),
             _ => None,
         };
         TickControl::new(
-            self.session_policy().clock,
-            replay,
-            self.dev_watch_paused,
-            self.replay_speed,
+            policy.clock,
+            room_time,
+            self.room_time_speed,
             self.match_countdown_deadline.is_some(),
         )
     }
@@ -776,15 +782,17 @@ impl RoomTask {
             } => self.on_command(player_id, client_seq, cmd),
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
             RoomEvent::ReturnToLobby { player_id } => self.on_return_to_lobby(player_id),
-            RoomEvent::SetReplaySpeed { player_id, speed } => {
-                self.on_set_replay_speed(player_id, speed)
+            RoomEvent::SetRoomTimeSpeed { player_id, speed } => {
+                self.on_set_room_time_speed(player_id, speed)
             }
-            RoomEvent::StepDevTick { player_id } => self.on_step_dev_tick(player_id),
-            RoomEvent::SeekReplay {
+            RoomEvent::StepRoomTime { player_id } => self.on_step_room_time(player_id),
+            RoomEvent::SeekRoomTime {
                 player_id,
                 ticks_back,
-            } => self.on_seek_replay(player_id, ticks_back),
-            RoomEvent::SeekReplayTo { player_id, tick } => self.on_seek_replay_to(player_id, tick),
+            } => self.on_seek_room_time(player_id, ticks_back),
+            RoomEvent::SeekRoomTimeTo { player_id, tick } => {
+                self.on_seek_room_time_to(player_id, tick)
+            }
             RoomEvent::SetReplayVision { player_id, vision } => {
                 self.on_set_replay_vision(player_id, vision)
             }
@@ -1701,7 +1709,7 @@ impl RoomTask {
         );
         let _ = ack.send(true);
         self.send_replay_start_to(player_id);
-        self.send_replay_state_to(player_id);
+        self.send_room_time_state_to(player_id);
         self.send_observer_analysis_to(player_id);
     }
 
@@ -1736,7 +1744,7 @@ impl RoomTask {
         match &self.phase {
             Phase::ReplayViewer(_) => {
                 self.send_replay_start_to(player_id);
-                self.send_replay_state_to(player_id);
+                self.send_room_time_state_to(player_id);
                 self.send_observer_analysis_to(player_id);
             }
             Phase::Lobby => match self.replay_session_for_mode() {
@@ -2613,7 +2621,7 @@ impl RoomTask {
         );
     }
 
-    fn send_replay_state_to(&self, watcher_id: u32) {
+    fn send_room_time_state_to(&self, watcher_id: u32) {
         let Phase::ReplayViewer(session) = &self.phase else {
             return;
         };
@@ -2624,7 +2632,7 @@ impl RoomTask {
             &self.room,
             watcher_id,
             &player.msg_tx,
-            ServerMessage::ReplayState(session.state()),
+            ServerMessage::RoomTimeState(session.state()),
         );
     }
 
@@ -2643,8 +2651,8 @@ impl RoomTask {
         );
     }
 
-    fn broadcast_replay_state_for(&self, session: &ReplaySession) {
-        let msg = ServerMessage::ReplayState(session.state());
+    fn broadcast_room_time_state_for(&self, session: &ReplaySession) {
+        let msg = ServerMessage::RoomTimeState(session.state());
         self.broadcast(&msg);
     }
 
@@ -2680,16 +2688,16 @@ impl RoomTask {
         let Phase::InGame(game) = &self.phase else {
             return;
         };
-        self.broadcast(&ServerMessage::ReplayState(ReplayPlaybackState {
+        self.broadcast(&ServerMessage::RoomTimeState(RoomTimeState {
             current_tick: game.tick_count(),
             duration_ticks: 0,
             keyframe_ticks: Vec::new(),
-            speed: if self.dev_watch_paused {
+            speed: if self.room_time_paused {
                 0.0
             } else {
-                self.replay_speed
+                self.room_time_speed
             },
-            paused: self.dev_watch_paused,
+            paused: self.room_time_paused,
             ended: false,
             controller_id: None,
         }));
@@ -2746,11 +2754,11 @@ impl RoomTask {
                 self.finish_match_countdown_if_due();
                 return;
             }
-            ScheduledTickAction::ReplayPlayback => {
+            ScheduledTickAction::RoomControlled(RoomTimeSource::ReplayPlayback) => {
                 self.on_tick_replay_viewer(scheduled);
                 return;
             }
-            ScheduledTickAction::DevWatch => {
+            ScheduledTickAction::RoomControlled(RoomTimeSource::DevScenario) => {
                 self.on_tick_dev_watch(scheduled);
                 return;
             }
@@ -2930,7 +2938,7 @@ impl RoomTask {
             );
             self.broadcast_observer_analysis_for(&session);
         } else {
-            self.broadcast_replay_state_for(&session);
+            self.broadcast_room_time_state_for(&session);
             self.broadcast_observer_analysis_for(&session);
         }
 
@@ -2938,36 +2946,47 @@ impl RoomTask {
         self.phase = Phase::ReplayViewer(session);
     }
 
-    pub(super) fn on_set_replay_speed(&mut self, player_id: u32, speed: f32) {
-        if let Phase::ReplayViewer(session) = &mut self.phase {
-            if !self.players.contains_key(&player_id) {
+    pub(super) fn on_set_room_time_speed(&mut self, player_id: u32, speed: f32) {
+        if !self.tick_control().allows_room_time_operation(
+            RoomTimeOperation::SetSpeed,
+            self.players.contains_key(&player_id),
+        ) {
+            return;
+        }
+
+        match self.session_policy().clock.room_time_source() {
+            Some(RoomTimeSource::ReplayPlayback) => {}
+            Some(RoomTimeSource::DevScenario) => {
+                match TickControl::room_time_speed(speed) {
+                    RoomTimeSpeed::Paused => {
+                        self.room_time_paused = true;
+                    }
+                    RoomTimeSpeed::Running(speed) => {
+                        self.room_time_paused = false;
+                        self.room_time_speed = speed;
+                    }
+                }
+                self.broadcast_dev_watch_state();
                 return;
             }
+            None => return,
+        }
+
+        if let Phase::ReplayViewer(session) = &mut self.phase {
             session.set_speed(player_id, speed);
             let state = session.state();
-            self.broadcast(&ServerMessage::ReplayState(state));
-            return;
+            self.broadcast(&ServerMessage::RoomTimeState(state));
         }
-        if !self.session_policy().is_dev_watch() {
-            return;
-        }
-        match TickControl::dev_watch_speed(speed) {
-            DevWatchSpeed::Paused => {
-                self.dev_watch_paused = true;
-            }
-            DevWatchSpeed::Running(speed) => {
-                self.dev_watch_paused = false;
-                self.replay_speed = speed;
-            }
-        }
-        self.broadcast_dev_watch_state();
     }
 
-    fn on_step_dev_tick(&mut self, player_id: u32) {
+    fn on_step_room_time(&mut self, player_id: u32) {
         if !self
             .tick_control()
-            .can_step_dev_tick(self.players.contains_key(&player_id))
+            .can_step_room_time(self.players.contains_key(&player_id))
         {
+            return;
+        }
+        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::DevScenario) {
             return;
         }
         self.on_tick_dev_watch(TokioInstant::now());
@@ -3383,15 +3402,18 @@ impl RoomTask {
         self.broadcast(&self.branch_staging_message(staging));
     }
 
-    /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
-    /// No-op outside replay rooms or when no game is active.
-    fn on_seek_replay(&mut self, player_id: u32, ticks_back: u32) {
+    /// Rewind room-controlled replay time by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
+    /// No-op outside rooms whose clock capability allows relative seek.
+    fn on_seek_room_time(&mut self, player_id: u32, ticks_back: u32) {
+        if !self.tick_control().allows_room_time_operation(
+            RoomTimeOperation::SeekRelative,
+            self.players.contains_key(&player_id),
+        ) {
+            return;
+        }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
-            if !self.players.contains_key(&player_id) {
-                return;
-            }
             let viewer_count = self.players.len();
             let seek_result = session.seek_back(&self.room, viewer_count, player_id, ticks_back);
             let starts = if seek_result.is_ok() {
@@ -3422,7 +3444,7 @@ impl RoomTask {
                         send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
                     }
                     if let Some(state) = state {
-                        self.broadcast(&ServerMessage::ReplayState(state));
+                        self.broadcast(&ServerMessage::RoomTimeState(state));
                     }
                     if let Some(analysis) = analysis {
                         self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
@@ -3436,14 +3458,18 @@ impl RoomTask {
         }
     }
 
-    /// Seek a replay to an absolute tick. No-op outside replay rooms or when no game is active.
-    fn on_seek_replay_to(&mut self, player_id: u32, tick: u32) {
+    /// Seek room-controlled replay time to an absolute tick. No-op outside rooms whose clock
+    /// capability allows absolute seek.
+    fn on_seek_room_time_to(&mut self, player_id: u32, tick: u32) {
+        if !self.tick_control().allows_room_time_operation(
+            RoomTimeOperation::SeekAbsolute,
+            self.players.contains_key(&player_id),
+        ) {
+            return;
+        }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
         if let Phase::ReplayViewer(session) = &mut self.phase {
-            if !self.players.contains_key(&player_id) {
-                return;
-            }
             let viewer_count = self.players.len();
             let seek_result = session.seek_to(&self.room, viewer_count, player_id, tick);
             let starts = if seek_result.is_ok() {
@@ -3474,7 +3500,7 @@ impl RoomTask {
                         send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
                     }
                     if let Some(state) = state {
-                        self.broadcast(&ServerMessage::ReplayState(state));
+                        self.broadcast(&ServerMessage::RoomTimeState(state));
                     }
                     if let Some(analysis) = analysis {
                         self.broadcast(&ServerMessage::ObserverAnalysis(analysis));
@@ -3687,7 +3713,7 @@ impl RoomTask {
         let recipients = self.order.clone();
         for id in recipients {
             self.send_replay_start_to(id);
-            self.send_replay_state_to(id);
+            self.send_room_time_state_to(id);
             self.send_observer_analysis_to(id);
         }
         crate::log_info!(
@@ -4280,7 +4306,7 @@ mod tests {
         add_test_room_player(&mut task, 99, true);
         task.phase = Phase::ReplayViewer(Box::new(replay));
 
-        task.on_set_replay_speed(99, 0.0);
+        task.on_set_room_time_speed(99, 0.0);
         assert_eq!(
             task.current_tick_interval(),
             Duration::from_millis(config::TICK_MS)
@@ -4288,7 +4314,7 @@ mod tests {
         task.on_tick(TokioInstant::now());
         assert_eq!(in_game_tick(&task), 0);
 
-        task.on_set_replay_speed(99, 1.0);
+        task.on_set_room_time_speed(99, 1.0);
         task.on_tick(TokioInstant::now());
         assert_eq!(in_game_tick(&task), 1);
     }
@@ -4321,7 +4347,7 @@ mod tests {
         replay_task.phase = Phase::ReplayViewer(Box::new(replay));
         assert_eq!(replay_task.current_tick_interval(), base.div_f32(2.0));
 
-        replay_task.on_set_replay_speed(99, 0.0);
+        replay_task.on_set_room_time_speed(99, 0.0);
         assert_eq!(replay_task.current_tick_interval(), base);
 
         let mut dev = RoomTask::new(
@@ -4337,9 +4363,10 @@ mod tests {
             false,
             DrainHandle::default(),
         );
-        dev.on_set_replay_speed(99, 2.0);
+        add_test_room_player(&mut dev, 99, true);
+        dev.on_set_room_time_speed(99, 2.0);
         assert_eq!(dev.current_tick_interval(), base.div_f32(2.0));
-        dev.on_set_replay_speed(99, 0.0);
+        dev.on_set_room_time_speed(99, 0.0);
         assert_eq!(dev.current_tick_interval(), base);
 
         let seed = replay_branch_test_seed(&players, 1);
@@ -4350,7 +4377,7 @@ mod tests {
             false,
             DrainHandle::default(),
         );
-        branch.replay_speed = 4.0;
+        branch.room_time_speed = 4.0;
         branch.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
         assert_eq!(branch.current_tick_interval(), base);
     }
@@ -4374,11 +4401,11 @@ mod tests {
         let mut writer = add_test_room_player(&mut task, 99, true);
         task.phase = Phase::ReplayViewer(Box::new(replay));
 
-        task.on_seek_replay(99, 1);
+        task.on_seek_room_time(99, 1);
         assert!(std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
-            .any(|msg| matches!(msg, ServerMessage::ReplayState(_))));
+            .any(|msg| matches!(msg, ServerMessage::RoomTimeState(_))));
 
-        task.on_seek_replay(99, 1);
+        task.on_seek_room_time(99, 1);
         let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
         assert!(messages.iter().any(|msg| {
             matches!(msg, ServerMessage::Error { msg } if msg.contains("wait before seeking again"))
@@ -4409,7 +4436,7 @@ mod tests {
         task.phase = Phase::ReplayViewer(Box::new(replay));
 
         task.send_replay_start_to(99);
-        task.send_replay_state_to(99);
+        task.send_room_time_state_to(99);
         task.send_observer_analysis_to(99);
         let join_messages: Vec<_> =
             std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
@@ -4418,7 +4445,7 @@ mod tests {
             ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 3 && analysis.players.len() == 2
         )));
 
-        task.on_seek_replay_to(99, 1);
+        task.on_seek_room_time_to(99, 1);
         let seek_messages: Vec<_> =
             std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
         assert!(seek_messages.iter().any(|msg| matches!(
@@ -5968,10 +5995,10 @@ mod tests {
         assert_eq!(in_game_tick(&task), 0);
         while writer.reliable_rx.try_recv().is_ok() {}
 
-        task.on_set_replay_speed(99, 0.0);
+        task.on_set_room_time_speed(99, 0.0);
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::ReplayState(state)
+            ServerMessage::RoomTimeState(state)
                 if state.paused && state.speed == 0.0 && state.current_tick == 0
         ));
         task.on_tick(TokioInstant::now());
@@ -5981,7 +6008,7 @@ mod tests {
             "scheduled ticks should not advance while paused"
         );
 
-        task.on_step_dev_tick(99);
+        task.on_step_room_time(99);
         assert_eq!(in_game_tick(&task), 1);
         let snapshot = writer.snapshots.take().expect("dev watch snapshot");
         let Phase::InGame(game) = &task.phase else {
@@ -5992,21 +6019,21 @@ mod tests {
         assert_eq!(snapshot.net_status.prediction_version, 0);
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::ReplayState(state)
+            ServerMessage::RoomTimeState(state)
                 if state.paused && state.speed == 0.0 && state.current_tick == 1
         ));
-        task.on_step_dev_tick(99);
+        task.on_step_room_time(99);
         assert_eq!(in_game_tick(&task), 2);
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::ReplayState(state)
+            ServerMessage::RoomTimeState(state)
                 if state.paused && state.speed == 0.0 && state.current_tick == 2
         ));
 
-        task.on_set_replay_speed(99, 1.0);
+        task.on_set_room_time_speed(99, 1.0);
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::ReplayState(state)
+            ServerMessage::RoomTimeState(state)
                 if !state.paused && state.speed == 1.0 && state.current_tick == 2
         ));
         task.on_tick(TokioInstant::now());
@@ -6067,7 +6094,7 @@ mod tests {
         ));
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::ReplayState(_)
+            ServerMessage::RoomTimeState(_)
         ));
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
@@ -6119,7 +6146,7 @@ mod tests {
         ));
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
-            ServerMessage::ReplayState(_)
+            ServerMessage::RoomTimeState(_)
         ));
 
         let _ = std::fs::remove_dir_all(artifact_dir);
@@ -6243,7 +6270,7 @@ mod tests {
             matches!(msg, ServerMessage::Start(payload) if payload.replay.is_some() && payload.tick == 0)
         }));
         assert!(a_messages.iter().any(
-            |msg| matches!(msg, ServerMessage::ReplayState(state) if state.current_tick == 0)
+            |msg| matches!(msg, ServerMessage::RoomTimeState(state) if state.current_tick == 0)
         ));
         assert!(!b_messages
             .iter()
@@ -6252,7 +6279,7 @@ mod tests {
             matches!(msg, ServerMessage::Start(payload) if payload.replay.is_some() && payload.tick == 0)
         }));
         assert!(b_messages.iter().any(
-            |msg| matches!(msg, ServerMessage::ReplayState(state) if state.current_tick == 0)
+            |msg| matches!(msg, ServerMessage::RoomTimeState(state) if state.current_tick == 0)
         ));
     }
 

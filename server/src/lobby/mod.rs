@@ -178,14 +178,14 @@ pub enum RoomEvent {
     GiveUp { player_id: u32 },
     /// A replay viewer asked to leave playback and return their connection to the lobby screen.
     ReturnToLobby { player_id: u32 },
-    /// Set replay/dev-watch playback speed multiplier; ignored outside replay/dev watch rooms.
-    SetReplaySpeed { player_id: u32, speed: f32 },
-    /// Advance a paused dev-watch room by one simulation tick.
-    StepDevTick { player_id: u32 },
-    /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
-    SeekReplay { player_id: u32, ticks_back: u32 },
-    /// Seek a replay to an absolute simulation tick (replay rooms only; clamped to duration).
-    SeekReplayTo { player_id: u32, tick: u32 },
+    /// Set room-controlled time speed where the session clock capability allows it.
+    SetRoomTimeSpeed { player_id: u32, speed: f32 },
+    /// Advance room-controlled time by one simulation tick where the clock allows stepping.
+    StepRoomTime { player_id: u32 },
+    /// Rewind room-controlled time by `ticks_back` ticks where the clock allows relative seek.
+    SeekRoomTime { player_id: u32, ticks_back: u32 },
+    /// Seek room-controlled time to an absolute tick where the clock allows absolute seek.
+    SeekRoomTimeTo { player_id: u32, tick: u32 },
     /// Select replay vision for this viewer only. Ignored outside replay rooms in phase 1.
     SetReplayVision {
         player_id: u32,

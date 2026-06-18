@@ -2609,7 +2609,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   seekBack.dataset.seekBack = "90";
   const stepDev = fakeEl("button");
   stepDev.className = "spd-btn dev-step-btn";
-  stepDev.dataset.stepDevTick = "";
+  stepDev.dataset.stepRoomTime = "";
   const concluded = fakeEl("span");
   concluded.id = "replay-concluded";
   replayControls.appendChild(speed2);
@@ -2625,13 +2625,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     visions: [],
     branches: 0,
     steps: 0,
-    setReplaySpeed(speed) {
+    setRoomTimeSpeed(speed) {
       this.speeds.push(speed);
     },
-    seekReplay(ticksBack) {
+    seekRoomTime(ticksBack) {
       this.seekBacks.push(ticksBack);
     },
-    seekReplayTo(tick) {
+    seekRoomTimeTo(tick) {
       this.seekTargets.push(tick);
     },
     setReplayVision(vision) {
@@ -2640,11 +2640,11 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     requestReplayBranch() {
       this.branches += 1;
     },
-    stepDevTick() {
+    stepRoomTime() {
       this.steps += 1;
     },
   };
-  const replayState = {
+  const roomTimeState = {
     players: [
       { id: 1, name: "Alpha", color: "#f00" },
       { id: 2, name: "Bravo", color: "#0f0" },
@@ -2652,7 +2652,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   };
   const replayUi = new ReplayControls({
     net: replayNet,
-    state: replayState,
+    state: roomTimeState,
     replayViewer: true,
     isReplay: true,
     isScenario: false,
@@ -2666,8 +2666,8 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   const branchReplay = replayControls.querySelector(".replay-branch-btn");
   assert(branchReplay?.textContent === "Resume play from here", "replay branch button describes resuming from the current tick");
   replayControls._listeners.get("click")({ target: speed2 });
-  assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setReplaySpeed");
-  replayUi.applyReplayState({ currentTick: 120, durationTicks: 1_000, speed: 2 });
+  assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setRoomTimeSpeed");
+  replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2 });
   replayControls._listeners.get("click")({ target: pauseReplay });
   assert(replayNet.speeds.at(-1) === 0, "replay pause button sends zero playback speed");
   assert(pauseReplay.textContent === "Resume", "paused replay button switches to resume");
@@ -2675,7 +2675,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(replayNet.speeds.at(-1) === 2, "replay resume button restores the last non-zero speed");
   assert(pauseReplay.textContent === "Pause", "resumed replay button switches back to pause");
   replayControls._listeners.get("click")({ target: seekBack });
-  assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekReplay");
+  assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekRoomTime");
   const visionButtons = replayControls.querySelectorAll(".vision-btn");
   assert(visionButtons.length === 3, "replay viewer builds all-player and per-player fog controls");
   replayUi.onReplayVisionClick({ target: visionButtons[1], shiftKey: false });
@@ -2692,7 +2692,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   );
   replayUi.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
   assert(replayNet.visions.at(-1).mode === "all", "all replay fog control restores union vision");
-  replayUi.applyReplayState({
+  replayUi.applyRoomTimeState({
     currentTick: 100,
     durationTicks: 1_000,
     keyframeTicks: [0, 400, 800],
@@ -2729,7 +2729,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   scenarioSpeed0.dataset.speed = "0";
   const scenarioStep = fakeEl("button");
   scenarioStep.className = "spd-btn dev-step-btn";
-  scenarioStep.dataset.stepDevTick = "";
+  scenarioStep.dataset.stepRoomTime = "";
   const scenarioSeek = fakeEl("button");
   scenarioSeek.className = "spd-btn seek-btn";
   scenarioSeek.dataset.seekBack = "30";
@@ -2739,7 +2739,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   dom.replaySpeed = scenarioControls;
   const scenarioUi = new ReplayControls({
     net: replayNet,
-    state: replayState,
+    state: roomTimeState,
     replayViewer: false,
     isReplay: false,
     isScenario: true,
@@ -2747,9 +2747,9 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
   assert(!scenarioStep.hidden, "scenario mode shows step controls");
   scenarioControls._listeners.get("click")({ target: scenarioStep });
-  assert(replayNet.steps === 1, "scenario step sends net.stepDevTick");
+  assert(replayNet.steps === 1, "scenario step sends net.stepRoomTime");
   scenarioControls._listeners.get("click")({ target: scenarioSpeed0 });
-  assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setReplaySpeed");
+  assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
   scenarioUi.destroy();
 
   const noticeAudioMatch = Object.create(Match.prototype);
@@ -3542,7 +3542,10 @@ function fakeAudioContext() {
   assertHasMethod(net, "setTeam", "Net");
   assertHasMethod(net, "setFaction", "Net");
   assertHasMethod(net, "setQuickstart", "Net");
-  assertHasMethod(net, "setReplaySpeed", "Net");
+  assertHasMethod(net, "setRoomTimeSpeed", "Net");
+  assertHasMethod(net, "stepRoomTime", "Net");
+  assertHasMethod(net, "seekRoomTime", "Net");
+  assertHasMethod(net, "seekRoomTimeTo", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
   assertHasMethod(net, "lab", "Net");
   assertHasMethod(net, "requestReplayBranch", "Net");
@@ -3578,6 +3581,10 @@ function fakeAudioContext() {
   assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
   assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
+  assert(msg.setRoomTimeSpeed(2).t === "setRoomTimeSpeed", "room-time speed builder tag");
+  assert(msg.stepRoomTime().t === "stepRoomTime", "room-time step builder tag");
+  assert(msg.seekRoomTime(90).ticksBack === 90, "room-time relative seek builder payload");
+  assert(msg.seekRoomTimeTo(450).tick === 450, "room-time absolute seek builder payload");
   assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");

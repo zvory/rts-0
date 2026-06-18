@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -47,13 +47,13 @@ instead of keeping fallback aliases.
 
 ## Implementation Checklist
 
-- [ ] Choose final neutral room-time protocol names and remove old replay/dev time names.
-- [ ] Mirror the protocol changes across Rust DTOs, server adapters, JavaScript builders/decoders,
+- [x] Choose final neutral room-time protocol names and remove old replay/dev time names.
+- [x] Mirror the protocol changes across Rust DTOs, server adapters, JavaScript builders/decoders,
       and docs.
-- [ ] Route server replay and dev scenario timing through clock capability and allowed operations.
-- [ ] Update client controls to use room-time state instead of replay/dev mode checks where possible.
-- [ ] Add or update focused tests for replay pause/speed/seek and dev pause/step.
-- [ ] Mark this phase as done in this file.
+- [x] Route server replay and dev scenario timing through clock capability and allowed operations.
+- [x] Update client controls to use room-time state instead of replay/dev mode checks where possible.
+- [x] Add or update focused tests for replay pause/speed/seek and dev pause/step.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

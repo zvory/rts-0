@@ -178,12 +178,12 @@ export function expireClientCommands(options = {}) {
   return { op: "expireClientCommands", ...options };
 }
 
-export function setReplaySpeed(speed) {
-  return { op: "setReplaySpeed", speed };
+export function setRoomTimeSpeed(speed) {
+  return { op: "setRoomTimeSpeed", speed };
 }
 
-export function stepDevTick() {
-  return { op: "stepDevTick" };
+export function stepRoomTime() {
+  return { op: "stepRoomTime" };
 }
 
 export function assertTickAdvanced(options = {}) {

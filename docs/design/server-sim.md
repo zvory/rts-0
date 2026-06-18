@@ -239,8 +239,9 @@ alive.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`,
-  `GiveUp`, `SetReplaySpeed`, `SeekReplay`, `SetReplayVision`, `Lab`). The room task is the single
-  writer of game state — no locks around `Game`.
+  `GiveUp`, `SetRoomTimeSpeed`, `StepRoomTime`, `SeekRoomTime`, `SeekRoomTimeTo`,
+  `SetReplayVision`, `Lab`). The room task is the single writer of game state — no locks around
+  `Game`.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
   connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive

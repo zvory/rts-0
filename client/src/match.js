@@ -236,7 +236,7 @@ export class Match {
       this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
     };
-    this.onReplayState = (m) => this.applyReplayState(m);
+    this.onRoomTimeState = (m) => this.applyRoomTimeState(m);
     this.onObserverAnalysis = (m) => this.observerAnalysisOverlay?.applyObserverAnalysis(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
@@ -252,7 +252,7 @@ export class Match {
       this.input.onPointerLockError = this.onPointerLockError;
     }
     this.net.on(S.SNAPSHOT, this.onSnapshot);
-    this.net.on(S.REPLAY_STATE, this.onReplayState);
+    this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
@@ -979,7 +979,7 @@ export class Match {
     this.stopNetReports();
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
-    this.net.off(S.REPLAY_STATE, this.onReplayState);
+    this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     this.replayControls?.destroy();
@@ -994,8 +994,8 @@ export class Match {
     }
   }
 
-  applyReplayState(state) {
-    this.replayControls?.applyReplayState(state);
+  applyRoomTimeState(state) {
+    this.replayControls?.applyRoomTimeState(state);
   }
 
   /**
@@ -1010,7 +1010,7 @@ export class Match {
     this.stopNetReports();
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
-    this.net.off(S.REPLAY_STATE, this.onReplayState);
+    this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);

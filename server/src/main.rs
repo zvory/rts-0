@@ -1416,7 +1416,7 @@ async fn send_server_message(
         ServerMessage::MatchCountdown { .. } => "match_countdown",
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
-        ServerMessage::ReplayState(_) => "replay_state",
+        ServerMessage::RoomTimeState(_) => "room_time_state",
         ServerMessage::ObserverAnalysis(_) => "observer_analysis",
         ServerMessage::JoinReplayPrompt { .. } => "join_replay_prompt",
         ServerMessage::LabState(_) => "lab_state",
@@ -1695,38 +1695,38 @@ async fn handle_client_message(
         ClientMessage::NetReport { report } => {
             structured_log::log_client_net_report(player_id, current_room_name.as_deref(), report);
         }
-        ClientMessage::SetReplaySpeed { speed } => {
+        ClientMessage::SetRoomTimeSpeed { speed } => {
             send_room_event(
                 player_id,
                 current_room,
-                RoomEvent::SetReplaySpeed { player_id, speed },
+                RoomEvent::SetRoomTimeSpeed { player_id, speed },
             )
             .await;
         }
-        ClientMessage::StepDevTick => {
+        ClientMessage::StepRoomTime => {
             send_room_event(
                 player_id,
                 current_room,
-                RoomEvent::StepDevTick { player_id },
+                RoomEvent::StepRoomTime { player_id },
             )
             .await;
         }
-        ClientMessage::SeekReplay { ticks_back } => {
+        ClientMessage::SeekRoomTime { ticks_back } => {
             send_room_event(
                 player_id,
                 current_room,
-                RoomEvent::SeekReplay {
+                RoomEvent::SeekRoomTime {
                     player_id,
                     ticks_back,
                 },
             )
             .await;
         }
-        ClientMessage::SeekReplayTo { tick } => {
+        ClientMessage::SeekRoomTimeTo { tick } => {
             send_room_event(
                 player_id,
                 current_room,
-                RoomEvent::SeekReplayTo { player_id, tick },
+                RoomEvent::SeekRoomTimeTo { player_id, tick },
             )
             .await;
         }
