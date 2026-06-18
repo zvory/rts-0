@@ -579,10 +579,10 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
 gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
 or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged enemy
-unit's position to the victim owner and same-team recipients that pass team-current event
-visibility. Same-team friendly-fire damage does not emit under-attack alerts. Unit attack events
-are sent to the attacker's team and to enemy recipients whose team can currently see the shooter or
-target point. They include `reveal` so a shooter
+unit's position to the victim owner only; same-team recipients may still see the attack event through
+shared vision, but they do not receive teammate under-attack alerts. Same-team friendly-fire damage
+does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy
+recipients whose team can currently see the shooter or target point. They include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Death events are sent to the dead entity's team and to enemy recipients whose team can currently see

@@ -759,7 +759,7 @@ fn visible_damage_emits_positioned_under_attack_alert_to_victim_owner() {
 }
 
 #[test]
-fn visible_enemy_damage_alerts_victim_team_only() {
+fn visible_enemy_damage_alerts_victim_owner_only() {
     let mut entities = EntityStore::new();
     let attacker_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -796,8 +796,8 @@ fn visible_enemy_damage_alerts_victim_team_only() {
             .get(&3)
             .expect("victim ally events should exist")
             .iter()
-            .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")),
-        "victim ally should receive the team under-attack notice through shared team vision"
+            .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")),
+        "victim ally should not receive the teammate's under-attack notice"
     );
     assert!(
         events
