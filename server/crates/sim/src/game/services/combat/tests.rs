@@ -2930,6 +2930,59 @@ fn building_between_attacker_and_target_blocks_the_shot() {
 }
 
 #[test]
+fn tank_trap_between_attacker_and_target_does_not_block_the_shot() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(300.0, 100.0));
+    let blocker = entities
+        .spawn_building(2, EntityKind::TankTrap, 160.0, 100.0, true)
+        .expect("tank trap should spawn");
+    let intended = entities
+        .spawn_unit(2, EntityKind::Worker, 230.0, 100.0)
+        .expect("intended target should spawn");
+    let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+    let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
+    let map = open_map(12);
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities
+            .get(attacker)
+            .expect("attacker should exist")
+            .target_id(),
+        Some(intended),
+        "attack-move should prefer the enemy worker over the closer tank trap"
+    );
+    assert_eq!(
+        entities.get(blocker).expect("blocker should exist").hp,
+        blocker_hp_before,
+        "tank traps should not take damage while a unit behind them is targeted"
+    );
+    assert!(
+        entities.get(intended).expect("intended should exist").hp < intended_hp_before,
+        "target behind the tank trap should take the shot damage"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("attacker owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == intended)),
+        "attack event should point at the intended target"
+    );
+}
+
+#[test]
 fn friendly_building_between_attacker_and_target_prevents_firing() {
     let mut entities = EntityStore::new();
     let attacker = entities
