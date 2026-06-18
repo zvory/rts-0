@@ -54,10 +54,12 @@ pub enum LabStartRole {
     ReadOnly,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "mode", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum LabVisionMode {
     FullWorld,
+    Team { team_id: TeamId },
+    Teams { team_ids: Vec<TeamId> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

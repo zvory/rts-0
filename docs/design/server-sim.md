@@ -236,8 +236,8 @@ alive.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`,
-  `GiveUp`, `SetReplaySpeed`, `SeekReplay`, `SetReplayVision`). The room task is the single writer
-  of game state — no locks around `Game`.
+  `GiveUp`, `SetReplaySpeed`, `SeekReplay`, `SetReplayVision`, `Lab`). The room task is the single
+  writer of game state — no locks around `Game`.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
   connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
@@ -245,9 +245,10 @@ alive.
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
 - Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
   room-owned operator/read-only viewer session record. They use the shared launch helper with
-  `StartPayload.lab` metadata, prediction disabled, and full-world projection through
-  `projection.rs`; lab state, dirty/log placeholders, and viewer roles stay in the room task rather
-  than in `Game`.
+  `StartPayload.lab` metadata and prediction disabled. Lab setup mutations call `Game::apply_lab_op`;
+  issue-as commands call `Game::issue_lab_command_as`, which rejects mixed-owner selections before
+  queuing a normal command. Lab state, dirty flags, viewer roles, selected vision, and append-only
+  operation log records stay in the room task rather than in `Game`.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view

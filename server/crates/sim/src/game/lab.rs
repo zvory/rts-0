@@ -19,6 +19,7 @@ use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupa
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
+use crate::protocol::Command;
 use crate::rules;
 
 use super::{systems, Game, MapMetadata, PlayerInit};
@@ -140,6 +141,9 @@ pub enum LabError {
         name: String,
         reason: String,
     },
+    InvalidCommand {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -225,6 +229,37 @@ impl Game {
             LabOp::SetCompletedResearch(input) => self.lab_set_completed_research(input),
             LabOp::RestoreScenario(scenario) => self.restore_lab_scenario(*scenario),
         }
+    }
+
+    pub fn issue_lab_command_as(
+        &mut self,
+        player_id: u32,
+        command: Command,
+    ) -> Result<(), LabError> {
+        self.validate_owner(player_id)?;
+        let authority_entities = command_authority_entities(&command);
+        if authority_entities.is_empty() {
+            return Err(LabError::InvalidCommand {
+                reason: "command must identify at least one owned entity".to_string(),
+            });
+        }
+        for entity_id in authority_entities {
+            let Some(entity) = self.entities.get(entity_id) else {
+                return Err(LabError::StaleEntity {
+                    entity_id,
+                });
+            };
+            if entity.owner != player_id {
+                return Err(LabError::InvalidCommand {
+                    reason: format!(
+                        "entity {entity_id} is owned by {}, not {player_id}",
+                        entity.owner
+                    ),
+                });
+            }
+        }
+        self.enqueue(player_id, super::command::SimCommand::from_protocol(command));
+        Ok(())
     }
 
     pub fn export_lab_scenario(&self) -> LabScenarioV1 {
@@ -720,6 +755,28 @@ impl Game {
                 &player.upgrades,
             );
         }
+    }
+}
+
+fn command_authority_entities(command: &Command) -> Vec<u32> {
+    match command {
+        Command::Move { units, .. }
+        | Command::AttackMove { units, .. }
+        | Command::Attack { units, .. }
+        | Command::SetupAntiTankGuns { units, .. }
+        | Command::TearDownAntiTankGuns { units }
+        | Command::Charge { units }
+        | Command::UseAbility { units, .. }
+        | Command::RecastAbility { units, .. }
+        | Command::SetAutocast { units, .. }
+        | Command::Gather { units, .. }
+        | Command::Build { units, .. }
+        | Command::Stop { units }
+        | Command::HoldPosition { units } => units.clone(),
+        Command::Train { building, .. }
+        | Command::Research { building, .. }
+        | Command::Cancel { building }
+        | Command::SetRally { building, .. } => vec![*building],
     }
 }
 

@@ -190,6 +190,12 @@ pub enum ClientMessage {
     SeekReplayTo { tick: u32 },
     /// Select which players' fog to use while viewing a replay. Per-viewer only.
     SetReplayVision { vision: ReplayVisionRequest },
+    /// Privileged lab request envelope. Only lab rooms route these requests.
+    Lab {
+        #[serde(rename = "requestId")]
+        request_id: u32,
+        op: LabClientOp,
+    },
     /// Request a new practice branch room from this replay room's current authoritative tick.
     RequestReplayBranch,
     /// Claim one original player seat in a replay branch staging room.
@@ -365,6 +371,48 @@ pub enum ReplayVisionRequest {
     Players { player_ids: Vec<u32> },
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum LabClientOp {
+    SpawnEntity {
+        owner: u32,
+        kind: String,
+        x: f32,
+        y: f32,
+        #[serde(default)]
+        completed: bool,
+    },
+    DeleteEntity {
+        entity_id: u32,
+    },
+    MoveEntity {
+        entity_id: u32,
+        x: f32,
+        y: f32,
+    },
+    SetEntityOwner {
+        entity_id: u32,
+        owner: u32,
+    },
+    SetPlayerResources {
+        player_id: u32,
+        steel: u32,
+        oil: u32,
+    },
+    SetCompletedResearch {
+        player_id: u32,
+        upgrade: String,
+        completed: bool,
+    },
+    SetVision {
+        vision: LabVisionMode,
+    },
+    IssueCommandAs {
+        player_id: u32,
+        cmd: Command,
+    },
+}
+
 // ---------------------------------------------------------------------------
 // Server -> Client
 // ---------------------------------------------------------------------------
@@ -466,6 +514,10 @@ pub enum ServerMessage {
         occupants: Vec<BranchStagingOccupant>,
         can_start: bool,
     },
+    /// Reliable lab control-plane state. World state still travels through `snapshot`.
+    LabState(LabState),
+    /// Reliable result for one lab request.
+    LabResult(LabResult),
     /// Server shutdown drain has started. Existing matches may continue until the deadline, but
     /// new match starts are disabled.
     ShutdownWarning {
@@ -486,6 +538,29 @@ pub enum ServerMessage {
     Error {
         msg: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabState {
+    pub room: String,
+    pub operator_id: u32,
+    pub role: LabStartRole,
+    pub vision: LabVisionMode,
+    pub dirty: bool,
+    pub operation_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabResult {
+    pub request_id: u32,
+    pub ok: bool,
+    pub op: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -842,6 +917,7 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("SEEK_REPLAY", "seekReplay"),
                 ("SEEK_REPLAY_TO", "seekReplayTo"),
                 ("SET_REPLAY_VISION", "setReplayVision"),
+                ("LAB", "lab"),
                 ("REQUEST_REPLAY_BRANCH", "requestReplayBranch"),
                 ("CLAIM_BRANCH_SEAT", "claimBranchSeat"),
                 ("RELEASE_BRANCH_SEAT", "releaseBranchSeat"),
@@ -859,6 +935,8 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("JOIN_REPLAY_PROMPT", "joinReplayPrompt"),
                 ("REPLAY_BRANCH_CREATED", "replayBranchCreated"),
                 ("BRANCH_STAGING", "branchStaging"),
+                ("LAB_STATE", "labState"),
+                ("LAB_RESULT", "labResult"),
                 ("SHUTDOWN_WARNING", "shutdownWarning"),
                 ("GAME_OVER", "gameOver"),
                 ("PONG", "pong"),
