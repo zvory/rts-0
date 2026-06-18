@@ -89,6 +89,29 @@ impl Game {
         map_metadata: MapMetadata,
     ) -> Game;
 
+    /// Create a lab match around an already validated map/player setup. Lab rooms still use the
+    /// normal `Game` simulation; the lab constructor only names the mode-specific setup seam.
+    pub fn new_lab(players: &[PlayerInit], seed: u32, map: Map, map_metadata: MapMetadata) -> Game;
+
+    /// Apply one typed, validated lab mutation and repair derived sim state before returning.
+    /// Accepted operations can spawn, delete, move, reassign, set resources, set completed
+    /// research, or restore a versioned lab scenario. Bad lab input returns `LabError`; room code
+    /// must not mutate entity stores or player state directly.
+    pub fn apply_lab_op(&mut self, op: lab::LabOp) -> Result<lab::LabOpOutcome, lab::LabError>;
+
+    /// Export authoritative lab setup data as versioned JSON-friendly scenario state, without
+    /// treating snapshots, fog, transient events, command logs, or room-owned lab metadata as the
+    /// scenario format.
+    pub fn export_lab_scenario(&self) -> lab::LabScenarioV1;
+
+    /// Restore a versioned lab scenario through the same validation/repair path used by
+    /// `apply_lab_op(LabOp::RestoreScenario(...))`, remapping scenario entity ids to fresh
+    /// authoritative ids.
+    pub fn restore_lab_scenario(
+        &mut self,
+        scenario: lab::LabScenarioV1,
+    ) -> Result<lab::LabOpOutcome, lab::LabError>;
+
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
 
@@ -158,6 +181,15 @@ respect (they get a start position, City Centre, workers, economy, and count tow
 win/elimination); the only difference is they have no socket. `Game` does not own AI controllers;
 the room task or tool harness asks `rts-ai` controllers for ordinary `SimCommand`s and enqueues
 them through this API before ticking — see §8.
+
+Lab mutation types live under `game::lab`. `LabOp` is intentionally narrow rather than a debug
+backdoor: entity mutations validate known unit/building kinds, real players, finite in-map
+positions, placement/collision legality, and stale ids before changing the world. Accepted lab
+mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
+fog, and building memory before returning. `LabScenarioV1` is setup data keyed by map identity,
+player state, and entity records; restore loads the named map, validates faction/research/kind data,
+recreates entities with fresh ids, and returns the id remap for callers that need to reconcile UI
+selection.
 
 `PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
 seated player a unique nonzero team by default; deserialized or hand-built fixtures with

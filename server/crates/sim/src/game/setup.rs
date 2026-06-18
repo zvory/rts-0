@@ -246,7 +246,7 @@ impl Game {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn new_inner_with_map(
+    pub(super) fn new_inner_with_map(
         players: &[PlayerInit],
         resource_override: Option<(u32, u32)>,
         seed: u32,

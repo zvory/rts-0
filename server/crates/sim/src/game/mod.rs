@@ -21,6 +21,7 @@ pub mod entity;
 pub(crate) mod fog;
 mod hero_abilities;
 mod invariants;
+pub mod lab;
 pub mod map;
 mod mortar;
 mod pathfinding;

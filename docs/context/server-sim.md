@@ -14,6 +14,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 
 ## Code map
 - `server/crates/sim/src/game/mod.rs` — public `Game` API
+- `server/crates/sim/src/game/lab.rs` — typed lab-only `Game` mutation and scenario setup API
 - `server/crates/sim/src/game/systems.rs` — thin tick orchestrator
 - `server/crates/sim/src/game/services/` — small pure helpers, called in order by `systems.rs`
 - `server/crates/sim/src/game/services/order_planner.rs` — pure command/queue planning policy
