@@ -430,6 +430,26 @@ impl<'a> MoveCoordinator<'a> {
             None => return false,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
+        if sx == gx && sy == gy {
+            if let Some(e) = entities.get_mut(id) {
+                e.set_path(Vec::new());
+                e.set_last_repath_tick(self.tick);
+                e.set_path_goal(Some(goal));
+                if matches!(
+                    e.order(),
+                    Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
+                ) {
+                    e.mark_move_phase(MovePhase::Arrived);
+                    if matches!(e.order(), Order::Move(_)) {
+                        e.set_order(Order::Idle);
+                    }
+                } else if matches!(e.order(), Order::Attack(_)) {
+                    e.reset_attack_unreachable_checks();
+                }
+            }
+            self.budget = self.budget.saturating_sub(1);
+            return true;
+        }
         let radius_tiles = config::unit_radius_tiles(kind);
         let route_shape = if smooth_static_segments && uses_oriented_vehicle_body(kind) {
             RouteShape::VehicleClearance
@@ -1555,6 +1575,50 @@ mod tests {
         // The unit is fully enclosed, so no route exists → PathFailed.
         let e = entities.get(id).unwrap();
         assert_eq!(e.move_phase(), Some(MovePhase::PathFailed));
+        assert!(e.path_is_empty());
+    }
+
+    #[test]
+    fn same_tile_plain_move_arrives_and_clears_active_order() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (ux, uy) = map.tile_center(10, 10);
+        let id = entities
+            .spawn_unit(1, EntityKind::Rifleman, ux, uy)
+            .expect("rifleman should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        coordinator.order_group_move(&mut entities, 1, &[id], (ux, uy), false);
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let e = entities.get(id).expect("rifleman should exist");
+        assert!(matches!(e.order(), Order::Idle));
+        assert_eq!(e.move_phase(), None);
+        assert!(e.path_is_empty());
+    }
+
+    #[test]
+    fn same_tile_attack_move_arrives_without_dropping_order() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (ux, uy) = map.tile_center(10, 10);
+        let id = entities
+            .spawn_unit(1, EntityKind::MachineGunner, ux, uy)
+            .expect("machine gunner should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        coordinator.order_group_move(&mut entities, 1, &[id], (ux, uy), true);
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let e = entities.get(id).expect("machine gunner should exist");
+        assert!(matches!(e.order(), Order::AttackMove(_)));
+        assert_eq!(e.move_phase(), Some(MovePhase::Arrived));
         assert!(e.path_is_empty());
     }
 
