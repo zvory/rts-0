@@ -8,11 +8,13 @@ export const S = Object.freeze({
   MATCH_COUNTDOWN: "matchCountdown",
   START: "start",
   SNAPSHOT: "snapshot",
-  REPLAY_STATE: "replayState",
+  ROOM_TIME_STATE: "roomTimeState",
   REPLAY_ANALYSIS: "replayAnalysis",
   JOIN_REPLAY_PROMPT: "joinReplayPrompt",
   REPLAY_BRANCH_CREATED: "replayBranchCreated",
   BRANCH_STAGING: "branchStaging",
+  LAB_STATE: "labState",
+  LAB_RESULT: "labResult",
   SHUTDOWN_WARNING: "shutdownWarning",
   GAME_OVER: "gameOver",
   PONG: "pong",
@@ -37,11 +39,12 @@ export const C = Object.freeze({
   RETURN_TO_LOBBY: "returnToLobby",
   PING: "ping",
   NET_REPORT: "netReport",
-  SET_REPLAY_SPEED: "setReplaySpeed",
-  STEP_DEV_TICK: "stepDevTick",
-  SEEK_REPLAY: "seekReplay",
-  SEEK_REPLAY_TO: "seekReplayTo",
+  SET_ROOM_TIME_SPEED: "setRoomTimeSpeed",
+  STEP_ROOM_TIME: "stepRoomTime",
+  SEEK_ROOM_TIME: "seekRoomTime",
+  SEEK_ROOM_TIME_TO: "seekRoomTimeTo",
   SET_REPLAY_VISION: "setReplayVision",
+  LAB: "lab",
   REQUEST_REPLAY_BRANCH: "requestReplayBranch",
   CLAIM_BRANCH_SEAT: "claimBranchSeat",
   RELEASE_BRANCH_SEAT: "releaseBranchSeat",
@@ -186,6 +189,18 @@ export const REPLAY_VISION = Object.freeze({
   ALL: "all",
   PLAYER: "player",
   PLAYERS: "players",
+});
+
+export const LAB_ROLE = Object.freeze({ OPERATOR: "operator", READ_ONLY: "readOnly" });
+export const LAB_VISION = Object.freeze({
+  FULL_WORLD: "fullWorld",
+  TEAM: "team",
+  TEAMS: "teams",
+});
+export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
+  NONE: "none",
+  OWNER_ONLY: "ownerOnly",
+  ALL: "all",
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
@@ -648,7 +663,7 @@ function readAbilityCooldown(record, label) {
   return ability;
 }
 
-/** Decode lobby-debug-mode owner-only path diagnostics. */
+/** Decode projection-policy movement path diagnostics. */
 function assignDebugPath(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
   const record = readArray(fields[index], "entity.debugPath", 6);
@@ -928,11 +943,62 @@ export const msg = Object.freeze({
   returnToLobby: () => ({ t: C.RETURN_TO_LOBBY }),
   ping: (ts) => ({ t: C.PING, ts }),
   netReport: (report) => ({ t: C.NET_REPORT, report }),
-  setReplaySpeed: (speed) => ({ t: C.SET_REPLAY_SPEED, speed }),
-  stepDevTick: () => ({ t: C.STEP_DEV_TICK }),
-  seekReplay: (ticksBack) => ({ t: C.SEEK_REPLAY, ticksBack }),
-  seekReplayTo: (tick) => ({ t: C.SEEK_REPLAY_TO, tick }),
+  setRoomTimeSpeed: (speed) => ({ t: C.SET_ROOM_TIME_SPEED, speed }),
+  stepRoomTime: () => ({ t: C.STEP_ROOM_TIME }),
+  seekRoomTime: (ticksBack) => ({ t: C.SEEK_ROOM_TIME, ticksBack }),
+  seekRoomTimeTo: (tick) => ({ t: C.SEEK_ROOM_TIME_TO, tick }),
   setReplayVision: (vision) => ({ t: C.SET_REPLAY_VISION, vision }),
+  lab: (requestId, op) => ({ t: C.LAB, requestId, op }),
+  labExportScenario: (requestId, name = undefined) => {
+    const op = { op: "exportScenario" };
+    if (name != null) op.name = name;
+    return { t: C.LAB, requestId, op };
+  },
+  labImportScenario: (requestId, scenario) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "importScenario", scenario },
+  }),
+  labSpawnEntity: (requestId, { owner, kind, x, y, completed = false }) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "spawnEntity", owner, kind, x, y, completed: !!completed },
+  }),
+  labDeleteEntity: (requestId, entityId) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "deleteEntity", entityId },
+  }),
+  labMoveEntity: (requestId, entityId, x, y) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "moveEntity", entityId, x, y },
+  }),
+  labSetEntityOwner: (requestId, entityId, owner) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "setEntityOwner", entityId, owner },
+  }),
+  labSetPlayerResources: (requestId, playerId, steel, oil) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "setPlayerResources", playerId, steel, oil },
+  }),
+  labSetCompletedResearch: (requestId, playerId, upgrade, completed) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "setCompletedResearch", playerId, upgrade, completed: !!completed },
+  }),
+  labSetVision: (requestId, vision) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "setVision", vision },
+  }),
+  labIssueCommandAs: (requestId, playerId, command) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "issueCommandAs", playerId, cmd: command },
+  }),
   requestReplayBranch: () => ({ t: C.REQUEST_REPLAY_BRANCH }),
   claimBranchSeat: (playerId) => ({ t: C.CLAIM_BRANCH_SEAT, playerId }),
   releaseBranchSeat: (playerId) => ({ t: C.RELEASE_BRANCH_SEAT, playerId }),
@@ -946,6 +1012,9 @@ export const msg = Object.freeze({
     t: C.SET_REPLAY_VISION,
     vision: { mode: REPLAY_VISION.PLAYERS, playerIds },
   }),
+  labVisionFullWorld: () => ({ mode: LAB_VISION.FULL_WORLD }),
+  labVisionTeam: (teamId) => ({ mode: LAB_VISION.TEAM, teamId }),
+  labVisionTeams: (teamIds) => ({ mode: LAB_VISION.TEAMS, teamIds }),
   selectMap: (map) => ({ t: C.SELECT_MAP, map }),
 });
 

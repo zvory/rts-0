@@ -11,6 +11,7 @@ import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import {
   DEFAULT_FACTION_ID,
   KIND,
+  MOVEMENT_PATH_DIAGNOSTICS,
   PASSABLE,
   STATE,
   isBuilding,
@@ -46,6 +47,18 @@ function lerpAngle(from, to, t) {
   return normalizeAngle(from + shortestAngleDelta(from, to) * t);
 }
 
+function normalizeDiagnostics(diagnostics) {
+  const movementPaths = Object.values(MOVEMENT_PATH_DIAGNOSTICS).includes(
+    diagnostics?.movementPaths,
+  )
+    ? diagnostics.movementPaths
+    : MOVEMENT_PATH_DIAGNOSTICS.NONE;
+  return {
+    movementPaths,
+    observerAnalysis: diagnostics?.observerAnalysis === true,
+  };
+}
+
 export class GameState {
   /**
    * @param {object} startInfo the §2.3 `start` payload.
@@ -64,7 +77,7 @@ export class GameState {
         this._normalizeResource(node, index),
       ),
     };
-    /** @type {Map<number, object>} id -> static resource node with last-known remaining. */
+    /** @type {Map<number, object>} id -> resource node state. */
     this.resourceById = new Map();
     for (const node of this.map.resources) this.resourceById.set(node.id, node);
     /** @type {Array<{id:number,teamId:number,factionId:string,name:string,color:string,startTileX:number,startTileY:number}>} */
@@ -100,12 +113,17 @@ export class GameState {
     /** @type {null | {used:number, cap:number, seq:number}} latest playable selection budget overflow. */
     this.selectionBudgetOverflow = null;
     this._selectionBudgetOverflowSeq = 0;
+    const diagnostics = normalizeDiagnostics(startInfo.diagnostics);
+    /** @type {{movementPaths:string, observerAnalysis:boolean}} diagnostic affordances for this recipient. */
+    this.diagnostics = diagnostics;
     /** @type {boolean} true when the server says movement path diagnostics are available. */
-    this.debugPathOverlaysAvailable = !!startInfo.debugMode;
+    this.debugPathOverlaysAvailable =
+      diagnostics.movementPaths !== MOVEMENT_PATH_DIAGNOSTICS.NONE;
     /** @type {boolean} local gear-menu preference for drawing movement path diagnostics. */
-    this.debugPathOverlaysEnabled = !!startInfo.debugMode;
-    /** @type {boolean} true for dev viewers that should show all server debug paths. */
-    this.showAllDebugPathOverlays = false;
+    this.debugPathOverlaysEnabled = this.debugPathOverlaysAvailable;
+    /** @type {boolean} true for recipients that may draw every server-projected debug path. */
+    this.showAllDebugPathOverlays =
+      diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.ALL;
     /** @type {Array<Array<number>>} ten local control groups, slot 9 is key 0. */
     this.controlGroups = Array.from({ length: 10 }, () => []);
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
@@ -853,7 +871,7 @@ export class GameState {
   }
 
   _resourceEntityViews() {
-    return (this.map.resources || []).map((node) => ({ ...node }));
+    return (this.map.resources || []).flatMap((n) => (n.remaining === 0 ? [] : [{ ...n }]));
   }
 
   // --- selection (client-only) -------------------------------------------

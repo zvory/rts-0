@@ -73,7 +73,7 @@ pub(super) fn shot_blocker_intersection(
         return unit_body_for_entity(entity)
             .and_then(|body| segment_intersects_unit_body(start, end, body));
     }
-    if entity.is_building() {
+    if entity.is_building() && entity.kind != EntityKind::TankTrap {
         return building_rect_for_entity(map, entity)
             .and_then(|rect| segment_intersects_rect(start, end, rect));
     }

@@ -21,6 +21,7 @@ import {
   diagnostics,
   dom,
   formatScore,
+  labLaunchConfig,
   replayLaunchConfig,
   wsUrl,
 } from "./bootstrap.js";
@@ -29,6 +30,7 @@ import { MatchHistory } from "./match_history.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
 import { ReplayViewer } from "./replay_viewer.js";
+import { createRoomCapabilities } from "./room_capabilities.js";
 import { formatTeamLabel, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
 import {
@@ -36,6 +38,9 @@ import {
   buildHotkeyCommandCatalog,
 } from "./hotkey_profiles.js";
 import { buildCommandCardContextCatalog } from "./hud_command_card.js";
+import { LabClient } from "./lab_client.js";
+import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_control_policy.js";
+import { LabPanel } from "./lab_panel.js";
 import { SettingsContainer } from "./settings_container.js";
 import { buildSettingsTabs } from "./settings_panels.js";
 
@@ -64,6 +69,7 @@ export class App {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = new Net(wsUrl(), diagnostics);
     this.devWatch = devWatchConfig();
+    this.labLaunch = labLaunchConfig();
     this.replayLaunch = replayLaunchConfig();
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
@@ -89,6 +95,9 @@ export class App {
     this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
     this.match = null;
+    this.labClient = null;
+    this.labPanel = null;
+    this.labControlPolicy = null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
     /** @type {number|undefined} heartbeat interval id while connected. */
@@ -138,6 +147,7 @@ export class App {
     try {
       await this.net.connect();
       if (this.replayLaunch) this.maybeAutoJoinReplay();
+      else if (this.labLaunch) this.maybeAutoJoinLab();
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.showConnectionWarning();
@@ -171,6 +181,15 @@ export class App {
     this.net.join(name, this.replayLaunch.room, true, true);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     this.lobby.setStatus("Starting replay...");
+  }
+
+  maybeAutoJoinLab() {
+    const name = "Lab Operator";
+    if (this.lobby?.elName) this.lobby.elName.value = name;
+    if (this.lobby?.elRoom) this.lobby.elRoom.value = this.labLaunch.room;
+    this.net.join(name, this.labLaunch.room, true, false);
+    if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
+    this.lobby.setStatus("Starting lab...");
   }
 
   /**
@@ -240,12 +259,18 @@ export class App {
     });
     const startsReplay = !!payload?.replay;
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
+    const capabilities = createRoomCapabilities({
+      startPayload: payload,
+      devWatch: this.devWatch,
+      replayViewer: startsReplay,
+    });
 
     const carriedCamera = this.takeMatchCameraView() || this.pendingCameraView;
     this.pendingCameraView = null;
 
     // If a previous match somehow lingers, tear it down first.
     if (this.match) this.match.destroy();
+    this.destroyLabShell();
     this.inReplayPlayback = startsReplay;
 
     dom.gameScreen.classList.remove("branch-background");
@@ -259,6 +284,17 @@ export class App {
     }
 
     const MatchClass = startsReplay ? ReplayViewer : Match;
+    const labMetadata = payload?.lab || null;
+    if (labMetadata) {
+      this.labClient = new LabClient(this.net);
+      this.labClient.setInitialState(labMetadata);
+      this.labControlPolicy = createLabControlPolicy({
+        labClient: this.labClient,
+        metadata: labMetadata,
+      });
+    } else {
+      this.labControlPolicy = createDefaultControlPolicy();
+    }
     this.match = new MatchClass(
       this.net,
       payload,
@@ -274,8 +310,21 @@ export class App {
         predictionEnabled: this.predictionEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
+        capabilities,
+        labMetadata,
+        labClient: this.labClient,
+        labControlPolicy: this.labControlPolicy,
       },
     );
+    if (labMetadata) {
+      this.labPanel = new LabPanel({
+        root: dom.gameScreen,
+        labClient: this.labClient,
+        launch: this.labLaunch,
+        startPayload: payload,
+        match: this.match,
+      });
+    }
     diagnostics.mark("app.onStart.end");
   }
 
@@ -421,7 +470,12 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
-    if (this.replayLaunch) {
+    if (this.replayLaunch || this.labLaunch) {
+      if (this.match) {
+        this.match.destroy();
+        this.match = null;
+      }
+      this.destroyLabShell();
       this.allowUnloadWithoutWarning = true;
       window.location.assign(new URL("/", window.location.href).toString());
       return;
@@ -431,6 +485,7 @@ export class App {
       this.match.destroy();
       this.match = null;
     }
+    this.destroyLabShell();
     this.inReplayPlayback = false;
     this.statusBadge.clearMatchMetrics();
     dom.gameOver.hidden = true;
@@ -445,6 +500,15 @@ export class App {
     // A new match row may have just been written server-side; pull the freshest list.
     if (this.matchHistory) this.matchHistory.refresh();
     else this._mountMatchHistory();
+  }
+
+  destroyLabShell() {
+    this.labPanel?.destroy();
+    this.labClient?.destroy();
+    this.labControlPolicy?.destroy?.();
+    this.labPanel = null;
+    this.labClient = null;
+    this.labControlPolicy = null;
   }
 
   mountLobbySettings() {

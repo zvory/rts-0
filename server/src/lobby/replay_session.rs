@@ -1,8 +1,6 @@
 use super::replay_validation;
 use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
-use crate::protocol::{
-    Event, ReplayBranchSeat, ReplayPlaybackState, ReplayVisionRequest, StartPayload,
-};
+use crate::protocol::{Event, ReplayBranchSeat, ReplayVisionRequest, RoomTimeState, StartPayload};
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
 use rts_sim::game::replay::{ReplayArtifactV1, ReplayValidationError};
@@ -243,8 +241,8 @@ impl ReplaySession {
         }
     }
 
-    pub(super) fn state(&self) -> ReplayPlaybackState {
-        ReplayPlaybackState {
+    pub(super) fn state(&self) -> RoomTimeState {
+        RoomTimeState {
             current_tick: self.current_tick(),
             duration_ticks: self.duration_ticks,
             keyframe_ticks: self

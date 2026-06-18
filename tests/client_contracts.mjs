@@ -3,7 +3,8 @@
 // constructors and pure methods documented in docs/design/client-ui.md §4.1.
 //
 // This does NOT spin up a browser or a server. Modules that require DOM / Pixi
-// (Renderer, Input, HUD, Minimap, Lobby) are not instantiated here.
+// (Input, HUD, Minimap, Lobby) are not instantiated here; renderer resilience
+// is covered with a tiny fake Pixi harness.
 
 import fs from "node:fs";
 import { Net } from "../client/src/net.js";
@@ -72,6 +73,7 @@ import {
   EVENT_CODE,
   KIND,
   KIND_CODE,
+  MOVEMENT_PATH_DIAGNOSTICS,
   NOTICE_SEVERITY,
   ORDER_STAGE,
   ORDER_STAGE_CODE,
@@ -101,6 +103,9 @@ import {
 import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
+import { LabClient, labVision, labVisionLabel } from "../client/src/lab_client.js";
+import { createDefaultControlPolicy, createLabControlPolicy } from "../client/src/lab_control_policy.js";
+import { LabPanel } from "../client/src/lab_panel.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
@@ -111,6 +116,7 @@ import {
   installedAppRuntime,
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
+import { Renderer } from "../client/src/renderer/index.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
 import { _drawBuilding } from "../client/src/renderer/buildings.js";
 import { buildRendererFeedbackView } from "../client/src/renderer/feedback_view_model.js";
@@ -119,6 +125,7 @@ import {
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
+  _drawMortarImpacts,
   _drawPlacement,
   _drawResourceMiningPreview,
 } from "../client/src/renderer/feedback.js";
@@ -137,6 +144,7 @@ import {
   createObserverAnalysisOverlayPreferences,
   shouldMountObserverAnalysisOverlay,
 } from "../client/src/observer_analysis_overlay.js";
+import { createRoomCapabilities } from "../client/src/room_capabilities.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -243,6 +251,27 @@ function withFakeDocument(fn) {
         addEventListener(type, handler) {
           this.listeners[type] = handler;
         },
+        removeEventListener(type, handler) {
+          if (this.listeners[type] === handler) delete this.listeners[type];
+        },
+        append(...children) {
+          this.children = this.children || [];
+          this.children.push(...children);
+        },
+        appendChild(child) {
+          this.children = this.children || [];
+          this.children.push(child);
+          return child;
+        },
+        replaceChildren(...children) {
+          this.children = [...children];
+        },
+        setAttribute(name, value) {
+          this[name] = String(value);
+        },
+        remove() {
+          this.removed = true;
+        },
         querySelectorAll() {
           return [];
         },
@@ -312,11 +341,14 @@ function withFakeHudDocument(fn) {
   class FakeElement {
     constructor(tagName) {
       this.tagName = String(tagName).toUpperCase();
+      this.type = "";
       this.className = "";
       this.textContent = "";
-      this.innerHTML = "";
       this.title = "";
       this.children = [];
+      this.parentNode = null;
+      this.dataset = {};
+      this.listeners = {};
       this.attributes = new Map();
       this.style = {
         values: new Map(),
@@ -324,8 +356,20 @@ function withFakeHudDocument(fn) {
           this.style.values.set(name, String(value));
         },
       };
+      this._innerHTML = "";
+    }
+    set innerHTML(value) {
+      this._innerHTML = String(value);
+      if (value === "") {
+        for (const child of this.children || []) child.parentNode = null;
+        this.children = [];
+      }
+    }
+    get innerHTML() {
+      return this._innerHTML;
     }
     appendChild(child) {
+      child.parentNode = this;
       this.children.push(child);
       return child;
     }
@@ -335,13 +379,28 @@ function withFakeHudDocument(fn) {
     getAttribute(name) {
       return this.attributes.get(name) || null;
     }
+    addEventListener(type, handler) {
+      this.listeners[type] = handler;
+    }
+    removeEventListener(type, handler) {
+      if (this.listeners[type] === handler) delete this.listeners[type];
+    }
+    contains(node) {
+      for (let cur = node; cur; cur = cur.parentNode) {
+        if (cur === this) return true;
+      }
+      return false;
+    }
+    closest(selector) {
+      for (let cur = this; cur; cur = cur.parentNode) {
+        if (matches(cur, selector)) return cur;
+      }
+      return null;
+    }
     querySelectorAll(selector) {
       const results = [];
-      const matches = (node) => selector.startsWith(".")
-        ? node.className.split(/\s+/).includes(selector.slice(1))
-        : false;
       const visit = (node) => {
-        if (matches(node)) results.push(node);
+        if (matches(node, selector)) results.push(node);
         for (const child of node.children || []) visit(child);
       };
       visit(this);
@@ -350,6 +409,12 @@ function withFakeHudDocument(fn) {
     querySelector(selector) {
       return this.querySelectorAll(selector)[0] || null;
     }
+  }
+  function matches(node, selector) {
+    if (!node) return false;
+    if (selector.startsWith(".")) return node.className.split(/\s+/).includes(selector.slice(1));
+    if (selector.startsWith("[")) return node.attributes.has(selector.slice(1, -1));
+    return node.tagName === selector.toUpperCase();
   }
   globalThis.document = {
     createElement(tagName) {
@@ -721,6 +786,72 @@ function hotkeyService() {
     assert(blocks.length === 2 && blocks.every((block) => block.className.includes("weight-12")),
       "HUD renders two Tank budget blocks into selected panel DOM");
     assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const selectedEntities = [
+      { id: 2100, owner: 1, kind: KIND.WORKER },
+      { id: 2101, owner: 1, kind: KIND.WORKER },
+      { id: 2102, owner: 1, kind: KIND.RIFLEMAN },
+      { id: 2103, owner: 1, kind: KIND.TANK },
+    ];
+    const byId = new Map(selectedEntities.map((entity) => [entity.id, entity]));
+    let selectedIds = selectedEntities.map((entity) => entity.id);
+    const state = {
+      selectionBudgetOverflow: null,
+      selectedEntities() {
+        return selectedIds.map((id) => byId.get(id)).filter(Boolean);
+      },
+      entityById(id) {
+        return byId.get(id) || null;
+      },
+      setSelection(ids) {
+        selectedIds = Array.from(ids);
+      },
+      removeFromSelection(ids) {
+        const removed = new Set(ids);
+        selectedIds = selectedIds.filter((id) => !removed.has(id));
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    const blockFor = (id) => panel.querySelectorAll(".sel-budget-block")
+      .find((block) => block.getAttribute("data-selection-entity-id") === String(id));
+    const clickBlock = (id, modifiers = {}) => {
+      panel.listeners.click({
+        target: blockFor(id),
+        preventDefault() {},
+        ...modifiers,
+      });
+    };
+
+    clickBlock(2100, { shiftKey: true });
+    assert(selectedIds.join(",") === "2101,2102,2103", "HUD selection panel shift-click removes that unit");
+
+    selectedIds = selectedEntities.map((entity) => entity.id);
+    clickBlock(2102);
+    assert(selectedIds.join(",") === "2102", "HUD selection panel left-click selects only that unit");
+
+    selectedIds = selectedEntities.map((entity) => entity.id);
+    clickBlock(2100, { ctrlKey: true });
+    assert(selectedIds.join(",") === "2100,2101", "HUD selection panel ctrl-click filters selection to that unit kind");
+
+    selectedIds = selectedEntities.map((entity) => entity.id);
+    panel.listeners.contextmenu({
+      target: blockFor(2103),
+      ctrlKey: true,
+      preventDefault() {},
+    });
+    assert(selectedIds.join(",") === "2103", "HUD selection panel control context-click filters selection to that unit kind");
+
+    hud.destroy();
+    assert(!panel.listeners.click && !panel.listeners.contextmenu, "HUD selection panel listeners are removed on destroy");
   });
 }
 
@@ -1296,6 +1427,44 @@ async function testReplayArtifactLaunchConfig() {
   }
 }
 
+async function testLabLaunchConfig() {
+  const priorDocument = globalThis.document;
+  const priorWindow = globalThis.window;
+  globalThis.document = {
+    getElementById: () => null,
+  };
+  globalThis.window = {
+    location: new URL("http://localhost/lab?room=sandbox&map=low-econ&seed=1234"),
+    localStorage: { getItem: () => null },
+  };
+  try {
+    const { labLaunchConfig } = await import("../client/src/bootstrap.js");
+    let config = labLaunchConfig();
+    assert(config, "lab route launch config should be recognized");
+    assert(config.publicRoom === "sandbox", "lab launch keeps public room label");
+    assert(config.map === "low-econ", "lab launch keeps map label");
+    assert(
+      config.room === "__lab__:sandbox:map=low-econ:seed=1234",
+      "lab launch should build the server lab room id",
+    );
+
+    globalThis.window.location = new URL("http://localhost/lab?room=bad/room&map=bad map");
+    config = labLaunchConfig();
+    assert(
+      config.room === "__lab__:default:map=Default",
+      "lab launch falls back for unsafe room and map tokens",
+    );
+
+    globalThis.window.location = new URL("http://localhost/?room=sandbox");
+    assert(labLaunchConfig() === null, "non-lab route does not auto-join a lab");
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  }
+}
+
 class FakeGraphics {
   constructor() {
     this.position = { set() {} };
@@ -1336,6 +1505,12 @@ class RecordingGraphics extends FakeGraphics {
   drawCircle(x, y, radius) {
     this.calls.push(["drawCircle", x, y, radius]);
   }
+  arc(x, y, radius, start, end, anticlockwise) {
+    this.calls.push(["arc", x, y, radius, start, end, anticlockwise]);
+  }
+  drawRect(x, y, width, height) {
+    this.calls.push(["drawRect", x, y, width, height]);
+  }
   drawPolygon(points) {
     this.calls.push(["drawPolygon", points]);
   }
@@ -1344,8 +1519,246 @@ class RecordingGraphics extends FakeGraphics {
   }
 }
 
+function installFakePixi() {
+  const priorPixi = globalThis.PIXI;
+  const priorWindow = globalThis.window;
+
+  class FakeContainer {
+    constructor() {
+      this.children = [];
+      this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
+      this.scale = { set: (value = 1) => { this.scaleValue = value; } };
+      this.visible = true;
+    }
+    addChild(child) {
+      this.children.push(child);
+      child.parent = this;
+      return child;
+    }
+    removeChild(child) {
+      this.children = this.children.filter((item) => item !== child);
+      child.parent = null;
+    }
+    destroy() {}
+  }
+
+  class PixiGraphics extends RecordingGraphics {
+    constructor() {
+      super();
+      this.visible = true;
+      this.alpha = 1;
+    }
+    destroy() {
+      this.destroyed = true;
+    }
+  }
+
+  class FakeApplication {
+    constructor(options = {}) {
+      this.options = options;
+      this.stage = new FakeContainer();
+      this.view = { style: {}, parentNode: null };
+      this.renderer = {
+        roundPixels: false,
+        resize: (w, h) => {
+          this.width = w;
+          this.height = h;
+        },
+      };
+    }
+    destroy() {
+      this.destroyed = true;
+    }
+  }
+
+  globalThis.window = {
+    ...(priorWindow || {}),
+    devicePixelRatio: 1,
+    innerWidth: 800,
+    innerHeight: 600,
+  };
+  globalThis.PIXI = {
+    Application: FakeApplication,
+    Container: FakeContainer,
+    Graphics: PixiGraphics,
+    SCALE_MODES: { NEAREST: "nearest" },
+    settings: {},
+  };
+
+  return () => {
+    if (priorPixi === undefined) delete globalThis.PIXI;
+    else globalThis.PIXI = priorPixi;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  };
+}
+
+{
+  const restorePixi = installFakePixi();
+  const priorConsoleError = console.error;
+  const consoleErrors = [];
+  console.error = (...args) => consoleErrors.push(args);
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._drawUnit = () => {
+      throw new Error("broken worker art");
+    };
+    renderer._drawMortarImpacts = () => {
+      throw new Error("broken mortar overlay");
+    };
+
+    let placementDraws = 0;
+    const noOpOverlay = () => {};
+    for (const name of [
+      "_drawAbilityObjects",
+      "_drawSmokes",
+      "_drawFog",
+      "_drawSmokeCanisters",
+      "_drawCommandFeedback",
+      "_drawMortarTargets",
+      "_drawMortarLaunches",
+      "_drawMortarShells",
+      "_drawArtilleryLaunches",
+      "_drawArtilleryTargets",
+      "_drawArtilleryImpacts",
+      "_drawSelectedMortarRanges",
+      "_drawBreakthroughAuras",
+      "_drawAbilityTargetPreview",
+      "_drawAntiTankGunSetupPreview",
+      "_drawOrderPlan",
+      "_drawDebugPathOverlay",
+      "_drawRallyPoints",
+      "_drawResourceMiningPreview",
+      "_drawMuzzleFlashes",
+    ]) {
+      renderer[name] = noOpOverlay;
+    }
+    renderer._drawPlacement = () => {
+      placementDraws += 1;
+    };
+
+    renderer.render(
+      {
+        playerId: 1,
+        players: [{ id: 1, color: "#4878c8" }],
+        selection: new Set(),
+        rememberedBuildings: [],
+        map: { tileSize: 32 },
+        entitiesInterpolated: () => [
+          { id: 101, owner: 1, kind: KIND.WORKER, x: 100, y: 120, facing: 0 },
+        ],
+      },
+      {
+        x: 0,
+        y: 0,
+        zoom: 1,
+      },
+      null,
+      1,
+    );
+
+    const fallback = renderer._pools.units.get(101);
+    assert(placementDraws === 1, "renderer continues later overlays after a render helper throws");
+    assert(renderer._renderErrors.get("unit:worker")?.count === 1, "renderer records entity render errors by kind");
+    assert(renderer._renderErrors.get("mortarImpacts")?.count === 1, "renderer records overlay render errors by label");
+    assert(fallback?.calls.some((call) => call[0] === "drawRect"), "broken entity art draws a checkerboard fallback");
+    assert(
+      consoleErrors.some((args) => String(args[0]).includes("[RTS_RENDER] skipped unit:worker")),
+      "renderer logs recovered render errors",
+    );
+    assert(globalThis.__rtsRenderErrors?.latest?.label === "mortarImpacts", "renderer exposes latest render error diagnostics");
+  } finally {
+    console.error = priorConsoleError;
+    restorePixi();
+    delete globalThis.__rtsRenderErrors;
+  }
+}
+
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const priorRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const priorConsoleError = console.error;
+  const consoleErrors = [];
+  const tickFn = () => {};
+  console.error = (...args) => consoleErrors.push(args);
+  globalThis.window = {
+    ...(priorWindow || {}),
+    location: { protocol: "http:", host: "localhost", search: "" },
+    localStorage: { getItem() { return null; } },
+  };
+  globalThis.document = {
+    hidden: false,
+    getElementById: () => null,
+  };
+  globalThis.requestAnimationFrame = (fn) => {
+    assert(fn === tickFn, "frame recovery schedules the match tick callback");
+    return 77;
+  };
+  try {
+    const { Match } = await import("../client/src/match.js");
+    const match = Object.create(Match.prototype);
+    Object.assign(match, {
+      running: true,
+      lastFrame: 1000,
+      tickFn,
+      frameErrors: { count: 0, lastLogAt: -Infinity },
+      health: {
+        noteFrameGap() {},
+        refreshLatency() {},
+        publish() {},
+      },
+      computeAlpha: () => 1,
+      camera: {
+        update() {
+          throw new Error("camera update failed");
+        },
+      },
+      input: { update() {} },
+      advancePredictionVisual() {},
+      fog: { update() {} },
+      ownEntities: () => [],
+      state: { map: { tileSize: 32 }, visibleTiles: null },
+      renderer: { render() {} },
+      hud: { update() {} },
+      minimap: { render() {} },
+      observerAnalysisOverlay: null,
+    });
+
+    match.frame(1016);
+
+    assert(match.rafId === 77, "match frame schedules the next frame after a client error");
+    assert(match.frameErrors.count === 1, "match frame records recovered client errors");
+    assert(
+      consoleErrors.some((args) => String(args[0]).includes("[RTS_FRAME] recovered")),
+      "match frame logs recovered client errors",
+    );
+    assert(globalThis.__rtsFrameErrors?.count === 1, "match frame exposes recovered frame diagnostics");
+  } finally {
+    if (priorRequestAnimationFrame === undefined) delete globalThis.requestAnimationFrame;
+    else globalThis.requestAnimationFrame = priorRequestAnimationFrame;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    console.error = priorConsoleError;
+    delete globalThis.__rtsFrameErrors;
+  }
+}
+
 await testDevWatchScenarioConfig();
 await testReplayArtifactLaunchConfig();
+await testLabLaunchConfig();
 
 assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
 assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");
@@ -1460,6 +1873,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     facing: 0,
     setupState: SETUP.DEPLOYED,
   }];
+  const mortarImpact = {
+    x: 192,
+    y: 208,
+    radiusTiles: 3,
+    seed: 91,
+    createdAt: performance.now(),
+  };
   const feedbackState = {
     playerId: 1,
     map: {
@@ -1483,7 +1903,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     liveMortarLaunches() { return []; },
     liveMortarShells() { return []; },
     liveMortarTargets() { return []; },
-    liveMortarImpacts() { return []; },
+    liveMortarImpacts() { return [mortarImpact]; },
     liveArtilleryTargets() { return []; },
     liveArtilleryLaunches() { return []; },
     liveArtilleryImpacts() { return []; },
@@ -1559,10 +1979,12 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   _drawAbilityTargetPreview.call(renderer, feedbackView);
   _drawAbilityObjects.call(renderer, feedbackView);
   _drawResourceMiningPreview.call(renderer, feedbackView);
+  _drawMortarImpacts.call(renderer, feedbackView);
 
   assert(placementGfx.calls.some((call) => call[0] === "drawRoundedRect"), "renderer feedback reads placement through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads command/preview state through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
+  assert(feedbackGfx.calls.some((call) => call[0] === "drawPolygon"), "renderer feedback draws live mortar impacts without missing helper references");
   assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
 }
 
@@ -2294,7 +2716,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   seekBack.dataset.seekBack = "90";
   const stepDev = fakeEl("button");
   stepDev.className = "spd-btn dev-step-btn";
-  stepDev.dataset.stepDevTick = "";
+  stepDev.dataset.stepRoomTime = "";
   const concluded = fakeEl("span");
   concluded.id = "replay-concluded";
   replayControls.appendChild(speed2);
@@ -2310,13 +2732,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     visions: [],
     branches: 0,
     steps: 0,
-    setReplaySpeed(speed) {
+    setRoomTimeSpeed(speed) {
       this.speeds.push(speed);
     },
-    seekReplay(ticksBack) {
+    seekRoomTime(ticksBack) {
       this.seekBacks.push(ticksBack);
     },
-    seekReplayTo(tick) {
+    seekRoomTimeTo(tick) {
       this.seekTargets.push(tick);
     },
     setReplayVision(vision) {
@@ -2325,11 +2747,11 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     requestReplayBranch() {
       this.branches += 1;
     },
-    stepDevTick() {
+    stepRoomTime() {
       this.steps += 1;
     },
   };
-  const replayState = {
+  const roomTimeState = {
     players: [
       { id: 1, name: "Alpha", color: "#f00" },
       { id: 2, name: "Bravo", color: "#0f0" },
@@ -2337,10 +2759,14 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   };
   const replayUi = new ReplayControls({
     net: replayNet,
-    state: replayState,
+    state: roomTimeState,
     replayViewer: true,
-    isReplay: true,
-    isScenario: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        replay: { durationTicks: 1_000 },
+      },
+      replayViewer: true,
+    }),
   });
   assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
   assert(replayControls.classList.contains("replay-viewer-controls"), "replay viewer controls keep wrapper class");
@@ -2351,8 +2777,8 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   const branchReplay = replayControls.querySelector(".replay-branch-btn");
   assert(branchReplay?.textContent === "Resume play from here", "replay branch button describes resuming from the current tick");
   replayControls._listeners.get("click")({ target: speed2 });
-  assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setReplaySpeed");
-  replayUi.applyReplayState({ currentTick: 120, durationTicks: 1_000, speed: 2 });
+  assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setRoomTimeSpeed");
+  replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2 });
   replayControls._listeners.get("click")({ target: pauseReplay });
   assert(replayNet.speeds.at(-1) === 0, "replay pause button sends zero playback speed");
   assert(pauseReplay.textContent === "Resume", "paused replay button switches to resume");
@@ -2360,7 +2786,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(replayNet.speeds.at(-1) === 2, "replay resume button restores the last non-zero speed");
   assert(pauseReplay.textContent === "Pause", "resumed replay button switches back to pause");
   replayControls._listeners.get("click")({ target: seekBack });
-  assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekReplay");
+  assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekRoomTime");
   const visionButtons = replayControls.querySelectorAll(".vision-btn");
   assert(visionButtons.length === 3, "replay viewer builds all-player and per-player fog controls");
   replayUi.onReplayVisionClick({ target: visionButtons[1], shiftKey: false });
@@ -2377,7 +2803,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   );
   replayUi.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
   assert(replayNet.visions.at(-1).mode === "all", "all replay fog control restores union vision");
-  replayUi.applyReplayState({
+  replayUi.applyRoomTimeState({
     currentTick: 100,
     durationTicks: 1_000,
     keyframeTicks: [0, 400, 800],
@@ -2414,7 +2840,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   scenarioSpeed0.dataset.speed = "0";
   const scenarioStep = fakeEl("button");
   scenarioStep.className = "spd-btn dev-step-btn";
-  scenarioStep.dataset.stepDevTick = "";
+  scenarioStep.dataset.stepRoomTime = "";
   const scenarioSeek = fakeEl("button");
   scenarioSeek.className = "spd-btn seek-btn";
   scenarioSeek.dataset.seekBack = "30";
@@ -2424,18 +2850,50 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   dom.replaySpeed = scenarioControls;
   const scenarioUi = new ReplayControls({
     net: replayNet,
-    state: replayState,
+    state: roomTimeState,
     replayViewer: false,
-    isReplay: false,
-    isScenario: true,
+    capabilities: createRoomCapabilities({
+      startPayload: { spectator: true },
+      devWatch: { kind: "scenario" },
+    }),
   });
   assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
   assert(!scenarioStep.hidden, "scenario mode shows step controls");
   scenarioControls._listeners.get("click")({ target: scenarioStep });
-  assert(replayNet.steps === 1, "scenario step sends net.stepDevTick");
+  assert(replayNet.steps === 1, "scenario step sends net.stepRoomTime");
   scenarioControls._listeners.get("click")({ target: scenarioSpeed0 });
-  assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setReplaySpeed");
+  assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
   scenarioUi.destroy();
+
+  const noCapabilityControls = fakeEl("div");
+  dom.replaySpeed = noCapabilityControls;
+  const noCapabilityUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: true,
+    capabilities: createRoomCapabilities({ startPayload: { spectator: true }, replayViewer: true }),
+  });
+  assert(!noCapabilityControls._listeners.has("click"), "room-time controls need an advertised capability");
+  assert(
+    !noCapabilityControls.querySelector(".replay-vision-controls"),
+    "replay identity alone does not build replay vision controls",
+  );
+  noCapabilityUi.destroy();
+
+  const normalCapabilities = createRoomCapabilities({
+    startPayload: { spectator: false },
+  });
+  assert(!normalCapabilities.roomTime.available, "normal matches do not mount room-time controls");
+  assert(normalCapabilities.commands.gameplay, "active players keep gameplay command affordances");
+
+  const spectatorCapabilities = createRoomCapabilities({
+    startPayload: { spectator: true, diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL } },
+  });
+  assert(!spectatorCapabilities.commands.gameplay, "spectators get read-only command affordances");
+  assert(
+    spectatorCapabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.ALL,
+    "capability parser keeps diagnostic affordances from the start payload",
+  );
 
   const noticeAudioMatch = Object.create(Match.prototype);
   const playedNotices = [];
@@ -3085,10 +3543,10 @@ function fakeAudioContext() {
       JSON.stringify({ c: "move", units: [1], x: 100, y: 200, queued: true }),
     "queued move command builder emits the queued flag only when requested",
   );
-  assert(ANTI_TANK_GUN_DEPLOYED_RANGE_TILES === 12, "client mirrors deployed anti-tank gun range");
+  assert(ANTI_TANK_GUN_DEPLOYED_RANGE_TILES === 14, "client mirrors deployed anti-tank gun range");
   assertApprox(
     ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
-    40 * Math.PI / 180,
+    45 * Math.PI / 180,
     0.000001,
     "client mirrors anti-tank gun field of fire",
   );
@@ -3227,8 +3685,12 @@ function fakeAudioContext() {
   assertHasMethod(net, "setTeam", "Net");
   assertHasMethod(net, "setFaction", "Net");
   assertHasMethod(net, "setQuickstart", "Net");
-  assertHasMethod(net, "setReplaySpeed", "Net");
+  assertHasMethod(net, "setRoomTimeSpeed", "Net");
+  assertHasMethod(net, "stepRoomTime", "Net");
+  assertHasMethod(net, "seekRoomTime", "Net");
+  assertHasMethod(net, "seekRoomTimeTo", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
+  assertHasMethod(net, "lab", "Net");
   assertHasMethod(net, "requestReplayBranch", "Net");
   assertHasMethod(net, "claimBranchSeat", "Net");
   assertHasMethod(net, "releaseBranchSeat", "Net");
@@ -3244,6 +3706,16 @@ function fakeAudioContext() {
   assertThrows(() => net.command(cmd.stop([1])), "Net.command requires controller-provided clientSeq");
   net.command(cmd.stop([1]), 7);
   assert(sent[0].clientSeq === 7, "Net.command sends the provided clientSeq");
+  net.lab(12, { op: "setVision", vision: msg.labVisionFullWorld() });
+  assert(sent[1].t === "lab" && sent[1].requestId === 12, "Net.lab sends lab request envelopes");
+  assert(
+    msg.labExportScenario(13, "saved").op.name === "saved",
+    "lab export builder includes a scenario name",
+  );
+  assert(
+    msg.labImportScenario(14, { schemaVersion: 1 }).op.scenario.schemaVersion === 1,
+    "lab import builder includes a scenario payload",
+  );
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(
     msg.join("A", "main", false, true).replayOk === true,
@@ -3252,6 +3724,10 @@ function fakeAudioContext() {
   assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
   assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
+  assert(msg.setRoomTimeSpeed(2).t === "setRoomTimeSpeed", "room-time speed builder tag");
+  assert(msg.stepRoomTime().t === "stepRoomTime", "room-time step builder tag");
+  assert(msg.seekRoomTime(90).ticksBack === 90, "room-time relative seek builder payload");
+  assert(msg.seekRoomTimeTo(450).tick === 450, "room-time absolute seek builder payload");
   assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
@@ -3276,6 +3752,145 @@ function fakeAudioContext() {
     "replay subset vision builder payload",
   );
 }
+
+// ---------------------------------------------------------------------------
+// Lab client and panel
+// ---------------------------------------------------------------------------
+{
+  const sent = [];
+  const net = new Net("ws://example.test/ws");
+  net.ws = {
+    readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
+    send(json) {
+      sent.push(JSON.parse(json));
+    },
+  };
+  const labClient = new LabClient(net, { timeoutMs: 1000 });
+  let observedState = null;
+  let observedResult = null;
+  labClient.subscribeState((state) => {
+    observedState = state;
+  });
+  labClient.subscribeResult((result) => {
+    observedResult = result;
+  });
+  labClient.setInitialState({
+    room: "__lab__:sandbox:map=Default",
+    operatorId: 1,
+    role: "operator",
+    vision: labVision.fullWorld(),
+    dirty: false,
+    operationCount: 0,
+  });
+  assert(observedState.role === "operator", "LabClient publishes initial lab state");
+  const resultPromise = labClient.setVision(labVision.team(2));
+  assert(
+    sent.at(-1).op.vision.mode === "team" && sent.at(-1).requestId === 1,
+    "LabClient allocates request ids for vision operations",
+  );
+  net._emit("labResult", { t: "labResult", requestId: 1, ok: true, op: "setVision" });
+  const result = await resultPromise;
+  assert(result.ok && observedResult.ok, "LabClient resolves matching labResult messages");
+  void labClient.spawnEntity({ owner: 2, kind: KIND.RIFLEMAN, x: 128, y: 160, completed: true });
+  assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.kind === KIND.RIFLEMAN, "LabClient sends spawn operations");
+  void labClient.setCompletedResearch(1, UPGRADE.TANK_UNLOCK, true);
+  assert(sent.at(-1).op.op === "setCompletedResearch" && sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK, "LabClient sends research operations");
+  void labClient.exportScenario("saved setup");
+  assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabClient sends scenario export requests");
+  void labClient.importScenario({ schemaVersion: 1, kind: "labScenario" });
+  assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.kind === "labScenario", "LabClient sends scenario import requests");
+  assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
+  labClient.destroy();
+}
+
+{
+  const requests = [];
+  const policy = createLabControlPolicy({
+    labClient: { request: (op) => { requests.push(op); return Promise.resolve({ ok: true }); } },
+    metadata: { role: "operator" },
+  });
+  assert(policy.kind === "lab" && policy.canIssueAs(1), "lab control policy gates issue-as to operator");
+  const state = {
+    selectedEntities() {
+      return [{ id: 11, owner: 2, kind: KIND.RIFLEMAN }];
+    },
+  };
+  assert(policy.canControlOwner(2, state), "lab control policy controls a single selected owner");
+  assert(!policy.canControlOwner(1, state), "lab control policy rejects non-selected owners");
+  const issued = await policy.issueCommand(cmd.move([11], 20, 30), { state });
+  assert(issued.sent && requests[0].playerId === 2, "lab control policy routes gameplay commands through issue-as");
+  const mixedState = {
+    selectedEntities() {
+      return [{ id: 11, owner: 1, kind: KIND.RIFLEMAN }, { id: 12, owner: 2, kind: KIND.RIFLEMAN }];
+    },
+  };
+  assert(!policy.canIssueGameplayCommand(cmd.stop([11, 12]), mixedState).ok, "lab policy rejects mixed-owner gameplay commands");
+  assert(!createDefaultControlPolicy().canIssueAs(1), "default control policy does not issue-as");
+}
+
+withFakeDocument(() => {
+  const sent = [];
+  const net = new Net("ws://example.test/ws");
+  net.ws = {
+    readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
+    send(json) {
+      sent.push(JSON.parse(json));
+    },
+  };
+  const root = document.createElement("div");
+  const labClient = new LabClient(net);
+  labClient.setInitialState({
+    room: "__lab__:sandbox:map=Default",
+    operatorId: 1,
+    role: "operator",
+    vision: labVision.fullWorld(),
+    dirty: false,
+    operationCount: 0,
+  });
+  const panel = new LabPanel({
+    root,
+    labClient,
+    launch: { publicRoom: "sandbox", map: "Default" },
+    startPayload: {
+      map: { name: "Default" },
+      players: [{ id: 1, teamId: 1 }, { id: 2, teamId: 2 }],
+    },
+  });
+  assert(root.children.length === 1, "LabPanel mounts inside the app-owned root");
+  assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
+  const teamButton = root.children[0].children
+    .flatMap((child) => child.children || [])
+    .find((child) => child.textContent === "Team 2");
+  teamButton.listeners.click();
+  assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
+  panel.fields.get("spawn-kind").value = KIND.RIFLEMAN;
+  panel.fields.get("spawn-owner").value = "2";
+  panel.fields.get("spawn-x").value = "128";
+  panel.fields.get("spawn-y").value = "160";
+  void panel.spawnEntity();
+  assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.owner === 2, "LabPanel spawn control sends setup mutation");
+  panel.fields.get("resource-player").value = "1";
+  panel.fields.get("resource-steel").value = "900";
+  panel.fields.get("resource-oil").value = "300";
+  void labClient.setPlayerResources(panel.int("resource-player"), panel.uint("resource-steel"), panel.uint("resource-oil"));
+  assert(sent.at(-1).op.op === "setPlayerResources" && sent.at(-1).op.steel === 900, "LabPanel resource fields normalize player state edits");
+  panel.fields.get("scenario-name").value = "saved setup";
+  void labClient.exportScenario(panel.value("scenario-name"));
+  assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabPanel scenario name feeds export requests");
+  panel.fields.get("scenario-json").value = JSON.stringify({
+    schemaVersion: 1,
+    kind: "labScenario",
+    name: "saved setup",
+    metadata: { exportedTick: 0, lab: { vision: labVision.fullWorld() } },
+  });
+  void panel.importScenario();
+  assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted scenario JSON");
+  panel.destroy();
+  labClient.destroy();
+  assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");
+});
 
 // ---------------------------------------------------------------------------
 // Command Budget
@@ -4428,6 +5043,10 @@ function fakeAudioContext() {
   assert(!("antiTankGunSetupPreview" in state), "GameState no longer exposes support preview shims");
   assert(!("updateResourceMiningPreview" in state), "GameState no longer exposes preview update shims");
   assert(state.selection instanceof Set, "GameState.selection");
+  assert(
+    state.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.NONE,
+    "GameState defaults movement path diagnostics to none",
+  );
   assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
   assert(state.debugPathOverlaysEnabled === false, "GameState leaves waypoint diagnostics off by default");
   assertHasMethod(state, "setSelection", "GameState");
@@ -4442,14 +5061,25 @@ function fakeAudioContext() {
 
   const debugState = new GameState({
     ...start,
-    debugMode: true,
+    diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.OWNER_ONLY },
     map: {
       ...start.map,
       resources: start.map.resources.map((resource) => ({ ...resource })),
     },
   });
-  assert(debugState.debugPathOverlaysAvailable === true, "GameState exposes waypoint diagnostics in debug mode");
-  assert(debugState.debugPathOverlaysEnabled === true, "GameState enables waypoint diagnostics in debug mode");
+  assert(debugState.debugPathOverlaysAvailable === true, "GameState exposes advertised waypoint diagnostics");
+  assert(debugState.debugPathOverlaysEnabled === true, "GameState enables advertised waypoint diagnostics");
+  assert(debugState.showAllDebugPathOverlays === false, "owner-only waypoint diagnostics stay selection scoped");
+
+  const fullDiagnosticState = new GameState({
+    ...start,
+    diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
+    map: {
+      ...start.map,
+      resources: start.map.resources.map((resource) => ({ ...resource })),
+    },
+  });
+  assert(fullDiagnosticState.showAllDebugPathOverlays === true, "full waypoint diagnostics may draw every projected path");
 
   // Snapshot buffering
   const t0 = performance.now();
@@ -4479,7 +5109,8 @@ function fakeAudioContext() {
     events: [{ e: "death", id: 200, x: 64, y: 96, kind: KIND.STEEL }],
   });
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
-  assert(state.entityById(200).remaining === 0, "visible resource death tombstones known resource");
+  assert(state.resourceById.get(200).remaining === 0, "visible resource death tombstones known resource");
+  assert(state.entityById(200) === undefined, "depleted resources are not exposed as local entities");
   assert(state.entityById(201).remaining === 3333, "untouched resources keep their last-known amount");
   const artilleryState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   artilleryState.applySnapshot({
@@ -4535,7 +5166,8 @@ function fakeAudioContext() {
   const entsOver = state.entitiesInterpolated(1.5);
   const entsMid = state.entitiesInterpolated(0.5);
   const midWorker = entsMid.find((e) => e.id === 1);
-  assert(entsMid.length === 3 && midWorker, "entitiesInterpolated returns units and known resources");
+  assert(entsMid.length === 2 && midWorker, "entitiesInterpolated returns units and live known resources");
+  assert(!entsMid.some((e) => e.id === 200), "entitiesInterpolated omits depleted resources");
   assert(midWorker.x >= 10 && midWorker.x <= 15, "interpolation works for moving units");
   assert(!("facing" in midWorker), "entitiesInterpolated does not add missing facing");
 
@@ -5838,7 +6470,15 @@ function fakeAudioContext() {
 
   const artilleryCommands = [];
   const artilleryFeedback = [];
-  const selectedArtillery = { id: 44, owner: 1, kind: KIND.ARTILLERY, x: 100, y: 100 };
+  const selectedArtillery = {
+    id: 44,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: Math.PI,
+  };
   const pointFireInput = Object.create(Input.prototype);
   pointFireInput.mouse = { x: 900, y: 100 };
   pointFireInput.state = {
@@ -5875,10 +6515,47 @@ function fakeAudioContext() {
     pointFireInput.clientIntent.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32,
     "Point Fire preview exposes minimum range in pixels",
   );
+  assert(
+    ARTILLERY_MIN_RANGE_TILES === 15 && ARTILLERY_MAX_RANGE_TILES === 60,
+    "Artillery point-fire range mirrors the 15-60 tile balance band",
+  );
+  const deployedArtillery = {
+    ...selectedArtillery,
+    setupState: SETUP.DEPLOYED,
+    setupFacing: 0,
+  };
+  const artilleryConeGfx = new RecordingGraphics();
+  _drawAntiTankGunSetupPreview.call(
+    { _feedbackGfx: artilleryConeGfx, _map: { tileSize: 32 } },
+    { playerId: 1, selectedEntities: () => [deployedArtillery] },
+  );
+  const artilleryConeArcs = artilleryConeGfx.calls.filter((call) => call[0] === "arc");
+  assert(
+    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MAX_RANGE_TILES * 32),
+    "Artillery field-of-fire cone preview uses the mirrored maximum range",
+  );
+  assert(
+    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MIN_RANGE_TILES * 32 && call[6] === true),
+    "Artillery field-of-fire cone preview cuts out the mirrored minimum range",
+  );
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
   assert(pointFireInput.clientIntent.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview clears minimum range invalidity outside the dead zone");
+  const targetingConeGfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: targetingConeGfx, _map: { tileSize: 32 } },
+    { abilityTargetPreview: pointFireInput.clientIntent.abilityTargetPreview },
+  );
+  const targetingConeArcs = targetingConeGfx.calls.filter((call) => call[0] === "arc");
+  assert(
+    targetingConeArcs.some((call) => call[3] === ARTILLERY_MAX_RANGE_TILES * 32),
+    "Point Fire targeting cone uses the mirrored maximum range",
+  );
+  assert(
+    targetingConeArcs.some((call) => call[3] === ARTILLERY_MIN_RANGE_TILES * 32 && call[6] === true),
+    "Point Fire targeting cone cuts out the mirrored minimum range",
+  );
 
   const previewGfx = new RecordingGraphics();
   _drawAbilityTargetPreview.call(
@@ -5945,6 +6622,17 @@ function fakeAudioContext() {
   assert(
     ekatInput.clientIntent.abilityTargetPreview.pathOrigins.some((origin) => origin.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR),
     "Ekat line preview marks anchor origin kind",
+  );
+  const ekatPreviewGfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: ekatPreviewGfx },
+    { abilityTargetPreview: ekatInput.clientIntent.abilityTargetPreview },
+  );
+  assert(
+    ekatPreviewGfx.calls.some(
+      (call) => call[0] === "lineStyle" && call[2] === 0xc7d07a,
+    ),
+    "Ekat line preview draws Magic Anchor origins without crashing",
   );
 
   const returnInput = Object.create(Input.prototype);
@@ -6063,11 +6751,18 @@ function fakeAudioContext() {
   assert(!trapColors.includes(0x4878c8), "Tank Trap renderer avoids owner/team coloring");
   assert(tintCalls === 0, "Tank Trap renderer does not request owner tint");
   assert(iconCalls === 0, "Tank Trap renderer uses geometry instead of the generic building stencil");
+  const firstBeam = trapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
+  const firstBeamXs = firstBeam.filter((_, index) => index % 2 === 0);
+  const firstBeamYs = firstBeam.filter((_, index) => index % 2 === 1);
+  const firstBeamSpan = Math.max(
+    Math.max(...firstBeamXs) - Math.min(...firstBeamXs),
+    Math.max(...firstBeamYs) - Math.min(...firstBeamYs),
+  );
+  assert(firstBeamSpan > 32, "Tank Trap renderer scales beams larger than the 1x1 footprint");
 
   const secondTrapEntity = { ...tankTrapEntity, id: 721 };
   _drawBuilding.call(fakeRenderer, secondTrapEntity, new Map([[1, 0x4878c8]]), {});
   const secondTrapGraphics = fakePools.get("buildings:721");
-  const firstBeam = trapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
   const secondBeam = secondTrapGraphics.calls.find((call) => call[0] === "drawPolygon")?.[1];
   assert(
     firstBeam?.some((value, index) => Math.abs(value - secondBeam[index]) > 0.1),
@@ -6498,20 +7193,38 @@ function fakeAudioContext() {
   );
 
   assert(
-    shouldMountObserverAnalysisOverlay({ payload: { replay: true, spectator: true }, replayViewer: true }),
-    "observer analysis mounts for replay viewers",
+    shouldMountObserverAnalysisOverlay({
+      capabilities: createRoomCapabilities({
+        startPayload: { replay: {}, spectator: true, diagnostics: { observerAnalysis: true } },
+        replayViewer: true,
+      }),
+    }),
+    "observer analysis mounts when the start payload advertises it for replay viewers",
   );
   assert(
-    shouldMountObserverAnalysisOverlay({ payload: { spectator: true }, replayViewer: false }),
-    "observer analysis mounts for live spectators",
+    shouldMountObserverAnalysisOverlay({
+      capabilities: createRoomCapabilities({
+        startPayload: { spectator: true, diagnostics: { observerAnalysis: true } },
+      }),
+    }),
+    "observer analysis mounts when the start payload advertises it for live spectators",
   );
   assert(
-    !shouldMountObserverAnalysisOverlay({ payload: { spectator: false }, replayViewer: false }),
-    "observer analysis stays hidden for active players",
+    !shouldMountObserverAnalysisOverlay({
+      capabilities: createRoomCapabilities({
+        startPayload: { spectator: false, diagnostics: { observerAnalysis: false } },
+      }),
+    }),
+    "observer analysis stays hidden without diagnostic metadata",
   );
   assert(
-    !shouldMountObserverAnalysisOverlay({ payload: { replay: true, spectator: true }, replayViewer: false }),
-    "observer analysis does not mount for non-viewer replay start payloads",
+    !shouldMountObserverAnalysisOverlay({
+      capabilities: createRoomCapabilities({
+        startPayload: { replay: {}, spectator: true },
+        replayViewer: true,
+      }),
+    }),
+    "observer analysis does not mount from replay identity alone",
   );
 
   withFakeOverlayDocument(({ FakeElement }) => {

@@ -2,8 +2,8 @@ import {
   assertTickAdvanced,
   capture,
   scenario,
-  setReplaySpeed,
-  stepDevTick,
+  setRoomTimeSpeed,
+  stepRoomTime,
 } from "../dsl.mjs";
 
 export default scenario("dev_scenario_step_tick", {
@@ -18,9 +18,9 @@ export default scenario("dev_scenario_step_tick", {
   },
   network: { mode: "direct" },
   steps: [
-    setReplaySpeed(0),
+    setRoomTimeSpeed(0),
     capture("paused"),
-    stepDevTick(),
+    stepRoomTime(),
     assertTickAdvanced({ delta: 1 }),
     capture("after-one-step"),
   ],

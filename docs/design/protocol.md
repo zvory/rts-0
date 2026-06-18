@@ -60,11 +60,12 @@ lobby/config dump replaces the source scrape.
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
-| `setReplaySpeed` | `speed: f32` | Set replay/dev-watch playback speed multiplier; ignored outside replay rooms and dev watch playback. `0` pauses replay playback and dev scenario watch rooms. Other accepted speeds are clamped. |
-| `stepDevTick` | — | Advance a paused dev scenario watch room by one authoritative simulation tick. Ignored outside paused dev scenario rooms. |
-| `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. Compatibility wrapper around absolute replay seek. |
-| `seekReplayTo` | `tick: u32` | Seek a replay to an absolute simulation tick, clamped to the replay duration. Ignored outside replay rooms. The room rate-limits accepted seeks. Accepted seeks restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `replayState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
+| `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback and dev scenario watch rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
+| `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms. |
+| `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted only in replay rooms. |
+| `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
+| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operators with `labResult`. Accepted setup mutations, issue-as commands, and vision changes are room-local and append to the lab operation log. |
 | `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
@@ -166,7 +167,7 @@ authority.
 | `matchCountdown` | `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, rejects new joins, and sends `start` only after the countdown duration elapses. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
-| `replayState` | `Replay playback state` (see 2.6). |
+| `roomTimeState` | `Room-controlled time state` (see 2.6). |
 | `replayAnalysis` | `Observer analysis state` (see 2.7). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
 | `replayBranchCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
@@ -227,7 +228,10 @@ Sent once when the match begins. Carries everything static for the whole match.
   spectator: bool,               // true when this connection is observing only
   predictionBuildId?: string,    // live active players only; server/client bundle id
   predictionVersion?: u32,       // live active players only; currently 1
-  debugMode?: bool,              // true when movement path diagnostics are available
+  diagnostics?: {                // explicit recipient-scoped diagnostic affordances
+    movementPaths?: "ownerOnly"|"all",
+    observerAnalysis?: bool
+  },
   replay?: {                     // present for production replay playback
     artifactSchemaVersion: u32,
     serverBuildSha: string,
@@ -236,6 +240,14 @@ Sent once when the match begins. Carries everything static for the whole match.
     mapContentHash: string,
     seed: u32,
     durationTicks: u32
+  },
+  lab?: {                        // present for lab room starts
+    room: string,                // safe public lab id, not the hidden internal room prefix
+    operatorId: u32,
+    role: "operator"|"readOnly",
+    vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] },
+    dirty: bool,
+    operationCount: u32
   },
   tick: u32,                     // starting tick (usually 0)
   map: {
@@ -258,11 +270,19 @@ resources, and each human player also starts with five supply depots, one Gun Wo
 two Vehicle Works (`factory` kind), and five of each unit kind including Command Cars. Debug mode also adds one inert enemy player in the clockwise-adjacent
 corner from the first human start, with five deployed Mortar Teams clumped around one Scout Car
 and four enemy Supply Depots five tiles north/east/south/west of the clump. It also sets
-`debugMode: true`,
-which lets the client expose local movement-waypoint overlay controls for the owner-only
-`debugPath` fields in snapshots.
+`diagnostics.movementPaths: "ownerOnly"` for active players, which lets the client expose local
+movement-waypoint overlay controls for the owner-only `debugPath` fields in snapshots. Spectators
+do not receive that movement-path diagnostic affordance. Dev scenario start payloads may advertise
+`diagnostics.movementPaths: "all"` because those rooms intentionally use full-world diagnostic
+projection. Replay viewers and live spectators receive `diagnostics.observerAnalysis: true` only
+when room projection policy will send observer-analysis payloads to that recipient.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
+
+Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
+metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and
+server-owned projection. `role` names the room-owned operator/read-only viewer classification; only
+the operator may send privileged lab operations in the MVP.
 
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
@@ -305,7 +325,7 @@ loadout records, and `winnerTeamId` when there is a winning team.
 
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
-at tick 0 plus `replayState`. Post-match replay defaults every viewer to all active players'
+at tick 0 plus `roomTimeState`. Post-match replay defaults every viewer to all active players'
 combined authoritative vision and starts at `2.0x` speed. `returnToLobby` detaches only the
 requesting replay viewer; the shared replay session remains alive for everyone else. The room drops
 the replay simulation and resets to a clean lobby only after the last viewer leaves. Dedicated
@@ -468,12 +488,14 @@ clients render them below the fog overlay and must not select or issue targeted 
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
-`debugPath` is present only in lobby Debug mode matches, only for the owner, and only while the unit
-has remaining movement waypoints. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
-staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
-points in traversal order and `waypoints[0]` is the current movement target. The compact slot
-encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`,
-with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
+`debugPath` is present only when the room's projection policy enables movement-path diagnostics for
+that recipient and only while the unit has remaining movement waypoints. Lobby Debug mode enables
+owner-only movement paths for active players. Dev scenario rooms may enable full projected movement
+paths. It carries `{ waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks,
+totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path points in traversal
+order and `waypoints[0]` is the current movement target. The compact slot encodes this as
+`[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`, with points
+encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `AbilityObject`: `{ id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState? }`.
 The compact `ao` slot uses ability ids from the existing ability code table and
@@ -550,7 +572,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   breakthroughTicks?: u16,       // active Breakthrough speed status; visible only with the entity
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
-  debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner
+  debugPath?: {                  // diagnostic policy only; remaining movement path; owner-only unless policy says full projected diagnostics
     waypoints: { x: f32, y: f32 }[],
     goal?: { x: f32, y: f32 },
     lastRepathTick: u32,
@@ -579,10 +601,10 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
 gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
 or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged enemy
-unit's position to the victim owner and same-team recipients that pass team-current event
-visibility. Same-team friendly-fire damage does not emit under-attack alerts. Unit attack events
-are sent to the attacker's team and to enemy recipients whose team can currently see the shooter or
-target point. They include `reveal` so a shooter
+unit's position to the victim owner only; same-team recipients may still see the attack event through
+shared vision, but they do not receive teammate under-attack alerts. Same-team friendly-fire damage
+does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy
+recipients whose team can currently see the shooter or target point. They include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Death events are sent to the dead entity's team and to enemy recipients whose team can currently see
@@ -613,14 +635,15 @@ friendly-fire attribution rule as mortar splash: owned and allied entities in th
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
-### 2.6 Replay playback state and vision
+### 2.6 Room time state and replay vision
 
-`replayState` is a reliable server message that carries the shared playback cursor/state. Replay
-rooms send it for playback cursor changes; dev scenario watch rooms also send it after pause/resume
-and one-tick step controls so clients can confirm the authoritative dev-watch speed and tick:
+`roomTimeState` is a reliable server message that carries the shared room-controlled time
+cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms also send
+it after pause/resume and one-tick step controls so clients can confirm the authoritative room-time
+speed and tick:
 ```
 {
-  t: "replayState",
+  t: "roomTimeState",
   currentTick: u32,
   durationTicks: u32,
   keyframeTicks: u32[],
@@ -645,11 +668,67 @@ not shared between viewers unless a later protocol explicitly adds shared-view c
 snapshots are spectator-style authoritative fog snapshots from the selected real player ids; the
 default is the union of all replay players.
 
+`LabClientOp` is tagged by `op`:
+```
+{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
+{ op: "deleteEntity", entityId: u32 }
+{ op: "moveEntity", entityId: u32, x: f32, y: f32 }
+{ op: "setEntityOwner", entityId: u32, owner: u32 }
+{ op: "setPlayerResources", playerId: u32, steel: u32, oil: u32 }
+{ op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
+{ op: "setVision", vision: LabVisionMode }
+{ op: "issueCommandAs", playerId: u32, cmd: Command }
+{ op: "exportScenario", name?: string }
+{ op: "importScenario", scenario: LabScenarioV1 }
+```
+`LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
+`{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
+room task before snapshot projection; unknown, empty, or duplicate team selections are rejected.
+`issueCommandAs` queues a normal gameplay command as the selected player only when all selected
+units belong to that player; mixed-owner selections are rejected instead of partitioned.
+
+`LabScenarioV1` is versioned setup JSON, not a saved snapshot:
+```
+{
+  schemaVersion: 1,
+  kind: "labScenario",
+  name: string,
+  seed: u32,
+  map: { name: string, schemaVersion: u32, contentHash: string },
+  players: [{
+    id: u32, teamId: u32, factionId: string, name: string, color: string, isAi: bool,
+    steel: u32, oil: u32, upgrades: string[]
+  }],
+  entities: [{
+    id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
+    constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32
+  }],
+  metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
+}
+```
+Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome`. Import validates the schema,
+map metadata, player/team/resource/research/entity fields, restores through the public lab `Game`
+API, applies lab vision metadata, and returns an entity id remap in `outcome.entityIdMap`.
+Transient snapshot fields, fog recipient projections, events, projectile runtime state, command
+logs, interpolation state, and lab operation result metadata are intentionally omitted.
+
+Reliable lab server messages:
+
+| `t` | Fields | Meaning |
+|-----|--------|---------|
+| `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Room-local lab control metadata. World state still travels through `snapshot`. |
+| `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
+
+Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timeline/keyframes,
+lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
+multi-operator conflict semantics, visual iteration hot reload, and `/dev/scenario` migration.
+Those require separate typed messages instead of overloading `LabClientOp`.
+
 ### 2.7 Observer analysis state
 
 `replayAnalysis` is the compatibility wire tag for reliable observer analysis overlay/tab data that
 cannot be derived safely from the browser's current projected snapshot. In replay playback it is
-sent to replay viewers after replay `start`/`replayState`, after accepted seeks, after replay
+sent to replay viewers after replay `start`/`roomTimeState`, after accepted seeks, after replay
 vision changes, and during replay playback ticks. Live matches send the same payload every server
 tick, at the normal snapshot cadence, only when at least one spectator connection is present. The
 server computes the live payload once per tick and sends it only to connections whose room player

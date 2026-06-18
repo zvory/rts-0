@@ -2,76 +2,77 @@ import { dom } from "./bootstrap.js";
 import { REPLAY_VISION } from "./protocol.js";
 
 export class ReplayControls {
-  constructor({ net, state, replayViewer = false, isReplay = false, isScenario = false }) {
+  constructor({ net, state, replayViewer = false, capabilities = null }) {
     this.net = net;
     this.state = state;
     this.replayViewer = !!replayViewer;
-    this.isReplay = !!isReplay;
-    this.isScenario = !!isScenario;
+    this.capabilities = capabilities || {};
+    this.roomTime = this.capabilities.roomTime || {};
+    this.visibility = this.capabilities.visibility || {};
     this.replayVisionSelection = new Set();
-    this.replayState = null;
+    this.roomTimeState = null;
     this.replaySeekPending = false;
     this.replaySeekTargetTick = null;
     this.replaySpeedHandler = null;
     this.lastReplaySpeed = 2;
 
-    if (!dom.replaySpeed || (!this.isReplay && !this.isScenario)) return;
+    if (!dom.replaySpeed || !this.roomTime.available) return;
 
     dom.replaySpeed.hidden = false;
     dom.replaySpeed.classList.toggle("replay-viewer-controls", this.replayViewer);
     for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) {
-      btn.hidden = this.isScenario;
+      btn.hidden = !this.roomTime.seekRelative;
     }
     for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
-      btn.hidden = !this.isScenario;
+      btn.hidden = !this.roomTime.step;
     }
     this.replaySpeedHandler = (e) => this.onReplaySpeedClick(e);
     dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
-    this.setReplaySpeedActive(this.replayViewer ? 2 : null);
-    if (this.replayViewer) this.buildReplayVisionControls();
+    this.setRoomTimeSpeedActive(this.replayViewer ? 2 : null);
+    if (this.visibility.replayVision) this.buildReplayVisionControls();
   }
 
   onReplaySpeedClick(e) {
     const btn = e.target.closest(".spd-btn");
     if (!btn) return;
-    if (btn.dataset.stepDevTick !== undefined) {
-      if (!this.isScenario) return;
-      this.net.stepDevTick();
+    if (btn.dataset.stepRoomTime !== undefined) {
+      if (!this.roomTime.step) return;
+      this.net.stepRoomTime();
       return;
     }
     if (btn.dataset.seekBack !== undefined) {
-      if (!this.isReplay) return;
+      if (!this.roomTime.seekRelative) return;
       const ticksBack = parseInt(btn.dataset.seekBack, 10);
       if (!isFinite(ticksBack) || ticksBack <= 0) return;
       this.setReplayConcluded(false);
-      const currentTick = Number.isFinite(this.replayState?.currentTick) ? this.replayState.currentTick : 0;
+      const currentTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
       this.setReplaySeekPending(Math.max(0, currentTick - ticksBack));
-      this.net.seekReplay(ticksBack);
+      this.net.seekRoomTime(ticksBack);
       return;
     }
     if (btn.dataset.replayPauseToggle !== undefined) {
-      if (!this.isReplay) return;
+      if (!this.roomTime.pause) return;
       const speed = this.isReplayPaused() ? this.lastReplaySpeed : 0;
-      this.net.setReplaySpeed(speed);
-      this.replayState = { ...(this.replayState || {}), speed, paused: speed === 0 };
-      this.setReplaySpeedActive(speed);
+      this.net.setRoomTimeSpeed(speed);
+      this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
+      this.setRoomTimeSpeedActive(speed);
       this.updateReplayPauseButton();
       this.updateReplayStatus();
       return;
     }
     const speed = parseFloat(btn.dataset.speed);
     if (!isFinite(speed)) return;
-    if (speed === 0 && !this.isScenario) return;
-    if (this.isReplay && speed > 0) this.lastReplaySpeed = speed;
-    this.net.setReplaySpeed(speed);
-    if (this.isReplay) this.replayState = { ...(this.replayState || {}), speed, paused: speed === 0 };
-    this.setReplaySpeedActive(speed);
+    if (speed === 0 && !this.roomTime.pause) return;
+    if (speed > 0) this.lastReplaySpeed = speed;
+    this.net.setRoomTimeSpeed(speed);
+    this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
+    this.setRoomTimeSpeedActive(speed);
     this.updateReplayPauseButton();
     this.updateReplayStatus();
   }
 
-  applyReplayState(state) {
-    this.replayState = state || null;
+  applyRoomTimeState(state) {
+    this.roomTimeState = state || null;
     this.setReplaySeekPending(null, false);
     if (Number.isFinite(state?.speed) && state.speed > 0) this.lastReplaySpeed = state.speed;
     const ended =
@@ -81,7 +82,7 @@ export class ReplayControls {
         state.durationTicks > 0 &&
         state.currentTick >= state.durationTicks);
     this.setReplayConcluded(ended);
-    if (Number.isFinite(state?.speed)) this.setReplaySpeedActive(state.speed);
+    if (Number.isFinite(state?.speed)) this.setRoomTimeSpeedActive(state.speed);
     this.updateReplayPauseButton();
     this.updateReplayStatus();
     this.updateReplayTimeline();
@@ -89,7 +90,7 @@ export class ReplayControls {
 
   noteSnapshotTick(tick) {
     if (!this.replayViewer || !Number.isFinite(tick)) return;
-    this.replayState = { ...(this.replayState || {}), currentTick: tick };
+    this.roomTimeState = { ...(this.roomTimeState || {}), currentTick: tick };
     this.updateReplayStatus();
     this.updateReplayTimeline();
   }
@@ -99,7 +100,7 @@ export class ReplayControls {
     if (status) status.hidden = !concluded;
   }
 
-  setReplaySpeedActive(speed) {
+  setRoomTimeSpeedActive(speed) {
     if (!dom.replaySpeed) return;
     for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn:not(.seek-btn)")) {
       if (btn.dataset.speed === undefined) continue;
@@ -112,7 +113,7 @@ export class ReplayControls {
   }
 
   isReplayPaused() {
-    return this.replayState?.paused === true || this.replayState?.speed === 0;
+    return this.roomTimeState?.paused === true || this.roomTimeState?.speed === 0;
   }
 
   updateReplayPauseButton() {
@@ -209,8 +210,9 @@ export class ReplayControls {
   }
 
   onReplayTimelineClick(ev) {
+    if (!this.roomTime.seekAbsolute) return;
     const track = ev.currentTarget;
-    const duration = Number.isFinite(this.replayState?.durationTicks) ? this.replayState.durationTicks : 0;
+    const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
     if (!track || duration <= 0) return;
     const rect = track.getBoundingClientRect();
     if (!rect.width) return;
@@ -218,7 +220,7 @@ export class ReplayControls {
     const tick = Math.round(ratio * duration);
     this.setReplayConcluded(false);
     this.setReplaySeekPending(tick);
-    this.net.seekReplayTo(tick);
+    this.net.seekRoomTimeTo(tick);
   }
 
   setReplaySeekPending(targetTick, pending = true) {
@@ -231,14 +233,14 @@ export class ReplayControls {
   updateReplayTimeline() {
     const timeline = dom.replaySpeed?.querySelector(".replay-timeline");
     if (!timeline) return;
-    const duration = Number.isFinite(this.replayState?.durationTicks) ? this.replayState.durationTicks : 0;
-    const current = Number.isFinite(this.replayState?.currentTick) ? this.replayState.currentTick : 0;
+    const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
+    const current = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
     const ratio = duration > 0 ? Math.max(0, Math.min(1, current / duration)) : 0;
     timeline.querySelector(".replay-timeline-progress")?.style.setProperty("--replay-progress", `${ratio * 100}%`);
 
     const marks = timeline.querySelector(".replay-timeline-marks");
     if (!marks) return;
-    const keyframeTicks = Array.isArray(this.replayState?.keyframeTicks) ? this.replayState.keyframeTicks : [];
+    const keyframeTicks = Array.isArray(this.roomTimeState?.keyframeTicks) ? this.roomTimeState.keyframeTicks : [];
     const normalized = [...new Set(keyframeTicks)]
       .filter((tick) => Number.isFinite(tick) && tick >= 0 && (duration <= 0 || tick <= duration))
       .sort((a, b) => a - b);
@@ -307,9 +309,9 @@ export class ReplayControls {
   updateReplayStatus() {
     const status = dom.replaySpeed?.querySelector(".replay-tick-status");
     if (!status) return;
-    const current = Number.isFinite(this.replayState?.currentTick) ? this.replayState.currentTick : 0;
-    const duration = Number.isFinite(this.replayState?.durationTicks) ? this.replayState.durationTicks : 0;
-    const speed = Number.isFinite(this.replayState?.speed) ? this.replayState.speed : 2;
+    const current = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
+    const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
+    const speed = Number.isFinite(this.roomTimeState?.speed) ? this.roomTimeState.speed : 2;
     const seeking = this.replaySeekPending
       ? ` · Seeking${Number.isFinite(this.replaySeekTargetTick) ? ` ${this.replaySeekTargetTick}` : ""}...`
       : "";

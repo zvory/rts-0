@@ -7,6 +7,7 @@ import {
   trainableUnitsForFaction,
   workerBuildablesForFaction,
 } from "./config.js";
+import { attackDescriptor, holdDescriptor, moveDescriptor, stopDescriptor } from "./hud_unit_commands.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
 //   Q W E
@@ -240,11 +241,11 @@ export function buildUnitCard(ctx, selection) {
 
   if (workerSelected) {
     return card("unit", signature, [
-        moveDescriptor(ctx, unitIds, 0),
-        holdDescriptor(unitIds, 1),
+        moveDescriptor(ctx, unitIds),
+        holdDescriptor(unitIds),
         null,
-        attackDescriptor(ctx, unitIds, 3),
-        null,
+        attackDescriptor(ctx, unitIds),
+        stopDescriptor(unitIds),
         null,
         {
           id: "worker:build-menu",
@@ -263,9 +264,10 @@ export function buildUnitCard(ctx, selection) {
   }
 
   const slots = new Array(9).fill(null);
-  slots[0] = moveDescriptor(ctx, unitIds, 0);
-  slots[1] = holdDescriptor(unitIds, 1);
-  slots[3] = attackDescriptor(ctx, unitIds, 3);
+  slots[0] = moveDescriptor(ctx, unitIds);
+  slots[1] = holdDescriptor(unitIds);
+  slots[3] = attackDescriptor(ctx, unitIds);
+  slots[4] = stopDescriptor(unitIds);
 
   let sequentialSlot = 6;
   const claimSlot = (preferred) => {
@@ -429,50 +431,6 @@ export function buildTrainCard(ctx, building) {
   return card("train", signature, slots);
 }
 
-function moveDescriptor(ctx, unitIds, slot) {
-  return {
-    id: "unit:move",
-    commandId: "unit.move",
-    kind: "button",
-    action: "move",
-    intent: { type: "beginCommandTarget", target: "move" },
-    icon: "MV",
-    label: "Move",
-    title: "Move to a target point",
-    enabled: unitIds.length > 0,
-    cls: ctx.commandTarget === "move" ? "active" : "",
-  };
-}
-
-function attackDescriptor(ctx, unitIds, slot) {
-  return {
-    id: "unit:attack",
-    commandId: "unit.attack",
-    kind: "button",
-    action: "attack",
-    intent: { type: "beginCommandTarget", target: "attack" },
-    icon: "ATG",
-    label: "Attack",
-    title: "Attack a target or attack-move to a point",
-    enabled: unitIds.length > 0,
-    cls: ctx.commandTarget === "attack" ? "active" : "",
-  };
-}
-
-function holdDescriptor(unitIds, slot) {
-  return {
-    id: "unit:hold",
-    commandId: "unit.holdPosition",
-    kind: "button",
-    action: "holdPosition",
-    intent: { type: "holdPosition", unitIds },
-    icon: "HLD",
-    label: "Hold",
-    title: "Hold position",
-    enabled: unitIds.length > 0,
-  };
-}
-
 export function selectedAbilityAffordances(ctx, selection) {
   const ownUnits = selectedOwnUnits(ctx, selection);
   const resources = resourcesOf(ctx);
@@ -554,6 +512,7 @@ function distanceSqToCenter(unit, center) {
 }
 
 function isOwn(ctx, e) {
+  if (ctx?.controlPolicy?.kind === "lab") return ctx.controlPolicy.canControlOwner(e?.owner, ctx.state);
   return e && e.owner === ctx.playerId;
 }
 

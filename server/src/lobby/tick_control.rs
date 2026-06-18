@@ -1,21 +1,20 @@
-use super::session_policy::ClockPolicy;
+use super::session_policy::{
+    ClockCapability, ClockTickSource, RoomTimeOperation, RoomTimeOperations, RoomTimeSource,
+};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct ReplayPlaybackClock {
+pub(super) struct RoomTimeClock {
     pub(super) speed: f32,
     pub(super) paused: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TickMode {
-    RoomTicker,
+    Idle,
     LiveMatch,
-    ReplayPlayback,
-    ReplayPaused,
-    DevWatch,
-    DevWatchPaused,
-    BranchStaging,
+    RoomControlled(RoomTimeSource),
+    RoomControlledPaused(RoomTimeSource),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,12 +22,11 @@ pub(super) enum ScheduledTickAction {
     Noop,
     Countdown,
     LiveMatch,
-    ReplayPlayback,
-    DevWatch,
+    RoomControlled(RoomTimeSource),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) enum DevWatchSpeed {
+pub(super) enum RoomTimeSpeed {
     Paused,
     Running(f32),
 }
@@ -36,32 +34,41 @@ pub(super) enum DevWatchSpeed {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct TickControl {
     mode: TickMode,
+    room_time_operations: RoomTimeOperations,
     countdown_active: bool,
     speed_multiplier: f32,
 }
 
 impl TickControl {
     pub(super) fn new(
-        clock: ClockPolicy,
-        replay: Option<ReplayPlaybackClock>,
-        dev_watch_paused: bool,
+        clock: ClockCapability,
+        room_time: Option<RoomTimeClock>,
         fallback_speed: f32,
         countdown_active: bool,
     ) -> Self {
+        let mut room_time_operations = RoomTimeOperations::NONE;
         let (mode, speed_multiplier) = match clock {
-            ClockPolicy::ReplayPlayback => match replay {
-                Some(replay) if replay.paused => (TickMode::ReplayPaused, 1.0),
-                Some(replay) => (TickMode::ReplayPlayback, replay.speed),
-                None => (TickMode::ReplayPlayback, fallback_speed),
+            ClockCapability::RoomControlled(capability) => {
+                room_time_operations = capability.operations;
+                let room_time = room_time.unwrap_or(RoomTimeClock {
+                    speed: fallback_speed,
+                    paused: false,
+                });
+                if room_time.paused {
+                    (TickMode::RoomControlledPaused(capability.source), 1.0)
+                } else {
+                    (TickMode::RoomControlled(capability.source), room_time.speed)
+                }
+            }
+            ClockCapability::FixedRealtime(source) => match source {
+                ClockTickSource::RoomTicker => (TickMode::Idle, fallback_speed),
+                ClockTickSource::LiveMatch => (TickMode::LiveMatch, fallback_speed),
+                ClockTickSource::BranchStaging => (TickMode::Idle, 1.0),
             },
-            ClockPolicy::DevWatch if dev_watch_paused => (TickMode::DevWatchPaused, 1.0),
-            ClockPolicy::DevWatch => (TickMode::DevWatch, fallback_speed),
-            ClockPolicy::BranchStaging => (TickMode::BranchStaging, 1.0),
-            ClockPolicy::LiveMatch => (TickMode::LiveMatch, fallback_speed),
-            ClockPolicy::RoomTicker => (TickMode::RoomTicker, fallback_speed),
         };
         Self {
             mode,
+            room_time_operations,
             countdown_active,
             speed_multiplier,
         }
@@ -77,24 +84,32 @@ impl TickControl {
 
     pub(super) fn scheduled_action(self) -> ScheduledTickAction {
         match self.mode {
-            TickMode::ReplayPaused | TickMode::DevWatchPaused => ScheduledTickAction::Noop,
+            TickMode::RoomControlledPaused(_) => ScheduledTickAction::Noop,
             _ if self.countdown_active => ScheduledTickAction::Countdown,
             TickMode::LiveMatch => ScheduledTickAction::LiveMatch,
-            TickMode::ReplayPlayback => ScheduledTickAction::ReplayPlayback,
-            TickMode::DevWatch => ScheduledTickAction::DevWatch,
-            TickMode::RoomTicker | TickMode::BranchStaging => ScheduledTickAction::Noop,
+            TickMode::RoomControlled(source) => ScheduledTickAction::RoomControlled(source),
+            TickMode::Idle => ScheduledTickAction::Noop,
         }
     }
 
-    pub(super) fn can_step_dev_tick(self, player_in_room: bool) -> bool {
-        player_in_room && matches!(self.mode, TickMode::DevWatchPaused)
+    pub(super) fn allows_room_time_operation(
+        self,
+        operation: RoomTimeOperation,
+        player_in_room: bool,
+    ) -> bool {
+        player_in_room && self.room_time_operations.allows(operation)
     }
 
-    pub(super) fn dev_watch_speed(speed: f32) -> DevWatchSpeed {
+    pub(super) fn can_step_room_time(self, player_in_room: bool) -> bool {
+        self.allows_room_time_operation(RoomTimeOperation::Step, player_in_room)
+            && matches!(self.mode, TickMode::RoomControlledPaused(_))
+    }
+
+    pub(super) fn room_time_speed(speed: f32) -> RoomTimeSpeed {
         if speed == 0.0 {
-            DevWatchSpeed::Paused
+            RoomTimeSpeed::Paused
         } else {
-            DevWatchSpeed::Running(speed.clamp(0.125, 8.0))
+            RoomTimeSpeed::Running(speed.clamp(0.125, 8.0))
         }
     }
 }
@@ -114,44 +129,68 @@ mod tests {
     fn tick_control_names_interval_decisions() {
         let base = Duration::from_millis(90);
 
-        let normal = TickControl::new(ClockPolicy::RoomTicker, None, false, 1.0, false);
+        let normal = TickControl::new(ClockCapability::ROOM_TICKER, None, 1.0, false);
         assert_duration_close(normal.tick_interval(base), Duration::from_millis(90));
         assert_eq!(normal.scheduled_action(), ScheduledTickAction::Noop);
 
         let replay = TickControl::new(
-            ClockPolicy::ReplayPlayback,
-            Some(ReplayPlaybackClock {
+            ClockCapability::REPLAY_PLAYBACK,
+            Some(RoomTimeClock {
                 speed: 2.0,
                 paused: false,
             }),
-            false,
             1.0,
             false,
         );
         assert_duration_close(replay.tick_interval(base), Duration::from_millis(45));
         assert_eq!(
             replay.scheduled_action(),
-            ScheduledTickAction::ReplayPlayback
+            ScheduledTickAction::RoomControlled(RoomTimeSource::ReplayPlayback)
         );
+        assert!(replay.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
+        assert!(replay.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
+        assert!(replay.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
+        assert!(!replay.allows_room_time_operation(RoomTimeOperation::Step, true));
 
         let paused_replay = TickControl::new(
-            ClockPolicy::ReplayPlayback,
-            Some(ReplayPlaybackClock {
+            ClockCapability::REPLAY_PLAYBACK,
+            Some(RoomTimeClock {
                 speed: 0.0,
                 paused: true,
             }),
-            false,
             1.0,
             false,
         );
         assert_duration_close(paused_replay.tick_interval(base), Duration::from_millis(90));
         assert_eq!(paused_replay.scheduled_action(), ScheduledTickAction::Noop);
 
-        let dev_watch = TickControl::new(ClockPolicy::DevWatch, None, false, 3.0, false);
+        let dev_watch = TickControl::new(
+            ClockCapability::DEV_SCENARIO,
+            Some(RoomTimeClock {
+                speed: 3.0,
+                paused: false,
+            }),
+            1.0,
+            false,
+        );
         assert_duration_close(dev_watch.tick_interval(base), Duration::from_millis(30));
-        assert_eq!(dev_watch.scheduled_action(), ScheduledTickAction::DevWatch);
+        assert_eq!(
+            dev_watch.scheduled_action(),
+            ScheduledTickAction::RoomControlled(RoomTimeSource::DevScenario)
+        );
+        assert!(dev_watch.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
+        assert!(dev_watch.allows_room_time_operation(RoomTimeOperation::Step, true));
+        assert!(!dev_watch.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
 
-        let paused_dev_watch = TickControl::new(ClockPolicy::DevWatch, None, true, 3.0, false);
+        let paused_dev_watch = TickControl::new(
+            ClockCapability::DEV_SCENARIO,
+            Some(RoomTimeClock {
+                speed: 3.0,
+                paused: true,
+            }),
+            1.0,
+            false,
+        );
         assert_duration_close(
             paused_dev_watch.tick_interval(base),
             Duration::from_millis(90),
@@ -160,29 +199,29 @@ mod tests {
             paused_dev_watch.scheduled_action(),
             ScheduledTickAction::Noop
         );
-        assert!(paused_dev_watch.can_step_dev_tick(true));
+        assert!(paused_dev_watch.can_step_room_time(true));
 
-        let branch_staging = TickControl::new(ClockPolicy::BranchStaging, None, false, 3.0, false);
+        let branch_staging = TickControl::new(ClockCapability::BRANCH_STAGING, None, 3.0, false);
         assert_duration_close(
             branch_staging.tick_interval(base),
             Duration::from_millis(90),
         );
         assert_eq!(branch_staging.scheduled_action(), ScheduledTickAction::Noop);
 
-        let countdown = TickControl::new(ClockPolicy::RoomTicker, None, false, 1.0, true);
+        let countdown = TickControl::new(ClockCapability::ROOM_TICKER, None, 1.0, true);
         assert_eq!(countdown.scheduled_action(), ScheduledTickAction::Countdown);
     }
 
     #[test]
-    fn dev_watch_speed_preserves_pause_and_clamps_running_speed() {
-        assert_eq!(TickControl::dev_watch_speed(0.0), DevWatchSpeed::Paused);
+    fn room_time_speed_preserves_pause_and_clamps_running_speed() {
+        assert_eq!(TickControl::room_time_speed(0.0), RoomTimeSpeed::Paused);
         assert_eq!(
-            TickControl::dev_watch_speed(0.01),
-            DevWatchSpeed::Running(0.125)
+            TickControl::room_time_speed(0.01),
+            RoomTimeSpeed::Running(0.125)
         );
         assert_eq!(
-            TickControl::dev_watch_speed(12.0),
-            DevWatchSpeed::Running(8.0)
+            TickControl::room_time_speed(12.0),
+            RoomTimeSpeed::Running(8.0)
         );
     }
 }

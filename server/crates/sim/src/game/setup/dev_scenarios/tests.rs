@@ -466,7 +466,7 @@ fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
 }
 
 #[test]
-fn tank_trap_enemy_breach_scenario_represents_current_vehicle_blocker_layer() {
+fn tank_trap_enemy_breach_scenario_closes_sparse_vehicle_gaps() {
     let setup = Game::new_tank_trap_pathing_scenario(
         "enemy_vehicle_breach",
         EntityKind::ScoutCar,
@@ -479,16 +479,30 @@ fn tank_trap_enemy_breach_scenario_represents_current_vehicle_blocker_layer() {
     assert_eq!(owned_kind_count(&setup.game, 2, EntityKind::TankTrap), 7);
 
     let occ = services::occupancy::Occupancy::build(&setup.game.map, &setup.game.entities);
-    let enemy_trap = setup
+    let mut enemy_trap_tiles: Vec<_> = setup
         .game
         .entities
         .iter()
-        .find(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
-        .expect("scenario should spawn enemy Tank Traps");
-    let (tx, ty) = setup.game.map.tile_of(enemy_trap.pos_x, enemy_trap.pos_y);
+        .filter(|entity| entity.owner == 2 && entity.kind == EntityKind::TankTrap)
+        .map(|entity| setup.game.map.tile_of(entity.pos_x, entity.pos_y))
+        .collect();
+    enemy_trap_tiles.sort_unstable();
+    let (tx, ty) = enemy_trap_tiles
+        .iter()
+        .copied()
+        .find(|&(tx, ty)| enemy_trap_tiles.contains(&(tx, ty + 2)))
+        .expect("scenario should spawn an enemy Tank Trap pair with one gap tile");
     assert!(
         !occ.passable_for_kind(tx as i32, ty as i32, EntityKind::ScoutCar),
-        "Phase 1 documents the current layer; Phase 2 should make enemy traps breachable for vehicle pathing"
+        "enemy Tank Traps should block vehicle pathing on their footprint"
+    );
+    assert!(
+        !occ.passable_for_kind(tx as i32, ty as i32 + 1, EntityKind::ScoutCar),
+        "sparse enemy Tank Trap pairs should close the one-tile vehicle gap between them"
+    );
+    assert!(
+        occ.passable_for_kind(tx as i32, ty as i32 + 1, EntityKind::Rifleman),
+        "closed Tank Trap pair gaps should remain infantry-passable"
     );
 }
 

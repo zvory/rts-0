@@ -1,0 +1,329 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "source": [
+        "server/crates/protocol/src/lib.rs",
+        "server/crates/protocol/src/bin/dump-protocol-contract.rs",
+        "server/crates/contract/src/lib.rs",
+        "server/crates/sim/src/protocol.rs",
+        "server/src/protocol.rs",
+        "client/src/protocol.js",
+        "tests/protocol_parity.mjs"
+      ],
+      "docs": [
+        "docs/context/protocol.md",
+        "docs/design/protocol.md",
+        "docs/design/hardening.md"
+      ],
+      "notes": "Wire DTOs, compact transport contracts, client/server message shape, snapshot/event fields, and fog-visible protocol data."
+    },
+    {
+      "source": [
+        "client/index.html",
+        "client/map-editor.html",
+        "client/unit-lab.html",
+        "client/src/app.js",
+        "client/src/bootstrap.js",
+        "client/src/main.js",
+        "client/src/match.js",
+        "client/src/net.js",
+        "client/src/state.js",
+        "client/styles.css"
+      ],
+      "docs": [
+        "docs/context/client-ui.md",
+        "docs/design/client-ui.md",
+        "docs/context/protocol.md"
+      ],
+      "notes": "Client app shell, match lifecycle, network wiring, browser entry points, and CSS surface. Protocol docs are relevant when message handling changes."
+    },
+    {
+      "source": [
+        "client/src/input/**",
+        "client/src/client_intent.js",
+        "client/src/command_budget.js",
+        "client/src/command_composer.js",
+        "client/src/branch_staging.js",
+        "client/src/hotkey_editor.js",
+        "client/src/hotkey_profiles.js",
+        "tests/input_context_menu_contracts.mjs",
+        "tests/hotkey_profiles.mjs"
+      ],
+      "docs": [
+        "docs/context/client-ui.md",
+        "docs/design/client-ui.md",
+        "docs/context/protocol.md",
+        "docs/design/protocol.md"
+      ],
+      "notes": "Input routing, command composition, hotkeys, and client-side command affordances. Protocol docs matter when commands or client intent shapes cross the wire."
+    },
+    {
+      "source": [
+        "client/src/renderer/**",
+        "client/src/camera.js",
+        "client/src/fog.js",
+        "client/src/minimap.js",
+        "client/src/resource_icons.js",
+        "tests/svg_migration_guardrails.mjs",
+        "tests/rig_*.mjs",
+        "tests/transparent_unit_pixels.mjs",
+        "tests/visual_pixel_compare*.mjs"
+      ],
+      "docs": [
+        "docs/context/client-ui.md",
+        "docs/design/client-ui.md",
+        "docs/context/balance.md",
+        "docs/design/balance.md"
+      ],
+      "notes": "Renderer, Pixi layers, SVG rigs, visual fog, camera, minimap, and UI-side stat mirrors used for presentation."
+    },
+    {
+      "source": [
+        "client/src/hud*.js",
+        "client/src/alerts.js",
+        "client/src/audio.js",
+        "client/src/combat_audio.js",
+        "client/src/lobby*.js",
+        "client/src/match_history.js",
+        "client/src/scoreboard.js",
+        "client/src/settings*.js",
+        "client/src/status_badge.js",
+        "client/assets/**",
+        "docs/sound/**"
+      ],
+      "docs": [
+        "docs/context/client-ui.md",
+        "docs/design/client-ui.md",
+        "docs/context/match-history.md",
+        "docs/design/match-history.md"
+      ],
+      "notes": "HUD, lobby UI, alerts, audio, settings, scoreboard, and browser match-history views. Match-history docs apply to history-facing UI paths."
+    },
+    {
+      "source": [
+        "server/crates/rules/src/**",
+        "server/crates/rules/src/bin/dump-faction-catalog.rs",
+        "server/crates/sim/src/rules/**",
+        "server/src/config.rs",
+        "client/src/config.js",
+        "tests/faction_integration.mjs",
+        "tests/client_contracts.mjs"
+      ],
+      "docs": [
+        "docs/context/balance.md",
+        "docs/design/balance.md",
+        "docs/design/faction-architecture-inventory.md",
+        "docs/context/client-ui.md"
+      ],
+      "notes": "Authoritative balance, faction catalogs, terrain/rules constants, compatibility shims, and mirrored client config."
+    },
+    {
+      "source": [
+        "server/crates/sim/src/game/mod.rs",
+        "server/crates/sim/src/game/systems.rs",
+        "server/crates/sim/src/game/setup.rs",
+        "server/crates/sim/src/game/entity/**",
+        "server/crates/sim/src/game/services/**",
+        "server/crates/sim/src/game/commands.rs",
+        "server/crates/sim/src/game/command.rs",
+        "server/crates/sim/src/game/snapshot.rs",
+        "server/crates/sim/src/game/tests.rs"
+      ],
+      "docs": [
+        "docs/context/server-sim.md",
+        "docs/design/server-sim.md",
+        "docs/context/protocol.md",
+        "docs/design/protocol.md"
+      ],
+      "notes": "Game API seam, tick orchestration, entity lifecycle, command/order semantics, snapshots, and sim service behavior."
+    },
+    {
+      "source": [
+        "server/crates/sim/src/game/pathfinding.rs",
+        "server/crates/sim/src/game/services/movement/**",
+        "server/crates/sim/src/game/services/pathing.rs",
+        "server/crates/sim/src/game/services/standability.rs",
+        "server/crates/sim/src/game/services/occupancy.rs",
+        "server/crates/sim/src/game/services/spatial.rs",
+        "server/crates/sim/src/game/map/**",
+        "server/assets/maps/**"
+      ],
+      "docs": [
+        "docs/context/server-sim.md",
+        "docs/design/server-sim.md",
+        "docs/context/testing.md",
+        "docs/design/testing.md"
+      ],
+      "notes": "Movement, pathing, standability, occupancy, authored maps, and map-driven behavior. Testing docs cover scenario and self-play coverage."
+    },
+    {
+      "source": [
+        "server/crates/sim/src/game/fog.rs",
+        "server/crates/sim/src/game/services/line_of_sight.rs",
+        "server/crates/sim/src/game/services/combat/**",
+        "server/crates/sim/src/game/artillery.rs",
+        "server/crates/sim/src/game/mortar.rs",
+        "server/crates/sim/src/game/ability*.rs",
+        "server/crates/sim/src/game/hero_abilities.rs",
+        "server/crates/sim/src/rules/projection.rs"
+      ],
+      "docs": [
+        "docs/context/server-sim.md",
+        "docs/design/server-sim.md",
+        "docs/context/protocol.md",
+        "docs/design/protocol.md",
+        "docs/design/hardening.md"
+      ],
+      "notes": "Combat, targeting, projectiles, abilities, line of sight, fog authority, and privacy-sensitive event/snapshot data."
+    },
+    {
+      "source": [
+        "server/crates/ai/src/**",
+        "server/src/bin/ai_*.rs",
+        "server/src/tools/ai_*.rs",
+        "scripts/ai-*.sh",
+        "tests/ai_integration.mjs"
+      ],
+      "docs": [
+        "docs/context/server-sim.md",
+        "docs/design/ai.md",
+        "docs/context/testing.md",
+        "docs/design/testing.md"
+      ],
+      "notes": "AI opponent decisions, self-play harnesses, AI tooling, and live AI integration seams."
+    },
+    {
+      "source": [
+        "client/src/prediction_*.js",
+        "client/src/progress_extrapolator.js",
+        "client/src/sim_wasm_adapter.js",
+        "client/vendor/sim-wasm/**",
+        "server/crates/sim-wasm/**",
+        "scripts/build-sim-wasm.sh",
+        "scripts/check-prediction-guardrails.mjs",
+        "scripts/check-sim-wasm-size.sh",
+        "tests/prediction_controller.mjs",
+        "tests/progress_extrapolator.mjs",
+        "tests/sim_wasm_smoke.mjs",
+        "tests/tri_state/**"
+      ],
+      "docs": [
+        "docs/context/client-ui.md",
+        "docs/design/client-ui.md",
+        "docs/context/protocol.md",
+        "docs/design/protocol.md",
+        "docs/context/testing.md",
+        "docs/design/testing.md"
+      ],
+      "notes": "Client prediction, local sim-wasm lane, progress extrapolation, reconciliation behavior, and tri-state parity coverage."
+    },
+    {
+      "source": [
+        "server/src/lobby/**",
+        "server/src/main.rs",
+        "server/src/lib.rs",
+        "server/src/dev_scenarios.rs",
+        "server/src/unit_design_lab.rs",
+        "server/src/wiki.rs",
+        "client/src/lab_*.js",
+        "client/src/replay_*.js",
+        "client/unit-lab.js"
+      ],
+      "docs": [
+        "docs/context/server-sim.md",
+        "docs/design/server-sim.md",
+        "docs/context/deployment.md",
+        "docs/context/protocol.md",
+        "docs/design/protocol.md"
+      ],
+      "notes": "Server shell, lobby/room tasks, session policy, replay/lab projection, dev scenarios, wiki routes, and Game API callers."
+    },
+    {
+      "source": [
+        "server/src/db.rs",
+        "server/src/lobby/*match*",
+        "server/src/lobby/*replay*",
+        "server/migrations/**",
+        "client/src/match_history.js"
+      ],
+      "docs": [
+        "docs/context/match-history.md",
+        "docs/design/match-history.md",
+        "docs/context/protocol.md",
+        "docs/design/protocol.md"
+      ],
+      "notes": "Match-history persistence, replay storage, API presentation, migrations, and env-gated recording behavior."
+    },
+    {
+      "source": [
+        "server/src/build_info.rs",
+        "server/src/structured_log.rs",
+        "docs/fly.md",
+        "scripts/fly-logs.sh",
+        ".github/workflows/deploy-beta.yml"
+      ],
+      "docs": [
+        "docs/context/deployment.md",
+        "docs/design/hardening.md",
+        "docs/fly.md",
+        "docs/perf-tracing.md"
+      ],
+      "notes": "Deployment, logging, Fly.io operation, build metadata, performance tracing, and production hardening surfaces."
+    },
+    {
+      "source": [
+        "tests/**",
+        "tests/run-all.sh",
+        "scripts/check-*.mjs",
+        "scripts/check-*.sh",
+        "scripts/install-hooks.sh",
+        ".github/workflows/main-tests.yml",
+        ".github/workflows/pr-ownership.yml"
+      ],
+      "docs": [
+        "docs/context/testing.md",
+        "docs/design/testing.md",
+        "docs/context/deployment.md",
+        "docs/pr-first-workflow.md"
+      ],
+      "notes": "Node integration tests, browser smoke tests, nextest/JUnit helpers, local hooks, CI workflows, and PR ownership checks."
+    },
+    {
+      "source": [
+        "server/crates/sim/src/game/setup/dev_scenarios/**",
+        "client/src/lab_client.js",
+        "client/src/lab_control_policy.js",
+        "client/src/lab_panel.js",
+        "client/unit-lab.*",
+        "tests/tri_state/**"
+      ],
+      "docs": [
+        "docs/context/testing.md",
+        "docs/design/testing.md",
+        "docs/context/server-sim.md",
+        "docs/design/server-sim.md",
+        "docs/context/client-ui.md"
+      ],
+      "notes": "Dev scenarios, lab UI/control paths, tri-state harnesses, and debug/testing workflows that cross sim and client boundaries."
+    },
+    {
+      "source": [
+        "plans/**",
+        "scripts/phase-runner*.mjs",
+        "scripts/phase-runner.sh",
+        "scripts/agent-pr.sh",
+        "scripts/wait-pr.sh",
+        "scripts/pr-sweep.sh",
+        "docs/pr-first-workflow.md"
+      ],
+      "docs": [
+        "docs/context/planning.md",
+        "plans/README.md",
+        "docs/pr-first-workflow.md",
+        "docs/context/testing.md"
+      ],
+      "notes": "Phased plan authoring, executor automation, owned PR lifecycle, and phase-runner test coverage."
+    }
+  ]
+}

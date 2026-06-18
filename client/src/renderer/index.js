@@ -69,6 +69,11 @@ import {
   _tankMotionVisual,
 } from "./units.js";
 
+const RENDER_ERROR_LOG_INTERVAL_MS = 5000;
+const MISSING_TEXTURE_SIZE_PX = 26;
+const MISSING_TEXTURE_MAGENTA = 0xff00ff;
+const MISSING_TEXTURE_DARK = 0x141018;
+
 export class Renderer {
   /**
    * @param {HTMLElement} canvasParent element the Pixi canvas is appended to
@@ -171,6 +176,7 @@ export class Renderer {
     this._rigDefinitionsByKind = new Map();
     this._rigComparisonPool = new Map();
     this._seen.rigComparisons = new Set();
+    this._renderErrors = new Map();
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
     this._map = null;
@@ -227,24 +233,35 @@ export class Renderer {
     // their own layers and are filled inline.
     for (const e of regularEntities) {
       liveIds.add(e.id);
-      if (isResource(e.kind)) this._drawResource(e, fog);
-      else if (isBuilding(e.kind)) this._drawBuilding(e, colorByOwner, state);
+      if (isResource(e.kind)) {
+        this._drawEntitySafely("resource", e, "resources", () => this._drawResource(e, fog));
+      } else if (isBuilding(e.kind)) {
+        this._drawEntitySafely("building", e, "buildings", () => this._drawBuilding(e, colorByOwner, state));
+      }
     }
     for (const e of state.rememberedBuildings || []) {
-      this._drawBuilding(e, colorByOwner, state);
+      this._drawEntitySafely("rememberedBuilding", e, "buildings", () => {
+        this._drawBuilding(e, colorByOwner, state);
+      });
     }
     for (const e of regularEntities) {
       liveIds.add(e.id);
-      if (isUnit(e.kind)) this._drawUnit(e, colorByOwner, state);
+      if (isUnit(e.kind)) {
+        this._drawEntitySafely("unit", e, "units", () => this._drawUnit(e, colorByOwner, state));
+      }
     }
     // Selection rings + HP bars after shapes are placed so they read on top.
     for (const e of regularEntities) {
       liveIds.add(e.id);
-      this._drawSelectionAndHp(e, selection, state);
+      this._drawSafely(`selectionHp:${e.kind || "unknown"}`, () => {
+        this._drawSelectionAndHp(e, selection, state);
+      });
     }
     for (const e of shotReveals) {
       liveIds.add(e.id);
-      this._drawShotRevealUnit(e, colorByOwner, state);
+      this._drawEntitySafely("shotReveal", e, "shotReveals", () => {
+        this._drawShotRevealUnit(e, colorByOwner, state);
+      });
     }
     // Hide pooled objects whose id was not touched this frame.
     this._sweep();
@@ -253,29 +270,96 @@ export class Renderer {
 
     // Overlays.
     this._abilityObjectGfx.clear();
-    this._drawAbilityObjects(feedbackView);
+    this._drawSafely("abilityObjects", () => this._drawAbilityObjects(feedbackView));
     this._smokeGfx.clear();
-    this._drawSmokes(feedbackView);
-    this._drawFog(fog);
-    this._drawSmokeCanisters(feedbackView);
-    this._drawCommandFeedback(feedbackView);
-    this._drawMortarTargets(feedbackView);
-    this._drawMortarLaunches(feedbackView);
-    this._drawMortarShells(feedbackView);
-    this._drawMortarImpacts(feedbackView);
-    this._drawArtilleryLaunches(feedbackView);
-    this._drawArtilleryTargets(feedbackView);
-    this._drawArtilleryImpacts(feedbackView);
-    this._drawSelectedMortarRanges(feedbackView);
-    this._drawBreakthroughAuras(feedbackView, regularEntities);
-    this._drawAbilityTargetPreview(feedbackView);
-    this._drawAntiTankGunSetupPreview(feedbackView);
-    this._drawOrderPlan(feedbackView);
-    this._drawDebugPathOverlay(feedbackView, regularEntities);
-    this._drawRallyPoints(feedbackView);
-    this._drawResourceMiningPreview(feedbackView);
-    this._drawMuzzleFlashes(feedbackView);
-    this._drawPlacement(feedbackView, fog);
+    this._drawSafely("smokes", () => this._drawSmokes(feedbackView));
+    this._drawSafely("fog", () => this._drawFog(fog));
+    this._drawSafely("smokeCanisters", () => this._drawSmokeCanisters(feedbackView));
+    this._drawSafely("commandFeedback", () => this._drawCommandFeedback(feedbackView));
+    this._drawSafely("mortarTargets", () => this._drawMortarTargets(feedbackView));
+    this._drawSafely("mortarLaunches", () => this._drawMortarLaunches(feedbackView));
+    this._drawSafely("mortarShells", () => this._drawMortarShells(feedbackView));
+    this._drawSafely("mortarImpacts", () => this._drawMortarImpacts(feedbackView));
+    this._drawSafely("artilleryLaunches", () => this._drawArtilleryLaunches(feedbackView));
+    this._drawSafely("artilleryTargets", () => this._drawArtilleryTargets(feedbackView));
+    this._drawSafely("artilleryImpacts", () => this._drawArtilleryImpacts(feedbackView));
+    this._drawSafely("selectedMortarRanges", () => this._drawSelectedMortarRanges(feedbackView));
+    this._drawSafely("breakthroughAuras", () => this._drawBreakthroughAuras(feedbackView, regularEntities));
+    this._drawSafely("abilityTargetPreview", () => this._drawAbilityTargetPreview(feedbackView));
+    this._drawSafely("antiTankGunSetupPreview", () => this._drawAntiTankGunSetupPreview(feedbackView));
+    this._drawSafely("orderPlan", () => this._drawOrderPlan(feedbackView));
+    this._drawSafely("debugPathOverlay", () => this._drawDebugPathOverlay(feedbackView, regularEntities));
+    this._drawSafely("rallyPoints", () => this._drawRallyPoints(feedbackView));
+    this._drawSafely("resourceMiningPreview", () => this._drawResourceMiningPreview(feedbackView));
+    this._drawSafely("muzzleFlashes", () => this._drawMuzzleFlashes(feedbackView));
+    this._drawSafely("placement", () => this._drawPlacement(feedbackView, fog));
+  }
+
+  _drawSafely(label, draw) {
+    try {
+      draw();
+      return true;
+    } catch (err) {
+      this._recordRenderError(label, err);
+      return false;
+    }
+  }
+
+  _drawEntitySafely(label, entity, fallbackPool, draw) {
+    try {
+      draw();
+      return true;
+    } catch (err) {
+      this._recordRenderError(`${label}:${entity?.kind || "unknown"}`, err);
+      try {
+        this._drawMissingTexture(entity, fallbackPool);
+      } catch (fallbackErr) {
+        this._recordRenderError(`${label}:missingTexture`, fallbackErr);
+      }
+      return false;
+    }
+  }
+
+  _drawMissingTexture(entity, poolName) {
+    if (!entity || entity.id == null || !this._pools?.[poolName]) return;
+    const g = this._slot(poolName, entity.id);
+    const x = Number.isFinite(entity.x) ? entity.x : 0;
+    const y = Number.isFinite(entity.y) ? entity.y : 0;
+    const size = MISSING_TEXTURE_SIZE_PX;
+    const half = size / 2;
+    const cell = size / 2;
+    g.position.set(x, y);
+    g.lineStyle(2, 0x0b0710, 0.95);
+    g.beginFill(MISSING_TEXTURE_MAGENTA, 1);
+    g.drawRect(-half, -half, cell, cell);
+    g.drawRect(0, 0, cell, cell);
+    g.beginFill(MISSING_TEXTURE_DARK, 1);
+    g.drawRect(0, -half, cell, cell);
+    g.drawRect(-half, 0, cell, cell);
+    g.endFill();
+    g.lineStyle(2, 0xffffff, 0.85);
+    g.drawRect(-half, -half, size, size);
+  }
+
+  _recordRenderError(label, err) {
+    const now = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+    const record = this._renderErrors.get(label) || { count: 0, lastLogAt: -Infinity, lastMessage: "" };
+    record.count += 1;
+    record.lastMessage = err?.stack || err?.message || String(err);
+    this._renderErrors.set(label, record);
+    globalThis.__rtsRenderErrors = {
+      total: Array.from(this._renderErrors.values()).reduce((sum, item) => sum + item.count, 0),
+      labels: Object.fromEntries(
+        Array.from(this._renderErrors.entries()).map(([key, value]) => [key, value.count]),
+      ),
+      latest: { label, message: record.lastMessage },
+    };
+    if (record.count <= 3 || now - record.lastLogAt >= RENDER_ERROR_LOG_INTERVAL_MS) {
+      record.lastLogAt = now;
+      console.error(`[RTS_RENDER] skipped ${label} after render error`, err);
+    }
   }
 
   // --- Entity drawing ------------------------------------------------------

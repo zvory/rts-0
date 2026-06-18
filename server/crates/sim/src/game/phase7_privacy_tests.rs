@@ -215,7 +215,7 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
 fn artillery_target_marker_is_visible_to_allies_not_hidden_enemies() {
     let mut game = empty_flat_game(&phase7_players());
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(22, 10);
+    let target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)

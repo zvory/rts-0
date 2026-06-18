@@ -294,7 +294,7 @@ fn push_under_attack_notice(
     }
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        if !teams.same_team_or_same_owner(pid, victim_owner)
+        if pid != victim_owner
             || !projection::event_visible_to_team(pid, x, y, attacker_owner, fog, teams)
         {
             continue;
@@ -305,5 +305,55 @@ fn push_under_attack_notice(
             y: Some(y),
             severity: crate::protocol::NoticeSeverity::Alert,
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::terrain;
+
+    fn open_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![(4, 4), (size - 5, size - 5)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
+    fn visible_team_fog(map: &Map, entities: &EntityStore) -> Fog {
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2, 3], entities, map);
+        fog
+    }
+
+    fn has_under_attack_notice(events: &HashMap<u32, Vec<Event>>, player: u32) -> bool {
+        events.get(&player).is_some_and(|player_events| {
+            player_events
+                .iter()
+                .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"))
+        })
+    }
+
+    #[test]
+    fn mortar_under_attack_notice_goes_to_victim_owner_not_teammate() {
+        let map = open_map(20);
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(2, EntityKind::Worker, 160.0, 160.0)
+            .expect("victim should spawn");
+        entities
+            .spawn_unit(3, EntityKind::Worker, 176.0, 160.0)
+            .expect("victim ally should spawn");
+        let fog = visible_team_fog(&map, &entities);
+        let teams = TeamRelations::from_player_teams([(1, 1), (2, 7), (3, 7)]);
+        let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new()), (3, Vec::new())]);
+
+        push_under_attack_notice(&mut events, &teams, &fog, 1, 2, 160.0, 160.0);
+
+        assert!(has_under_attack_notice(&events, 2));
+        assert!(!has_under_attack_notice(&events, 3));
+        assert!(!has_under_attack_notice(&events, 1));
     }
 }

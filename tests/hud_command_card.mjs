@@ -96,6 +96,7 @@ function buttonSlots(card) {
     { commandId: "unit.move", slotIndex: 0, hotkey: "Q" },
     { commandId: "unit.holdPosition", slotIndex: 1, hotkey: "W" },
     { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
+    { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
     { commandId: "worker.buildMenu", slotIndex: 6, hotkey: "Z" },
   ]);
 
@@ -158,6 +159,30 @@ function buttonSlots(card) {
     label: "Smoke",
     enabled: true,
   }]);
+}
+
+{
+  const commandCar = {
+    id: 31,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0, remainingUses: null }],
+  };
+  const commandCarCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [commandCar],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.deepEqual(buttonSlots(commandCarCard), [
+    { commandId: "unit.move", slotIndex: 0, hotkey: "Q" },
+    { commandId: "unit.holdPosition", slotIndex: 1, hotkey: "W" },
+    { commandId: kriegsiaCommandId("ability", ABILITY.BREAKTHROUGH), slotIndex: 2, hotkey: "E" },
+    { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
+    { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
+  ]);
 }
 
 {

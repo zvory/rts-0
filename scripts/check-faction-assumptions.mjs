@@ -230,6 +230,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/entity/store.rs",
   "server/crates/sim/src/game/fog.rs",
   "server/crates/sim/src/game/invariants.rs",
+  // Lab API tests stage current catalog entities while runtime validation stays catalog-routed.
+  "server/crates/sim/src/game/lab.rs",
   "server/crates/sim/src/game/mod.rs",
   "server/crates/sim/src/game/mortar.rs",
   "server/crates/sim/src/game/player_state.rs",

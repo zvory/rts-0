@@ -46,7 +46,6 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tri-state-test-"));
     startInfo: {
       playerId: 1,
       spectator: false,
-      debugMode: false,
       tick: 0,
       map: { width: 1, height: 1, tileSize: 32, terrain: [0], resources: [] },
       players: [{ id: 1, name: "A", color: "#f00", startTileX: 0, startTileY: 0 }],

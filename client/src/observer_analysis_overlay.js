@@ -18,8 +18,8 @@ export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: "resources-lost", label: "Resources lost" },
 ]);
 
-export function shouldMountObserverAnalysisOverlay({ payload, replayViewer = false } = {}) {
-  return (!!replayViewer && !!payload?.replay) || (!!payload?.spectator && !payload?.replay);
+export function shouldMountObserverAnalysisOverlay({ capabilities } = {}) {
+  return capabilities?.diagnostics?.observerAnalysis === true;
 }
 
 export function createObserverAnalysisOverlayPreferences(storage = safeLocalStorage()) {

@@ -12,10 +12,11 @@ use std::collections::BTreeMap;
 
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
-    DebugPathPoint, DebugPathView, EntityView, Event, MapInfo, NoticeSeverity, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ReplayPlaybackState,
-    ReplayStartMetadata, ResourceDelta, ResourceNode, SmokeCloudView, Snapshot, SnapshotNetStatus,
-    StartPayload, TeamId, DEFAULT_FACTION_ID,
+    DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event, LabStartMetadata,
+    LabStartRole, LabVisionMode, MapInfo, MovementPathDiagnosticScope, NoticeSeverity,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
+    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomTimeState, SmokeCloudView, Snapshot,
+    SnapshotNetStatus, StartPayload, TeamId, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -176,19 +177,25 @@ pub enum ClientMessage {
     Ping { ts: f64 },
     /// Client-observed network/render health aggregate for server logs.
     NetReport { report: ClientNetReport },
-    /// Set replay/dev-watch playback speed multiplier. `0` pauses replay and dev-watch playback.
-    SetReplaySpeed { speed: f32 },
-    /// Advance a paused dev-watch room by one simulation tick. Ignored outside dev watch.
-    StepDevTick,
-    /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
-    SeekReplay {
+    /// Set room-controlled time speed. `0` pauses rooms whose clock supports pause.
+    SetRoomTimeSpeed { speed: f32 },
+    /// Advance room-controlled time by one simulation tick where the clock allows stepping.
+    StepRoomTime,
+    /// Rewind room-controlled time by `ticks_back` ticks where relative seek is allowed.
+    SeekRoomTime {
         #[serde(rename = "ticksBack")]
         ticks_back: u32,
     },
-    /// Seek a replay to an absolute simulation tick (replay rooms only; clamped to duration).
-    SeekReplayTo { tick: u32 },
+    /// Seek room-controlled time to an absolute simulation tick where absolute seek is allowed.
+    SeekRoomTimeTo { tick: u32 },
     /// Select which players' fog to use while viewing a replay. Per-viewer only.
     SetReplayVision { vision: ReplayVisionRequest },
+    /// Privileged lab request envelope. Only lab rooms route these requests.
+    Lab {
+        #[serde(rename = "requestId")]
+        request_id: u32,
+        op: LabClientOp,
+    },
     /// Request a new practice branch room from this replay room's current authoritative tick.
     RequestReplayBranch,
     /// Claim one original player seat in a replay branch staging room.
@@ -364,6 +371,118 @@ pub enum ReplayVisionRequest {
     Players { player_ids: Vec<u32> },
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum LabClientOp {
+    ExportScenario {
+        #[serde(default)]
+        name: Option<String>,
+    },
+    ImportScenario {
+        scenario: LabScenarioV1,
+    },
+    SpawnEntity {
+        owner: u32,
+        kind: String,
+        x: f32,
+        y: f32,
+        #[serde(default)]
+        completed: bool,
+    },
+    DeleteEntity {
+        entity_id: u32,
+    },
+    MoveEntity {
+        entity_id: u32,
+        x: f32,
+        y: f32,
+    },
+    SetEntityOwner {
+        entity_id: u32,
+        owner: u32,
+    },
+    SetPlayerResources {
+        player_id: u32,
+        steel: u32,
+        oil: u32,
+    },
+    SetCompletedResearch {
+        player_id: u32,
+        upgrade: String,
+        completed: bool,
+    },
+    SetVision {
+        vision: LabVisionMode,
+    },
+    IssueCommandAs {
+        player_id: u32,
+        cmd: Command,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioV1 {
+    pub schema_version: u32,
+    pub kind: String,
+    pub name: String,
+    pub seed: u32,
+    pub map: LabScenarioMap,
+    pub players: Vec<LabScenarioPlayer>,
+    pub entities: Vec<LabScenarioEntity>,
+    pub metadata: LabScenarioMetadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioMap {
+    pub name: String,
+    pub schema_version: u32,
+    pub content_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioPlayer {
+    pub id: u32,
+    pub team_id: u32,
+    pub faction_id: String,
+    pub name: String,
+    pub color: String,
+    pub is_ai: bool,
+    pub steel: u32,
+    pub oil: u32,
+    pub upgrades: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioEntity {
+    pub id: u32,
+    pub owner: u32,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    pub hp: u32,
+    pub completed: bool,
+    pub construction_progress: Option<u32>,
+    pub construction_total: Option<u32>,
+    pub resource_remaining: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioMetadata {
+    pub exported_tick: u32,
+    pub lab: LabScenarioLabMetadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioLabMetadata {
+    pub vision: LabVisionMode,
+}
+
 // ---------------------------------------------------------------------------
 // Server -> Client
 // ---------------------------------------------------------------------------
@@ -439,8 +558,8 @@ pub enum ServerMessage {
     Start(StartPayload),
     /// Per-player, fog-filtered world state.
     Snapshot(Snapshot),
-    /// Shared replay playback cursor/state. Sent reliably outside snapshot cadence.
-    ReplayState(ReplayPlaybackState),
+    /// Shared room-controlled time cursor/state. Sent reliably outside snapshot cadence.
+    RoomTimeState(RoomTimeState),
     /// Authoritative observer analysis data for replay viewers and live spectators. The wire tag
     /// remains `replayAnalysis` for compatibility while live delivery is gated by the room task.
     #[serde(rename = "replayAnalysis")]
@@ -465,6 +584,10 @@ pub enum ServerMessage {
         occupants: Vec<BranchStagingOccupant>,
         can_start: bool,
     },
+    /// Reliable lab control-plane state. World state still travels through `snapshot`.
+    LabState(LabState),
+    /// Reliable result for one lab request.
+    LabResult(LabResult),
     /// Server shutdown drain has started. Existing matches may continue until the deadline, but
     /// new match starts are disabled.
     ShutdownWarning {
@@ -485,6 +608,29 @@ pub enum ServerMessage {
     Error {
         msg: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabState {
+    pub room: String,
+    pub operator_id: u32,
+    pub role: LabStartRole,
+    pub vision: LabVisionMode,
+    pub dirty: bool,
+    pub operation_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabResult {
+    pub request_id: u32,
+    pub ok: bool,
+    pub op: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -836,11 +982,12 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("RETURN_TO_LOBBY", "returnToLobby"),
                 ("PING", "ping"),
                 ("NET_REPORT", "netReport"),
-                ("SET_REPLAY_SPEED", "setReplaySpeed"),
-                ("STEP_DEV_TICK", "stepDevTick"),
-                ("SEEK_REPLAY", "seekReplay"),
-                ("SEEK_REPLAY_TO", "seekReplayTo"),
+                ("SET_ROOM_TIME_SPEED", "setRoomTimeSpeed"),
+                ("STEP_ROOM_TIME", "stepRoomTime"),
+                ("SEEK_ROOM_TIME", "seekRoomTime"),
+                ("SEEK_ROOM_TIME_TO", "seekRoomTimeTo"),
                 ("SET_REPLAY_VISION", "setReplayVision"),
+                ("LAB", "lab"),
                 ("REQUEST_REPLAY_BRANCH", "requestReplayBranch"),
                 ("CLAIM_BRANCH_SEAT", "claimBranchSeat"),
                 ("RELEASE_BRANCH_SEAT", "releaseBranchSeat"),
@@ -853,11 +1000,13 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("MATCH_COUNTDOWN", "matchCountdown"),
                 ("START", "start"),
                 ("SNAPSHOT", "snapshot"),
-                ("REPLAY_STATE", "replayState"),
+                ("ROOM_TIME_STATE", "roomTimeState"),
                 ("REPLAY_ANALYSIS", "replayAnalysis"),
                 ("JOIN_REPLAY_PROMPT", "joinReplayPrompt"),
                 ("REPLAY_BRANCH_CREATED", "replayBranchCreated"),
                 ("BRANCH_STAGING", "branchStaging"),
+                ("LAB_STATE", "labState"),
+                ("LAB_RESULT", "labResult"),
                 ("SHUTDOWN_WARNING", "shutdownWarning"),
                 ("GAME_OVER", "gameOver"),
                 ("PONG", "pong"),
@@ -2056,12 +2205,12 @@ mod tests {
 
     #[test]
     fn seek_replay_to_deserializes_absolute_tick() {
-        let msg: ClientMessage = serde_json::from_str(r#"{"t":"seekReplayTo","tick":4100}"#)
-            .expect("seekReplayTo should deserialize");
+        let msg: ClientMessage = serde_json::from_str(r#"{"t":"seekRoomTimeTo","tick":4100}"#)
+            .expect("seekRoomTimeTo should deserialize");
 
         match msg {
-            ClientMessage::SeekReplayTo { tick } => assert_eq!(tick, 4_100),
-            other => panic!("expected seekReplayTo, got {other:?}"),
+            ClientMessage::SeekRoomTimeTo { tick } => assert_eq!(tick, 4_100),
+            other => panic!("expected seekRoomTimeTo, got {other:?}"),
         }
     }
 

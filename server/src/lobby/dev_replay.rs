@@ -1,9 +1,14 @@
-use super::room_task::{DevScenarioConfig, DevScenarioId, RoomMode};
+use super::room_task::{DevScenarioConfig, DevScenarioId, LabRoomConfig, RoomMode};
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
 use rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
+    if let Some(raw) = room.strip_prefix(LAB_ROOM_PREFIX) {
+        if let Some(config) = parse_lab_room(raw) {
+            return RoomMode::Lab(config);
+        }
+    }
     if let Some(artifact) = room.strip_prefix(REPLAY_ARTIFACT_ROOM_PREFIX) {
         return RoomMode::ReplayArtifact {
             artifact: artifact.to_string(),
@@ -33,6 +38,41 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
         }
     }
     RoomMode::Normal
+}
+
+fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
+    let mut parts = raw.split(':');
+    let public_id = parts.next()?.trim();
+    if !safe_lab_token(public_id, 40) {
+        return None;
+    }
+    let mut map_name = "Default".to_string();
+    let mut seed = None;
+    for part in parts {
+        if let Some(map) = part.strip_prefix("map=") {
+            if !safe_lab_token(map, 48) {
+                return None;
+            }
+            map_name = map.to_string();
+        } else if let Some(raw_seed) = part.strip_prefix("seed=") {
+            seed = Some(raw_seed.parse::<u32>().ok()?);
+        } else {
+            return None;
+        }
+    }
+    Some(LabRoomConfig {
+        public_id: public_id.to_string(),
+        map_name,
+        seed,
+    })
+}
+
+fn safe_lab_token(value: &str, max_len: usize) -> bool {
+    !value.is_empty()
+        && value.len() <= max_len
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 pub(super) fn match_seed() -> u32 {
@@ -118,6 +158,34 @@ mod tests {
             color: "#ffffff".to_string(),
             is_ai: false,
         }]
+    }
+
+    #[test]
+    fn room_mode_for_accepts_bounded_lab_room_config() {
+        match room_mode_for("__lab__:sandbox:map=low-econ:seed=12345") {
+            RoomMode::Lab(config) => {
+                assert_eq!(config.public_id, "sandbox");
+                assert_eq!(config.map_name, "low-econ");
+                assert_eq!(config.seed, Some(12345));
+            }
+            _ => panic!("safe lab room should parse as lab mode"),
+        }
+    }
+
+    #[test]
+    fn room_mode_for_rejects_unsafe_lab_room_config() {
+        assert!(matches!(
+            room_mode_for("__lab__:../../bad:map=Default"),
+            RoomMode::Normal
+        ));
+        assert!(matches!(
+            room_mode_for("__lab__:sandbox:map=Low Econ"),
+            RoomMode::Normal
+        ));
+        assert!(matches!(
+            room_mode_for("__lab__:sandbox:seed=not-a-number"),
+            RoomMode::Normal
+        ));
     }
 
     #[test]

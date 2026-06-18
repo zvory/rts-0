@@ -12,9 +12,12 @@ const AREA_BY_FILE = new Map(Object.entries({
   "app.js": "app-shell",
   "match.js": "app-shell",
   "match_health.js": "app-shell",
+  "frame_recovery.js": "app-shell",
   "observer_analysis_overlay.js": "app-shell",
   "replay_controls.js": "app-shell",
   "replay_viewer.js": "app-shell",
+  "lab_control_policy.js": "app-shell",
+  "room_capabilities.js": "app-shell",
 
   "state.js": "model",
   "client_intent.js": "model",
@@ -28,11 +31,14 @@ const AREA_BY_FILE = new Map(Object.entries({
 
   "net.js": "transport",
   "protocol.js": "transport",
+  "lab_client.js": "transport",
 
   "config.js": "rules-mirror",
 
   "hud.js": "ui",
   "hud_command_card.js": "ui",
+  "hud_selection_panel.js": "ui",
+  "hud_unit_commands.js": "ui",
   "hotkey_editor.js": "ui",
   "hotkey_profiles.js": "ui",
   "lobby.js": "ui",
@@ -42,6 +48,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "status_badge.js": "ui",
   "minimap.js": "ui",
   "branch_staging.js": "ui",
+  "lab_panel.js": "ui",
   "settings_container.js": "ui",
   "settings_panels.js": "ui",
   "scoreboard.js": "ui",
@@ -68,22 +75,29 @@ const ALLOWED_PROTOTYPE_GRAFTS = new Set([
   "renderer/index.js:Renderer",
 ]);
 
+const FORBIDDEN_MATCH_LAB_IMPORTS = new Set([
+  "lab_client.js",
+  "lab_panel.js",
+]);
+
 // Phase 6 client-boundary ratchet: these are the cleanup-phase byte counts for
 // the largest modules. Future growth should either extract a focused helper or
 // update this table with the phase-specific reason.
 const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Tank Trap Phase 5 extends placement feedback to draw multi-site line previews.
   "renderer/feedback.js": 46315,
-  // Hold Position adds a distinct command-card intent dispatch while preserving legacy Stop.
-  "hud.js": 44080,
-  "state.js": 38576,
+  // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
+  "hud.js": 44208,
+  // Room2 Phase 4 adds recipient diagnostic affordance parsing to GameState.
+  "state.js": 39267,
   // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
   "input/index.js": 38854,
-  "match.js": 38289,
-  // Hold Position adds the mirrored holdPosition command discriminator/builder.
-  "protocol.js": 36084,
-  // Hold Position moves the unit hold button to the W grid slot with a distinct command id.
-  "hud_command_card.js": 29393,
+  // Room2 Phase 3 renames replay/dev time wiring to neutral room-time handlers.
+  "match.js": 38818,
+  // Room2 Phase 4 mirrors start-payload diagnostic capability constants.
+  "protocol.js": 38269,
+  // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
+  "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,
   "observer_analysis_overlay.js": 27903,
   "audio.js": 27339,
@@ -249,6 +263,11 @@ function resolveImport(fromFile, specifier) {
 }
 
 function checkImport(fromFile, toFile) {
+  if (fromFile === "match.js" && FORBIDDEN_MATCH_LAB_IMPORTS.has(toFile)) {
+    failures.push(`${fromFile} -> ${toFile}: Match must receive lab UI/services through app-shell dependency injection`);
+    return;
+  }
+
   const from = modules.get(fromFile);
   const to = modules.get(toFile);
   if (!from?.area || !to?.area) return;

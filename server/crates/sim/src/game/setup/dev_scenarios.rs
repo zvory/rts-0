@@ -471,7 +471,6 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
         })
         .collect();
     game.map_metadata = super::dev_map_metadata(metadata_name);
-    game.debug_path_overlays = true;
     game.active_construction_sites.clear();
     game.starting_loadout = StartingLoadout::DebugHuman;
     game.rng = rng;

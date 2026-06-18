@@ -21,6 +21,7 @@ pub mod entity;
 pub(crate) mod fog;
 mod hero_abilities;
 mod invariants;
+pub mod lab;
 pub mod map;
 mod mortar;
 mod pathfinding;
@@ -86,6 +87,25 @@ pub struct PlayerStartingLoadout {
     pub loadout_id: String,
     pub starting_steel: u32,
     pub starting_oil: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SnapshotOptions {
+    pub include_movement_paths: bool,
+    pub movement_paths_for_all_projected: bool,
+}
+
+impl SnapshotOptions {
+    fn debug_path_projection(self) -> projection::DebugPathProjection {
+        match (
+            self.include_movement_paths,
+            self.movement_paths_for_all_projected,
+        ) {
+            (false, _) => projection::DebugPathProjection::None,
+            (true, false) => projection::DebugPathProjection::OwnerOnly,
+            (true, true) => projection::DebugPathProjection::AllProjected,
+        }
+    }
 }
 
 /// Per-player economy and bookkeeping carried for the whole match. Visible to `systems` (the
@@ -160,9 +180,6 @@ pub struct Game {
     starting_loadouts: Vec<PlayerStartingLoadout>,
     /// Stable authored map identity used by replay artifacts.
     map_metadata: MapMetadata,
-    /// True for lobby "Debug mode" matches; enables owner-only movement path diagnostics in
-    /// snapshots even when the server binary is built in release mode.
-    debug_path_overlays: bool,
     /// Under-construction building ids that received authoritative build progress this tick.
     active_construction_sites: BTreeSet<u32>,
     starting_loadout: StartingLoadout,

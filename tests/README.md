@@ -19,8 +19,9 @@ fall back to the full gate. The CI
 Rust/architecture job installs `cargo-nextest` and invokes `tests/run-all.sh --only-rust`, so the
 required Rust path is the same nextest-backed runner developers use locally.
 Run `./scripts/install-hooks.sh` once per
-checkout to install the tracked hooks locally; those hooks run cheap staged-diff checks instead of
-the full suite. Normal `main` updates go through owned PRs with auto-merge armed.
+checkout to install the tracked hooks locally; those hooks run cheap staged-diff checks and
+`node scripts/check-docs-health.mjs` instead of the full suite. Normal `main` updates go through
+owned PRs with auto-merge armed.
 The `Main test gate` workflow cancels superseded runs for the same PR and cancels stale post-merge
 `main` push runs when a newer `main` push starts. Canceled stale `main` runs do not trigger beta
 deploys; only a successful push run for `main` can do that.

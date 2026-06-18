@@ -1487,7 +1487,7 @@ fn artillery_point_fire_queue_is_terminal() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(22, 10);
+    let target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -1529,7 +1529,7 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(22, 10);
+    let target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -1614,7 +1614,7 @@ fn packed_artillery_point_fire_does_not_auto_setup_or_fire() {
     let mut game = empty_flat_game(&players);
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
-    let target = game.map.tile_center(22, 10);
+    let target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -1652,7 +1652,7 @@ fn manually_deployed_artillery_can_point_fire() {
     let initial_steel = game.players[0].steel;
     let pos = game.map.tile_center(10, 10);
     let setup_target = game.map.tile_center(18, 10);
-    let fire_target = game.map.tile_center(22, 10);
+    let fire_target = game.map.tile_center(26, 10);
     let artillery = game
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -4156,9 +4156,18 @@ fn normal_move_then_queued_move_snapshot_shows_active_and_future_waypoints() {
 }
 
 #[test]
-fn lobby_debug_mode_snapshot_shows_runtime_movement_debug_path() {
-    for (lobby_debug, expected_debug_path) in [(false, false), (true, true)] {
-        let (mut game, unit, first, _, _) = queued_move_fixture_with_lobby_debug(lobby_debug);
+fn snapshot_options_control_runtime_movement_debug_path() {
+    for (options, expected_debug_path) in [
+        (SnapshotOptions::default(), false),
+        (
+            SnapshotOptions {
+                include_movement_paths: true,
+                movement_paths_for_all_projected: false,
+            },
+            true,
+        ),
+    ] {
+        let (mut game, unit, first, _, _) = queued_move_fixture_with_lobby_debug(true);
 
         game.enqueue(
             1,
@@ -4172,7 +4181,7 @@ fn lobby_debug_mode_snapshot_shows_runtime_movement_debug_path() {
         game.tick();
 
         let view = game
-            .snapshot_for(1)
+            .snapshot_for_with_options(1, options)
             .entities
             .into_iter()
             .find(|entity| entity.id == unit)
@@ -4180,7 +4189,7 @@ fn lobby_debug_mode_snapshot_shows_runtime_movement_debug_path() {
         assert_eq!(
             view.debug_path.is_some(),
             expected_debug_path,
-            "debug path visibility should follow lobby Debug mode"
+            "debug path visibility should follow neutral snapshot options"
         );
         if let Some(debug_path) = view.debug_path {
             assert_eq!(
@@ -4211,7 +4220,13 @@ fn dev_scenario_snapshot_shows_runtime_movement_debug_path() {
     game.tick();
 
     let view = game
-        .snapshot_for(setup.player_id)
+        .snapshot_full_for_with_options(
+            setup.player_id,
+            SnapshotOptions {
+                include_movement_paths: true,
+                movement_paths_for_all_projected: true,
+            },
+        )
         .entities
         .into_iter()
         .find(|entity| entity.id == unit)
@@ -4269,9 +4284,13 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
         },
     );
     game.tick();
+    let debug_options = SnapshotOptions {
+        include_movement_paths: true,
+        movement_paths_for_all_projected: false,
+    };
     for unit in command_units {
         let view = game
-            .snapshot_for(setup.player_id)
+            .snapshot_for_with_options(setup.player_id, debug_options)
             .entities
             .into_iter()
             .find(|entity| entity.id == unit)

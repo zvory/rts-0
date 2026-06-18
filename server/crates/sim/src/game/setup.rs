@@ -246,7 +246,7 @@ impl Game {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn new_inner_with_map(
+    pub(super) fn new_inner_with_map(
         players: &[PlayerInit],
         resource_override: Option<(u32, u32)>,
         seed: u32,
@@ -372,7 +372,6 @@ impl Game {
             seed,
             starting_loadouts: resolved_starting_loadouts,
             map_metadata,
-            debug_path_overlays: starting_loadout == StartingLoadout::DebugHuman,
             active_construction_sites: BTreeSet::new(),
             starting_loadout,
             rng,
@@ -425,8 +424,9 @@ impl Game {
             spectator: false,
             prediction_build_id: None,
             prediction_version: 0,
-            debug_mode: self.debug_path_overlays,
+            diagnostics: Default::default(),
             replay: None,
+            lab: None,
             tick: self.tick,
             map,
             players,
