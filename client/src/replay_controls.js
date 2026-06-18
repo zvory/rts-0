@@ -2,12 +2,13 @@ import { dom } from "./bootstrap.js";
 import { REPLAY_VISION } from "./protocol.js";
 
 export class ReplayControls {
-  constructor({ net, state, replayViewer = false, isReplay = false, isScenario = false }) {
+  constructor({ net, state, replayViewer = false, capabilities = null }) {
     this.net = net;
     this.state = state;
     this.replayViewer = !!replayViewer;
-    this.isReplay = !!isReplay;
-    this.isScenario = !!isScenario;
+    this.capabilities = capabilities || {};
+    this.roomTime = this.capabilities.roomTime || {};
+    this.visibility = this.capabilities.visibility || {};
     this.replayVisionSelection = new Set();
     this.roomTimeState = null;
     this.replaySeekPending = false;
@@ -15,32 +16,32 @@ export class ReplayControls {
     this.replaySpeedHandler = null;
     this.lastReplaySpeed = 2;
 
-    if (!dom.replaySpeed || (!this.isReplay && !this.isScenario)) return;
+    if (!dom.replaySpeed || !this.roomTime.available) return;
 
     dom.replaySpeed.hidden = false;
     dom.replaySpeed.classList.toggle("replay-viewer-controls", this.replayViewer);
     for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) {
-      btn.hidden = this.isScenario;
+      btn.hidden = !this.roomTime.seekRelative;
     }
     for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
-      btn.hidden = !this.isScenario;
+      btn.hidden = !this.roomTime.step;
     }
     this.replaySpeedHandler = (e) => this.onReplaySpeedClick(e);
     dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
     this.setRoomTimeSpeedActive(this.replayViewer ? 2 : null);
-    if (this.replayViewer) this.buildReplayVisionControls();
+    if (this.visibility.replayVision) this.buildReplayVisionControls();
   }
 
   onReplaySpeedClick(e) {
     const btn = e.target.closest(".spd-btn");
     if (!btn) return;
     if (btn.dataset.stepRoomTime !== undefined) {
-      if (!this.isScenario) return;
+      if (!this.roomTime.step) return;
       this.net.stepRoomTime();
       return;
     }
     if (btn.dataset.seekBack !== undefined) {
-      if (!this.isReplay) return;
+      if (!this.roomTime.seekRelative) return;
       const ticksBack = parseInt(btn.dataset.seekBack, 10);
       if (!isFinite(ticksBack) || ticksBack <= 0) return;
       this.setReplayConcluded(false);
@@ -50,7 +51,7 @@ export class ReplayControls {
       return;
     }
     if (btn.dataset.replayPauseToggle !== undefined) {
-      if (!this.isReplay) return;
+      if (!this.roomTime.pause) return;
       const speed = this.isReplayPaused() ? this.lastReplaySpeed : 0;
       this.net.setRoomTimeSpeed(speed);
       this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
@@ -61,10 +62,10 @@ export class ReplayControls {
     }
     const speed = parseFloat(btn.dataset.speed);
     if (!isFinite(speed)) return;
-    if (speed === 0 && !this.isScenario) return;
-    if (this.isReplay && speed > 0) this.lastReplaySpeed = speed;
+    if (speed === 0 && !this.roomTime.pause) return;
+    if (speed > 0) this.lastReplaySpeed = speed;
     this.net.setRoomTimeSpeed(speed);
-    if (this.isReplay) this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
+    this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
     this.setRoomTimeSpeedActive(speed);
     this.updateReplayPauseButton();
     this.updateReplayStatus();
@@ -209,6 +210,7 @@ export class ReplayControls {
   }
 
   onReplayTimelineClick(ev) {
+    if (!this.roomTime.seekAbsolute) return;
     const track = ev.currentTarget;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
     if (!track || duration <= 0) return;

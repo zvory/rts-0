@@ -144,6 +144,7 @@ import {
   createObserverAnalysisOverlayPreferences,
   shouldMountObserverAnalysisOverlay,
 } from "../client/src/observer_analysis_overlay.js";
+import { createRoomCapabilities } from "../client/src/room_capabilities.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -2658,8 +2659,12 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     net: replayNet,
     state: roomTimeState,
     replayViewer: true,
-    isReplay: true,
-    isScenario: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        replay: { durationTicks: 1_000 },
+      },
+      replayViewer: true,
+    }),
   });
   assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
   assert(replayControls.classList.contains("replay-viewer-controls"), "replay viewer controls keep wrapper class");
@@ -2745,8 +2750,10 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     net: replayNet,
     state: roomTimeState,
     replayViewer: false,
-    isReplay: false,
-    isScenario: true,
+    capabilities: createRoomCapabilities({
+      startPayload: { spectator: true },
+      devWatch: { kind: "scenario" },
+    }),
   });
   assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
   assert(!scenarioStep.hidden, "scenario mode shows step controls");
@@ -2755,6 +2762,36 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   scenarioControls._listeners.get("click")({ target: scenarioSpeed0 });
   assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
   scenarioUi.destroy();
+
+  const noCapabilityControls = fakeEl("div");
+  dom.replaySpeed = noCapabilityControls;
+  const noCapabilityUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: true,
+    capabilities: createRoomCapabilities({ startPayload: { spectator: true }, replayViewer: true }),
+  });
+  assert(!noCapabilityControls._listeners.has("click"), "room-time controls need an advertised capability");
+  assert(
+    !noCapabilityControls.querySelector(".replay-vision-controls"),
+    "replay identity alone does not build replay vision controls",
+  );
+  noCapabilityUi.destroy();
+
+  const normalCapabilities = createRoomCapabilities({
+    startPayload: { spectator: false },
+  });
+  assert(!normalCapabilities.roomTime.available, "normal matches do not mount room-time controls");
+  assert(normalCapabilities.commands.gameplay, "active players keep gameplay command affordances");
+
+  const spectatorCapabilities = createRoomCapabilities({
+    startPayload: { spectator: true, diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL } },
+  });
+  assert(!spectatorCapabilities.commands.gameplay, "spectators get read-only command affordances");
+  assert(
+    spectatorCapabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.ALL,
+    "capability parser keeps diagnostic affordances from the start payload",
+  );
 
   const noticeAudioMatch = Object.create(Match.prototype);
   const playedNotices = [];
@@ -7055,29 +7092,35 @@ withFakeDocument(() => {
 
   assert(
     shouldMountObserverAnalysisOverlay({
-      payload: { replay: true, spectator: true, diagnostics: { observerAnalysis: true } },
-      replayViewer: true,
+      capabilities: createRoomCapabilities({
+        startPayload: { replay: {}, spectator: true, diagnostics: { observerAnalysis: true } },
+        replayViewer: true,
+      }),
     }),
     "observer analysis mounts when the start payload advertises it for replay viewers",
   );
   assert(
     shouldMountObserverAnalysisOverlay({
-      payload: { spectator: true, diagnostics: { observerAnalysis: true } },
-      replayViewer: false,
+      capabilities: createRoomCapabilities({
+        startPayload: { spectator: true, diagnostics: { observerAnalysis: true } },
+      }),
     }),
     "observer analysis mounts when the start payload advertises it for live spectators",
   );
   assert(
     !shouldMountObserverAnalysisOverlay({
-      payload: { spectator: false, diagnostics: { observerAnalysis: false } },
-      replayViewer: false,
+      capabilities: createRoomCapabilities({
+        startPayload: { spectator: false, diagnostics: { observerAnalysis: false } },
+      }),
     }),
     "observer analysis stays hidden without diagnostic metadata",
   );
   assert(
     !shouldMountObserverAnalysisOverlay({
-      payload: { replay: true, spectator: true },
-      replayViewer: true,
+      capabilities: createRoomCapabilities({
+        startPayload: { replay: {}, spectator: true },
+        replayViewer: true,
+      }),
     }),
     "observer analysis does not mount from replay identity alone",
   );

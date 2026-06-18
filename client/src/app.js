@@ -30,6 +30,7 @@ import { MatchHistory } from "./match_history.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { createObserverAnalysisOverlayPreferences } from "./observer_analysis_overlay.js";
 import { ReplayViewer } from "./replay_viewer.js";
+import { createRoomCapabilities } from "./room_capabilities.js";
 import { formatTeamLabel, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
 import {
@@ -258,6 +259,11 @@ export class App {
     });
     const startsReplay = !!payload?.replay;
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
+    const capabilities = createRoomCapabilities({
+      startPayload: payload,
+      devWatch: this.devWatch,
+      replayViewer: startsReplay,
+    });
 
     const carriedCamera = this.takeMatchCameraView() || this.pendingCameraView;
     this.pendingCameraView = null;
@@ -304,6 +310,7 @@ export class App {
         predictionEnabled: this.predictionEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
+        capabilities,
         labMetadata,
         labClient: this.labClient,
         labControlPolicy: this.labControlPolicy,
