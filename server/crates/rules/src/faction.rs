@@ -215,7 +215,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         title: "Target mortar fire",
         carriers: &[EntityKind::MortarTeam],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(9),
+        range_tiles: Some(balance::MORTAR_RANGE_TILES),
         min_range_tiles: None,
         cooldown_ticks: (balance::TICK_HZ as u16) * 2,
         charges: None,
