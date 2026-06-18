@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -50,12 +50,12 @@ must be a first-class policy axis rather than a side effect of authority, vision
 
 ## Implementation Checklist
 
-- [ ] Add or rename policy types for the full capability bundle.
-- [ ] Add a first-class mutation capability with tests for every current room path.
-- [ ] Move low-risk room-task decisions to policy reads.
-- [ ] Document which product-mode checks intentionally remain at setup/routing edges.
-- [ ] Update source-of-truth docs if policy names or responsibilities change.
-- [ ] Mark this phase as done in this file.
+- [x] Add or rename policy types for the full capability bundle.
+- [x] Add a first-class mutation capability with tests for every current room path.
+- [x] Move low-risk room-task decisions to policy reads.
+- [x] Document which product-mode checks intentionally remain at setup/routing edges.
+- [x] Update source-of-truth docs if policy names or responsibilities change.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

@@ -269,18 +269,21 @@ AI controllers, or Tokio coordination into `rts-sim`:
   transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
   `Game`.
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
-  names the state source, join, clock, authority, vision, mutation, persistence, and start-payload
-  choices used by the rest of the lobby helpers.
+  names the state source, join, clock, authority, mutation, visibility, diagnostics,
+  persistence/export, start-payload, and UI-affordance choices used by the rest of the lobby
+  helpers. Product identity still selects real setup paths such as replay-artifact loading, dev
+  scenario construction, replay-branch seeding, and lab room initialization; lower-level helpers
+  should consume the explicit policy fields when the behavior is shared.
 - `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
   human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
   aliases, and command issuer resolution.
 - `tick_control.rs` maps the session clock policy, replay pause/speed, dev-watch pause state, and
   countdown state to the room ticker interval and scheduled action. `RoomTask` still owns the Tokio
   interval and remains the only task that advances a room.
-- `projection.rs` owns snapshot projection decisions for client fanout. Live active players get
-  player fog, live spectators get active-seat union fog, replay viewers get their per-viewer replay
-  vision, branch-live active players use original-seat aliases, and dev-watch viewers get
-  full-world scenario snapshots.
+- `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
+  active players get player fog, live spectators get active-seat union fog, replay viewers get their
+  per-viewer replay vision, branch-live active players use original-seat aliases, and dev-watch
+  viewers get full-world scenario snapshots.
 - `launch.rs` owns common `StartPayload` stamping for live, replay-branch-live, and dev-watch
   starts: player id, spectator flag, prediction build/version, pending snapshot clearing, and the
   send loop. Replay viewer payloads remain in `replay_session.rs` because they also carry replay

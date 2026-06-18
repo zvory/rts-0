@@ -706,7 +706,8 @@ impl RoomTask {
     }
 
     fn projection_policy(&self) -> ProjectionPolicy {
-        ProjectionPolicy::new(self.session_policy().vision)
+        let policy = self.session_policy();
+        ProjectionPolicy::new(policy.visibility, policy.diagnostics)
     }
 
     fn is_dev_watch(&self) -> bool {
@@ -714,8 +715,10 @@ impl RoomTask {
     }
 
     fn should_persist_match_history(&self) -> bool {
+        let match_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
         self.match_player_count >= 1
-            && self.session_policy().allows_match_history()
+            && match_policy.has_authoritative_mutation()
+            && match_policy.allows_match_history()
             && !is_automated_match_history_room(&self.room)
             && !match_history_participants_are_automated(&self.match_participants)
     }
@@ -867,7 +870,7 @@ impl RoomTask {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
-        if policy.uses_branch_staging_join() {
+        if policy.uses_branch_room_join() {
             self.on_join_branch_staging(player_id, name, msg_tx, ack);
             return;
         }
