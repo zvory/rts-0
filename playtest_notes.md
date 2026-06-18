@@ -1,3 +1,15 @@
+add an option to see movement waypoints the debug setting while in replays
+
+
+workers building tank traps should take damage if their tank trap is attacked? or, workers hould take attack priority from tank traps? idk, for some reason workers building tank traps seem invulnerable, so tank traps should not block shots like buildings do.
+
+increase AT gun field of fire by 5 degrees
+
+
+when machine gunner spawns, and if it doesn't move, it doesn't seem to attack units that come near it, like maybe it's not setting up or its otherwise stuck
+
+in 2v2, you should not get alerts or sound alerts if your teammate is e.g. under attack
+
 
 the vehicle works should take way longer to build or take longer, or need something more
 
