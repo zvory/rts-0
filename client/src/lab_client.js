@@ -41,6 +41,30 @@ export class LabClient {
     return this.request({ op: "setVision", vision });
   }
 
+  spawnEntity({ owner, kind, x, y, completed = true }) {
+    return this.request({ op: "spawnEntity", owner, kind, x, y, completed: !!completed });
+  }
+
+  deleteEntity(entityId) {
+    return this.request({ op: "deleteEntity", entityId });
+  }
+
+  moveEntity(entityId, x, y) {
+    return this.request({ op: "moveEntity", entityId, x, y });
+  }
+
+  setEntityOwner(entityId, owner) {
+    return this.request({ op: "setEntityOwner", entityId, owner });
+  }
+
+  setPlayerResources(playerId, steel, oil) {
+    return this.request({ op: "setPlayerResources", playerId, steel, oil });
+  }
+
+  setCompletedResearch(playerId, upgrade, completed) {
+    return this.request({ op: "setCompletedResearch", playerId, upgrade, completed: !!completed });
+  }
+
   request(op, { timeoutMs = this.timeoutMs } = {}) {
     const requestId = this.allocateRequestId();
     const opName = typeof op?.op === "string" ? op.op : "unknown";

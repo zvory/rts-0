@@ -1,4 +1,5 @@
 import { LAB_ROLE, msg } from "./protocol.js";
+import { STATS, UPGRADES } from "./config.js";
 
 const labVision = Object.freeze({
   fullWorld: () => msg.labVisionFullWorld(),
@@ -7,14 +8,16 @@ const labVision = Object.freeze({
 });
 
 export class LabPanel {
-  constructor({ root, labClient, launch = null, startPayload = null }) {
+  constructor({ root, labClient, launch = null, startPayload = null, match = null }) {
     this.root = root;
     this.labClient = labClient;
     this.launch = launch;
     this.startPayload = startPayload;
+    this.match = match;
     this.state = labClient?.state || startPayload?.lab || null;
     this.lastResult = labClient?.lastResult || null;
     this.teamInputs = new Map();
+    this.fields = new Map();
     this.listeners = [];
     this.unsubscribeState = null;
     this.unsubscribeResult = null;
@@ -37,6 +40,7 @@ export class LabPanel {
   render() {
     this.removeListeners();
     this.teamInputs.clear();
+    this.fields.clear();
     this.el.replaceChildren();
 
     const header = document.createElement("header");
@@ -89,6 +93,10 @@ export class LabPanel {
     }
     this.el.appendChild(controls);
 
+    if (this.canOperate()) {
+      this.el.appendChild(this.renderSetupTools());
+    }
+
     const result = document.createElement("p");
     result.className = "lab-result";
     if (this.lastResult) {
@@ -101,6 +109,58 @@ export class LabPanel {
       result.dataset.state = "idle";
     }
     this.el.appendChild(result);
+  }
+
+  renderSetupTools() {
+    const root = document.createElement("section");
+    root.className = "lab-tools";
+    root.setAttribute("aria-label", "Lab setup tools");
+
+    const selection = this.selectedEntities();
+    const selectedIds = selection.map((entity) => entity.id);
+    const issueOwner = singleOwner(selection);
+    const point = this.defaultWorldPoint();
+
+    root.appendChild(this.fieldset("Spawn", [
+      this.selectField("spawn-kind", "Kind", spawnKinds(), KIND_LABELS),
+      this.playerSelectField("spawn-owner", "Owner"),
+      this.numberField("spawn-x", "X", point.x),
+      this.numberField("spawn-y", "Y", point.y),
+      this.checkboxField("spawn-completed", "Complete", true),
+      this.button("Spawn", () => this.spawnEntity()),
+    ]));
+
+    root.appendChild(this.fieldset("Selected", [
+      this.readout(`${selectedIds.length} selected`),
+      this.numberField("move-x", "X", point.x),
+      this.numberField("move-y", "Y", point.y),
+      this.button("Move", () => this.batchSelected((entity) => this.labClient.moveEntity(entity.id, this.num("move-x"), this.num("move-y")))),
+      this.playerSelectField("set-owner", "Owner"),
+      this.button("Set owner", () => this.batchSelected((entity) => this.labClient.setEntityOwner(entity.id, this.int("set-owner")))),
+      this.button("Delete", () => this.batchSelected((entity) => this.labClient.deleteEntity(entity.id))),
+      this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
+    ]));
+
+    root.appendChild(this.fieldset("Player State", [
+      this.playerSelectField("resource-player", "Player"),
+      this.numberField("resource-steel", "Steel", this.resourcesForFirstPlayer().steel),
+      this.numberField("resource-oil", "Oil", this.resourcesForFirstPlayer().oil),
+      this.button("Set resources", () => this.labClient.setPlayerResources(
+        this.int("resource-player"),
+        this.uint("resource-steel"),
+        this.uint("resource-oil"),
+      )),
+      this.playerSelectField("research-player", "Player"),
+      this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels()),
+      this.checkboxField("research-completed", "Complete", true),
+      this.button("Set research", () => this.labClient.setCompletedResearch(
+        this.int("research-player"),
+        this.value("research-upgrade"),
+        this.bool("research-completed"),
+      )),
+    ]));
+
+    return root;
   }
 
   addStatus(root, label, value) {
@@ -121,6 +181,149 @@ export class LabPanel {
     button.addEventListener("click", onClick);
     this.listeners.push([button, "click", onClick]);
     return button;
+  }
+
+  fieldset(title, children) {
+    const section = document.createElement("section");
+    section.className = "lab-tool-group";
+    const h = document.createElement("h3");
+    h.textContent = title;
+    section.appendChild(h);
+    for (const child of children) section.appendChild(child);
+    return section;
+  }
+
+  readout(text) {
+    const node = document.createElement("p");
+    node.className = "lab-readout";
+    node.textContent = text;
+    return node;
+  }
+
+  numberField(id, label, value) {
+    const wrap = this.inputField(id, label, "number", value);
+    const input = this.fields.get(id);
+    input.step = "1";
+    return wrap;
+  }
+
+  checkboxField(id, label, checked) {
+    const wrap = this.fieldWrap(label);
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = !!checked;
+    this.fields.set(id, input);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  inputField(id, label, type, value) {
+    const wrap = this.fieldWrap(label);
+    const input = document.createElement("input");
+    input.type = type;
+    input.value = String(value ?? "");
+    this.fields.set(id, input);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  selectField(id, label, values, labels = {}) {
+    const wrap = this.fieldWrap(label);
+    const select = document.createElement("select");
+    for (const value of values) {
+      const option = document.createElement("option");
+      option.value = String(value);
+      option.textContent = labels[value] || String(value);
+      select.appendChild(option);
+    }
+    this.fields.set(id, select);
+    wrap.appendChild(select);
+    return wrap;
+  }
+
+  playerSelectField(id, label) {
+    const labels = {};
+    const values = this.players().map((player) => {
+      labels[player.id] = player.name ? `P${player.id} ${player.name}` : `P${player.id}`;
+      return player.id;
+    });
+    return this.selectField(id, label, values, labels);
+  }
+
+  fieldWrap(labelText) {
+    const label = document.createElement("label");
+    label.className = "lab-field";
+    const span = document.createElement("span");
+    span.textContent = labelText;
+    label.appendChild(span);
+    return label;
+  }
+
+  spawnEntity() {
+    return this.labClient.spawnEntity({
+      kind: this.value("spawn-kind"),
+      owner: this.int("spawn-owner"),
+      x: this.num("spawn-x"),
+      y: this.num("spawn-y"),
+      completed: this.bool("spawn-completed"),
+    });
+  }
+
+  batchSelected(request) {
+    const selected = this.selectedEntities();
+    if (selected.length === 0) return Promise.resolve(null);
+    return selected.reduce(
+      (chain, entity) => chain.then(() => request(entity)),
+      Promise.resolve(null),
+    );
+  }
+
+  selectedEntities() {
+    return typeof this.match?.state?.selectedEntities === "function"
+      ? this.match.state.selectedEntities()
+      : [];
+  }
+
+  defaultWorldPoint() {
+    const camera = this.match?.camera;
+    const map = this.match?.state?.map;
+    if (camera && Number.isFinite(camera.x) && Number.isFinite(camera.y)) {
+      return { x: Math.round(camera.x), y: Math.round(camera.y) };
+    }
+    return {
+      x: Math.round((map?.width || 1024) / 2),
+      y: Math.round((map?.height || 1024) / 2),
+    };
+  }
+
+  resourcesForFirstPlayer() {
+    const first = this.match?.state?.playerResources?.[0] || null;
+    return { steel: first?.steel ?? 0, oil: first?.oil ?? 0 };
+  }
+
+  value(id) {
+    return this.fields.get(id)?.value ?? "";
+  }
+
+  num(id) {
+    const value = Number(this.value(id));
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  int(id) {
+    return Math.trunc(this.num(id));
+  }
+
+  uint(id) {
+    return Math.max(0, this.int(id));
+  }
+
+  bool(id) {
+    return !!this.fields.get(id)?.checked;
+  }
+
+  canOperate() {
+    return this.state?.role === LAB_ROLE.OPERATOR;
   }
 
   requestVision(vision) {
@@ -152,6 +355,10 @@ export class LabPanel {
     return Array.from(ids).sort((a, b) => a - b);
   }
 
+  players() {
+    return (this.startPayload?.players || []).filter((player) => Number.isFinite(Number(player?.id)));
+  }
+
   visionIncludesTeam(teamId) {
     const vision = this.state?.vision;
     if (vision?.mode === "team") return Number(vision.teamId) === teamId;
@@ -172,6 +379,25 @@ export class LabPanel {
     this.removeListeners();
     this.el.remove();
   }
+}
+
+const KIND_LABELS = Object.fromEntries(
+  Object.entries(STATS).map(([kind, st]) => [kind, st.label || kind]),
+);
+
+function spawnKinds() {
+  return Object.keys(STATS).filter((kind) => STATS[kind]?.cost || STATS[kind]?.trains);
+}
+
+function upgradeLabels() {
+  return Object.fromEntries(
+    Object.entries(UPGRADES).map(([upgrade, def]) => [upgrade, def.label || upgrade]),
+  );
+}
+
+function singleOwner(selection) {
+  const owners = new Set((selection || []).map((entity) => Number(entity.owner)).filter((owner) => owner > 0));
+  return owners.size === 1 ? Array.from(owners)[0] : null;
 }
 
 function roleLabel(role) {

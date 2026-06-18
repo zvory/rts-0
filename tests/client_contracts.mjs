@@ -3382,13 +3382,36 @@ function fakeAudioContext() {
   net._emit("labResult", { t: "labResult", requestId: 1, ok: true, op: "setVision" });
   const result = await resultPromise;
   assert(result.ok && observedResult.ok, "LabClient resolves matching labResult messages");
+  void labClient.spawnEntity({ owner: 2, kind: KIND.RIFLEMAN, x: 128, y: 160, completed: true });
+  assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.kind === KIND.RIFLEMAN, "LabClient sends spawn operations");
+  void labClient.setCompletedResearch(1, UPGRADE.TANK_UNLOCK, true);
+  assert(sent.at(-1).op.op === "setCompletedResearch" && sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK, "LabClient sends research operations");
   assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
   labClient.destroy();
 }
 
 {
-  const policy = createLabControlPolicy({ metadata: { role: "operator" } });
+  const requests = [];
+  const policy = createLabControlPolicy({
+    labClient: { request: (op) => { requests.push(op); return Promise.resolve({ ok: true }); } },
+    metadata: { role: "operator" },
+  });
   assert(policy.kind === "lab" && policy.canIssueAs(1), "lab control policy gates issue-as to operator");
+  const state = {
+    selectedEntities() {
+      return [{ id: 11, owner: 2, kind: KIND.RIFLEMAN }];
+    },
+  };
+  assert(policy.canControlOwner(2, state), "lab control policy controls a single selected owner");
+  assert(!policy.canControlOwner(1, state), "lab control policy rejects non-selected owners");
+  const issued = await policy.issueCommand(cmd.move([11], 20, 30), { state });
+  assert(issued.sent && requests[0].playerId === 2, "lab control policy routes gameplay commands through issue-as");
+  const mixedState = {
+    selectedEntities() {
+      return [{ id: 11, owner: 1, kind: KIND.RIFLEMAN }, { id: 12, owner: 2, kind: KIND.RIFLEMAN }];
+    },
+  };
+  assert(!policy.canIssueGameplayCommand(cmd.stop([11, 12]), mixedState).ok, "lab policy rejects mixed-owner gameplay commands");
   assert(!createDefaultControlPolicy().canIssueAs(1), "default control policy does not issue-as");
 }
 
@@ -3428,6 +3451,17 @@ withFakeDocument(() => {
     .find((child) => child.textContent === "Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
+  panel.fields.get("spawn-kind").value = KIND.RIFLEMAN;
+  panel.fields.get("spawn-owner").value = "2";
+  panel.fields.get("spawn-x").value = "128";
+  panel.fields.get("spawn-y").value = "160";
+  void panel.spawnEntity();
+  assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.owner === 2, "LabPanel spawn control sends setup mutation");
+  panel.fields.get("resource-player").value = "1";
+  panel.fields.get("resource-steel").value = "900";
+  panel.fields.get("resource-oil").value = "300";
+  void labClient.setPlayerResources(panel.int("resource-player"), panel.uint("resource-steel"), panel.uint("resource-oil"));
+  assert(sent.at(-1).op.op === "setPlayerResources" && sent.at(-1).op.steel === 900, "LabPanel resource fields normalize player state edits");
   panel.destroy();
   labClient.destroy();
   assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");

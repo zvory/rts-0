@@ -554,6 +554,7 @@ function distanceSqToCenter(unit, center) {
 }
 
 function isOwn(ctx, e) {
+  if (ctx?.controlPolicy?.kind === "lab") return ctx.controlPolicy.canControlOwner(e?.owner, ctx.state);
   return e && e.owner === ctx.playerId;
 }
 
