@@ -43,6 +43,7 @@ src/
   main.js         # Entry point: starts App
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
+  frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
@@ -762,6 +763,10 @@ and unit layer):
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
+- Renderer failures must fail soft: one broken entity or feedback effect should log a throttled
+  `[RTS_RENDER]` error, skip that visual path, and let the rest of the frame continue. Broken
+  entity art draws a magenta/black checkerboard fallback instead of stopping the match loop; the
+  frame loop also reschedules after unexpected client errors and logs `[RTS_FRAME]`.
 - Keep a cohesive muted palette; define colors in `config.js`.
 - Art must stay faction-agnostic: no Soviet, German, Nazi, imperial, national, or unit-branch
   iconography. Avoid flags, stars, crosses, eagles, skulls, sickles, hammers, and historically

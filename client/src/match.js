@@ -6,6 +6,7 @@ import {
   machineGunSoundKey,
 } from "./combat_audio.js";
 import { Fog } from "./fog.js";
+import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
@@ -219,6 +220,7 @@ export class Match {
     this.lastFrame = performance.now();
     this.tickFn = this.frame.bind(this);
     this.rafId = undefined;
+    this.frameErrors = createFrameErrorState();
 
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => {
@@ -932,38 +934,7 @@ export class Match {
    * @param {number} now high-res timestamp from rAF
    */
   frame(now) {
-    if (!this.running) return;
-
-    const dt = (now - this.lastFrame) / 1000; // seconds since last frame
-    const frameGapMs = now - this.lastFrame;
-    this.lastFrame = now;
-    if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
-      this.health.noteFrameGap(frameGapMs);
-    }
-    this.health.refreshLatency();
-
-    const alpha = this.computeAlpha();
-
-    this.camera.update(dt, this.input);
-    if (this.audio) {
-      this.audio.setListener(
-        this.camera.x + this.camera.viewW / (2 * this.camera.zoom),
-        this.camera.y + this.camera.viewH / (2 * this.camera.zoom),
-        this.camera.zoom,
-        this.camera.viewW,
-      );
-    }
-    this.input.update(dt);
-    this.advancePredictionVisual();
-    this.fog.update(this.ownEntities(), this.state.map.tileSize, this.state.visibleTiles);
-
-    this.renderer.render(this.state, this.camera, this.fog, alpha, { clientIntent: this.clientIntent });
-    this.hud.update();
-    this.minimap.render();
-    this.observerAnalysisOverlay?.update();
-    this.health.publish();
-
-    this.rafId = requestAnimationFrame(this.tickFn);
+    runMatchFrameSafely(this, now);
   }
 
   /**
