@@ -197,6 +197,11 @@ export const LAB_VISION = Object.freeze({
   TEAM: "team",
   TEAMS: "teams",
 });
+export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
+  NONE: "none",
+  OWNER_ONLY: "ownerOnly",
+  ALL: "all",
+});
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
@@ -658,7 +663,7 @@ function readAbilityCooldown(record, label) {
   return ability;
 }
 
-/** Decode lobby-debug-mode owner-only path diagnostics. */
+/** Decode projection-policy movement path diagnostics. */
 function assignDebugPath(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
   const record = readArray(fields[index], "entity.debugPath", 6);

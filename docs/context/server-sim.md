@@ -14,20 +14,21 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   touching scripted tests or scenario setup
 
 ## Code map
-- `server/crates/sim/src/game/mod.rs` — public `Game` API.
-- `server/crates/sim/src/game/lab.rs` — typed lab-only mutation and scenario setup API.
-- `server/crates/sim/src/game/systems.rs` — thin tick orchestrator.
-- `server/crates/sim/src/game/services/` — per-tick service helpers for commands, order planning,
-  movement, combat, economy, production, construction, death, occupancy, supply, pathing,
-  standability, spatial queries, and line of sight.
-- `server/crates/sim/src/game/entity/`, `command.rs`, `commands.rs`, `snapshot.rs`, `fog.rs`,
-  `building_memory.rs`, `pathfinding.rs`, and `map/` — core sim data and behavior.
+- `server/crates/sim/src/game/mod.rs`, `lab.rs`, `systems.rs`, `entity/`, `command*.rs`,
+  `snapshot.rs`, `fog.rs`, `building_memory.rs`, `pathfinding.rs`, and `map/` — public `Game` API,
+  lab mutation API, tick orchestration, and core sim state/behavior.
+- `server/crates/sim/src/game/services/` — per-tick services; `order_planner.rs` and
+  `order_execution.rs` own command/queue planning and issue-time mutation helpers.
 - `server/crates/rules/src/` and `server/crates/sim/src/rules/projection.rs` — declarative rules
   and fog-gated projection policy.
 - `server/crates/ai/src/` — AI opponents and self-play harnesses.
-- `server/src/lobby/` — room-owned lifecycle, session policy, participants, tick control,
-  projection/fanout, launch payloads, live ticks, replay/branch sessions, snapshots, and crash/dev
-  replay loading.
+- `server/src/lobby/room_task.rs`, `session_policy.rs`, `participants.rs`, and `tick_control.rs` —
+  room ownership, lifecycle policy, seat/issuer resolution, and clocking.
+- `server/src/lobby/projection.rs`, `snapshot_fanout.rs`, and `snapshots.rs` — per-recipient
+  visibility, fanout, compacting, and diagnostic snapshot options such as movement-path inclusion.
+- `server/src/lobby/launch.rs`, `live_tick.rs`, `replay_session.rs`, `replay_branch.rs`,
+  `connection.rs`, `dev_replay.rs`, and `crash_replay.rs` — launch payloads, live/replay/branch
+  execution, connection delivery, dev replay loading, and panic artifacts.
 - `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deployment drain coordination.
 - Guardrails: `scripts/check-lobby-architecture.mjs`, `scripts/check-crate-boundaries.mjs`, and
   `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`.

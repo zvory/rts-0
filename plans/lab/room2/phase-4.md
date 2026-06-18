@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -52,13 +52,13 @@ when asked through neutral snapshot options.
 
 ## Implementation Checklist
 
-- [ ] Add neutral snapshot options or projection options for diagnostics.
-- [ ] Move debug-path inclusion decisions out of starting loadout and into projection policy.
-- [ ] Replace `debugMode` with explicit diagnostic capability metadata.
-- [ ] Update client debug settings and renderer feedback to consume the new metadata.
-- [ ] Add focused tests for owner-only diagnostics, dev full-world diagnostics, and lab/non-lab
+- [x] Add neutral snapshot options or projection options for diagnostics.
+- [x] Move debug-path inclusion decisions out of starting loadout and into projection policy.
+- [x] Replace `debugMode` with explicit diagnostic capability metadata.
+- [x] Update client debug settings and renderer feedback to consume the new metadata.
+- [x] Add focused tests for owner-only diagnostics, dev full-world diagnostics, and lab/non-lab
       diagnostic classification.
-- [ ] Mark this phase as done in this file.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
