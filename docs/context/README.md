@@ -28,3 +28,8 @@ task-specific capsules it references as each phase begins.
 
 For any multi-phase or phased implementation plan, read [planning.md](planning.md) before writing
 the plan.
+
+For optional source-to-doc navigation, use the advisory routing map at
+[../doc-map.json](../doc-map.json). It points common source areas to likely relevant capsules and
+design docs, but it does not claim exclusive ownership or require a docs change for every mapped
+source change.
