@@ -80,8 +80,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
   "input/index.js": 38854,
   "match.js": 38289,
-  // Hold Position adds the mirrored holdPosition command discriminator/builder.
-  "protocol.js": 36084,
+  // Lab MVP Phase 1 adds mirrored StartPayload.lab role/vision constants.
+  "protocol.js": 36243,
   // Hold Position moves the unit hold button to the W grid slot with a distinct command id.
   "hud_command_card.js": 29393,
   "renderer/shared.js": 28113,

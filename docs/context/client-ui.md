@@ -27,7 +27,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   area-local collaborators.
 - `renderer`: `renderer/` — Pixi facade, layers, terrain, entity, fog, feedback, art helpers.
 - `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`,
-  `prediction_settings.js` — browser/platform services and camera/fog/persistent-setting helpers.
+  `prediction_settings.js` — browser/platform services, launch-url helpers, and
+  camera/fog/persistent-setting helpers.
 
 ## Invariants
 - **No framework, no JS build step.** Plain ES2020 modules. PixiJS v7 is the global `PIXI` — do

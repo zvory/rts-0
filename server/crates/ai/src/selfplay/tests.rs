@@ -1143,6 +1143,7 @@ fn pending_tracker_start_payload() -> StartPayload {
         prediction_version: 0,
         debug_mode: false,
         replay: None,
+        lab: None,
         tick: 0,
         map: MapInfo {
             width: 96,

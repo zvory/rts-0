@@ -81,6 +81,11 @@ impl ProjectionPolicy {
         seat_id: Option<u32>,
         spectator_visible_player_ids: &[u32],
     ) -> SnapshotProjection {
+        if self.vision == VisionPolicy::LabFullWorld {
+            return SnapshotProjection::FullWorld {
+                player_id: seat_id.unwrap_or(connection_id),
+            };
+        }
         match role {
             RecipientRole::ActivePlayer => SnapshotProjection::PlayerFog {
                 player_id: seat_id.unwrap_or(connection_id),
@@ -109,7 +114,8 @@ impl ProjectionPolicy {
             VisionPolicy::ReplayVision => ObserverAnalysisAudience::ReplayViewers,
             VisionPolicy::LobbyState
             | VisionPolicy::BranchStagingState
-            | VisionPolicy::DevFullWorld => ObserverAnalysisAudience::None,
+            | VisionPolicy::DevFullWorld
+            | VisionPolicy::LabFullWorld => ObserverAnalysisAudience::None,
         }
     }
 }
@@ -163,6 +169,23 @@ mod tests {
         );
         assert_eq!(
             dev.observer_analysis_audience(),
+            ObserverAnalysisAudience::None
+        );
+    }
+
+    #[test]
+    fn projection_policy_classifies_lab_as_full_world_without_analysis() {
+        let lab = ProjectionPolicy::new(VisionPolicy::LabFullWorld);
+        assert_eq!(
+            lab.live_snapshot_for(RecipientRole::Spectator, 99, Some(1), &[1, 2]),
+            SnapshotProjection::FullWorld { player_id: 1 }
+        );
+        assert_eq!(
+            lab.live_snapshot_for(RecipientRole::ActivePlayer, 99, None, &[1, 2]),
+            SnapshotProjection::FullWorld { player_id: 99 }
+        );
+        assert_eq!(
+            lab.observer_analysis_audience(),
             ObserverAnalysisAudience::None
         );
     }

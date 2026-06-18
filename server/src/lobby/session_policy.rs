@@ -7,6 +7,7 @@ pub(super) enum SessionMode {
     Replay,
     ReplayArtifact,
     ReplayBranch,
+    Lab,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +28,7 @@ pub(super) enum StateSource {
     ReplayBranchSeed,
     BranchLiveGame,
     DevScenario,
+    LabGame,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,6 +38,7 @@ pub(super) enum JoinPolicy {
     ReplayPromptOrAttach,
     BranchStaging,
     DevWatch,
+    LabRoom,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +58,7 @@ pub(super) enum AuthorityPolicy {
     BranchStagingHost,
     BranchLiveSeatAliases,
     DevWatchControls,
+    LabOperator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,6 +68,7 @@ pub(super) enum VisionPolicy {
     ReplayVision,
     BranchStagingState,
     DevFullWorld,
+    LabFullWorld,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +79,7 @@ pub(super) enum MutationPolicy {
     BranchStagingClaims,
     BranchLiveGame,
     DevScenarioGame,
+    LabReadOnly,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +96,7 @@ pub(super) enum StartPayloadPolicy {
     ReplayViewer,
     ReplayBranchLive,
     DevWatch,
+    Lab,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,6 +239,17 @@ impl SessionPolicy {
                 };
                 policy.countdown_eligible = phase == SessionPhase::BranchStaging;
             }
+            SessionMode::Lab => {
+                policy.state_source = StateSource::LabGame;
+                policy.join = JoinPolicy::LabRoom;
+                policy.clock = ClockPolicy::LiveMatch;
+                policy.authority = AuthorityPolicy::LabOperator;
+                policy.vision = VisionPolicy::LabFullWorld;
+                policy.mutation = MutationPolicy::LabReadOnly;
+                policy.persistence = PersistencePolicy::Suppressed;
+                policy.start_payload = StartPayloadPolicy::Lab;
+                policy.countdown_eligible = false;
+            }
         }
 
         policy
@@ -253,6 +271,10 @@ impl SessionPolicy {
         self.join == JoinPolicy::BranchStaging
     }
 
+    pub(super) fn uses_lab_room_join(self) -> bool {
+        self.join == JoinPolicy::LabRoom
+    }
+
     pub(super) fn allows_match_history(self) -> bool {
         self.mode == SessionMode::Normal
     }
@@ -266,6 +288,7 @@ impl From<&RoomMode> for SessionMode {
             RoomMode::Replay { .. } => Self::Replay,
             RoomMode::ReplayArtifact { .. } => Self::ReplayArtifact,
             RoomMode::ReplayBranch { .. } => Self::ReplayBranch,
+            RoomMode::Lab(_) => Self::Lab,
         }
     }
 }
@@ -382,5 +405,27 @@ mod tests {
         assert!(!dev.countdown_eligible);
         assert!(dev.is_dev_watch());
         assert!(!dev.allows_match_history());
+    }
+
+    #[test]
+    fn session_policy_classifies_lab_as_full_world_room_mode() {
+        let lab_lobby = SessionPolicy::new(SessionMode::Lab, SessionPhase::Lobby);
+        assert_eq!(lab_lobby.state_source, StateSource::LabGame);
+        assert_eq!(lab_lobby.join, JoinPolicy::LabRoom);
+        assert_eq!(lab_lobby.clock, ClockPolicy::LiveMatch);
+        assert_eq!(lab_lobby.authority, AuthorityPolicy::LabOperator);
+        assert_eq!(lab_lobby.vision, VisionPolicy::LabFullWorld);
+        assert_eq!(lab_lobby.mutation, MutationPolicy::LabReadOnly);
+        assert_eq!(lab_lobby.persistence, PersistencePolicy::Suppressed);
+        assert_eq!(lab_lobby.start_payload, StartPayloadPolicy::Lab);
+        assert!(!lab_lobby.countdown_eligible);
+        assert!(lab_lobby.uses_lab_room_join());
+        assert!(!lab_lobby.allows_match_history());
+
+        let lab_live = SessionPolicy::new(SessionMode::Lab, SessionPhase::LiveMatch);
+        assert_eq!(lab_live.state_source, StateSource::LabGame);
+        assert_eq!(lab_live.join, JoinPolicy::LabRoom);
+        assert_eq!(lab_live.vision, VisionPolicy::LabFullWorld);
+        assert_eq!(lab_live.start_payload, StartPayloadPolicy::Lab);
     }
 }

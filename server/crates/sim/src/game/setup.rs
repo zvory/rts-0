@@ -427,6 +427,7 @@ impl Game {
             prediction_version: 0,
             debug_mode: self.debug_path_overlays,
             replay: None,
+            lab: None,
             tick: self.tick,
             map,
             players,

@@ -21,6 +21,7 @@ import {
   diagnostics,
   dom,
   formatScore,
+  labLaunchConfig,
   replayLaunchConfig,
   wsUrl,
 } from "./bootstrap.js";
@@ -64,6 +65,7 @@ export class App {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = new Net(wsUrl(), diagnostics);
     this.devWatch = devWatchConfig();
+    this.labLaunch = labLaunchConfig();
     this.replayLaunch = replayLaunchConfig();
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
@@ -138,6 +140,7 @@ export class App {
     try {
       await this.net.connect();
       if (this.replayLaunch) this.maybeAutoJoinReplay();
+      else if (this.labLaunch) this.maybeAutoJoinLab();
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.showConnectionWarning();
@@ -171,6 +174,15 @@ export class App {
     this.net.join(name, this.replayLaunch.room, true, true);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     this.lobby.setStatus("Starting replay...");
+  }
+
+  maybeAutoJoinLab() {
+    const name = "Lab Operator";
+    if (this.lobby?.elName) this.lobby.elName.value = name;
+    if (this.lobby?.elRoom) this.lobby.elRoom.value = this.labLaunch.room;
+    this.net.join(name, this.labLaunch.room, true, false);
+    if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
+    this.lobby.setStatus("Starting lab...");
   }
 
   /**
@@ -421,7 +433,7 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
-    if (this.replayLaunch) {
+    if (this.replayLaunch || this.labLaunch) {
       this.allowUnloadWithoutWarning = true;
       window.location.assign(new URL("/", window.location.href).toString());
       return;

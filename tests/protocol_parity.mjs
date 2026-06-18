@@ -16,6 +16,8 @@ import {
   EVENT_CODE,
   KIND,
   KIND_CODE,
+  LAB_ROLE,
+  LAB_VISION,
   NOTICE_SEVERITY,
   NOTICE_SEVERITY_CODE,
   ORDER_STAGE,
@@ -204,6 +206,15 @@ assert(
   // not part of this phase's structured protocol export.
   rustContract.includes("prediction_build_id") && rustContract.includes("prediction_version"),
   "start payload must expose prediction compatibility metadata",
+);
+assert(
+  rustContract.includes("LabStartMetadata") &&
+    rustContract.includes("operator_id") &&
+    rustContract.includes("operation_count") &&
+    LAB_ROLE.OPERATOR === "operator" &&
+    LAB_ROLE.READ_ONLY === "readOnly" &&
+    LAB_VISION.FULL_WORLD === "fullWorld",
+  "start payload must expose mirrored lab metadata",
 );
 assert(
   rustContract.includes("DEFAULT_FACTION_ID") &&

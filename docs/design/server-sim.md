@@ -211,6 +211,11 @@ alive.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
   `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
+- Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
+  room-owned operator/read-only viewer session record. They use the shared launch helper with
+  `StartPayload.lab` metadata, prediction disabled, and full-world projection through
+  `projection.rs`; lab state, dirty/log placeholders, and viewer roles stay in the room task rather
+  than in `Game`.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view

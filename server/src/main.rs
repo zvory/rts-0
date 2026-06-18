@@ -130,6 +130,8 @@ async fn main() {
         .route("/", get(index_handler))
         .route("/beta", get(beta_redirect_handler))
         .route("/beta/", get(beta_redirect_handler))
+        .route("/lab", get(index_handler))
+        .route("/lab/", get(index_handler))
         .route("/version", get(version_handler))
         .route("/wiki", get(wiki::wiki_index_handler))
         .route("/wiki/", get(wiki::wiki_index_handler))

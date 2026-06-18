@@ -237,6 +237,14 @@ Sent once when the match begins. Carries everything static for the whole match.
     seed: u32,
     durationTicks: u32
   },
+  lab?: {                        // present for lab room starts
+    room: string,                // safe public lab id, not the hidden internal room prefix
+    operatorId: u32,
+    role: "operator"|"readOnly",
+    vision: "fullWorld",
+    dirty: bool,
+    operationCount: u32
+  },
   tick: u32,                     // starting tick (usually 0)
   map: {
     width: u32, height: u32,     // in tiles
@@ -263,6 +271,12 @@ which lets the client expose local movement-waypoint overlay controls for the ow
 `debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
+
+Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
+metadata omitted. The MVP skeleton uses a hidden internal room id, a default two-team real `Game`
+template, and server-owned `fullWorld` projection for every lab viewer. `role` names the room-owned
+operator/read-only viewer classification; it does not grant privileged lab mutations until the lab
+operation protocol is added.
 
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
