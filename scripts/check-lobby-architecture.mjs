@@ -18,6 +18,7 @@ const allowedSnapshotCalls = new Map(Object.entries({
 }));
 
 const snapshotCallRe = /\.\s*(snapshot_full_for|snapshot_for_spectator|snapshot_for)\s*\(/g;
+const labMutationCallRe = /\.\s*(apply_lab_op|issue_lab_command_as|restore_lab_scenario)\s*\(/g;
 const failures = [];
 
 for (const file of listRustFiles(lobbySrc)) {
@@ -31,6 +32,14 @@ for (const file of listRustFiles(lobbySrc)) {
     failures.push(
       `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${method} must route through projection.rs`,
     );
+  }
+
+  if (file !== "room_task.rs") {
+    for (const match of stripped.matchAll(labMutationCallRe)) {
+      failures.push(
+        `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${match[1]} must stay centralized in room_task.rs lab request handling`,
+      );
+    }
   }
 }
 

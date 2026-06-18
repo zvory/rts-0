@@ -71,6 +71,11 @@ const ALLOWED_PROTOTYPE_GRAFTS = new Set([
   "renderer/index.js:Renderer",
 ]);
 
+const FORBIDDEN_MATCH_LAB_IMPORTS = new Set([
+  "lab_client.js",
+  "lab_panel.js",
+]);
+
 // Phase 6 client-boundary ratchet: these are the cleanup-phase byte counts for
 // the largest modules. Future growth should either extract a focused helper or
 // update this table with the phase-specific reason.
@@ -253,6 +258,11 @@ function resolveImport(fromFile, specifier) {
 }
 
 function checkImport(fromFile, toFile) {
+  if (fromFile === "match.js" && FORBIDDEN_MATCH_LAB_IMPORTS.has(toFile)) {
+    failures.push(`${fromFile} -> ${toFile}: Match must receive lab UI/services through app-shell dependency injection`);
+    return;
+  }
+
   const from = modules.get(fromFile);
   const to = modules.get(toFile);
   if (!from?.area || !to?.area) return;

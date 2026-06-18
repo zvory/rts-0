@@ -306,7 +306,9 @@ would either widen this behavior-preserving refactor or add scenario registratio
 future lab work should consume the extracted primitives first and migrate scenario setup only with a
 separate product-approved design. `scripts/check-lobby-architecture.mjs` guards the now-stable
 fanout boundary by failing new production lobby calls to `Game::snapshot_for*` outside
-`projection.rs`, except for the existing AI think context in `live_tick.rs`.
+`projection.rs`, except for the existing AI think context in `live_tick.rs`. The same guardrail
+keeps accepted lab mutation and issue-as calls centralized in `room_task.rs`, where operator
+authorization, result routing, dirty state, and the append-only operation log live.
 
 ### 3.3 Rules layer (`rules/`)
 

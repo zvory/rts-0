@@ -41,6 +41,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   imports are allowed, and `app-shell` may compose other areas. Non-shell cross-area imports should
   use dependency injection through `Match`/`App`; if an import is intentional, update
   `ALLOWED_CROSS_AREA_IMPORTS` in `scripts/check-client-architecture.mjs` with a reason.
+- **Lab UI stays app-owned.** `App` owns `LabClient` and `LabPanel`; `Match` receives injected lab
+  metadata/control policy and must not import the lab transport or panel modules directly.
 - **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,
   minimap, and renderer feedback. Do not read or write placement, command targeting, command-card
   mode, previews, or command feedback through `GameState` shims.

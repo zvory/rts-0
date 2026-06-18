@@ -298,9 +298,9 @@ export function createDefaultControlPolicy()
 
 `App` owns `LabClient`, `LabPanel`, and lab control policy lifetimes when a `start` payload carries
 `lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
-constructor options only; renderer, HUD, input, and minimap do not import lab modules. Phase 4 only
-ships vision controls and status/result display, leaving setup tools and issue-as policy to later
-lab phases.
+constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
+MVP exposes room-local vision, setup mutations, issue-as commands, and scenario import/export
+through those collaborators while keeping the normal match screen authentic.
 
 `hotkey_profiles.js`
 ```js
@@ -778,14 +778,15 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
-  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`.
+  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
+  `lab_control_policy.js`.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js`.
-- `transport`: `net.js`, `protocol.js`.
+- `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card, lobby controller/view, match history, minimap, resource icons,
-  scoreboard, status badge, branch staging, settings.
+  scoreboard, status badge, branch staging, lab panel, settings.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
@@ -796,6 +797,8 @@ Import rules:
 - Files in the same area may import each other.
 - `app-shell` files may compose other areas; prefer adding new cross-area wiring in `match.js` or
   `app.js` instead of importing collaborators from feature modules.
+- Lab UI and transport lifetimes stay in `App`: `match.js` may receive lab metadata/control policy,
+  but must not import `lab_client.js` or `lab_panel.js`.
 - Non-shell cross-area imports should normally become dependency injection through `Match`, `App`,
   or a facade. If one is intentional, update `ALLOWED_CROSS_AREA_IMPORTS` in
   `scripts/check-client-architecture.mjs` with a reason.
