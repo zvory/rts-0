@@ -550,9 +550,10 @@ blocking stone tile itself and the visible edge of a smoke cloud, but not tiles 
 Units inside smoke do not stamp vision; friendly units inside smoke remain owner-visible through
 projection, while enemy units inside smoke are withheld and cannot be targeted. Combat
 auto-acquisition and firing both use the smoke-aware LOS query; explicit attack orders may chase
-toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Future forest
-visibility/cover rules should extend the terrain rules and this service instead of adding ad hoc
-checks to fog or combat.
+toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Direct-fire shot
+projection also checks hard entity blockers: tanks and non-Tank-Trap building footprints intercept
+shots, while Tank Traps do not. Future forest visibility/cover rules should extend the terrain rules
+and this service instead of adding ad hoc checks to fog or combat.
 
 `Game` still recomputes raw live fog per player after each tick, because command validation and
 combat targeting depend on owner-local current vision. Event visibility and building-memory
@@ -579,7 +580,8 @@ body `facing`, configured length/width, and a small clearance margin, building b
 axis-aligned rectangles derived from footprint tiles, and resource node bodies are circles for
 build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, and
 vehicle-body-only static blockers; Tank Trap pairs exactly two tiles apart close the single tile
-between them on the vehicle-body-only layer while remaining infantry-passable. Movement and
+between them on the vehicle-body-only layer while remaining infantry-passable and shot-transparent.
+Movement and
 standability choose the combined static layer from the routed unit's rules-level
 `MovementBodyClass`, and path-cache fingerprints are computed for the same blocker layer.
 `services::standability` owns reusable legality predicates for unit bodies and building sites.
