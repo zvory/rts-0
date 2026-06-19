@@ -39,6 +39,13 @@ setting is off, the live match must keep the current authoritative-only command 
 - Keep the server-authoritative model. Client prediction is display and responsiveness only.
 - Keep prediction owner-safe. Do not send hidden enemy ids, hidden positions, hidden orders, target
   ids, enemy economy, or full-world state to support prediction.
+- Keep transport scheduling metadata out of `SimCommand`. `clientSeq`, `executeTick`,
+  receipt/result status, command lead, and rollback diagnostics belong to the live room/protocol
+  layer; the simulation should keep receiving ordinary player-owned `SimCommand`s through the
+  `Game` API.
+- Keep live rollback mechanics out of `ReplaySession`. Reuse replay ideas by extracting shared
+  keyframe/fast-forward helpers where useful, but live match code should own a purpose-built
+  rollback history instead of coupling live rooms to replay playback UI state.
 - Keep the existing movement prediction setting as the rollout/debug gate. Prediction disabled
   must clear local overlays and preserve monotonic `clientSeq` allocation.
 - Start with `commandLeadTicks = 2`; adapt upward only from measured late arrivals, excessive
@@ -64,6 +71,29 @@ setting is off, the live match must keep the current authoritative-only command 
 - When a phase is complete, mark its phase document done in the implementation commit and provide a
   handoff message describing what changed, what the next agent should do, and the core manual test
   focus.
+
+## Required Architecture Boundaries
+
+The rollback phases should introduce small, named collaborators rather than expanding the room task
+or prediction controller into catch-all modules:
+
+- `LiveCommandScheduler` owns live command envelopes, accepted effective ticks, deterministic
+  ordering, and draining due commands into `Game::enqueue`.
+- `RollbackHistory` owns authoritative keyframes, the applied command stream by tick, replay/cost
+  measurements, and history expiry. A restore for tick `T` starts from the post-tick `T - 1`
+  keyframe, with an explicit tick-0 keyframe for commands applied on tick 1.
+- `CommandResultTracker` owns owner-only command result metadata keyed by `(connection_id,
+  clientSeq)`, including requested, accepted, applied, late, rollback, fallback, and reason data.
+  Snapshot fanout may attach a bounded result list, but gameplay code should not scrape debug
+  strings.
+- `CommandLeadController` owns per-player lead recommendations, upward adjustment, slow decay, and
+  the owner-only lead value exposed to the client.
+- Browser cadence logic should be a named prediction-path collaborator, injected through `Match`.
+  `PredictionController` may compose it, but cadence estimation, command result ingestion, and
+  WASM replay should remain separable so tests can cover each one without a full browser match.
+
+If an implementation cannot keep one of these boundaries, the phase handoff must call that out as a
+blocker or deliberately document the narrower substitute API before later phases build on it.
 
 ## Phase Summaries
 

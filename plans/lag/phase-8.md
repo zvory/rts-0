@@ -19,12 +19,24 @@ must identify the optimization work or temporary lower window needed before broa
   - worst-case command burst replay cost
   - snapshot fanout cost after rollback
   - fallback threshold when replay would exceed budget
+- Treat this phase as a rollout gate. If Phase 4 data already shows 26-tick rollback exceeding the
+  documented fallback threshold under representative loads, pause default enablement of broader
+  prediction surfaces and either lower the window temporarily or split out an optimization phase.
+- Choose and document numeric budgets before declaring success. Initial review thresholds should
+  account for the 30 Hz room budget: rollback replay plus corrected snapshot fanout must leave
+  enough headroom for normal tick work, and over-budget paths must fall back late instead of
+  blocking the room task.
 - Server optimization candidates if needed:
   - cheaper `Game` clone/keyframe representation
   - replay snapshots at fixed intervals inside the 26-tick ring
   - command-log compaction
   - avoiding unnecessary snapshot projection during replay
   - narrower rollback support for expensive room modes until optimized
+- Lead/window tuning:
+  - compare two-tick lead with the final rollback window under healthy, jittery, and bursty
+    profiles
+  - report how often commands fall back late at each tested lead/window combination
+  - document the cost and feel tradeoff before lowering the rollback window or raising default lead
 - Client prediction budgets:
   - evaluate moving WASM prediction/replay work to a Web Worker or equivalent isolated scheduler
   - keep the no-JS-build-step development model unless a generated WASM worker wrapper is
@@ -63,6 +75,9 @@ must identify the optimization work or temporary lower window needed before broa
   - rollback during command bursts
   - rollback with representative entity counts
   - fallback path when budget is exceeded
+  - human-only rooms and AI-backed rooms, or an explicit `rollbackUnsupported` result for AI-backed
+    rooms if Phase 4 left them unsupported
+  - corrected snapshot fanout cost after rollback under normal active-player fog filtering
 - Unit/contract tests for client worker lifecycle if a worker is added:
   - init success
   - init failure fallback
@@ -92,5 +107,7 @@ cause long stalls or repeated visible correction.
 ## Handoff Expectations
 
 The handoff must include measured server rollback costs, whether 26 ticks is viable, required
-server optimizations if it is not, the chosen client execution model, fallback thresholds, new
-report fields if any, and whether a Worker is required before broad rollout.
+server optimizations if it is not, the chosen client execution model, fallback thresholds, final
+lead/window tuning recommendation, new report fields if any, whether a Worker is required before
+broad rollout, and whether later phases may enable full visual prediction or must stay in
+accepted-intent-overlay mode.

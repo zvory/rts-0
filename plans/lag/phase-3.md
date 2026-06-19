@@ -13,16 +13,34 @@ authority instead of predicting earlier than the server can ever confirm.
 
 ## Scope
 
-- Add a per-room scheduled command queue for live gameplay commands.
-- Add a rolling authoritative history buffer for at least `ROLLBACK_WINDOW_TICKS = 26` ticks.
-- Store the minimum state needed to restore and replay deterministically:
-  - authoritative `Game` state or keyframes
-  - consumed command log entries by effective tick
-  - AI command ordering if AI is active
-  - room/player metadata needed for snapshot fanout after replay
+- Add these live-room primitives before changing command timing:
+  - `ScheduledCommandEnvelope`: transport-owned command metadata, including connection id, seat id,
+    `clientSeq`, command, requested/accepted execute tick, arrival order, source (`human` or `ai`),
+    and diagnostics state.
+  - `LiveCommandScheduler`: validates requested execute ticks, assigns accepted effective ticks,
+    keeps deterministic per-tick ordering, and drains due commands into `Game::enqueue`.
+  - `RollbackHistory`: stores tick-0 and rolling post-tick keyframes plus the command envelopes
+    applied for each tick.
+  - `CommandResultTracker`: stores owner-only result metadata and contiguous sim-consumption ACK
+    state.
+  - `CommandLeadController`: tracks per-connection lead recommendation and decay.
+- Replace direct live-player `game.enqueue(...)` calls from `RoomTask::on_command` with scheduler
+  insertion. `RoomTask` should still own connection/seat authority and `clientSeq` validation, but
+  effective-tick policy belongs in `LiveCommandScheduler`.
+- Add a rolling authoritative history buffer for at least `ROLLBACK_WINDOW_TICKS = 26` ticks plus
+  tick 0. A restore for command tick `T` must start from the post-tick `T - 1` keyframe, so the
+  history contract must say exactly whether a frame is pre-tick or post-tick.
+- Store only the state needed to restore and replay deterministically:
+  - authoritative `Game` keyframes
+  - scheduled/applied command envelopes by effective tick and arrival order
+  - AI commands already generated for each tick, not rerun AI thinking during replay
+  - command result tracker state needed to rebuild owner-only metadata
+  - lead controller state needed to keep recommendations deterministic
 - For each sequenced player command:
   - validate `clientSeq` as today
-  - accept the requested execute tick only inside a bounded future window
+  - accept the requested execute tick only inside `currentTick + 1` through
+    `currentTick + MAX_FUTURE_EXECUTE_LEAD_TICKS`; initialize that constant to the rollback window
+    unless this phase documents a smaller value
   - queue on the accepted effective tick if it has not passed
   - if the command arrives late, record rollback eligibility but still apply late in this phase
     until Phase 4 enables restore/replay
@@ -30,6 +48,11 @@ authority instead of predicting earlier than the server can ever confirm.
   - stable by effective tick
   - stable by room arrival order within a tick
   - stable across branch-live seat aliases
+- Keep AI ordering deterministic:
+  - live AI thinking still runs once for the live tick
+  - generated AI commands become scheduler envelopes for that tick
+  - dry-run restore/replay uses recorded AI envelopes from history rather than invoking AI
+    controllers again
 - Instrument history and replay primitives before rollback is active:
   - clone/keyframe cost
   - restore cost
@@ -41,6 +64,9 @@ authority instead of predicting earlier than the server can ever confirm.
   - decay downward slowly after stable windows
 - Include owner-only late/applied metadata in command result diagnostics.
 - Preserve sim-consumption ACK semantics; do not drop pending client commands on socket receipt.
+- Keep `Game` API changes narrow. If `Game` needs a helper for keyframe cloning or replay stepping,
+  expose that helper deliberately; do not add transport metadata or scheduling policy to
+  `SimCommand`.
 
 ## Expected Touch Points
 
@@ -58,11 +84,15 @@ authority instead of predicting earlier than the server can ever confirm.
 ## Verification
 
 - Rust tests for:
+  - `RoomTask::on_command` no longer directly enqueues live human commands outside the scheduler
   - command queued for future effective tick
   - same-tick deterministic ordering
   - command arriving after requested execute tick applies late
+  - future execute ticks beyond the acceptance window produce stable result metadata
   - history buffer stores and expires the expected tick range
+  - tick-0 and post-tick keyframe semantics are documented by tests
   - restoring a recent state and replaying without inserted commands reaches the same snapshot
+  - replay uses recorded AI command envelopes rather than rerunning AI thinking
   - late command increments lead recommendation
   - stable windows decay lead recommendation toward two ticks
   - stale or wrapped `clientSeq` stays rejected
@@ -86,5 +116,6 @@ a short fixed delay rather than remote echo.
 ## Handoff Expectations
 
 The handoff must state the effective-tick acceptance window, history representation, measured
-history/dry-run replay costs, late-command policy before rollback, lead adjustment thresholds,
-decay policy, and what Phase 4 needs to enable actual rollback.
+history/dry-run replay costs, keyframe tick semantics, scheduler/result/lead API names, AI replay
+policy, late-command policy before rollback, lead adjustment thresholds, decay policy, and what
+Phase 4 needs to enable actual rollback.
