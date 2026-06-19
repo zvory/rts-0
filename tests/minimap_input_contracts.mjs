@@ -17,6 +17,7 @@ function assertApprox(actual, expected, epsilon, msg) {
 function installWindowStub() {
   const listeners = [];
   globalThis.window = {
+    devicePixelRatio: 1,
     innerWidth: 800,
     innerHeight: 600,
     addEventListener(type, handler) {
@@ -55,6 +56,101 @@ function fakeCanvas(rect = { left: 100, top: 200, width: 242, height: 242 }) {
       listeners.push(["remove", type, handler]);
     },
   };
+}
+
+function recordingContext(label) {
+  return {
+    label,
+    calls: [],
+    fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 1,
+    globalAlpha: 1,
+    clearRect(...args) {
+      this.calls.push({ op: "clearRect", args });
+    },
+    fillRect(...args) {
+      this.calls.push({ op: "fillRect", args, fillStyle: this.fillStyle, globalAlpha: this.globalAlpha });
+    },
+    strokeRect(...args) {
+      this.calls.push({ op: "strokeRect", args, strokeStyle: this.strokeStyle, lineWidth: this.lineWidth });
+    },
+    drawImage(source, ...args) {
+      this.calls.push({ op: "drawImage", source: source?.label || "", args });
+    },
+    save() {
+      this.calls.push({ op: "save" });
+    },
+    restore() {
+      this.calls.push({ op: "restore" });
+    },
+    beginPath() {
+      this.calls.push({ op: "beginPath" });
+    },
+    arc(...args) {
+      this.calls.push({ op: "arc", args });
+    },
+    stroke() {
+      this.calls.push({ op: "stroke" });
+    },
+  };
+}
+
+function fakeRenderableCanvas({
+  width = 16,
+  height = width,
+  rect = { left: 0, top: 0, width, height },
+  context = recordingContext("main"),
+} = {}) {
+  const listeners = [];
+  return {
+    label: "main",
+    width,
+    height,
+    rect,
+    context,
+    listeners,
+    getContext() {
+      return context;
+    },
+    getBoundingClientRect() {
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.left + rect.width,
+        bottom: rect.top + rect.height,
+        width: rect.width,
+        height: rect.height,
+      };
+    },
+    addEventListener(type, handler) {
+      listeners.push(["add", type, handler]);
+    },
+    removeEventListener(type, handler) {
+      listeners.push(["remove", type, handler]);
+    },
+  };
+}
+
+function staticCanvasFactory(layers) {
+  return () => {
+    const label = `static-${layers.length}`;
+    const context = recordingContext(label);
+    const canvas = {
+      label,
+      width: 1,
+      height: 1,
+      getContext() {
+        return context;
+      },
+    };
+    layers.push({ canvas, context });
+    return canvas;
+  };
+}
+
+function countCalls(context, op) {
+  return context.calls.filter((call) => call.op === op).length;
 }
 
 function minimapHarness({
@@ -238,6 +334,95 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(h.net.sent.every((command) => command.c === "attackMove" && command.queued === true), "held-A minimap targeting queues attack-move commands");
   assert(h.clientIntent.commandTarget === "attack", "held-A minimap targeting stays armed after queued clicks");
   h.minimap.destroy();
+}
+
+// Static terrain and resource marks are cached instead of repainted every render.
+{
+  installWindowStub();
+  const layers = [];
+  const rect = { left: 0, top: 0, width: 16, height: 16 };
+  const canvas = fakeRenderableCanvas({ width: 16, height: 16, rect });
+  const state = {
+    playerId: 1,
+    map: {
+      width: 2,
+      height: 2,
+      tileSize: 1,
+      terrain: [0, 1, 2, 0],
+      resources: [
+        { id: 10, kind: "steel", x: 0.5, y: 0.5, remaining: 100 },
+        { id: 11, kind: "oil", x: 1.5, y: 1.5, remaining: 100 },
+      ],
+    },
+    selectedEntities() {
+      return [];
+    },
+    entitiesInterpolated() {
+      return [];
+    },
+    players: [],
+  };
+  const fog = {
+    isVisible() {
+      return false;
+    },
+    isExplored() {
+      return false;
+    },
+  };
+  const camera = { x: 0, y: 0, zoom: 1, viewW: 2, viewH: 2, centerOn() {} };
+  const minimap = new Minimap(canvas, state, camera, fog, { issueCommand() {} }, null, {
+    staticCanvasFactory: staticCanvasFactory(layers),
+  });
+
+  minimap.render();
+  assert(layers.length === 2, "minimap creates terrain and resource static layers");
+  const terrainLayer = layers[0];
+  const resourceLayer = layers[1];
+  const terrainDrawIndex = canvas.context.calls.findIndex((call) =>
+    call.op === "drawImage" && call.source === terrainLayer.canvas.label,
+  );
+  const fogIndex = canvas.context.calls.findIndex((call, index) =>
+    index > terrainDrawIndex && call.op === "fillRect",
+  );
+  const resourceDrawIndex = canvas.context.calls.findIndex((call) =>
+    call.op === "drawImage" && call.source === resourceLayer.canvas.label,
+  );
+  assert(terrainDrawIndex >= 0, "terrain static layer draws into the minimap");
+  assert(fogIndex > terrainDrawIndex, "fog still draws above cached terrain");
+  assert(resourceDrawIndex > fogIndex, "cached resources still draw above fog");
+  const terrainFillsAfterFirst = countCalls(terrainLayer.context, "fillRect");
+  const resourceFillsAfterFirst = countCalls(resourceLayer.context, "fillRect");
+
+  minimap.render();
+  assert(
+    countCalls(terrainLayer.context, "fillRect") === terrainFillsAfterFirst,
+    "second render reuses cached terrain layer",
+  );
+  assert(
+    countCalls(resourceLayer.context, "fillRect") === resourceFillsAfterFirst,
+    "second render reuses cached resource layer",
+  );
+
+  state.map.resources[0].remaining = 0;
+  minimap.render();
+  assert(
+    countCalls(terrainLayer.context, "fillRect") === terrainFillsAfterFirst,
+    "resource depletion does not rebuild terrain cache",
+  );
+  assert(
+    countCalls(resourceLayer.context, "clearRect") >= 2,
+    "resource depletion invalidates resource cache",
+  );
+
+  rect.width = 20;
+  rect.height = 20;
+  minimap.render();
+  assert(
+    countCalls(terrainLayer.context, "fillRect") > terrainFillsAfterFirst,
+    "canvas presentation changes invalidate terrain cache",
+  );
+  minimap.destroy();
 }
 
 // Destroy unregisters the zone so rematches cannot double-fire stale minimap handlers.
