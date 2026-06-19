@@ -6,6 +6,9 @@ import { S, decodeServerMessage, parseServerFrame, msg, cmd as cmdBuilders } fro
 import { ReportWindowAggregate } from "./report_window_aggregate.js";
 
 export const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
+const SNAPSHOT_BYTE_SOURCE = "application-payload";
+const WEBSOCKET_COMPRESSION_NONE = "none";
+const WEBSOCKET_COMPRESSION_PERMESSAGE_DEFLATE = "permessage-deflate";
 
 const SNAPSHOT_BYTE_BUCKETS = Object.freeze([
   512,
@@ -266,11 +269,13 @@ export class Net {
     const bytes = stats.byteSizes.summary();
     const parse = stats.parseMs.summary();
     const decode = stats.decodeMs.summary();
+    const extensions = websocketExtensions(this.ws);
     const out = {
       snapshotBytesTotal: stats.bytesTotal,
       snapshotBytesMax: stats.bytesMax,
       snapshotBytesAvg: stats.messageCount > 0 ? Math.round(stats.bytesTotal / stats.messageCount) : 0,
       snapshotMessageCount: stats.messageCount,
+      snapshotByteSource: SNAPSHOT_BYTE_SOURCE,
       snapshotBytesP95: bytes.p95,
       snapshotSegmentBudgetBytes: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
       snapshotOverSegmentBudgetCount: stats.overSegmentBudgetCount,
@@ -280,6 +285,8 @@ export class Net {
       snapshotParseP95Ms: parse.p95,
       snapshotDecodeMaxMs: decode.max,
       snapshotDecodeP95Ms: decode.p95,
+      websocketExtensions: extensions,
+      websocketCompression: websocketCompressionState(extensions),
     };
     stats.bytesTotal = 0;
     stats.bytesMax = 0;
@@ -485,4 +492,18 @@ function frameByteLength(data) {
   if (data instanceof ArrayBuffer) return data.byteLength;
   if (ArrayBuffer.isView(data)) return data.byteLength;
   return undefined;
+}
+
+function websocketExtensions(ws) {
+  return typeof ws?.extensions === "string" ? ws.extensions : "";
+}
+
+function websocketCompressionState(extensions) {
+  return String(extensions || "")
+    .toLowerCase()
+    .split(",")
+    .map((part) => part.trim().split(";")[0]?.trim())
+    .includes(WEBSOCKET_COMPRESSION_PERMESSAGE_DEFLATE)
+    ? WEBSOCKET_COMPRESSION_PERMESSAGE_DEFLATE
+    : WEBSOCKET_COMPRESSION_NONE;
 }

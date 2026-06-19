@@ -67,6 +67,7 @@ export class HudSelectionPanel {
   constructor(panel, state) {
     this.panel = panel;
     this.state = state;
+    this._renderSig = null;
     this._selectionOverflowSig = null;
     this._selectionOverflowUntil = 0;
     this._onClick = (ev) => this._handleClick(ev);
@@ -83,6 +84,7 @@ export class HudSelectionPanel {
       this.panel.removeEventListener("contextmenu", this._onContextMenu);
     }
     if (this.panel) this.panel.innerHTML = "";
+    this._renderSig = null;
   }
 
   /** Render the selection summary: single-entity detail or multi-entity command budget grid. */
@@ -96,17 +98,26 @@ export class HudSelectionPanel {
       ? this.state.selectedEntities()
       : [];
     if (!sel || sel.length === 0) {
+      if (this._renderSig === "empty") return;
+      this._renderSig = "empty";
       panel.innerHTML = "";
       return;
     }
 
     if (sel.length === 1) {
+      const sig = selectionPanelSignature(sel, null);
+      if (sig === this._renderSig) return;
+      this._renderSig = sig;
       panel.innerHTML = "";
       panel.appendChild(this._selectionEntityNode(this._singleSelectionNode(sel[0]), sel[0]));
       return;
     }
 
     const overflow = this._visibleSelectionOverflow();
+    const sig = selectionPanelSignature(sel, overflow);
+    if (sig === this._renderSig) return;
+    this._renderSig = sig;
+
     const model = selectionBudgetGridModel(sel, overflow);
     const frag = document.createDocumentFragment();
     const header = document.createElement("div");
@@ -280,6 +291,58 @@ export class HudSelectionPanel {
     );
     return node;
   }
+}
+
+function selectionPanelSignature(entities, overflow) {
+  if (!entities || entities.length === 0) return "empty";
+  if (entities.length === 1) return `single:${selectionDetailSignature(entities[0])}`;
+  const selected = entities.map(selectionBudgetEntitySignature).join("|");
+  const overflowSig = overflow
+    ? `${numberSig(overflow.used)}:${numberSig(overflow.cap)}:${sigValue(overflow.seq)}`
+    : "none";
+  return `multi:${selected}|overflow:${overflowSig}`;
+}
+
+function selectionDetailSignature(entity) {
+  if (!entity) return "missing";
+  const productionPct = Math.round(clamp01(Number(entity.prodProgress) || 0) * 100);
+  return [
+    sigValue(entity.id),
+    sigValue(entity.kind),
+    sigValue(entity.label),
+    sigValue(entity.hp),
+    sigValue(entity.maxHp),
+    entity.kind === KIND.TANK ? formatTankOilUsed(entity.oilUsed) : "",
+    sigValue(entity.prodQueue),
+    sigValue(entity.prodKind),
+    sigValue(entity.prodUpgrade),
+    productionPct,
+    entity.optimisticProduction ? 1 : 0,
+  ].join(":");
+}
+
+function selectionBudgetEntitySignature(entity) {
+  if (!entity) return "missing";
+  return [
+    sigValue(entity.id),
+    sigValue(entity.kind),
+    sigValue(entity.label),
+  ].join(":");
+}
+
+function numberSig(value, digits = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  return digits > 0 ? number.toFixed(digits) : String(Math.round(number));
+}
+
+function sigValue(value) {
+  return value == null ? "" : String(value);
+}
+
+function clamp01(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }
 
 function selectionBudgetForHudEntities(entities) {

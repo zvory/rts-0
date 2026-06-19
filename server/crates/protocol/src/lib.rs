@@ -239,6 +239,8 @@ pub struct ClientNetReport {
     #[serde(default)]
     pub snapshot_message_count: u32,
     #[serde(default)]
+    pub snapshot_byte_source: String,
+    #[serde(default)]
     pub snapshot_bytes_p95: u32,
     #[serde(default)]
     pub snapshot_segment_budget_bytes: u32,
@@ -254,6 +256,10 @@ pub struct ClientNetReport {
     pub snapshot_decode_max_ms: u16,
     #[serde(default)]
     pub snapshot_decode_p95_ms: u16,
+    #[serde(default)]
+    pub websocket_extensions: String,
+    #[serde(default)]
+    pub websocket_compression: String,
     #[serde(default)]
     pub snapshot_apply_max_ms: u16,
     #[serde(default)]
@@ -2368,6 +2374,7 @@ mod tests {
                 "snapshotBytesMax":92000,
                 "snapshotBytesAvg":64000,
                 "snapshotMessageCount":289,
+                "snapshotByteSource":"application-payload",
                 "snapshotBytesP95":85000,
                 "snapshotSegmentBudgetBytes":1280,
                 "snapshotOverSegmentBudgetCount":280,
@@ -2376,6 +2383,8 @@ mod tests {
                 "snapshotParseP95Ms":4,
                 "snapshotDecodeMaxMs":11,
                 "snapshotDecodeP95Ms":8,
+                "websocketExtensions":"permessage-deflate; client_max_window_bits",
+                "websocketCompression":"permessage-deflate",
                 "snapshotApplyMaxMs":13,
                 "snapshotApplyP95Ms":8,
                 "predictionApplyMaxMs":7,
@@ -2436,11 +2445,14 @@ mod tests {
                 assert_eq!(report.match_run_id, "main-123");
                 assert_eq!(report.snapshot_gap_max_ms, 420);
                 assert_eq!(report.snapshot_bytes_max, 92_000);
+                assert_eq!(report.snapshot_byte_source, "application-payload");
                 assert_eq!(report.snapshot_bytes_p95, 85_000);
                 assert_eq!(report.snapshot_segment_budget_bytes, 1_280);
                 assert_eq!(report.snapshot_over_segment_budget_count, 280);
                 assert_eq!(report.snapshot_over_segment_budget_pct_x100, 9_689);
                 assert_eq!(report.snapshot_decode_p95_ms, 8);
+                assert_eq!(report.websocket_extensions, "permessage-deflate; client_max_window_bits");
+                assert_eq!(report.websocket_compression, "permessage-deflate");
                 assert_eq!(report.snapshot_burst_max, 5);
                 assert_eq!(report.frame_work_max_ms, 42);
                 assert_eq!(report.worst_frame_phase, "match.renderer");
@@ -2492,11 +2504,14 @@ mod tests {
                 assert_eq!(report.renderer_p95_ms, 0);
                 assert_eq!(report.entity_count, 0);
                 assert_eq!(report.snapshot_bytes_total, 0);
+                assert_eq!(report.snapshot_byte_source, "");
                 assert_eq!(report.snapshot_bytes_p95, 0);
                 assert_eq!(report.snapshot_segment_budget_bytes, 0);
                 assert_eq!(report.snapshot_over_segment_budget_count, 0);
                 assert_eq!(report.snapshot_over_segment_budget_pct_x100, 0);
                 assert_eq!(report.snapshot_parse_max_ms, 0);
+                assert_eq!(report.websocket_extensions, "");
+                assert_eq!(report.websocket_compression, "");
                 assert_eq!(report.snapshot_tick_gap_max, 0);
                 assert_eq!(report.match_run_id, "");
                 assert_eq!(report.command_issue_to_server_receipt_max_ms, 0);

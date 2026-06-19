@@ -2,8 +2,9 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 2 is merged and the user-approved follow-up is
-      MessagePack binary snapshots instead of WebSocket compression.
+- [ ] Ready for implementation after the completed compression-viability pass is archived in
+      [phase-2.5-compression-viability.md](phase-2.5-compression-viability.md) and the
+      user-approved follow-up is MessagePack binary snapshots instead of WebSocket compression.
 
 ## Objective
 
@@ -85,7 +86,7 @@ smoke, the rollback is to revert the MessagePack change rather than carry both s
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 2 is merged and the MessagePack direction supersedes the old deflate follow-up.
+- [ ] Confirm the archived compression-viability evidence is superseded by the MessagePack direction.
 - [ ] Add Rust MessagePack encoding for compact snapshots.
 - [ ] Add browser MessagePack decoding for snapshot binary frames.
 - [ ] Make MessagePack binary frames the normal live snapshot path after local validation.

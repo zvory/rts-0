@@ -1,5 +1,6 @@
 import { STATS, UPGRADES } from "./config.js";
 import { isUnit } from "./protocol.js";
+import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
 import { resourceValueElement } from "./resource_icons.js";
 
 const STORAGE_KEY = "rts.observerAnalysisOverlay";
@@ -263,36 +264,14 @@ export class ObserverAnalysisOverlay {
   }
 
   renderBody(tab, frameViews = null) {
-    if (!this.bodyEl) return;
-    if (tab.id === ARMY_VALUE_TAB_ID) {
-      const rows = calculateViewportArmyValue({
-        entities: Array.isArray(frameViews?.authoritativeEntities)
-          ? frameViews.authoritativeEntities
-          : this.getEntities(),
-        cameraBounds: this.getCameraBounds(),
-        players: this.getPlayers(),
-        stats: this.stats,
-      });
-      this.bodyEl.replaceChildren(this.renderArmyValue(rows));
-      return;
-    }
-    if (tab.id === PRODUCTION_TAB_ID) {
-      this.bodyEl.replaceChildren(this.renderProduction(this.analysis));
-      return;
-    }
-    if (tab.id === UNITS_TAB_ID) {
-      this.bodyEl.replaceChildren(this.renderUnits(this.analysis));
-      return;
-    }
-    if (tab.id === UNITS_LOST_TAB_ID) {
-      this.bodyEl.replaceChildren(this.renderUnitsLost(this.analysis));
-      return;
-    }
-    if (tab.id === RESOURCES_LOST_TAB_ID) {
-      this.bodyEl.replaceChildren(this.renderResourcesLost(this.analysis));
-      return;
-    }
-    this.bodyEl.replaceChildren(this.renderPlaceholder(tab));
+    renderObserverAnalysisBody(this, tab, frameViews, {
+      armyValue: ARMY_VALUE_TAB_ID,
+      production: PRODUCTION_TAB_ID,
+      units: UNITS_TAB_ID,
+      unitsLost: UNITS_LOST_TAB_ID,
+      resourcesLost: RESOURCES_LOST_TAB_ID,
+      calculateViewportArmyValue,
+    });
   }
 
   renderArmyValue(rows) {
