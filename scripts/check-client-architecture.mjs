@@ -34,7 +34,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "net.js": "transport",
   "protocol.js": "transport",
   "lab_client.js": "transport",
-  "report_window_aggregate.js": "transport",
+  "report_window_aggregate.js": "platform",
 
   "config.js": "rules-mirror",
 
@@ -71,7 +71,10 @@ const AREA_PREFIXES = [
   ["input/", "input"],
 ];
 
-const ALLOWED_CROSS_AREA_IMPORTS = new Map();
+const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
+  "net.js -> report_window_aggregate.js": "Net Report Phase 1 shares bounded report-window aggregation with client perf and command diagnostics.",
+  "prediction_controller.js -> report_window_aggregate.js": "Net Report Phase 2 reuses the bounded report-window helper for command milestone diagnostics.",
+}));
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([
   "input/index.js:Input",
@@ -96,10 +99,10 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Quick-cast click suppression keeps guard math in input/quick_cast_selection_guard.js while
   // input/index.js owns the mouse down/move/up routing hooks.
   "input/index.js": 39869,
-  // Net Report Phase 1 wires bounded snapshot diagnostics into the live report path.
-  "match.js": 39020,
-  // Room2 Phase 4 mirrors start-payload diagnostic capability constants.
-  "protocol.js": 38269,
+  // Net Report Phase 2 wires command receipt diagnostics into the live report path.
+  "match.js": 41905,
+  // Net Report Phase 2 mirrors the commandReceipt server message tag.
+  "protocol.js": 38306,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,

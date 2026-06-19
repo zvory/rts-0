@@ -261,16 +261,19 @@ export class PredictionController {
       pending.receiptTick = receipt.serverTick;
     }
     const diagnostic = this.commandDiagnosticsBySeq.get(seq);
+    let firstReceipt = true;
     if (diagnostic && diagnostic.receiptAt == null) {
       diagnostic.receiptAt = receivedAt;
       diagnostic.receiptTick = receipt.serverTick;
       this.commandReport.commandServerReceived += 1;
       this.addCommandTiming("issueToServerReceipt", receivedAt - diagnostic.issuedAt);
+    } else if (diagnostic) {
+      firstReceipt = false;
     } else if (!diagnostic) {
       this.commandReport.commandServerReceived += 1;
     }
     this.lastReceipt = receipt;
-    this.receiptCount += 1;
+    if (firstReceipt) this.receiptCount += 1;
     return this.debugSummary();
   }
 
