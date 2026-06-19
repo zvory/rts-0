@@ -230,6 +230,32 @@ pub struct ClientNetReport {
     pub snapshots: u32,
     pub frame_gap_max_ms: u16,
     pub fps_estimate: u16,
+    #[serde(default)]
+    pub frame_work_max_ms: u16,
+    #[serde(default)]
+    pub frame_work_p95_ms: u16,
+    #[serde(default)]
+    pub slow_frame_count: u32,
+    #[serde(default)]
+    pub worst_frame_phase: String,
+    #[serde(default)]
+    pub worst_frame_phase_ms: u16,
+    #[serde(default)]
+    pub renderer_max_ms: u16,
+    #[serde(default)]
+    pub renderer_p95_ms: u16,
+    #[serde(default)]
+    pub entity_count: u32,
+    #[serde(default)]
+    pub selected_count: u16,
+    #[serde(default)]
+    pub visible_tile_count: u32,
+    #[serde(default)]
+    pub viewport_width: u16,
+    #[serde(default)]
+    pub viewport_height: u16,
+    #[serde(default)]
+    pub device_pixel_ratio_x100: u16,
     pub hidden: bool,
     pub focused: bool,
     pub ws_buffered_bytes: u32,
@@ -2184,6 +2210,19 @@ mod tests {
                 "snapshots":289,
                 "frameGapMaxMs":37,
                 "fpsEstimate":58,
+                "frameWorkMaxMs":42,
+                "frameWorkP95Ms":24,
+                "slowFrameCount":2,
+                "worstFramePhase":"match.renderer",
+                "worstFramePhaseMs":22,
+                "rendererMaxMs":20,
+                "rendererP95Ms":16,
+                "entityCount":325,
+                "selectedCount":9,
+                "visibleTileCount":918,
+                "viewportWidth":1440,
+                "viewportHeight":900,
+                "devicePixelRatioX100":200,
                 "hidden":false,
                 "focused":true,
                 "wsBufferedBytes":0,
@@ -2198,7 +2237,49 @@ mod tests {
             ClientMessage::NetReport { report } => {
                 assert_eq!(report.schema_version, 1);
                 assert_eq!(report.snapshot_gap_max_ms, 420);
+                assert_eq!(report.frame_work_max_ms, 42);
+                assert_eq!(report.worst_frame_phase, "match.renderer");
+                assert_eq!(report.entity_count, 325);
+                assert_eq!(report.device_pixel_ratio_x100, 200);
                 assert_eq!(report.head_of_line_count, 7);
+            }
+            other => panic!("expected net report, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn client_net_report_defaults_perf_fields() {
+        let raw = r#"{
+            "t":"netReport",
+            "report":{
+                "schemaVersion":1,
+                "elapsedMs":10000,
+                "matchTick":300,
+                "rttMs":82,
+                "rttMaxMs":82,
+                "badRttSamples":0,
+                "snapshotJitterMs":0,
+                "snapshotGapMaxMs":33,
+                "jitterSamples":0,
+                "snapshots":300,
+                "frameGapMaxMs":16,
+                "fpsEstimate":60,
+                "hidden":false,
+                "focused":true,
+                "wsBufferedBytes":0,
+                "serverTickMs":4,
+                "serverLagMs":0,
+                "slowTickCount":0,
+                "headOfLineCount":0
+            }
+        }"#;
+        let msg: ClientMessage = serde_json::from_str(raw).unwrap();
+        match msg {
+            ClientMessage::NetReport { report } => {
+                assert_eq!(report.frame_work_max_ms, 0);
+                assert_eq!(report.worst_frame_phase, "");
+                assert_eq!(report.renderer_p95_ms, 0);
+                assert_eq!(report.entity_count, 0);
             }
             other => panic!("expected net report, got {other:?}"),
         }

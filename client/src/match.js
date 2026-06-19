@@ -5,6 +5,7 @@ import {
   machineGunnerHasAudibleTarget,
   machineGunSoundKey,
 } from "./combat_audio.js";
+import { clientPerfReportFields } from "./client_perf_report.js";
 import { Fog } from "./fog.js";
 import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
 import { FrameProfiler } from "./frame_profiler.js";
@@ -337,6 +338,7 @@ export class Match {
       snapshots: clampU32(stats.snapshots),
       frameGapMaxMs: clampU16(stats.frameGapMaxMs),
       fpsEstimate: clampU16(avgFrameMs > 0 ? 1000 / avgFrameMs : 0),
+      ...clientPerfReportFields(this.frameProfiler),
       hidden: !!document.hidden,
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : true,
       wsBufferedBytes: clampU32(this.net.bufferedAmount),
@@ -356,8 +358,12 @@ export class Match {
       predictionMode: report.predictionMode,
       pendingCommandCount: report.pendingCommandCount,
       correctionDistancePx: report.correctionDistancePx,
+      frameWorkMaxMs: report.frameWorkMaxMs,
+      rendererMaxMs: report.rendererMaxMs,
+      worstFramePhase: report.worstFramePhase,
     });
     this.health.resetReportStats();
+    this.frameProfiler?.resetReportWindow?.();
   }
 
   applyPredictionDisplayOverlay(overlay = null) {

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -53,13 +53,13 @@ which client-side phase was slow, not just that FPS was low.
 
 ## Implementation Checklist
 
-- [ ] Select the stable Phase 1 aggregate fields to upload.
-- [ ] Extend JS report generation with bounded fields.
-- [ ] Extend the Rust protocol DTO with backwards-compatible defaults where appropriate.
-- [ ] Extend structured logging and issue classification.
-- [ ] Update protocol/perf docs.
-- [ ] Add focused JS/Rust tests.
-- [ ] Mark this phase as done in this file.
+- [x] Select the stable Phase 1 aggregate fields to upload.
+- [x] Extend JS report generation with bounded fields.
+- [x] Extend the Rust protocol DTO with backwards-compatible defaults where appropriate.
+- [x] Extend structured logging and issue classification.
+- [x] Update protocol/perf docs.
+- [x] Add focused JS/Rust tests.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

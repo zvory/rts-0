@@ -16,9 +16,13 @@ export class FrameProfiler {
     this.slowPhaseMs = slowPhaseMs;
     this.maxRecentFrames = maxRecentFrames;
     this.phases = new Map();
+    this.reportPhases = new Map();
     this.frameCount = 0;
     this.slowFrameCount = 0;
+    this.reportFrameCount = 0;
+    this.reportSlowFrameCount = 0;
     this.worstPhaseCounts = new Map();
+    this.reportWorstPhaseCounts = new Map();
     this.recentFrames = [];
     this.latestContext = {};
     this.activeFrame = null;
@@ -52,6 +56,7 @@ export class FrameProfiler {
     const ms = clampDuration(durationMs);
     if (ms == null) return;
     this.aggregateFor(safeLabel).add(ms, slowMs);
+    this.aggregateFor(safeLabel, this.reportPhases).add(ms, slowMs);
     if (includeInWorst && this.activeFrame) {
       this.activeFrame.phaseMs.set(safeLabel, (this.activeFrame.phaseMs.get(safeLabel) || 0) + ms);
       if (ms >= this.activeFrame.worstPhaseMs) {
@@ -69,11 +74,19 @@ export class FrameProfiler {
     const totalWorkMs = Math.max(0, at - frame.startedAt);
     this.recordPhase("frame.work", totalWorkMs, { slowMs: this.slowFrameMs, includeInWorst: false });
     this.frameCount += 1;
+    this.reportFrameCount += 1;
     const slow = (Number.isFinite(frame.frameGapMs) && frame.frameGapMs >= this.slowFrameMs)
       || totalWorkMs >= this.slowFrameMs;
-    if (slow) this.slowFrameCount += 1;
+    if (slow) {
+      this.slowFrameCount += 1;
+      this.reportSlowFrameCount += 1;
+    }
     if (frame.worstPhase) {
       this.worstPhaseCounts.set(frame.worstPhase, (this.worstPhaseCounts.get(frame.worstPhase) || 0) + 1);
+      this.reportWorstPhaseCounts.set(
+        frame.worstPhase,
+        (this.reportWorstPhaseCounts.get(frame.worstPhase) || 0) + 1,
+      );
     }
     const summary = {
       at: round1(at),
@@ -97,22 +110,35 @@ export class FrameProfiler {
   }
 
   summary() {
-    const phaseRows = Array.from(this.phases.entries())
-      .map(([label, aggregate]) => ({ label, ...aggregate.summary() }))
-      .sort((a, b) => b.totalMs - a.totalMs || b.maxMs - a.maxMs || a.label.localeCompare(b.label));
-    const worstPhase = Array.from(this.worstPhaseCounts.entries())
-      .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))[0] || null;
     return {
       schemaVersion: 1,
       frameCount: this.frameCount,
       slowFrameCount: this.slowFrameCount,
       slowFrameMs: this.slowFrameMs,
       slowPhaseMs: this.slowPhaseMs,
-      worstPhase,
+      worstPhase: worstPhaseFrom(this.worstPhaseCounts),
       context: this.latestContext,
-      phases: phaseRows,
+      phases: phaseRowsFrom(this.phases),
       recentFrames: this.recentFrames.slice(),
+    };
+  }
+
+  reportSummary() {
+    const frameWork = this.reportPhases.get("frame.work");
+    const renderer = this.reportPhases.get("match.renderer");
+    const worstFramePhase = worstPhaseFrom(this.reportWorstPhaseCounts);
+    const worstAggregate = worstFramePhase ? this.reportPhases.get(worstFramePhase.label) : null;
+    return {
+      schemaVersion: 1,
+      frameCount: this.reportFrameCount,
+      slowFrameCount: this.reportSlowFrameCount,
+      frameWorkMaxMs: aggregateMaxMs(frameWork),
+      frameWorkP95Ms: aggregatePercentileMs(frameWork, 0.95),
+      worstFramePhase: worstFramePhase?.label || "",
+      worstFramePhaseMs: aggregateMaxMs(worstAggregate),
+      rendererMaxMs: aggregateMaxMs(renderer),
+      rendererP95Ms: aggregatePercentileMs(renderer, 0.95),
+      context: this.latestContext,
     };
   }
 
@@ -151,11 +177,22 @@ export class FrameProfiler {
 
   reset() {
     this.phases.clear();
+    this.reportPhases.clear();
     this.frameCount = 0;
     this.slowFrameCount = 0;
+    this.reportFrameCount = 0;
+    this.reportSlowFrameCount = 0;
     this.worstPhaseCounts.clear();
+    this.reportWorstPhaseCounts.clear();
     this.recentFrames = [];
     this.activeFrame = null;
+  }
+
+  resetReportWindow() {
+    this.reportPhases.clear();
+    this.reportFrameCount = 0;
+    this.reportSlowFrameCount = 0;
+    this.reportWorstPhaseCounts.clear();
   }
 
   debugSurface() {
@@ -164,14 +201,15 @@ export class FrameProfiler {
       text: () => this.text(),
       copy: () => this.copy(),
       reset: () => this.reset(),
+      reportSummary: () => this.reportSummary(),
     };
   }
 
-  aggregateFor(label) {
-    let aggregate = this.phases.get(label);
+  aggregateFor(label, phases = this.phases) {
+    let aggregate = phases.get(label);
     if (!aggregate) {
       aggregate = new PhaseAggregate();
-      this.phases.set(label, aggregate);
+      phases.set(label, aggregate);
     }
     return aggregate;
   }
@@ -205,6 +243,10 @@ class PhaseAggregate {
       slowCount: this.slowCount,
     };
   }
+
+  percentileMs(percentile) {
+    return percentileBucketDuration(this.buckets, this.count, percentile);
+  }
 }
 
 export function collectMatchFrameContext(match) {
@@ -215,6 +257,7 @@ export function collectMatchFrameContext(match) {
   const prediction = match?.prediction?.debugSummary?.() || {};
   return {
     matchTick: finiteOrNull(match?.lastSnapshotTick),
+    entityCount: sizeOf(state._curById),
     selectedCount: sizeOf(state.selection),
     rememberedBuildingCount: Array.isArray(state.rememberedBuildings) ? state.rememberedBuildings.length : 0,
     visibleTileCount: countVisibleTiles(state.visibleTiles),
@@ -246,6 +289,39 @@ function percentileBucket(buckets, count, percentile) {
     if (seen >= target) return i < DEFAULT_BUCKETS_MS.length ? DEFAULT_BUCKETS_MS[i] : `>${DEFAULT_BUCKETS_MS.at(-1)}`;
   }
   return 0;
+}
+
+function percentileBucketDuration(buckets, count, percentile) {
+  if (count <= 0) return 0;
+  const target = Math.max(1, Math.ceil(count * percentile));
+  let seen = 0;
+  for (let i = 0; i < buckets.length; i += 1) {
+    seen += buckets[i];
+    if (seen >= target) {
+      return i < DEFAULT_BUCKETS_MS.length ? DEFAULT_BUCKETS_MS[i] : DEFAULT_BUCKETS_MS.at(-1);
+    }
+  }
+  return 0;
+}
+
+function phaseRowsFrom(phases) {
+  return Array.from(phases.entries())
+    .map(([label, aggregate]) => ({ label, ...aggregate.summary() }))
+    .sort((a, b) => b.totalMs - a.totalMs || b.maxMs - a.maxMs || a.label.localeCompare(b.label));
+}
+
+function worstPhaseFrom(counts) {
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))[0] || null;
+}
+
+function aggregateMaxMs(aggregate) {
+  return aggregate ? round1(aggregate.maxMs) : 0;
+}
+
+function aggregatePercentileMs(aggregate, percentile) {
+  return aggregate ? aggregate.percentileMs(percentile) : 0;
 }
 
 function countVisibleTiles(tiles) {

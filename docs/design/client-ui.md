@@ -33,6 +33,7 @@ src/
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
   scoreboard.js   # Shared score/result formatting helpers
   observer_analysis_overlay.js # replay/live spectator analysis overlay
+  client_perf_report.js # bounded client frame-profiler upload field shaping
   match_health.js # match network/render health reporter
   frame_profiler.js # bounded client frame phase profiler and debug summary API
   branch_staging.js # replay branch staging panel
@@ -796,8 +797,8 @@ removed `GameState` intent shims such as `state.commandTarget`, `state.placement
 update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`, `frame_profiler.js`,
-  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `client_perf_report.js`, `match_health.js`,
+  `frame_profiler.js`, `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
   `lab_control_policy.js`, `room_capabilities.js`.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,

@@ -11,6 +11,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "main.js": "app-shell",
   "app.js": "app-shell",
   "match.js": "app-shell",
+  "client_perf_report.js": "app-shell",
   "match_health.js": "app-shell",
   "frame_profiler.js": "app-shell",
   "frame_recovery.js": "app-shell",

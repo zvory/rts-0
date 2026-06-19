@@ -3,8 +3,8 @@
 ## Browser frame phase profiling
 
 During a live match or replay, the browser exposes a local-only frame profiler at
-`window.__rtsPerf`. The profiler does not upload data in this phase; it keeps bounded aggregate
-timings in memory so a local lag report can separate slow frame gaps from concrete client work.
+`window.__rtsPerf`. The profiler keeps bounded aggregate timings in memory so a local lag report can
+separate slow frame gaps from concrete client work.
 
 Useful console calls:
 
@@ -29,6 +29,14 @@ prints the same text to the console.
 
 Optional server-side performance tracing is controlled by environment variables. It is off by
 default and emits structured `tracing` logs under the `server::perf` target when enabled.
+
+Every `ClientNetReport` upload includes a bounded report-window summary from the same profiler:
+`frameWorkMaxMs`, `frameWorkP95Ms`, `slowFrameCount`, `worstFramePhase`, `worstFramePhaseMs`,
+`rendererMaxMs`, `rendererP95Ms`, `entityCount`, `selectedCount`, `visibleTileCount`,
+`viewportWidth`, `viewportHeight`, and `devicePixelRatioX100`. Report-window profiler counters reset
+after each upload; the `window.__rtsPerf` debug summary remains cumulative until `reset()` is called.
+Raw phase arrays, recent frame records, stack traces, entity ids, command payloads, and replay data
+are intentionally not uploaded.
 
 ## Modes
 
@@ -117,3 +125,23 @@ calls are added under `server` outside the helper. The only exception is
 `server/crates/sim/src/perf.rs`, which is the centralized simulation performance logging surface and
 cannot depend back on the server crate. `tests/run-all.sh` runs that check as part of the
 architecture policy gate.
+
+`client_net_report` issue classification uses stable buckets:
+
+- `client_renderer`: `rendererMaxMs >= 33` or `rendererP95Ms >= 16`; inspect `worstFramePhase`,
+  entity count, visible tiles, viewport size, and DPR to separate paint-heavy scenes from network
+  lag.
+- `client_frame_work`: `frameWorkMaxMs >= 33` or `frameWorkP95Ms >= 24`; points at local browser
+  work outside pure renderer cost.
+- `client_frame_stall`: `frameGapMaxMs >= 100`, or `slowFrameCount > 0` when frame-work thresholds
+  were not crossed; points at requestAnimationFrame gaps even when measured frame work was not the
+  dominant issue.
+- Existing buckets continue to separate `network_rtt`, `snapshot_gap`, `snapshot_jitter`,
+  `server_tick`, `server_scheduler_lag`, `websocket_backlog`, `pending_commands`,
+  `prediction_correction`, `prediction_disabled`, and `wasm_budget`.
+
+For Fly or local logs, start with:
+
+```bash
+scripts/fly-logs.sh beta recent | rg 'client_net_report|primary_issue'
+```
