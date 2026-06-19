@@ -30,6 +30,7 @@ claiming a change is done.
 - `node scripts/check-docs-health.mjs` — docs map, capsule size, and local Markdown link hygiene.
 - `node scripts/check-wiki.mjs` — wiki route hardening, local links, generated stats, and faction
   catalog parity.
+- `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10` — render-lag suite; no FPS gate.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate dependency direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
   enforce `rts-sim::game` internal architecture ratchets.

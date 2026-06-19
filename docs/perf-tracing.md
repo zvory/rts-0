@@ -102,23 +102,43 @@ Browser client performance harness:
 
 ```bash
 node scripts/client-perf-harness.mjs --list
-node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6
-node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6
+node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
+node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 10
+node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
+node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
 ```
 
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
 points at an already-healthy server. It drives headless Chrome with the existing
 `tests/package.json` `puppeteer-core` dependency path, copies the preserved Matt/Alex replay into
 `server/target/selfplay-artifacts/client_perf_matt_alex_match_54/replay.json` at runtime, and writes
-one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. Each summary
-includes a `snapshotPacketBudget` block with payload p95 bytes, the selected budget, over-budget
-count, and over-budget percentage when the generated `ClientNetReport` includes them. Pass `--trace`
-to also write a Chrome `trace.json`; traces are opt-in because they are larger and machine-local.
+one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. The
+`--render-lag-suite` path runs the Matt/Alex replay, the vehicle-wall stress scenario, and a
+selected-unit HUD stress scenario, then writes a rollup at
+`target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
+`renderBudget` advisory output for the 120 FPS target, a `snapshotPacketBudget` block with payload
+p95 bytes, the selected packet budget, over-budget count, and over-budget percentage when the
+generated `ClientNetReport` includes them. Pass `--trace` to also write a Chrome `trace.json`;
+traces are opt-in because they are larger and machine-local.
 
 The default harness result fails for runtime errors, page/console/request errors, and missing
 `window.__rtsPerf` or generated `ClientNetReport` summaries. It deliberately does not fail on an
 absolute FPS, frame time, or trace-timing budget. Treat the numbers as local evidence for comparing
 optimization branches on the same machine, not as a portable guarantee for other laptops.
+
+For render-lag comparisons, read `renderBudget.frameWork` first: `frame.work` is total browser work
+inside the RAF and should be compared to the 8.33 ms 120 FPS frame budget. Recurring top-level
+`match.*` phases above 1-2 ms p95 are advisory follow-up candidates; `match.renderer` and
+`match.minimap` are top-level phases, while `renderer.*` rows are nested renderer subphases and
+must not be added back into `frame.work`. If local-only minimap probes such as `minimap.*` rows are
+enabled during an investigation, treat them as nested minimap detail under `match.minimap`, not as a
+separate top-level cost. Always inspect p95 bucket, max, worst-phase count, and shape context
+(`entityCount`, `selectedCount`, visible tiles, viewport, and device pixel ratio) together.
+
+Keep evidence streams separate. Matt and Alex beta FPS/network reports are per-player browser
+observations from deployed matches; `matt-alex-replay` is a local replay of preserved match 54 data;
+`vehicle-wall-stress` and `selected-unit-hud-stress` are local no-fog dev scenarios. Do not average
+or merge those rows when deciding whether a branch improved render cost.
 
 Snapshot codec bake-off:
 
