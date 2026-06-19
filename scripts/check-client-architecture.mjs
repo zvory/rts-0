@@ -90,8 +90,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "hud.js": 44208,
   // Room2 Phase 4 adds recipient diagnostic affordance parsing to GameState.
   "state.js": 39267,
-  // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
-  "input/index.js": 38854,
+  // Quick-cast click suppression keeps guard math in input/quick_cast_selection_guard.js while
+  // input/index.js owns the mouse down/move/up routing hooks.
+  "input/index.js": 39869,
   // Room2 Phase 3 renames replay/dev time wiring to neutral room-time handlers.
   "match.js": 38818,
   // Room2 Phase 4 mirrors start-payload diagnostic capability constants.

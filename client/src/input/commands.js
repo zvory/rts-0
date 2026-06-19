@@ -12,6 +12,7 @@ import {
 import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { commandHotkeyFromEvent } from "./placement.js";
+import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 
 export function _onRightClick(p, ev = {}) {
   const intent = clientIntent(this);
@@ -410,12 +411,14 @@ export function _activateCommandHotkey(ev) {
 export function _quickCastCommandTarget(ev = {}) {
   const intent = clientIntent(this);
   if (!intent?.commandTarget || !this.mouse) return false;
+  const quickCastPoint = { x: this.mouse.x, y: this.mouse.y };
   this._issueTargetedCommand(this.mouse, ev);
   const issued = typeof intent.issueCommandTarget === "function"
     ? intent.issueCommandTarget(ev)
     : { keepArmed: false };
   if (!issued.keepArmed) {
     intent.endCommandTarget?.();
+    armPostQuickCastSelectionGuard(this, quickCastPoint);
   }
   return true;
 }
