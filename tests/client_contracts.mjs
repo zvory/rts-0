@@ -22,6 +22,7 @@ import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
+import { FrameProfiler, collectMatchFrameContext } from "../client/src/frame_profiler.js";
 import { MatchHealth } from "../client/src/match_health.js";
 import {
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
@@ -1266,6 +1267,89 @@ function hotkeyService() {
 }
 
 // ---------------------------------------------------------------------------
+// Frame profiler
+// ---------------------------------------------------------------------------
+
+{
+  let clock = 0;
+  const profiler = new FrameProfiler({
+    now: () => clock,
+    slowFrameMs: 20,
+    slowPhaseMs: 5,
+    maxRecentFrames: 2,
+  });
+
+  profiler.beginFrame({ at: 0, frameGapMs: 16 });
+  profiler.recordPhase("match.camera", 3);
+  profiler.recordPhase("renderer.units", 9);
+  profiler.endFrame({ at: 25, context: { entityCount: 7, selectedCount: 2, hidden: false, focused: true } });
+
+  clock = 40;
+  profiler.beginFrame({ at: 40, frameGapMs: 40 });
+  profiler.time("match.hud", () => { clock = 47; });
+  profiler.endFrame({ at: 48, context: { visibleTileCount: 12 } });
+
+  clock = 70;
+  profiler.beginFrame({ at: 70, frameGapMs: 10 });
+  profiler.recordPhase("renderer.units", 1);
+  profiler.endFrame({ at: 72 });
+
+  const summary = profiler.summary();
+  assert(summary.schemaVersion === 1, "FrameProfiler exposes a versioned debug summary");
+  assert(summary.frameCount === 3, "FrameProfiler counts completed frames");
+  assert(summary.slowFrameCount === 2, "FrameProfiler counts slow frames by gap or work");
+  assert(summary.recentFrames.length === 2, "FrameProfiler keeps recent frame history bounded");
+  assert(summary.context.entityCount === 7, "FrameProfiler preserves latest entity count context");
+  assert(summary.context.visibleTileCount === 12, "FrameProfiler merges later shape context");
+  const unitsPhase = summary.phases.find((phase) => phase.label === "renderer.units");
+  assert(unitsPhase?.count === 2, "FrameProfiler aggregates repeated renderer phases");
+  assert(unitsPhase?.slowCount === 1, "FrameProfiler counts slow phase samples");
+  assert(unitsPhase?.maxMs === 9, "FrameProfiler records phase max timing");
+  assert(unitsPhase?.p50Ms === 1, "FrameProfiler reports bucketed p50 timing");
+  assert(unitsPhase?.p95Ms === 12, "FrameProfiler reports bucketed p95 timing");
+  assert(summary.worstPhase?.label === "renderer.units", "FrameProfiler reports the most common worst phase");
+  assert(profiler.text().includes("renderer.units"), "FrameProfiler text summary is copyable");
+  const surface = profiler.debugSurface();
+  assert(typeof surface.summary === "function", "FrameProfiler debug surface exposes summary()");
+  assert(typeof surface.copy === "function", "FrameProfiler debug surface exposes copy()");
+  surface.reset();
+  assert(profiler.summary().frameCount === 0, "FrameProfiler debug surface reset clears aggregates");
+}
+
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  globalThis.window = { devicePixelRatio: 2 };
+  globalThis.document = { hidden: true, hasFocus: () => false };
+  try {
+    const context = collectMatchFrameContext({
+      lastSnapshotTick: 123,
+      state: {
+        selection: new Set([1, 2]),
+        rememberedBuildings: [{ id: 9 }],
+        visibleTiles: Uint8Array.from([1, 0, 1, 1]),
+      },
+      camera: { viewW: 800, viewH: 600, zoom: 1.5 },
+      renderer: { app: { view: { width: 1600, height: 1200 }, renderer: {} } },
+      prediction: { debugSummary: () => ({ mode: "predicting" }) },
+    });
+    assert(context.matchTick === 123, "match frame context includes latest match tick");
+    assert(context.selectedCount === 2, "match frame context includes selected count");
+    assert(context.rememberedBuildingCount === 1, "match frame context includes remembered building count");
+    assert(context.visibleTileCount === 3, "match frame context counts visible tiles");
+    assert(context.canvasWidth === 1600, "match frame context includes canvas backing width");
+    assert(context.devicePixelRatio === 2, "match frame context includes device pixel ratio");
+    assert(context.predictionMode === "predicting", "match frame context includes prediction mode");
+    assert(context.hidden === true && context.focused === false, "match frame context includes document state");
+  } finally {
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Match health
 // ---------------------------------------------------------------------------
 
@@ -1619,6 +1703,7 @@ function installFakePixi() {
       },
     };
     const renderer = new Renderer(parent);
+    const profiler = new FrameProfiler();
     renderer._drawUnit = () => {
       throw new Error("broken worker art");
     };
@@ -1674,12 +1759,17 @@ function installFakePixi() {
       },
       null,
       1,
+      { profiler },
     );
 
     const fallback = renderer._pools.units.get(101);
+    const rendererPhases = new Set(profiler.summary().phases.map((phase) => phase.label));
     assert(placementDraws === 1, "renderer continues later overlays after a render helper throws");
     assert(renderer._renderErrors.get("unit:worker")?.count === 1, "renderer records entity render errors by kind");
     assert(renderer._renderErrors.get("mortarImpacts")?.count === 1, "renderer records overlay render errors by label");
+    assert(rendererPhases.has("renderer.units"), "renderer records unit sub-phase timing");
+    assert(rendererPhases.has("renderer.feedbackOverlays"), "renderer records feedback overlay sub-phase timing");
+    assert(profiler.summary().context.entityCount === 1, "renderer profiler context includes entity count");
     assert(fallback?.calls.some((call) => call[0] === "drawRect"), "broken entity art draws a checkerboard fallback");
     assert(
       consoleErrors.some((args) => String(args[0]).includes("[RTS_RENDER] skipped unit:worker")),

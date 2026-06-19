@@ -34,6 +34,7 @@ src/
   scoreboard.js   # Shared score/result formatting helpers
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   match_health.js # match network/render health reporter
+  frame_profiler.js # bounded client frame phase profiler and debug summary API
   branch_staging.js # replay branch staging panel
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
@@ -795,7 +796,7 @@ removed `GameState` intent shims such as `state.commandTarget`, `state.placement
 update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`, `frame_profiler.js`,
   `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
   `lab_control_policy.js`, `room_capabilities.js`.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,

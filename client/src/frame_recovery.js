@@ -1,3 +1,5 @@
+import { collectMatchFrameContext } from "./frame_profiler.js";
+
 const FRAME_ERROR_LOG_INTERVAL_MS = 5000;
 
 export function createFrameErrorState() {
@@ -19,34 +21,47 @@ export function runMatchFrameSafely(match, now) {
 function runMatchFrame(match, now) {
   const dt = (now - match.lastFrame) / 1000;
   const frameGapMs = now - match.lastFrame;
+  match.frameProfiler?.beginFrame({ at: now, frameGapMs });
+  const time = (label, fn) => match.frameProfiler ? match.frameProfiler.time(label, fn) : fn();
   match.lastFrame = now;
-  if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
-    match.health.noteFrameGap(frameGapMs, now);
+  try {
+    if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
+      time("match.healthFrameGap", () => match.health.noteFrameGap(frameGapMs, now));
+    }
+    time("match.latencyRefresh", () => match.health.refreshLatency());
+
+    const alpha = time("match.alpha", () => match.computeAlpha());
+
+    time("match.camera", () => {
+      match.camera.update(dt, match.input);
+      if (match.audio) {
+        match.audio.setListener(
+          match.camera.x + match.camera.viewW / (2 * match.camera.zoom),
+          match.camera.y + match.camera.viewH / (2 * match.camera.zoom),
+          match.camera.zoom,
+          match.camera.viewW,
+        );
+      }
+    });
+    time("match.input", () => match.input.update(dt));
+    time("match.predictionVisual", () => match.advancePredictionVisual());
+    time("match.fog", () => {
+      match.fog.update(match.ownEntities(), match.state.map.tileSize, match.state.visibleTiles);
+    });
+
+    time("match.renderer", () => {
+      match.renderer.render(match.state, match.camera, match.fog, alpha, {
+        clientIntent: match.clientIntent,
+        profiler: match.frameProfiler,
+      });
+    });
+    time("match.hud", () => match.hud.update());
+    time("match.minimap", () => match.minimap.render());
+    time("match.observerAnalysis", () => match.observerAnalysisOverlay?.update());
+    time("match.healthPublish", () => match.health.publish());
+  } finally {
+    match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });
   }
-  match.health.refreshLatency();
-
-  const alpha = match.computeAlpha();
-
-  match.camera.update(dt, match.input);
-  if (match.audio) {
-    match.audio.setListener(
-      match.camera.x + match.camera.viewW / (2 * match.camera.zoom),
-      match.camera.y + match.camera.viewH / (2 * match.camera.zoom),
-      match.camera.zoom,
-      match.camera.viewW,
-    );
-  }
-  match.input.update(dt);
-  match.advancePredictionVisual();
-  match.fog.update(match.ownEntities(), match.state.map.tileSize, match.state.visibleTiles);
-
-  match.renderer.render(match.state, match.camera, match.fog, alpha, {
-    clientIntent: match.clientIntent,
-  });
-  match.hud.update();
-  match.minimap.render();
-  match.observerAnalysisOverlay?.update();
-  match.health.publish();
 }
 
 function recordFrameError(state, err) {

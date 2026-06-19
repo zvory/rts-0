@@ -7,6 +7,7 @@ import {
 } from "./combat_audio.js";
 import { Fog } from "./fog.js";
 import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
+import { FrameProfiler } from "./frame_profiler.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
@@ -116,6 +117,9 @@ export class Match {
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
+    this.frameProfiler = new FrameProfiler();
+    this.frameProfilerSurface = this.frameProfiler.debugSurface();
+    if (typeof window !== "undefined") window.__rtsPerf = this.frameProfilerSurface;
     this.predictionStartInfo = payload;
     this.predictionPlayerId = payload?.playerId;
     this.predictionCompatibility = predictionCompatibility(payload);
@@ -980,6 +984,9 @@ export class Match {
     this.observerAnalysisOverlay?.destroy();
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
+    if (typeof window !== "undefined" && window.__rtsPerf === this.frameProfilerSurface) {
+      delete window.__rtsPerf;
+    }
     this.replayControls = null;
     this.observerAnalysisOverlay = null;
     if (this.input && typeof this.input.destroy === "function") {

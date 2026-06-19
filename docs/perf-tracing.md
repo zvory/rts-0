@@ -1,5 +1,32 @@
 # Server performance tracing
 
+## Browser frame phase profiling
+
+During a live match or replay, the browser exposes a local-only frame profiler at
+`window.__rtsPerf`. The profiler does not upload data in this phase; it keeps bounded aggregate
+timings in memory so a local lag report can separate slow frame gaps from concrete client work.
+
+Useful console calls:
+
+```js
+window.__rtsPerf.summary()
+window.__rtsPerf.text()
+window.__rtsPerf.copy()
+window.__rtsPerf.reset()
+```
+
+The summary includes total frames, slow-frame count, recent frames, approximate p50/p95 buckets, max
+time, slow sample count, and worst-phase counts for match phases such as camera, input, prediction
+visual advance, fog, renderer, HUD, minimap, observer analysis, and health publish. Renderer
+sub-phases cover entity preparation, feedback view building, resources/buildings, units,
+selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement.
+
+Shape context is intentionally bounded: entity counts, selected count, remembered building count,
+visible tile count, viewport/canvas size, device pixel ratio, prediction mode, and
+hidden/focused state. Use `copy()` when filing a local browser performance note; it writes a
+tab-separated phase table to the clipboard when the browser allows clipboard access, otherwise it
+prints the same text to the console.
+
 Optional server-side performance tracing is controlled by environment variables. It is off by
 default and emits structured `tracing` logs under the `server::perf` target when enabled.
 
