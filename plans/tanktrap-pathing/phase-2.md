@@ -1,6 +1,6 @@
 # Phase 2 - Owner-Aware Pathing and Acquisition Policy
 
-Status: planned.
+Status: done.
 
 ## Goal
 
@@ -113,3 +113,32 @@ Rifleman attack against an enemy Tank Trap.
 Mark this phase done in the implementation commit. The handoff must summarize the final obstacle
 relation policy, the exact tests run, manual scenario observations, any path-cache or architecture
 implications, and whether docs were updated or intentionally left unchanged.
+
+## Handoff
+
+Implemented owner-aware Tank Trap path planning without making Tank Traps globally non-colliding.
+The final policy is:
+
+- Infantry-like movement remains pass-through for all Tank Traps.
+- Vehicle-body physical movement, collision, and standability still treat live Tank Trap footprints
+  and closed one-tile Tank Trap gaps as blockers.
+- Vehicle path planning keeps own and allied Tank Traps in the static blocker layer.
+- Vehicle path planning excludes enemy Tank Traps and enemy-only one-tile Tank Trap gap closures so
+  vehicles can route into breachable enemy walls.
+- Combat auto-acquisition ignores Tank Traps for infantry-like attackers, but keeps Tank Traps
+  eligible for vehicle-body attackers.
+- Explicit attack orders against visible enemy Tank Traps remain legal through the existing hostile
+  target validation path.
+
+Path-cache fingerprints now include the owner/team relation used for a path request. The
+server-sim and testing design docs were updated to document the planning-vs-physical-legality split.
+
+Focused verification:
+
+```bash
+cargo test --manifest-path server/Cargo.toml -p rts-sim tank_trap
+```
+
+`cargo nextest` was not available in this environment, so the focused cargo test command was used
+as the local fallback. Manual browser scenario checks were not run in this pass; the covered
+scenario tests assert the new friendly/allied blocker and enemy-breachable planning contract.

@@ -1,4 +1,4 @@
-use crate::game::entity::{Entity, EntityKind, EntityStore, Order};
+use crate::game::entity::{movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
@@ -88,9 +88,9 @@ pub(super) fn resolve_target(
 
     // Anti-Tank Guns prefer tanks over all other targets; fall back to nearest enemy if no tank
     // is in range.
-    let prefers_armored = entities
-        .get(self_id)
-        .map(|e| combat_rules::prefers_armored_targets(e.kind))
+    let attacker_kind = entities.get(self_id).map(|e| e.kind);
+    let prefers_armored = attacker_kind
+        .map(combat_rules::prefers_armored_targets)
         .unwrap_or(false);
     if prefers_armored {
         if let Some(id) = world_query::nearest_tank_in_range_filtered(
@@ -146,11 +146,18 @@ pub(super) fn resolve_target(
         py,
         acquire_px,
         |target| {
+            attacker_kind.is_some_and(|kind| target_relevant_for_auto_acquisition(kind, target))
+                &&
             target_currently_fireable(
                 map, entities, los, fog, smokes, self_id, owner, px, py, target,
             )
         },
     )
+}
+
+fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -> bool {
+    !(movement_body_class(attacker) == MovementBodyClass::InfantryLike
+        && target.kind == EntityKind::TankTrap)
 }
 
 #[allow(clippy::too_many_arguments)]

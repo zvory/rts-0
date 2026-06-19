@@ -457,7 +457,7 @@ fn tank_trap_friendly_reroute_wall_mixes_own_and_allied_blockers() {
     let (tx, ty) = setup.game.map.tile_of(trap.pos_x, trap.pos_y);
     assert!(
         !occ.passable_for_kind(tx as i32, ty as i32, EntityKind::Tank),
-        "own/allied Tank Traps should be vehicle-body blockers before Phase 2"
+        "own/allied Tank Traps should remain physical vehicle-body blockers"
     );
     assert!(
         occ.passable_for_kind(tx as i32, ty as i32, EntityKind::Rifleman),
@@ -494,11 +494,11 @@ fn tank_trap_enemy_breach_scenario_closes_sparse_vehicle_gaps() {
         .expect("scenario should spawn an enemy Tank Trap pair with one gap tile");
     assert!(
         !occ.passable_for_kind(tx as i32, ty as i32, EntityKind::ScoutCar),
-        "enemy Tank Traps should block vehicle pathing on their footprint"
+        "enemy Tank Traps should remain physical vehicle-body blockers"
     );
     assert!(
         !occ.passable_for_kind(tx as i32, ty as i32 + 1, EntityKind::ScoutCar),
-        "sparse enemy Tank Trap pairs should close the one-tile vehicle gap between them"
+        "sparse enemy Tank Trap pairs should still be physically too tight for vehicles"
     );
     assert!(
         occ.passable_for_kind(tx as i32, ty as i32 + 1, EntityKind::Rifleman),

@@ -116,7 +116,9 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     let occ = Occupancy::build(map, entities);
     let spatial = SpatialIndex::build(entities, map.size);
     let mut pathing = PathingService::new(256, 64);
-    let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 10);
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
+    let mut coordinator =
+        MoveCoordinator::new_with_teams(&mut pathing, map, &occ, 10, teams.clone());
     let mut fog = Fog::new(map.size);
     let player_ids: Vec<u32> = players.iter().map(|player| player.id).collect();
     fog.recompute_with_smoke(&player_ids, entities, map, smokes);
@@ -135,7 +137,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     combat_system(
         map,
         entities,
-        &TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id))),
+        &teams,
         &mortar_autocast_researched,
         &occ,
         &spatial,
@@ -2980,6 +2982,80 @@ fn tank_trap_between_attacker_and_target_does_not_block_the_shot() {
             .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == intended)),
         "attack event should point at the intended target"
     );
+}
+
+#[test]
+fn infantry_like_auto_acquisition_ignores_enemy_tank_traps() {
+    for kind in [
+        EntityKind::Worker,
+        EntityKind::Rifleman,
+        EntityKind::MachineGunner,
+    ] {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("attacker should spawn");
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .set_order(Order::attack_move_to(300.0, 100.0));
+        let trap = entities
+            .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
+            .expect("tank trap should spawn");
+        let trap_hp_before = entities.get(trap).expect("trap should exist").hp;
+
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &open_map(12),
+        );
+
+        assert_eq!(
+            entities
+                .get(attacker)
+                .expect("attacker should exist")
+                .target_id(),
+            None,
+            "{kind:?} should not auto-acquire enemy Tank Traps"
+        );
+        assert_eq!(
+            entities.get(trap).expect("trap should exist").hp,
+            trap_hp_before,
+            "{kind:?} should not damage enemy Tank Traps without a direct order"
+        );
+    }
+}
+
+#[test]
+fn vehicle_body_auto_acquisition_keeps_enemy_tank_traps_targetable() {
+    for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("attacker should spawn");
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .set_order(Order::attack_move_to(300.0, 100.0));
+        let trap = entities
+            .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
+            .expect("tank trap should spawn");
+
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &open_map(12),
+        );
+
+        assert_eq!(
+            entities
+                .get(attacker)
+                .expect("attacker should exist")
+                .target_id(),
+            Some(trap),
+            "{kind:?} should still auto-acquire enemy Tank Traps"
+        );
+    }
 }
 
 #[test]

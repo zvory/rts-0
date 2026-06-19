@@ -27,12 +27,13 @@ use crate::game::services::geometry::{
 };
 use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
-    building_footprint, footprint_center, footprint_tiles, Occupancy,
+    building_footprint, footprint_center, footprint_tiles, Occupancy, StaticPathingRelation,
 };
 use crate::game::services::pathing::{
     simplify_reverse_waypoints_with_limit, PathRequest, PathingService, RouteShape,
 };
 use crate::game::services::standability;
+use crate::game::teams::TeamRelations;
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
@@ -56,21 +57,40 @@ pub struct MoveCoordinator<'a> {
     pathing: &'a mut PathingService,
     map: &'a Map,
     occ: &'a Occupancy<'a>,
+    teams: TeamRelations,
     tick: u32,
     budget: usize,
 }
 
 impl<'a> MoveCoordinator<'a> {
+    #[cfg(test)]
     pub fn new(
         pathing: &'a mut PathingService,
         map: &'a Map,
         occ: &'a Occupancy<'a>,
         tick: u32,
     ) -> Self {
+        Self::new_with_teams(
+            pathing,
+            map,
+            occ,
+            tick,
+            TeamRelations::from_player_teams(std::iter::empty()),
+        )
+    }
+
+    pub fn new_with_teams(
+        pathing: &'a mut PathingService,
+        map: &'a Map,
+        occ: &'a Occupancy<'a>,
+        tick: u32,
+        teams: TeamRelations,
+    ) -> Self {
         MoveCoordinator {
             pathing,
             map,
             occ,
+            teams,
             tick,
             budget: MAX_REQUESTS_PER_TICK,
         }
@@ -421,9 +441,10 @@ impl<'a> MoveCoordinator<'a> {
         goal: (f32, f32),
         smooth_static_segments: bool,
     ) -> bool {
-        let ((sx, sy), kind, start_pos) = match entities.get(id) {
+        let ((sx, sy), owner, kind, start_pos) = match entities.get(id) {
             Some(e) => (
                 self.map.tile_of(e.pos_x, e.pos_y),
+                e.owner,
                 e.kind,
                 (e.pos_x, e.pos_y),
             ),
@@ -457,6 +478,7 @@ impl<'a> MoveCoordinator<'a> {
             RouteShape::Normal
         };
         let req = PathRequest {
+            relation: StaticPathingRelation::for_player(owner, &self.teams),
             kind,
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
@@ -591,16 +613,17 @@ impl<'a> MoveCoordinator<'a> {
         if self.budget == 0 {
             return None;
         }
-        let (unit_kind, sx, sy) = match entities.get(id) {
+        let (unit_owner, unit_kind, sx, sy) = match entities.get(id) {
             Some(e) if e.is_unit() => {
                 let (sx, sy) = self.map.tile_of(e.pos_x, e.pos_y);
-                (e.kind, sx, sy)
+                (e.owner, e.kind, sx, sy)
             }
             _ => return None,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         let radius_tiles = config::unit_radius_tiles(unit_kind);
         let req = PathRequest {
+            relation: StaticPathingRelation::for_player(unit_owner, &self.teams),
             kind: unit_kind,
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),

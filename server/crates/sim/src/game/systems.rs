@@ -127,8 +127,15 @@ pub(crate) fn run_tick(
     let pre_command = crate::perf::timed(perf.as_deref_mut(), "pre_command_derived", || {
         PreCommandDerivedState::rebuild(map, entities)
     });
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let mut coordinator = crate::perf::timed(perf.as_deref_mut(), "move_coordinator_new", || {
-        services::move_coordinator::MoveCoordinator::new(pathing, map, &pre_command.occupancy, tick)
+        services::move_coordinator::MoveCoordinator::new_with_teams(
+            pathing,
+            map,
+            &pre_command.occupancy,
+            tick,
+            teams.clone(),
+        )
     });
 
     crate::perf::timed(perf.as_deref_mut(), "apply_commands", || {
@@ -201,7 +208,6 @@ pub(crate) fn run_tick(
     });
 
     crate::perf::timed(perf.as_deref_mut(), "combat", || {
-        let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         let mortar_autocast_researched = |owner| {
             players
                 .iter()
