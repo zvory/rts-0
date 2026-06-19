@@ -28,6 +28,17 @@ from tracing output. Strip them before ad hoc text analysis, for example:
 jq -r '.message' fly-match-54-all.jsonl | perl -pe 's/\e\[[0-9;]*m//g'
 ```
 
+For the repeatable parser/playbook path, run:
+
+```bash
+node ../../../scripts/parse-net-report-logs.mjs fly-match-54-all.jsonl fly-match-55-all.jsonl
+```
+
+The parser emits the compact table and evidence-bounded classification described in
+[`docs/perf-tracing.md`](../../perf-tracing.md#network-incident-parser). It reports the newer
+payload, command milestone, and server snapshot timing fields as unavailable for these older logs
+instead of treating them as zero.
+
 ## Matches
 
 | match | UTC window | winner | players | replay build |
