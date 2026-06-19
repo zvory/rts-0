@@ -1,0 +1,98 @@
+[
+  {
+    "artifact_schema_version": 2,
+    "build_sha": "7e5fb0881792",
+    "debug_mode": false,
+    "duration_ms": 393177,
+    "duration_ticks": 11914,
+    "ended_at": "2026-06-19T01:00:57.039452+00:00",
+    "human_count": 2,
+    "id": 54,
+    "local_only": false,
+    "map_hash": "13ac64aab0be91a8",
+    "map_name": "Default",
+    "map_schema_version": 2,
+    "outcome": "win",
+    "participants": [
+      "alex",
+      "<b>matt</b>"
+    ],
+    "replay_map_name": "Default",
+    "score_screen": [
+      {
+        "buildingsKilled": 0,
+        "buildingsLost": 0,
+        "color": "#0072b2",
+        "id": 4,
+        "name": "alex",
+        "structureScore": 2880,
+        "teamId": 1,
+        "unitScore": 3720,
+        "unitsKilled": 14,
+        "unitsLost": 5
+      },
+      {
+        "buildingsKilled": 0,
+        "buildingsLost": 14,
+        "color": "#d55e00",
+        "id": 5,
+        "name": "<b>matt</b>",
+        "structureScore": 1480,
+        "teamId": 2,
+        "unitScore": 2940,
+        "unitsKilled": 5,
+        "unitsLost": 49
+      }
+    ],
+    "started_at": "2026-06-19T00:54:23.861999+00:00",
+    "winner_name": "alex"
+  },
+  {
+    "artifact_schema_version": 2,
+    "build_sha": "7e5fb0881792",
+    "debug_mode": false,
+    "duration_ms": 298796,
+    "duration_ticks": 9054,
+    "ended_at": "2026-06-19T01:11:05.015263+00:00",
+    "human_count": 2,
+    "id": 55,
+    "local_only": false,
+    "map_hash": "13ac64aab0be91a8",
+    "map_name": "Default",
+    "map_schema_version": 2,
+    "outcome": "win",
+    "participants": [
+      "alex",
+      "matt"
+    ],
+    "replay_map_name": "Default",
+    "score_screen": [
+      {
+        "buildingsKilled": 0,
+        "buildingsLost": 5,
+        "color": "#0072b2",
+        "id": 7,
+        "name": "alex",
+        "structureScore": 800,
+        "teamId": 1,
+        "unitScore": 1200,
+        "unitsKilled": 0,
+        "unitsLost": 24
+      },
+      {
+        "buildingsKilled": 2,
+        "buildingsLost": 0,
+        "color": "#d55e00",
+        "id": 8,
+        "name": "matt",
+        "structureScore": 600,
+        "teamId": 2,
+        "unitScore": 900,
+        "unitsKilled": 24,
+        "unitsLost": 0
+      }
+    ],
+    "started_at": "2026-06-19T01:06:06.218959+00:00",
+    "winner_name": "matt"
+  }
+]
