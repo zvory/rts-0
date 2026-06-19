@@ -9,7 +9,9 @@
 //   - `exploredGrid` : 1 where a tile has *ever* been visible (cumulative, never cleared).
 //
 // A tile is rendered clear when visible, dimmed when explored-but-not-visible, and
-// solid dark when never explored (the renderer reads the grids directly).
+// solid dark when never explored (the renderer reads the grids directly). `revision`
+// increments only when those visibility semantics change so canvas overlays can cache
+// their fog view between identical frames.
 
 import { STATS } from "./config.js";
 import { TERRAIN } from "./protocol.js";
@@ -35,6 +37,10 @@ export class Fog {
     this.exploredGrid = new Uint8Array(mapWidth * mapHeight);
     this.terrain = terrain;
     this.revealAll = false;
+    this.revision = 0;
+    this.visibleRevision = 0;
+    this.exploredRevision = 0;
+    this._nextVisibleGrid = new Uint8Array(mapWidth * mapHeight);
   }
 
   /**
@@ -50,28 +56,52 @@ export class Fog {
    */
   update(ownEntities, tileSize, serverVisibleTiles = null) {
     if (this.revealAll) {
-      this.visibleGrid.fill(1);
-      this.exploredGrid.fill(1);
+      this._recordGridChanges(
+        this._fillGridIfChanged(this.visibleGrid, 1),
+        this._fillGridIfChanged(this.exploredGrid, 1),
+      );
       return;
     }
     if (serverVisibleTiles && serverVisibleTiles.length === this.visibleGrid.length) {
+      let visibleChanged = false;
+      let exploredChanged = false;
       for (let i = 0; i < this.visibleGrid.length; i++) {
         const visible = serverVisibleTiles[i] ? 1 : 0;
-        this.visibleGrid[i] = visible;
-        if (visible) this.exploredGrid[i] = 1;
+        if (this.visibleGrid[i] !== visible) {
+          this.visibleGrid[i] = visible;
+          visibleChanged = true;
+        }
+        if (visible && this.exploredGrid[i] !== 1) {
+          this.exploredGrid[i] = 1;
+          exploredChanged = true;
+        }
       }
+      this._recordGridChanges(visibleChanged, exploredChanged);
       return;
     }
-    this.visibleGrid.fill(0);
-    if (!ownEntities || !tileSize) return;
+    const nextVisible = this._nextVisibleGrid;
+    nextVisible.fill(0);
+    let exploredChanged = false;
 
-    for (const e of ownEntities) {
-      const stat = STATS[e.kind];
-      const sight = (stat && stat.sight) || DEFAULT_SIGHT_TILES;
-      const cx = e.x / tileSize;
-      const cy = e.y / tileSize;
-      this._stampCircle(cx, cy, sight);
+    if (ownEntities && tileSize) {
+      for (const e of ownEntities) {
+        const stat = STATS[e.kind];
+        const sight = (stat && stat.sight) || DEFAULT_SIGHT_TILES;
+        const cx = e.x / tileSize;
+        const cy = e.y / tileSize;
+        exploredChanged = this._stampCircle(cx, cy, sight, nextVisible) || exploredChanged;
+      }
     }
+
+    let visibleChanged = false;
+    for (let i = 0; i < this.visibleGrid.length; i++) {
+      const visible = nextVisible[i];
+      if (this.visibleGrid[i] !== visible) {
+        this.visibleGrid[i] = visible;
+        visibleChanged = true;
+      }
+    }
+    this._recordGridChanges(visibleChanged, exploredChanged);
   }
 
   /**
@@ -79,12 +109,13 @@ export class Fog {
    * visible and explored. Uses a squared-distance test so the reveal is round.
    * @private
    */
-  _stampCircle(cx, cy, radius) {
+  _stampCircle(cx, cy, radius, visibleGrid = this.visibleGrid) {
     const r2 = radius * radius;
     const minTx = Math.max(0, Math.floor(cx - radius));
     const maxTx = Math.min(this.width - 1, Math.ceil(cx + radius));
     const minTy = Math.max(0, Math.floor(cy - radius));
     const maxTy = Math.min(this.height - 1, Math.ceil(cy + radius));
+    let exploredChanged = false;
 
     for (let ty = minTy; ty <= maxTy; ty++) {
       // Compare against tile centers so the disc is symmetric around the entity.
@@ -94,11 +125,15 @@ export class Fog {
         const dx = tx + 0.5 - cx;
         if (dx * dx + dy * dy <= r2 && this._tileVisibleFrom(cx, cy, tx, ty)) {
           const i = rowBase + tx;
-          this.visibleGrid[i] = 1;
-          this.exploredGrid[i] = 1;
+          visibleGrid[i] = 1;
+          if (this.exploredGrid[i] !== 1) {
+            this.exploredGrid[i] = 1;
+            exploredChanged = true;
+          }
         }
       }
     }
+    return exploredChanged;
   }
 
   /**
@@ -124,11 +159,33 @@ export class Fog {
   }
 
   setRevealAll(enabled) {
-    this.revealAll = !!enabled;
+    const next = !!enabled;
+    const modeChanged = this.revealAll !== next;
+    this.revealAll = next;
+    let visibleChanged = false;
+    let exploredChanged = false;
     if (this.revealAll) {
-      this.visibleGrid.fill(1);
-      this.exploredGrid.fill(1);
+      visibleChanged = this._fillGridIfChanged(this.visibleGrid, 1);
+      exploredChanged = this._fillGridIfChanged(this.exploredGrid, 1);
     }
+    this._recordGridChanges(visibleChanged, exploredChanged, modeChanged);
+  }
+
+  _fillGridIfChanged(grid, value) {
+    let changed = false;
+    for (let i = 0; i < grid.length; i++) {
+      if (grid[i] !== value) {
+        grid[i] = value;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  _recordGridChanges(visibleChanged, exploredChanged, semanticChanged = false) {
+    if (visibleChanged) this.visibleRevision += 1;
+    if (exploredChanged) this.exploredRevision += 1;
+    if (visibleChanged || exploredChanged || semanticChanged) this.revision += 1;
   }
 
   _tileVisibleFrom(fromX, fromY, tileX, tileY) {
