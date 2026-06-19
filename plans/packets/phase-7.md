@@ -31,6 +31,7 @@ Record, at minimum:
 - server serialize/diff p95;
 - stale/unsupported/malformed/resync counts;
 - code paths or modes where compact JSON fallback was used.
+- the Phase 2.5 selected encoding default, opt-in path, or deferral state.
 
 ## Rollout Policy
 
@@ -45,6 +46,8 @@ Default to the conservative choice:
   forcing default rollout.
 - If recovery, replay/lab, or fog/privacy issues remain, keep delta mode disabled by default and open
   a follow-up plan before more implementation.
+- Do not silently change the Phase 2.5 encoding default or fallback while defaulting deltas unless
+  the measurements explicitly cover that combined mode and rollback path.
 
 ## Work
 

@@ -71,13 +71,20 @@ phase should keep JSON as the default while producing reproducible size and CPU 
 Matt/Alex replay, AI harness, and at least one current live/dev workload. It should end with a
 documented recommendation to ship one encoding path, defer all of them, or split follow-up work.
 
+### [Phase 2.5 - Selected Encoding Rollout](phase-2.5.md)
+
+Apply the Phase 2 recommendation before any delta work begins. This phase should ship the selected
+encoding/compression path safely, keep it opt-in with documented blockers, or explicitly defer format
+changes while preserving compact JSON as the default and fallback. It must leave later delta phases
+with a clear default codec, rollback path, and decision artifact.
+
 ### [Phase 3 - Delta Snapshot Envelope And Baseline Scaffold](phase-3.md)
 
 Add the stateful snapshot frame envelope, per-writer baseline tracking, forced-keyframe rules, and
 client reconstruction seam without trying to shrink payloads yet. This phase should prove that a
 keyframe-only run through the new path behaves like current compact JSON snapshots and that baselines
-are updated only for frames actually sent. It stays gated on Phase 2 evidence and explicit user
-approval before delta work begins.
+are updated only for frames actually sent. It stays gated on Phase 2.5's applied encoding decision
+and explicit user approval before delta work begins.
 
 ### [Phase 4 - Resource And Fog Delta Prototype](phase-4.md)
 
@@ -116,6 +123,7 @@ and docs remain clear.
 
 1. [Phase 1 - Packet Budget Measurement](phase-1.md)
 2. [Phase 2 - Encoding And Compression Bake-off](phase-2.md)
+2.5. [Phase 2.5 - Selected Encoding Rollout](phase-2.5.md)
 3. [Phase 3 - Delta Snapshot Envelope And Baseline Scaffold](phase-3.md)
 4. [Phase 4 - Resource And Fog Delta Prototype](phase-4.md)
 5. [Phase 5 - Entity Record Delta Protocol](phase-5.md)
@@ -133,21 +141,24 @@ and docs remain clear.
   evidence for comparisons, not portable guarantees across maps and workloads.
 - Do not upload raw snapshots, raw command logs, entity id streams, player names, browser traces, or
   packet captures from normal clients.
-- Do not implement delta phases until Phase 2 has merged, its decision artifact recommends moving
-  beyond encoding/compression, and the user explicitly approves delta work.
+- Do not implement delta phases until Phase 2.5 has merged, the applied encoding decision recommends
+  moving beyond encoding/compression, and the user explicitly approves delta work.
 
 ## Implementation Process
 
 Implement one phase at a time. Do not start a later phase from an assumed merge; use the PR wait gate
-and confirm the phase head is reachable from `origin/main`. Phase 1 and Phase 2 can run normally:
+and confirm the phase head is reachable from `origin/main`. Phase 1, Phase 2, and Phase 2.5 can run
+normally:
 
 ```bash
 scripts/phase-runner.sh --plan packets phase-1 --pr --wait
 scripts/phase-runner.sh --plan packets phase-2 --pr --wait
+scripts/phase-runner.sh --plan packets phase-2.5 --pr --wait
 ```
 
-Do not run delta phases until Phase 2 recommends delta work and the user explicitly approves that
-direction. After that gate, run them one at a time:
+Do not run delta phases until Phase 2.5 has applied the Phase 2 recommendation, recommends delta
+work as the next step, and the user explicitly approves that direction. After that gate, run them one
+at a time:
 
 ```bash
 scripts/phase-runner.sh --plan packets phase-3 --pr --wait

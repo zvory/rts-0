@@ -75,7 +75,8 @@ performance, and failure-mode checks.
   - recommend one candidate to ship by default, recommend a follow-up phase, or recommend deferring
     format changes in favor of deltas;
   - include the exact baseline and candidate numbers used for the recommendation;
-  - note any dependency, browser, or deployment risk that blocks a candidate.
+  - note any dependency, browser, or deployment risk that blocks a candidate;
+  - state the exact recommendation Phase 2.5 should apply.
 
 ## Expected Touch Points
 
@@ -141,5 +142,5 @@ parse/decode/apply timing are present and understandable.
 Provide a comparison table for every candidate attempted: encoded p95 bytes, max bytes, over-budget
 rate, browser parse/decode/apply p95, server serialize p95, dependency risk, browser support risk, and
 maintenance cost. State the recommendation plainly: ship a candidate, run one more focused phase, or
-skip format work and move to delta design. If a candidate was not implemented, explain the concrete
-blocker or why it was not worth the scope.
+skip format work and move to delta design. This recommendation is the input to Phase 2.5. If a
+candidate was not implemented, explain the concrete blocker or why it was not worth the scope.
