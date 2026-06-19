@@ -317,6 +317,21 @@ function fakeClassList() {
 
 function fakeHudRootWithoutResourceSpans() {
   const ids = new Map();
+  const resourceSpan = (id) => {
+    let text = "";
+    return {
+      id,
+      textWrites: 0,
+      classList: fakeClassList(),
+      get textContent() {
+        return text;
+      },
+      set textContent(value) {
+        this.textWrites += 1;
+        text = String(value);
+      },
+    };
+  };
   const hud = {
     _html: "",
     get innerHTML() {
@@ -327,7 +342,7 @@ function fakeHudRootWithoutResourceSpans() {
       ids.clear();
       for (const id of ["res-steel", "res-oil", "res-supply"]) {
         if (this._html.includes(`id="${id}"`)) {
-          ids.set(id, { id, textContent: "", classList: fakeClassList() });
+          ids.set(id, resourceSpan(id));
         }
       }
     },
@@ -537,6 +552,7 @@ function withFakeOverlayDocument(fn) {
       this.children = [];
       this.parentNode = null;
       this.focused = false;
+      this.replaceChildrenCount = 0;
       this.listeners = {};
       this.attributes = new Map();
       this.classList = {
@@ -561,6 +577,7 @@ function withFakeOverlayDocument(fn) {
       return child;
     }
     replaceChildren(...children) {
+      this.replaceChildrenCount += 1;
       for (const child of this.children) child.parentNode = null;
       this.children = [];
       this.append(...children);
@@ -733,6 +750,16 @@ function hotkeyService() {
   assert(ids.get("res-steel").textContent === "325", "restored HUD steel span updates from live resources");
   assert(ids.get("res-oil").textContent === "80", "restored HUD oil span updates from live resources");
   assert(ids.get("res-supply").textContent === "7 / 14", "restored HUD supply span updates from live supply");
+  const steelWrites = ids.get("res-steel").textWrites;
+  const oilWrites = ids.get("res-oil").textWrites;
+  const supplyWrites = ids.get("res-supply").textWrites;
+  hud._renderSinglePlayerResources();
+  assert(ids.get("res-steel").textWrites === steelWrites, "unchanged HUD steel skips duplicate text writes");
+  assert(ids.get("res-oil").textWrites === oilWrites, "unchanged HUD oil skips duplicate text writes");
+  assert(ids.get("res-supply").textWrites === supplyWrites, "unchanged HUD supply skips duplicate text writes");
+  state.resources.steel = 326;
+  hud._renderSinglePlayerResources();
+  assert(ids.get("res-steel").textContent === "326", "changed HUD steel still updates after dirty guard");
 }
 
 // ---------------------------------------------------------------------------
@@ -797,6 +824,34 @@ function hotkeyService() {
     assert(blocks.length === 2 && blocks.every((block) => block.className.includes("weight-12")),
       "HUD renders two Tank budget blocks into selected panel DOM");
     assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
+    const stableChildren = panel.children;
+    hud._renderSelectedPanel();
+    assert(panel.children === stableChildren, "HUD selected budget grid skips unchanged DOM rebuilds");
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const selected = { id: 2200, owner: 1, kind: KIND.TANK, hp: 80, maxHp: 100, oilUsed: 4.2 };
+    const state = {
+      selectionBudgetOverflow: null,
+      selectedEntities() {
+        return [selected];
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    const stableNode = panel.children[0];
+    hud._renderSelectedPanel();
+    assert(panel.children[0] === stableNode, "HUD selected detail skips unchanged DOM rebuilds");
+    selected.hp = 40;
+    hud._renderSelectedPanel();
+    assert(panel.children[0] !== stableNode, "HUD selected detail updates when displayed health changes");
+    assert(panel.children[0].innerHTML.includes("40 / 100"), "HUD selected detail renders changed health after dirty guard");
   });
 
   withFakeHudDocument(({ FakeElement }) => {
@@ -7501,6 +7556,8 @@ withFakeDocument(() => {
   withFakeOverlayDocument(({ FakeElement }) => {
     const root = new FakeElement("section");
     restored.selectedTab = "army-value";
+    restored.visible = true;
+    restored.collapsed = false;
     const overlay = new ObserverAnalysisOverlay({
       root,
       preferences: restored,
@@ -7517,6 +7574,25 @@ withFakeDocument(() => {
         && findFakes(root, (el) => el.classList.contains("replay-army-value-oil"))
           .some((cell) => cell.querySelector(".oil")),
       "observer analysis army value uses shared steel and oil icons",
+    );
+    const analysisBody = root.querySelector("#replay-analysis-body");
+    const stableArmyValueRenders = analysisBody.replaceChildrenCount;
+    overlay.update({
+      authoritativeEntities: [{ id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 20, y: 20 }],
+    });
+    assert(
+      analysisBody.replaceChildrenCount === stableArmyValueRenders,
+      "observer analysis skips unchanged army-value body DOM replacement",
+    );
+    overlay.update({
+      authoritativeEntities: [
+        { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 20, y: 20 },
+        { id: 2, owner: 2, kind: KIND.TANK, x: 20, y: 20 },
+      ],
+    });
+    assert(
+      analysisBody.replaceChildrenCount === stableArmyValueRenders + 1,
+      "observer analysis replaces army-value body when visible values change",
     );
 
     const unitsTab = root.querySelector(".replay-analysis-tab");
