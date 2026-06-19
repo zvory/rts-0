@@ -20,23 +20,28 @@ blocking rollout on CPU timing proof.
   - worst-case command burst replay cost
   - commands absorbed while replay is active
   - commands applied late because they arrived behind the active replay cursor
+  - commands applied by clamped rollback at the oldest safe replayable tick
+  - room metronome delay accumulated while catch-up replay runs
+  - authoritative snapshot gap observed by clients during catch-up
   - snapshot fanout cost after rollback
   - replay command-count fuse hits
   - slow catch-up replay logs for later optimization
 - Do not treat server CPU timing as a rollout gate in this phase. Slow catch-up passes should be
   structured-log evidence for follow-up optimization, not an automatic reason to disable the feature.
-  The normal hard fallback path is the command-count fuse, unsupported deterministic history, or
-  outside-window/behind-cursor command timing.
+  The normal hard fallback path is the command-count fuse, unsupported deterministic history,
+  unsafe clamped rollback, or behind-cursor command timing.
 - Server optimization candidates if logs later show a real problem:
   - cheaper `Game` clone/keyframe representation
   - replay snapshots at fixed intervals inside the six-tick ring
   - command-log compaction
   - avoiding unnecessary snapshot projection during replay
+  - yielding or chunking catch-up replay so command inbox drains happen between replay ticks
   - narrower rollback support for expensive room modes until optimized
 - Lead/window tuning:
   - compare two-tick lead with the final rollback window under healthy, jittery, and bursty
     profiles
   - report how often commands fall back late at each tested lead/window combination
+  - report how often outside-window commands use clamped rollback instead of live fallback
   - document the feel tradeoff before raising default lead or changing the six-tick window
 - Client prediction diagnostics:
   - evaluate moving WASM prediction/replay work to a Web Worker or equivalent isolated scheduler
@@ -76,6 +81,8 @@ blocking rollout on CPU timing proof.
   - rollback during command bursts
   - two-player alternating late commands during catch-up replay
   - command arriving behind the active replay cursor
+  - outside-window command using clamped rollback
+  - synthetic slow catch-up pass that records metronome delay and latest-snapshot gap
   - rollback with representative entity counts
   - fallback path when `MAX_REPLAY_COMMANDS` is exceeded
   - human-only rooms and AI-backed rooms, or an explicit `rollbackUnsupported` result for AI-backed
@@ -105,12 +112,14 @@ blocking rollout on CPU timing proof.
 
 Play or replay a busy local match on a weaker machine or throttled browser profile. Movement
 prediction on should still paint provisional command response promptly; server catch-up logs should
-show replay distance, absorbed commands, behind-cursor late commands, and replay elapsed time.
+show replay distance, absorbed commands, clamped rollback commands, behind-cursor late commands,
+metronome delay, snapshot gap, and replay elapsed time.
 
 ## Handoff Expectations
 
 The handoff must include measured server catch-up timing logs, whether the six-tick window produced
-slow replay evidence worth follow-up, the replay command-count fuse behavior, the chosen client
-execution model, final lead/window tuning recommendation, new report fields if any, whether a Worker
-is required before broad rollout, and whether later phases may enable full visual prediction or must
-stay in accepted-intent-overlay mode.
+slow replay evidence worth follow-up, metronome-delay and snapshot-gap evidence, the replay
+command-count fuse behavior, the chosen client execution model, final lead/window/clamped-fallback
+tuning recommendation, new report fields if any, whether a Worker is required before broad rollout,
+and whether later phases may enable full visual prediction or must stay in accepted-intent-overlay
+mode.
