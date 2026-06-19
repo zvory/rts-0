@@ -37,7 +37,9 @@ use rts_server::dev_scenarios::{
     dev_scenario_unit_label, parse_dev_scenario_launch_with_case,
 };
 use rts_server::lobby::{self, Lobby, RoomEvent};
-use rts_server::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
+use rts_server::protocol::{
+    default_snapshot_codec, encode_snapshot_frame, ClientMessage, ServerMessage, SnapshotFrame,
+};
 use rts_server::structured_log;
 use rts_sim::game::map::Map;
 use rts_sim::game::replay::{
@@ -1242,8 +1244,9 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     // Outbound path: room (and this task, for welcome/pong) -> writer task -> socket.
     let (conn_tx, writer_rx) = lobby::ConnectionSink::new();
 
-    // Writer task: serialize each ServerMessage to a JSON TEXT frame and push it to the socket.
-    // Reliable messages stay object-shaped JSON; snapshots use the compact v1 JSON schema.
+    // Writer task: serialize each ServerMessage and push it to the socket.
+    // Reliable messages stay object-shaped JSON; snapshots use the negotiated codec seam, which
+    // currently defaults to compact JSON text.
     // Reliable messages are FIFO and prioritized over snapshots. Snapshots are latest-only:
     // while the socket is busy, newer snapshots replace older unsent snapshots.
     let writer = tokio::spawn(async move {
@@ -1430,15 +1433,18 @@ async fn send_server_message(
     };
     let serialize_start = Instant::now();
     let encoded = match msg {
-        ServerMessage::Snapshot(snapshot) => serialize_compact_snapshot(&snapshot),
-        reliable => serde_json::to_string(&reliable),
+        ServerMessage::Snapshot(snapshot) => {
+            encode_snapshot_frame(&snapshot, default_snapshot_codec())
+                .map(ServerFrame::from_snapshot_frame)
+        }
+        reliable => serde_json::to_string(&reliable).map(ServerFrame::Text),
     };
     let serialize_duration = serialize_start.elapsed();
     match encoded {
-        Ok(json) => {
-            let bytes = json.len();
+        Ok(frame) => {
+            let bytes = frame.len();
             let send_start = Instant::now();
-            if sink.send(Message::Text(json.into())).await.is_err() {
+            if sink.send(frame.into_message()).await.is_err() {
                 // Socket gone; stop writing. The reader side will emit Leave.
                 perf::log_writer_message(
                     player_id,
@@ -1463,6 +1469,34 @@ async fn send_server_message(
         }
     }
     true
+}
+
+enum ServerFrame {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
+impl ServerFrame {
+    fn from_snapshot_frame(frame: SnapshotFrame) -> Self {
+        match frame {
+            SnapshotFrame::Text(text) => ServerFrame::Text(text),
+            SnapshotFrame::Binary(bytes) => ServerFrame::Binary(bytes),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            ServerFrame::Text(text) => text.len(),
+            ServerFrame::Binary(bytes) => bytes.len(),
+        }
+    }
+
+    fn into_message(self) -> Message {
+        match self {
+            ServerFrame::Text(text) => Message::Text(text.into()),
+            ServerFrame::Binary(bytes) => Message::Binary(bytes.into()),
+        }
+    }
 }
 
 /// Translate one parsed [`ClientMessage`] into the appropriate side effect.

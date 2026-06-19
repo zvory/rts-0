@@ -477,9 +477,16 @@ dev snapshots include every object and spectator/replay snapshots use the existi
 Enemy objects never carry owner-only state, and `sourceCasterId` is omitted unless the caster is
 safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 22. `client/src/net.js`
-decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
-Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
+Live WebSocket snapshot frames are sent with snapshot codec `compact-json`, codec version 1. That
+codec currently means compact JSON text, version 22. `client/src/net.js` decodes this
+transport shape back into the semantic object above before dispatching `S.SNAPSHOT`. Older
+object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
+
+The codec seam is explicit but conservative: compact JSON is the default, the only live supported
+codec, and the fallback path. Binary frames are rejected by the browser protocol parser until a
+future experiment adds an explicit codec/version and client decoder. Offline bake-off tooling may
+compare protobuf-style, MessagePack, CBOR, deflate, or custom binary candidates, but those artifacts
+do not change live negotiation and must not silently strand older clients.
 
 ```
 {

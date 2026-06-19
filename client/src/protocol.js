@@ -208,6 +208,10 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
 export const COMPACT_SNAPSHOT_VERSION = 22;
+export const SNAPSHOT_CODEC_VERSION = 1;
+export const SNAPSHOT_CODEC = Object.freeze({
+  COMPACT_JSON: "compact-json",
+});
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -359,6 +363,21 @@ const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 const MAX_COMPACT_VISIBLE_TILES = 65536;
 const MAX_COMPACT_REMEMBERED_BUILDINGS = 20000;
 const MAX_COMPACT_BUILDING_FOOTPRINT = 64;
+
+/**
+ * Parse one WebSocket server frame into a raw protocol message.
+ * Compact JSON text remains the only live snapshot codec. Binary frames are
+ * intentionally rejected until an experiment graduates to a documented codec.
+ * @param {string|ArrayBuffer|ArrayBufferView} frame
+ * @returns {object}
+ */
+export function parseServerFrame(frame) {
+  if (typeof frame === "string") return JSON.parse(frame);
+  if (frame instanceof ArrayBuffer || ArrayBuffer.isView(frame)) {
+    throw new Error("unsupported binary server frame");
+  }
+  throw new Error("unsupported server frame type");
+}
 
 /**
  * Expand server messages into the semantic shapes the rest of the client expects.

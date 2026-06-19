@@ -34,6 +34,8 @@ import {
   UPGRADE,
   UPGRADE_CODE,
   COMPACT_SNAPSHOT_VERSION,
+  SNAPSHOT_CODEC,
+  SNAPSHOT_CODEC_VERSION,
   PREDICTION_PROTOCOL_VERSION,
   DEFAULT_FACTION_ID,
   cmd,
@@ -160,6 +162,12 @@ assertSameCodes(
   { [KIND.STEEL]: KIND_CODE[KIND.STEEL], [KIND.OIL]: KIND_CODE[KIND.OIL] },
 );
 assert(protocolContract.compactSnapshotVersion === COMPACT_SNAPSHOT_VERSION, "compact snapshot version must match Rust");
+assert(protocolContract.snapshotCodecs.defaultCodec === SNAPSHOT_CODEC.COMPACT_JSON, "default snapshot codec must match Rust");
+assert(protocolContract.snapshotCodecs.codecVersion === SNAPSHOT_CODEC_VERSION, "snapshot codec version must match Rust");
+assert(
+  protocolContract.snapshotCodecs.supported.join(",") === SNAPSHOT_CODEC.COMPACT_JSON,
+  "supported snapshot codecs must match Rust",
+);
 assert(
   protocolDoc.includes(`compact JSON text, version ${COMPACT_SNAPSHOT_VERSION}`) &&
     protocolDoc.includes(`"v": ${COMPACT_SNAPSHOT_VERSION}`),

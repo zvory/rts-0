@@ -2,7 +2,7 @@
 // See docs/design/client-ui.md §4.1. All wire shapes come from protocol.js builders so the
 // client and server stay in lockstep; this module owns no game logic.
 
-import { S, decodeServerMessage, msg, cmd as cmdBuilders } from "./protocol.js";
+import { S, decodeServerMessage, parseServerFrame, msg, cmd as cmdBuilders } from "./protocol.js";
 import { ReportWindowAggregate } from "./report_window_aggregate.js";
 
 export const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
@@ -79,6 +79,7 @@ export class Net {
       let settled = false;
       this.diagnostics?.mark("ws.connect.start", { url: this.url });
       const ws = new WebSocket(this.url);
+      ws.binaryType = "arraybuffer";
       this.ws = ws;
 
       ws.addEventListener("open", () => {
@@ -395,19 +396,20 @@ export class Net {
    * @param {MessageEvent} ev
    */
   _onMessage(ev) {
-    const rawBytes = typeof ev.data === "string" ? ev.data.length : undefined;
+    const rawBytes = frameByteLength(ev.data);
     let m;
     let parseMs = 0;
     let decodeMs = 0;
     try {
       const parseStartedAt = performance.now();
-      const raw = JSON.parse(ev.data);
+      const raw = parseServerFrame(ev.data);
       parseMs = performance.now() - parseStartedAt;
       const decodeStartedAt = performance.now();
       m = decodeServerMessage(raw);
       decodeMs = performance.now() - decodeStartedAt;
     } catch (err) {
       // Ignore malformed frames rather than tearing down the connection.
+      this.diagnostics?.mark("server.recv.malformed", { bytes: rawBytes });
       return;
     }
     if (!m || typeof m.t !== "string") return;
@@ -476,4 +478,11 @@ export class Net {
     stats.parseMs.add(parseMs);
     stats.decodeMs.add(decodeMs);
   }
+}
+
+function frameByteLength(data) {
+  if (typeof data === "string") return data.length;
+  if (data instanceof ArrayBuffer) return data.byteLength;
+  if (ArrayBuffer.isView(data)) return data.byteLength;
+  return undefined;
 }

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 1 is merged.
+- [x] Done.
 
 ## Objective
 
@@ -100,18 +100,18 @@ performance, and failure-mode checks.
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 1 packet-budget fields are merged and available for comparison.
-- [ ] Define snapshot codec names, versioning, negotiation/fallback behavior, and defaults.
-- [ ] Add a codec seam while preserving compact JSON baseline behavior.
-- [ ] Implement only candidates that can be kept maintainable during the phase; document skipped
+- [x] Confirm Phase 1 packet-budget fields are merged and available for comparison.
+- [x] Define snapshot codec names, versioning, negotiation/fallback behavior, and defaults.
+- [x] Add a codec seam while preserving compact JSON baseline behavior.
+- [x] Implement only candidates that can be kept maintainable during the phase; document skipped
       candidates with evidence instead of forcing risky dependencies.
-- [ ] Add benchmark collection for baseline and each implemented candidate.
-- [ ] Compare p95 bytes, over-budget rate, parse/decode/apply cost, server serialize cost, and code
+- [x] Add benchmark collection for baseline and each implemented candidate.
+- [x] Compare p95 bytes, over-budget rate, parse/decode/apply cost, server serialize cost, and code
       complexity.
-- [ ] Update protocol/perf docs and focused tests.
-- [ ] Produce a decision artifact in the phase handoff or a small committed doc if the implementation
+- [x] Update protocol/perf docs and focused tests.
+- [x] Produce a decision artifact in the phase handoff or a small committed doc if the implementation
       needs one.
-- [ ] Mark this phase as done in this file.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

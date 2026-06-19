@@ -101,8 +101,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "input/index.js": 39869,
   // Net Report Phase 2 wires command receipt diagnostics into the live report path.
   "match.js": 41905,
-  // Net Report Phase 2 mirrors the commandReceipt server message tag.
-  "protocol.js": 38306,
+  // Packets Phase 2 adds the explicit snapshot codec seam and frame parser.
+  "protocol.js": 39015,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,
