@@ -205,11 +205,17 @@ export class HUD {
       this._restoreSinglePlayerResourceShell();
       this._resSig = null;
     }
-    if (this.elSteel) this.elSteel.textContent = String(r.steel ?? 0);
-    if (this.elOil) this.elOil.textContent = String(r.oil ?? 0);
+    const steel = r.steel ?? 0;
+    const oil = r.oil ?? 0;
+    const used = r.supplyUsed ?? 0;
+    const cap = r.supplyCap ?? 0;
+    const sig = `single:${steel}:${oil}:${used}:${cap}`;
+    if (sig === this._resSig) return;
+    this._resSig = sig;
+
+    if (this.elSteel) this.elSteel.textContent = String(steel);
+    if (this.elOil) this.elOil.textContent = String(oil);
     if (this.elSupply) {
-      const used = r.supplyUsed ?? 0;
-      const cap = r.supplyCap ?? 0;
       this.elSupply.textContent = `${used} / ${cap}`;
       // Flag over-cap (blocked production) so styles.css can color it.
       this.elSupply.classList.toggle("supply-capped", cap > 0 && used >= cap);

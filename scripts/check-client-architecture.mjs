@@ -17,6 +17,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "frame_recovery.js": "app-shell",
   "frame_entity_views.js": "app-shell",
   "observer_analysis_overlay.js": "app-shell",
+  "observer_analysis_signatures.js": "app-shell",
   "replay_controls.js": "app-shell",
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",
