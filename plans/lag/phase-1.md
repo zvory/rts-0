@@ -35,14 +35,17 @@ on it.
   - stable reason codes
 - Expose the current per-player server command lead recommendation in owner-only snapshot net
   status or a similarly compact owner-only payload.
-- Document `ROLLBACK_WINDOW_TICKS = 26` as the initial product target. Keep it configurable or
-  centralized so performance phases can tune it without hunting constants.
+- Document `ROLLBACK_WINDOW_TICKS = 6` as the initial product target, exactly 200 ms at 30 Hz. Keep
+  it configurable or centralized so later phases can tune it without hunting constants.
+- Document the hard catch-up command fuse, initially `MAX_REPLAY_COMMANDS = 1000`, as a safety cap
+  rather than a normal tuning path.
 - Define initial stable reason codes in this phase, even if some are produced only by later phases:
   `invalidSeq`, `staleSeq`, `notInGame`, `notPlayer`, `notJoined`, `executeTickMissing`,
   `executeTickInvalid`, `executeTickTooOld`, `executeTickTooFarFuture`, `rollbackEligible`,
-  `rollbackApplied`, `rollbackWindowMiss`, `rollbackBudgetExceeded`, `rollbackUnsupported`,
-  `authoritativeNoop`, `rejectedOwnership`, `rejectedInvalidTarget`, `rejectedCost`, and
-  `unsupportedCommand`. If a code is intentionally not implemented yet, document it as reserved.
+  `rollbackApplied`, `rollbackWindowMiss`, `rollbackCommandCapExceeded`, `rollbackUnsupported`,
+  `lateDuringReplay`, `authoritativeNoop`, `rejectedOwnership`, `rejectedInvalidTarget`,
+  `rejectedCost`, and `unsupportedCommand`. If a code is intentionally not implemented yet,
+  document it as reserved.
 - Bump `PREDICTION_PROTOCOL_VERSION` and update the compact snapshot contract only after the Rust
   and JS mirrors, protocol docs, and parity fixture agree on the new result payload shape.
 - Keep current command execution timing unchanged in this phase; this is a contract and

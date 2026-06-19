@@ -57,7 +57,7 @@ server scheduling or rollback to be enabled yet.
   - execute tick stamping based on latest server tick
   - pre-first-snapshot neutral behavior
   - clamped tick estimation after stale, duplicate, skipped, and burst-delivered snapshots
-  - rollback-window display for commands whose intended tick is still within 26 ticks
+  - rollback-window display for commands whose intended tick is still within 6 ticks
   - Phase 1 command result entries attaching to the matching pending command by `clientSeq`
   - disabled setting preserving authoritative-only command behavior
 - Add tri-state scenarios for:

@@ -4,10 +4,11 @@
 
 Eliminate player-visible command-response lag by making live commands run through a short,
 predictable command cadence instead of variable remote-echo timing, then repairing late delivery
-with bounded server rollback. The first rollout target is a two-tick command lead at 30 Hz; if a
-command arrives late but still within the rollback window, the server should roll back, insert the
-command at its intended tick, replay to present, and broadcast corrected authority. The server
-remains authoritative; the browser uses owner-safe prediction and replay so local owned-world
+with bounded server rollback. The first rollout target is a two-tick command lead at 30 Hz and a
+six-tick rollback window, roughly 200 ms. If a command arrives late but still within that window, the
+server should enter a non-reentrant catch-up replay, insert the command at its intended tick when the
+replay cursor has not passed it, greedily replay to present, and broadcast corrected authority. The
+server remains authoritative; the browser uses owner-safe prediction and replay so local owned-world
 response starts on the same effective tick the server is expected to honor.
 
 This plan builds on the existing movement prediction setting and prediction debug surfaces. Do not
@@ -21,11 +22,17 @@ setting is off, the live match must keep the current authoritative-only command 
 - Every sequenced gameplay command carries an intended `executeTick`.
 - The client initially schedules commands two ticks ahead of its current server-tick estimate.
 - The server queues commands for the requested effective tick when they arrive in time.
-- A command that arrives after its requested effective tick but within `ROLLBACK_WINDOW_TICKS = 26`
+- A command that arrives after its requested effective tick but within `ROLLBACK_WINDOW_TICKS = 6`
   is inserted at the intended tick by restoring a recent authoritative state and replaying forward.
-- A command that arrives outside the rollback window, or when rollback cannot complete inside the
-  server performance budget, is applied at the next legal authoritative tick, marked late in
+- Rollback is a single catch-up section, not a nested operation. While replay is active, new commands
+  are greedily folded into the replay command stream if their accepted tick has not passed the replay
+  cursor.
+- If a command arrives during replay after its intended tick has already passed, it is applied at the
+  earliest remaining replay tick or the next live tick, marked `lateDuringReplay` or equivalent in
   owner-only result metadata, and used to raise that player's future command lead.
+- A command that arrives outside the rollback window, or when the replay command-count cap is hit, is
+  applied at the next legal authoritative tick, marked late in owner-only result metadata, and used
+  to raise that player's future command lead.
 - The client predicts from the intended effective tick, then imports authoritative snapshots and
   replays pending commands forward to the current display tick instead of visually rewinding to an
   old server pose.
@@ -51,11 +58,22 @@ setting is off, the live match must keep the current authoritative-only command 
 - Start with `commandLeadTicks = 2`; adapt upward only from measured late arrivals, excessive
   correction, or repeated jitter. Decay downward slowly after stable windows.
 - Treat late commands as expected under bad networks, not as fatal desyncs. Commands inside the
-  rollback window should be retroactively honored; commands outside the window fall back to late
-  execution and lead adjustment.
-- Keep the rollback window bounded. The product target is 26 ticks, roughly 867 ms at 30 Hz, but
-  implementation must prove the server can restore and replay that window inside explicit CPU
-  budgets before broad rollout.
+  rollback window should be retroactively honored when the replay cursor has not passed their
+  accepted tick; commands outside the window or behind the active replay cursor fall back to the
+  earliest legal catch-up/live tick and lead adjustment.
+- Keep the rollback window bounded. The product target is 6 ticks, exactly 200 ms at 30 Hz. This caps
+  the authority rewind distance, not wall-clock CPU time. Trust the current server tick speed for the
+  initial rollout, record slow catch-up replay timings, and treat optimization as follow-up evidence
+  rather than a phase-blocking rollout gate.
+- Rollback must be non-reentrant. Once a room enters catch-up replay, it cannot start another
+  rollback until it exits catch-up and resumes live ticking.
+- Catch-up replay should greedily drain newly arrived commands between replay ticks. If the accepted
+  tick is still ahead of or equal to the replay cursor, insert the command into that replay tick's
+  deterministic command list. If the accepted tick is behind the cursor, apply it at the earliest
+  remaining replay tick or the next live tick.
+- Add a hard replay command-count fuse, initially `MAX_REPLAY_COMMANDS = 1000`, so command bursts
+  cannot grow a catch-up pass without bound. Hitting the fuse falls back to late execution and lead
+  adjustment; it should also produce structured diagnostics.
 - Rollback may invalidate snapshots, events, audio cues, and visible remote-unit positions already
   observed by clients. Corrected snapshots remain authoritative; clients should smooth corrected
   remote state where possible instead of trying to undo every old visual effect.
@@ -79,9 +97,10 @@ or prediction controller into catch-all modules:
 
 - `LiveCommandScheduler` owns live command envelopes, accepted effective ticks, deterministic
   ordering, and draining due commands into `Game::enqueue`.
-- `RollbackHistory` owns authoritative keyframes, the applied command stream by tick, replay/cost
-  measurements, and history expiry. A restore for tick `T` starts from the post-tick `T - 1`
-  keyframe, with an explicit tick-0 keyframe for commands applied on tick 1.
+- `RollbackHistory` owns authoritative keyframes, the applied command stream by tick, catch-up replay
+  measurements, replay command-count accounting, and history expiry. A restore for tick `T` starts
+  from the post-tick `T - 1` keyframe, with an explicit tick-0 keyframe for commands applied on tick
+  1.
 - `CommandResultTracker` owns owner-only command result metadata keyed by `(connection_id,
   clientSeq)`, including requested, accepted, applied, late, rollback, fallback, and reason data.
   Snapshot fanout may attach a bounded result list, but gameplay code should not scrape debug
@@ -117,17 +136,18 @@ monotonic and debuggable.
 
 Make the room task execute queued player commands on their accepted effective ticks and maintain the
 authoritative history required for rollback. This phase should add a rolling state/keyframe and
-command-log buffer for at least 26 ticks, plus measurements for clone, restore, and replay cost. It
-creates the deterministic scheduling and history substrate but may still fall back to late execution
-until rollback itself lands.
+command-log buffer for at least 6 ticks, plus logs for clone, restore, replay timing, and replay
+command-count accounting. It creates the deterministic scheduling and history substrate but may
+still fall back to late execution until rollback itself lands.
 
 ### [Phase 4 - Bounded Server Rollback](phase-4.md)
 
-Use the history buffer to honor late commands that arrive within the 26-tick rollback window. The
-server restores the nearest safe state, inserts the command at its intended tick, replays to the
-current tick, and emits corrected snapshots and rollback diagnostics. If replay cost exceeds budget
-or the command misses the history window, the server falls back to late execution and lead
-adjustment.
+Use the history buffer to honor late commands that arrive within the six-tick rollback window. The
+server restores the nearest safe state, enters a non-reentrant catch-up mode, inserts commands at
+their intended ticks when the replay cursor has not passed them, replays greedily to present, and
+emits corrected snapshots and rollback diagnostics. If the command misses the history window,
+arrives behind the active replay cursor, or hits the replay command-count fuse, the server falls back
+to earliest-legal late execution and lead adjustment.
 
 ### [Phase 5 - Movement Prediction on Effective Ticks](phase-5.md)
 
@@ -155,21 +175,21 @@ ghost and only becomes an authoritative scaffold after the server confirms it. T
 predict resource spending, supply changes, spawned units, completed upgrades, or completed
 buildings before server snapshots confirm them.
 
-### [Phase 8 - Rollback and Prediction Performance Budget](phase-8.md)
+### [Phase 8 - Catch-up Replay and Prediction Observability](phase-8.md)
 
-Prove the server can afford bounded rollback and the client can afford prediction/replay without
-creating frame lag on weaker machines. Server-side replay must have explicit budgets, spike logs,
-and fallback behavior; client-side prediction should move or isolate expensive work where needed.
-This phase uses server perf traces, the existing frame profiler, net reports, and a repeatable
-browser perf harness to prove the command loop stays prompt.
+Instrument bounded rollback and client prediction/replay so slow catch-up passes and frame stalls are
+visible without blocking the initial rollout on CPU timing proof. Server-side replay must log replay
+distance, command count, elapsed time, and command-cap fallback; client-side prediction should move
+or isolate expensive work where needed. This phase uses server perf traces, the existing frame
+profiler, net reports, and a repeatable browser perf harness to keep the command loop observable.
 
 ### [Phase 9 - Rollout, Tuning, and Regression Matrix](phase-9.md)
 
 Turn the hybrid cadence and rollback path into the default behavior under the Movement prediction
-setting after correctness and performance gates pass. Lock in thresholds for two-tick floor,
-26-tick rollback window, upward lead adjustment, decay, rollback CPU budgets, correction budgets,
-and fallback modes. This phase updates docs, operator playbooks, and tri-state/perf suites so
-future gameplay work cannot quietly break command responsiveness.
+setting after correctness gates pass and catch-up diagnostics are in place. Lock in thresholds for
+the two-tick floor, six-tick rollback window, upward lead adjustment, decay, replay command-count
+fuse, correction budgets, and fallback modes. This phase updates docs, operator playbooks, and
+tri-state/perf suites so future gameplay work cannot quietly break command responsiveness.
 
 ## Phase Index
 
@@ -180,7 +200,7 @@ future gameplay work cannot quietly break command responsiveness.
 5. [Phase 5 - Movement Prediction on Effective Ticks](phase-5.md)
 6. [Phase 6 - Unit Intent Surfaces](phase-6.md)
 7. [Phase 7 - Building, Rally, Queue, and Build Intent](phase-7.md)
-8. [Phase 8 - Rollback and Prediction Performance Budget](phase-8.md)
+8. [Phase 8 - Catch-up Replay and Prediction Observability](phase-8.md)
 9. [Phase 9 - Rollout, Tuning, and Regression Matrix](phase-9.md)
 
 ## Non-Goals
@@ -207,10 +227,11 @@ Every phase must add or run the relevant subset of:
 - `node scripts/check-client-architecture.mjs` for client module changes
 - focused Rust tests for room scheduling, rollback replay, protocol DTOs, sim-wasm, and command
   services
-- server rollback perf checks once Phase 8 adds or updates them
+- server rollback/catch-up diagnostic checks once Phase 8 adds or updates them
 - browser perf harness checks once Phase 8 adds or updates them
 
 Tri-state coverage should prefer scenario artifacts over visual judgment. For each predicted command
 family, include at least one healthy two-tick case, one late-arrival rollback case, one
-outside-window late fallback case, one rejected/no-op case, one coalesced or skipped snapshot case,
-and one prediction-disabled authoritative-only case.
+outside-window late fallback case, one command that arrives behind the active replay cursor, one
+rejected/no-op case, one coalesced or skipped snapshot case, and one prediction-disabled
+authoritative-only case.

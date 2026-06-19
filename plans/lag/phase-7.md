@@ -58,6 +58,7 @@ cancel, and queue surfaces.
 - Unit tests for:
   - train optimism on effective tick and confirmation by snapshot/result metadata
   - train/rally correction after rollback
+  - train/rally correction when a command arrives behind the active replay cursor
   - rally correction by authoritative `rallyPlan`
   - research intent clears on rejection and never grants upgrade locally
   - cancel intent does not refund locally before authority

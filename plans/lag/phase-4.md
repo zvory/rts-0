@@ -6,25 +6,38 @@
 
 ## Objective
 
-Use the Phase 3 history buffer to honor late commands that arrive within the 26-tick rollback
-window. The server should restore recent authority, insert the late command at its intended
-effective tick, replay to present, and emit corrected snapshots without making rollback an
-unbounded CPU liability.
+Use the Phase 3 history buffer to honor late commands that arrive within the six-tick rollback
+window. The server should restore recent authority, enter a non-reentrant catch-up replay, insert
+late commands at their intended ticks when the replay cursor has not passed them, replay greedily to
+present, and emit corrected snapshots.
 
 ## Scope
 
-- Define `ROLLBACK_WINDOW_TICKS = 26` as the initial maximum rollback distance.
+- Define `ROLLBACK_WINDOW_TICKS = 6` as the initial maximum rollback distance. At 30 Hz this is
+  exactly 200 ms.
+- Define `MAX_REPLAY_COMMANDS = 1000` as the initial catch-up command-count fuse. This is a safety
+  cap against pathological command bursts, not a normal tuning lever.
 - Add a `RollbackEngine` or equivalent helper that is owned by the live scheduler/history layer.
   `RoomTask` and `LiveTickDriver` may request rollback, but restore/insert/replay/fallback details
   should not be hand-coded in the room event handler.
 - When a command arrives after its requested `executeTick`:
-  - if `currentTick - executeTick <= 26` and history is available, roll back and insert it
+  - if `currentTick - executeTick <= 6` and history is available, roll back and insert it
   - if the command is outside the window, execute late at the next legal tick and raise future lead
-  - if rollback replay exceeds budget or fails, execute late and report fallback metadata
-- Replay deterministically from the restored tick to the current tick:
+  - if the replay command-count fuse is hit, execute late and report fallback metadata
+- Rollback is non-reentrant:
+  - once catch-up replay starts, no nested rollback may begin until the replay exits
+  - commands that arrive while catch-up replay is active are drained between replay ticks
+  - if a newly arrived command's accepted tick is still ahead of or equal to the replay cursor, insert
+    it into that replay tick's deterministic command list
+  - if the accepted tick is already behind the replay cursor, apply the command at the earliest
+    remaining replay tick or the next live tick, mark it `lateDuringReplay` or equivalent, and raise
+    future lead when appropriate
+- Replay deterministically from the restored tick to the current live tick:
   - restore the Phase 3 post-tick keyframe immediately before the inserted command's effective tick
   - original commands remain in stable effective-tick/order order
-  - inserted late command joins the correct tick with stable ordering
+  - inserted late commands join the correct tick with stable ordering
+  - newly arrived commands absorbed during replay join the earliest legal replay tick under the
+    cursor rules above
   - recorded AI envelopes are replayed exactly; if the history lacks deterministic AI envelopes,
     rollback is unsupported for that room and the command falls back late
   - sim events are regenerated from the corrected authority for the replayed ticks, but old visual
@@ -32,7 +45,8 @@ unbounded CPU liability.
 - After rollback:
   - update per-player ACK/result metadata
   - send corrected latest snapshots through the normal fog-filtered fanout path
-  - record rollback replay ticks, elapsed time, and fallback reasons
+  - record rollback replay ticks, elapsed time, replay command count, absorbed-during-replay command
+    count, and fallback reasons
 - Preserve ACK semantics:
   - socket receipt stays diagnostic-only
   - `lastSimConsumedClientSeq` advances only for contiguous client sequences whose commands have
@@ -61,23 +75,32 @@ unbounded CPU liability.
 ## Verification
 
 - Rust tests for:
-  - one late command inside 26 ticks rolls back and applies at intended tick
-  - command exactly at the 26-tick boundary is handled according to the documented rule
+  - one late command inside 6 ticks rolls back and applies at intended tick
+  - command exactly at the 6-tick boundary is handled according to the documented rule
   - command outside the window executes late and records fallback metadata
   - command inside the window but missing a keyframe or recorded AI stream falls back with
     `rollbackUnsupported`
-  - command inside the window but over budget falls back with `rollbackBudgetExceeded`
+  - command inside the window but past the active replay cursor applies at the earliest remaining
+    replay tick or next live tick with `lateDuringReplay`
+  - command bursts beyond `MAX_REPLAY_COMMANDS` fall back with `rollbackCommandCapExceeded`
   - rollback replay without inserted commands is snapshot-identical to uninterrupted authority
   - inserted command ordering is deterministic with same-tick existing commands
+  - commands from both players that arrive during catch-up are absorbed into a single non-reentrant
+    replay when their accepted ticks have not passed
+  - alternating late commands from both players do not trigger nested rollback or repeated restore
+    loops
   - rollback does not double-consume commands or duplicate ACKs
   - rollback never emits full-world snapshots or hidden target ids to a normal active player
   - rollback after deaths/combat either works or is explicitly excluded with a fallback reason
-  - rollback cost metrics are recorded
+  - rollback catch-up timing and command-count diagnostics are recorded
 - Tri-state scenarios for:
   - healthy two-tick command needs no rollback
-  - late move inside 26 ticks rolls back and converges
-  - late move outside 26 ticks falls back to late execution
-  - burst of two late commands replays once or in a documented deterministic sequence
+  - late move inside 6 ticks rolls back and converges
+  - late move outside 6 ticks falls back to late execution
+  - burst of two late commands from one player replays once or in a documented deterministic sequence
+  - burst or alternating late commands from two players complete one catch-up pass without nested
+    rollback
+  - command arriving behind the active replay cursor executes at the earliest legal catch-up/live tick
   - prediction disabled still uses authoritative scheduling/rollback without local prediction
 - Run:
   - focused `cargo test --manifest-path server/Cargo.toml -p rts-server ...`
@@ -88,12 +111,13 @@ unbounded CPU liability.
 ## Manual Testing Focus
 
 Use artificial latency or a test profile that delays command delivery by less than and greater than
-26 ticks. Inside the window, the command should be honored as if it landed on its intended tick;
-outside the window, the game should fall back to late execution and future lead adjustment.
+6 ticks. Inside the window, the command should be honored as if it landed on its intended tick unless
+it arrived behind an active replay cursor; outside the window or behind the cursor, the game should
+execute at the earliest legal catch-up/live tick and adjust future lead.
 
 ## Handoff Expectations
 
 The handoff must state whether rollback is enabled for all live rooms or a narrower subset, the
-measured replay costs, the fallback budget, unsupported rollback cases, ACK/result behavior after a
-rollback, whether AI-backed rooms are supported, and whether server-side optimization is needed
-before broader prediction work continues.
+measured replay timing logs, replay command-count fuse, absorbed-during-replay behavior, active
+replay cursor fallback behavior, unsupported rollback cases, ACK/result behavior after rollback, and
+whether AI-backed rooms are supported.
