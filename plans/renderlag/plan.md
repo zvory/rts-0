@@ -3,11 +3,11 @@
 ## Purpose
 
 Improve client-side rendering headroom so normal matches, replays, and deterministic stress
-workloads have a credible path toward 120 FPS on weaker laptops. The current measurement evidence
-points first at minimap work, then repeated per-frame entity view allocation, then Pixi renderer
-scaling and DOM/overlay churn. This plan turns those findings into small implementation phases that
-can be measured independently without changing server authority, gameplay semantics, or network
-diagnostics.
+workloads have a credible path toward smooth play on weaker laptops. The first optimization pass
+targeted the obvious 120 FPS blocker: minimap work, repeated per-frame entity view allocation, Pixi
+renderer scaling, and DOM/overlay churn. The next pass treats 120 FPS as a floor for local
+headroom, adds enough diagnostics to make the next bottleneck obvious, and uses harsher local
+benchmarks before starting another broad optimization campaign.
 
 ## Current Evidence
 
@@ -28,6 +28,15 @@ diagnostics.
   workloads, but they contain frame-by-frame rebuild paths that are cheap to guard once the larger
   paint costs are addressed.
 
+## Forward Goal
+
+Future render-lag work should optimize against browser frame work budgets, not literal
+`requestAnimationFrame` FPS. A local 60 FPS image has a 16.67 ms frame budget, 120 FPS has 8.33 ms,
+240 FPS has 4.17 ms, and 480 FPS has 2.08 ms. Because weak-player hardware is not always available,
+the next local target is to make the Matt/Alex replay and stress workloads consistently clear the
+240 FPS frame-work budget under normal local conditions, then use CPU/DPR/viewport stress to expose
+the next bottleneck before attempting another optimization phase.
+
 ## Overall Constraints
 
 - Stay focused on browser client FPS and rendering work. Do not change server tick rate, simulation
@@ -41,6 +50,12 @@ diagnostics.
 - Keep the 120 FPS frame budget in view: 8.33 ms total frame work leaves very little room for a
   3-6 ms recurring minimap cost. Each phase should report whether it improved p50, p95 bucket, max,
   and worst-phase counts for the Matt/Alex replay and vehicle-wall stress workloads.
+- For new phases, report 60, 120, 240, and 480 FPS frame-work budgets together. The 120 FPS budget is
+  no longer enough by itself to prove weak-machine headroom; local p95 near 8 ms should be treated as
+  "barely 120", not as a finished state.
+- Prefer harsher local measurement over speculation about unavailable low-end hardware. Use
+  deterministic stress workloads, CPU throttling, viewport and device-pixel-ratio variation, and
+  heavier fog/combat/selection cases before declaring the next bottleneck.
 - Do not combine per-player beta FPS reports when analyzing results. Matt's and Alex's reports are
   separate client observations; local replay or stress harness numbers are separate local browser
   measurements.
@@ -107,6 +122,30 @@ teach the browser perf harness and docs how to run the render-lag comparison sui
 machine-specific FPS. It should also document which workloads, phase labels, and manual checks future
 render optimization work must use.
 
+### [Phase 7 - Frame Budget Reframe](phase-7.md)
+
+Reframe the render-lag tooling and docs around frame-work budgets for 60, 120, 240, and 480 FPS.
+This phase should make local benchmark output show how far each workload is from the next headroom
+target, without treating raw RAF FPS as portable or adding a hard CI gate. The result should make it
+obvious when a branch is merely 120 FPS-capable locally versus actually leaving room for weaker
+hardware.
+
+### [Phase 8 - Deep Render Diagnostics](phase-8.md)
+
+Add local-only or bounded render diagnostics that explain why a frame is expensive after the minimap
+wins. This phase should report stable counters for Pixi object churn, rig redraws, overlay redraws,
+fog/minimap invalidations, entity-view reuse, and long-frame context so the next optimization target
+is evidence-backed. The goal is to replace "something is fundamentally wrong" with a ranked list of
+measured costs.
+
+### [Phase 9 - Harsher Render Stress Matrix](phase-9.md)
+
+Expand the browser perf harness into a harsher local stress matrix that can stand in for unavailable
+low-end machines. This phase should combine Matt/Alex replay, existing stress workloads, at least one
+new fog/combat-heavy workload, CPU throttling, viewport/DPR variation, and repeated samples into one
+artifact summary. The output should identify whether the next bottleneck is renderer work, fog,
+DOM/HUD, canvas resolution, browser frame gaps, or something still missing from diagnostics.
+
 ## Phase Index
 
 1. [Phase 1 - Minimap Static Layer Cache](phase-1.md)
@@ -115,6 +154,9 @@ render optimization work must use.
 4. [Phase 4 - Pixi Renderer Scaling Pass](phase-4.md)
 5. [Phase 5 - HUD And Observer Dirty Guards](phase-5.md)
 6. [Phase 6 - Render Budget Harness And Playbook](phase-6.md)
+7. [Phase 7 - Frame Budget Reframe](phase-7.md)
+8. [Phase 8 - Deep Render Diagnostics](phase-8.md)
+9. [Phase 9 - Harsher Render Stress Matrix](phase-9.md)
 
 ## Non-Goals
 
@@ -135,4 +177,5 @@ and confirm the phase head is reachable from `origin/main`. For unattended execu
 ```bash
 scripts/phase-runner.sh --plan renderlag phase-1 --pr --wait
 scripts/phase-runner.sh --plan renderlag phase-1 phase-2 phase-3 phase-4 phase-5 phase-6 --pr --wait
+scripts/phase-runner.sh --plan renderlag phase-7 phase-8 phase-9 --pr --wait
 ```
