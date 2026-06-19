@@ -61,8 +61,52 @@ function sentSeqs(sent) {
   for (const id of [1, 2, 3, 4, 5]) controller.issueCommand({ c: "stop", units: [id] });
   controller.applyAuthoritativeSnapshot({ tick: 10, netStatus: { lastSimConsumedClientSeq: 3 } });
   assert(controller.debugSummary().pendingClientSeqs.join(",") === "4,5", "ack 3 leaves 4 and 5 pending");
+  let report = controller.consumeCommandReportStats();
+  assert(report.commandsIssued === 5, "command report counts issued commands");
+  assert(report.commandSocketSendAccepted === 5, "command report counts browser-accepted sends");
+  assert(report.commandSimAcknowledged === 3, "command report counts sim acknowledgements");
+  assert(report.commandIssueToSimAckMaxMs === 0, "same-clock sim ack latency is tracked");
   controller.recordSocketReceipt(4, { serverTick: 10 });
   assert(controller.debugSummary().pendingClientSeqs.join(",") === "4,5", "socket receipt is diagnostic only");
+  report = controller.consumeCommandReportStats();
+  assert(report.commandServerReceived === 1, "command report counts server receipts");
+}
+
+{
+  let now = 100;
+  const controller = new PredictionController({
+    now: () => now,
+    sendCommand: () => true,
+  });
+  controller.issueCommand({ c: "stop", units: [1] });
+  now = 160;
+  controller.recordSocketReceipt(1, { serverTick: 4, accepted: true });
+  now = 220;
+  controller.applyAuthoritativeSnapshot({ tick: 5, netStatus: { lastSimConsumedClientSeq: 1 } });
+  now = 226;
+  controller.recordAckSnapshotApplied(1, 220);
+  const report = controller.consumeCommandReportStats();
+  assert(report.commandIssueToServerReceiptLatestMs === 60, "issue-to-receipt latest is tracked");
+  assert(report.commandServerReceiptToSimAckLatestMs === 60, "receipt-to-sim-ack latest is tracked");
+  assert(report.commandIssueToSimAckLatestMs === 120, "issue-to-sim-ack latest is tracked");
+  assert(report.commandAckSnapshotReceivedToAppliedLatestMs === 6, "ack snapshot apply timing is tracked");
+  assert(report.commandSimAcknowledged === 1, "sim ack count is reported");
+}
+
+{
+  let now = 0;
+  const controller = new PredictionController({
+    enabled: false,
+    now: () => now,
+    sendCommand: () => true,
+  });
+  controller.issueCommand({ c: "stop", units: [1] });
+  now = 40;
+  controller.recordSocketReceipt(1, { accepted: false, reason: "notPlayer", serverTick: 0 });
+  const report = controller.consumeCommandReportStats();
+  assert(report.commandsIssued === 1, "disabled command diagnostics still count issued commands");
+  assert(report.commandRejected === 1, "disabled command diagnostics count receipt rejections");
+  assert(controller.debugSummary().pendingCommandCount === 0, "disabled prediction pending remains empty");
 }
 
 {

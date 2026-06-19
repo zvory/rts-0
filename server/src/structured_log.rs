@@ -55,6 +55,9 @@ pub const NET_REPORT_WS_BUFFERED_BYTES_ISSUE: u32 = 64 * 1024;
 pub const NET_REPORT_SERVER_TICK_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_SERVER_LAG_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_PENDING_COMMAND_ISSUE: u16 = 8;
+pub const NET_REPORT_COMMAND_UPLOAD_ISSUE_MS: u16 = 180;
+pub const NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS: u16 = 66;
+pub const NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS: u16 = 16;
 pub const NET_REPORT_CORRECTION_ISSUE_PX: u16 = 32;
 pub const NET_REPORT_REPLAY_TICK_ISSUE: u16 = 8;
 
@@ -80,6 +83,7 @@ pub fn log_client_net_report(
         schema_version = report.schema_version,
         build_id = %build_id(),
         room = %room,
+        match_run_id = %report.match_run_id,
         player_id,
         primary_issue,
         elapsed_ms = report.elapsed_ms,
@@ -134,6 +138,25 @@ pub fn log_client_net_report(
         prediction_mode = %report.prediction_mode,
         pending_command_count = report.pending_command_count,
         acknowledged_command_latency_ms = report.acknowledged_command_latency_ms,
+        commands_issued = report.commands_issued,
+        command_socket_send_accepted = report.command_socket_send_accepted,
+        command_server_received = report.command_server_received,
+        command_sim_acknowledged = report.command_sim_acknowledged,
+        command_rejected = report.command_rejected,
+        command_issue_to_server_receipt_latest_ms = report.command_issue_to_server_receipt_latest_ms,
+        command_issue_to_server_receipt_max_ms = report.command_issue_to_server_receipt_max_ms,
+        command_issue_to_server_receipt_p95_ms = report.command_issue_to_server_receipt_p95_ms,
+        command_server_receipt_to_sim_ack_latest_ms = report.command_server_receipt_to_sim_ack_latest_ms,
+        command_server_receipt_to_sim_ack_max_ms = report.command_server_receipt_to_sim_ack_max_ms,
+        command_server_receipt_to_sim_ack_p95_ms = report.command_server_receipt_to_sim_ack_p95_ms,
+        command_issue_to_sim_ack_latest_ms = report.command_issue_to_sim_ack_latest_ms,
+        command_issue_to_sim_ack_max_ms = report.command_issue_to_sim_ack_max_ms,
+        command_issue_to_sim_ack_p95_ms = report.command_issue_to_sim_ack_p95_ms,
+        command_ack_snapshot_received_to_applied_latest_ms = report.command_ack_snapshot_received_to_applied_latest_ms,
+        command_ack_snapshot_received_to_applied_max_ms = report.command_ack_snapshot_received_to_applied_max_ms,
+        command_ack_snapshot_received_to_applied_p95_ms = report.command_ack_snapshot_received_to_applied_p95_ms,
+        oldest_pending_command_age_ms = report.oldest_pending_command_age_ms,
+        max_pending_command_count = report.max_pending_command_count,
         correction_distance_px = report.correction_distance_px,
         correction_count = report.correction_count,
         prediction_disable_count = report.prediction_disable_count,
@@ -177,6 +200,15 @@ pub fn is_notable_net_report(report: &ClientNetReport) -> bool {
         || report.server_lag_ms >= NET_REPORT_SERVER_LAG_ISSUE_MS
         || report.pending_command_count >= NET_REPORT_PENDING_COMMAND_ISSUE
         || report.acknowledged_command_latency_ms >= NET_REPORT_LATENCY_ISSUE_MS
+        || report.command_rejected > 0
+        || report.command_issue_to_server_receipt_max_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
+        || report.command_server_receipt_to_sim_ack_max_ms
+            >= NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS
+        || report.command_issue_to_sim_ack_max_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
+        || report.command_ack_snapshot_received_to_applied_max_ms
+            >= NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS
+        || report.oldest_pending_command_age_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
+        || report.max_pending_command_count >= NET_REPORT_PENDING_COMMAND_ISSUE
         || report.correction_distance_px >= NET_REPORT_CORRECTION_ISSUE_PX
         || report.correction_count > 0
         || report.prediction_disable_count > 0
@@ -185,7 +217,23 @@ pub fn is_notable_net_report(report: &ClientNetReport) -> bool {
 }
 
 pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
-    if report.prediction_disable_count > 0 {
+    if report.command_rejected > 0 {
+        "command_rejected"
+    } else if report.command_issue_to_server_receipt_max_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS {
+        "command_upload_delay"
+    } else if report.command_server_receipt_to_sim_ack_max_ms
+        >= NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS
+    {
+        "command_server_queue"
+    } else if report.command_ack_snapshot_received_to_applied_max_ms
+        >= NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS
+    {
+        "command_ack_apply"
+    } else if report.command_issue_to_sim_ack_max_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
+        || report.oldest_pending_command_age_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
+    {
+        "command_response_delay"
+    } else if report.prediction_disable_count > 0 {
         "prediction_disabled"
     } else if report.correction_distance_px >= NET_REPORT_CORRECTION_ISSUE_PX
         || report.correction_count > 0
@@ -348,6 +396,7 @@ mod tests {
     fn clean_report() -> ClientNetReport {
         ClientNetReport {
             schema_version: 1,
+            match_run_id: "main-1".to_string(),
             elapsed_ms: 10_000,
             match_tick: 300,
             rtt_ms: 40,
@@ -400,6 +449,25 @@ mod tests {
             prediction_mode: String::new(),
             pending_command_count: 0,
             acknowledged_command_latency_ms: 0,
+            commands_issued: 0,
+            command_socket_send_accepted: 0,
+            command_server_received: 0,
+            command_sim_acknowledged: 0,
+            command_rejected: 0,
+            command_issue_to_server_receipt_latest_ms: 0,
+            command_issue_to_server_receipt_max_ms: 0,
+            command_issue_to_server_receipt_p95_ms: 0,
+            command_server_receipt_to_sim_ack_latest_ms: 0,
+            command_server_receipt_to_sim_ack_max_ms: 0,
+            command_server_receipt_to_sim_ack_p95_ms: 0,
+            command_issue_to_sim_ack_latest_ms: 0,
+            command_issue_to_sim_ack_max_ms: 0,
+            command_issue_to_sim_ack_p95_ms: 0,
+            command_ack_snapshot_received_to_applied_latest_ms: 0,
+            command_ack_snapshot_received_to_applied_max_ms: 0,
+            command_ack_snapshot_received_to_applied_p95_ms: 0,
+            oldest_pending_command_age_ms: 0,
+            max_pending_command_count: 0,
             correction_distance_px: 0,
             correction_count: 0,
             prediction_disable_count: 0,
@@ -462,6 +530,24 @@ mod tests {
         report.snapshot_tick_gap_max = NET_REPORT_SNAPSHOT_TICK_GAP_ISSUE;
         assert!(is_notable_net_report(&report));
         assert_eq!(classify_client_net_report(&report), "snapshot_cadence");
+    }
+
+    #[test]
+    fn net_report_classifies_command_milestones_before_generic_network() {
+        let mut report = clean_report();
+        report.rtt_max_ms = NET_REPORT_LATENCY_ISSUE_MS;
+        report.command_issue_to_server_receipt_max_ms = NET_REPORT_COMMAND_UPLOAD_ISSUE_MS;
+        assert!(is_notable_net_report(&report));
+        assert_eq!(classify_client_net_report(&report), "command_upload_delay");
+
+        let mut report = clean_report();
+        report.command_server_receipt_to_sim_ack_max_ms = NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS;
+        assert_eq!(classify_client_net_report(&report), "command_server_queue");
+
+        let mut report = clean_report();
+        report.command_ack_snapshot_received_to_applied_max_ms =
+            NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS;
+        assert_eq!(classify_client_net_report(&report), "command_ack_apply");
     }
 
     #[test]

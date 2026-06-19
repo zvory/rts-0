@@ -46,8 +46,16 @@ The same upload also includes bounded snapshot diagnostics:
 - Cadence: `snapshotTickGapMax`, `staleSnapshotCount`, `duplicateSnapshotCount`,
   `skippedSnapshotCount`, `snapshotBurstCount`, and `snapshotBurstMax`.
 
+Command-response diagnostics are also reported as bounded window aggregates keyed by the live
+`matchRunId`: issued/send-accepted/server-received/sim-acknowledged/rejected counts,
+issue-to-server-receipt latest/max/p95, server-receipt-to-sim-ack latest/max/p95,
+issue-to-sim-ack latest/max/p95, ack-snapshot-received-to-applied latest/max/p95, oldest pending
+command age, and max pending command count. The server receipt comes from a tiny reliable
+`commandReceipt` message keyed only by `clientSeq`; it carries no command payload, unit ids, target
+ids, positions, or player-entered text and does not reconcile prediction.
+
 Raw snapshot JSON, raw timestamp arrays, raw phase arrays, recent frame records, stack traces, entity
-ids, command payloads, and replay data are intentionally not uploaded.
+ids, command payloads, command targets, and replay data are intentionally not uploaded.
 
 ## Modes
 
@@ -145,7 +153,7 @@ crate::log_warn!(room = %room, error = %err, "room task failed");
 Use a named helper function in `structured_log.rs` when a log needs stable fields, correlation, or
 issue classification. Current high-signal helpers cover:
 
-- `client_net_report` with `build_id` and `primary_issue`.
+- `client_net_report` with `build_id`, `match_run_id`, and `primary_issue`.
 - `performance tick summary` rows include `match_run_id` when emitted by a live room.
 - `match_started` with `match_run_id`, map, seed, participants, build, and player counts.
 - `match_ended` with `match_run_id`, duration, tick count, slow-tick count, head-of-line max, and
@@ -179,6 +187,11 @@ architecture policy gate.
 - Existing buckets continue to separate `network_rtt`, `snapshot_gap`, `snapshot_jitter`,
   `snapshot_cadence`, `server_tick`, `server_scheduler_lag`, `websocket_backlog`, `pending_commands`,
   `prediction_correction`, `prediction_disabled`, and `wasm_budget`.
+- `command_upload_delay`, `command_server_queue`, `command_response_delay`, `command_ack_apply`, and
+  `command_rejected` classify command milestone issues before they fall through to generic RTT or
+  prediction fallback buckets. Upload delay is high issue-to-receipt timing; server queue delay is
+  high receipt-to-sim-ack timing; response delay is high issue-to-sim-ack or oldest pending age; ack
+  apply points at browser processing after the ack snapshot arrives.
 
 `snapshot_cadence` covers `snapshotTickGapMax >= 3`, stale/duplicate/skipped snapshot counters, or
 `snapshotBurstMax >= 3`. Use it to distinguish receive burst/head-of-line symptoms from high RTT:

@@ -129,6 +129,7 @@ export class Match {
     if (typeof window !== "undefined") window.__rtsPerf = this.frameProfilerSurface;
     this.predictionStartInfo = payload;
     this.predictionPlayerId = payload?.playerId;
+    this.matchRunId = typeof payload?.matchRunId === "string" ? payload.matchRunId : "";
     this.predictionCompatibility = predictionCompatibility(payload);
     this.predictionAdapter = this.createPredictionAdapter();
     this.predictionInitToken = 0;
@@ -234,6 +235,9 @@ export class Match {
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => {
       const now = performance.now();
+      const ackSeq = Number.isFinite(m?.netStatus?.lastSimConsumedClientSeq)
+        ? m.netStatus.lastSimConsumedClientSeq
+        : null;
       this.health.noteSnapshotArrival(now, document.hidden, m?.tick);
       recordSnapshotProcessing(
         this.snapshotProcessingReport,
@@ -244,12 +248,14 @@ export class Match {
           this.applyPredictedSnapshot();
         },
       );
+      if (ackSeq != null) this.prediction.recordAckSnapshotApplied(ackSeq, now);
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.replayControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
       this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
     };
+    this.onCommandReceipt = (m) => this.handleCommandReceipt(m);
     this.onRoomTimeState = (m) => this.applyRoomTimeState(m);
     this.onObserverAnalysis = (m) => this.observerAnalysisOverlay?.applyObserverAnalysis(m);
     this.onResize = this.handleResize.bind(this);
@@ -266,6 +272,7 @@ export class Match {
       this.input.onPointerLockError = this.onPointerLockError;
     }
     this.net.on(S.SNAPSHOT, this.onSnapshot);
+    this.net.on(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.addEventListener("resize", this.onResize);
@@ -339,6 +346,7 @@ export class Match {
     const avgFrameMs = stats.frameCount > 0 ? stats.frameTotalMs / stats.frameCount : 0;
     const report = {
       schemaVersion: 1,
+      matchRunId: this.matchRunId,
       elapsedMs: clampU32(elapsedMs),
       matchTick: clampU32(this.lastSnapshotTick),
       rttMs: clampU16(metrics.latencyMs),
@@ -529,10 +537,12 @@ export class Match {
   predictionReportFields() {
     const controller = this.prediction.debugSummary();
     const wasm = this.predictionAdapter.diagnostics();
+    const commandReport = this.prediction.consumeCommandReportStats?.() || {};
     return {
       predictionMode: String(controller.mode || "disabled"),
-      pendingCommandCount: clampU16(controller.pendingCommandCount),
+      pendingCommandCount: clampU16(controller.commandDiagnosticPendingCount ?? controller.pendingCommandCount),
       acknowledgedCommandLatencyMs: clampU16(controller.ackLatencyMs),
+      ...clampedCommandReportFields(commandReport),
       correctionDistancePx: clampU16(controller.maxCorrectionDistance),
       correctionCount: clampU32(controller.correctionCount),
       predictionDisableCount: clampU32(controller.disableCount),
@@ -540,6 +550,18 @@ export class Match {
       wasmMemoryBytes: clampU32(wasm.memoryBytes),
       predictionReplayTicks: clampU16(wasm.lastReplayTicks),
     };
+  }
+
+  handleCommandReceipt(message) {
+    if (!message || !this.prediction) return;
+    const detail = {
+      serverTick: message.serverTick,
+      accepted: message.accepted !== false,
+      reason: typeof message.reason === "string" ? message.reason : null,
+    };
+    if (detail.accepted) this.prediction.recordSocketReceipt(message.clientSeq, detail);
+    else this.prediction.recordCommandRejection(message.clientSeq, detail.reason, detail);
+    this.publishPredictionDebug();
   }
 
   applySpectatorUi() {
@@ -1001,6 +1023,7 @@ export class Match {
     this.stopNetReports();
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
+    this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
@@ -1035,6 +1058,7 @@ export class Match {
     this.stopNetReports();
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
+    this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("resize", this.onResize);
@@ -1072,6 +1096,30 @@ function clampU16(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return 0;
   return Math.min(65535, Math.round(n));
+}
+
+function clampedCommandReportFields(report = {}) {
+  return {
+    commandsIssued: clampU32(report.commandsIssued),
+    commandSocketSendAccepted: clampU32(report.commandSocketSendAccepted),
+    commandServerReceived: clampU32(report.commandServerReceived),
+    commandSimAcknowledged: clampU32(report.commandSimAcknowledged),
+    commandRejected: clampU32(report.commandRejected),
+    commandIssueToServerReceiptLatestMs: clampU16(report.commandIssueToServerReceiptLatestMs),
+    commandIssueToServerReceiptMaxMs: clampU16(report.commandIssueToServerReceiptMaxMs),
+    commandIssueToServerReceiptP95Ms: clampU16(report.commandIssueToServerReceiptP95Ms),
+    commandServerReceiptToSimAckLatestMs: clampU16(report.commandServerReceiptToSimAckLatestMs),
+    commandServerReceiptToSimAckMaxMs: clampU16(report.commandServerReceiptToSimAckMaxMs),
+    commandServerReceiptToSimAckP95Ms: clampU16(report.commandServerReceiptToSimAckP95Ms),
+    commandIssueToSimAckLatestMs: clampU16(report.commandIssueToSimAckLatestMs),
+    commandIssueToSimAckMaxMs: clampU16(report.commandIssueToSimAckMaxMs),
+    commandIssueToSimAckP95Ms: clampU16(report.commandIssueToSimAckP95Ms),
+    commandAckSnapshotReceivedToAppliedLatestMs: clampU16(report.commandAckSnapshotReceivedToAppliedLatestMs),
+    commandAckSnapshotReceivedToAppliedMaxMs: clampU16(report.commandAckSnapshotReceivedToAppliedMaxMs),
+    commandAckSnapshotReceivedToAppliedP95Ms: clampU16(report.commandAckSnapshotReceivedToAppliedP95Ms),
+    oldestPendingCommandAgeMs: clampU16(report.oldestPendingCommandAgeMs),
+    maxPendingCommandCount: clampU16(report.maxPendingCommandCount),
+  };
 }
 
 function clampU32(value) {

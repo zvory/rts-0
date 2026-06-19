@@ -1,3 +1,5 @@
+import { ReportWindowAggregate } from "./report_window_aggregate.js";
+
 const U32_MAX = 0xffffffff;
 const DEFAULT_COMMAND_TIMEOUT_MS = 15000;
 const DEFAULT_UI_CONFIRMATION_SNAPSHOTS = 4;
@@ -59,6 +61,7 @@ export class PredictionController {
     this.latestAuthoritativeTick = null;
     this.latestAckSeq = 0;
     this.latestAckTick = null;
+    this.latestAckSnapshotAppliedSeq = 0;
     this.issuedCount = 0;
     this.acknowledgedCount = 0;
     this.staleSnapshotCount = 0;
@@ -78,6 +81,9 @@ export class PredictionController {
     this.uiRejectedCount = 0;
     this.ackLatencyMs = null;
     this.maxAckLatencyMs = 0;
+    this.commandDiagnosticsBySeq = new Map();
+    this.commandDiagnosticPending = [];
+    this.resetCommandReportWindow();
     this.disableReasons = {};
   }
 
@@ -94,8 +100,14 @@ export class PredictionController {
     this.latestAuthoritativeTick = null;
     this.latestAckSeq = 0;
     this.latestAckTick = null;
-    this.issuedCount = 0;
-    this.acknowledgedCount = 0;
+    this.latestAckSnapshotAppliedSeq = 0;
+    if (!preserveClientSeq) {
+      this.issuedCount = 0;
+      this.acknowledgedCount = 0;
+      this.commandDiagnosticsBySeq.clear();
+      this.commandDiagnosticPending = [];
+      this.resetCommandReportWindow();
+    }
     this.staleSnapshotCount = 0;
     this.duplicateSnapshotCount = 0;
     this.skippedSnapshotCount = 0;
@@ -122,12 +134,13 @@ export class PredictionController {
 
   issueCommand(cmd, options = {}) {
     const clientSeq = this._allocateClientSeq();
+    const issuedAt = this.now();
+    this.trackCommandIssue(clientSeq, issuedAt);
     if (!this.enabled) {
-      this.issuedCount += 1;
       const sent = this.sendCommand ? this.sendCommand(cmd, clientSeq) : false;
+      this.recordCommandSendAccepted(clientSeq, !!sent);
       return { clientSeq, sent: !!sent, predicted: false };
     }
-    const issuedAt = this.now();
     const pending = {
       clientSeq,
       cmd,
@@ -152,7 +165,6 @@ export class PredictionController {
       options,
     );
     if (optimistic) this.optimisticUi.push(optimistic);
-    this.issuedCount += 1;
     let predicted = false;
     try {
       predicted = !!this.predictor?.enqueueCommand(clientSeq, cmd);
@@ -162,11 +174,19 @@ export class PredictionController {
     if (predicted) this.enterPredicting();
     const sent = this.sendCommand ? this.sendCommand(cmd, clientSeq) : false;
     pending.sendAccepted = !!sent;
+    this.recordCommandSendAccepted(clientSeq, !!sent);
     return { clientSeq, sent: !!sent, predicted };
   }
 
   applyAuthoritativeSnapshot(snapshot, { allowStale = false } = {}) {
-    if (!this.enabled || !snapshot || typeof snapshot !== "object") {
+    if (!snapshot || typeof snapshot !== "object") {
+      return this.debugSummary();
+    }
+    if (!this.enabled) {
+      const ackSeq = finiteU32(snapshot.netStatus?.lastSimConsumedClientSeq);
+      if (ackSeq != null) {
+        this.applySimAcknowledgement(ackSeq, finiteU32(snapshot.netStatus?.lastSimConsumedClientTick));
+      }
       return this.debugSummary();
     }
     const tick = finiteU32(snapshot.tick);
@@ -197,13 +217,14 @@ export class PredictionController {
   }
 
   applySimAcknowledgement(clientSeq, serverTick = null) {
-    if (!this.enabled) return this.debugSummary();
     const ackSeq = finiteU32(clientSeq);
     if (ackSeq == null || ackSeq <= this.latestAckSeq) return this.debugSummary();
     this.latestAckSeq = ackSeq;
     const ackTick = finiteU32(serverTick);
     if (ackTick != null) this.latestAckTick = ackTick;
+    this.recordCommandSimAcknowledgement(ackSeq);
 
+    if (!this.enabled) return this.debugSummary();
     const kept = [];
     for (const pending of this.pending) {
       if (pending.clientSeq <= ackSeq) {
@@ -223,37 +244,71 @@ export class PredictionController {
   }
 
   recordSocketReceipt(clientSeq, detail = {}) {
-    if (!this.enabled) return this.debugSummary();
     const seq = finiteU32(clientSeq);
     if (seq == null) return this.debugSummary();
+    if (detail?.accepted === false) {
+      return this.recordCommandRejection(seq, detail.reason || null, detail);
+    }
     const pending = this.pendingBySeq.get(seq);
+    const receivedAt = this.now();
     const receipt = {
       clientSeq: seq,
-      receivedAt: this.now(),
+      receivedAt,
       serverTick: finiteU32(detail.serverTick),
     };
     if (pending) {
       pending.receiptAt = receipt.receivedAt;
       pending.receiptTick = receipt.serverTick;
     }
+    const diagnostic = this.commandDiagnosticsBySeq.get(seq);
+    if (diagnostic && diagnostic.receiptAt == null) {
+      diagnostic.receiptAt = receivedAt;
+      diagnostic.receiptTick = receipt.serverTick;
+      this.commandReport.commandServerReceived += 1;
+      this.addCommandTiming("issueToServerReceipt", receivedAt - diagnostic.issuedAt);
+    } else if (!diagnostic) {
+      this.commandReport.commandServerReceived += 1;
+    }
     this.lastReceipt = receipt;
     this.receiptCount += 1;
     return this.debugSummary();
   }
 
-  recordCommandRejection(clientSeq, reason = null) {
-    if (!this.enabled) return this.debugSummary();
+  recordCommandRejection(clientSeq, reason = null, detail = {}) {
     const seq = finiteU32(clientSeq);
     if (seq == null) return this.debugSummary();
     const pending = this.pendingBySeq.get(seq);
     const rejectedAt = this.now();
+    const serverTick = finiteU32(detail.serverTick);
     if (pending) {
       pending.rejectedAt = rejectedAt;
       pending.rejectionReason = reason;
+      if (serverTick != null) pending.receiptTick = serverTick;
     }
-    this.lastRejected = { clientSeq: seq, reason, rejectedAt };
+    const diagnostic = this.commandDiagnosticsBySeq.get(seq);
+    if (diagnostic && diagnostic.rejectedAt == null) {
+      diagnostic.rejectedAt = rejectedAt;
+      diagnostic.rejectionReason = reason;
+      diagnostic.receiptTick = serverTick;
+      this.commandReport.commandRejected += 1;
+      this.addCommandTiming("issueToServerReceipt", rejectedAt - diagnostic.issuedAt);
+    } else if (!diagnostic) {
+      this.commandReport.commandRejected += 1;
+    }
+    this.lastRejected = { clientSeq: seq, reason, rejectedAt, serverTick };
     this.rejectionCount += 1;
     this.dropOptimisticUiForSeq(seq, "rejected");
+    return this.debugSummary();
+  }
+
+  recordAckSnapshotApplied(clientSeq, snapshotReceivedAt) {
+    const seq = finiteU32(clientSeq);
+    const receivedAt = Number(snapshotReceivedAt);
+    if (seq == null || seq <= this.latestAckSnapshotAppliedSeq || !Number.isFinite(receivedAt)) {
+      return this.debugSummary();
+    }
+    this.latestAckSnapshotAppliedSeq = seq;
+    this.addCommandTiming("ackSnapshotReceivedToApplied", this.now() - receivedAt);
     return this.debugSummary();
   }
 
@@ -387,9 +442,12 @@ export class PredictionController {
       enabled: this.enabled,
       pendingCommandCount: this.pending.length,
       pendingClientSeqs: this.pending.map((entry) => entry.clientSeq),
+      commandDiagnosticPendingCount: this.commandDiagnosticPending.length,
+      commandDiagnosticPendingSeqs: this.commandDiagnosticPending.map((entry) => entry.clientSeq),
       latestAuthoritativeTick: this.latestAuthoritativeTick,
       latestAckSeq: this.latestAckSeq,
       latestAckTick: this.latestAckTick,
+      latestAckSnapshotAppliedSeq: this.latestAckSnapshotAppliedSeq,
       nextClientSeq: this.nextClientSeq,
       issuedCount: this.issuedCount,
       acknowledgedCount: this.acknowledgedCount,
@@ -410,11 +468,123 @@ export class PredictionController {
       snapCorrectionCount: this.snapCorrectionCount,
       ackLatencyMs: this.ackLatencyMs,
       maxAckLatencyMs: this.maxAckLatencyMs,
+      commandReport: this.peekCommandReportStats(),
       disableReasons: { ...this.disableReasons },
       disableCount: Object.values(this.disableReasons).reduce((sum, count) => sum + count, 0),
       lastReceipt: this.lastReceipt,
       lastRejected: this.lastRejected,
       lastCorrection: this.lastCorrection,
+    };
+  }
+
+  resetCommandReportWindow() {
+    this.commandReport = {
+      commandsIssued: 0,
+      commandSocketSendAccepted: 0,
+      commandServerReceived: 0,
+      commandSimAcknowledged: 0,
+      commandRejected: 0,
+      maxPendingCommandCount: this.commandDiagnosticPending?.length || 0,
+    };
+    this.commandTimings = {
+      issueToServerReceipt: new ReportWindowAggregate(),
+      serverReceiptToSimAck: new ReportWindowAggregate(),
+      issueToSimAck: new ReportWindowAggregate(),
+      ackSnapshotReceivedToApplied: new ReportWindowAggregate(),
+    };
+    this.commandTimingLatest = {
+      issueToServerReceipt: 0,
+      serverReceiptToSimAck: 0,
+      issueToSimAck: 0,
+      ackSnapshotReceivedToApplied: 0,
+    };
+  }
+
+  trackCommandIssue(clientSeq, issuedAt) {
+    const diagnostic = {
+      clientSeq,
+      issuedAt,
+      sendAccepted: false,
+      receiptAt: null,
+      receiptTick: null,
+      simAckAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+    };
+    this.commandDiagnosticsBySeq.set(clientSeq, diagnostic);
+    this.commandDiagnosticPending.push(diagnostic);
+    this.issuedCount += 1;
+    this.commandReport.commandsIssued += 1;
+    this.commandReport.maxPendingCommandCount = Math.max(
+      this.commandReport.maxPendingCommandCount,
+      this.commandDiagnosticPending.length,
+    );
+    return diagnostic;
+  }
+
+  recordCommandSendAccepted(clientSeq, sent) {
+    const diagnostic = this.commandDiagnosticsBySeq.get(clientSeq);
+    if (diagnostic) diagnostic.sendAccepted = !!sent;
+    if (sent) this.commandReport.commandSocketSendAccepted += 1;
+  }
+
+  recordCommandSimAcknowledgement(ackSeq) {
+    const now = this.now();
+    const kept = [];
+    for (const diagnostic of this.commandDiagnosticPending) {
+      if (diagnostic.clientSeq <= ackSeq) {
+        diagnostic.simAckAt = now;
+        this.commandDiagnosticsBySeq.delete(diagnostic.clientSeq);
+        this.commandReport.commandSimAcknowledged += 1;
+        this.addCommandTiming("issueToSimAck", now - diagnostic.issuedAt);
+        if (diagnostic.receiptAt != null) {
+          this.addCommandTiming("serverReceiptToSimAck", now - diagnostic.receiptAt);
+        }
+      } else {
+        kept.push(diagnostic);
+      }
+    }
+    this.commandDiagnosticPending = kept;
+  }
+
+  addCommandTiming(kind, value) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0 || !this.commandTimings[kind]) return;
+    this.commandTimingLatest[kind] = Math.round(Math.min(number, 60_000));
+    this.commandTimings[kind].add(number);
+  }
+
+  consumeCommandReportStats(now = this.now()) {
+    const out = this.peekCommandReportStats(now);
+    this.resetCommandReportWindow();
+    return out;
+  }
+
+  peekCommandReportStats(now = this.now()) {
+    const issueToReceipt = this.commandTimings.issueToServerReceipt.summary();
+    const receiptToAck = this.commandTimings.serverReceiptToSimAck.summary();
+    const issueToAck = this.commandTimings.issueToSimAck.summary();
+    const ackApply = this.commandTimings.ackSnapshotReceivedToApplied.summary();
+    return {
+      commandsIssued: this.commandReport.commandsIssued,
+      commandSocketSendAccepted: this.commandReport.commandSocketSendAccepted,
+      commandServerReceived: this.commandReport.commandServerReceived,
+      commandSimAcknowledged: this.commandReport.commandSimAcknowledged,
+      commandRejected: this.commandReport.commandRejected,
+      commandIssueToServerReceiptLatestMs: this.commandTimingLatest.issueToServerReceipt,
+      commandIssueToServerReceiptMaxMs: issueToReceipt.max,
+      commandIssueToServerReceiptP95Ms: issueToReceipt.p95,
+      commandServerReceiptToSimAckLatestMs: this.commandTimingLatest.serverReceiptToSimAck,
+      commandServerReceiptToSimAckMaxMs: receiptToAck.max,
+      commandServerReceiptToSimAckP95Ms: receiptToAck.p95,
+      commandIssueToSimAckLatestMs: this.commandTimingLatest.issueToSimAck,
+      commandIssueToSimAckMaxMs: issueToAck.max,
+      commandIssueToSimAckP95Ms: issueToAck.p95,
+      commandAckSnapshotReceivedToAppliedLatestMs: this.commandTimingLatest.ackSnapshotReceivedToApplied,
+      commandAckSnapshotReceivedToAppliedMaxMs: ackApply.max,
+      commandAckSnapshotReceivedToAppliedP95Ms: ackApply.p95,
+      oldestPendingCommandAgeMs: oldestPendingAge(this.commandDiagnosticPending, now),
+      maxPendingCommandCount: this.commandReport.maxPendingCommandCount,
     };
   }
 
@@ -543,6 +713,15 @@ function rallyPlansEqual(a, b) {
 function finiteNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function oldestPendingAge(entries, now) {
+  let oldest = 0;
+  for (const entry of entries || []) {
+    const age = now - entry.issuedAt;
+    if (Number.isFinite(age) && age > oldest) oldest = age;
+  }
+  return Math.round(Math.min(oldest, 60_000));
 }
 
 function optimisticUiByFamily(entries) {

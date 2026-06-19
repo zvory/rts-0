@@ -18,6 +18,7 @@ export const S = Object.freeze({
   SHUTDOWN_WARNING: "shutdownWarning",
   GAME_OVER: "gameOver",
   PONG: "pong",
+  COMMAND_RECEIPT: "commandReceipt",
   ERROR: "error",
 });
 

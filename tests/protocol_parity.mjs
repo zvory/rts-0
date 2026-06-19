@@ -219,10 +219,17 @@ assert(
   JSON.stringify(msg.command(cmd.holdPosition([1]), 10)) === JSON.stringify({ t: "command", clientSeq: 10, cmd: { c: "holdPosition", units: [1] } }),
   "holdPosition command builder must emit clientSeq envelope",
 );
+assert(S.COMMAND_RECEIPT === "commandReceipt", "command receipt server tag must be mirrored");
+assert(
+  rust.includes("CommandReceipt") && protocolDoc.includes("commandReceipt"),
+  "command receipt server message must be mirrored in Rust and docs",
+);
 assert(
   // Temporary source-text allowlist: start payload field-shape assertions are contract DTO checks,
   // not part of this phase's structured protocol export.
-  rustContract.includes("prediction_build_id") && rustContract.includes("prediction_version"),
+  rustContract.includes("prediction_build_id") &&
+    rustContract.includes("prediction_version") &&
+    rustContract.includes("match_run_id"),
   "start payload must expose prediction compatibility metadata",
 );
 assert(

@@ -55,7 +55,7 @@ lobby/config dump replaces the source scrape.
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setQuickstart` | `enabled: bool` | Host toggles "Debug mode" for the next match in this room. |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
-| `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation. |
+| `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
@@ -112,17 +112,19 @@ whole plan; a queued rally appends if space remains and establishes the first st
 empty.
 
 Prediction acknowledgement has two milestones. Socket/room receipt means the server parsed a
-sequenced command and queued it for the room; this is diagnostics-only and is not exposed as the
-reconciliation acknowledgement. Sim consumption means the authoritative tick stream drained the
-queued command into the simulation; snapshots expose only this milestone. Sim consumption does not
-mean the command succeeded: ownership, affordability, visibility, placement, and other
-authoritative validation can still make the command a no-op.
+sequenced command and the room task accepted or rejected the envelope; the server may send a tiny
+`commandReceipt` containing only `clientSeq`, `serverTick`, `accepted`, and optional stable `reason`.
+This is diagnostics-only and is not the reconciliation acknowledgement. Sim consumption means the
+authoritative tick stream drained the queued command into the simulation; snapshots expose only this
+milestone. Sim consumption does not mean the command succeeded: ownership, affordability,
+visibility, placement, and other authoritative validation can still make the command a no-op.
 
 `ClientNetReport` is an untrusted, rate-limited diagnostic aggregate emitted by the browser while
 in a match:
 ```
 {
   schemaVersion: u8,        // currently 1
+  matchRunId: string,       // live match correlation id from start payload; empty when absent
   elapsedMs: u32,           // client-side aggregation window duration
   matchTick: u32,           // latest snapshot tick observed by this client
   rttMs: u16,               // latest app-level ping round-trip sample
@@ -175,6 +177,25 @@ in a match:
   predictionMode: string,   // disabled, tracking, predicting, or resyncing
   pendingCommandCount: u16,
   acknowledgedCommandLatencyMs: u16, // latest local issue -> sim-ack latency
+  commandsIssued: u32,                 // commands allocated in this report window
+  commandSocketSendAccepted: u32,      // WebSocket.send accepted by the browser
+  commandServerReceived: u32,          // accepted commandReceipt count
+  commandSimAcknowledged: u32,         // commands covered by snapshot sim-consumption ack
+  commandRejected: u32,                // rejected commandReceipt count
+  commandIssueToServerReceiptLatestMs: u16,
+  commandIssueToServerReceiptMaxMs: u16,
+  commandIssueToServerReceiptP95Ms: u16,
+  commandServerReceiptToSimAckLatestMs: u16,
+  commandServerReceiptToSimAckMaxMs: u16,
+  commandServerReceiptToSimAckP95Ms: u16,
+  commandIssueToSimAckLatestMs: u16,
+  commandIssueToSimAckMaxMs: u16,
+  commandIssueToSimAckP95Ms: u16,
+  commandAckSnapshotReceivedToAppliedLatestMs: u16,
+  commandAckSnapshotReceivedToAppliedMaxMs: u16,
+  commandAckSnapshotReceivedToAppliedP95Ms: u16,
+  oldestPendingCommandAgeMs: u16,
+  maxPendingCommandCount: u16,
   correctionDistancePx: u16,         // largest correction observed by the client
   correctionCount: u32,
   predictionDisableCount: u32,
@@ -183,16 +204,19 @@ in a match:
   predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
 }
 ```
-The snapshot payload, parse, decode, apply, prediction-apply, and cadence fields are report-window
-aggregates only; raw snapshot JSON, raw timestamp arrays, entity ids, replay data, and command
-payloads are not uploaded. The frame-work and renderer fields come from the browser's bounded
+The snapshot payload, parse, decode, apply, prediction-apply, cadence, and command milestone fields
+are report-window aggregates only; raw snapshot JSON, raw timestamp arrays, entity ids, unit ids,
+target ids, positions, replay data, and command payloads are not uploaded. Command milestone timing
+splits local issue to receipt, receipt to sim acknowledgement, issue to sim acknowledgement, and ack
+snapshot receipt to browser apply. The frame-work and renderer fields come from the browser's bounded
 frame-profiler report window; the local debug surface may keep richer cumulative phase tables, but
 those raw arrays and detailed recent frames are not uploaded. The server logs this message only when
 the aggregate contains notable lag, jitter, browser frame stalls, local JS frame work, payload
 pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
-backlog, server tick/scheduler pressure, or prediction correction/fallback signals, alongside the
-connection's `player_id` and room name. Values are advisory because clients are untrusted; use them
-to diagnose transport/browser/prediction/render behavior, not as gameplay authority.
+backlog, server tick/scheduler pressure, command milestone delay/rejection, or prediction
+correction/fallback signals, alongside the connection's `player_id`, room name, and reported
+`match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
+transport/browser/prediction/render behavior, not as gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)
 
@@ -211,6 +235,7 @@ to diagnose transport/browser/prediction/render behavior, not as gameplay author
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
+| `commandReceipt` | `clientSeq: u32`, `serverTick: u32`, `accepted: bool`, `reason?: string` — reliable diagnostics-only room receipt. Does not reconcile prediction. |
 | `error`    | `msg: string` |
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
@@ -264,6 +289,7 @@ Sent once when the match begins. Carries everything static for the whole match.
   spectator: bool,               // true when this connection is observing only
   predictionBuildId?: string,    // live active players only; server/client bundle id
   predictionVersion?: u32,       // live active players only; currently 1
+  matchRunId?: string,           // live match correlation id for log joins
   capabilities?: {               // explicit recipient-scoped shared room affordances
     roomTime?: {
       available?: bool,
