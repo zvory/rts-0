@@ -4,7 +4,7 @@
 import { MatchInputRouter } from "../client/src/input/router.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { Minimap } from "../client/src/minimap.js";
-import { KIND } from "../client/src/protocol.js";
+import { KIND, TERRAIN } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -421,6 +421,108 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(
     countCalls(terrainLayer.context, "fillRect") > terrainFillsAfterFirst,
     "canvas presentation changes invalidate terrain cache",
+  );
+  minimap.destroy();
+}
+
+// Cacheable fog grids repaint the fog layer only when fog revisions change.
+{
+  installWindowStub();
+  const layers = [];
+  const rect = { left: 0, top: 0, width: 16, height: 16 };
+  const canvas = fakeRenderableCanvas({ width: 16, height: 16, rect });
+  const state = {
+    playerId: 1,
+    map: {
+      width: 4,
+      height: 2,
+      tileSize: 1,
+      terrain: [
+        TERRAIN.GRASS,
+        TERRAIN.ROCK,
+        TERRAIN.GRASS,
+        TERRAIN.WATER,
+        TERRAIN.GRASS,
+        TERRAIN.GRASS,
+        TERRAIN.GRASS,
+        TERRAIN.GRASS,
+      ],
+      resources: [],
+    },
+    selectedEntities() {
+      return [];
+    },
+    entitiesInterpolated() {
+      return [];
+    },
+    players: [],
+  };
+  const visibleGrid = new Uint8Array(8);
+  const exploredGrid = new Uint8Array(8);
+  visibleGrid[0] = 1;
+  exploredGrid[0] = 1;
+  exploredGrid[1] = 1;
+  const fog = {
+    width: 4,
+    height: 2,
+    visibleGrid,
+    exploredGrid,
+    revision: 1,
+    visibleRevision: 1,
+    exploredRevision: 1,
+    revealAll: false,
+    isVisible(tx, ty) {
+      return this.visibleGrid[ty * this.width + tx] === 1;
+    },
+    isExplored(tx, ty) {
+      return this.exploredGrid[ty * this.width + tx] === 1;
+    },
+  };
+  const camera = { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 2, centerOn() {} };
+  const minimap = new Minimap(canvas, state, camera, fog, { issueCommand() {} }, null, {
+    staticCanvasFactory: staticCanvasFactory(layers),
+  });
+
+  minimap.render();
+  assert(layers.length === 2, "minimap creates terrain and fog static layers");
+  const terrainLayer = layers[0];
+  const fogLayer = layers[1];
+  const terrainDrawIndex = canvas.context.calls.findIndex((call) =>
+    call.op === "drawImage" && call.source === terrainLayer.canvas.label,
+  );
+  const fogDrawIndex = canvas.context.calls.findIndex((call) =>
+    call.op === "drawImage" && call.source === fogLayer.canvas.label,
+  );
+  assert(fogDrawIndex > terrainDrawIndex, "cached fog still draws above cached terrain");
+  const fogFillsAfterFirst = countCalls(fogLayer.context, "fillRect");
+  assert(fogFillsAfterFirst > 0, "fog cache paints hidden minimap runs");
+
+  minimap.render();
+  assert(
+    countCalls(fogLayer.context, "fillRect") === fogFillsAfterFirst,
+    "second render reuses cached fog layer",
+  );
+
+  visibleGrid[1] = 1;
+  fog.revision += 1;
+  fog.visibleRevision += 1;
+  minimap.render();
+  const fogFillsAfterVisibleChange = countCalls(fogLayer.context, "fillRect");
+  assert(
+    fogFillsAfterVisibleChange > fogFillsAfterFirst,
+    "visibility revision invalidates cached fog layer",
+  );
+
+  fog.revealAll = true;
+  visibleGrid.fill(1);
+  exploredGrid.fill(1);
+  fog.revision += 1;
+  fog.visibleRevision += 1;
+  fog.exploredRevision += 1;
+  minimap.render();
+  assert(
+    countCalls(fogLayer.context, "fillRect") === fogFillsAfterVisibleChange,
+    "reveal-all fog cache clears without repainting hidden fog",
   );
   minimap.destroy();
 }

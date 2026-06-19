@@ -473,8 +473,9 @@ export class Fog {
   constructor(mapWidth, mapHeight)
   update(ownEntities, tileSize, serverVisibleTiles?) // copy server visibility when provided; accumulate explored
   isVisible(tileX,tileY), isExplored(tileX,tileY)
-  // renderer reads the grids to draw the black/dim overlay
+  // renderer reads the grids to draw the black/dim overlay; minimap caches against revision
   visibleGrid, exploredGrid              // Uint8Array length w*h
+  revision, visibleRevision, exploredRevision
 }
 ```
 `match.js` must exclude `visionOnly` and shot-reveal entities from `ownEntities` before calling

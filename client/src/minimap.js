@@ -17,6 +17,7 @@ import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
 const PING_MS = 900;
 const BORDER_PULSE_MS = 700;
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
+const IMPASSABLE_FOG_SCALE = 0.56;
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
@@ -112,6 +113,9 @@ export class Minimap {
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;
+    this._fogLayer = null;
+    this._fogLayerCtx = null;
+    this._fogLayerSignature = null;
 
     this._dragging = false;
     this._pings = [];
@@ -167,6 +171,7 @@ export class Minimap {
   _invalidateStaticLayers() {
     this._terrainLayerSignature = null;
     this._resourceLayerSignature = null;
+    this._fogLayerSignature = null;
   }
 
   /** World px → canvas px. */
@@ -314,8 +319,12 @@ export class Minimap {
   }
 
   _ensureStaticLayer(kind) {
-    const layerProp = kind === "terrain" ? "_terrainLayer" : "_resourceLayer";
-    const ctxProp = kind === "terrain" ? "_terrainLayerCtx" : "_resourceLayerCtx";
+    const layerProp = kind === "terrain"
+      ? "_terrainLayer"
+      : kind === "resource" ? "_resourceLayer" : "_fogLayer";
+    const ctxProp = kind === "terrain"
+      ? "_terrainLayerCtx"
+      : kind === "resource" ? "_resourceLayerCtx" : "_fogLayerCtx";
     if (!this[layerProp]) {
       this[layerProp] = this._createStaticCanvas();
     }
@@ -381,37 +390,118 @@ export class Minimap {
   }
 
   /**
-   * Draw the fog overlay over the terrain/entities: unexplored heavily dimmed, explored but
-   * not currently visible dimmed, visible clear. Drawn per tile from the fog grids.
+   * Draw the fog overlay over terrain/entities from a cached layer. The layer is rebuilt only
+   * when Fog.revision or presentation inputs change; resource marks still draw above it.
    */
   _drawFog() {
     const map = this.state.map;
     const fog = this.fog;
     if (!fog) return;
-    const ctx = this.ctx;
+    const signature = this._fogLayerStaticSignature(map, fog);
+    if (!signature) {
+      this._paintFog(this.ctx, map, fog);
+      return;
+    }
+    const layer = this._ensureStaticLayer("fog");
+    if (!layer) {
+      this._paintFog(this.ctx, map, fog);
+      return;
+    }
+    if (staticSignatureChanged(this._fogLayerSignature, signature)) {
+      layer.ctx.clearRect(0, 0, this.size, this.size);
+      this._paintFog(layer.ctx, map, fog);
+      this._fogLayerSignature = signature;
+    }
+    this.ctx.drawImage(layer.canvas, 0, 0);
+  }
+
+  _paintFog(ctx, map, fog) {
+    if (fog.revealAll) return;
     const ts = map.tileSize;
-    const cw = ts * this._scale + 1;
     const ch = ts * this._scale + 1;
+    const visibleGrid = this._fogGridForMap(fog.visibleGrid, map);
+    const exploredGrid = this._fogGridForMap(fog.exploredGrid, map);
+    const useGrids = !!visibleGrid && !!exploredGrid;
+    const exploredFill = hex(COLORS.fogExplored);
+    const unexploredFill = hex(COLORS.fogUnexplored);
 
     // Stone/water tiles keep only a light wash of fog so the map's shape stays legible.
-    const IMPASSABLE_FOG_SCALE = 0.56;
     ctx.save();
     for (let ty = 0; ty < map.height; ty++) {
+      let runStart = -1;
+      let runFillStyle = "";
+      let runAlpha = 0;
+      const flushRun = (endTx) => {
+        if (runStart < 0) return;
+        const p = this._worldToCanvas(runStart * ts, ty * ts);
+        ctx.globalAlpha = runAlpha;
+        ctx.fillStyle = runFillStyle;
+        ctx.fillRect(p.x, p.y, (endTx - runStart) * ts * this._scale + 1, ch);
+        runStart = -1;
+      };
       for (let tx = 0; tx < map.width; tx++) {
-        if (fog.isVisible(tx, ty)) continue; // clear
-        const impassable = isImpassableTerrainCode(map.terrain[ty * map.width + tx]);
-        const p = this._worldToCanvas(tx * ts, ty * ts);
-        if (fog.isExplored(tx, ty)) {
-          ctx.globalAlpha = FOG_EXPLORED_ALPHA * (impassable ? IMPASSABLE_FOG_SCALE : 1);
-          ctx.fillStyle = hex(COLORS.fogExplored);
-        } else {
-          ctx.globalAlpha = FOG_UNEXPLORED_ALPHA * (impassable ? IMPASSABLE_FOG_SCALE : 1);
-          ctx.fillStyle = hex(COLORS.fogUnexplored);
+        const i = ty * map.width + tx;
+        const visible = useGrids ? visibleGrid[i] === 1 : fog.isVisible(tx, ty);
+        if (visible) {
+          flushRun(tx);
+          continue;
         }
-        ctx.fillRect(p.x, p.y, cw, ch);
+        const impassable = isImpassableTerrainCode(map.terrain[i]);
+        const explored = useGrids ? exploredGrid[i] === 1 : fog.isExplored(tx, ty);
+        const fillStyle = explored ? exploredFill : unexploredFill;
+        const alpha = (explored ? FOG_EXPLORED_ALPHA : FOG_UNEXPLORED_ALPHA)
+          * (impassable ? IMPASSABLE_FOG_SCALE : 1);
+        if (runStart >= 0 && runFillStyle === fillStyle && runAlpha === alpha) {
+          continue;
+        }
+        flushRun(tx);
+        runStart = tx;
+        runFillStyle = fillStyle;
+        runAlpha = alpha;
       }
+      flushRun(map.width);
     }
     ctx.restore();
+  }
+
+  _fogGridForMap(grid, map) {
+    const cellCount = map.width * map.height;
+    return grid && grid.length === cellCount ? grid : null;
+  }
+
+  _fogLayerStaticSignature(map, fog) {
+    if (!Number.isFinite(fog.revision)) return null;
+    if (!this._fogGridForMap(fog.visibleGrid, map) || !this._fogGridForMap(fog.exploredGrid, map)) {
+      return null;
+    }
+    return {
+      map,
+      terrain: map.terrain,
+      mapWidth: map.width,
+      mapHeight: map.height,
+      tileSize: map.tileSize,
+      size: this.size,
+      scale: this._scale,
+      offX: this._offX,
+      offY: this._offY,
+      presentation: this._canvasPresentationSignature(),
+      fog,
+      fogWidth: fog.width,
+      fogHeight: fog.height,
+      visibleGrid: fog.visibleGrid,
+      exploredGrid: fog.exploredGrid,
+      revision: fog.revision,
+      visibleRevision: fog.visibleRevision,
+      exploredRevision: fog.exploredRevision,
+      revealAll: !!fog.revealAll,
+      style: [
+        COLORS.fogExplored,
+        COLORS.fogUnexplored,
+        FOG_EXPLORED_ALPHA,
+        FOG_UNEXPLORED_ALPHA,
+        IMPASSABLE_FOG_SCALE,
+      ].join(","),
+    };
   }
 
   /** Draw a colored blip for each visible entity (own/enemy/neutral). */
@@ -536,6 +626,9 @@ export class Minimap {
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;
+    this._fogLayer = null;
+    this._fogLayerCtx = null;
+    this._fogLayerSignature = null;
   }
 
   _issueCommand(command) {

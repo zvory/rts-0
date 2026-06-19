@@ -7061,6 +7061,7 @@ withFakeDocument(() => {
   assert(fog.width === 8 && fog.height === 8, "Fog dimensions");
   assert(fog.visibleGrid instanceof Uint8Array, "Fog.visibleGrid is Uint8Array");
   assert(fog.exploredGrid instanceof Uint8Array, "Fog.exploredGrid is Uint8Array");
+  assert(fog.revision === 0, "Fog starts with a stable cache revision");
   assertHasMethod(fog, "update", "Fog");
   assertHasMethod(fog, "isVisible", "Fog");
   assertHasMethod(fog, "isExplored", "Fog");
@@ -7077,13 +7078,29 @@ withFakeDocument(() => {
     [{ kind: "worker", x: 64, y: 64 }], // center of tile (2,2) at ts=32
     32,
   );
+  const revisionAfterReveal = fog.revision;
+  assert(revisionAfterReveal > 0, "Fog revision increments when visibility changes");
   assert(fog.isVisible(2, 2) === true, "tile under entity should be visible");
   assert(fog.isExplored(2, 2) === true, "tile under entity should be explored");
+  fog.update(
+    [{ kind: "worker", x: 64, y: 64 }],
+    32,
+  );
+  assert(fog.revision === revisionAfterReveal, "Fog revision stays stable for identical visibility");
 
   // After clearing visible, explored should persist
   fog.update([], 32);
+  assert(fog.revision > revisionAfterReveal, "Fog revision increments when current visibility clears");
   assert(fog.isVisible(2, 2) === false, "tile should no longer be visible");
   assert(fog.isExplored(2, 2) === true, "tile should still be explored");
+
+  const serverFog = new Fog(2, 1);
+  serverFog.update([], 32, new Uint8Array([1, 0]));
+  const serverRevision = serverFog.revision;
+  serverFog.update([], 32, new Uint8Array([1, 0]));
+  assert(serverFog.revision === serverRevision, "server fog revisions are stable for repeated grids");
+  serverFog.update([], 32, new Uint8Array([0, 1]));
+  assert(serverFog.revision > serverRevision, "server fog revisions change for new grids");
 
   const terrain = new Array(8 * 8).fill(TERRAIN.GRASS);
   terrain[2 * 8 + 3] = TERRAIN.ROCK;
