@@ -749,6 +749,16 @@ impl RoomTask {
             && !match_history_participants_are_automated(&self.match_participants)
     }
 
+    fn should_capture_post_match_replay(&self) -> bool {
+        let match_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
+        match_policy.captures_post_match_replay()
+    }
+
+    fn should_attach_match_history_replay_artifact(&self) -> bool {
+        let match_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
+        match_policy.attaches_match_history_replay_artifact()
+    }
+
     // -- Event handling ------------------------------------------------------
 
     fn handle_event(&mut self, event: RoomEvent) {
@@ -2131,6 +2141,7 @@ impl RoomTask {
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
+        let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
         let recipients: Vec<_> = self
             .order
             .iter()
@@ -2151,6 +2162,7 @@ impl RoomTask {
                     } else {
                         LaunchPrediction::Enabled
                     },
+                    capabilities: start_policy.start_capabilities(!player.spectator),
                     diagnostics: projection_policy.diagnostic_capabilities_for(role),
                     clear_pending_snapshot: false,
                     lab: None,
@@ -2226,6 +2238,7 @@ impl RoomTask {
         self.dev_view_player_id = None;
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
+        let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
         let mut recipients = Vec::new();
         for &connection_id in &self.order {
             let Some(player) = self.players.get_mut(&connection_id) else {
@@ -2251,6 +2264,7 @@ impl RoomTask {
                 } else {
                     LaunchPrediction::Disabled
                 },
+                capabilities: start_policy.start_capabilities(mapped_seat.is_some()),
                 diagnostics: projection_policy.diagnostic_capabilities_for(role),
                 clear_pending_snapshot: true,
                 lab: None,
@@ -2331,6 +2345,7 @@ impl RoomTask {
         self.dev_view_player_id = None;
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
+        let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
         let recipients: Vec<_> = self
             .order
             .iter()
@@ -2344,6 +2359,7 @@ impl RoomTask {
                         .unwrap_or(LAB_PLAYER_ONE_ID),
                     spectator: true,
                     prediction: LaunchPrediction::Disabled,
+                    capabilities: start_policy.start_capabilities(false),
                     diagnostics: projection_policy
                         .diagnostic_capabilities_for(RecipientRole::Spectator),
                     clear_pending_snapshot: false,
@@ -2584,6 +2600,7 @@ impl RoomTask {
         let diagnostics = self
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
+        let capabilities = self.session_policy().start_capabilities(false);
         super::launch::send_start_payloads(
             &self.room,
             &payload,
@@ -2592,6 +2609,7 @@ impl RoomTask {
                 payload_player_id: self.dev_view_player_id.unwrap_or(watcher_id),
                 spectator: true,
                 prediction: LaunchPrediction::Disabled,
+                capabilities,
                 diagnostics,
                 clear_pending_snapshot: false,
                 lab: None,
@@ -2611,6 +2629,7 @@ impl RoomTask {
         let diagnostics = self
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
+        let capabilities = self.session_policy().start_capabilities(false);
         super::launch::send_start_payloads(
             &self.room,
             &payload,
@@ -2623,6 +2642,7 @@ impl RoomTask {
                     .unwrap_or(LAB_PLAYER_ONE_ID),
                 spectator: true,
                 prediction: LaunchPrediction::Disabled,
+                capabilities,
                 diagnostics,
                 clear_pending_snapshot: false,
                 lab: self.lab_start_metadata_for(watcher_id),
@@ -2664,6 +2684,7 @@ impl RoomTask {
         payload.diagnostics = self
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
+        payload.capabilities = self.session_policy().start_capabilities(false);
         send_or_log(
             &self.room,
             watcher_id,
@@ -3093,7 +3114,8 @@ impl RoomTask {
             );
             return;
         }
-        if !matches!(self.mode, RoomMode::Lab(_)) {
+        let policy = self.session_policy();
+        if !policy.allows_lab_privileged_ops() {
             self.send_lab_result_to(
                 player_id,
                 LabResult {
@@ -3101,6 +3123,25 @@ impl RoomTask {
                     ok: false,
                     op: op_kind,
                     error: Some("lab requests are only valid in lab rooms".to_string()),
+                    outcome: None,
+                },
+            );
+            return;
+        }
+        if matches!(
+            op,
+            LabClientOp::ExportScenario { .. } | LabClientOp::ImportScenario { .. }
+        ) && !policy.allows_lab_scenario_io()
+        {
+            self.send_lab_result_to(
+                player_id,
+                LabResult {
+                    request_id,
+                    ok: false,
+                    op: op_kind,
+                    error: Some(
+                        "lab scenario import/export is not enabled in this room".to_string(),
+                    ),
                     outcome: None,
                 },
             );
@@ -3152,15 +3193,18 @@ impl RoomTask {
             return lab_result_error(request_id, op, &err);
         }
         let tick = game.tick_count();
+        let log_operations = self.session_policy().logs_lab_operations();
         if let Some(session) = &mut self.lab_session {
             session.vision_mode = vision;
-            session.operation_log.push(LabOperationLogEntry {
-                tick,
-                request_id,
-                operator_id,
-                op: op.clone(),
-                result: "accepted".to_string(),
-            });
+            if log_operations {
+                session.operation_log.push(LabOperationLogEntry {
+                    tick,
+                    request_id,
+                    operator_id,
+                    op: op.clone(),
+                    result: "accepted".to_string(),
+                });
+            }
         }
         self.broadcast_lab_state();
         LabResult {
@@ -3179,6 +3223,7 @@ impl RoomTask {
         cmd: Command,
     ) -> LabResult {
         let op = "issueCommandAs".to_string();
+        let log_operations = self.session_policy().logs_lab_operations();
         let tick = {
             let Some(game) = self.live_game_mut() else {
                 return lab_result_error(request_id, op, "lab game is not running");
@@ -3190,13 +3235,15 @@ impl RoomTask {
         };
         if let Some(session) = &mut self.lab_session {
             session.dirty = true;
-            session.operation_log.push(LabOperationLogEntry {
-                tick,
-                request_id,
-                operator_id: session.operator_id,
-                op: op.clone(),
-                result: format!("playerId={command_player_id}"),
-            });
+            if log_operations {
+                session.operation_log.push(LabOperationLogEntry {
+                    tick,
+                    request_id,
+                    operator_id: session.operator_id,
+                    op: op.clone(),
+                    result: format!("playerId={command_player_id}"),
+                });
+            }
         }
         self.broadcast_lab_state();
         LabResult {
@@ -3210,6 +3257,9 @@ impl RoomTask {
 
     fn export_lab_scenario(&self, request_id: u32, name: Option<String>) -> LabResult {
         let op = "exportScenario".to_string();
+        if !self.session_policy().allows_lab_scenario_io() {
+            return lab_result_error(request_id, op, "lab scenario export is not enabled");
+        }
         let Some(game) = self.live_game() else {
             return lab_result_error(request_id, op, "lab game is not running");
         };
@@ -3264,6 +3314,7 @@ impl RoomTask {
             Ok(op) => op,
             Err(err) => return lab_result_error(request_id, op_kind, &err),
         };
+        let log_operations = self.session_policy().logs_lab_operations();
         let (tick, outcome_json) = {
             let Some(game) = self.live_game_mut() else {
                 return lab_result_error(request_id, op_kind, "lab game is not running");
@@ -3279,13 +3330,15 @@ impl RoomTask {
             if let Some(vision) = imported_vision {
                 session.vision_mode = vision;
             }
-            session.operation_log.push(LabOperationLogEntry {
-                tick,
-                request_id,
-                operator_id: session.operator_id,
-                op: op_kind.clone(),
-                result: outcome_json.to_string(),
-            });
+            if log_operations {
+                session.operation_log.push(LabOperationLogEntry {
+                    tick,
+                    request_id,
+                    operator_id: session.operator_id,
+                    op: op_kind.clone(),
+                    result: outcome_json.to_string(),
+                });
+            }
         }
         self.broadcast_lab_state();
         LabResult {
@@ -3642,9 +3695,16 @@ impl RoomTask {
             .map(|player| player.head_of_line_count)
             .max()
             .unwrap_or(0);
-        let replay_artifact = game.filter(|_| !self.is_dev_watch()).map(|game| {
-            ReplayArtifactV1::capture_from_game(game, server_build_sha(), winner_id, scores.clone())
-        });
+        let replay_artifact = game
+            .filter(|_| self.should_capture_post_match_replay())
+            .map(|game| {
+                ReplayArtifactV1::capture_from_game(
+                    game,
+                    server_build_sha(),
+                    winner_id,
+                    scores.clone(),
+                )
+            });
         let will_record_history = self.db.is_some()
             && self.match_started_at.is_some()
             && self.should_persist_match_history();
@@ -3676,16 +3736,19 @@ impl RoomTask {
                 let winner_name = winner_id
                     .and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
                 let score_json = serde_json::to_value(&scores).unwrap_or(serde_json::Value::Null);
-                let replay = replay_artifact
-                    .as_ref()
-                    .and_then(|artifact| match crate::db::MatchReplayRecord::from_artifact(artifact)
-                    {
-                        Ok(replay) => Some(replay),
-                        Err(err) => {
-                            crate::log_warn!(room = %self.room, error = %err, "failed to serialize replay artifact for match history");
-                            None
+                let replay = if self.should_attach_match_history_replay_artifact() {
+                    replay_artifact.as_ref().and_then(|artifact| {
+                        match crate::db::MatchReplayRecord::from_artifact(artifact) {
+                            Ok(replay) => Some(replay),
+                            Err(err) => {
+                                crate::log_warn!(room = %self.room, error = %err, "failed to serialize replay artifact for match history");
+                                None
+                            }
                         }
-                    });
+                    })
+                } else {
+                    None
+                };
                 let rec = crate::db::MatchRecord {
                     started_at,
                     ended_at,

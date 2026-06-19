@@ -1,6 +1,7 @@
 const LATENCY_ISSUE_MS = 180;
 const JITTER_ISSUE_MS = 20;
 const JITTER_WINDOW = 8;
+const FPS_WINDOW_MS = 60_000;
 
 export class MatchHealth {
   constructor({ net, statusBadge, snapshotMs }) {
@@ -12,11 +13,15 @@ export class MatchHealth {
     this.lastSnapshotArrivedAt = null;
     this.reportStartedAt = performance.now();
     this.reportStats = this.createReportStats();
+    this.frameSamples = [];
+    this.frameWindowTotalMs = 0;
     this.health = {
       latencyMs: null,
       serverTickMs: null,
       serverLagMs: null,
       jitterMs: null,
+      fps: null,
+      fpsOneMinute: null,
       issues: {
         latency: { active: false, count: 0 },
         slowTick: { active: false, count: 0 },
@@ -44,11 +49,30 @@ export class MatchHealth {
     this.reportStats = this.createReportStats();
   }
 
-  noteFrameGap(frameGapMs) {
+  noteFrameGap(frameGapMs, now = performance.now()) {
     if (!Number.isFinite(frameGapMs) || frameGapMs < 0) return;
     this.reportStats.frameCount += 1;
     this.reportStats.frameTotalMs += frameGapMs;
     this.reportStats.frameGapMaxMs = Math.max(this.reportStats.frameGapMaxMs, frameGapMs);
+    if (frameGapMs <= 0 || !Number.isFinite(now)) return;
+    this.health.fps = 1000 / frameGapMs;
+    this.frameSamples.push({ at: now, gapMs: frameGapMs });
+    this.frameWindowTotalMs += frameGapMs;
+    this.pruneFrameSamples(now);
+    this.health.fpsOneMinute = this.frameWindowTotalMs > 0
+      ? this.frameSamples.length * 1000 / this.frameWindowTotalMs
+      : null;
+  }
+
+  pruneFrameSamples(now) {
+    const cutoff = now - FPS_WINDOW_MS;
+    let removeCount = 0;
+    while (removeCount < this.frameSamples.length && this.frameSamples[removeCount].at < cutoff) {
+      this.frameWindowTotalMs -= this.frameSamples[removeCount].gapMs;
+      removeCount += 1;
+    }
+    if (removeCount > 0) this.frameSamples.splice(0, removeCount);
+    if (this.frameSamples.length === 0) this.frameWindowTotalMs = 0;
   }
 
   noteSnapshotArrival(now, documentHidden) {
@@ -107,6 +131,8 @@ export class MatchHealth {
       serverTickMs: this.health.serverTickMs,
       serverLagMs: this.health.serverLagMs,
       jitterMs: this.health.jitterMs,
+      fps: this.health.fps,
+      fpsOneMinute: this.health.fpsOneMinute,
       issues: this.health.issues,
     };
   }

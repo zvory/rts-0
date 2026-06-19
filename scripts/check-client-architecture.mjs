@@ -90,8 +90,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "hud.js": 44208,
   // Room2 Phase 4 adds recipient diagnostic affordance parsing to GameState.
   "state.js": 39267,
-  // Tank Trap Phase 5 adds placement-drag lifecycle hooks while line math lives in input/tank_trap_line.js.
-  "input/index.js": 38854,
+  // Quick-cast click suppression keeps guard math in input/quick_cast_selection_guard.js while
+  // input/index.js owns the mouse down/move/up routing hooks.
+  "input/index.js": 39869,
   // Room2 Phase 3 renames replay/dev time wiring to neutral room-time handlers.
   "match.js": 38818,
   // Room2 Phase 4 mirrors start-payload diagnostic capability constants.
@@ -154,6 +155,7 @@ for (const file of files) {
   });
   checkLargeFileBaseline(file, source);
   checkForbiddenGameStateIntentShims(file, source);
+  checkRoomCapabilityParser(file, source);
 }
 
 for (const mod of modules.values()) {
@@ -250,6 +252,22 @@ function checkForbiddenGameStateIntentShims(file, source) {
     const directStateRe = new RegExp(`(?:\\bstate|\\bthis\\.state)(?:\\.${name}\\b|\\?\\.${name}\\b)`);
     if (directStateRe.test(source)) {
       failures.push(`${file}: forbidden GameState intent shim reference ${name}; use injected ClientIntent or a narrow view model`);
+    }
+  }
+}
+
+function checkRoomCapabilityParser(file, source) {
+  if (file !== "room_capabilities.js") return;
+  const forbidden = [
+    ["devWatch", "dev-watch route identity"],
+    ["replayViewer", "replay-viewer shell identity"],
+    ["startPayload?.replay", "replay start metadata"],
+    ["startPayload.replay", "replay start metadata"],
+    ["debugMode", "legacy debug-mode flag"],
+  ];
+  for (const [needle, label] of forbidden) {
+    if (source.includes(needle)) {
+      failures.push(`${file}: room capabilities must read startPayload.capabilities/diagnostics, not ${label}`);
     }
   }
 }

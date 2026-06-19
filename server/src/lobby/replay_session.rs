@@ -236,6 +236,7 @@ impl ReplaySession {
         StartPayload {
             player_id: viewer_id,
             spectator: true,
+            capabilities: Default::default(),
             replay: Some(self.artifact.start_metadata()),
             ..self.game.start_payload()
         }

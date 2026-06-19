@@ -99,6 +99,11 @@ The room owns:
 The room should not know how to mutate an entity. It should know only how to validate that the
 request came from the operator, bound the payload, call `Game`, and send a result.
 
+The landed room capability model makes persistence and export explicit room-policy choices.
+Normal matches are eligible for match-history rows and durable replay artifacts, replay branches
+keep only transient post-match replay capture, dev scenarios suppress replay/history writes, and
+labs keep scenario import/export plus a room-local operation log without public storage.
+
 ### Wire Protocol
 
 `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`, `client/src/protocol.js`, and

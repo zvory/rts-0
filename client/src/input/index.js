@@ -62,6 +62,11 @@ import {
   _jumpToControlGroupCluster,
 } from "./control_groups.js";
 import {
+  clearPostQuickCastSelectionGuard,
+  consumePostQuickCastSelectionGuard,
+  postQuickCastSelectionGuardActiveAt,
+} from "./quick_cast_selection_guard.js";
+import {
   cursorLockSupported,
   installedAppRuntime,
   enterCursorLock,
@@ -159,6 +164,8 @@ export class Input {
     this._dragging = false;
     // Last completed single click: { x, y, t } in screen pixels + timestamp ms.
     this._lastClick = null;
+    // One-shot selection suppression after an unqueued quick-cast at the cursor.
+    this._postQuickCastSelectionGuard = null;
     // Last recalled control-group slot for number-key double-tap camera jumps.
     this._lastControlGroupTap = null;
     // Cursor-lock state. While locked, `this.mouse` is a viewport-local virtual
@@ -735,6 +742,7 @@ export class Input {
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
     if (this.pointerLocked && ev.button === 2) {
+      clearPostQuickCastSelectionGuard(this);
       this._suppressNextContextMenuUntil = performance.now() + CONTEXT_MENU_SUPPRESS_MS;
       if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._onRightClick(p, ev);
       ev.preventDefault();
@@ -742,6 +750,7 @@ export class Input {
       return;
     }
     if (!this.pointerLocked && ev.button === 2 && ev.shiftKey) {
+      clearPostQuickCastSelectionGuard(this);
       // Some browsers/OS combinations show Shift+right-click menus without a
       // normal contextmenu event, so queue orders on mousedown for that chord.
       this._suppressNextContextMenuUntil = performance.now() + CONTEXT_MENU_SUPPRESS_MS;
@@ -750,6 +759,7 @@ export class Input {
       ev.stopPropagation();
       return;
     }
+    if (ev.button !== 0) clearPostQuickCastSelectionGuard(this);
     if (ev.button !== 2 && this._routeLockedPointerDown(ev, p)) {
       ev.preventDefault();
       return;
@@ -788,6 +798,10 @@ export class Input {
       // Promote to a real box once the cursor has moved past a small threshold.
       if (!this._dragging && this._dragDistance() >= DRAG_THRESHOLD_PX) {
         this._dragging = true;
+        if (this._drag.suppressPostQuickCastSelection) {
+          this._drag.suppressPostQuickCastSelection = false;
+          clearPostQuickCastSelectionGuard(this);
+        }
       }
       if (this._dragging) {
         this.renderer.drawSelectionBox(this._normalizedDragRect());
@@ -821,6 +835,8 @@ export class Input {
     if (wasDragging) {
       this._lastClick = null;
       this._commitBoxSelection(drag, ev.shiftKey);
+    } else if (drag.suppressPostQuickCastSelection && consumePostQuickCastSelectionGuard(this, p)) {
+      this._lastClick = null;
     } else {
       const now = performance.now();
       const last = this._lastClick;
@@ -833,6 +849,7 @@ export class Input {
   }
 
   _handleContextMenu(ev) {
+    clearPostQuickCastSelectionGuard(this);
     // Always suppress the native menu over the viewport; treat as a right-click.
     ev.preventDefault();
     ev.stopPropagation();
@@ -856,12 +873,14 @@ export class Input {
   _onLeftDown(p, ev) {
     // Build placement: a valid left-click confirms the build with a selected worker.
     if (this._placement()) {
+      clearPostQuickCastSelectionGuard(this);
       if (this._beginTankTrapPlacementDrag()) return;
       this._confirmPlacement(ev);
       return;
     }
     // Command-card targeting: the next left-click issues the armed command.
     if (this._commandTarget()) {
+      clearPostQuickCastSelectionGuard(this);
       this._issueTargetedCommand(p, ev);
       const issued = typeof this._intent()?.issueCommandTarget === "function"
         ? this._intent().issueCommandTarget(ev)
@@ -872,7 +891,8 @@ export class Input {
       return;
     }
     // Otherwise begin a (possible) selection drag from this anchor.
-    this._drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    const suppressPostQuickCastSelection = postQuickCastSelectionGuardActiveAt(this, p);
+    this._drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, suppressPostQuickCastSelection };
     this._dragging = false;
     void ev;
   }

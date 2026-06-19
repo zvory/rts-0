@@ -1,0 +1,10214 @@
+{
+  "artifactSchemaVersion": 2,
+  "commandLog": [
+    {
+      "command": {
+        "c": "gather",
+        "node": 14,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 7,
+      "tick": 58
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 35,
+        "units": [
+          30,
+          31,
+          29,
+          28
+        ]
+      },
+      "playerId": 8,
+      "tick": 63
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 35,
+        "units": [
+          30,
+          31,
+          29,
+          28
+        ]
+      },
+      "playerId": 8,
+      "tick": 69
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 34,
+        "units": [
+          30,
+          31,
+          29,
+          28
+        ]
+      },
+      "playerId": 8,
+      "tick": 75
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 76
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 8,
+      "tick": 92
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 37,
+        "units": [
+          29
+        ]
+      },
+      "playerId": 8,
+      "tick": 140
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 37,
+        "units": [
+          29
+        ]
+      },
+      "playerId": 8,
+      "tick": 146
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 37,
+        "units": [
+          29
+        ]
+      },
+      "playerId": 8,
+      "tick": 152
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 37,
+        "units": [
+          29
+        ]
+      },
+      "playerId": 8,
+      "tick": 159
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 458.6768798828125,
+        "y": 492.5746765136719
+      },
+      "playerId": 7,
+      "tick": 261
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 444.4912109375,
+        "y": 495.1078186035156
+      },
+      "playerId": 7,
+      "tick": 267
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 432.3320617675781,
+        "y": 498.1476135253906
+      },
+      "playerId": 7,
+      "tick": 271
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 424.2259521484375,
+        "y": 503.21392822265625
+      },
+      "playerId": 7,
+      "tick": 275
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "setRally",
+        "kind": "move",
+        "x": 463.0,
+        "y": 3742.0
+      },
+      "playerId": 8,
+      "tick": 345
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 8,
+      "tick": 353
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 403
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 11,
+        "units": [
+          137
+        ]
+      },
+      "playerId": 7,
+      "tick": 457
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 11,
+        "units": [
+          137
+        ]
+      },
+      "playerId": 7,
+      "tick": 462
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 11,
+        "units": [
+          137
+        ]
+      },
+      "playerId": 7,
+      "tick": 467
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 197.0,
+        "y": 3635.0
+      },
+      "playerId": 8,
+      "tick": 471
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 0.0,
+        "y": 3754.0
+      },
+      "playerId": 8,
+      "tick": 476
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 875.8032836914062,
+        "y": 1173.245849609375
+      },
+      "playerId": 8,
+      "tick": 485
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 561.8360595703125,
+        "y": 991.4754028320312
+      },
+      "playerId": 8,
+      "tick": 490
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 543.2842407226562,
+        "y": 385.6755065917969
+      },
+      "playerId": 7,
+      "tick": 497
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 561.5230102539062,
+        "y": 371.4898376464844
+      },
+      "playerId": 7,
+      "tick": 502
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "setRally",
+        "kind": "move",
+        "x": 418.0,
+        "y": 3555.0
+      },
+      "playerId": 8,
+      "tick": 549
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "setRally",
+        "kind": "move",
+        "x": 410.0,
+        "y": 3545.0
+      },
+      "playerId": 8,
+      "tick": 557
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "setRally",
+        "kind": "move",
+        "x": 460.0,
+        "y": 3501.0
+      },
+      "playerId": 8,
+      "tick": 582
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "setRally",
+        "kind": "move",
+        "x": 470.0,
+        "y": 3489.0
+      },
+      "playerId": 8,
+      "tick": 589
+    },
+    {
+      "command": {
+        "building": 27,
+        "c": "setRally",
+        "kind": "move",
+        "x": 468.0,
+        "y": 3489.0
+      },
+      "playerId": 8,
+      "tick": 604
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 743
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 6,
+        "units": [
+          139
+        ]
+      },
+      "playerId": 7,
+      "tick": 814
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 6,
+        "units": [
+          139
+        ]
+      },
+      "playerId": 7,
+      "tick": 824
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 32,
+        "units": [
+          140
+        ]
+      },
+      "playerId": 8,
+      "tick": 849
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 544.8041381835938,
+        "y": 355.2776184082031
+      },
+      "playerId": 7,
+      "tick": 876
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 290.0,
+        "y": 1767.234130859375
+      },
+      "playerId": 8,
+      "tick": 942
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 432.0,
+        "y": 1677.234130859375
+      },
+      "playerId": 8,
+      "tick": 950
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 426.0,
+        "y": 1681.234130859375
+      },
+      "playerId": 8,
+      "tick": 954
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 431.0,
+        "y": 2224.814208984375
+      },
+      "playerId": 8,
+      "tick": 1072
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 437.0,
+        "y": 2231.814208984375
+      },
+      "playerId": 8,
+      "tick": 1079
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 457.0,
+        "y": 2216.814208984375
+      },
+      "playerId": 8,
+      "tick": 1086
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 1114
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 646.0,
+        "y": 2087.814208984375
+      },
+      "playerId": 8,
+      "tick": 1144
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 686.0,
+        "y": 2073.814208984375
+      },
+      "playerId": 8,
+      "tick": 1151
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 683.0,
+        "y": 2064.814208984375
+      },
+      "playerId": 8,
+      "tick": 1156
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          141
+        ],
+        "x": 624.3452758789062,
+        "y": 448.49774169921875
+      },
+      "playerId": 7,
+      "tick": 1179
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 12,
+        "units": [
+          141
+        ]
+      },
+      "playerId": 7,
+      "tick": 1193
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 568.0,
+        "y": 2186.814208984375
+      },
+      "playerId": 8,
+      "tick": 1211
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 559.0,
+        "y": 2174.814208984375
+      },
+      "playerId": 8,
+      "tick": 1217
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 531.6317749023438,
+        "y": 367.436767578125
+      },
+      "playerId": 7,
+      "tick": 1248
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 544.2975463867188,
+        "y": 361.3572082519531
+      },
+      "playerId": 7,
+      "tick": 1253
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 561.5230102539062,
+        "y": 352.7444763183594
+      },
+      "playerId": 7,
+      "tick": 1258
+    },
+    {
+      "command": {
+        "building": "barracks",
+        "c": "build",
+        "tileX": 14,
+        "tileY": 68,
+        "units": [
+          138
+        ]
+      },
+      "playerId": 8,
+      "tick": 1261
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 570.642333984375,
+        "y": 344.1317443847656
+      },
+      "playerId": 7,
+      "tick": 1262
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 570.642333984375,
+        "y": 344.1317443847656
+      },
+      "playerId": 7,
+      "tick": 1266
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 1460
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 1486
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "setRally",
+        "kind": "move",
+        "x": 703.0,
+        "y": 2129.814208984375
+      },
+      "playerId": 8,
+      "tick": 1494
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 351.0,
+        "y": 2121.814208984375
+      },
+      "playerId": 8,
+      "tick": 1511
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 377.0,
+        "y": 2100.814208984375
+      },
+      "playerId": 8,
+      "tick": 1517
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 391.0,
+        "y": 2103.814208984375
+      },
+      "playerId": 8,
+      "tick": 1524
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 455.0,
+        "y": 2082.814208984375
+      },
+      "playerId": 8,
+      "tick": 1537
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          143
+        ],
+        "x": 663.8624877929688,
+        "y": 474.3359375
+      },
+      "playerId": 7,
+      "tick": 1542
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 466.0,
+        "y": 2081.814208984375
+      },
+      "playerId": 8,
+      "tick": 1544
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 18,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 1549
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 475.0,
+        "y": 2075.814208984375
+      },
+      "playerId": 8,
+      "tick": 1551
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 489.0,
+        "y": 2065.814208984375
+      },
+      "playerId": 8,
+      "tick": 1557
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 495.0,
+        "y": 2058.814208984375
+      },
+      "playerId": 8,
+      "tick": 1566
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 499.0,
+        "y": 2056.814208984375
+      },
+      "playerId": 8,
+      "tick": 1575
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 488.0,
+        "y": 2079.814208984375
+      },
+      "playerId": 8,
+      "tick": 1591
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 526.0,
+        "y": 2071.814208984375
+      },
+      "playerId": 8,
+      "tick": 1598
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 538.0,
+        "y": 2067.814208984375
+      },
+      "playerId": 8,
+      "tick": 1606
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 563.0,
+        "y": 2061.814208984375
+      },
+      "playerId": 8,
+      "tick": 1612
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 563.0,
+        "y": 2061.814208984375
+      },
+      "playerId": 8,
+      "tick": 1620
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 564.0,
+        "y": 2061.814208984375
+      },
+      "playerId": 8,
+      "tick": 1627
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 550.0,
+        "y": 2069.814208984375
+      },
+      "playerId": 8,
+      "tick": 1638
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          143
+        ],
+        "x": 696.7935180664062,
+        "y": 427.72589111328125
+      },
+      "playerId": 7,
+      "tick": 1666
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 564.0,
+        "y": 2064.814208984375
+      },
+      "playerId": 8,
+      "tick": 1686
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 580.0,
+        "y": 2060.814208984375
+      },
+      "playerId": 8,
+      "tick": 1692
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          143
+        ],
+        "x": 1061.8623046875,
+        "y": 270.2244873046875
+      },
+      "playerId": 7,
+      "tick": 1695
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 595.0,
+        "y": 2056.814208984375
+      },
+      "playerId": 8,
+      "tick": 1699
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 605.0,
+        "y": 2054.814208984375
+      },
+      "playerId": 8,
+      "tick": 1706
+    },
+    {
+      "command": {
+        "building": "city_centre",
+        "c": "build",
+        "tileX": 38,
+        "tileY": 11,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 1726
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 649.0,
+        "y": 2048.814208984375
+      },
+      "playerId": 8,
+      "tick": 1730
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 649.0,
+        "y": 2048.814208984375
+      },
+      "playerId": 8,
+      "tick": 1740
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 704.0,
+        "y": 2031.8140869140625
+      },
+      "playerId": 8,
+      "tick": 1770
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 734.0,
+        "y": 2013.8140869140625
+      },
+      "playerId": 8,
+      "tick": 1776
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 1793
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 812.0,
+        "y": 2061.134033203125
+      },
+      "playerId": 8,
+      "tick": 1800
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 832.0,
+        "y": 2041.1341552734375
+      },
+      "playerId": 8,
+      "tick": 1807
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 832.0,
+        "y": 2038.1341552734375
+      },
+      "playerId": 8,
+      "tick": 1813
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 1840
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          144
+        ],
+        "x": 784.0,
+        "y": 1959.1341552734375
+      },
+      "playerId": 8,
+      "tick": 1861
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          144
+        ],
+        "x": 827.0,
+        "y": 1957.1341552734375
+      },
+      "playerId": 8,
+      "tick": 1882
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 12,
+        "units": [
+          145
+        ]
+      },
+      "playerId": 7,
+      "tick": 1904
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 7,
+        "units": [
+          145
+        ]
+      },
+      "playerId": 7,
+      "tick": 1917
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 7,
+        "units": [
+          145
+        ]
+      },
+      "playerId": 7,
+      "tick": 1926
+    },
+    {
+      "command": {
+        "building": "barracks",
+        "c": "build",
+        "tileX": 26,
+        "tileY": 63,
+        "units": [
+          138
+        ]
+      },
+      "playerId": 8,
+      "tick": 2023
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "setRally",
+        "kind": "move",
+        "x": 773.0,
+        "y": 1985.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2053
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "setRally",
+        "kind": "move",
+        "x": 792.0,
+        "y": 1994.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2059
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "setRally",
+        "kind": "move",
+        "x": 792.0,
+        "y": 1994.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2066
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148
+        ],
+        "x": 809.0,
+        "y": 1985.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2189
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148
+        ],
+        "x": 779.0,
+        "y": 1995.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2197
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 2220
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 625.7028198242188,
+        "y": 518.0092163085938
+      },
+      "playerId": 7,
+      "tick": 2276
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 605.9442138671875,
+        "y": 586.4044189453125
+      },
+      "playerId": 7,
+      "tick": 2281
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 604.42431640625,
+        "y": 594.510498046875
+      },
+      "playerId": 7,
+      "tick": 2286
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 605.9442138671875,
+        "y": 595.5237426757812
+      },
+      "playerId": 7,
+      "tick": 2290
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 909.0,
+        "y": 2008.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2300
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 910.0,
+        "y": 2009.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2305
+    },
+    {
+      "command": {
+        "building": 147,
+        "c": "setRally",
+        "kind": "move",
+        "x": 880.0,
+        "y": 1959.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2322
+    },
+    {
+      "command": {
+        "building": "depot",
+        "c": "build",
+        "tileX": 19,
+        "tileY": 18,
+        "units": [
+          149
+        ]
+      },
+      "playerId": 7,
+      "tick": 2325
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 20,
+        "queued": true,
+        "units": [
+          149
+        ]
+      },
+      "playerId": 7,
+      "tick": 2350
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          144
+        ],
+        "x": 840.0,
+        "y": 2007.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2350
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148
+        ],
+        "x": 784.0,
+        "y": 1975.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2372
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 2396
+    },
+    {
+      "command": {
+        "building": 147,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 2414
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 58,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 2497
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          143
+        ],
+        "x": 1160.6021728515625,
+        "y": 535.3490600585938
+      },
+      "playerId": 7,
+      "tick": 2520
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          143
+        ],
+        "x": 1171.1021728515625,
+        "y": 531.8490600585938
+      },
+      "playerId": 7,
+      "tick": 2526
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 64,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 2549
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 58,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 2556
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          151
+        ],
+        "x": 840.0,
+        "y": 1963.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2561
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 58,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 2562
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1127.375,
+        "y": 509.70745849609375
+      },
+      "playerId": 7,
+      "tick": 2646
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1131.2950439453125,
+        "y": 512.5074462890625
+      },
+      "playerId": 7,
+      "tick": 2652
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1132.9749755859375,
+        "y": 512.5074462890625
+      },
+      "playerId": 7,
+      "tick": 2656
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1136.3349609375,
+        "y": 506.34747314453125
+      },
+      "playerId": 7,
+      "tick": 2668
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1136.3349609375,
+        "y": 506.34747314453125
+      },
+      "playerId": 7,
+      "tick": 2668
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1136.3349609375,
+        "y": 506.34747314453125
+      },
+      "playerId": 7,
+      "tick": 2674
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1136.3349609375,
+        "y": 506.34747314453125
+      },
+      "playerId": 7,
+      "tick": 2674
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 2681
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 2687
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 2692
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          138
+        ],
+        "x": 944.0,
+        "y": 1849.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2726
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          138
+        ],
+        "x": 867.0,
+        "y": 1788.1341552734375
+      },
+      "playerId": 8,
+      "tick": 2742
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 670.9750366210938,
+        "y": 561.7874755859375
+      },
+      "playerId": 7,
+      "tick": 2752
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 710.7350463867188,
+        "y": 570.7474975585938
+      },
+      "playerId": 7,
+      "tick": 2757
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 734.2550048828125,
+        "y": 577.4674682617188
+      },
+      "playerId": 7,
+      "tick": 2761
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          149
+        ],
+        "x": 608.2550048828125,
+        "y": 541.6275024414062
+      },
+      "playerId": 7,
+      "tick": 2779
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 20,
+        "units": [
+          149
+        ]
+      },
+      "playerId": 7,
+      "tick": 2785
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 20,
+        "units": [
+          149
+        ]
+      },
+      "playerId": 7,
+      "tick": 2789
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 24,
+        "units": [
+          149
+        ]
+      },
+      "playerId": 7,
+      "tick": 2808
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          151,
+          148,
+          138,
+          144,
+          152
+        ],
+        "x": 618.0,
+        "y": 1472.3040771484375
+      },
+      "playerId": 8,
+      "tick": 2844
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 2847
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 2866
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          151,
+          148,
+          138,
+          144,
+          152
+        ],
+        "x": 758.0,
+        "y": 1433.3040771484375
+      },
+      "playerId": 8,
+      "tick": 2884
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          143
+        ],
+        "x": 1153.9290771484375,
+        "y": 474.59521484375
+      },
+      "playerId": 7,
+      "tick": 2888
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 71,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 2895
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 71,
+        "units": [
+          143
+        ]
+      },
+      "playerId": 7,
+      "tick": 2901
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          151,
+          148,
+          138,
+          144,
+          152
+        ],
+        "x": 577.0,
+        "y": 1164.97412109375
+      },
+      "playerId": 8,
+      "tick": 2910
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 73,
+        "units": [
+          153
+        ]
+      },
+      "playerId": 7,
+      "tick": 2973
+    },
+    {
+      "command": {
+        "c": "holdPosition",
+        "units": [
+          138
+        ]
+      },
+      "playerId": 8,
+      "tick": 2996
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          138
+        ],
+        "x": 676.0,
+        "y": 1578.714111328125
+      },
+      "playerId": 8,
+      "tick": 3037
+    },
+    {
+      "command": {
+        "building": "depot",
+        "c": "build",
+        "tileX": 20,
+        "tileY": 48,
+        "units": [
+          138
+        ]
+      },
+      "playerId": 8,
+      "tick": 3044
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 18,
+        "units": [
+          156
+        ]
+      },
+      "playerId": 7,
+      "tick": 3197
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 18,
+        "units": [
+          156
+        ]
+      },
+      "playerId": 7,
+      "tick": 3202
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          151,
+          148,
+          152,
+          144
+        ],
+        "x": 709.0,
+        "y": 886.464111328125
+      },
+      "playerId": 8,
+      "tick": 3219
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 72,
+        "units": [
+          154
+        ]
+      },
+      "playerId": 7,
+      "tick": 3314
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 72,
+        "units": [
+          154
+        ]
+      },
+      "playerId": 7,
+      "tick": 3319
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 72,
+        "units": [
+          154
+        ]
+      },
+      "playerId": 7,
+      "tick": 3324
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 3397
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          151,
+          148,
+          152,
+          144
+        ],
+        "x": 780.327880859375,
+        "y": 724.8734130859375
+      },
+      "playerId": 8,
+      "tick": 3441
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 58,
+        "units": [
+          157
+        ]
+      },
+      "playerId": 7,
+      "tick": 3451
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 58,
+        "units": [
+          157
+        ]
+      },
+      "playerId": 7,
+      "tick": 3457
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 58,
+        "units": [
+          157
+        ]
+      },
+      "playerId": 7,
+      "tick": 3461
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          151,
+          148,
+          152,
+          144
+        ],
+        "x": 759.327880859375,
+        "y": 728.8734130859375
+      },
+      "playerId": 8,
+      "tick": 3463
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 689.4705200195312,
+        "y": 504.7262878417969
+      },
+      "playerId": 7,
+      "tick": 3475
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 689.4705200195312,
+        "y": 504.7262878417969
+      },
+      "playerId": 7,
+      "tick": 3475
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 696.4951782226562,
+        "y": 508.9410705566406
+      },
+      "playerId": 7,
+      "tick": 3480
+    },
+    {
+      "command": {
+        "building": 1,
+        "c": "setRally",
+        "kind": "move",
+        "x": 696.4951782226562,
+        "y": 508.9410705566406
+      },
+      "playerId": 7,
+      "tick": 3480
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          151,
+          148,
+          152,
+          144
+        ],
+        "x": 325.327880859375,
+        "y": 524.29345703125
+      },
+      "playerId": 8,
+      "tick": 3484
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 3496
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          158
+        ],
+        "x": 674.0162963867188,
+        "y": 576.3776245117188
+      },
+      "playerId": 7,
+      "tick": 3529
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          158
+        ],
+        "x": 718.9739990234375,
+        "y": 595.3441162109375
+      },
+      "playerId": 7,
+      "tick": 3534
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          158
+        ],
+        "x": 729.510986328125,
+        "y": 598.1539916992188
+      },
+      "playerId": 7,
+      "tick": 3539
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 3544
+    },
+    {
+      "command": {
+        "building": 147,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 3556
+    },
+    {
+      "command": {
+        "building": "barracks",
+        "c": "build",
+        "tileX": 21,
+        "tileY": 17,
+        "units": [
+          158
+        ]
+      },
+      "playerId": 7,
+      "tick": 3559
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 19,
+        "queued": true,
+        "units": [
+          158
+        ]
+      },
+      "playerId": 7,
+      "tick": 3584
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 3584
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 594.2294921875,
+        "y": 635.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3609
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 560.2294921875,
+        "y": 619.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3615
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 557.2294921875,
+        "y": 612.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3622
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 558.2294921875,
+        "y": 599.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3628
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 614.2294921875,
+        "y": 568.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3640
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 619.2294921875,
+        "y": 558.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3646
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 628.2294921875,
+        "y": 553.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3657
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3671
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3678
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3684
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3690
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 623.2294921875,
+        "y": 537.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3744
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3748
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3756
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3761
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3769
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3775
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 658.2294921875,
+        "y": 526.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3781
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 658.2294921875,
+        "y": 526.8724365234375
+      },
+      "playerId": 8,
+      "tick": 3787
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3798
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 158,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3809
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 156,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3835
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 156,
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 3841
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          152,
+          144
+        ],
+        "x": 552.2294921875,
+        "y": 403.8724670410156
+      },
+      "playerId": 8,
+      "tick": 3861
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160
+        ],
+        "x": 1014.0088500976562,
+        "y": 440.80206298828125
+      },
+      "playerId": 7,
+      "tick": 3876
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160
+        ],
+        "x": 1034.38037109375,
+        "y": 500.511474609375
+      },
+      "playerId": 7,
+      "tick": 3886
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 3922
+    },
+    {
+      "command": {
+        "building": 147,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 3931
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 1028.05810546875,
+        "y": 551.0888671875
+      },
+      "playerId": 7,
+      "tick": 3952
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 1043.5123291015625,
+        "y": 605.1786499023438
+      },
+      "playerId": 7,
+      "tick": 3959
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 1068.801025390625,
+        "y": 611.5007934570312
+      },
+      "playerId": 7,
+      "tick": 3964
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 1084.2552490234375,
+        "y": 614.3106689453125
+      },
+      "playerId": 7,
+      "tick": 3968
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 1097.60205078125,
+        "y": 615.0131225585938
+      },
+      "playerId": 7,
+      "tick": 3973
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          162,
+          163
+        ],
+        "x": 660.9835815429688,
+        "y": 776.65576171875
+      },
+      "playerId": 8,
+      "tick": 3985
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 1103.2218017578125,
+        "y": 579.889892578125
+      },
+      "playerId": 7,
+      "tick": 4010
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          162,
+          163
+        ],
+        "x": 506.6065673828125,
+        "y": 619.0819702148438
+      },
+      "playerId": 8,
+      "tick": 4013
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 926.9033203125,
+        "y": 562.3283081054688
+      },
+      "playerId": 7,
+      "tick": 4017
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          162,
+          163
+        ],
+        "x": 488.6065673828125,
+        "y": 620.0819702148438
+      },
+      "playerId": 8,
+      "tick": 4018
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153
+        ],
+        "x": 910.044189453125,
+        "y": 612.2032470703125
+      },
+      "playerId": 7,
+      "tick": 4024
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          137,
+          145,
+          141,
+          139,
+          161
+        ],
+        "x": 578.481201171875,
+        "y": 668.400390625
+      },
+      "playerId": 7,
+      "tick": 4063
+    },
+    {
+      "command": {
+        "building": 147,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 4069
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          137,
+          145,
+          139,
+          161
+        ],
+        "x": 692.2803955078125,
+        "y": 414.8108825683594
+      },
+      "playerId": 7,
+      "tick": 4084
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          137,
+          145,
+          139
+        ],
+        "x": 672.6113891601562,
+        "y": 384.60491943359375
+      },
+      "playerId": 7,
+      "tick": 4089
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          145,
+          139
+        ],
+        "x": 649.4300537109375,
+        "y": 395.1418762207031
+      },
+      "playerId": 7,
+      "tick": 4106
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 976.7782592773438,
+        "y": 515.2632446289062
+      },
+      "playerId": 7,
+      "tick": 4126
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1014.0088500976562,
+        "y": 534.9322509765625
+      },
+      "playerId": 7,
+      "tick": 4132
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1043.5123291015625,
+        "y": 539.1470336914062
+      },
+      "playerId": 7,
+      "tick": 4137
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1061.073974609375,
+        "y": 540.5519409179688
+      },
+      "playerId": 7,
+      "tick": 4142
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1113.7587890625,
+        "y": 543.36181640625
+      },
+      "playerId": 7,
+      "tick": 4148
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1180.4927978515625,
+        "y": 541.25439453125
+      },
+      "playerId": 7,
+      "tick": 4156
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1198.7569580078125,
+        "y": 542.6593017578125
+      },
+      "playerId": 7,
+      "tick": 4162
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1198.7569580078125,
+        "y": 542.6593017578125
+      },
+      "playerId": 7,
+      "tick": 4168
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1198.7569580078125,
+        "y": 542.6593017578125
+      },
+      "playerId": 7,
+      "tick": 4174
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1184.005126953125,
+        "y": 546.8740844726562
+      },
+      "playerId": 7,
+      "tick": 4181
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          164
+        ],
+        "x": 1095.4947509765625,
+        "y": 491.37945556640625
+      },
+      "playerId": 7,
+      "tick": 4204
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          164
+        ],
+        "x": 1153.7991943359375,
+        "y": 551.0888671875
+      },
+      "playerId": 7,
+      "tick": 4211
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 4215
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          164
+        ],
+        "x": 1156.609130859375,
+        "y": 563.7332763671875
+      },
+      "playerId": 7,
+      "tick": 4216
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          153,
+          160
+        ],
+        "x": 1161.5263671875,
+        "y": 556.0061645507812
+      },
+      "playerId": 7,
+      "tick": 4232
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          164
+        ],
+        "x": 1132.0228271484375,
+        "y": 505.4287414550781
+      },
+      "playerId": 7,
+      "tick": 4250
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          164
+        ],
+        "x": 1153.7991943359375,
+        "y": 515.9656982421875
+      },
+      "playerId": 7,
+      "tick": 4256
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "cancel"
+      },
+      "playerId": 8,
+      "tick": 4551
+    },
+    {
+      "command": {
+        "building": 147,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 4639
+    },
+    {
+      "command": {
+        "building": 142,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 8,
+      "tick": 4651
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160,
+          153,
+          164
+        ],
+        "x": 1224.045654296875,
+        "y": 527.9075927734375
+      },
+      "playerId": 7,
+      "tick": 4725
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 63,
+        "units": [
+          160,
+          153,
+          164
+        ]
+      },
+      "playerId": 7,
+      "tick": 4739
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          167,
+          165,
+          166,
+          168
+        ],
+        "x": 2049.049072265625,
+        "y": 1222.8197021484375
+      },
+      "playerId": 8,
+      "tick": 4745
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 62,
+        "units": [
+          160,
+          153,
+          164
+        ]
+      },
+      "playerId": 7,
+      "tick": 4763
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          167,
+          165,
+          166,
+          168
+        ],
+        "x": 454.36065673828125,
+        "y": 651.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4768
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          167,
+          165,
+          166,
+          168
+        ],
+        "x": 536.3606567382812,
+        "y": 583.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4772
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1205.781494140625,
+        "y": 520.1804809570312
+      },
+      "playerId": 7,
+      "tick": 4789
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1183.302734375,
+        "y": 549.6839599609375
+      },
+      "playerId": 7,
+      "tick": 4795
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 4796
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152
+        ],
+        "x": 491.36065673828125,
+        "y": 628.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4798
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 4802
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "train",
+        "unit": "worker"
+      },
+      "playerId": 7,
+      "tick": 4809
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          151,
+          148,
+          144,
+          152
+        ],
+        "x": 430.36065673828125,
+        "y": 705.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4813
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          151,
+          148,
+          144,
+          152
+        ],
+        "x": 416.36065673828125,
+        "y": 704.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4820
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          151,
+          148,
+          144,
+          152
+        ],
+        "x": 357.36065673828125,
+        "y": 743.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4825
+    },
+    {
+      "command": {
+        "building": 159,
+        "c": "setRally",
+        "kind": "move",
+        "x": 825.74853515625,
+        "y": 560.220947265625
+      },
+      "playerId": 7,
+      "tick": 4827
+    },
+    {
+      "command": {
+        "building": 159,
+        "c": "setRally",
+        "kind": "move",
+        "x": 860.8717041015625,
+        "y": 563.7332763671875
+      },
+      "playerId": 7,
+      "tick": 4833
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          162,
+          163
+        ],
+        "x": 469.36065673828125,
+        "y": 671.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4841
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          162,
+          163
+        ],
+        "x": 390.36065673828125,
+        "y": 594.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4846
+    },
+    {
+      "command": {
+        "building": 159,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 7,
+      "tick": 4854
+    },
+    {
+      "command": {
+        "building": 159,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 7,
+      "tick": 4860
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152
+        ],
+        "x": 257.36065673828125,
+        "y": 747.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4862
+    },
+    {
+      "command": {
+        "building": 159,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 7,
+      "tick": 4866
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          162,
+          163
+        ],
+        "x": 548.3606567382812,
+        "y": 664.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4878
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          162,
+          163
+        ],
+        "x": 511.36065673828125,
+        "y": 652.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4884
+    },
+    {
+      "command": {
+        "building": 159,
+        "c": "train",
+        "unit": "rifleman"
+      },
+      "playerId": 7,
+      "tick": 4895
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 766.3606567382812,
+        "y": 747.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4900
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 766.3606567382812,
+        "y": 749.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4907
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 761.3606567382812,
+        "y": 750.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4913
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 772.3606567382812,
+        "y": 749.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4925
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 880.3606567382812,
+        "y": 620.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4935
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 880.3606567382812,
+        "y": 620.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4944
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 824.3606567382812,
+        "y": 622.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4949
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 602.3606567382812,
+        "y": 616.4098510742188
+      },
+      "playerId": 8,
+      "tick": 4959
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 4967
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 4972
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 4988
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 4995
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5001
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5025
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5031
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 758.3606567382812,
+        "y": 535.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5046
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5053
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 744.3606567382812,
+        "y": 537.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5068
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5074
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 850.3606567382812,
+        "y": 490.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5095
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5109
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5114
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 787.3606567382812,
+        "y": 478.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5123
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 150,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5143
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 790.3606567382812,
+        "y": 480.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5155
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 171,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5184
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 896.3606567382812,
+        "y": 596.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5197
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          171
+        ],
+        "x": 973.9684448242188,
+        "y": 542.6593017578125
+      },
+      "playerId": 7,
+      "tick": 5201
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          171
+        ],
+        "x": 980.2905883789062,
+        "y": 530.7174682617188
+      },
+      "playerId": 7,
+      "tick": 5208
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 171,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5211
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          171
+        ],
+        "x": 957.1093139648438,
+        "y": 567.2455444335938
+      },
+      "playerId": 7,
+      "tick": 5221
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 927.3606567382812,
+        "y": 594.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5222
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          171
+        ],
+        "x": 1002.0670166015625,
+        "y": 558.8159790039062
+      },
+      "playerId": 7,
+      "tick": 5231
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 171,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5238
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 996.3606567382812,
+        "y": 584.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5249
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 171,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5263
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 1013.3606567382812,
+        "y": 572.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5273
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 171,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5285
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 963.3606567382812,
+        "y": 499.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5300
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 527.3606567382812,
+        "y": 647.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5323
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172
+        ],
+        "x": 1169.9559326171875,
+        "y": 567.9480590820312
+      },
+      "playerId": 7,
+      "tick": 5323
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172
+        ],
+        "x": 1178.385498046875,
+        "y": 600.2613525390625
+      },
+      "playerId": 7,
+      "tick": 5329
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 546.3606567382812,
+        "y": 650.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5334
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 567.3606567382812,
+        "y": 723.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5349
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 504.36065673828125,
+        "y": 711.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5355
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 498.36065673828125,
+        "y": 712.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5374
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 485.36065673828125,
+        "y": 710.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5379
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 483.36065673828125,
+        "y": 709.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5396
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 483.36065673828125,
+        "y": 709.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5402
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 472.36065673828125,
+        "y": 701.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5419
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 470.36065673828125,
+        "y": 695.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5424
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 902.3606567382812,
+        "y": 509.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5441
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 902.3606567382812,
+        "y": 509.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5447
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5460
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 747.3606567382812,
+        "y": 749.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5474
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 173,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5498
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          173
+        ],
+        "x": 873.5160522460938,
+        "y": 491.37945556640625
+      },
+      "playerId": 7,
+      "tick": 5503
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 958.3606567382812,
+        "y": 602.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5507
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 173,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5524
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 885.3606567382812,
+        "y": 446.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5539
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5553
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 529.3606567382812,
+        "y": 655.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5565
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1158.0140380859375,
+        "y": 607.2860107421875
+      },
+      "playerId": 7,
+      "tick": 5569
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1112.3538818359375,
+        "y": 614.3106689453125
+      },
+      "playerId": 7,
+      "tick": 5575
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5577
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1129.2130126953125,
+        "y": 635.3845825195312
+      },
+      "playerId": 7,
+      "tick": 5588
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1152.394287109375,
+        "y": 641.7067260742188
+      },
+      "playerId": 7,
+      "tick": 5593
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 827.3606567382812,
+        "y": 779.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5604
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1213.5086669921875,
+        "y": 648.0289306640625
+      },
+      "playerId": 7,
+      "tick": 5606
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1233.880126953125,
+        "y": 650.1362915039062
+      },
+      "playerId": 7,
+      "tick": 5612
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5614
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1236.68994140625,
+        "y": 651.541259765625
+      },
+      "playerId": 7,
+      "tick": 5618
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1236.68994140625,
+        "y": 645.9215087890625
+      },
+      "playerId": 7,
+      "tick": 5625
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 987.3606567382812,
+        "y": 614.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5637
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1243.714599609375,
+        "y": 629.0623779296875
+      },
+      "playerId": 7,
+      "tick": 5642
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 968.3606567382812,
+        "y": 615.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5644
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5654
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1282.35009765625,
+        "y": 629.0623779296875
+      },
+      "playerId": 7,
+      "tick": 5657
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1290.7796630859375,
+        "y": 631.1697998046875
+      },
+      "playerId": 7,
+      "tick": 5672
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 730.3606567382812,
+        "y": 462.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5675
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          172,
+          174
+        ],
+        "x": 1290.7796630859375,
+        "y": 627.657470703125
+      },
+      "playerId": 7,
+      "tick": 5678
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          148,
+          151,
+          144,
+          152,
+          162,
+          163
+        ],
+        "x": 663.3606567382812,
+        "y": 464.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5681
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 70,
+        "units": [
+          172,
+          174
+        ]
+      },
+      "playerId": 7,
+      "tick": 5690
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 70,
+        "units": [
+          172,
+          174
+        ]
+      },
+      "playerId": 7,
+      "tick": 5697
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 660.3606567382812,
+        "y": 434.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5700
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 616.3606567382812,
+        "y": 420.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5707
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 609.3606567382812,
+        "y": 434.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5715
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5723
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 639.3606567382812,
+        "y": 514.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5741
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 650.3606567382812,
+        "y": 525.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5747
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1342.7620849609375,
+        "y": 412.00103759765625
+      },
+      "playerId": 7,
+      "tick": 5754
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 159,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 5758
+    },
+    {
+      "command": {
+        "building": 146,
+        "c": "setRally",
+        "kind": "move",
+        "x": 1370.860595703125,
+        "y": 414.8108825683594
+      },
+      "playerId": 7,
+      "tick": 5759
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 873.3606567382812,
+        "y": 744.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5774
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 884.3606567382812,
+        "y": 699.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5781
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 831.3606567382812,
+        "y": 581.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5796
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          157
+        ],
+        "x": 1415.1158447265625,
+        "y": 664.1856079101562
+      },
+      "playerId": 7,
+      "tick": 5800
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          157
+        ],
+        "x": 1419.33056640625,
+        "y": 690.1767578125
+      },
+      "playerId": 7,
+      "tick": 5805
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          157
+        ],
+        "x": 1416.520751953125,
+        "y": 682.4496459960938
+      },
+      "playerId": 7,
+      "tick": 5811
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 944.3606567382812,
+        "y": 496.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5812
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          157
+        ],
+        "x": 1409.49609375,
+        "y": 669.1028442382812
+      },
+      "playerId": 7,
+      "tick": 5815
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 910.3606567382812,
+        "y": 505.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5818
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          157
+        ],
+        "x": 1408.793701171875,
+        "y": 662.7807006835938
+      },
+      "playerId": 7,
+      "tick": 5820
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          157
+        ],
+        "x": 1403.1739501953125,
+        "y": 648.7313842773438
+      },
+      "playerId": 7,
+      "tick": 5826
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 857.3606567382812,
+        "y": 549.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5827
+    },
+    {
+      "command": {
+        "building": "training_centre",
+        "c": "build",
+        "tileX": 42,
+        "tileY": 19,
+        "units": [
+          157
+        ]
+      },
+      "playerId": 7,
+      "tick": 5842
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 622.3606567382812,
+        "y": 408.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5843
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 618.3606567382812,
+        "y": 408.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5849
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 634.3606567382812,
+        "y": 426.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5855
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 68,
+        "queued": true,
+        "units": [
+          157
+        ]
+      },
+      "playerId": 7,
+      "tick": 5861
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 330.36065673828125,
+        "y": 432.40985107421875
+      },
+      "playerId": 8,
+      "tick": 5869
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 874.3606567382812,
+        "y": 789.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5882
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160
+        ],
+        "x": 1261.2762451171875,
+        "y": 656.45849609375
+      },
+      "playerId": 7,
+      "tick": 5886
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160
+        ],
+        "x": 1242.3096923828125,
+        "y": 681.7471923828125
+      },
+      "playerId": 7,
+      "tick": 5892
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          160
+        ],
+        "x": 1256.3590087890625,
+        "y": 678.9373168945312
+      },
+      "playerId": 7,
+      "tick": 5896
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 396.36065673828125,
+        "y": 598.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5898
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 780.3606567382812,
+        "y": 768.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5905
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 69,
+        "units": [
+          160
+        ]
+      },
+      "playerId": 7,
+      "tick": 5915
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 724.3606567382812,
+        "y": 827.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5924
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 69,
+        "units": [
+          160
+        ]
+      },
+      "playerId": 7,
+      "tick": 5926
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 715.3606567382812,
+        "y": 767.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5928
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 373.36065673828125,
+        "y": 677.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5942
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 393.36065673828125,
+        "y": 708.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5946
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 53,
+        "units": [
+          177
+        ]
+      },
+      "playerId": 7,
+      "tick": 5947
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 54,
+        "units": [
+          177
+        ]
+      },
+      "playerId": 7,
+      "tick": 5953
+    },
+    {
+      "command": {
+        "c": "gather",
+        "node": 54,
+        "units": [
+          177
+        ]
+      },
+      "playerId": 7,
+      "tick": 5958
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 284.36065673828125,
+        "y": 563.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5961
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 253.36065673828125,
+        "y": 550.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5967
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 935.3606567382812,
+        "y": 624.4098510742188
+      },
+      "playerId": 8,
+      "tick": 5993
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 614.3606567382812,
+        "y": 355.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6006
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 670.3606567382812,
+        "y": 726.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6019
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 412.36065673828125,
+        "y": 492.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6033
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 407.36065673828125,
+        "y": 492.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6040
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 343.36065673828125,
+        "y": 448.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6061
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 341.36065673828125,
+        "y": 453.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6068
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 340.36065673828125,
+        "y": 463.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6094
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 347.36065673828125,
+        "y": 467.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6094
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6103
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 273.36065673828125,
+        "y": 462.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6119
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 260.36065673828125,
+        "y": 465.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6124
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6139
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 672.3606567382812,
+        "y": 448.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6153
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 284.36065673828125,
+        "y": 467.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6163
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6168
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 650.3606567382812,
+        "y": 539.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6182
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6189
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 287.36065673828125,
+        "y": 506.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6199
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 358.36065673828125,
+        "y": 472.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6205
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 491.36065673828125,
+        "y": 401.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6211
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 691.3606567382812,
+        "y": 567.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6224
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 438.36065673828125,
+        "y": 650.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6243
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 607.3606567382812,
+        "y": 381.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6248
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 764.3606567382812,
+        "y": 524.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6261
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6269
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 662.3606567382812,
+        "y": 610.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6281
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6287
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 679.3606567382812,
+        "y": 577.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6299
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6304
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 723.3606567382812,
+        "y": 599.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6316
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6322
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 205.36065673828125,
+        "y": 400.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6333
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6340
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 253.36065673828125,
+        "y": 364.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6349
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6355
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 269.36065673828125,
+        "y": 374.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6363
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6367
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 637.3606567382812,
+        "y": 592.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6377
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6382
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 504.36065673828125,
+        "y": 634.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6394
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6398
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 351.36065673828125,
+        "y": 591.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6408
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6413
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 621.3606567382812,
+        "y": 586.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6427
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6431
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 582.3606567382812,
+        "y": 406.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6443
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6445
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 907.3606567382812,
+        "y": 534.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6455
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 778.8106689453125,
+        "y": 382.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6530
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 685.8106689453125,
+        "y": 359.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6536
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 542.8106689453125,
+        "y": 509.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6550
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 475.8106689453125,
+        "y": 461.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6554
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6568
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 215.81065368652344,
+        "y": 460.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6573
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 243.81065368652344,
+        "y": 495.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6584
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 300.8106689453125,
+        "y": 332.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6589
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 288.8106689453125,
+        "y": 413.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6599
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 299.8106689453125,
+        "y": 533.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6603
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 324.8106689453125,
+        "y": 551.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6613
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 327.8106689453125,
+        "y": 424.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6619
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 885.8106689453125,
+        "y": 546.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6629
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 527.8106689453125,
+        "y": 338.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6637
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 822.8106689453125,
+        "y": 645.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6649
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 501.8106689453125,
+        "y": 355.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6657
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 778.8106689453125,
+        "y": 595.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6668
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6673
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 756.8106689453125,
+        "y": 615.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6684
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 469.8106689453125,
+        "y": 320.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6692
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 692.8106689453125,
+        "y": 606.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6706
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 456.8106689453125,
+        "y": 296.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6712
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 709.8106689453125,
+        "y": 559.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6724
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 697.8106689453125,
+        "y": 541.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6732
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 590.8106689453125,
+        "y": 655.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6741
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 578.8106689453125,
+        "y": 669.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6749
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 792.8106689453125,
+        "y": 457.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6759
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 583.8106689453125,
+        "y": 373.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6766
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 1,
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ]
+      },
+      "playerId": 8,
+      "tick": 6776
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 341.8106689453125,
+        "y": 335.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6779
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 789.8106689453125,
+        "y": 558.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6792
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 801.8106689453125,
+        "y": 571.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6800
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 339.8106689453125,
+        "y": 624.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6852
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 326.8106689453125,
+        "y": 468.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6863
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 629.8106689453125,
+        "y": 369.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6904
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 563.8106689453125,
+        "y": 320.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6907
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 183.81065368652344,
+        "y": 424.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6923
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 259.8106689453125,
+        "y": 387.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6931
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 382.8106689453125,
+        "y": 274.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6934
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 326.8106689453125,
+        "y": 628.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6951
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 563.8106689453125,
+        "y": 329.40985107421875
+      },
+      "playerId": 8,
+      "tick": 6958
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 739.8106689453125,
+        "y": 617.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6969
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 738.8106689453125,
+        "y": 617.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6976
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 738.8106689453125,
+        "y": 617.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6983
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 738.8106689453125,
+        "y": 617.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6989
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 755.8106689453125,
+        "y": 598.4098510742188
+      },
+      "playerId": 8,
+      "tick": 6996
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 843.8106689453125,
+        "y": 496.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7003
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 839.8106689453125,
+        "y": 493.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7006
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 746.8106689453125,
+        "y": 688.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7019
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 746.8106689453125,
+        "y": 683.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7025
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 827.8106689453125,
+        "y": 478.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7030
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 661.8106689453125,
+        "y": 733.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7042
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 690.8106689453125,
+        "y": 691.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7048
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 819.8106689453125,
+        "y": 522.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7052
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 723.8106689453125,
+        "y": 722.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7064
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 732.8106689453125,
+        "y": 703.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7070
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 837.8106689453125,
+        "y": 565.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7074
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 791.8106689453125,
+        "y": 740.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7086
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 794.8106689453125,
+        "y": 727.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7092
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 893.8106689453125,
+        "y": 567.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7096
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 739.8106689453125,
+        "y": 751.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7111
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 631.8106689453125,
+        "y": 705.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7114
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 523.8106689453125,
+        "y": 699.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7122
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 799.8106689453125,
+        "y": 661.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7132
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 830.8106689453125,
+        "y": 669.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7140
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 611.8106689453125,
+        "y": 703.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7146
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 610.8106689453125,
+        "y": 703.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7154
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 610.8106689453125,
+        "y": 703.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7161
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 864.8106689453125,
+        "y": 633.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7178
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 864.8106689453125,
+        "y": 633.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7185
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 622.8106689453125,
+        "y": 701.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7198
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 622.8106689453125,
+        "y": 701.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7205
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 933.8106689453125,
+        "y": 540.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7218
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 878.8106689453125,
+        "y": 521.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7225
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 849.8106689453125,
+        "y": 498.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7238
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 836.8106689453125,
+        "y": 485.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7243
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 895.8106689453125,
+        "y": 488.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7261
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 726.8106689453125,
+        "y": 708.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7270
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 717.8106689453125,
+        "y": 713.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7277
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 701.8106689453125,
+        "y": 688.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7283
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 878.8106689453125,
+        "y": 478.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7291
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 535.8106689453125,
+        "y": 746.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7310
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 539.8106689453125,
+        "y": 725.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7317
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 932.8106689453125,
+        "y": 533.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7334
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 658.8106689453125,
+        "y": 571.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7350
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 576.8106689453125,
+        "y": 587.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7361
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 842.8106689453125,
+        "y": 478.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7381
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 842.8106689453125,
+        "y": 478.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7388
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 620.8106689453125,
+        "y": 683.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7403
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 577.8106689453125,
+        "y": 712.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7415
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 577.8106689453125,
+        "y": 712.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7420
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 886.8106689453125,
+        "y": 569.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7429
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 700.8106689453125,
+        "y": 775.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7446
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 700.8106689453125,
+        "y": 775.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7453
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 934.8106689453125,
+        "y": 579.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7467
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 563.8106689453125,
+        "y": 704.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7482
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 572.8106689453125,
+        "y": 693.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7489
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 833.8106689453125,
+        "y": 551.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7498
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 826.8106689453125,
+        "y": 556.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7503
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 548.8106689453125,
+        "y": 641.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7516
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 547.8106689453125,
+        "y": 642.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7523
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 922.8106689453125,
+        "y": 527.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7530
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 495.8106689453125,
+        "y": 678.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7544
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 496.8106689453125,
+        "y": 679.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7552
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 885.8106689453125,
+        "y": 573.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7564
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 885.8106689453125,
+        "y": 573.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7571
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 889.8106689453125,
+        "y": 567.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7582
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 953.8106689453125,
+        "y": 526.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7591
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 976.8106689453125,
+        "y": 495.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7598
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1000.8106689453125,
+        "y": 472.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7606
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 993.8106689453125,
+        "y": 424.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7616
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 993.8106689453125,
+        "y": 424.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7624
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 963.8106689453125,
+        "y": 387.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7634
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 940.8106689453125,
+        "y": 354.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7642
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1021.8106689453125,
+        "y": 367.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7651
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1021.8106689453125,
+        "y": 371.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7660
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1039.8106689453125,
+        "y": 506.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7671
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1046.8106689453125,
+        "y": 501.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7677
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1097.8106689453125,
+        "y": 392.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7686
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1090.8106689453125,
+        "y": 403.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7692
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 831.8106689453125,
+        "y": 621.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7698
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1183.8106689453125,
+        "y": 382.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7709
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1153.8106689453125,
+        "y": 424.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7714
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1021.8106689453125,
+        "y": 660.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7726
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1117.8106689453125,
+        "y": 564.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7732
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1146.8106689453125,
+        "y": 557.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7739
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1151.8106689453125,
+        "y": 541.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7747
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1166.8106689453125,
+        "y": 504.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7752
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1189.8106689453125,
+        "y": 417.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7757
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          165,
+          167,
+          168,
+          166,
+          151,
+          152,
+          162,
+          148,
+          144,
+          163
+        ],
+        "x": 1229.8106689453125,
+        "y": 446.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7770
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1265.8106689453125,
+        "y": 700.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7883
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1297.8106689453125,
+        "y": 674.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7888
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1301.8106689453125,
+        "y": 647.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7897
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1332.8106689453125,
+        "y": 653.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7904
+    },
+    {
+      "command": {
+        "c": "attack",
+        "target": 176,
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ]
+      },
+      "playerId": 8,
+      "tick": 7908
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1285.8106689453125,
+        "y": 696.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7925
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1343.8106689453125,
+        "y": 599.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7930
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1380.8106689453125,
+        "y": 529.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7937
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1401.8106689453125,
+        "y": 535.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7943
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1420.8106689453125,
+        "y": 529.4098510742188
+      },
+      "playerId": 8,
+      "tick": 7946
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1470.8106689453125,
+        "y": 394.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7966
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1458.8106689453125,
+        "y": 375.40985107421875
+      },
+      "playerId": 8,
+      "tick": 7969
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1432.8106689453125,
+        "y": 392.40985107421875
+      },
+      "playerId": 8,
+      "tick": 8014
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          167,
+          162,
+          151,
+          168,
+          152,
+          165,
+          148,
+          166,
+          144
+        ],
+        "x": 1430.8106689453125,
+        "y": 358.40985107421875
+      },
+      "playerId": 8,
+      "tick": 8020
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 1088.8106689453125,
+        "y": 745.4098510742188
+      },
+      "playerId": 8,
+      "tick": 8104
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 1079.8106689453125,
+        "y": 750.4098510742188
+      },
+      "playerId": 8,
+      "tick": 8109
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 1078.8106689453125,
+        "y": 771.4098510742188
+      },
+      "playerId": 8,
+      "tick": 8118
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 940.8106689453125,
+        "y": 875.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8143
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 935.8106689453125,
+        "y": 868.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8151
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 877.8106689453125,
+        "y": 835.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8169
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 874.8106689453125,
+        "y": 839.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8178
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 852.8106689453125,
+        "y": 840.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8186
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 762.8106689453125,
+        "y": 776.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8204
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 751.8106689453125,
+        "y": 768.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8212
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 751.8106689453125,
+        "y": 768.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8221
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 656.8106689453125,
+        "y": 779.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8234
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 573.8106689453125,
+        "y": 777.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8245
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 573.8106689453125,
+        "y": 650.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8254
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 573.8106689453125,
+        "y": 650.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8262
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          152,
+          163,
+          167,
+          168,
+          151,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 587.8106689453125,
+        "y": 646.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8270
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 617.8106689453125,
+        "y": 793.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8365
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 617.8106689453125,
+        "y": 794.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8371
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 1048.8106689453125,
+        "y": 861.2698364257812
+      },
+      "playerId": 8,
+      "tick": 8390
+    },
+    {
+      "command": {
+        "c": "move",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 673.5975341796875,
+        "y": 697.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8459
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 637.5975341796875,
+        "y": 667.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8462
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 637.5975341796875,
+        "y": 664.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8476
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 560.5975341796875,
+        "y": 734.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8502
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 558.5975341796875,
+        "y": 745.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8514
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 468.5975341796875,
+        "y": 785.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8525
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 439.5975341796875,
+        "y": 776.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8536
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 426.5975341796875,
+        "y": 724.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8546
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 426.5975341796875,
+        "y": 724.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8551
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 421.5975341796875,
+        "y": 616.6203002929688
+      },
+      "playerId": 8,
+      "tick": 8594
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 763.232177734375,
+        "y": 591.208251953125
+      },
+      "playerId": 8,
+      "tick": 8637
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 763.232177734375,
+        "y": 590.208251953125
+      },
+      "playerId": 8,
+      "tick": 8643
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 840.232177734375,
+        "y": 509.208251953125
+      },
+      "playerId": 8,
+      "tick": 8728
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 822.232177734375,
+        "y": 727.208251953125
+      },
+      "playerId": 8,
+      "tick": 8813
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 817.232177734375,
+        "y": 731.208251953125
+      },
+      "playerId": 8,
+      "tick": 8816
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 597.232177734375,
+        "y": 797.208251953125
+      },
+      "playerId": 8,
+      "tick": 8917
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 486.2322082519531,
+        "y": 785.208251953125
+      },
+      "playerId": 8,
+      "tick": 8941
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 480.2322082519531,
+        "y": 784.208251953125
+      },
+      "playerId": 8,
+      "tick": 8955
+    },
+    {
+      "command": {
+        "c": "attackMove",
+        "units": [
+          163,
+          152,
+          167,
+          151,
+          168,
+          162,
+          166,
+          165,
+          148,
+          144
+        ],
+        "x": 466.2322082519531,
+        "y": 781.208251953125
+      },
+      "playerId": 8,
+      "tick": 8972
+    }
+  ],
+  "durationTicks": 9054,
+  "finalScores": [
+    {
+      "buildingsKilled": 0,
+      "buildingsLost": 5,
+      "color": "#0072b2",
+      "id": 7,
+      "name": "alex",
+      "structureScore": 800,
+      "teamId": 1,
+      "unitScore": 1200,
+      "unitsKilled": 0,
+      "unitsLost": 24
+    },
+    {
+      "buildingsKilled": 2,
+      "buildingsLost": 0,
+      "color": "#d55e00",
+      "id": 8,
+      "name": "matt",
+      "structureScore": 600,
+      "teamId": 2,
+      "unitScore": 900,
+      "unitsKilled": 24,
+      "unitsLost": 0
+    }
+  ],
+  "mapContentHash": "13ac64aab0be91a8",
+  "mapName": "Default",
+  "mapSchemaVersion": 2,
+  "playerLoadouts": [
+    {
+      "factionId": "kriegsia",
+      "loadoutId": "kriegsia.standard",
+      "playerId": 7,
+      "startingOil": 0,
+      "startingSteel": 75
+    },
+    {
+      "factionId": "kriegsia",
+      "loadoutId": "kriegsia.standard",
+      "playerId": 8,
+      "startingOil": 0,
+      "startingSteel": 75
+    }
+  ],
+  "players": [
+    {
+      "color": "#0072b2",
+      "faction_id": "kriegsia",
+      "id": 7,
+      "is_ai": false,
+      "name": "alex",
+      "team_id": 1
+    },
+    {
+      "color": "#d55e00",
+      "faction_id": "kriegsia",
+      "id": 8,
+      "is_ai": false,
+      "name": "matt",
+      "team_id": 2
+    }
+  ],
+  "seed": 1344866594,
+  "serverBuildSha": "7e5fb0881792",
+  "winnerId": 8,
+  "winnerTeamId": 2
+}

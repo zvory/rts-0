@@ -286,9 +286,11 @@ AI controllers, or Tokio coordination into `rts-sim`:
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
   names the state source, join, clock, authority, mutation, visibility, diagnostics,
   persistence/export, start-payload, and UI-affordance choices used by the rest of the lobby
-  helpers. Product identity still selects real setup paths such as replay-artifact loading, dev
-  scenario construction, replay-branch seeding, and lab room initialization; lower-level helpers
-  should consume the explicit policy fields when the behavior is shared.
+  helpers. Persistence is split into match-history eligibility, transient post-match replay
+  capture, match-history replay-artifact attachment, and room-local lab operation logging. Product
+  identity still selects real setup paths such as replay-artifact loading, dev scenario
+  construction, replay-branch seeding, and lab room initialization; lower-level helpers should
+  consume the explicit policy fields when the behavior is shared.
 - `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
   human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
   aliases, and command issuer resolution.
@@ -300,9 +302,9 @@ AI controllers, or Tokio coordination into `rts-sim`:
   per-viewer replay vision, branch-live active players use original-seat aliases, and dev-watch
   viewers get full-world scenario snapshots.
 - `launch.rs` owns common `StartPayload` stamping for live, replay-branch-live, and dev-watch
-  starts: player id, spectator flag, prediction build/version, pending snapshot clearing, and the
-  send loop. Replay viewer payloads remain in `replay_session.rs` because they also carry replay
-  metadata.
+  starts: player id, spectator flag, prediction build/version, recipient capability metadata,
+  pending snapshot clearing, and the send loop. Replay viewer payloads remain in
+  `replay_session.rs` because they also carry replay metadata.
 - `live_tick.rs` runs one live simulation tick around the existing `Game` seam: AI command enqueue,
   `Game::tick`, snapshot fanout, observer analysis, defeat/game-over checks, and panic replay
   capture.

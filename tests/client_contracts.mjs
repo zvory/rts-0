@@ -100,6 +100,7 @@ import {
   tankTrapLineTiles,
   validTankTrapLineSites,
 } from "../client/src/input/tank_trap_line.js";
+import { armPostQuickCastSelectionGuard } from "../client/src/input/quick_cast_selection_guard.js";
 import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
@@ -1302,6 +1303,14 @@ function hotkeyService() {
   assert(health.metrics().issues.jitter.count === 1, "snapshot jitter issue count increments");
   assert(health.reportStats.jitterSamples === 1, "jitter samples feed net report stats");
 
+  health.noteFrameGap(16, 1000);
+  health.noteFrameGap(16, 1016);
+  assert(health.metrics().fps === 62.5, "MatchHealth records live FPS from the latest frame gap");
+  assert(health.metrics().fpsOneMinute === 62.5, "MatchHealth records rolling one-minute FPS");
+  health.noteFrameGap(32, 62017);
+  assert(health.metrics().fps === 31.25, "live FPS follows the latest frame");
+  assert(health.metrics().fpsOneMinute === 31.25, "one-minute FPS prunes stale frame samples");
+
   let now = 187;
   for (let i = 0; i < 8; i += 1) {
     now += 34;
@@ -1331,7 +1340,7 @@ function hotkeyService() {
   health.publish();
   assert(badgePayload !== null, "MatchHealth publishes status badge payload");
   assert(
-    Object.keys(badgePayload).join(",") === "latencyMs,serverTickMs,serverLagMs,jitterMs,issues",
+    Object.keys(badgePayload).join(",") === "latencyMs,serverTickMs,serverLagMs,jitterMs,fps,fpsOneMinute,issues",
     "status badge payload shape stays unchanged",
   );
   assert(
@@ -2764,8 +2773,18 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     capabilities: createRoomCapabilities({
       startPayload: {
         replay: { durationTicks: 1_000 },
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+            seekRelative: true,
+            seekAbsolute: true,
+            timeline: true,
+          },
+          visibility: { replayVision: true },
+        },
       },
-      replayViewer: true,
     }),
   });
   assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
@@ -2853,8 +2872,17 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     state: roomTimeState,
     replayViewer: false,
     capabilities: createRoomCapabilities({
-      startPayload: { spectator: true },
-      devWatch: { kind: "scenario" },
+      startPayload: {
+        spectator: true,
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+            step: true,
+          },
+        },
+      },
     }),
   });
   assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
@@ -2871,7 +2899,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     net: replayNet,
     state: roomTimeState,
     replayViewer: true,
-    capabilities: createRoomCapabilities({ startPayload: { spectator: true }, replayViewer: true }),
+    capabilities: createRoomCapabilities({ startPayload: { spectator: true, replay: {} } }),
   });
   assert(!noCapabilityControls._listeners.has("click"), "room-time controls need an advertised capability");
   assert(
@@ -2881,13 +2909,17 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   noCapabilityUi.destroy();
 
   const normalCapabilities = createRoomCapabilities({
-    startPayload: { spectator: false },
+    startPayload: { spectator: false, capabilities: { commands: { gameplay: true } } },
   });
   assert(!normalCapabilities.roomTime.available, "normal matches do not mount room-time controls");
   assert(normalCapabilities.commands.gameplay, "active players keep gameplay command affordances");
 
   const spectatorCapabilities = createRoomCapabilities({
-    startPayload: { spectator: true, diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL } },
+    startPayload: {
+      spectator: true,
+      diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
+      capabilities: { commands: { gameplay: false } },
+    },
   });
   assert(!spectatorCapabilities.commands.gameplay, "spectators get read-only command affordances");
   assert(
@@ -6297,7 +6329,16 @@ withFakeDocument(() => {
   const originalDocument = globalThis.document;
   const hotkeyTargetedInput = Object.create(Input.prototype);
   const hotkeyIssues = [];
+  const quickCastSelectionClicks = [];
+  const quickCastBoxSelections = [];
   hotkeyTargetedInput.mouse = { x: 420, y: 260 };
+  hotkeyTargetedInput.pointerLocked = false;
+  hotkeyTargetedInput.cameraNavigation = null;
+  hotkeyTargetedInput._panDrag = null;
+  hotkeyTargetedInput._drag = null;
+  hotkeyTargetedInput._dragging = false;
+  hotkeyTargetedInput._placementDrag = null;
+  hotkeyTargetedInput.renderer = { drawSelectionBox() {} };
   hotkeyTargetedInput._handleControlGroupHotkey = () => false;
   hotkeyTargetedInput._quickCastCommandTarget = (ev) => {
     hotkeyIssues.push({ shiftKey: !!ev.shiftKey, mouse: hotkeyTargetedInput.mouse });
@@ -6306,6 +6347,11 @@ withFakeDocument(() => {
   hotkeyTargetedInput._issueTargetedCommand = (p, ev) => {
     hotkeyIssues.push({ issuedAt: p, queued: !!ev.shiftKey });
   };
+  hotkeyTargetedInput._eventScreenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
+  hotkeyTargetedInput._screenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
+  hotkeyTargetedInput._trackMouse = () => {};
+  hotkeyTargetedInput._commitClickSelection = (p) => quickCastSelectionClicks.push(p);
+  hotkeyTargetedInput._commitBoxSelection = (drag) => quickCastBoxSelections.push(drag);
   hotkeyTargetedInput.state = {};
   hotkeyTargetedInput.clientIntent = new ClientIntent();
   globalThis.document = {
@@ -6344,6 +6390,39 @@ withFakeDocument(() => {
   assert(
     hotkeyTargetedInput.clientIntent.commandTarget === null,
     "unqueued quick-cast should consume the armed targeted order",
+  );
+  hotkeyTargetedInput._onLeftDown({ x: 422, y: 261 }, {});
+  hotkeyTargetedInput._handleMouseUp({
+    button: 0,
+    clientX: 422,
+    clientY: 261,
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  });
+  assert(
+    quickCastSelectionClicks.length === 0,
+    "near click after unqueued quick-cast should not become selection",
+  );
+  assert(
+    hotkeyTargetedInput._postQuickCastSelectionGuard === null,
+    "post quick-cast selection guard should be one-shot",
+  );
+
+  armPostQuickCastSelectionGuard(hotkeyTargetedInput, { x: 420, y: 260 });
+  hotkeyTargetedInput._onLeftDown({ x: 420, y: 260 }, {});
+  hotkeyTargetedInput._handleMouseMove({ clientX: 428, clientY: 260 });
+  hotkeyTargetedInput._handleMouseUp({
+    button: 0,
+    clientX: 428,
+    clientY: 260,
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  });
+  assert(
+    quickCastBoxSelections.length === 1,
+    "drag after unqueued quick-cast should still perform box selection",
   );
 
   hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY", { shiftKey: true }));
@@ -7196,7 +7275,6 @@ withFakeDocument(() => {
     shouldMountObserverAnalysisOverlay({
       capabilities: createRoomCapabilities({
         startPayload: { replay: {}, spectator: true, diagnostics: { observerAnalysis: true } },
-        replayViewer: true,
       }),
     }),
     "observer analysis mounts when the start payload advertises it for replay viewers",
@@ -7221,7 +7299,6 @@ withFakeDocument(() => {
     !shouldMountObserverAnalysisOverlay({
       capabilities: createRoomCapabilities({
         startPayload: { replay: {}, spectator: true },
-        replayViewer: true,
       }),
     }),
     "observer analysis does not mount from replay identity alone",

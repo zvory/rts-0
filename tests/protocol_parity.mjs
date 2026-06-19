@@ -49,6 +49,8 @@ const rustContractPath = path.join(repoRoot, "server/crates/contract/src/lib.rs"
 const rustContract = fs.readFileSync(rustContractPath, "utf8");
 const rustLobbyPath = path.join(repoRoot, "server/src/lobby/mod.rs");
 const rustLobby = fs.readFileSync(rustLobbyPath, "utf8");
+const roomCapabilitiesPath = path.join(repoRoot, "client/src/room_capabilities.js");
+const roomCapabilities = fs.readFileSync(roomCapabilitiesPath, "utf8");
 const protocolDocPath = path.join(repoRoot, "docs/design/protocol.md");
 const protocolDoc = fs.readFileSync(protocolDocPath, "utf8");
 const protocolContract = JSON.parse(
@@ -226,6 +228,18 @@ assert(
     MOVEMENT_PATH_DIAGNOSTICS.OWNER_ONLY === "ownerOnly" &&
     MOVEMENT_PATH_DIAGNOSTICS.ALL === "all",
   "start payload must expose diagnostic capability metadata instead of debugMode",
+);
+assert(
+  rustContract.includes("RoomCapabilities") &&
+    rustContract.includes("RoomTimeCapabilities") &&
+    rustContract.includes("VisibilityCapabilities") &&
+    rustContract.includes("CommandCapabilities") &&
+    protocolDoc.includes("capabilities?:") &&
+    roomCapabilities.includes("startPayload?.capabilities") &&
+    roomCapabilities.includes("roomTime") &&
+    roomCapabilities.includes("replayVision") &&
+    roomCapabilities.includes("gameplay"),
+  "start payload room capabilities must be documented and mirrored by the client parser",
 );
 assert(
   C.LAB === "lab" && S.LAB_STATE === "labState" && S.LAB_RESULT === "labResult",

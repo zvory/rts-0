@@ -424,6 +424,7 @@ impl Game {
             spectator: false,
             prediction_build_id: None,
             prediction_version: 0,
+            capabilities: Default::default(),
             diagnostics: Default::default(),
             replay: None,
             lab: None,

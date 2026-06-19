@@ -271,12 +271,13 @@ buildGiveUpAction({ visible, onOpen })
 
 `room_capabilities.js`
 ```js
-createRoomCapabilities({ startPayload, devWatch, replayViewer })
+createRoomCapabilities({ startPayload })
 ```
-`Match` and app-shell controls consume this parsed capability record for room-time controls,
-diagnostic settings, observer analysis, vision controls, and read-only/gameplay command affordances.
-Product shells may still use product metadata for launch/routing and owned controls such as replay
-branch creation or lab scenario tools.
+`Match` and app-shell controls consume this parsed `startPayload.capabilities` and
+`startPayload.diagnostics` record for room-time controls, diagnostic settings, observer analysis,
+vision controls, and read-only/gameplay command affordances. Product shells may still use product
+metadata for launch/routing and owned controls such as replay branch creation or lab scenario tools,
+but shared affordances must not be inferred from replay/dev/lab identity.
 
 `lab_client.js`
 ```js
@@ -546,7 +547,9 @@ minimap receive `ClientIntent` from `Match`; input and minimap clicks call
 clicks use one composer path instead of command-specific sticky flags. A plain
 targeted-order command-card hotkey tap arms the target after keyup; pressing the same resolved
 hotkey again inside the quick-cast window issues it at the current cursor world point. Shift does
-the same with `queued: true` and keeps the target armed until Shift is released.
+the same with `queued: true` and keeps the target armed until Shift is released. After an unqueued
+quick-cast consumes the armed target, the next near, still viewport left-click is ignored as an
+accidental confirmation click; moving far enough to become a drag restores normal selection.
 
 `input/router.js`
 ```js
