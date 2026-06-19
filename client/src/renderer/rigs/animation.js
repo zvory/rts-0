@@ -11,6 +11,7 @@ const TRANSFORM_PROPERTIES = new Set([
 ]);
 const LOCAL_TRANSFORM_PROPERTIES = new Set(["transform.localX", "transform.localY"]);
 const GEOMETRY_SCALE_PROPERTIES = new Set(["geometry.scaleX", "geometry.scaleY"]);
+const RIG_CONTEXT_READY = Symbol("rtsRigContextReady");
 
 export function createRigRenderContext(entity, {
   state = {},
@@ -54,7 +55,7 @@ export function createRigRenderContext(entity, {
   const oil = state.resources ? state.resources.oil : null;
   const lowOil = ownUnit && typeof oil === "number" && oil > 0 && oil <= 5;
   const oilStarved = ownUnit && oil === 0 && (entity.state === STATE.MOVE || entity.state === STATE.ATTACK);
-  return {
+  const context = {
     now,
     teamColor: colorByOwner.get(entity.owner) ?? hexToInt(entity.teamColor),
     recoilProgress,
@@ -91,6 +92,8 @@ export function createRigRenderContext(entity, {
     oilStarved,
     fuelCueVisible: lowOil || oilStarved,
   };
+  Object.defineProperty(context, RIG_CONTEXT_READY, { value: true });
+  return context;
 }
 
 function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {
@@ -119,10 +122,13 @@ function scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx) {
 }
 
 export function sampleRigAnimation(definition, entity, renderContext = {}) {
-  const context = {
-    ...createRigRenderContext(entity, { now: renderContext.now ?? 0 }),
-    ...renderContext,
-  };
+  const inputContext = renderContext || {};
+  const context = inputContext[RIG_CONTEXT_READY]
+    ? inputContext
+    : {
+      ...createRigRenderContext(entity, { now: inputContext.now ?? 0 }),
+      ...inputContext,
+    };
   const parts = {};
   for (const part of definition.parts || []) {
     parts[part.id] = {
