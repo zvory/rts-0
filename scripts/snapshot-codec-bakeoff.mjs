@@ -70,7 +70,7 @@ const CANDIDATES = Object.freeze([
     dependencyRisk: "none",
     browserSupportRisk: "none",
     maintenanceCost: "low",
-    note: "Current live text-frame baseline.",
+    note: "Historical live text-frame baseline kept for before/after comparisons.",
     encode: encodeCompactJson,
     decode: decodeCompactJson,
   },
@@ -194,7 +194,7 @@ export function formatBakeoffMarkdown(result) {
   lines.push("## Limits");
   lines.push("");
   lines.push("- Deflate numbers are compressed payload bytes from Node zlib, not verified browser post-extension wire bytes.");
-  lines.push("- Browser apply cost is unchanged unless a live client decoder replaces the current JSON path; this bake-off measures candidate encode/decode CPU only.");
+  lines.push("- Live browser cost includes the active frame parser plus compact snapshot expansion; this bake-off measures candidate encode/decode CPU in local JavaScript only.");
   lines.push("- Raw snapshot payloads are not uploaded by normal clients; only local harness captures should be used as inputs.");
   return `${lines.join("\n")}\n`;
 }
@@ -348,32 +348,20 @@ function pctX100(part, whole) {
 
 function recommendationFor({ baseline, smallest, candidates }) {
   const deflate = candidates.find((candidate) => candidate.id === "compact-json-deflate");
-  const custom = candidates.find((candidate) => candidate.id === "custom-positional-binary");
-  const deflateWins =
-    deflate && baseline && deflate.bytes.p95 < Math.round(baseline.bytes.p95 * 0.75);
-  const customWins =
-    custom && baseline && custom.bytes.p95 < Math.round(baseline.bytes.p95 * 0.75);
-  if (deflateWins) {
-    return {
-      summary: "Keep compact JSON as the default and run a focused WebSocket compression follow-up before any binary codec rollout.",
-      reason:
-        `Deflate had the smallest measured p95 (${deflate.bytes.p95} bytes vs compact JSON ${baseline.bytes.p95}), ` +
-        "but the current measurement is an offline proxy and the server/browser extension path still needs live verification.",
-    };
-  }
-  if (customWins) {
-    return {
-      summary: "Keep compact JSON as the default and defer custom binary unless delta work still leaves packet pressure unresolved.",
-      reason:
-        `The custom positional binary had the smallest measured p95 (${custom.bytes.p95} bytes vs compact JSON ${baseline.bytes.p95}), ` +
-        "but it carries high browser and maintenance risk compared with the upcoming fog-safe delta phases.",
-    };
-  }
+  const messagepack = candidates.find((candidate) => candidate.id === "messagepack-compact");
+  const messagepackDelta =
+    baseline && messagepack
+      ? `MessagePack p95 was ${messagepack.bytes.p95} bytes vs compact JSON ${baseline.bytes.p95}. `
+      : "";
+  const deflateNote =
+    deflate && messagepack && deflate.bytes.p95 < messagepack.bytes.p95
+      ? `Offline deflate was smaller at p95 ${deflate.bytes.p95} bytes, but it is not the active WebSocket path and remains a compressed-payload proxy. `
+      : "";
   return {
-    summary: "Keep compact JSON as the default and prioritize fog-safe delta design over a format-only binary rollout.",
+    summary: "Use MessagePack compact as the active full-snapshot baseline and keep this bake-off as local comparison evidence.",
     reason:
-      `The smallest measured candidate was ${smallest.label} at p95 ${smallest.bytes.p95} bytes, while compact JSON was p95 ${baseline.bytes.p95}. ` +
-      "The measured savings do not justify changing the live codec before delta/keyframe work proves a larger win.",
+      `${messagepackDelta}${deflateNote}` +
+      `The smallest measured candidate in this local fixture was ${smallest.label} at p95 ${smallest.bytes.p95} bytes; larger payload reductions should come from the later fog-safe delta phases rather than reopening the codec decision in this script.`,
   };
 }
 
@@ -526,13 +514,13 @@ function readTypedValue(reader) {
   throw new Error(`unknown typed value tag ${tag}`);
 }
 
-function encodeMessagePack(value) {
+export function encodeMessagePack(value) {
   const writer = new ByteWriter();
   writeMessagePackValue(writer, value);
   return writer.finish();
 }
 
-function decodeMessagePack(bytes) {
+export function decodeMessagePack(bytes) {
   const reader = new ByteReader(bytes);
   const value = readMessagePackValue(reader);
   reader.done();

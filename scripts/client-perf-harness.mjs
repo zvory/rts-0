@@ -6,7 +6,11 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { formatBakeoffMarkdown, runSnapshotCodecBakeoff } from "./snapshot-codec-bakeoff.mjs";
+import {
+  decodeMessagePack,
+  formatBakeoffMarkdown,
+  runSnapshotCodecBakeoff,
+} from "./snapshot-codec-bakeoff.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..");
@@ -165,7 +169,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
 
     summary = await collectPageSummary(page);
     if (args.snapshotCodecBakeoff) {
-      const frames = await collectSnapshotCodecFrames(page);
+      const frames = normalizeCapturedSnapshotCodecFrames(await collectSnapshotCodecFrames(page));
       const framesPath = path.join(artifactDir, "snapshot-frames.jsonl");
       fs.writeFileSync(framesPath, frames.map((frame) => JSON.stringify(frame)).join("\n") + "\n");
       if (frames.length > 0) {
@@ -315,6 +319,9 @@ function snapshotPacketBudgetSummary(report) {
     snapshotOverSegmentBudgetCount: numberOrNull(report.snapshotOverSegmentBudgetCount),
     snapshotOverSegmentBudgetPctX100: numberOrNull(report.snapshotOverSegmentBudgetPctX100),
     snapshotByteSource: stringOrNull(report.snapshotByteSource),
+    snapshotCodec: stringOrNull(report.snapshotCodec),
+    snapshotCodecVersion: numberOrNull(report.snapshotCodecVersion),
+    snapshotFrameKind: stringOrNull(report.snapshotFrameKind),
     websocketCompression: stringOrNull(report.websocketCompression),
     websocketExtensions: stringOrNull(report.websocketExtensions),
   };
@@ -709,9 +716,23 @@ async function installSnapshotCodecCapture(page, maxSamples) {
       constructor(...args) {
         super(...args);
         this.addEventListener("message", (event) => {
-          if (frames.length >= limit || typeof event.data !== "string") return;
-          if (!event.data.startsWith("{\"t\":\"snapshot\"")) return;
-          frames.push(event.data);
+          if (frames.length >= limit) return;
+          if (typeof event.data === "string") {
+            if (!event.data.startsWith("{\"t\":\"snapshot\"")) return;
+            frames.push({ kind: "text", text: event.data });
+            return;
+          }
+          const bytes =
+            event.data instanceof ArrayBuffer
+              ? new Uint8Array(event.data)
+              : ArrayBuffer.isView(event.data)
+                ? new Uint8Array(event.data.buffer, event.data.byteOffset, event.data.byteLength)
+                : null;
+          if (!bytes || bytes.length < 6) return;
+          if (bytes[0] !== 0x52 || bytes[1] !== 0x54 || bytes[2] !== 0x53 || bytes[3] !== 0x4d) {
+            return;
+          }
+          frames.push({ kind: "binary", bytes: Array.from(bytes) });
         });
       }
     }
@@ -725,6 +746,30 @@ async function installSnapshotCodecCapture(page, maxSamples) {
 
 async function collectSnapshotCodecFrames(page) {
   return page.evaluate(() => window.__rtsSnapshotCodecCapture?.frames || []);
+}
+
+function normalizeCapturedSnapshotCodecFrames(frames) {
+  return frames.map((frame, index) => {
+    if (typeof frame === "string") return frame;
+    if (frame?.kind === "text" && typeof frame.text === "string") return frame.text;
+    if (frame?.kind === "binary" && Array.isArray(frame.bytes)) {
+      const bytes = Uint8Array.from(frame.bytes);
+      if (
+        bytes.length < 6 ||
+        bytes[0] !== 0x52 ||
+        bytes[1] !== 0x54 ||
+        bytes[2] !== 0x53 ||
+        bytes[3] !== 0x4d
+      ) {
+        throw new Error(`captured snapshot frame ${index} has an invalid MessagePack header`);
+      }
+      if (bytes[4] !== 1) {
+        throw new Error(`captured snapshot frame ${index} uses unsupported MessagePack version ${bytes[4]}`);
+      }
+      return JSON.stringify(decodeMessagePack(bytes.subarray(5)));
+    }
+    throw new Error(`unsupported captured snapshot frame ${index}`);
+  });
 }
 
 async function loadPuppeteer() {
@@ -840,7 +885,7 @@ Options:
   --duration-ms <n>              Browser collection time per workload in milliseconds.
   --output-root <path>           Artifact root. Default: target/client-perf.
   --trace                        Also write a Chrome trace.json per workload.
-  --snapshot-codec-bakeoff       Capture local raw snapshot frames and write codec bake-off artifacts.
+  --snapshot-codec-bakeoff       Capture local snapshot frames and write codec bake-off artifacts.
   --snapshot-codec-max-samples <n> Maximum snapshot frames captured per workload. Default: ${DEFAULT_CODEC_SAMPLE_LIMIT}.
   --base-url <url>               Reuse an already-running server when healthy.
   --port <n>                     Port for a harness-started server.

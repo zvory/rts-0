@@ -1,4 +1,4 @@
-//! Wire protocol (JSON over WebSocket). See `docs/design/protocol.md`.
+//! Wire protocol (JSON + binary snapshots over WebSocket). See `docs/design/protocol.md`.
 //!
 //! This file is the authoritative Rust side of the contract. `client/src/protocol.js`
 //! is its JavaScript mirror — change both together.
@@ -9,6 +9,7 @@
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::fmt;
 
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
@@ -177,7 +178,9 @@ pub enum ClientMessage {
     /// Latency probe.
     Ping { ts: f64 },
     /// Client-observed network/render health aggregate for server logs.
-    NetReport { report: ClientNetReport },
+    NetReport {
+        report: Box<ClientNetReport>,
+    },
     /// Set room-controlled time speed. `0` pauses rooms whose clock supports pause.
     SetRoomTimeSpeed { speed: f32 },
     /// Advance room-controlled time by one simulation tick where the clock allows stepping.
@@ -240,6 +243,12 @@ pub struct ClientNetReport {
     pub snapshot_message_count: u32,
     #[serde(default)]
     pub snapshot_byte_source: String,
+    #[serde(default)]
+    pub snapshot_codec: String,
+    #[serde(default)]
+    pub snapshot_codec_version: u16,
+    #[serde(default)]
+    pub snapshot_frame_kind: String,
     #[serde(default)]
     pub snapshot_bytes_p95: u32,
     #[serde(default)]
@@ -827,7 +836,7 @@ pub struct LobbyPlayer {
 // Compact snapshot transport encoding
 // ---------------------------------------------------------------------------
 
-/// Version for the array-shaped JSON snapshot representation sent over WebSocket.
+/// Version for the array-shaped compact snapshot representation sent over WebSocket.
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
@@ -836,26 +845,42 @@ pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 pub const COMPACT_SNAPSHOT_VERSION: u8 = 22;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
+pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
 
 pub const SNAPSHOT_CODEC_VERSION: u16 = 1;
+pub const SNAPSHOT_FRAME_KIND_TEXT: &str = "text";
+pub const SNAPSHOT_FRAME_KIND_BINARY: &str = "binary";
+pub const MESSAGEPACK_SNAPSHOT_FRAME_MAGIC: [u8; 4] = [0x52, 0x54, 0x53, 0x4d]; // RTSM
+const MESSAGEPACK_SNAPSHOT_HEADER_VERSION: u8 = 1;
 
 pub const COMPACT_UNKNOWN_CODE: u8 = 255;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SnapshotCodec {
     CompactJson,
+    MessagePackCompact,
 }
 
 impl SnapshotCodec {
     pub fn name(self) -> &'static str {
         match self {
             SnapshotCodec::CompactJson => SNAPSHOT_CODEC_COMPACT_JSON,
+            SnapshotCodec::MessagePackCompact => SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
         }
     }
 
     pub fn version(self) -> u16 {
         match self {
-            SnapshotCodec::CompactJson => SNAPSHOT_CODEC_VERSION,
+            SnapshotCodec::CompactJson | SnapshotCodec::MessagePackCompact => {
+                SNAPSHOT_CODEC_VERSION
+            }
+        }
+    }
+
+    pub fn frame_kind(self) -> &'static str {
+        match self {
+            SnapshotCodec::CompactJson => SNAPSHOT_FRAME_KIND_TEXT,
+            SnapshotCodec::MessagePackCompact => SNAPSHOT_FRAME_KIND_BINARY,
         }
     }
 }
@@ -866,20 +891,66 @@ pub enum SnapshotFrame {
     Binary(Vec<u8>),
 }
 
+impl SnapshotFrame {
+    pub fn frame_kind(&self) -> &'static str {
+        match self {
+            SnapshotFrame::Text(_) => SNAPSHOT_FRAME_KIND_TEXT,
+            SnapshotFrame::Binary(_) => SNAPSHOT_FRAME_KIND_BINARY,
+        }
+    }
+}
+
 pub fn default_snapshot_codec() -> SnapshotCodec {
-    SnapshotCodec::CompactJson
+    SnapshotCodec::MessagePackCompact
 }
 
 pub fn supported_snapshot_codec(name: &str, version: u16) -> bool {
-    name == SNAPSHOT_CODEC_COMPACT_JSON && version == SNAPSHOT_CODEC_VERSION
+    name == SNAPSHOT_CODEC_MESSAGEPACK_COMPACT && version == SNAPSHOT_CODEC_VERSION
+}
+
+#[derive(Debug)]
+pub enum SnapshotEncodeError {
+    Json(serde_json::Error),
+    UnsupportedNumber,
+    ContainerTooLarge(&'static str, usize),
+}
+
+impl fmt::Display for SnapshotEncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SnapshotEncodeError::Json(err) => write!(f, "{err}"),
+            SnapshotEncodeError::UnsupportedNumber => {
+                write!(f, "compact snapshot contains an unsupported number")
+            }
+            SnapshotEncodeError::ContainerTooLarge(kind, len) => {
+                write!(
+                    f,
+                    "compact snapshot {kind} length {len} exceeds MessagePack bounds"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for SnapshotEncodeError {}
+
+impl From<serde_json::Error> for SnapshotEncodeError {
+    fn from(value: serde_json::Error) -> Self {
+        SnapshotEncodeError::Json(value)
+    }
 }
 
 pub fn encode_snapshot_frame(
     snapshot: &Snapshot,
     codec: SnapshotCodec,
-) -> serde_json::Result<SnapshotFrame> {
+) -> Result<SnapshotFrame, SnapshotEncodeError> {
     match codec {
-        SnapshotCodec::CompactJson => serialize_compact_snapshot(snapshot).map(SnapshotFrame::Text),
+        SnapshotCodec::CompactJson => serialize_compact_snapshot(snapshot)
+            .map(SnapshotFrame::Text)
+            .map_err(SnapshotEncodeError::from),
+        SnapshotCodec::MessagePackCompact => {
+            serialize_messagepack_compact_snapshot(snapshot).map(SnapshotFrame::Binary)
+        }
     }
 }
 
@@ -904,8 +975,8 @@ pub struct ProtocolContract {
 pub struct SnapshotCodecContract {
     default_codec: &'static str,
     codec_version: u16,
+    default_frame_kind: &'static str,
     supported: Vec<&'static str>,
-    binary_experiment_default: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1144,10 +1215,10 @@ pub fn protocol_contract() -> ProtocolContract {
         compact_snapshot_version: COMPACT_SNAPSHOT_VERSION,
         prediction_protocol_version: PREDICTION_PROTOCOL_VERSION,
         snapshot_codecs: SnapshotCodecContract {
-            default_codec: SNAPSHOT_CODEC_COMPACT_JSON,
+            default_codec: SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
             codec_version: SNAPSHOT_CODEC_VERSION,
-            supported: vec![SNAPSHOT_CODEC_COMPACT_JSON],
-            binary_experiment_default: false,
+            default_frame_kind: SNAPSHOT_FRAME_KIND_BINARY,
+            supported: vec![SNAPSHOT_CODEC_MESSAGEPACK_COMPACT],
         },
         default_faction_id: DEFAULT_FACTION_ID,
         unknown_code_sentinel: COMPACT_UNKNOWN_CODE,
@@ -1601,6 +1672,160 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
     serde_json::to_string(&CompactSnapshot(snapshot))
+}
+
+/// Serialize one semantic snapshot as a versioned MessagePack compact binary frame payload.
+pub fn serialize_messagepack_compact_snapshot(
+    snapshot: &Snapshot,
+) -> Result<Vec<u8>, SnapshotEncodeError> {
+    let compact = serde_json::to_value(CompactSnapshot(snapshot))?;
+    let mut out = Vec::new();
+    out.extend_from_slice(&MESSAGEPACK_SNAPSHOT_FRAME_MAGIC);
+    out.push(MESSAGEPACK_SNAPSHOT_HEADER_VERSION);
+    write_messagepack_value(&mut out, &compact)?;
+    Ok(out)
+}
+
+fn write_messagepack_value(
+    out: &mut Vec<u8>,
+    value: &serde_json::Value,
+) -> Result<(), SnapshotEncodeError> {
+    match value {
+        serde_json::Value::Null => out.push(0xc0),
+        serde_json::Value::Bool(false) => out.push(0xc2),
+        serde_json::Value::Bool(true) => out.push(0xc3),
+        serde_json::Value::Number(number) => write_messagepack_number(out, number)?,
+        serde_json::Value::String(value) => write_messagepack_string(out, value)?,
+        serde_json::Value::Array(values) => {
+            write_messagepack_array_len(out, values.len())?;
+            for item in values {
+                write_messagepack_value(out, item)?;
+            }
+        }
+        serde_json::Value::Object(values) => {
+            write_messagepack_map_len(out, values.len())?;
+            for (key, item) in values {
+                write_messagepack_string(out, key)?;
+                write_messagepack_value(out, item)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_messagepack_number(
+    out: &mut Vec<u8>,
+    number: &serde_json::Number,
+) -> Result<(), SnapshotEncodeError> {
+    if let Some(value) = number.as_u64() {
+        write_messagepack_uint(out, value);
+    } else if let Some(value) = number.as_i64() {
+        write_messagepack_int(out, value);
+    } else if let Some(value) = number.as_f64() {
+        if !value.is_finite() {
+            return Err(SnapshotEncodeError::UnsupportedNumber);
+        }
+        if value.fract() == 0.0 && value >= 0.0 && value <= u64::MAX as f64 {
+            write_messagepack_uint(out, value as u64);
+        } else if value.fract() == 0.0 && value >= i64::MIN as f64 && value < 0.0 {
+            write_messagepack_int(out, value as i64);
+        } else {
+            out.push(0xcb);
+            out.extend_from_slice(&value.to_be_bytes());
+        }
+    } else {
+        return Err(SnapshotEncodeError::UnsupportedNumber);
+    }
+    Ok(())
+}
+
+fn write_messagepack_uint(out: &mut Vec<u8>, value: u64) {
+    if value <= 0x7f {
+        out.push(value as u8);
+    } else if value <= u8::MAX as u64 {
+        out.push(0xcc);
+        out.push(value as u8);
+    } else if value <= u16::MAX as u64 {
+        out.push(0xcd);
+        out.extend_from_slice(&(value as u16).to_be_bytes());
+    } else if value <= u32::MAX as u64 {
+        out.push(0xce);
+        out.extend_from_slice(&(value as u32).to_be_bytes());
+    } else {
+        out.push(0xcf);
+        out.extend_from_slice(&value.to_be_bytes());
+    }
+}
+
+fn write_messagepack_int(out: &mut Vec<u8>, value: i64) {
+    if value >= 0 {
+        write_messagepack_uint(out, value as u64);
+    } else if value >= -32 {
+        out.push((0xe0_i16 + (value + 32) as i16) as u8);
+    } else if value >= i8::MIN as i64 {
+        out.push(0xd0);
+        out.push(value as i8 as u8);
+    } else if value >= i16::MIN as i64 {
+        out.push(0xd1);
+        out.extend_from_slice(&(value as i16).to_be_bytes());
+    } else if value >= i32::MIN as i64 {
+        out.push(0xd2);
+        out.extend_from_slice(&(value as i32).to_be_bytes());
+    } else {
+        out.push(0xd3);
+        out.extend_from_slice(&value.to_be_bytes());
+    }
+}
+
+fn write_messagepack_string(out: &mut Vec<u8>, value: &str) -> Result<(), SnapshotEncodeError> {
+    let bytes = value.as_bytes();
+    let len = bytes.len();
+    if len < 32 {
+        out.push(0xa0 | len as u8);
+    } else if len <= u8::MAX as usize {
+        out.push(0xd9);
+        out.push(len as u8);
+    } else if len <= u16::MAX as usize {
+        out.push(0xda);
+        out.extend_from_slice(&(len as u16).to_be_bytes());
+    } else if len <= u32::MAX as usize {
+        out.push(0xdb);
+        out.extend_from_slice(&(len as u32).to_be_bytes());
+    } else {
+        return Err(SnapshotEncodeError::ContainerTooLarge("string", len));
+    }
+    out.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn write_messagepack_array_len(out: &mut Vec<u8>, len: usize) -> Result<(), SnapshotEncodeError> {
+    if len < 16 {
+        out.push(0x90 | len as u8);
+    } else if len <= u16::MAX as usize {
+        out.push(0xdc);
+        out.extend_from_slice(&(len as u16).to_be_bytes());
+    } else if len <= u32::MAX as usize {
+        out.push(0xdd);
+        out.extend_from_slice(&(len as u32).to_be_bytes());
+    } else {
+        return Err(SnapshotEncodeError::ContainerTooLarge("array", len));
+    }
+    Ok(())
+}
+
+fn write_messagepack_map_len(out: &mut Vec<u8>, len: usize) -> Result<(), SnapshotEncodeError> {
+    if len < 16 {
+        out.push(0x80 | len as u8);
+    } else if len <= u16::MAX as usize {
+        out.push(0xde);
+        out.extend_from_slice(&(len as u16).to_be_bytes());
+    } else if len <= u32::MAX as usize {
+        out.push(0xdf);
+        out.extend_from_slice(&(len as u32).to_be_bytes());
+    } else {
+        return Err(SnapshotEncodeError::ContainerTooLarge("map", len));
+    }
+    Ok(())
 }
 
 struct CompactSnapshot<'a>(&'a Snapshot);
@@ -2374,7 +2599,10 @@ mod tests {
                 "snapshotBytesMax":92000,
                 "snapshotBytesAvg":64000,
                 "snapshotMessageCount":289,
-                "snapshotByteSource":"application-payload",
+                "snapshotByteSource":"messagepack-application-payload",
+                "snapshotCodec":"messagepack-compact",
+                "snapshotCodecVersion":1,
+                "snapshotFrameKind":"binary",
                 "snapshotBytesP95":85000,
                 "snapshotSegmentBudgetBytes":1280,
                 "snapshotOverSegmentBudgetCount":280,
@@ -2445,13 +2673,22 @@ mod tests {
                 assert_eq!(report.match_run_id, "main-123");
                 assert_eq!(report.snapshot_gap_max_ms, 420);
                 assert_eq!(report.snapshot_bytes_max, 92_000);
-                assert_eq!(report.snapshot_byte_source, "application-payload");
+                assert_eq!(
+                    report.snapshot_byte_source,
+                    "messagepack-application-payload"
+                );
+                assert_eq!(report.snapshot_codec, "messagepack-compact");
+                assert_eq!(report.snapshot_codec_version, 1);
+                assert_eq!(report.snapshot_frame_kind, "binary");
                 assert_eq!(report.snapshot_bytes_p95, 85_000);
                 assert_eq!(report.snapshot_segment_budget_bytes, 1_280);
                 assert_eq!(report.snapshot_over_segment_budget_count, 280);
                 assert_eq!(report.snapshot_over_segment_budget_pct_x100, 9_689);
                 assert_eq!(report.snapshot_decode_p95_ms, 8);
-                assert_eq!(report.websocket_extensions, "permessage-deflate; client_max_window_bits");
+                assert_eq!(
+                    report.websocket_extensions,
+                    "permessage-deflate; client_max_window_bits"
+                );
                 assert_eq!(report.websocket_compression, "permessage-deflate");
                 assert_eq!(report.snapshot_burst_max, 5);
                 assert_eq!(report.frame_work_max_ms, 42);
@@ -2505,6 +2742,9 @@ mod tests {
                 assert_eq!(report.entity_count, 0);
                 assert_eq!(report.snapshot_bytes_total, 0);
                 assert_eq!(report.snapshot_byte_source, "");
+                assert_eq!(report.snapshot_codec, "");
+                assert_eq!(report.snapshot_codec_version, 0);
+                assert_eq!(report.snapshot_frame_kind, "");
                 assert_eq!(report.snapshot_bytes_p95, 0);
                 assert_eq!(report.snapshot_segment_budget_bytes, 0);
                 assert_eq!(report.snapshot_over_segment_budget_count, 0);
@@ -2978,26 +3218,53 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_codec_seam_defaults_to_compact_json_text() {
+    fn snapshot_codec_seam_defaults_to_messagepack_binary() {
         let snapshot = representative_snapshot();
-        assert_eq!(default_snapshot_codec().name(), SNAPSHOT_CODEC_COMPACT_JSON);
+        assert_eq!(
+            default_snapshot_codec().name(),
+            SNAPSHOT_CODEC_MESSAGEPACK_COMPACT
+        );
         assert_eq!(default_snapshot_codec().version(), SNAPSHOT_CODEC_VERSION);
         assert!(supported_snapshot_codec(
-            SNAPSHOT_CODEC_COMPACT_JSON,
+            SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
             SNAPSHOT_CODEC_VERSION
         ));
         assert!(!supported_snapshot_codec(
-            "custom-positional-binary",
+            SNAPSHOT_CODEC_COMPACT_JSON,
             SNAPSHOT_CODEC_VERSION
         ));
         let frame = encode_snapshot_frame(&snapshot, default_snapshot_codec()).unwrap();
+        match frame {
+            SnapshotFrame::Binary(bytes) => {
+                assert_eq!(
+                    &bytes[..MESSAGEPACK_SNAPSHOT_FRAME_MAGIC.len()],
+                    MESSAGEPACK_SNAPSHOT_FRAME_MAGIC.as_slice()
+                );
+                assert_eq!(
+                    bytes[MESSAGEPACK_SNAPSHOT_FRAME_MAGIC.len()],
+                    MESSAGEPACK_SNAPSHOT_HEADER_VERSION
+                );
+                let compact_json = serialize_compact_snapshot(&snapshot).unwrap();
+                assert!(
+                    bytes.len() < compact_json.len(),
+                    "MessagePack should be smaller than compact JSON for the representative snapshot"
+                );
+            }
+            SnapshotFrame::Text(_) => panic!("default snapshot codec must be binary"),
+        }
+    }
+
+    #[test]
+    fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
+        let snapshot = representative_snapshot();
+        let frame = encode_snapshot_frame(&snapshot, SnapshotCodec::CompactJson).unwrap();
         match frame {
             SnapshotFrame::Text(text) => {
                 let value: serde_json::Value = serde_json::from_str(&text).unwrap();
                 assert_eq!(value["t"], "snapshot");
                 assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
             }
-            SnapshotFrame::Binary(_) => panic!("default snapshot codec must stay text"),
+            SnapshotFrame::Binary(_) => panic!("compact JSON baseline codec must stay text"),
         }
     }
 

@@ -1,4 +1,4 @@
-import { decodeServerMessage } from "../../../client/src/protocol.js";
+import { decodeServerMessage, parseServerFrame } from "../../../client/src/protocol.js";
 import { summarizeSnapshot, ownEntityByKind } from "../diffs.mjs";
 
 const DEFAULT_WS = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
@@ -22,6 +22,7 @@ export class RemoteLane {
 
   async start() {
     this.ws = new WebSocket(this.url);
+    this.ws.binaryType = "arraybuffer";
     this.ws.onmessage = (event) => this.onMessage(event);
     this.ws.onerror = (event) => {
       this.artifacts.remote({ event: "ws.error", message: event.message || event.type || "error" });
@@ -52,7 +53,7 @@ export class RemoteLane {
   onMessage(event) {
     let message;
     try {
-      message = decodeServerMessage(JSON.parse(event.data));
+      message = decodeServerMessage(parseServerFrame(event.data));
     } catch (err) {
       this.artifacts.remote({ event: "decode.error", message: err.message });
       return;

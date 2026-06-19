@@ -10,7 +10,7 @@ use std::process;
 use std::time::{Duration, Instant};
 
 use crate::lobby::compact_snapshot_for_wire;
-use crate::protocol::{serialize_compact_snapshot, Event};
+use crate::protocol::{default_snapshot_codec, encode_snapshot_frame, Event, SnapshotFrame};
 use crate::structured_log::SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -360,20 +360,25 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
             let compact_duration = compact_start.elapsed();
 
             let serialize_start = Instant::now();
-            let payload = serialize_compact_snapshot(&snapshot)
+            let codec = default_snapshot_codec();
+            let payload = encode_snapshot_frame(&snapshot, codec)
                 .map_err(|err| format!("failed to serialize snapshot: {err}"))?;
             let serialize_duration = serialize_start.elapsed();
-            snapshot_bytes = snapshot_bytes.saturating_add(payload.len() as u64);
+            let payload_len = snapshot_frame_len(&payload);
+            snapshot_bytes = snapshot_bytes.saturating_add(payload_len as u64);
             serialized_snapshots = serialized_snapshots.saturating_add(1);
             perf_report.record_snapshot_serialize(serialize_duration);
-            perf_report.record_snapshot_payload_bytes(payload.len());
-            perf::log_writer_message(
-                player.id,
-                "snapshot",
-                serialize_duration,
-                Duration::ZERO,
-                payload.len(),
-            );
+            perf_report.record_snapshot_payload_bytes(payload_len);
+            perf::log_writer_message(perf::WriterMessageTiming {
+                player_id: player.id,
+                message_kind: "snapshot",
+                snapshot_codec: codec.name(),
+                snapshot_codec_version: codec.version(),
+                frame_kind: payload.frame_kind(),
+                serialize: serialize_duration,
+                send: Duration::ZERO,
+                bytes: payload_len,
+            });
 
             if let Some(perf_tick) = perf_tick.as_mut() {
                 perf_tick.record_snapshot(perf::SnapshotRecord {
@@ -433,6 +438,13 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         final_counts: game.perf_entity_counts(),
         perf_report,
     })
+}
+
+fn snapshot_frame_len(frame: &SnapshotFrame) -> usize {
+    match frame {
+        SnapshotFrame::Text(text) => text.len(),
+        SnapshotFrame::Binary(bytes) => bytes.len(),
+    }
 }
 
 fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {

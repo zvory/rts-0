@@ -95,6 +95,9 @@ const TRANSPORT_DIAGNOSTIC_FIELDS = [
   ["websocket_compression", "WebSocket compression"],
   ["websocket_extensions", "WebSocket extensions"],
   ["snapshot_byte_source", "snapshot byte source"],
+  ["snapshot_codec", "snapshot codec"],
+  ["snapshot_codec_version", "snapshot codec version"],
+  ["snapshot_frame_kind", "snapshot frame kind"],
 ];
 
 const ISSUE_GROUPS = [
@@ -842,6 +845,9 @@ function missingDiagnosticGroups(rows) {
   }
   if (!fields.has("snapshot_byte_source")) {
     missing.push("snapshot byte measurement source: no matching fields in input");
+  }
+  if (!fields.has("snapshot_codec") || !fields.has("snapshot_frame_kind")) {
+    missing.push("snapshot codec/frame kind: no matching fields in input");
   }
   return missing;
 }

@@ -2,11 +2,20 @@
 // See docs/design/client-ui.md §4.1. All wire shapes come from protocol.js builders so the
 // client and server stay in lockstep; this module owns no game logic.
 
-import { S, decodeServerMessage, parseServerFrame, msg, cmd as cmdBuilders } from "./protocol.js";
+import {
+  S,
+  SNAPSHOT_CODEC,
+  SNAPSHOT_CODEC_VERSION,
+  SNAPSHOT_FRAME_KIND,
+  decodeServerMessage,
+  parseServerFrame,
+  msg,
+  cmd as cmdBuilders,
+} from "./protocol.js";
 import { ReportWindowAggregate } from "./report_window_aggregate.js";
 
 export const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
-const SNAPSHOT_BYTE_SOURCE = "application-payload";
+const SNAPSHOT_BYTE_SOURCE = "messagepack-application-payload";
 const WEBSOCKET_COMPRESSION_NONE = "none";
 const WEBSOCKET_COMPRESSION_PERMESSAGE_DEFLATE = "permessage-deflate";
 
@@ -261,6 +270,9 @@ export class Net {
       }),
       parseMs: new ReportWindowAggregate(),
       decodeMs: new ReportWindowAggregate(),
+      snapshotCodec: SNAPSHOT_CODEC.MESSAGEPACK_COMPACT,
+      snapshotCodecVersion: SNAPSHOT_CODEC_VERSION,
+      snapshotFrameKind: SNAPSHOT_FRAME_KIND.BINARY,
     };
   }
 
@@ -276,6 +288,9 @@ export class Net {
       snapshotBytesAvg: stats.messageCount > 0 ? Math.round(stats.bytesTotal / stats.messageCount) : 0,
       snapshotMessageCount: stats.messageCount,
       snapshotByteSource: SNAPSHOT_BYTE_SOURCE,
+      snapshotCodec: stats.snapshotCodec,
+      snapshotCodecVersion: stats.snapshotCodecVersion,
+      snapshotFrameKind: stats.snapshotFrameKind,
       snapshotBytesP95: bytes.p95,
       snapshotSegmentBudgetBytes: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
       snapshotOverSegmentBudgetCount: stats.overSegmentBudgetCount,
@@ -295,6 +310,9 @@ export class Net {
     stats.byteSizes.reset();
     stats.parseMs.reset();
     stats.decodeMs.reset();
+    stats.snapshotCodec = SNAPSHOT_CODEC.MESSAGEPACK_COMPACT;
+    stats.snapshotCodecVersion = SNAPSHOT_CODEC_VERSION;
+    stats.snapshotFrameKind = SNAPSHOT_FRAME_KIND.BINARY;
     return out;
   }
 
@@ -425,10 +443,17 @@ export class Net {
     if (m.t === S.SNAPSHOT || m.t === S.PONG) this.diagnostics?.count(label, detail);
     else this.diagnostics?.mark(label, detail);
     if (m.t === S.SNAPSHOT) {
+      const frameKind = snapshotFrameKindForData(ev.data);
       this.noteSnapshotFrame({
         bytes: rawBytes,
         parseMs,
         decodeMs,
+        snapshotCodec:
+          frameKind === SNAPSHOT_FRAME_KIND.BINARY
+            ? SNAPSHOT_CODEC.MESSAGEPACK_COMPACT
+            : SNAPSHOT_CODEC.COMPACT_JSON,
+        snapshotCodecVersion: SNAPSHOT_CODEC_VERSION,
+        frameKind,
       });
     }
 
@@ -470,8 +495,13 @@ export class Net {
     }
   }
 
-  noteSnapshotFrame({ bytes, parseMs, decodeMs }) {
+  noteSnapshotFrame({ bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind }) {
     const stats = this.snapshotReportStats;
+    if (snapshotCodec) stats.snapshotCodec = snapshotCodec;
+    if (Number.isInteger(snapshotCodecVersion) && snapshotCodecVersion > 0) {
+      stats.snapshotCodecVersion = snapshotCodecVersion;
+    }
+    if (frameKind) stats.snapshotFrameKind = frameKind;
     const byteCount = Number(bytes);
     if (Number.isFinite(byteCount) && byteCount > 0) {
       stats.bytesTotal += byteCount;
@@ -492,6 +522,10 @@ function frameByteLength(data) {
   if (data instanceof ArrayBuffer) return data.byteLength;
   if (ArrayBuffer.isView(data)) return data.byteLength;
   return undefined;
+}
+
+function snapshotFrameKindForData(data) {
+  return typeof data === "string" ? SNAPSHOT_FRAME_KIND.TEXT : SNAPSHOT_FRAME_KIND.BINARY;
 }
 
 function websocketExtensions(ws) {
