@@ -3963,11 +3963,21 @@ function fakeAudioContext() {
   globalThis.performance = { now: () => nowSamples.shift() ?? 17 };
   try {
     const reportNet = new Net("ws://example.invalid");
+    reportNet.ws = { extensions: "permessage-deflate; client_max_window_bits" };
     reportNet._onMessage({ data: JSON.stringify({ t: "snapshot", tick: 1, entities: [] }) });
     reportNet._onMessage({ data: JSON.stringify({ t: "snapshot", tick: 2, entities: [] }) });
     const stats = reportNet.consumeSnapshotReportStats();
     assert(stats.snapshotMessageCount === 2, "Net reports snapshot message count");
     assert(stats.snapshotBytesTotal > stats.snapshotBytesMax, "Net reports bounded snapshot byte totals");
+    assert(stats.snapshotByteSource === "application-payload", "Net labels payload byte measurement source");
+    assert(
+      stats.websocketExtensions.includes("permessage-deflate"),
+      "Net reports browser WebSocket extension string",
+    );
+    assert(
+      stats.websocketCompression === "permessage-deflate",
+      "Net reports negotiated permessage-deflate state",
+    );
     assert(stats.snapshotSegmentBudgetBytes === SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES, "Net reports snapshot packet budget");
     assert(stats.snapshotBytesP95 >= stats.snapshotBytesAvg, "Net reports snapshot byte p95");
     assert(stats.snapshotOverSegmentBudgetCount === 0, "small snapshots stay within packet budget");
@@ -3975,6 +3985,7 @@ function fakeAudioContext() {
     assert(stats.snapshotDecodeMaxMs === 4, "Net reports compact decode max");
     const resetStats = reportNet.consumeSnapshotReportStats();
     assert(resetStats.snapshotMessageCount === 0, "Net snapshot report stats reset");
+    assert(resetStats.websocketCompression === "permessage-deflate", "Net keeps compression state after stats reset");
     assert(resetStats.snapshotOverSegmentBudgetCount === 0, "Net snapshot packet-budget stats reset");
 
     reportNet.noteSnapshotFrame({
@@ -3991,12 +4002,15 @@ function fakeAudioContext() {
   }
   for (const field of [
     "snapshotBytesTotal",
+    "snapshotByteSource",
     "snapshotBytesP95",
     "snapshotSegmentBudgetBytes",
     "snapshotOverSegmentBudgetCount",
     "snapshotOverSegmentBudgetPctX100",
     "snapshotParseMaxMs",
     "snapshotDecodeP95Ms",
+    "websocketExtensions",
+    "websocketCompression",
     "snapshotApplyMaxMs",
     "predictionApplyP95Ms",
     "snapshotTickGapMax",

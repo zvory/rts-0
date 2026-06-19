@@ -87,7 +87,7 @@ try {
   writeFileSync(
     packetLog,
     [
-      '2026-06-19T02:00:00Z INFO event="client_net_report" match_run_id="packet-1" player_id=2 primary_issue="packet_budget_pressure" rtt_max_ms=40 snapshot_gap_max_ms=33 snapshot_jitter_ms=0 snapshot_bytes_max=4096 snapshot_bytes_p95=2048 snapshot_bytes_avg=1800 snapshot_segment_budget_bytes=1280 snapshot_over_segment_budget_count=180 snapshot_over_segment_budget_pct_x100=6000 frame_gap_max_ms=16 fps_estimate=60 server_tick_ms=4 server_lag_ms=0 "client network report"',
+      '2026-06-19T02:00:00Z INFO event="client_net_report" match_run_id="packet-1" player_id=2 primary_issue="packet_budget_pressure" rtt_max_ms=40 snapshot_gap_max_ms=33 snapshot_jitter_ms=0 snapshot_bytes_max=4096 snapshot_byte_source="application-payload" snapshot_bytes_p95=2048 snapshot_bytes_avg=1800 snapshot_segment_budget_bytes=1280 snapshot_over_segment_budget_count=180 snapshot_over_segment_budget_pct_x100=6000 websocket_extensions="" websocket_compression="none" frame_gap_max_ms=16 fps_estimate=60 server_tick_ms=4 server_lag_ms=0 "client network report"',
     ].join("\n") + "\n"
   );
   const packetParsed = JSON.parse(run(["--format", "json", packetLog]));
@@ -98,10 +98,15 @@ try {
   assert.equal(packetPlayer.metrics.snapshot_bytes_p95.max, 2048);
   assert.equal(packetPlayer.metrics.snapshot_segment_budget_bytes.max, 1280);
   assert.equal(packetPlayer.metrics.snapshot_over_segment_budget_pct_x100.max, 6000);
+  assert.equal(packetPlayer.transport.websocketCompression.values[0].value, "none");
+  assert.equal(packetMatch.transport.snapshotByteSource.values[0].value, "application-payload");
   assert.equal(packetMatch.missing.some((item) => item.includes("packet-budget")), false);
+  assert.equal(packetMatch.missing.some((item) => item.includes("compression negotiation")), false);
   const packetMarkdown = run([packetLog]);
   assert.match(packetMarkdown, /payload p95/);
   assert.match(packetMarkdown, /60%/);
+  assert.match(packetMarkdown, /Transport diagnostics:/);
+  assert.match(packetMarkdown, /WebSocket compression none=1/);
 } finally {
   rmSync(packetDir, { recursive: true, force: true });
 }

@@ -2,8 +2,10 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 2 is merged and its decision artifact recommends a
-      compression follow-up.
+- [x] Done. Phase 2 was merged, the current Axum/Tungstenite stack cannot negotiate
+      `permessage-deflate` directly, runtime diagnostics now expose negotiated compression state,
+      and [phase-2.5-compression-viability.md](phase-2.5-compression-viability.md) records the
+      Phase 2.6 implementation-route recommendation.
 
 ## Objective
 
@@ -83,16 +85,16 @@ starting delta work from ambiguity.
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 2 is merged and `phase-2-bakeoff.md` recommends WebSocket compression follow-up.
-- [ ] Determine whether the current Rust WebSocket stack can negotiate `permessage-deflate`.
-- [ ] Add bounded diagnostics for negotiated compression state without changing the default path.
-- [ ] Add or extend harnesses to capture Matt/Alex, stress, and AI/server compression evidence.
-- [ ] Run local realistic benchmarks and record before/after payload, timing, and backlog results.
-- [ ] Verify beta/Fly negotiation and log/parser output when credentials and deployment access are
+- [x] Confirm Phase 2 is merged and `phase-2-bakeoff.md` recommends WebSocket compression follow-up.
+- [x] Determine whether the current Rust WebSocket stack can negotiate `permessage-deflate`.
+- [x] Add bounded diagnostics for negotiated compression state without changing the default path.
+- [x] Add or extend harnesses to capture Matt/Alex, stress, and AI/server compression evidence.
+- [x] Run local realistic benchmarks and record before/after payload, timing, and backlog results.
+- [x] Verify beta/Fly negotiation and log/parser output when credentials and deployment access are
       available.
-- [ ] Decide whether Phase 2.6 should ship compression by default, ship opt-in/beta-only, or defer.
-- [ ] Update protocol/perf docs and focused tests.
-- [ ] Mark this phase as done in this file.
+- [x] Decide whether Phase 2.6 should ship compression by default, ship opt-in/beta-only, or defer.
+- [x] Update protocol/perf docs and focused tests.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
