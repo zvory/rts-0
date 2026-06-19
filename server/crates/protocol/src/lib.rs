@@ -239,6 +239,14 @@ pub struct ClientNetReport {
     #[serde(default)]
     pub snapshot_message_count: u32,
     #[serde(default)]
+    pub snapshot_bytes_p95: u32,
+    #[serde(default)]
+    pub snapshot_segment_budget_bytes: u32,
+    #[serde(default)]
+    pub snapshot_over_segment_budget_count: u32,
+    #[serde(default)]
+    pub snapshot_over_segment_budget_pct_x100: u16,
+    #[serde(default)]
     pub snapshot_parse_max_ms: u16,
     #[serde(default)]
     pub snapshot_parse_p95_ms: u16,
@@ -2298,6 +2306,10 @@ mod tests {
                 "snapshotBytesMax":92000,
                 "snapshotBytesAvg":64000,
                 "snapshotMessageCount":289,
+                "snapshotBytesP95":85000,
+                "snapshotSegmentBudgetBytes":1280,
+                "snapshotOverSegmentBudgetCount":280,
+                "snapshotOverSegmentBudgetPctX100":9689,
                 "snapshotParseMaxMs":9,
                 "snapshotParseP95Ms":4,
                 "snapshotDecodeMaxMs":11,
@@ -2362,6 +2374,10 @@ mod tests {
                 assert_eq!(report.match_run_id, "main-123");
                 assert_eq!(report.snapshot_gap_max_ms, 420);
                 assert_eq!(report.snapshot_bytes_max, 92_000);
+                assert_eq!(report.snapshot_bytes_p95, 85_000);
+                assert_eq!(report.snapshot_segment_budget_bytes, 1_280);
+                assert_eq!(report.snapshot_over_segment_budget_count, 280);
+                assert_eq!(report.snapshot_over_segment_budget_pct_x100, 9_689);
                 assert_eq!(report.snapshot_decode_p95_ms, 8);
                 assert_eq!(report.snapshot_burst_max, 5);
                 assert_eq!(report.frame_work_max_ms, 42);
@@ -2414,6 +2430,10 @@ mod tests {
                 assert_eq!(report.renderer_p95_ms, 0);
                 assert_eq!(report.entity_count, 0);
                 assert_eq!(report.snapshot_bytes_total, 0);
+                assert_eq!(report.snapshot_bytes_p95, 0);
+                assert_eq!(report.snapshot_segment_budget_bytes, 0);
+                assert_eq!(report.snapshot_over_segment_budget_count, 0);
+                assert_eq!(report.snapshot_over_segment_budget_pct_x100, 0);
                 assert_eq!(report.snapshot_parse_max_ms, 0);
                 assert_eq!(report.snapshot_tick_gap_max, 0);
                 assert_eq!(report.match_run_id, "");

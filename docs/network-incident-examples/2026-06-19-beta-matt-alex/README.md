@@ -36,8 +36,8 @@ node ../../../scripts/parse-net-report-logs.mjs fly-match-54-all.jsonl fly-match
 
 The parser emits the compact table and evidence-bounded classification described in
 [`docs/perf-tracing.md`](../../perf-tracing.md#network-incident-parser). It reports the newer
-payload, command milestone, and server snapshot timing fields as unavailable for these older logs
-instead of treating them as zero.
+payload, packet-budget, command milestone, and server snapshot timing fields as unavailable for
+these older logs instead of treating them as zero.
 
 ## Matches
 

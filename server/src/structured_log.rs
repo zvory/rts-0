@@ -36,6 +36,11 @@ macro_rules! log_error {
 pub const NET_REPORT_LATENCY_ISSUE_MS: u16 = 180;
 pub const NET_REPORT_JITTER_ISSUE_MS: u16 = 20;
 pub const NET_REPORT_SNAPSHOT_GAP_ISSUE_MS: u16 = 100;
+/// Payload byte budget chosen below the common Ethernet MSS to leave room for WebSocket/TLS/TCP/IP
+/// overhead that client payload-byte measurements do not include.
+pub const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES: u32 = 1_280;
+pub const NET_REPORT_SNAPSHOT_PACKET_BUDGET_MIN_SAMPLES: u32 = 120;
+pub const NET_REPORT_SNAPSHOT_PACKET_BUDGET_OVER_PCT_X100: u16 = 5_000;
 pub const NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES: u32 = 256 * 1024;
 pub const NET_REPORT_SNAPSHOT_PAYLOAD_AVG_ISSUE_BYTES: u32 = 128 * 1024;
 pub const NET_REPORT_SNAPSHOT_PARSE_ISSUE_MS: u16 = 16;
@@ -99,6 +104,10 @@ pub fn log_client_net_report(
         snapshot_bytes_max = report.snapshot_bytes_max,
         snapshot_bytes_avg = report.snapshot_bytes_avg,
         snapshot_message_count = report.snapshot_message_count,
+        snapshot_bytes_p95 = report.snapshot_bytes_p95,
+        snapshot_segment_budget_bytes = report.snapshot_segment_budget_bytes,
+        snapshot_over_segment_budget_count = report.snapshot_over_segment_budget_count,
+        snapshot_over_segment_budget_pct_x100 = report.snapshot_over_segment_budget_pct_x100,
         snapshot_parse_max_ms = report.snapshot_parse_max_ms,
         snapshot_parse_p95_ms = report.snapshot_parse_p95_ms,
         snapshot_decode_max_ms = report.snapshot_decode_max_ms,
@@ -174,6 +183,7 @@ pub fn is_notable_net_report(report: &ClientNetReport) -> bool {
         || report.snapshot_jitter_ms >= NET_REPORT_JITTER_ISSUE_MS
         || report.jitter_samples > 0
         || report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS
+        || has_packet_budget_pressure(report)
         || report.snapshot_bytes_max >= NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES
         || report.snapshot_bytes_avg >= NET_REPORT_SNAPSHOT_PAYLOAD_AVG_ISSUE_BYTES
         || report.snapshot_parse_max_ms >= NET_REPORT_SNAPSHOT_PARSE_ISSUE_MS
@@ -247,6 +257,8 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
         || report.snapshot_bytes_avg >= NET_REPORT_SNAPSHOT_PAYLOAD_AVG_ISSUE_BYTES
     {
         "payload_pressure"
+    } else if has_packet_budget_pressure(report) {
+        "packet_budget_pressure"
     } else if report.snapshot_apply_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
         || report.snapshot_apply_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
         || report.prediction_apply_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
@@ -301,6 +313,18 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
     } else {
         "other"
     }
+}
+
+fn has_packet_budget_pressure(report: &ClientNetReport) -> bool {
+    let budget = if report.snapshot_segment_budget_bytes > 0 {
+        report.snapshot_segment_budget_bytes
+    } else {
+        SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES
+    };
+    report.snapshot_message_count >= NET_REPORT_SNAPSHOT_PACKET_BUDGET_MIN_SAMPLES
+        && report.snapshot_bytes_p95 > budget
+        && report.snapshot_over_segment_budget_pct_x100
+            >= NET_REPORT_SNAPSHOT_PACKET_BUDGET_OVER_PCT_X100
 }
 
 pub struct MatchStartedLog<'a> {
@@ -410,6 +434,10 @@ mod tests {
             snapshot_bytes_max: 5_000,
             snapshot_bytes_avg: 4_000,
             snapshot_message_count: 300,
+            snapshot_bytes_p95: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
+            snapshot_segment_budget_bytes: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
+            snapshot_over_segment_budget_count: 0,
+            snapshot_over_segment_budget_pct_x100: 0,
             snapshot_parse_max_ms: 1,
             snapshot_parse_p95_ms: 1,
             snapshot_decode_max_ms: 2,
@@ -506,6 +534,23 @@ mod tests {
         assert_eq!(classify_client_net_report(&report), "prediction_correction");
         report.prediction_disable_count = 1;
         assert_eq!(classify_client_net_report(&report), "prediction_disabled");
+    }
+
+    #[test]
+    fn net_report_classifies_packet_budget_pressure_separately_from_large_payloads() {
+        let mut report = clean_report();
+        report.snapshot_bytes_p95 = SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1;
+        report.snapshot_over_segment_budget_count = 200;
+        report.snapshot_over_segment_budget_pct_x100 =
+            NET_REPORT_SNAPSHOT_PACKET_BUDGET_OVER_PCT_X100;
+        assert!(is_notable_net_report(&report));
+        assert_eq!(
+            classify_client_net_report(&report),
+            "packet_budget_pressure"
+        );
+
+        report.snapshot_bytes_max = NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES;
+        assert_eq!(classify_client_net_report(&report), "payload_pressure");
     }
 
     #[test]

@@ -5,6 +5,35 @@
 import { S, decodeServerMessage, msg, cmd as cmdBuilders } from "./protocol.js";
 import { ReportWindowAggregate } from "./report_window_aggregate.js";
 
+export const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
+
+const SNAPSHOT_BYTE_BUCKETS = Object.freeze([
+  512,
+  768,
+  1024,
+  SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
+  1536,
+  2048,
+  3072,
+  4096,
+  6144,
+  8192,
+  12288,
+  16384,
+  24576,
+  32768,
+  49152,
+  65536,
+  98304,
+  131072,
+  196608,
+  262144,
+  393216,
+  524288,
+  786432,
+  1048576,
+]);
+
 /**
  * Thin client transport over a single WebSocket connection.
  *
@@ -221,6 +250,11 @@ export class Net {
       bytesTotal: 0,
       bytesMax: 0,
       messageCount: 0,
+      overSegmentBudgetCount: 0,
+      byteSizes: new ReportWindowAggregate({
+        buckets: SNAPSHOT_BYTE_BUCKETS,
+        maxValue: SNAPSHOT_BYTE_BUCKETS.at(-1),
+      }),
       parseMs: new ReportWindowAggregate(),
       decodeMs: new ReportWindowAggregate(),
     };
@@ -228,6 +262,7 @@ export class Net {
 
   consumeSnapshotReportStats() {
     const stats = this.snapshotReportStats;
+    const bytes = stats.byteSizes.summary();
     const parse = stats.parseMs.summary();
     const decode = stats.decodeMs.summary();
     const out = {
@@ -235,6 +270,11 @@ export class Net {
       snapshotBytesMax: stats.bytesMax,
       snapshotBytesAvg: stats.messageCount > 0 ? Math.round(stats.bytesTotal / stats.messageCount) : 0,
       snapshotMessageCount: stats.messageCount,
+      snapshotBytesP95: bytes.p95,
+      snapshotSegmentBudgetBytes: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
+      snapshotOverSegmentBudgetCount: stats.overSegmentBudgetCount,
+      snapshotOverSegmentBudgetPctX100:
+        stats.messageCount > 0 ? Math.round((stats.overSegmentBudgetCount * 10000) / stats.messageCount) : 0,
       snapshotParseMaxMs: parse.max,
       snapshotParseP95Ms: parse.p95,
       snapshotDecodeMaxMs: decode.max,
@@ -243,6 +283,8 @@ export class Net {
     stats.bytesTotal = 0;
     stats.bytesMax = 0;
     stats.messageCount = 0;
+    stats.overSegmentBudgetCount = 0;
+    stats.byteSizes.reset();
     stats.parseMs.reset();
     stats.decodeMs.reset();
     return out;
@@ -425,6 +467,10 @@ export class Net {
     if (Number.isFinite(byteCount) && byteCount > 0) {
       stats.bytesTotal += byteCount;
       stats.bytesMax = Math.max(stats.bytesMax, byteCount);
+      stats.byteSizes.add(byteCount);
+      if (byteCount > SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES) {
+        stats.overSegmentBudgetCount += 1;
+      }
     }
     stats.messageCount += 1;
     stats.parseMs.add(parseMs);

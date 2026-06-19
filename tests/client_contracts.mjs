@@ -8,7 +8,7 @@
 
 import fs from "node:fs";
 import { CLIENT_NET_REPORT_FIELDS } from "./client_net_report_fields.mjs";
-import { Net } from "../client/src/net.js";
+import { Net, SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES } from "../client/src/net.js";
 import {
   DEFAULT_AI_PROFILE_ID,
   MAX_LOBBY_TEAMS,
@@ -3882,14 +3882,33 @@ function fakeAudioContext() {
     const stats = reportNet.consumeSnapshotReportStats();
     assert(stats.snapshotMessageCount === 2, "Net reports snapshot message count");
     assert(stats.snapshotBytesTotal > stats.snapshotBytesMax, "Net reports bounded snapshot byte totals");
+    assert(stats.snapshotSegmentBudgetBytes === SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES, "Net reports snapshot packet budget");
+    assert(stats.snapshotBytesP95 >= stats.snapshotBytesAvg, "Net reports snapshot byte p95");
+    assert(stats.snapshotOverSegmentBudgetCount === 0, "small snapshots stay within packet budget");
     assert(stats.snapshotParseMaxMs === 3, "Net reports JSON parse max");
     assert(stats.snapshotDecodeMaxMs === 4, "Net reports compact decode max");
-    assert(reportNet.consumeSnapshotReportStats().snapshotMessageCount === 0, "Net snapshot report stats reset");
+    const resetStats = reportNet.consumeSnapshotReportStats();
+    assert(resetStats.snapshotMessageCount === 0, "Net snapshot report stats reset");
+    assert(resetStats.snapshotOverSegmentBudgetCount === 0, "Net snapshot packet-budget stats reset");
+
+    reportNet.noteSnapshotFrame({
+      bytes: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1,
+      parseMs: 0,
+      decodeMs: 0,
+    });
+    const overBudget = reportNet.consumeSnapshotReportStats();
+    assert(overBudget.snapshotBytesP95 > SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES, "Net reports over-budget byte p95");
+    assert(overBudget.snapshotOverSegmentBudgetCount === 1, "Net counts over-budget snapshot frames");
+    assert(overBudget.snapshotOverSegmentBudgetPctX100 === 10000, "Net reports over-budget snapshot percentage");
   } finally {
     globalThis.performance = priorPerformance;
   }
   for (const field of [
     "snapshotBytesTotal",
+    "snapshotBytesP95",
+    "snapshotSegmentBudgetBytes",
+    "snapshotOverSegmentBudgetCount",
+    "snapshotOverSegmentBudgetPctX100",
     "snapshotParseMaxMs",
     "snapshotDecodeP95Ms",
     "snapshotApplyMaxMs",

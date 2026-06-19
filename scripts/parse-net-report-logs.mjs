@@ -3,6 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+const SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES = 1280;
+const SNAPSHOT_PACKET_BUDGET_RATE_WARN_X100 = 5000;
 
 const METRICS = [
   ["rtt_ms", "RTT"],
@@ -10,7 +12,9 @@ const METRICS = [
   ["snapshot_jitter_ms", "snapshot jitter"],
   ["snapshot_gap_max_ms", "snapshot gap"],
   ["snapshot_bytes_max", "payload bytes max"],
+  ["snapshot_bytes_p95", "payload bytes p95"],
   ["snapshot_bytes_avg", "payload bytes avg"],
+  ["snapshot_over_segment_budget_pct_x100", "payload over budget"],
   ["snapshot_parse_max_ms", "parse max"],
   ["snapshot_parse_p95_ms", "parse p95"],
   ["snapshot_decode_max_ms", "decode max"],
@@ -53,7 +57,11 @@ const SUMMARY_FIELDS = [
   "snapshot_jitter_ms",
   "snapshot_gap_max_ms",
   "snapshot_bytes_max",
+  "snapshot_bytes_p95",
   "snapshot_bytes_avg",
+  "snapshot_segment_budget_bytes",
+  "snapshot_over_segment_budget_count",
+  "snapshot_over_segment_budget_pct_x100",
   "snapshot_parse_max_ms",
   "snapshot_parse_p95_ms",
   "snapshot_decode_max_ms",
@@ -118,6 +126,8 @@ const ISSUE_GROUPS = [
     label: "browser payload parsing/decode/apply/frame work",
     fields: [
       "snapshot_bytes_max",
+      "snapshot_bytes_p95",
+      "snapshot_over_segment_budget_pct_x100",
       "snapshot_parse_max_ms",
       "snapshot_decode_max_ms",
       "snapshot_apply_max_ms",
@@ -150,7 +160,9 @@ const WARN_THRESHOLD = {
   snapshot_jitter_ms: 20,
   snapshot_gap_max_ms: 100,
   snapshot_bytes_max: 256 * 1024,
+  snapshot_bytes_p95: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1,
   snapshot_bytes_avg: 128 * 1024,
+  snapshot_over_segment_budget_pct_x100: SNAPSHOT_PACKET_BUDGET_RATE_WARN_X100,
   snapshot_parse_max_ms: 16,
   snapshot_parse_p95_ms: 8,
   snapshot_decode_max_ms: 16,
@@ -473,6 +485,7 @@ function analyze(rows, warnings) {
       match.ended.push(row);
       applyMatchFields(match, row.fields);
     } else if (row.event === "client_net_report") {
+      applyMatchFields(match, row.fields);
       addPlayerReport(match, row);
     } else if (row.event === "performance_tick") {
       match.serverTicks.push(row);
@@ -600,7 +613,7 @@ function finalizeMatch(match) {
     classifications: groups,
     missing,
     transportNote:
-      "Unsupported: Fly logs and ClientNetReport do not expose packet loss, retransmits, or per-packet browser transport data.",
+      "Unsupported: Fly logs and ClientNetReport do not expose packet loss, retransmits, or per-packet browser transport data. Packet-budget fields are payload bytes only and exclude WebSocket/TLS/TCP/IP overhead.",
   };
 }
 
@@ -767,6 +780,9 @@ function missingDiagnosticGroups(rows) {
       missing.push(`${group.label}: no matching fields in input`);
     }
   }
+  if (!fields.has("snapshot_bytes_p95") && !fields.has("snapshot_over_segment_budget_pct_x100")) {
+    missing.push("snapshot packet-budget payload p95/rate: no matching fields in input");
+  }
   return missing;
 }
 
@@ -803,8 +819,8 @@ function formatMarkdown(report) {
     );
 
     lines.push("");
-    lines.push("| player | reports | primary issues | RTT max | snapshot gap max | jitter max | payload max | parse/decode/apply max | frame gap max | frame work max | renderer max | FPS min | command response max | server tick max | server lag max |");
-    lines.push("| --- | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    lines.push("| player | reports | primary issues | RTT max | snapshot gap max | jitter max | payload max | payload p95 | over budget | parse/decode/apply max | frame gap max | frame work max | renderer max | FPS min | command response max | server tick max | server lag max |");
+    lines.push("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
     for (const player of match.players) {
       lines.push(
         [
@@ -815,6 +831,8 @@ function formatMarkdown(report) {
           metricMax(player, "snapshot_gap_max_ms"),
           metricMax(player, "snapshot_jitter_ms"),
           metricMax(player, "snapshot_bytes_max"),
+          metricMax(player, "snapshot_bytes_p95"),
+          metricPctX100Max(player, "snapshot_over_segment_budget_pct_x100"),
           `${metricMax(player, "snapshot_parse_max_ms")}/${metricMax(player, "snapshot_decode_max_ms")}/${metricMax(player, "snapshot_apply_max_ms")}`,
           metricMax(player, "frame_gap_max_ms"),
           metricMax(player, "frame_work_max_ms"),
@@ -853,8 +871,23 @@ function metricMax(player, field) {
   return formatValue(player.metrics[field]?.max);
 }
 
+function metricPctX100Max(player, field) {
+  return formatPctX100(player.metrics[field]?.max);
+}
+
 function metricMin(player, field) {
   return formatValue(player.metrics[field]?.min);
+}
+
+function formatPctX100(value) {
+  if (value === null || value === undefined || value === "") {
+    return "n/a";
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "n/a";
+  }
+  return `${(number / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 }
 
 function formatValue(value) {

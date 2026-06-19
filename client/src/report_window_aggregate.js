@@ -1,8 +1,9 @@
 const DEFAULT_BUCKETS = Object.freeze([1, 2, 4, 8, 12, 16, 24, 33, 50, 75, 100, 150, 250, 500, 1000]);
 
 export class ReportWindowAggregate {
-  constructor({ buckets = DEFAULT_BUCKETS } = {}) {
+  constructor({ buckets = DEFAULT_BUCKETS, maxValue = 60_000 } = {}) {
     this.buckets = buckets;
+    this.maxValue = Number.isFinite(maxValue) && maxValue > 0 ? maxValue : 60_000;
     this.count = 0;
     this.total = 0;
     this.max = 0;
@@ -12,7 +13,7 @@ export class ReportWindowAggregate {
   add(value) {
     const number = Number(value);
     if (!Number.isFinite(number) || number < 0) return;
-    const clamped = Math.min(number, 60_000);
+    const clamped = Math.min(number, this.maxValue);
     this.count += 1;
     this.total += clamped;
     this.max = Math.max(this.max, clamped);
