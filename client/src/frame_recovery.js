@@ -21,7 +21,7 @@ function runMatchFrame(match, now) {
   const frameGapMs = now - match.lastFrame;
   match.lastFrame = now;
   if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
-    match.health.noteFrameGap(frameGapMs);
+    match.health.noteFrameGap(frameGapMs, now);
   }
   match.health.refreshLatency();
 

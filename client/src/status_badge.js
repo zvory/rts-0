@@ -49,6 +49,8 @@ export class StatusBadge {
         (metrics
           ? `<div class="status-badge-metrics">` +
               metricSpan("rtt", formatMs(metrics.latencyMs), metrics.issues.latency.active) +
+              metricSpan("fps", formatFps(metrics.fps), false) +
+              metricSpan("1m fps", formatFps(metrics.fpsOneMinute), false) +
               metricSpan("tick", formatMs(metrics.serverTickMs), metrics.issues.slowTick.active) +
               metricSpan("lag", formatMs(metrics.serverLagMs), metrics.issues.slowTick.active) +
               metricSpan("jit", formatMs(metrics.jitterMs), metrics.issues.jitter.active) +
@@ -85,6 +87,8 @@ export class StatusBadge {
       lines.push(
         [
           `rtt ${formatMs(metrics.latencyMs)}`,
+          `fps ${formatFps(metrics.fps)}`,
+          `1m fps ${formatFps(metrics.fpsOneMinute)}`,
           `tick ${formatMs(metrics.serverTickMs)}`,
           `lag ${formatMs(metrics.serverLagMs)}`,
           `jit ${formatMs(metrics.jitterMs)}`,
@@ -138,6 +142,10 @@ function formatIssueText(label, issue) {
 
 function formatMs(value) {
   return Number.isFinite(value) ? `${Math.max(0, Math.round(value))}ms` : "--";
+}
+
+function formatFps(value) {
+  return Number.isFinite(value) ? String(Math.max(0, Math.round(value))) : "--";
 }
 
 async function copyText(text) {
