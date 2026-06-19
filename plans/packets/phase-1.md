@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation.
+- [x] Done.
 
 ## Objective
 
@@ -87,15 +87,15 @@ over-budget counts, and repeatable harness output that compares branches on the 
 
 ## Implementation Checklist
 
-- [ ] Pick and document the payload-byte budget constant.
-- [ ] Add bounded browser aggregation for byte p95 and over-budget count/rate.
-- [ ] Extend `ClientNetReport` Rust and JavaScript mirrors with serde/default compatibility.
-- [ ] Update structured logging, notable-report thresholds, and primary-issue classification.
-- [ ] Update parser summaries and old-log compatibility tests.
-- [ ] Update client perf harness summaries without adding a hard byte gate.
-- [ ] Update protocol/perf docs.
-- [ ] Add focused JS/Rust/parser/protocol tests.
-- [ ] Mark this phase as done in this file.
+- [x] Pick and document the payload-byte budget constant.
+- [x] Add bounded browser aggregation for byte p95 and over-budget count/rate.
+- [x] Extend `ClientNetReport` Rust and JavaScript mirrors with serde/default compatibility.
+- [x] Update structured logging, notable-report thresholds, and primary-issue classification.
+- [x] Update parser summaries and old-log compatibility tests.
+- [x] Update client perf harness summaries without adding a hard byte gate.
+- [x] Update protocol/perf docs.
+- [x] Add focused JS/Rust/parser/protocol tests.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

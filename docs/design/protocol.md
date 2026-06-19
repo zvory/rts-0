@@ -138,6 +138,10 @@ in a match:
   snapshotBytesMax: u32,     // largest received snapshot WebSocket text bytes
   snapshotBytesAvg: u32,     // average received snapshot WebSocket text bytes
   snapshotMessageCount: u32, // snapshot frames observed by the transport report window
+  snapshotBytesP95: u32,     // bucketed p95 received snapshot WebSocket text bytes
+  snapshotSegmentBudgetBytes: u32, // payload-byte single-segment budget used by this client
+  snapshotOverSegmentBudgetCount: u32, // snapshot frames above snapshotSegmentBudgetBytes
+  snapshotOverSegmentBudgetPctX100: u16, // over-budget percentage multiplied by 100
   snapshotParseMaxMs: u16,   // max browser JSON.parse cost for snapshot frames
   snapshotParseP95Ms: u16,   // bucketed p95 JSON.parse cost for snapshot frames
   snapshotDecodeMaxMs: u16,  // max compact protocol decode cost
@@ -206,16 +210,19 @@ in a match:
 ```
 The snapshot payload, parse, decode, apply, prediction-apply, cadence, and command milestone fields
 are report-window aggregates only; raw snapshot JSON, raw timestamp arrays, entity ids, unit ids,
-target ids, positions, replay data, and command payloads are not uploaded. Command milestone timing
-splits local issue to receipt, receipt to sim acknowledgement, issue to sim acknowledgement, and ack
-snapshot receipt to browser apply. The frame-work and renderer fields come from the browser's bounded
-frame-profiler report window; the local debug surface may keep richer cumulative phase tables, but
-those raw arrays and detailed recent frames are not uploaded. The server logs this message only when
-the aggregate contains notable lag, jitter, browser frame stalls, local JS frame work, payload
-pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
-backlog, server tick/scheduler pressure, command milestone delay/rejection, or prediction
-correction/fallback signals, alongside the connection's `player_id`, room name, and reported
-`match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
+target ids, positions, replay data, and command payloads are not uploaded. The canonical
+single-segment payload budget is 1280 bytes. It is intentionally below a common 1460-byte Ethernet
+TCP MSS because the measured snapshot bytes are only WebSocket text payload bytes and exclude
+WebSocket framing plus TLS, TCP, and IP overhead. Command milestone timing splits local issue to
+receipt, receipt to sim acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to
+browser apply. The frame-work and renderer fields come from the browser's bounded frame-profiler
+report window; the local debug surface may keep richer cumulative phase tables, but those raw arrays
+and detailed recent frames are not uploaded. The server logs this message only when the aggregate
+contains notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure,
+packet-budget pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer
+cost, WebSocket backlog, server tick/scheduler pressure, command milestone delay/rejection, or
+prediction correction/fallback signals, alongside the connection's `player_id`, room name, and
+reported `match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
 transport/browser/prediction/render behavior, not as gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)

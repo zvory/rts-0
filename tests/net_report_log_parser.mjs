@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -53,6 +53,7 @@ assert.equal(player5.metrics.snapshot_gap_max_ms.max, 1077);
 assert.equal(player5.metrics.frame_gap_max_ms.max, 700);
 assert.equal(player5.metrics.fps_estimate.min, 15);
 assert.equal(player5.metrics.snapshot_bytes_max, null);
+assert.equal(player5.metrics.snapshot_bytes_p95, null);
 
 const serverClassification = match54.classifications.find(
   (item) => item.id === "server_tick_scheduler"
@@ -69,11 +70,41 @@ assert.ok(
   match54.missing.some((item) => item.includes("server snapshot projection")),
   "expected unavailable newer server snapshot perf data to be reported as missing"
 );
+assert.ok(
+  match54.missing.some((item) => item.includes("packet-budget")),
+  "expected unavailable packet-budget fields to be reported as missing"
+);
 
 const markdown = run([...logs]);
 assert.match(markdown, /## Match 54/);
 assert.match(markdown, /player 5 frame_gap_max_ms max 700/);
 assert.match(markdown, /packet loss, retransmits, or per-packet browser transport data/);
+assert.match(markdown, /payload p95/);
+
+const packetDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-packet-"));
+try {
+  const packetLog = path.join(packetDir, "packet.log");
+  writeFileSync(
+    packetLog,
+    [
+      '2026-06-19T02:00:00Z INFO event="client_net_report" match_run_id="packet-1" player_id=2 primary_issue="packet_budget_pressure" rtt_max_ms=40 snapshot_gap_max_ms=33 snapshot_jitter_ms=0 snapshot_bytes_max=4096 snapshot_bytes_p95=2048 snapshot_bytes_avg=1800 snapshot_segment_budget_bytes=1280 snapshot_over_segment_budget_count=180 snapshot_over_segment_budget_pct_x100=6000 frame_gap_max_ms=16 fps_estimate=60 server_tick_ms=4 server_lag_ms=0 "client network report"',
+    ].join("\n") + "\n"
+  );
+  const packetParsed = JSON.parse(run(["--format", "json", packetLog]));
+  const packetMatch = packetParsed.matches.find((match) => match.matchRunId === "packet-1");
+  assert.ok(packetMatch, "expected synthetic packet-budget match summary");
+  const packetPlayer = packetMatch.players.find((player) => player.playerId === "2");
+  assert.ok(packetPlayer, "expected synthetic packet-budget player summary");
+  assert.equal(packetPlayer.metrics.snapshot_bytes_p95.max, 2048);
+  assert.equal(packetPlayer.metrics.snapshot_segment_budget_bytes.max, 1280);
+  assert.equal(packetPlayer.metrics.snapshot_over_segment_budget_pct_x100.max, 6000);
+  assert.equal(packetMatch.missing.some((item) => item.includes("packet-budget")), false);
+  const packetMarkdown = run([packetLog]);
+  assert.match(packetMarkdown, /payload p95/);
+  assert.match(packetMarkdown, /60%/);
+} finally {
+  rmSync(packetDir, { recursive: true, force: true });
+}
 
 const tsv = run(["--format=tsv", ...logs]);
 assert.match(tsv, /^match\tplayer_id\treports/m);

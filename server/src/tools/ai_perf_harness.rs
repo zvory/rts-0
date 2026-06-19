@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use crate::lobby::compact_snapshot_for_wire;
 use crate::protocol::{serialize_compact_snapshot, Event};
+use crate::structured_log::SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rts_ai::{AiController, AiThinkContext};
@@ -61,6 +62,7 @@ struct PerfReport {
     snapshot_entities: CountSeries,
     snapshot_resource_deltas: CountSeries,
     snapshot_events: CountSeries,
+    snapshot_payload_bytes: CountSeries,
     worst_ticks: Vec<WorstTick>,
 }
 
@@ -89,6 +91,10 @@ struct CountSeries {
 impl PerfReport {
     fn record_snapshot_serialize(&mut self, duration: Duration) {
         self.snapshot_serialize.record(duration);
+    }
+
+    fn record_snapshot_payload_bytes(&mut self, bytes: usize) {
+        self.snapshot_payload_bytes.record(bytes);
     }
 
     fn record_total_only_tick(&mut self, tick: u32, total: Duration, counts: perf::EntityCounts) {
@@ -209,6 +215,18 @@ impl CountSeries {
         self.samples.push(count);
     }
 
+    fn len(&self) -> usize {
+        self.samples.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.samples.is_empty()
+    }
+
+    fn total(&self) -> u64 {
+        self.samples.iter().map(|&value| value as u64).sum()
+    }
+
     fn max(&self) -> usize {
         self.samples.iter().copied().max().unwrap_or(0)
     }
@@ -219,6 +237,24 @@ impl CountSeries {
         } else {
             self.samples.iter().sum::<usize>() / self.samples.len()
         }
+    }
+
+    fn percentile(&self, numerator: usize, denominator: usize) -> usize {
+        if self.samples.is_empty() || denominator == 0 {
+            return 0;
+        }
+        let mut sorted = self.samples.clone();
+        sorted.sort_unstable();
+        let rank = (sorted.len() * numerator).div_ceil(denominator);
+        let index = rank.saturating_sub(1).min(sorted.len() - 1);
+        sorted[index]
+    }
+
+    fn count_over(&self, threshold: usize) -> usize {
+        self.samples
+            .iter()
+            .filter(|&&count| count > threshold)
+            .count()
     }
 }
 
@@ -330,6 +366,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
             snapshot_bytes = snapshot_bytes.saturating_add(payload.len() as u64);
             serialized_snapshots = serialized_snapshots.saturating_add(1);
             perf_report.record_snapshot_serialize(serialize_duration);
+            perf_report.record_snapshot_payload_bytes(payload.len());
             perf::log_writer_message(
                 player.id,
                 "snapshot",
@@ -581,6 +618,7 @@ fn print_summary(summary: &HarnessSummary) {
         summary.serialized_snapshots,
         summary.snapshot_bytes
     );
+    print_snapshot_payload_bytes(&summary.perf_report.snapshot_payload_bytes);
     println!(
         "events: attacks={} deaths={}  final_entities={} units={} buildings={} resources={}",
         summary.attack_events,
@@ -591,6 +629,25 @@ fn print_summary(summary: &HarnessSummary) {
         summary.final_counts.resources
     );
     print_perf_report(&summary.perf_report);
+}
+
+fn print_snapshot_payload_bytes(bytes: &CountSeries) {
+    if bytes.is_empty() {
+        return;
+    }
+    let budget = SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES as usize;
+    let over_budget = bytes.count_over(budget);
+    println!(
+        "snapshot_payload_bytes: samples={} total={} avg={} p95={} max={} segment_budget={} over_segment_budget={} over_segment_budget_pct_x100={}",
+        bytes.len(),
+        bytes.total(),
+        bytes.avg(),
+        bytes.percentile(95, 100),
+        bytes.max(),
+        budget,
+        over_budget,
+        pct_x100(over_budget, bytes.len())
+    );
 }
 
 fn print_perf_report(report: &PerfReport) {
@@ -765,6 +822,12 @@ fn percent_of(part: Duration, whole: Duration) -> f64 {
     } else {
         part.as_secs_f64() * 100.0 / whole.as_secs_f64()
     }
+}
+
+fn pct_x100(part: usize, whole: usize) -> usize {
+    (part * 10_000 + (whole / 2))
+        .checked_div(whole)
+        .unwrap_or(0)
 }
 
 fn duration_div(duration: Duration, divisor: u32) -> Duration {

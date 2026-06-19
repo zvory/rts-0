@@ -165,6 +165,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       health: summary.health,
       perf: summary.perf,
       clientNetReport: summary.clientNetReport,
+      snapshotPacketBudget: snapshotPacketBudgetSummary(summary.clientNetReport),
       page: {
         title: summary.title,
         location: summary.location,
@@ -225,6 +226,20 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     fs.writeFileSync(path.join(artifactDir, "summary.json"), `${JSON.stringify(artifact, null, 2)}\n`);
     return { status: "failed", artifactDir, errors };
   }
+}
+
+function snapshotPacketBudgetSummary(report) {
+  if (!report) return null;
+  return {
+    snapshotBytesP95: numberOrNull(report.snapshotBytesP95),
+    snapshotSegmentBudgetBytes: numberOrNull(report.snapshotSegmentBudgetBytes),
+    snapshotOverSegmentBudgetCount: numberOrNull(report.snapshotOverSegmentBudgetCount),
+    snapshotOverSegmentBudgetPctX100: numberOrNull(report.snapshotOverSegmentBudgetPctX100),
+  };
+}
+
+function numberOrNull(value) {
+  return Number.isFinite(value) ? value : null;
 }
 
 async function collectPageSummary(page) {

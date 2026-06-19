@@ -38,8 +38,9 @@ after each upload; the `window.__rtsPerf` debug summary remains cumulative until
 
 The same upload also includes bounded snapshot diagnostics:
 
-- Payload size: `snapshotBytesTotal`, `snapshotBytesMax`, `snapshotBytesAvg`, and
-  `snapshotMessageCount`.
+- Payload size: `snapshotBytesTotal`, `snapshotBytesMax`, `snapshotBytesAvg`,
+  `snapshotMessageCount`, `snapshotBytesP95`, `snapshotSegmentBudgetBytes`,
+  `snapshotOverSegmentBudgetCount`, and `snapshotOverSegmentBudgetPctX100`.
 - Browser processing: `snapshotParseMaxMs`/`snapshotParseP95Ms`,
   `snapshotDecodeMaxMs`/`snapshotDecodeP95Ms`, `snapshotApplyMaxMs`/`snapshotApplyP95Ms`, and
   `predictionApplyMaxMs`/`predictionApplyP95Ms`.
@@ -54,8 +55,11 @@ command age, and max pending command count. The server receipt comes from a tiny
 `commandReceipt` message keyed only by `clientSeq`; it carries no command payload, unit ids, target
 ids, positions, or player-entered text and does not reconcile prediction.
 
-Raw snapshot JSON, raw timestamp arrays, raw phase arrays, recent frame records, stack traces, entity
-ids, command payloads, command targets, and replay data are intentionally not uploaded.
+The canonical single-segment payload budget is 1280 bytes. Client measurements count only snapshot
+WebSocket text payload bytes, so they exclude WebSocket framing plus TLS, TCP, and IP overhead; a
+1460-byte JSON payload is not a safe single-segment target. Raw snapshot JSON, raw timestamp arrays,
+raw phase arrays, recent frame records, stack traces, entity ids, command payloads, command targets,
+and replay data are intentionally not uploaded.
 
 ## Modes
 
@@ -106,7 +110,9 @@ The browser harness starts a local server on an isolated port unless `RTS_URL` o
 points at an already-healthy server. It drives headless Chrome with the existing
 `tests/package.json` `puppeteer-core` dependency path, copies the preserved Matt/Alex replay into
 `server/target/selfplay-artifacts/client_perf_matt_alex_match_54/replay.json` at runtime, and writes
-one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. Pass `--trace`
+one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. Each summary
+includes a `snapshotPacketBudget` block with payload p95 bytes, the selected budget, over-budget
+count, and over-budget percentage when the generated `ClientNetReport` includes them. Pass `--trace`
 to also write a Chrome `trace.json`; traces are opt-in because they are larger and machine-local.
 
 The default harness result fails for runtime errors, page/console/request errors, and missing
@@ -184,14 +190,16 @@ Classification is evidence-bounded:
   evidence.
 - Client network/snapshot delivery pressure uses RTT, bad RTT samples, snapshot jitter, snapshot gaps,
   stale/duplicate/skipped snapshot counters, and burst counters.
-- Browser processing pressure uses payload size, JSON parse, compact decode, snapshot apply,
-  prediction apply, frame work, renderer timing, frame gaps, and FPS estimates.
+- Browser processing pressure uses payload size, packet-budget p95/rate, JSON parse, compact decode,
+  snapshot apply, prediction apply, frame work, renderer timing, frame gaps, and FPS estimates.
 - Command path pressure uses legacy acknowledged-command latency when that is all an old log has, and
   uses the newer upload/server-receipt/sim-ack/downstream-apply milestones when present.
 
 The parser always prints that packet loss, retransmit behavior, and per-packet browser transport data
-are unavailable. Treat WebSocket/TCP head-of-line or WebTransport theories as unsupported unless the
-available rows show concrete writer backlog, snapshot burst/coalescing, or downstream delivery gaps.
+are unavailable. Packet-budget p95 and over-budget-rate fields are payload-byte aggregates only, not
+proof of packet fragmentation on the user's path. Treat WebSocket/TCP head-of-line or WebTransport
+theories as unsupported unless the available rows show concrete writer backlog, snapshot
+burst/coalescing, or downstream delivery gaps.
 
 The preserved Matt/Alex incident is the canonical fixture:
 
@@ -202,8 +210,8 @@ node scripts/parse-net-report-logs.mjs \
 ```
 
 The expected shape is: server tick/scheduler pressure not indicated; Matt's player rows show high
-RTT/snapshot timing and low frame pacing; older payload, parse/decode/apply, command milestone, and
-server snapshot timing fields are reported as unavailable instead of zero.
+RTT/snapshot timing and low frame pacing; older payload, packet-budget, parse/decode/apply, command
+milestone, and server snapshot timing fields are reported as unavailable instead of zero.
 
 ## Structured server logging
 
@@ -237,6 +245,10 @@ architecture policy gate.
   lag.
 - `payload_pressure`: `snapshotBytesMax >= 262144` or `snapshotBytesAvg >= 131072`; inspect server
   snapshot/perf rows for projection or compaction pressure.
+- `packet_budget_pressure`: at least 120 snapshot-frame samples, `snapshotBytesP95` above the
+  reported `snapshotSegmentBudgetBytes`, and `snapshotOverSegmentBudgetPctX100 >= 5000`. This is
+  separate from `payload_pressure`; it is meant to highlight persistent single-segment budget
+  pressure without replacing the older pathological-frame thresholds.
 - `client_snapshot_parse`: `snapshotParseMaxMs >= 16` or `snapshotParseP95Ms >= 8`; points at
   browser JSON parsing cost for received snapshot frames.
 - `client_snapshot_decode`: `snapshotDecodeMaxMs >= 16` or `snapshotDecodeP95Ms >= 8`; points at
