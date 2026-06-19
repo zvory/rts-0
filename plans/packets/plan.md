@@ -20,6 +20,17 @@ runs a controlled encoding/compression bake-off before any larger delta protocol
 - Keep JSON compact snapshots as the default compatibility path until a phase proves a replacement is
   smaller, fast enough to parse/decode, and safe across live, replay, lab, observer, and spectator
   paths.
+- Delta work must happen after per-recipient fog projection. Do not diff from global simulation state
+  or retain a baseline that contains data the recipient was not allowed to see.
+- Delta baselines are per connection/recipient and are updated only after the writer successfully
+  sends a frame. The latest-only pending snapshot slot should continue to hold a full semantic
+  snapshot; it must not hold a chain of unsent deltas.
+- Any stateful delta mode must force keyframes on match start, reconnect, unsupported version,
+  compact/schema version change, replay seek, lab time/vision reset, projection-policy change, and a
+  documented periodic cadence.
+- The client-side delta reconstructor must return the same semantic snapshot shape consumed by
+  `GameState.applySnapshot`; renderer, HUD, minimap, and input code should not learn about transport
+  deltas.
 - Use a conservative "single-segment budget" constant for payload bytes. The exact value must be
   chosen and documented in Phase 1, but it should account for WebSocket/TLS/TCP/IP overhead because
   existing snapshot byte logs count only payload bytes.
@@ -30,6 +41,9 @@ runs a controlled encoding/compression bake-off before any larger delta protocol
 - Coordinate any protocol field or snapshot wire change with `server/crates/protocol/src/lib.rs`,
   `client/src/protocol.js`, `docs/design/protocol.md`, `docs/perf-tracing.md`, focused tests, and the
   incident parser where applicable.
+- Transient events are not durable baseline state. If a delta phase changes event handling, it must
+  state whether it preserves the current latest-only semantics or deliberately adds bounded event
+  accumulation with fog-safe tests.
 - Each phase must be implemented on its own `zvorygin/` branch, pushed as an owned PR with auto-merge
   armed, then waited on until GitHub reports the PR merged and the phase head is reachable from
   `origin/main`.
@@ -57,34 +71,56 @@ phase should keep JSON as the default while producing reproducible size and CPU 
 Matt/Alex replay, AI harness, and at least one current live/dev workload. It should end with a
 documented recommendation to ship one encoding path, defer all of them, or split follow-up work.
 
-### [Phase 3 - Delta Snapshot Design Pass](phase-3.md)
+### [Phase 3 - Delta Snapshot Envelope And Baseline Scaffold](phase-3.md)
 
-Tentative and review-gated. A separate AI should turn the delta idea into a real design before any
-implementation starts, including baseline ownership, keyframes, coalesced latest-only snapshots,
-replay/lab compatibility, and fog safety. This placeholder exists so the likely next direction is
-visible, but it is not runner-ready yet.
+Add the stateful snapshot frame envelope, per-writer baseline tracking, forced-keyframe rules, and
+client reconstruction seam without trying to shrink payloads yet. This phase should prove that a
+keyframe-only run through the new path behaves like current compact JSON snapshots and that baselines
+are updated only for frames actually sent. It stays gated on Phase 2 evidence and explicit user
+approval before delta work begins.
 
 ### [Phase 4 - Resource And Fog Delta Prototype](phase-4.md)
 
-Tentative and review-gated. This placeholder covers the lower-risk state that currently contributes
-recurring bytes, especially resource remaining updates and visible-tile runs. It needs Phase 3's
-design before implementation because the client must reconstruct correct full semantic state after
-skipped, replaced, or keyframed snapshots.
+Implement the first real deltas for resource remaining updates and row-major `visibleTiles`, while
+entities and other sections remain full/keyframed. This phase should use the Phase 3 baseline model,
+fall back to a keyframe when a patch is larger or unsafe, and compare payload/reconstruction cost
+against Phase 1/2 baselines. Its goal is to prove the full keyframe/reconstruct/recover loop on
+lower-risk snapshot sections before entity state becomes stateful.
 
-### [Phase 5 - Entity Delta And Keyframe Protocol](phase-5.md)
+### [Phase 5 - Entity Record Delta Protocol](phase-5.md)
 
-Tentative and review-gated. This placeholder covers the full stateful snapshot delta protocol for
-entities, ability objects, remembered buildings, events, upgrades, and net status. It is expected to
-be the durable path to consistently smaller snapshots, but it is complex enough to require a separate
-fleshing-out pass and explicit user approval.
+Add record-level entity add/update/remove deltas after fog projection, using full compact entity
+records for changed entities rather than field-level patches. This phase should prove that entities
+leaving visibility are removed from the client baseline, hidden target/tracer data is not retained,
+and coalesced latest-only sends diff against the last sent frame, not skipped ticks. It keeps the
+existing keyframe fallback and should not attempt auxiliary section deltas in the same PR.
+
+### [Phase 6 - Auxiliary Section Deltas And Recovery](phase-6.md)
+
+Extend the delta policy to smokes, ability objects, remembered buildings, optional spectator/replay
+resource sections, upgrades, and recovery diagnostics. This phase should keep `events` and
+`netStatus` deliberately full or explicitly document any bounded event accumulation change, then
+harden stale-baseline, malformed-frame, replay/lab seek, vision-mode, and keyframe-request recovery.
+It is where the implementation stops being a narrow prototype and proves compatibility across live,
+spectator, replay, branch, lab, and dev-watch paths.
+
+### [Phase 7 - Defaulting, Rollout, And Cleanup](phase-7.md)
+
+Use Phase 1 through Phase 6 measurements to decide whether delta snapshots should become the default,
+remain opt-in, or be reverted/deferred. This phase should update perf tooling and incident parsing
+with delta/keyframe ratios, resync counts, and keyframe reasons, then choose a conservative rollout
+flag and rollback path. It should remove stale experiment code only after the compact JSON fallback
+and docs remain clear.
 
 ## Phase Index
 
 1. [Phase 1 - Packet Budget Measurement](phase-1.md)
 2. [Phase 2 - Encoding And Compression Bake-off](phase-2.md)
-3. [Phase 3 - Delta Snapshot Design Pass](phase-3.md)
+3. [Phase 3 - Delta Snapshot Envelope And Baseline Scaffold](phase-3.md)
 4. [Phase 4 - Resource And Fog Delta Prototype](phase-4.md)
-5. [Phase 5 - Entity Delta And Keyframe Protocol](phase-5.md)
+5. [Phase 5 - Entity Record Delta Protocol](phase-5.md)
+6. [Phase 6 - Auxiliary Section Deltas And Recovery](phase-6.md)
+7. [Phase 7 - Defaulting, Rollout, And Cleanup](phase-7.md)
 
 ## Non-Goals
 
@@ -97,25 +133,26 @@ fleshing-out pass and explicit user approval.
   evidence for comparisons, not portable guarantees across maps and workloads.
 - Do not upload raw snapshots, raw command logs, entity id streams, player names, browser traces, or
   packet captures from normal clients.
-- Do not implement tentative delta phases until Phase 3 is rewritten into an approved, fully fleshed
-  out plan.
+- Do not implement delta phases until Phase 2 has merged, its decision artifact recommends moving
+  beyond encoding/compression, and the user explicitly approves delta work.
 
 ## Implementation Process
 
 Implement one phase at a time. Do not start a later phase from an assumed merge; use the PR wait gate
-and confirm the phase head is reachable from `origin/main`. For unattended executor passes, use only
-the fully specified phases until the tentative delta phases are rewritten and approved:
+and confirm the phase head is reachable from `origin/main`. Phase 1 and Phase 2 can run normally:
 
 ```bash
 scripts/phase-runner.sh --plan packets phase-1 --pr --wait
-scripts/phase-runner.sh --plan packets phase-1 phase-2 --pr --wait
+scripts/phase-runner.sh --plan packets phase-2 --pr --wait
 ```
 
-Do not run:
+Do not run delta phases until Phase 2 recommends delta work and the user explicitly approves that
+direction. After that gate, run them one at a time:
 
 ```bash
 scripts/phase-runner.sh --plan packets phase-3 --pr --wait
+scripts/phase-runner.sh --plan packets phase-4 --pr --wait
+scripts/phase-runner.sh --plan packets phase-5 --pr --wait
+scripts/phase-runner.sh --plan packets phase-6 --pr --wait
+scripts/phase-runner.sh --plan packets phase-7 --pr --wait
 ```
-
-until Phase 3 has been replaced with a runner-ready design document and the user has explicitly
-approved moving into delta work.
