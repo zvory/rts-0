@@ -82,9 +82,16 @@ export class UnitRigInstance {
 
 function applyPartState(display, part, state, context) {
   display.visible = state.visible;
+  if (!state.visible) return;
+
   applyDisplayTransform(display, displayTransform(state));
+  const tint = tintForSlot(state.tintSlot, context);
+  const drawKey = partDrawKey(state, tint);
+  if (display.rtsRigDrawKey === drawKey) return;
+
   display.clear?.();
-  drawPart(display, part.geometry, part.paint, tintForSlot(state.tintSlot, context), state.geometryScale);
+  drawPart(display, part.geometry, part.paint, tint, state.geometryScale);
+  display.rtsRigDrawKey = drawKey;
 }
 
 function displayTransform(state) {
@@ -102,11 +109,19 @@ function displayTransform(state) {
 }
 
 function applyDisplayTransform(display, transform) {
-  display.alpha = transform.alpha;
-  setPoint(display.position, transform.x, transform.y);
-  setPoint(display.pivot, transform.pivotX, transform.pivotY);
-  setPoint(display.scale, transform.scaleX, transform.scaleY);
-  display.rotation = transform.rotation;
+  const last = display.rtsRigTransform;
+  if (!last || !nearly(last.alpha, transform.alpha)) display.alpha = transform.alpha;
+  if (!last || !nearly(last.x, transform.x) || !nearly(last.y, transform.y)) {
+    setPoint(display.position, transform.x, transform.y);
+  }
+  if (!last || !nearly(last.pivotX, transform.pivotX) || !nearly(last.pivotY, transform.pivotY)) {
+    setPoint(display.pivot, transform.pivotX, transform.pivotY);
+  }
+  if (!last || !nearly(last.scaleX, transform.scaleX) || !nearly(last.scaleY, transform.scaleY)) {
+    setPoint(display.scale, transform.scaleX, transform.scaleY);
+  }
+  if (!last || !nearly(last.rotation, transform.rotation)) display.rotation = transform.rotation;
+  display.rtsRigTransform = transform;
 }
 
 function nearly(a, b) {
@@ -131,6 +146,16 @@ function drawPart(g, geometry, paint, tint, geometryScale = null) {
   if (fill !== null) g.beginFill?.(fill, paint.fillOpacity ?? 1);
   drawGeometry(g, geometry, geometryScale);
   if (fill !== null) g.endFill?.();
+}
+
+function partDrawKey(state, tint) {
+  const geometryScale = state.geometryScale || {};
+  return [
+    tint?.fill ?? "",
+    tint?.stroke ?? "",
+    geometryScale.x ?? 1,
+    geometryScale.y ?? 1,
+  ].join("|");
 }
 
 function drawGeometry(g, geometry, geometryScale = null) {

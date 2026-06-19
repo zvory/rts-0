@@ -116,6 +116,56 @@ test("rig runtime creates one container child per part and updates transforms", 
   assert.equal(instance.container.destroyed, true);
 });
 
+test("rig runtime reuses part graphics when only transforms change", () => {
+  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
+  const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
+  const entity = {
+    id: 12,
+    kind: KIND.WORKER,
+    owner: 1,
+    x: 24,
+    y: 32,
+    facing: 0,
+    hp: 20,
+    maxHp: 30,
+  };
+
+  instance.update(entity, createRigRenderContext(entity, {
+    now: fixedNow,
+    colorByOwner: new Map([[1, 0x225588]]),
+  }));
+
+  const body = instance.parts.get("part.body").display;
+  const facingTick = instance.parts.get("part.facingTick").display;
+  const bodyCommands = body.commands;
+  const facingTickCommands = facingTick.commands;
+  const bodyClearCount = body.clearCount;
+  const facingTickClearCount = facingTick.clearCount;
+
+  const moved = { ...entity, x: 64, y: 80, facing: Math.PI / 2 };
+  instance.update(moved, createRigRenderContext(moved, {
+    now: fixedNow + 16,
+    colorByOwner: new Map([[1, 0x225588]]),
+  }));
+
+  assert.equal(instance.container.x, 64);
+  assert.equal(instance.container.y, 80);
+  assert.equal(facingTick.rotation, Math.PI / 2);
+  assert.equal(body.commands, bodyCommands);
+  assert.equal(facingTick.commands, facingTickCommands);
+  assert.equal(body.clearCount, bodyClearCount);
+  assert.equal(facingTick.clearCount, facingTickClearCount);
+
+  instance.update(moved, createRigRenderContext(moved, {
+    now: fixedNow + 32,
+    colorByOwner: new Map([[1, 0x884422]]),
+  }));
+
+  assert.equal(body.clearCount, bodyClearCount + 1);
+  assert.equal(body.commands.find((cmd) => cmd.op === "beginFill").color, 0x884422);
+  instance.destroy();
+});
+
 test("rig runtime can update one routed part group", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
@@ -465,9 +515,11 @@ class FakeGraphics extends FakeContainer {
     super();
     this.commands = [];
     this.lineWidth = 0;
+    this.clearCount = 0;
   }
 
   clear() {
+    this.clearCount += 1;
     this.commands = [];
     this.lineWidth = 0;
   }
