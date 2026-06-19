@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -46,13 +46,13 @@ should provide evidence for future optimization work while avoiding brittle mach
 
 ## Implementation Checklist
 
-- [ ] Add the harness script with workload selection and isolated output directories.
-- [ ] Add Matt/Alex replay workload setup without committing generated `target/` artifacts.
-- [ ] Add at least one non-replay stress/dev workload.
-- [ ] Collect and write summary JSON for each workload.
-- [ ] Make the harness fail on runtime/test errors and missing performance summaries.
-- [ ] Document local usage and artifact interpretation.
-- [ ] Mark this phase as done in this file.
+- [x] Add the harness script with workload selection and isolated output directories.
+- [x] Add Matt/Alex replay workload setup without committing generated `target/` artifacts.
+- [x] Add at least one non-replay stress/dev workload.
+- [x] Collect and write summary JSON for each workload.
+- [x] Make the harness fail on runtime/test errors and missing performance summaries.
+- [x] Document local usage and artifact interpretation.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

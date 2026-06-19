@@ -75,6 +75,26 @@ exercises simulation, per-player snapshot fanout, snapshot compaction, and compa
 serialization without requiring browser clients. Override the usual `RTS_PERF*` and `RUST_LOG`
 environment variables when you need a different trace shape, or pass `--perf full` for every tick.
 
+Browser client performance harness:
+
+```bash
+node scripts/client-perf-harness.mjs --list
+node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6
+node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6
+```
+
+The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
+points at an already-healthy server. It drives headless Chrome with the existing
+`tests/package.json` `puppeteer-core` dependency path, copies the preserved Matt/Alex replay into
+`server/target/selfplay-artifacts/client_perf_matt_alex_match_54/replay.json` at runtime, and writes
+one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. Pass `--trace`
+to also write a Chrome `trace.json`; traces are opt-in because they are larger and machine-local.
+
+The default harness result fails for runtime errors, page/console/request errors, and missing
+`window.__rtsPerf` or generated `ClientNetReport` summaries. It deliberately does not fail on an
+absolute FPS, frame time, or trace-timing budget. Treat the numbers as local evidence for comparing
+optimization branches on the same machine, not as a portable guarantee for other laptops.
+
 The Fly production deploy enables the low-noise spike mode in `fly.toml`:
 
 ```toml
