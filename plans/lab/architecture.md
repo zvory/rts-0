@@ -6,7 +6,7 @@ implementation phases.
 
 Related subplans:
 
-- [Room architecture requirements](room/requirements.md) defines the high-level goal that rooms,
+- [Room architecture requirements](../archive/lab/room/requirements.md) defines the high-level goal that rooms,
   replays, dev scenarios, and labs evolve toward shared room primitives with explicit policies
   instead of duplicated special cases.
 
