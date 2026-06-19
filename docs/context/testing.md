@@ -42,8 +42,9 @@ claiming a change is done.
   local gate failure with an install hint.
 - Live Node suites need a running server. Use `tests/run-all.sh` to boot a private one, or start
   `cd server && cargo run` first for individual Node suites.
-- Installed hooks run staged whitespace checks plus `node scripts/check-docs-health.mjs` before
-  commits and merges. They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
+- Installed hooks run staged whitespace checks, excluding the human-owned `playtest_notes.md`, plus
+  `node scripts/check-docs-health.mjs` before commits and merges. They do not run `tests/run-all.sh`;
+  GitHub Actions owns the full-suite gate.
 - Browser smoke dependencies are shared across worktrees under
   `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}` and keyed by `tests/package-lock.json`.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.

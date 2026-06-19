@@ -18,8 +18,8 @@ hook="${1:-hook}"
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-echo "$hook: running cheap staged diff checks (git diff --cached --check)"
-git diff --cached --check
+echo "$hook: running cheap staged diff checks (git diff --cached --check, excluding playtest_notes.md)"
+git diff --cached --check -- . ':(top,exclude)playtest_notes.md'
 
 echo "$hook: running docs health check"
 node scripts/check-docs-health.mjs

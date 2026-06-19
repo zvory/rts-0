@@ -82,7 +82,8 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   `./tests/run-all.sh` check from the `Main test gate` workflow. Admin bypass is reserved for emergency repair and
   explicitly authorized migration work only.
 - Ordinary commits run cheap local hooks, currently staged whitespace checks through
-  `git diff --cached --check`. The hooks do not run the full local suite by default.
+  `git diff --cached --check`, excluding the human-owned `playtest_notes.md`. The hooks do not run
+  the full local suite by default.
 - During development, run only targeted tests that match the files or contracts changed. Use
   GitHub Actions as the authoritative full gate through the PR lifecycle.
 - If a cheap local hook fails, fix the staged diff instead of bypassing it unless the task is
