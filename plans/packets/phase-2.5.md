@@ -1,127 +1,129 @@
-# Phase 2.5 - Selected Encoding Rollout
+# Phase 2.5 - Real Compression Viability
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 2 is merged and its decision artifact names the encoding
-      or compression recommendation to apply.
+- [ ] Ready for implementation after Phase 2 is merged and its decision artifact recommends a
+      compression follow-up.
 
 ## Objective
 
-Apply the Phase 2 encoding/compression recommendation before any delta work begins. This phase turns
-the bake-off result into a clear runtime decision: ship a selected codec or compression path safely,
-keep it opt-in with documented blockers, or explicitly defer format changes and preserve compact JSON
-as the default.
+Prove whether compact JSON over real WebSocket compression can improve packet-budget pressure in the
+actual server/browser/deployment path. This phase should answer the production-relevant question:
+can Chrome and the Rust/Fly WebSocket stack negotiate `permessage-deflate`, and does that reduce
+snapshot delivery pressure on realistic workloads without creating server writer backlog or CPU
+pressure? It should not change the default live snapshot path yet.
 
 ## Background
 
-Phase 2 compares compact JSON, WebSocket compression, protobuf-style schema binary, MessagePack,
-CBOR, and custom positional binary. That comparison may leave experiment code, feature flags,
-benchmark harnesses, and docs describing multiple candidates. The project needs a narrow follow-up
-that applies the recommendation instead of making Phase 3 guess whether encoding work shipped,
-stayed experimental, or was rejected in favor of deltas.
+Phase 2 showed that offline `deflateRaw` compressed deterministic compact snapshot fixtures from
+17,533 p95 bytes to 4,466 p95 bytes. That is the strongest size result by far, but it was not a real
+WebSocket measurement: it did not prove that the current `axum`/`tokio-tungstenite` server supports
+`permessage-deflate`, that Chrome negotiates it on `/ws`, or that beta/Fly preserves the extension.
 
-## Decision Inputs
-
-Start from the Phase 2 decision artifact. It must include:
-
-- the candidate or default/fallback policy Phase 2 recommends;
-- the exact baseline and candidate measurements behind that recommendation;
-- dependency, browser, deployment, and maintenance risks;
-- whether the recommendation is default rollout, opt-in/beta rollout, one more focused hardening
-  pass, or deferral in favor of delta work.
-
-If Phase 2 did not produce enough evidence to choose one of those outcomes, keep compact JSON as the
-default, document the missing evidence, and do not start delta phases from ambiguous assumptions.
+This phase turns that offline result into runtime evidence. The expected fallback remains the current
+compact JSON text snapshot path; if compression is unsupported or too risky in the current stack, the
+phase should document the blocker and the smallest implementation route for Phase 2.6 rather than
+starting delta work from ambiguity.
 
 ## Work
 
-- Apply the Phase 2 recommendation:
-  - if Phase 2 recommends shipping a candidate, implement or harden the selected runtime path;
-  - if Phase 2 recommends opt-in only, keep the flag/capability explicit and document the blocker for
-    default rollout;
-  - if Phase 2 recommends deferring format changes, disable or remove experiment-only paths that
-    would confuse later work while keeping useful measurement tooling;
-  - if Phase 2 recommends one more focused hardening pass, keep the scope limited to the named
-    candidate and produce the final rollout/defer decision in this phase.
-- Keep compact JSON as the compatibility fallback:
-  - unsupported clients must fall back or fail clearly according to the documented negotiation
+- Verify WebSocket compression support in the current stack:
+  - inspect the current `axum`/`tokio-tungstenite`/`tungstenite` feature surface and determine
+    whether `permessage-deflate` can be enabled directly;
+  - if direct support is missing, identify the smallest viable route: dependency feature, transport
+    wrapper, alternate WebSocket crate, or explicit application-level compression as a separate
+    choice;
+  - keep this decision documented in the phase handoff and docs.
+- Add real runtime negotiation diagnostics:
+  - expose whether the browser sees `permessage-deflate` through `WebSocket.extensions`;
+  - surface negotiated compression state in bounded client reports, server structured logs, and
+    browser harness summaries;
+  - distinguish application payload bytes from negotiated/compressed wire evidence so logs do not
+    claim post-compression bytes when they only measured JSON text length.
+- Build a production-like compression benchmark path:
+  - run the Matt/Alex replay workload through the browser harness with compression diagnostics;
+  - run a stress workload such as vehicle-wall stress or an equivalent high-entity local/dev path;
+  - run an AI/server perf workload that captures snapshot serialization cost, writer send/backlog
+    signals, and packet-budget p95/rate before and after the compression candidate;
+  - when practical, deploy or use beta and verify the same negotiation/report fields through `/ws`,
+    `/version`, server logs, and incident parser output.
+- Compare against the Phase 1/2 baselines:
+  - report p50/p95/p99/max application payload bytes;
+  - report negotiated compression state and, if measurable, compressed bytes or a clearly labeled
+    compressed-byte proxy;
+  - report snapshot parse/decode/apply p95, server serialization/compression p95, writer backlog,
+    snapshot gaps/jitter, and command acknowledgement health;
+  - call out whether the observed gain is large enough to spend CPU on compression before delta work.
+- Keep default behavior unchanged:
+  - compact JSON without required compression remains the compatibility path;
+  - no client should require a new decoder in this phase;
+  - if a compression experiment is added, keep it opt-in or beta-only with a clear rollback switch.
+- Update docs and tests:
+  - update `docs/perf-tracing.md` with the real-compression benchmark commands and interpretation;
+  - update `docs/design/protocol.md` only if runtime negotiation/report fields change the protocol
     contract;
-  - rollback must be a runtime flag, negotiated capability, or similarly quick operational switch;
-  - no selected codec may strand replay, spectator, lab, branch, or dev-watch paths.
-- Finalize runtime selection:
-  - name the default snapshot codec for normal live matches;
-  - document whether replay, spectator, lab, branch, and dev-watch use the same codec or force
-    compact JSON;
-  - surface active codec/version in client reports, server logs, and perf harness summaries;
-  - preserve existing reliable non-snapshot message behavior unless Phase 2 showed it matters.
-- Harden the selected path:
-  - keep semantic `Snapshot` as the boundary above the codec unless Phase 2 explicitly proved a safe
-    exception;
-  - keep `GameState.applySnapshot` receiving the same semantic shape;
-  - enforce codec version constants, bounds checks, malformed-frame rejection, and fallback behavior;
-  - keep byte metrics explicit about application payload bytes versus compressed-on-wire bytes.
-- Update docs and cleanup:
-  - update `docs/design/protocol.md` with the final codec/default/fallback contract;
-  - update `docs/perf-tracing.md` with the selected measurement and rollout controls;
-  - remove stale experiment-only code for rejected candidates when it is safe to do so;
-  - leave Phase 3 delta docs untouched except for the gate that points to this phase.
+  - add focused tests for new report/log/parser/harness fields and fallback behavior.
 
 ## Expected Touch Points
 
-- `server/crates/protocol/src/lib.rs`
-- `server/crates/protocol/Cargo.toml` if the selected codec needs a retained dependency
+- `server/Cargo.toml` and `server/Cargo.lock` if dependency features or a WebSocket crate change
 - `server/src/main.rs`
-- `server/src/lobby/connection.rs`
-- `server/src/perf.rs` or structured snapshot-send logs
+- `server/src/structured_log.rs`
+- `server/src/perf.rs` or writer timing logs
 - `client/src/net.js`
-- `client/src/protocol.js`
 - `client/src/client_perf_report.js`
 - `scripts/client-perf-harness.mjs`
 - `scripts/parse-net-report-logs.mjs`
-- `docs/design/protocol.md`
+- `scripts/fly-logs.sh` only for bounded beta verification, not for token handling changes
+- `docs/design/protocol.md` if report/protocol fields change
 - `docs/perf-tracing.md`
 - `tests/client_contracts.mjs`
-- `tests/protocol_parity.mjs`
-- focused Rust protocol tests for the selected/default/fallback path
-- focused client decoder tests for selected codec, fallback, and malformed frames
+- `tests/client_net_report_fields.mjs`
+- `tests/net_report_log_parser.mjs`
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 2 is merged and its decision artifact is available.
-- [ ] State which Phase 2 recommendation this phase is applying.
-- [ ] Choose default-on, opt-in only, focused hardening, or deferred/no-op for encoding changes.
-- [ ] Implement the selected runtime selection, fallback, and rollback behavior.
-- [ ] Remove or disable experiment-only paths that should not survive the decision.
-- [ ] Update report/log/parser/harness output so the active codec and version are visible.
-- [ ] Update protocol/perf docs with the final encoding default and fallback contract.
-- [ ] Add or keep focused tests for codec constants, negotiation, fallback, and malformed input.
+- [ ] Confirm Phase 2 is merged and `phase-2-bakeoff.md` recommends WebSocket compression follow-up.
+- [ ] Determine whether the current Rust WebSocket stack can negotiate `permessage-deflate`.
+- [ ] Add bounded diagnostics for negotiated compression state without changing the default path.
+- [ ] Add or extend harnesses to capture Matt/Alex, stress, and AI/server compression evidence.
+- [ ] Run local realistic benchmarks and record before/after payload, timing, and backlog results.
+- [ ] Verify beta/Fly negotiation and log/parser output when credentials and deployment access are
+      available.
+- [ ] Decide whether Phase 2.6 should ship compression by default, ship opt-in/beta-only, or defer.
+- [ ] Update protocol/perf docs and focused tests.
 - [ ] Mark this phase as done in this file.
 
 ## Verification
 
 - `node tests/client_contracts.mjs`
-- `node tests/protocol_parity.mjs`
-- focused Rust protocol tests for retained codec encode/decode, fallback, and malformed rejection
-- focused client decoder tests for the selected codec and compact JSON fallback
-- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6` for the selected
-  default or opt-in path when practical
-- `scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots` or the Phase 2
-  documented server-side payload benchmark for the selected path when practical
+- `node tests/client_net_report_fields.mjs`
+- `node tests/net_report_log_parser.mjs`
+- `node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6 --snapshot-codec-bakeoff`
+- a high-entity stress browser harness workload, preferably `vehicle-wall-stress` if available
+- `scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots` or an equivalent
+  documented server-side compression benchmark
+- bounded beta verification when practical:
+  - confirm `/version` identifies the candidate build;
+  - confirm the browser reports negotiated compression state;
+  - confirm server logs and parser summaries show compression state and delivery/backlog effects.
 - `node scripts/check-docs-health.mjs`
 - `git diff --check`
 
-If the selected candidate cannot be verified locally across representative workloads, keep it opt-in
-or disabled by default and document the exact missing evidence.
+If beta verification cannot run in the implementation environment, leave compression default-off and
+state the exact missing production evidence in the handoff.
 
 ## Manual Test Focus
 
-Run a normal local match in the selected default mode and in the compact JSON fallback mode. Confirm
-snapshots apply, commands acknowledge, fog remains correct, replay entry/seek works, spectator view
-renders, lab/dev-watch paths still start, and diagnostics clearly name the active codec/version.
+Run a normal local match with compression disabled and with the compression candidate enabled. Confirm
+that snapshots apply, commands acknowledge, replay/lab entry still works, and diagnostics visibly
+state whether compression was negotiated. On beta, run a representative match or replay long enough
+to produce client network reports and compare packet-budget pressure, writer backlog, snapshot gaps,
+and command acknowledgement health against the pre-compression baseline.
 
 ## Handoff Expectations
 
-State the Phase 2 recommendation applied, the final default/opt-in/deferred decision, the rollback
-switch, the retained fallback path, and the exact verification run. If encoding changes were
-deferred, explicitly tell Phase 3 whether delta work is now the recommended next step and whether
-the user has approved moving beyond encoding/compression.
+State whether real `permessage-deflate` negotiated locally and on beta. Include the measured
+before/after table for Matt/Alex, stress, and AI/server workloads. State the exact recommendation for
+Phase 2.6: default-on rollout, opt-in/beta rollout, implementation-route follow-up, or deferral
+before delta work.
