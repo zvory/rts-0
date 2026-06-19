@@ -29,6 +29,7 @@ rubberbanding.
 - Track correction distance separately for:
   - ordinary authoritative drift
   - server rollback correction
+  - late-during-replay correction
   - outside-window late fallback correction
   - hidden blocker/path divergence
 - Keep Movement prediction setting as the gate.
@@ -51,12 +52,14 @@ rubberbanding.
   - local movement does not start before effective tick
   - movement starts on two-tick cadence when enabled
   - rolled-back authoritative application converges without repeated snapback
+  - command arriving behind the active replay cursor corrects once and raises future lead
   - outside-window late fallback corrects once and raises future lead
   - prediction-disabled path renders only authoritative snapshots
   - queued movement replays in effective-tick order after rollback and coalesced snapshots
 - Add tri-state profiles for:
   - healthy two-tick lead
-  - 5, 10, 20, and 26 tick delayed authoritative command delivery
+  - 2, 4, and 6 tick delayed authoritative command delivery
+  - one command delayed past the active replay cursor
   - one outside-window late command followed by lead increase
   - burst delivery and latest-only snapshot coalescing
   - hidden blocker correction without hidden-state leak

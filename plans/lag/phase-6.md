@@ -57,6 +57,7 @@ exists:
 - Unit tests for each enabled family:
   - accepted on healthy two-tick cadence
   - late arrival inside rollback window converges
+  - arrival behind the active replay cursor corrects and clears local intent
   - outside-window late arrival corrects and raises lead when appropriate
   - rejected by ownership
   - rejected by invalid target or missing eligibility

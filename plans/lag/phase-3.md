@@ -27,7 +27,7 @@ authority instead of predicting earlier than the server can ever confirm.
 - Replace direct live-player `game.enqueue(...)` calls from `RoomTask::on_command` with scheduler
   insertion. `RoomTask` should still own connection/seat authority and `clientSeq` validation, but
   effective-tick policy belongs in `LiveCommandScheduler`.
-- Add a rolling authoritative history buffer for at least `ROLLBACK_WINDOW_TICKS = 26` ticks plus
+- Add a rolling authoritative history buffer for at least `ROLLBACK_WINDOW_TICKS = 6` ticks plus
   tick 0. A restore for command tick `T` must start from the post-tick `T - 1` keyframe, so the
   history contract must say exactly whether a frame is pre-tick or post-tick.
 - Store only the state needed to restore and replay deterministically:
@@ -56,7 +56,8 @@ authority instead of predicting earlier than the server can ever confirm.
 - Instrument history and replay primitives before rollback is active:
   - clone/keyframe cost
   - restore cost
-  - dry-run replay cost for 5, 10, 20, and 26 ticks where practical
+  - dry-run replay timing logs for 1, 2, 4, and 6 ticks where practical
+  - dry-run command-count accounting up to the `MAX_REPLAY_COMMANDS = 1000` fuse
   - memory footprint for the history ring
 - Track per-player command lead recommendations:
   - floor at two ticks
@@ -89,7 +90,7 @@ authority instead of predicting earlier than the server can ever confirm.
   - same-tick deterministic ordering
   - command arriving after requested execute tick applies late
   - future execute ticks beyond the acceptance window produce stable result metadata
-  - history buffer stores and expires the expected tick range
+  - history buffer stores and expires the six-tick rollback range
   - tick-0 and post-tick keyframe semantics are documented by tests
   - restoring a recent state and replaying without inserted commands reaches the same snapshot
   - replay uses recorded AI command envelopes rather than rerunning AI thinking
@@ -99,7 +100,8 @@ authority instead of predicting earlier than the server can ever confirm.
   - spectators and replay viewers cannot schedule gameplay commands
 - Tri-state scenarios for:
   - healthy two-tick command executes on requested tick
-  - late command reports rollback eligibility but applies late before Phase 4
+  - late command within six ticks reports rollback eligibility but applies late before Phase 4
+  - late command older than six ticks reports outside-window fallback metadata
   - repeated late commands raise future lead
   - prediction disabled remains authoritative-only
 - Run:
@@ -116,6 +118,6 @@ a short fixed delay rather than remote echo.
 ## Handoff Expectations
 
 The handoff must state the effective-tick acceptance window, history representation, measured
-history/dry-run replay costs, keyframe tick semantics, scheduler/result/lead API names, AI replay
-policy, late-command policy before rollback, lead adjustment thresholds, decay policy, and what
-Phase 4 needs to enable actual rollback.
+history/dry-run replay timing logs, keyframe tick semantics, scheduler/result/lead API names, AI
+replay policy, late-command policy before rollback, lead adjustment thresholds, decay policy, the
+replay command-count fuse, and what Phase 4 needs to enable actual catch-up rollback.

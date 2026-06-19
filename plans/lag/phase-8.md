@@ -1,4 +1,4 @@
-# Phase 8 - Rollback and Prediction Performance Budget
+# Phase 8 - Catch-up Replay and Prediction Observability
 
 ## Phase Status
 
@@ -6,29 +6,30 @@
 
 ## Objective
 
-Prove the server can afford bounded rollback and the client can afford prediction/replay without
-creating frame lag on weaker machines. If the 26-tick rollback target is too expensive, this phase
-must identify the optimization work or temporary lower window needed before broad rollout.
+Make server catch-up replay and client prediction/replay observable enough to tune after rollout.
+The initial server assumption is that the six-tick, roughly 200 ms rollback window is cheap enough on
+the current simulation; this phase should log slow catch-up work and command-cap fallbacks instead of
+blocking rollout on CPU timing proof.
 
 ## Scope
 
-- Server rollback budgets:
+- Server catch-up diagnostics:
   - history memory per active room
   - average and p95 restore cost
-  - average and p95 replay cost for 5, 10, 20, and 26 ticks
+  - average and p95 replay timing for 1, 2, 4, and 6 ticks
   - worst-case command burst replay cost
+  - commands absorbed while replay is active
+  - commands applied late because they arrived behind the active replay cursor
   - snapshot fanout cost after rollback
-  - fallback threshold when replay would exceed budget
-- Treat this phase as a rollout gate. If Phase 4 data already shows 26-tick rollback exceeding the
-  documented fallback threshold under representative loads, pause default enablement of broader
-  prediction surfaces and either lower the window temporarily or split out an optimization phase.
-- Choose and document numeric budgets before declaring success. Initial review thresholds should
-  account for the 30 Hz room budget: rollback replay plus corrected snapshot fanout must leave
-  enough headroom for normal tick work, and over-budget paths must fall back late instead of
-  blocking the room task.
-- Server optimization candidates if needed:
+  - replay command-count fuse hits
+  - slow catch-up replay logs for later optimization
+- Do not treat server CPU timing as a rollout gate in this phase. Slow catch-up passes should be
+  structured-log evidence for follow-up optimization, not an automatic reason to disable the feature.
+  The normal hard fallback path is the command-count fuse, unsupported deterministic history, or
+  outside-window/behind-cursor command timing.
+- Server optimization candidates if logs later show a real problem:
   - cheaper `Game` clone/keyframe representation
-  - replay snapshots at fixed intervals inside the 26-tick ring
+  - replay snapshots at fixed intervals inside the six-tick ring
   - command-log compaction
   - avoiding unnecessary snapshot projection during replay
   - narrower rollback support for expensive room modes until optimized
@@ -36,13 +37,13 @@ must identify the optimization work or temporary lower window needed before broa
   - compare two-tick lead with the final rollback window under healthy, jittery, and bursty
     profiles
   - report how often commands fall back late at each tested lead/window combination
-  - document the cost and feel tradeoff before lowering the rollback window or raising default lead
-- Client prediction budgets:
+  - document the feel tradeoff before raising default lead or changing the six-tick window
+- Client prediction diagnostics:
   - evaluate moving WASM prediction/replay work to a Web Worker or equivalent isolated scheduler
   - keep the no-JS-build-step development model unless a generated WASM worker wrapper is
     explicitly checked in and documented
   - preserve the existing Movement prediction setting as the gate for worker-backed prediction
-- Add budgeted client modes:
+- Add diagnosed client modes:
   - full visual prediction
   - reduced horizon or lower-frequency prediction
   - accepted-intent overlay only
@@ -69,12 +70,14 @@ must identify the optimization work or temporary lower window needed before broa
 
 ## Verification
 
-- Server perf tests or harness runs for:
+- Server diagnostic tests or harness runs for:
   - no rollback baseline
-  - 5, 10, 20, and 26 tick rollback replay
+  - 1, 2, 4, and 6 tick rollback replay
   - rollback during command bursts
+  - two-player alternating late commands during catch-up replay
+  - command arriving behind the active replay cursor
   - rollback with representative entity counts
-  - fallback path when budget is exceeded
+  - fallback path when `MAX_REPLAY_COMMANDS` is exceeded
   - human-only rooms and AI-backed rooms, or an explicit `rollbackUnsupported` result for AI-backed
     rooms if Phase 4 left them unsupported
   - corrected snapshot fanout cost after rollback under normal active-player fog filtering
@@ -88,10 +91,10 @@ must identify the optimization work or temporary lower window needed before broa
   - representative command burst
   - high entity count
   - CPU throttled browser profile if supported
-  - prediction worker startup and steady-state budget
+  - prediction worker startup and steady-state timing
 - Net report/structured log tests if fields change.
 - Run:
-  - server rollback perf command added or updated by this phase
+  - server rollback/catch-up diagnostic command added or updated by this phase
   - `node tests/client_contracts.mjs`
   - `node tests/prediction_controller.mjs`
   - `node tests/sim_wasm_smoke.mjs` when WASM assets are present
@@ -101,13 +104,13 @@ must identify the optimization work or temporary lower window needed before broa
 ## Manual Testing Focus
 
 Play or replay a busy local match on a weaker machine or throttled browser profile. Movement
-prediction on should still paint provisional command response promptly; server rollback should not
-cause long stalls or repeated visible correction.
+prediction on should still paint provisional command response promptly; server catch-up logs should
+show replay distance, absorbed commands, behind-cursor late commands, and replay elapsed time.
 
 ## Handoff Expectations
 
-The handoff must include measured server rollback costs, whether 26 ticks is viable, required
-server optimizations if it is not, the chosen client execution model, fallback thresholds, final
-lead/window tuning recommendation, new report fields if any, whether a Worker is required before
-broad rollout, and whether later phases may enable full visual prediction or must stay in
-accepted-intent-overlay mode.
+The handoff must include measured server catch-up timing logs, whether the six-tick window produced
+slow replay evidence worth follow-up, the replay command-count fuse behavior, the chosen client
+execution model, final lead/window tuning recommendation, new report fields if any, whether a Worker
+is required before broad rollout, and whether later phases may enable full visual prediction or must
+stay in accepted-intent-overlay mode.

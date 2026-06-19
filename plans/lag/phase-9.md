@@ -7,7 +7,7 @@
 ## Objective
 
 Make hybrid command cadence and bounded rollback the default behavior under the existing Movement
-prediction setting after correctness and performance gates pass. This phase locks in tuning,
+prediction setting after correctness gates and catch-up diagnostics are in place. This phase locks in tuning,
 documentation, and regression coverage so future gameplay changes cannot quietly reintroduce
 remote-echo command feel.
 
@@ -15,18 +15,20 @@ remote-echo command feel.
 
 - Finalize tuning:
   - default `commandLeadTicks = 2`
-  - `ROLLBACK_WINDOW_TICKS = 26` or a lower temporary value if Phase 8 proves 26 is too expensive
+  - `ROLLBACK_WINDOW_TICKS = 6`
   - maximum normal lead
   - late-arrival threshold for increasing lead
   - stable-window threshold for decay
-  - rollback CPU budget and fallback threshold
+  - `MAX_REPLAY_COMMANDS = 1000` replay fuse and fallback reason
+  - slow catch-up logging thresholds for later optimization
   - correction distance budgets
   - worker/perf degradation thresholds
 - Make the cadence and rollback path default for compatible live active-player sessions when
   Movement prediction is enabled.
 - Keep all tuning values centralized and documented with ownership:
   - protocol constants and compact versions in the protocol crate/mirror
-  - server scheduling, rollback window, future-tick bounds, and fallback thresholds in one
+  - server scheduling, rollback window, future-tick bounds, replay cursor policy, and fallback
+    thresholds in one
     live-room scheduling module
   - client lead defaults and degraded prediction modes in the prediction path
   - operator-facing thresholds in `docs/perf-tracing.md`
@@ -66,12 +68,13 @@ remote-echo command feel.
   - `node scripts/check-client-architecture.mjs`
   - `node tests/protocol_parity.mjs`
   - focused Rust room/protocol/sim-wasm tests
-  - server rollback perf command from Phase 8
+  - server rollback/catch-up diagnostic command from Phase 8
 - Run a browser perf harness covering:
   - healthy local profile
   - 100 ms RTT with jitter
   - 250 ms RTT with burst delivery
-  - 26-tick rollback command delivery
+  - 6-tick rollback command delivery
+  - command delivery behind an active replay cursor
   - weaker client or CPU-throttled profile
 - Verify the regression matrix mechanically where practical: add or update a small checker or test
   fixture that fails when a command family is marked predicted without matching tri-state coverage
