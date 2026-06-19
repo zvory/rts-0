@@ -1303,6 +1303,14 @@ function hotkeyService() {
   assert(health.metrics().issues.jitter.count === 1, "snapshot jitter issue count increments");
   assert(health.reportStats.jitterSamples === 1, "jitter samples feed net report stats");
 
+  health.noteFrameGap(16, 1000);
+  health.noteFrameGap(16, 1016);
+  assert(health.metrics().fps === 62.5, "MatchHealth records live FPS from the latest frame gap");
+  assert(health.metrics().fpsOneMinute === 62.5, "MatchHealth records rolling one-minute FPS");
+  health.noteFrameGap(32, 62017);
+  assert(health.metrics().fps === 31.25, "live FPS follows the latest frame");
+  assert(health.metrics().fpsOneMinute === 31.25, "one-minute FPS prunes stale frame samples");
+
   let now = 187;
   for (let i = 0; i < 8; i += 1) {
     now += 34;
@@ -1332,7 +1340,7 @@ function hotkeyService() {
   health.publish();
   assert(badgePayload !== null, "MatchHealth publishes status badge payload");
   assert(
-    Object.keys(badgePayload).join(",") === "latencyMs,serverTickMs,serverLagMs,jitterMs,issues",
+    Object.keys(badgePayload).join(",") === "latencyMs,serverTickMs,serverLagMs,jitterMs,fps,fpsOneMinute,issues",
     "status badge payload shape stays unchanged",
   );
   assert(
