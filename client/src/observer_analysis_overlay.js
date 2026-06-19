@@ -240,9 +240,9 @@ export class ObserverAnalysisOverlay {
     this.renderBody(tab);
   }
 
-  update() {
+  update(frameViews = null) {
     if (!this.bodyEl || this.bodyEl.hidden || this.preferences.selectedTab !== ARMY_VALUE_TAB_ID) return;
-    this.renderBody(OBSERVER_ANALYSIS_TABS[0]);
+    this.renderBody(OBSERVER_ANALYSIS_TABS[0], frameViews);
   }
 
   applyObserverAnalysis(payload) {
@@ -262,11 +262,13 @@ export class ObserverAnalysisOverlay {
     }
   }
 
-  renderBody(tab) {
+  renderBody(tab, frameViews = null) {
     if (!this.bodyEl) return;
     if (tab.id === ARMY_VALUE_TAB_ID) {
       const rows = calculateViewportArmyValue({
-        entities: this.getEntities(),
+        entities: Array.isArray(frameViews?.authoritativeEntities)
+          ? frameViews.authoritativeEntities
+          : this.getEntities(),
         cameraBounds: this.getCameraBounds(),
         players: this.getPlayers(),
         stats: this.stats,

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -47,14 +47,14 @@ and observer consumers that need the same data.
 
 ## Implementation Checklist
 
-- [ ] Define the frame-local entity view shape and ownership.
-- [ ] Replace repeated same-frame interpolation calls in renderer, minimap, fog, HUD, and observer
+- [x] Define the frame-local entity view shape and ownership.
+- [x] Replace repeated same-frame interpolation calls in renderer, minimap, fog, HUD, and observer
       paths where practical.
-- [ ] Keep prediction, spectator, replay, and dev-viewer behavior unchanged.
-- [ ] Add focused coverage for frame-view cache behavior and stale-frame avoidance.
-- [ ] Run before/after browser perf harness workloads and save artifact paths in the handoff.
-- [ ] Run verification and record exact results.
-- [ ] Mark this phase as done in this file.
+- [x] Keep prediction, spectator, replay, and dev-viewer behavior unchanged.
+- [x] Add focused coverage for frame-view cache behavior and stale-frame avoidance.
+- [x] Run before/after browser perf harness workloads and save artifact paths in the handoff.
+- [x] Run verification and record exact results.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

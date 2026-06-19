@@ -23,6 +23,7 @@ import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
+import { buildFrameEntityViews } from "../client/src/frame_entity_views.js";
 import { FrameProfiler, collectMatchFrameContext } from "../client/src/frame_profiler.js";
 import { MatchHealth } from "../client/src/match_health.js";
 import {
@@ -1361,6 +1362,66 @@ function hotkeyService() {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Frame entity views
+// ---------------------------------------------------------------------------
+
+{
+  const calls = [];
+  const selected = [{ id: 10, owner: 1, kind: KIND.WORKER, x: 80, y: 80 }];
+  const state = {
+    playerId: 1,
+    spectator: false,
+    entitiesInterpolated(alpha, options = {}) {
+      calls.push({ alpha, includePrediction: options.includePrediction !== false });
+      if (options.includePrediction === false) {
+        return [
+          { id: 1, owner: 1, kind: KIND.WORKER, x: 10, y: 12 },
+          { id: 2, owner: 2, kind: KIND.RIFLEMAN, x: 30, y: 32 },
+          { id: 3, owner: 0, kind: KIND.STEEL, x: 40, y: 40 },
+          { id: 4, owner: 1, kind: KIND.RIFLEMAN, x: 50, y: 50, shotReveal: true },
+          { id: 5, owner: 1, kind: KIND.RIFLEMAN, x: 60, y: 60, visionOnly: true },
+        ];
+      }
+      return [{ id: 1, owner: 1, kind: KIND.WORKER, x: alpha * 100, y: alpha * 100 }];
+    },
+    selectedEntities() {
+      return selected;
+    },
+  };
+
+  const frameViews = buildFrameEntityViews(state, { alpha: 0.5 });
+  assert(frameViews.interpolatedEntities[0].x === 50, "frame entity views keep alpha-interpolated entities");
+  assert(frameViews.currentEntities[0].x === 100, "frame entity views keep latest predicted current entities");
+  assert(frameViews.authoritativeEntities.some((entity) => entity.id === 2), "frame entity views keep authoritative entities");
+  assert(frameViews.selectedEntities === selected, "frame entity views reuse the selected entity array");
+  assert(
+    frameViews.fogSourceEntities.length === 1 && frameViews.fogSourceEntities[0].id === 1,
+    "frame entity views filter fog sources to own non-shot-reveal non-vision entries",
+  );
+  assert(frameViews.debug.entitiesInterpolatedCalls === 3, "frame entity views cap interpolation calls for a mixed-alpha frame");
+  assert(frameViews.debug.selectedEntitiesCalls === 1, "frame entity views resolve selection once");
+  assert(
+    calls.map((call) => `${call.alpha}:${call.includePrediction}`).join("|") === "0.5:true|1:true|1:false",
+    "frame entity views request predicted alpha, predicted current, and no-prediction current views",
+  );
+
+  calls.length = 0;
+  const currentFrameViews = buildFrameEntityViews(state, { alpha: 1 });
+  assert(
+    currentFrameViews.currentEntities === currentFrameViews.interpolatedEntities,
+    "frame entity views reuse alpha-1 predicted entities for current predicted consumers",
+  );
+  assert(currentFrameViews.debug.entitiesInterpolatedCalls === 2, "alpha-1 frame skips duplicate predicted current interpolation");
+
+  state.spectator = true;
+  const spectatorViews = buildFrameEntityViews(state, { alpha: 1 });
+  assert(
+    spectatorViews.fogSourceEntities.map((entity) => entity.id).join(",") === "1,2",
+    "spectator fog sources include non-neutral visible entities from the authoritative union",
+  );
 }
 
 // ---------------------------------------------------------------------------

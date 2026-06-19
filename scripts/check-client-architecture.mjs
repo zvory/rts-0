@@ -15,6 +15,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "match_health.js": "app-shell",
   "frame_profiler.js": "app-shell",
   "frame_recovery.js": "app-shell",
+  "frame_entity_views.js": "app-shell",
   "observer_analysis_overlay.js": "app-shell",
   "replay_controls.js": "app-shell",
   "replay_viewer.js": "app-shell",
@@ -106,7 +107,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,
-  "observer_analysis_overlay.js": 27903,
+  // Render Lag Phase 3 lets the observer Army Value tab consume frame-local entity views.
+  "observer_analysis_overlay.js": 28009,
   "audio.js": 27339,
 }));
 

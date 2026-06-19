@@ -203,7 +203,7 @@ export class Minimap {
   // --- Rendering -------------------------------------------------------------
 
   /** Draw the full minimap for the current frame. */
-  render() {
+  render(frameViews = null) {
     const ctx = this.ctx;
     if (!ctx) return;
     this._syncCanvasSize();
@@ -215,7 +215,7 @@ export class Minimap {
     if (!this._ensureTransform()) return;
 
     this._drawTerrainLayer();
-    this._drawEntities();
+    this._drawEntities(frameViews);
     this._drawFog();
     this._drawResourceLayer();
     this._drawViewport();
@@ -505,9 +505,11 @@ export class Minimap {
   }
 
   /** Draw a colored blip for each visible entity (own/enemy/neutral). */
-  _drawEntities() {
+  _drawEntities(frameViews = null) {
     const ctx = this.ctx;
-    const entities = this.state.entitiesInterpolated(1);
+    const entities = Array.isArray(frameViews?.currentEntities)
+      ? frameViews.currentEntities
+      : this.state.entitiesInterpolated(1);
     for (const e of entities) {
       const p = this._worldToCanvas(e.x, e.y);
       ctx.fillStyle = this._blipColor(e);
