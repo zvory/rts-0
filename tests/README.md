@@ -184,6 +184,22 @@ node tests/client_smoke.mjs
 # env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to Chrome/Chromium)
 ```
 
+## Browser performance harness
+
+`scripts/client-perf-harness.mjs` drives headless Chrome against fixed replay/dev workloads and
+writes machine-readable summaries under `target/client-perf/<workload>/<timestamp>/`.
+
+```bash
+node scripts/client-perf-harness.mjs --list
+node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6
+node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6
+```
+
+The harness starts its own local server unless `RTS_URL` or `--base-url` points at a healthy server.
+It fails on runtime errors or missing perf summaries, not on absolute FPS thresholds. Open a
+generated `summary.json` to inspect workload metadata, build/version, viewport, entity/context
+counts, frame timing aggregates, worst phases, page errors, and the generated client net report.
+
 ## SVG rig checks
 
 Unit visuals are SVG-authored rigs rendered through Pixi. The temporary legacy equivalence harness
