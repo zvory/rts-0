@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -54,14 +54,14 @@ frame phases are expensive" while keeping the data local/debug-only.
 
 ## Implementation Checklist
 
-- [ ] Add the bounded frame profiler and summary API.
-- [ ] Instrument the top-level match frame phases.
-- [ ] Instrument renderer sub-phases without changing rendered behavior.
-- [ ] Expose local summaries through `window.__rtsPerf` or an equivalent stable debug surface.
-- [ ] Add focused tests for aggregation, bounds, percentile/worst-phase behavior, and debug-surface
+- [x] Add the bounded frame profiler and summary API.
+- [x] Instrument the top-level match frame phases.
+- [x] Instrument renderer sub-phases without changing rendered behavior.
+- [x] Expose local summaries through `window.__rtsPerf` or an equivalent stable debug surface.
+- [x] Add focused tests for aggregation, bounds, percentile/worst-phase behavior, and debug-surface
   shape.
-- [ ] Document how to inspect/copy local summaries.
-- [ ] Mark this phase as done in this file.
+- [x] Document how to inspect/copy local summaries.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

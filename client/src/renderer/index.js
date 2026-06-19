@@ -205,7 +205,8 @@ export class Renderer {
    * @param {import("./fog.js").Fog} fog
    * @param {number} alpha interpolation factor 0..1 between the two latest snapshots
    */
-  render(state, camera, fog, alpha, { clientIntent = null } = {}) {
+  render(state, camera, fog, alpha, { clientIntent = null, profiler = null } = {}) {
+    const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
@@ -213,86 +214,119 @@ export class Renderer {
     // Begin a fresh reconciliation pass.
     for (const key of Object.keys(this._seen)) this._seen[key].clear();
 
-    const entities = state.entitiesInterpolated(alpha) || [];
-    const regularEntities = entities.filter((e) => !e.shotReveal);
-    const shotReveals = entities.filter((e) => e.shotReveal);
-    const feedbackView = buildRendererFeedbackView(state, { clientIntent, entities });
-    const selection = state.selection || new Set();
-    const colorByOwner = this._ownerColors(state);
+    let entities = [];
+    let regularEntities = [];
+    let shotReveals = [];
+    let selection = new Set();
+    let colorByOwner = new Map();
     const liveIds = new Set();
+    time("renderer.entityPrep", () => {
+      entities = state.entitiesInterpolated(alpha) || [];
+      regularEntities = entities.filter((e) => !e.shotReveal);
+      shotReveals = entities.filter((e) => e.shotReveal);
+      selection = state.selection || new Set();
+      colorByOwner = this._ownerColors(state);
+      profiler?.setContext({
+        entityCount: entities.length,
+        regularEntityCount: regularEntities.length,
+        shotRevealCount: shotReveals.length,
+        rememberedBuildingCount: Array.isArray(state?.rememberedBuildings) ? state.rememberedBuildings.length : 0,
+        selectedCount: typeof state?.selection?.size === "number" ? state.selection.size : 0,
+      });
+    });
+    const feedbackView = time(
+      "renderer.feedbackView",
+      () => buildRendererFeedbackView(state, { clientIntent, entities }),
+    );
 
     // Nodes currently being mined: any worker latched to them. Used by
     // _drawResource to overlay an X marker.
     this._miningNodes = new Set();
-    for (const e of regularEntities) {
-      if (e.latchedNode) this._miningNodes.add(e.latchedNode);
-    }
+    time("renderer.miningPrep", () => {
+      for (const e of regularEntities) {
+        if (e.latchedNode) this._miningNodes.add(e.latchedNode);
+      }
+    });
 
     // Two passes so silhouettes layer correctly: resources + buildings first
     // (footprints sit under units), then units. Selection rings / hp bars are
     // their own layers and are filled inline.
-    for (const e of regularEntities) {
-      liveIds.add(e.id);
-      if (isResource(e.kind)) {
-        this._drawEntitySafely("resource", e, "resources", () => this._drawResource(e, fog));
-      } else if (isBuilding(e.kind)) {
-        this._drawEntitySafely("building", e, "buildings", () => this._drawBuilding(e, colorByOwner, state));
+    time("renderer.resourcesBuildings", () => {
+      for (const e of regularEntities) {
+        liveIds.add(e.id);
+        if (isResource(e.kind)) {
+          this._drawEntitySafely("resource", e, "resources", () => this._drawResource(e, fog));
+        } else if (isBuilding(e.kind)) {
+          this._drawEntitySafely("building", e, "buildings", () => this._drawBuilding(e, colorByOwner, state));
+        }
       }
-    }
-    for (const e of state.rememberedBuildings || []) {
-      this._drawEntitySafely("rememberedBuilding", e, "buildings", () => {
-        this._drawBuilding(e, colorByOwner, state);
-      });
-    }
-    for (const e of regularEntities) {
-      liveIds.add(e.id);
-      if (isUnit(e.kind)) {
-        this._drawEntitySafely("unit", e, "units", () => this._drawUnit(e, colorByOwner, state));
+      for (const e of state.rememberedBuildings || []) {
+        this._drawEntitySafely("rememberedBuilding", e, "buildings", () => {
+          this._drawBuilding(e, colorByOwner, state);
+        });
       }
-    }
+    });
+    time("renderer.units", () => {
+      for (const e of regularEntities) {
+        liveIds.add(e.id);
+        if (isUnit(e.kind)) {
+          this._drawEntitySafely("unit", e, "units", () => this._drawUnit(e, colorByOwner, state));
+        }
+      }
+    });
     // Selection rings + HP bars after shapes are placed so they read on top.
-    for (const e of regularEntities) {
-      liveIds.add(e.id);
-      this._drawSafely(`selectionHp:${e.kind || "unknown"}`, () => {
-        this._drawSelectionAndHp(e, selection, state);
-      });
-    }
-    for (const e of shotReveals) {
-      liveIds.add(e.id);
-      this._drawEntitySafely("shotReveal", e, "shotReveals", () => {
-        this._drawShotRevealUnit(e, colorByOwner, state);
-      });
-    }
+    time("renderer.selectionHp", () => {
+      for (const e of regularEntities) {
+        liveIds.add(e.id);
+        this._drawSafely(`selectionHp:${e.kind || "unknown"}`, () => {
+          this._drawSelectionAndHp(e, selection, state);
+        });
+      }
+    });
+    time("renderer.shotReveals", () => {
+      for (const e of shotReveals) {
+        liveIds.add(e.id);
+        this._drawEntitySafely("shotReveal", e, "shotReveals", () => {
+          this._drawShotRevealUnit(e, colorByOwner, state);
+        });
+      }
+    });
     // Hide pooled objects whose id was not touched this frame.
-    this._sweep();
-    this._sweepSetupVisuals(liveIds);
-    this._sweepTankMotion(liveIds);
+    time("renderer.sweeps", () => {
+      this._sweep();
+      this._sweepSetupVisuals(liveIds);
+      this._sweepTankMotion(liveIds);
+    });
 
     // Overlays.
-    this._abilityObjectGfx.clear();
-    this._drawSafely("abilityObjects", () => this._drawAbilityObjects(feedbackView));
-    this._smokeGfx.clear();
-    this._drawSafely("smokes", () => this._drawSmokes(feedbackView));
-    this._drawSafely("fog", () => this._drawFog(fog));
-    this._drawSafely("smokeCanisters", () => this._drawSmokeCanisters(feedbackView));
-    this._drawSafely("commandFeedback", () => this._drawCommandFeedback(feedbackView));
-    this._drawSafely("mortarTargets", () => this._drawMortarTargets(feedbackView));
-    this._drawSafely("mortarLaunches", () => this._drawMortarLaunches(feedbackView));
-    this._drawSafely("mortarShells", () => this._drawMortarShells(feedbackView));
-    this._drawSafely("mortarImpacts", () => this._drawMortarImpacts(feedbackView));
-    this._drawSafely("artilleryLaunches", () => this._drawArtilleryLaunches(feedbackView));
-    this._drawSafely("artilleryTargets", () => this._drawArtilleryTargets(feedbackView));
-    this._drawSafely("artilleryImpacts", () => this._drawArtilleryImpacts(feedbackView));
-    this._drawSafely("selectedMortarRanges", () => this._drawSelectedMortarRanges(feedbackView));
-    this._drawSafely("breakthroughAuras", () => this._drawBreakthroughAuras(feedbackView, regularEntities));
-    this._drawSafely("abilityTargetPreview", () => this._drawAbilityTargetPreview(feedbackView));
-    this._drawSafely("antiTankGunSetupPreview", () => this._drawAntiTankGunSetupPreview(feedbackView));
-    this._drawSafely("orderPlan", () => this._drawOrderPlan(feedbackView));
-    this._drawSafely("debugPathOverlay", () => this._drawDebugPathOverlay(feedbackView, regularEntities));
-    this._drawSafely("rallyPoints", () => this._drawRallyPoints(feedbackView));
-    this._drawSafely("resourceMiningPreview", () => this._drawResourceMiningPreview(feedbackView));
-    this._drawSafely("muzzleFlashes", () => this._drawMuzzleFlashes(feedbackView));
-    this._drawSafely("placement", () => this._drawPlacement(feedbackView, fog));
+    time("renderer.effectsOverlays", () => {
+      this._abilityObjectGfx.clear();
+      this._drawSafely("abilityObjects", () => this._drawAbilityObjects(feedbackView));
+      this._smokeGfx.clear();
+      this._drawSafely("smokes", () => this._drawSmokes(feedbackView));
+    });
+    time("renderer.fogDraw", () => this._drawSafely("fog", () => this._drawFog(fog)));
+    time("renderer.feedbackOverlays", () => {
+      this._drawSafely("smokeCanisters", () => this._drawSmokeCanisters(feedbackView));
+      this._drawSafely("commandFeedback", () => this._drawCommandFeedback(feedbackView));
+      this._drawSafely("mortarTargets", () => this._drawMortarTargets(feedbackView));
+      this._drawSafely("mortarLaunches", () => this._drawMortarLaunches(feedbackView));
+      this._drawSafely("mortarShells", () => this._drawMortarShells(feedbackView));
+      this._drawSafely("mortarImpacts", () => this._drawMortarImpacts(feedbackView));
+      this._drawSafely("artilleryLaunches", () => this._drawArtilleryLaunches(feedbackView));
+      this._drawSafely("artilleryTargets", () => this._drawArtilleryTargets(feedbackView));
+      this._drawSafely("artilleryImpacts", () => this._drawArtilleryImpacts(feedbackView));
+      this._drawSafely("selectedMortarRanges", () => this._drawSelectedMortarRanges(feedbackView));
+      this._drawSafely("breakthroughAuras", () => this._drawBreakthroughAuras(feedbackView, regularEntities));
+      this._drawSafely("abilityTargetPreview", () => this._drawAbilityTargetPreview(feedbackView));
+      this._drawSafely("antiTankGunSetupPreview", () => this._drawAntiTankGunSetupPreview(feedbackView));
+      this._drawSafely("orderPlan", () => this._drawOrderPlan(feedbackView));
+      this._drawSafely("debugPathOverlay", () => this._drawDebugPathOverlay(feedbackView, regularEntities));
+      this._drawSafely("rallyPoints", () => this._drawRallyPoints(feedbackView));
+      this._drawSafely("resourceMiningPreview", () => this._drawResourceMiningPreview(feedbackView));
+      this._drawSafely("muzzleFlashes", () => this._drawMuzzleFlashes(feedbackView));
+    });
+    time("renderer.placement", () => this._drawSafely("placement", () => this._drawPlacement(feedbackView, fog)));
   }
 
   _drawSafely(label, draw) {
