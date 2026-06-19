@@ -1,5 +1,5 @@
 {
-  "reason": "add authoritative lab mutation API",
+  "reason": "Tank Trap owner-aware pathing policy and regression coverage",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -239,7 +239,7 @@
     },
     {
       "path": "services/occupancy.rs",
-      "lines": 469
+      "lines": 786
     },
     {
       "path": "services/order_execution.rs",
@@ -255,7 +255,7 @@
     },
     {
       "path": "services/pathing.rs",
-      "lines": 1795
+      "lines": 1985
     },
     {
       "path": "services/production.rs",

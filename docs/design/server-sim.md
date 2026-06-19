@@ -641,12 +641,14 @@ checked without adding any wire-protocol fields.
 `(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their
 body `facing`, configured length/width, and a small clearance margin, building bodies are
 axis-aligned rectangles derived from footprint tiles, and resource node bodies are circles for
-build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, and
-vehicle-body-only static blockers; Tank Trap pairs exactly two tiles apart close the single tile
-between them on the vehicle-body-only layer while remaining infantry-passable and shot-transparent.
-Movement and
-standability choose the combined static layer from the routed unit's rules-level
-`MovementBodyClass`, and path-cache fingerprints are computed for the same blocker layer.
+build-site blocking. `services::occupancy` separates terrain, all-ground static blockers, physical
+vehicle-body-only blockers, and the owner-aware path-planning view of vehicle-body-only blockers.
+Tank Trap pairs exactly two tiles apart close the single tile between them for physical vehicle body
+legality while remaining infantry-passable and shot-transparent. Vehicle path planning keeps own and
+allied Tank Traps in the static blocker layer but treats enemy Tank Traps as breachable obstacles, so
+paths can route into an enemy wall and combat can attack it. Path-cache fingerprints include the same
+owner/team relation as the path request. Movement, collision, and standability still use physical
+legality, so live enemy Tank Traps are not globally non-colliding.
 `services::standability` owns reusable legality predicates for unit bodies and building sites.
 Production spawn exits, construction/build intent, movement landing, steering
 candidates, collision push targets, and formation goal selection all use this shared standability

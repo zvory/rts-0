@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use crate::game::entity::{uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind};
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
-use crate::game::services::occupancy::Occupancy;
+use crate::game::services::occupancy::{Occupancy, StaticPathingRelation};
 use crate::game::services::standability;
 use crate::rules::terrain::{self, TerrainKind};
 
@@ -23,7 +23,9 @@ const VEHICLE_DIAGONAL_BLOCKER_COST: u32 = 3;
 
 /// Parameters for a single path query.
 #[derive(Clone)]
-pub struct PathRequest {
+pub(crate) struct PathRequest {
+    /// Owner/team relation used for owner-aware static obstacle policy.
+    pub(super) relation: StaticPathingRelation,
     /// Entity kind being routed.
     pub kind: EntityKind,
     /// Start tile (inclusive).
@@ -37,6 +39,12 @@ pub struct PathRequest {
     pub route_shape: RouteShape,
     /// Max A* nodes to expand. `None` uses the service default.
     pub budget: Option<usize>,
+}
+
+impl PathRequest {
+    fn relation(&self) -> StaticPathingRelation {
+        self.relation.clone()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -62,6 +70,7 @@ impl RouteShape {
 struct TerrainPassability<'a> {
     map: &'a Map,
     occupancy: &'a Occupancy<'a>,
+    relation: StaticPathingRelation,
     kind: EntityKind,
     radius_tiles: u32,
     route_shape: RouteShape,
@@ -84,7 +93,10 @@ impl TerrainPassability<'_> {
         if !terrain::movement_allowed(self.kind, terrain_kind) {
             return false;
         }
-        if !self.occupancy.passable_for_kind(tx, ty, self.kind) {
+        if !self
+            .occupancy
+            .passable_for_kind_and_relation(tx, ty, self.kind, &self.relation)
+        {
             return false;
         }
         true
@@ -119,8 +131,13 @@ impl Passability for TerrainPassability<'_> {
         {
             return 0;
         }
-        vehicle_clearance_cost(self.occupancy.clearance_at_tile_for_kind(tx, ty, self.kind))
-            .saturating_add(self.vehicle_corner_cost(tx, ty))
+        vehicle_clearance_cost(self.occupancy.clearance_at_tile_for_kind_and_relation(
+            tx,
+            ty,
+            self.kind,
+            &self.relation,
+        ))
+        .saturating_add(self.vehicle_corner_cost(tx, ty))
     }
 }
 
@@ -152,7 +169,15 @@ impl TerrainPassability<'_> {
     }
 }
 
-type CacheKey = (EntityKind, (i32, i32), (i32, i32), u32, RouteShape, u64);
+type CacheKey = (
+    StaticPathingRelation,
+    EntityKind,
+    (i32, i32),
+    (i32, i32),
+    u32,
+    RouteShape,
+    u64,
+);
 
 #[derive(Clone)]
 struct CacheEntry {
@@ -198,11 +223,13 @@ impl PathingService {
     ) -> Vec<(f32, f32)> {
         let start = req.start;
         let kind = req.kind;
+        let relation = req.relation();
         let tile_path = self.request_tile_path(map, occupancy, req);
         if uses_pivot_vehicle_movement(kind) {
             let pass = TerrainPassability {
                 map,
                 occupancy,
+                relation,
                 kind,
                 radius_tiles: 0,
                 route_shape: RouteShape::VehicleClearance,
@@ -223,13 +250,15 @@ impl PathingService {
         let pass = TerrainPassability {
             map,
             occupancy,
+            relation: req.relation(),
             kind: req.kind,
             radius_tiles: req.radius_tiles,
             route_shape: req.route_shape,
             avoid_diagonal_pinch: uses_oriented_vehicle_body(req.kind),
         };
 
-        let static_fingerprint = occupancy.static_fingerprint_for_kind(req.kind);
+        let static_fingerprint =
+            occupancy.static_fingerprint_for_kind_and_relation(req.kind, &req.relation);
         if let Some(tile_path) = self.cache_lookup(&req, &pass, static_fingerprint) {
             return tile_path;
         }
@@ -258,6 +287,7 @@ impl PathingService {
         static_fingerprint: u64,
     ) -> Option<Vec<(i32, i32)>> {
         let key: CacheKey = (
+            req.relation.clone(),
             req.kind,
             req.start,
             req.goal,
@@ -287,13 +317,14 @@ impl PathingService {
                 .cache
                 .iter()
                 .min_by_key(|(k, e)| (e.last_used, *k))
-                .map(|(k, _)| *k)
+                .map(|(k, _)| k.clone())
             {
                 self.cache.remove(&oldest_key);
             }
         }
         self.cache.insert(
             (
+                req.relation.clone(),
                 req.kind,
                 req.start,
                 req.goal,
@@ -450,11 +481,11 @@ impl PathingService {
         route_shape: RouteShape,
     ) -> bool {
         self.cache.keys().any(|key| {
-            key.0 == kind
-                && key.1 == start
-                && key.2 == goal
-                && key.3 == radius
-                && key.4 == route_shape
+            key.1 == kind
+                && key.2 == start
+                && key.3 == goal
+                && key.4 == radius
+                && key.5 == route_shape
         })
     }
 }
@@ -525,6 +556,7 @@ mod tests {
         let mut service = PathingService::new(8_192, 256);
         let radius_tiles = config::unit_radius_tiles(kind);
         let req = PathRequest {
+            relation: StaticPathingRelation::single_owner(1),
             kind,
             start,
             goal,
@@ -552,6 +584,7 @@ mod tests {
             map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind,
                 start,
                 goal,
@@ -719,6 +752,7 @@ mod tests {
         let reqs = [((1, 1), (2, 2)), ((1, 1), (3, 3)), ((2, 2), (4, 4))];
         for (start, goal) in &reqs {
             let req = PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Worker,
                 start: *start,
                 goal: *goal,
@@ -736,6 +770,7 @@ mod tests {
         // This 4th insert triggers eviction (capacity is 3). All entries have
         // last_used == 1, so the tie-breaker is the cache key itself.
         let req4 = PathRequest {
+            relation: StaticPathingRelation::single_owner(1),
             kind: EntityKind::Worker,
             start: (1, 1),
             goal: (5, 5),
@@ -788,6 +823,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Worker,
                 start,
                 goal,
@@ -804,6 +840,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Worker,
                 start,
                 goal,
@@ -983,6 +1020,7 @@ mod tests {
                 &map,
                 &occ,
                 PathRequest {
+                    relation: StaticPathingRelation::single_owner(1),
                     kind: EntityKind::Tank,
                     start,
                     goal,
@@ -1027,6 +1065,7 @@ mod tests {
                 &map,
                 &occ,
                 PathRequest {
+                    relation: StaticPathingRelation::single_owner(1),
                     kind: EntityKind::ScoutCar,
                     start,
                     goal,
@@ -1064,6 +1103,7 @@ mod tests {
         let goal = (13, 5);
         let mut service = PathingService::new(8_192, 256);
         let req = PathRequest {
+            relation: StaticPathingRelation::single_owner(1),
             kind: EntityKind::ScoutCar,
             start,
             goal,
@@ -1114,6 +1154,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Rifleman,
                 start,
                 goal,
@@ -1132,6 +1173,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Tank,
                 start,
                 goal,
@@ -1148,6 +1190,40 @@ mod tests {
     }
 
     #[test]
+    fn enemy_tank_trap_pathing_routes_vehicle_body_into_breachable_obstacle() {
+        let map = flat_test_map(12);
+        let mut entities = EntityStore::new();
+        let (tx, ty) =
+            crate::game::services::occupancy::footprint_center(&map, EntityKind::TankTrap, 5, 5);
+        entities
+            .spawn_building(2, EntityKind::TankTrap, tx, ty, true)
+            .expect("enemy tank trap should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        let start = (2, 5);
+        let goal = (8, 5);
+
+        let tank_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
+                kind: EntityKind::Tank,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+        assert_eq!(tank_path.last().copied(), Some(goal));
+        assert!(
+            tank_path.contains(&(5, 5)),
+            "vehicle-body path should route into enemy Tank Trap tiles: {tank_path:?}"
+        );
+    }
+
+    #[test]
     fn tank_trap_vehicle_fingerprint_does_not_invalidate_infantry_cache() {
         let map = flat_test_map(12);
         let start = (2, 5);
@@ -1156,6 +1232,7 @@ mod tests {
         let empty_occ = Occupancy::build(&map, &empty_entities);
         let mut service = PathingService::new(8_192, 256);
         let infantry_req = PathRequest {
+            relation: StaticPathingRelation::single_owner(1),
             kind: EntityKind::Worker,
             start,
             goal,
@@ -1164,6 +1241,7 @@ mod tests {
             budget: None,
         };
         let vehicle_req = PathRequest {
+            relation: StaticPathingRelation::single_owner(1),
             kind: EntityKind::Tank,
             start,
             goal,
@@ -1240,6 +1318,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Tank,
                 start,
                 goal,
@@ -1285,6 +1364,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Rifleman,
                 start,
                 goal,
@@ -1303,6 +1383,7 @@ mod tests {
                 &map,
                 &occ,
                 PathRequest {
+                    relation: StaticPathingRelation::single_owner(1),
                     kind,
                     start,
                     goal,
@@ -1344,6 +1425,7 @@ mod tests {
                 &map,
                 &occ,
                 PathRequest {
+                    relation: StaticPathingRelation::single_owner(1),
                     kind,
                     start,
                     goal,
@@ -1373,6 +1455,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Tank,
                 start,
                 goal,
@@ -1388,6 +1471,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Tank,
                 start,
                 goal,
@@ -1677,6 +1761,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Tank,
                 start,
                 goal,
@@ -1713,6 +1798,7 @@ mod tests {
                 &map,
                 &occ,
                 PathRequest {
+                    relation: StaticPathingRelation::single_owner(1),
                     kind,
                     start,
                     goal,
@@ -1725,6 +1811,7 @@ mod tests {
                 &map,
                 &occ,
                 PathRequest {
+                    relation: StaticPathingRelation::single_owner(1),
                     kind,
                     start,
                     goal,
@@ -1760,6 +1847,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::ScoutCar,
                 start,
                 goal,
@@ -1785,6 +1873,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::ScoutCar,
                 start,
                 goal,
@@ -1838,6 +1927,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Tank,
                 start,
                 goal,
@@ -1876,6 +1966,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                relation: StaticPathingRelation::single_owner(1),
                 kind: EntityKind::Rifleman,
                 start,
                 goal,

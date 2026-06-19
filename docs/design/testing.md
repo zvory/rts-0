@@ -128,7 +128,9 @@ not expose arbitrary spawning or map editing through client commands. Scenario a
 under `target/scenario-artifacts/` is not currently implemented.
 
 The Tank Trap pathing matrix scenarios are harnesses for owner-aware pathing, infantry
-pass-through, explicit infantry attacks, and attack-move acquisition filtering.
+pass-through, explicit infantry attacks, and attack-move acquisition filtering. Enemy Tank Traps are
+breachable for vehicle path planning only; physical movement and standability still treat live Tank
+Trap footprints and closed one-tile gaps as vehicle-body blockers until combat removes enough traps.
 
 ## 11. Package-aware test selection policy
 
