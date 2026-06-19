@@ -21,6 +21,36 @@ const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 
+const terrainStyleSignature = () => [
+  COLORS.rock,
+  COLORS.water,
+  COLORS.field,
+  COLORS.mud,
+  COLORS.grass,
+  COLORS.grassAlt,
+].join(",");
+
+const resourceStyleSignature = () => [
+  COLORS.oil,
+  COLORS.steel,
+].join(",");
+
+const resourceLayoutSignature = (resources) => {
+  let signature = `${resources.length}`;
+  for (const node of resources) {
+    signature += `|${node.id}:${node.kind}:${node.x}:${node.y}:${node.remaining ?? ""}`;
+  }
+  return signature;
+};
+
+const staticSignatureChanged = (prev, next) => {
+  if (!prev) return true;
+  for (const [key, value] of Object.entries(next)) {
+    if (prev[key] !== value) return true;
+  }
+  return false;
+};
+
 // Per-terrain fill (matches the renderer palette; rock reads as impassable).
 const terrainFill = (code, tx, ty) => {
   if (code === TERRAIN.ROCK) return hex(COLORS.rock);
@@ -71,6 +101,17 @@ export class Minimap {
     this._offY = 0;
     this._mapW = 0; // map world width/height in px (for invalidation)
     this._mapH = 0;
+    this._canvasHeight = canvasEl.height;
+
+    this._staticCanvasFactory = typeof options.staticCanvasFactory === "function"
+      ? options.staticCanvasFactory
+      : null;
+    this._terrainLayer = null;
+    this._terrainLayerCtx = null;
+    this._terrainLayerSignature = null;
+    this._resourceLayer = null;
+    this._resourceLayerCtx = null;
+    this._resourceLayerSignature = null;
 
     this._dragging = false;
     this._pings = [];
@@ -92,6 +133,7 @@ export class Minimap {
 
   /** (Re)compute the world→canvas scale/offset from the current map dimensions. */
   _ensureTransform() {
+    this._syncCanvasSize();
     const map = this.state.map;
     if (!map) return false;
     const worldW = map.width * map.tileSize;
@@ -105,6 +147,26 @@ export class Minimap {
     this._offX = (this.size - worldW * this._scale) / 2;
     this._offY = (this.size - worldH * this._scale) / 2;
     return true;
+  }
+
+  _syncCanvasSize() {
+    const width = Number.isFinite(this.canvas.width) && this.canvas.width > 0
+      ? this.canvas.width
+      : this.size;
+    const height = Number.isFinite(this.canvas.height) && this.canvas.height > 0
+      ? this.canvas.height
+      : width;
+    if (width === this.size && height === this._canvasHeight) return;
+    this.size = width;
+    this._canvasHeight = height;
+    this._mapW = 0;
+    this._mapH = 0;
+    this._invalidateStaticLayers();
+  }
+
+  _invalidateStaticLayers() {
+    this._terrainLayerSignature = null;
+    this._resourceLayerSignature = null;
   }
 
   /** World px → canvas px. */
@@ -139,6 +201,7 @@ export class Minimap {
   render() {
     const ctx = this.ctx;
     if (!ctx) return;
+    this._syncCanvasSize();
 
     // Void background (outside the map / before a map exists).
     ctx.fillStyle = hex(COLORS.bgVoid);
@@ -146,10 +209,10 @@ export class Minimap {
 
     if (!this._ensureTransform()) return;
 
-    this._drawTerrain();
+    this._drawTerrainLayer();
     this._drawEntities();
     this._drawFog();
-    this._drawResources();
+    this._drawResourceLayer();
     this._drawViewport();
     this._drawPings(performance.now());
   }
@@ -175,8 +238,10 @@ export class Minimap {
 
   /** Fill one minimap cell per tile with its terrain color. */
   _drawTerrain() {
-    const map = this.state.map;
-    const ctx = this.ctx;
+    this._paintTerrain(this.ctx, this.state.map);
+  }
+
+  _paintTerrain(ctx, map) {
     const ts = map.tileSize;
     // Cell size in canvas px; +1 to avoid hairline seams between adjacent cells.
     const cw = ts * this._scale + 1;
@@ -191,10 +256,28 @@ export class Minimap {
     }
   }
 
+  _drawTerrainLayer() {
+    const map = this.state.map;
+    const layer = this._ensureStaticLayer("terrain");
+    if (!layer) {
+      this._drawTerrain();
+      return;
+    }
+    const signature = this._terrainStaticSignature(map);
+    if (staticSignatureChanged(this._terrainLayerSignature, signature)) {
+      layer.ctx.clearRect(0, 0, this.size, this.size);
+      this._paintTerrain(layer.ctx, map);
+      this._terrainLayerSignature = signature;
+    }
+    this.ctx.drawImage(layer.canvas, 0, 0);
+  }
+
   /** Draw non-depleted static resource blips after fog so they are always visible. */
   _drawResources() {
-    const map = this.state.map;
-    const ctx = this.ctx;
+    this._paintResources(this.ctx, this.state.map);
+  }
+
+  _paintResources(ctx, map) {
     const r = 2.2;
     for (const node of map.resources || []) {
       if (node.remaining === 0) continue;
@@ -210,6 +293,91 @@ export class Minimap {
         ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
       }
     }
+  }
+
+  _drawResourceLayer() {
+    const map = this.state.map;
+    const resources = map.resources || [];
+    if (resources.length === 0) return;
+    const layer = this._ensureStaticLayer("resource");
+    if (!layer) {
+      this._drawResources();
+      return;
+    }
+    const signature = this._resourceStaticSignature(map, resources);
+    if (staticSignatureChanged(this._resourceLayerSignature, signature)) {
+      layer.ctx.clearRect(0, 0, this.size, this.size);
+      this._paintResources(layer.ctx, map);
+      this._resourceLayerSignature = signature;
+    }
+    this.ctx.drawImage(layer.canvas, 0, 0);
+  }
+
+  _ensureStaticLayer(kind) {
+    const layerProp = kind === "terrain" ? "_terrainLayer" : "_resourceLayer";
+    const ctxProp = kind === "terrain" ? "_terrainLayerCtx" : "_resourceLayerCtx";
+    if (!this[layerProp]) {
+      this[layerProp] = this._createStaticCanvas();
+    }
+    const canvas = this[layerProp];
+    if (!canvas) return null;
+    if (canvas.width !== this.size) canvas.width = this.size;
+    if (canvas.height !== this.size) canvas.height = this.size;
+    if (!this[ctxProp]) this[ctxProp] = canvas.getContext?.("2d") || null;
+    const ctx = this[ctxProp];
+    return ctx ? { canvas, ctx } : null;
+  }
+
+  _createStaticCanvas() {
+    if (this._staticCanvasFactory) return this._staticCanvasFactory();
+    if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(1, 1);
+    const doc = this.canvas?.ownerDocument || (typeof document !== "undefined" ? document : null);
+    return doc?.createElement ? doc.createElement("canvas") : null;
+  }
+
+  _terrainStaticSignature(map) {
+    return {
+      map,
+      terrain: map.terrain,
+      mapWidth: map.width,
+      mapHeight: map.height,
+      tileSize: map.tileSize,
+      size: this.size,
+      scale: this._scale,
+      offX: this._offX,
+      offY: this._offY,
+      presentation: this._canvasPresentationSignature(),
+      style: terrainStyleSignature(),
+    };
+  }
+
+  _resourceStaticSignature(map, resources) {
+    return {
+      map,
+      resources,
+      mapWidth: map.width,
+      mapHeight: map.height,
+      tileSize: map.tileSize,
+      size: this.size,
+      scale: this._scale,
+      offX: this._offX,
+      offY: this._offY,
+      presentation: this._canvasPresentationSignature(),
+      style: resourceStyleSignature(),
+      layout: resourceLayoutSignature(resources),
+    };
+  }
+
+  _canvasPresentationSignature() {
+    const dpr = Number(globalThis.window?.devicePixelRatio ?? globalThis.devicePixelRatio ?? 1) || 1;
+    let rectW = 0;
+    let rectH = 0;
+    if (typeof this.canvas.getBoundingClientRect === "function") {
+      const rect = this.canvas.getBoundingClientRect();
+      rectW = rect?.width || 0;
+      rectH = rect?.height || 0;
+    }
+    return `${this.canvas.width}x${this.canvas.height}@${dpr}:${rectW}x${rectH}`;
   }
 
   /**
@@ -362,6 +530,12 @@ export class Minimap {
     c.removeEventListener("mousedown", this._onCanvasMouseDown);
     window.removeEventListener("mousemove", this._onWinMouseMove);
     window.removeEventListener("mouseup", this._onWinMouseUp);
+    this._terrainLayer = null;
+    this._terrainLayerCtx = null;
+    this._terrainLayerSignature = null;
+    this._resourceLayer = null;
+    this._resourceLayerCtx = null;
+    this._resourceLayerSignature = null;
   }
 
   _issueCommand(command) {
