@@ -34,7 +34,6 @@ export function _sweep() {
   }
   if (this._iconPool) for (const id of this._iconPool.keys()) ids.add(id);
   if (this._queueLabelPool) for (const id of this._queueLabelPool.keys()) ids.add(id);
-  if (this._rigComparisonPool) for (const id of this._rigComparisonPool.keys()) ids.add(id);
   if (this._liveRigPools) {
     for (const pool of Object.values(this._liveRigPools)) {
       for (const id of pool.keys()) ids.add(id);
@@ -87,19 +86,6 @@ export function _sweep() {
         this._queueLabelPool.delete(id);
       } else {
         t.visible = false;
-      }
-    }
-  }
-  if (this._rigComparisonPool) {
-    const seen = this._seen.rigComparisons || new Set();
-    for (const [id, instance] of this._rigComparisonPool) {
-      if (seen.has(id)) continue;
-      if (evict.has(id)) {
-        this.layers.rigComparisons?.removeChild?.(instance.container);
-        instance.destroy();
-        this._rigComparisonPool.delete(id);
-      } else {
-        instance.container.visible = false;
       }
     }
   }

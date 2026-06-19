@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not implemented.
+- [x] Implemented.
 
 ## Objective
 
@@ -49,18 +49,42 @@ visual path.
 
 ## Implementation Checklist
 
-- [ ] Delete legacy procedural unit renderer code.
-- [ ] Delete temporary comparison flags, pools, baseline fixtures, update-only oracle paths, and
+- [x] Delete legacy procedural unit renderer code.
+- [x] Delete temporary comparison flags, pools, baseline fixtures, update-only oracle paths, and
       equivalence fixtures.
-- [ ] Remove or replace Phase 5.x artifacts:
+- [x] Remove or replace Phase 5.x artifacts:
       `unit_migration_manifests.mjs`, `svg_migration_guardrails.mjs`,
       `transparent_unit_pixels.mjs`, `dump-legacy-unit-parts.mjs`, and
       `legacy-unit-oracle.baseline.json`.
-- [ ] Keep permanent schema/importer/animation/render smoke coverage.
-- [ ] Enforce rig-only unit visual boundary in architecture checks or focused tests.
-- [ ] Update docs for future SVG-authored unit work.
-- [ ] Remove stale feature gates and fallback routing.
-- [ ] Run verification and record exact results.
+- [x] Keep permanent schema/importer/animation/render smoke coverage.
+- [x] Enforce rig-only unit visual boundary in architecture checks or focused tests.
+- [x] Update docs for future SVG-authored unit work.
+- [x] Remove stale feature gates and fallback routing.
+- [x] Run verification and record exact results.
+
+## Completion Notes
+
+- `client/src/renderer/units.js` now routes unit and shot-reveal visuals only through live SVG rig
+  definitions. Missing definitions or routes fail through the renderer's existing missing-texture
+  guard instead of drawing a procedural unit fallback.
+- Removed the migration comparison seam from `renderer/rigs/runtime.js`, renderer initialization,
+  teardown, and sweep logic.
+- Deleted the temporary Phase 5.x migration stack: manifest, static guardrail, transparent pixel
+  harness/page, legacy oracle baseline, visual pixel diff helper/test, and legacy part dump script.
+- Preserved permanent coverage in schema/importer/runtime/client-contract tests, refreshed the stale
+  Ekat SVG fixture to match production rig source, and added architecture checks that prevent
+  procedural unit art from returning to `renderer/units.js`.
+- Updated `docs/design/client-ui.md`, `tests/README.md`, `docs/doc-map.json`, and `tests/run-all.sh`
+  for the post-migration SVG rig workflow.
+
+## Verification Results
+
+- `node tests/rig_schema.mjs` passed.
+- `node tests/svg_rig_importer.mjs` passed.
+- `node tests/rig_runtime.mjs` passed.
+- `node scripts/check-client-architecture.mjs` passed.
+- `node tests/client_contracts.mjs` passed.
+- `git diff --check` passed.
 
 ## Verification
 

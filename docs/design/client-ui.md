@@ -190,7 +190,6 @@ shot-reveal alpha, map tile size, worker busy state, breakthrough ticks, and oil
 export function createDefaultPixiFactory(pixi?)
 export function createUnitRigInstance(kind, definition, pixiFactory?)
 export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definition, options?)
-export function renderRigLegacyComparison(renderer, entity, colorByOwner, state, definition)
 export class UnitRigInstance {
   update(entity, renderContext)
   destroy()
@@ -198,16 +197,22 @@ export class UnitRigInstance {
 ```
 `UnitRigInstance` owns one Pixi container and one graphics child per normalized rig part, redraws
 primitive geometry with sampled transforms and tint slots, and tears down all owned children through
-`destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind` and currently enables
-Worker, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank,
-Command Car, and Ekat; missing or invalid definitions fall back to legacy procedural drawing. Temporary
-SVG migration guardrails live in `tests/fixtures/svg/unit_migration_manifests.mjs` and
-`tests/svg_migration_guardrails.mjs`; a live-routed kind must have a manifest and passing
-part-level plus full-composition pixel gates before it is added. Shadow and body parts route
-through separate live pools so normal unit and shot-reveal layer ordering stays intact.
-`renderer/units.js` also keeps a test-gated side-by-side comparison seam: `_rigComparisonEnabled`
-must be set and a definition must exist in `_rigDefinitionsByKind`; otherwise comparison rendering
-stays dormant.
+`destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind` and covers Worker,
+Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank, Command Car, and
+Ekat. Missing or invalid unit rig definitions fail through the renderer's soft missing-texture guard
+rather than falling back to a procedural unit branch. Shadow and body parts route through separate
+live pools so normal unit and shot-reveal layer ordering stays intact.
+
+SVG unit art workflow:
+- Author the SVG under the approved importer subset: root rig metadata, stable `part.*` ids,
+  `anchor.*` ids for at least `origin`, `selection`, and `hp`, semantic `bounds.*`, direct hex
+  paint, approved tint slots, and schema-approved `data-rts-animation` bindings.
+- Keep source SVGs mirrored by the checked-in runtime strings in `renderer/rigs/*_svg.js` and
+  fixture SVGs in `tests/fixtures/svg/` when a fixture is useful for importer/runtime tests.
+- Verify new or changed rigs with `node tests/rig_schema.mjs`, `node tests/svg_rig_importer.mjs`,
+  `node tests/rig_runtime.mjs`, and `node scripts/check-client-architecture.mjs`.
+- Use `/dev/unit-lab` only as a visual preview/design browser. Acceptance for runtime contract
+  changes comes from schema, importer, animation, renderer smoke, and architecture tests.
 
 `renderer/feedback_view_model.js`
 ```js
@@ -722,13 +727,14 @@ and unit layer):
 - The render layer is cleared each frame so expired clouds vanish automatically when they drop from
   the next snapshot.
 
-### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
+### 4.2 Rendering & look (PixiJS, SVG unit rigs — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
   shadows → units → selection rings → health bars → fog overlay → shot-revealed units →
   command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
-- Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
-  dark outline, HP bar above when damaged/selected, and glowing selection ring when selected.
+- Units: SVG-authored rig parts rendered into Pixi containers, with low-detail hard-edged
+  silhouettes tinted by player color, a dark drop shadow, dark outline, HP bar above when
+  damaged/selected, and glowing selection ring when selected.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner: shared
   infantry body with oversized role weapons; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
