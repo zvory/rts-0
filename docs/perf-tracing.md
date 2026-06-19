@@ -140,6 +140,71 @@ whether lag is in per-player projection/compaction, JSON serialization, or socke
   analysis-only write-up for a case where the server stayed healthy but one player had both
   network/snapshot jitter and poor local frame pacing.
 
+## Network incident parser
+
+Use `scripts/parse-net-report-logs.mjs` when a player-reported lag incident has preserved Fly JSONL
+logs. It reads Fly JSONL from `scripts/fly-logs.sh search` or raw tracing text, strips ANSI tracing
+decoration, extracts `client_net_report`, `match_started`, `match_ended`, `performance tick summary`,
+`performance snapshot timing`, and `performance writer timing` rows, then emits a compact markdown
+summary plus JSON/TSV machine-readable output.
+
+Example:
+
+```bash
+scripts/fly-logs.sh beta search \
+  --from 2026-06-19T00:50:00Z \
+  --to 2026-06-19T01:15:00Z \
+  --filter 'client network report|match started|match ended|performance tick summary|performance snapshot timing|performance writer timing' \
+  > /tmp/rts-lag-window.jsonl
+
+node scripts/parse-net-report-logs.mjs --out-dir /tmp/rts-lag-summary /tmp/rts-lag-window.jsonl
+open /tmp/rts-lag-summary/incident-summary.md
+```
+
+For a quick terminal view:
+
+```bash
+node scripts/parse-net-report-logs.mjs /tmp/rts-lag-window.jsonl
+node scripts/parse-net-report-logs.mjs --format tsv /tmp/rts-lag-window.jsonl
+node scripts/parse-net-report-logs.mjs --format json /tmp/rts-lag-window.jsonl
+```
+
+The markdown table is the operator-facing summary. The JSON output preserves per-match and per-player
+metrics, row counts, classifications, and missing-data warnings for follow-up scripts. The TSV output
+is intentionally flat so it can be pasted into a spreadsheet or attached to a bug report.
+
+Classification is evidence-bounded:
+
+- Server tick/scheduler pressure requires server tick, scheduler lag, slow-tick, or performance tick
+  rows. Clean `server_tick_ms`, `server_lag_ms`, and `slow_tick_count` values are evidence against
+  server-lag blame, not proof that every host resource was perfect.
+- Server snapshot projection/compact/serialization pressure requires `performance tick summary` or
+  `performance snapshot timing` rows. Older incidents without those rows are reported as unavailable.
+- WebSocket writer/send pressure requires writer timing, high buffered bytes, or head-of-line/backlog
+  evidence.
+- Client network/snapshot delivery pressure uses RTT, bad RTT samples, snapshot jitter, snapshot gaps,
+  stale/duplicate/skipped snapshot counters, and burst counters.
+- Browser processing pressure uses payload size, JSON parse, compact decode, snapshot apply,
+  prediction apply, frame work, renderer timing, frame gaps, and FPS estimates.
+- Command path pressure uses legacy acknowledged-command latency when that is all an old log has, and
+  uses the newer upload/server-receipt/sim-ack/downstream-apply milestones when present.
+
+The parser always prints that packet loss, retransmit behavior, and per-packet browser transport data
+are unavailable. Treat WebSocket/TCP head-of-line or WebTransport theories as unsupported unless the
+available rows show concrete writer backlog, snapshot burst/coalescing, or downstream delivery gaps.
+
+The preserved Matt/Alex incident is the canonical fixture:
+
+```bash
+node scripts/parse-net-report-logs.mjs \
+  docs/network-incident-examples/2026-06-19-beta-matt-alex/fly-match-54-all.jsonl \
+  docs/network-incident-examples/2026-06-19-beta-matt-alex/fly-match-55-all.jsonl
+```
+
+The expected shape is: server tick/scheduler pressure not indicated; Matt's player rows show high
+RTT/snapshot timing and low frame pacing; older payload, parse/decode/apply, command milestone, and
+server snapshot timing fields are reported as unavailable instead of zero.
+
 ## Structured server logging
 
 Server logs in `server/src` must go through `server/src/structured_log.rs`. Use the helper macros

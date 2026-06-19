@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -49,13 +49,13 @@ ANSI-decorated log text.
 
 ## Implementation Checklist
 
-- [ ] Define the parser input and output contract.
-- [ ] Strip ANSI log decoration and parse structured field/value pairs robustly.
-- [ ] Aggregate per-match and per-player diagnostic maxima/buckets.
-- [ ] Add evidence-bounded classification and missing-data warnings.
-- [ ] Add focused parser tests or fixture validation.
-- [ ] Document local/Fly usage and interpretation.
-- [ ] Mark this phase as done in this file.
+- [x] Define the parser input and output contract.
+- [x] Strip ANSI log decoration and parse structured field/value pairs robustly.
+- [x] Aggregate per-match and per-player diagnostic maxima/buckets.
+- [x] Add evidence-bounded classification and missing-data warnings.
+- [x] Add focused parser tests or fixture validation.
+- [x] Document local/Fly usage and interpretation.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
