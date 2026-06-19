@@ -35,9 +35,10 @@ exists:
 - Prediction must not show server validation as successful until command result metadata or
   owner-visible snapshots prove it.
 - Rejected and no-op commands must clear provisional intent by `clientSeq`.
-- Rolled-back commands should reconcile as corrected authority, not as mysterious path snapbacks.
-- Outside-window late commands must remain legible through fallback metadata and future lead
-  adjustment.
+- Rolled-back and clamped-rollback commands should reconcile as corrected authority, not as
+  mysterious path snapbacks.
+- Outside-window late commands must remain legible through clamped rollback or fallback metadata and
+  future lead adjustment.
 
 ## Expected Touch Points
 
@@ -58,7 +59,8 @@ exists:
   - accepted on healthy two-tick cadence
   - late arrival inside rollback window converges
   - arrival behind the active replay cursor corrects and clears local intent
-  - outside-window late arrival corrects and raises lead when appropriate
+  - outside-window late arrival uses clamped rollback when the family is clamp-safe, or corrects via
+    fallback and raises lead when appropriate
   - rejected by ownership
   - rejected by invalid target or missing eligibility
   - no-op remains legible and clears local intent
@@ -86,6 +88,7 @@ stale local intent.
 
 ## Handoff Expectations
 
-The handoff must list exactly which unit command families are enabled, which remain
-authoritative-only, the no-op/rejection signals used, and the tri-state artifacts that should be
-inspected if later behavior regresses.
+The handoff must list exactly which unit command families are enabled, which are clamp-safe,
+which are exact-rollback-only or live-fallback-only, which remain authoritative-only, the
+no-op/rejection signals used, and the tri-state artifacts that should be inspected if later behavior
+regresses.

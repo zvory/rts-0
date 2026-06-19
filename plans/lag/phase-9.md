@@ -20,16 +20,17 @@ remote-echo command feel.
   - late-arrival threshold for increasing lead
   - stable-window threshold for decay
   - `MAX_REPLAY_COMMANDS = 1000` replay fuse and fallback reason
+  - clamped rollback enablement and command-family clamp-safe rules
   - slow catch-up logging thresholds for later optimization
+  - maximum tolerated metronome delay and authoritative snapshot gap before follow-up action
   - correction distance budgets
   - worker/perf degradation thresholds
 - Make the cadence and rollback path default for compatible live active-player sessions when
   Movement prediction is enabled.
 - Keep all tuning values centralized and documented with ownership:
   - protocol constants and compact versions in the protocol crate/mirror
-  - server scheduling, rollback window, future-tick bounds, replay cursor policy, and fallback
-    thresholds in one
-    live-room scheduling module
+  - server scheduling, rollback window, future-tick bounds, replay cursor policy, clamped fallback,
+    and fallback thresholds in one live-room scheduling module
   - client lead defaults and degraded prediction modes in the prediction path
   - operator-facing thresholds in `docs/perf-tracing.md`
 - Keep spectators, replay viewers, unsupported factions, incompatible builds, and prediction-off
@@ -45,7 +46,8 @@ remote-echo command feel.
   - any relevant context capsules if section lists shift
 - Add a concise regression matrix that maps each command family to:
   - predicted owned-world response
-  - rollback behavior
+  - exact rollback behavior
+  - clamped rollback behavior
   - authoritative-only side effects
   - required tests
   - known unsupported cases
@@ -54,6 +56,7 @@ remote-echo command feel.
     rooms
   - whether the final mode is full visual prediction, reduced prediction, accepted-intent overlay,
     or authoritative-only for each command family
+  - whether each command family is clamp-safe, exact-rollback-only, or live-fallback-only
   - what evidence would trigger reverting to a higher lead, smaller rollback window, or
     authoritative-only mode
 
@@ -74,7 +77,9 @@ remote-echo command feel.
   - 100 ms RTT with jitter
   - 250 ms RTT with burst delivery
   - 6-tick rollback command delivery
+  - outside-window clamped rollback command delivery
   - command delivery behind an active replay cursor
+  - synthetic slow catch-up that creates a measurable snapshot gap
   - weaker client or CPU-throttled profile
 - Verify the regression matrix mechanically where practical: add or update a small checker or test
   fixture that fails when a command family is marked predicted without matching tri-state coverage
@@ -87,8 +92,10 @@ remote-echo command feel.
 
 Run short online-like matches with Movement prediction on and off. Confirm normal healthy play has
 a small stable command delay, bad conditions inside the rollback window still honor the intended
-command tick, outside-window stalls degrade to late execution and lead adjustment, and turning
-Movement prediction off returns to the old authoritative-only behavior.
+command tick, outside-window clamp-safe commands use the oldest safe replayable tick, unsupported
+outside-window commands degrade to late execution and lead adjustment, slow catch-up produces a
+bounded authoritative snapshot gap while local owned prediction continues, and turning Movement
+prediction off returns to the old authoritative-only behavior.
 
 ## Handoff Expectations
 
@@ -103,7 +110,8 @@ and which player-facing command surfaces should be watched in playtests.
 - Prediction-off fallback is verified.
 - Rollback, late fallback, correction distances, and degraded prediction modes are visible in
   diagnostics.
+- Clamped rollback, metronome delay, and authoritative snapshot gaps are visible in diagnostics.
 - All enabled command families have tri-state coverage.
 - Every command family has an explicit matrix row saying whether it is predicted, intent-only,
-  rollback-supported, or authoritative-only.
+  exact-rollback-supported, clamped-rollback-supported, or authoritative-only.
 - Docs and context capsules match the implemented contract.

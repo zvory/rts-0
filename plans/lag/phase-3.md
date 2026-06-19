@@ -42,8 +42,9 @@ authority instead of predicting earlier than the server can ever confirm.
     `currentTick + MAX_FUTURE_EXECUTE_LEAD_TICKS`; initialize that constant to the rollback window
     unless this phase documents a smaller value
   - queue on the accepted effective tick if it has not passed
-  - if the command arrives late, record rollback eligibility but still apply late in this phase
-    until Phase 4 enables restore/replay
+  - if the command arrives late, record exact rollback eligibility, possible clamped fallback
+    diagnostics, and live-fallback metadata, but still apply late in this phase until Phase 4 enables
+    restore/replay
 - Keep command ordering deterministic:
   - stable by effective tick
   - stable by room arrival order within a tick
@@ -101,7 +102,8 @@ authority instead of predicting earlier than the server can ever confirm.
 - Tri-state scenarios for:
   - healthy two-tick command executes on requested tick
   - late command within six ticks reports rollback eligibility but applies late before Phase 4
-  - late command older than six ticks reports outside-window fallback metadata
+  - late command older than six ticks reports clamped-rollback eligibility or outside-window fallback
+    metadata, but still applies late before Phase 4
   - repeated late commands raise future lead
   - prediction disabled remains authoritative-only
 - Run:

@@ -28,7 +28,7 @@ on it.
   - applied tick, when known
   - late-by tick count
   - rollback-window eligibility
-  - rollback applied/skipped/fallback status
+  - rollback applied/clamped/skipped/fallback status
   - rollback replay tick count and elapsed time when available
   - envelope/result status, separated into at least `received`, `scheduled`, `applied`,
     `rejected`, `noop`, and `lateFallback` where the server can state it safely
@@ -42,10 +42,10 @@ on it.
 - Define initial stable reason codes in this phase, even if some are produced only by later phases:
   `invalidSeq`, `staleSeq`, `notInGame`, `notPlayer`, `notJoined`, `executeTickMissing`,
   `executeTickInvalid`, `executeTickTooOld`, `executeTickTooFarFuture`, `rollbackEligible`,
-  `rollbackApplied`, `rollbackWindowMiss`, `rollbackCommandCapExceeded`, `rollbackUnsupported`,
-  `lateDuringReplay`, `authoritativeNoop`, `rejectedOwnership`, `rejectedInvalidTarget`,
-  `rejectedCost`, and `unsupportedCommand`. If a code is intentionally not implemented yet,
-  document it as reserved.
+  `rollbackApplied`, `rollbackClamped`, `rollbackWindowMiss`, `rollbackCommandCapExceeded`,
+  `rollbackUnsupported`, `lateDuringReplay`, `authoritativeNoop`, `rejectedOwnership`,
+  `rejectedInvalidTarget`, `rejectedCost`, and `unsupportedCommand`. If a code is intentionally not
+  implemented yet, document it as reserved.
 - Bump `PREDICTION_PROTOCOL_VERSION` and update the compact snapshot contract only after the Rust
   and JS mirrors, protocol docs, and parity fixture agree on the new result payload shape.
 - Keep current command execution timing unchanged in this phase; this is a contract and

@@ -18,7 +18,7 @@ cancel, and queue surfaces.
   - correct to authoritative `rallyPlan` when snapshots arrive or rollback rewrites the result
 - Train:
   - keep optimistic queue display
-  - tie confirmation, rejection, timeout, rollback, and late fallback to `clientSeq`
+  - tie confirmation, rejection, timeout, rollback, clamped rollback, and late fallback to `clientSeq`
   - do not spawn units or spend resources locally
 - Research:
   - show provisional accepted queue/progress intent only after command result metadata or safe
@@ -58,6 +58,8 @@ cancel, and queue surfaces.
 - Unit tests for:
   - train optimism on effective tick and confirmation by snapshot/result metadata
   - train/rally correction after rollback
+  - train/rally correction after clamped rollback when the surface is declared clamp-safe, or explicit
+    live fallback when it is not
   - train/rally correction when a command arrives behind the active replay cursor
   - rally correction by authoritative `rallyPlan`
   - research intent clears on rejection and never grants upgrade locally
@@ -89,6 +91,6 @@ server authority.
 
 ## Handoff Expectations
 
-The handoff must list which building surfaces are provisional, which side effects remain
-authoritative-only, whether any owner-only metadata was added, and which construction-related cases
-remain intentionally unsupported.
+The handoff must list which building surfaces are provisional, which are clamp-safe, which side
+effects remain authoritative-only, whether any owner-only metadata was added, and which
+construction-related cases remain intentionally unsupported.
