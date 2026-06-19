@@ -8,8 +8,8 @@
 
 Build the browser-side command cadence controller behind the existing Movement prediction setting.
 The client should estimate authoritative server tick, start commands at a two-tick lead, stamp
-commands with intended effective ticks, and expose diagnostics without requiring server scheduling
-to be enabled yet.
+commands with intended effective ticks, and expose rollback-aware diagnostics without requiring
+server scheduling or rollback to be enabled yet.
 
 ## Scope
 
@@ -26,7 +26,7 @@ to be enabled yet.
   - preserve current authoritative-only behavior
   - keep `clientSeq` monotonic
 - Add debug output for lead ticks, estimated server tick, command issue time, intended execute tick,
-  and pending command age.
+  rollback eligibility window, server result status, and pending command age.
 
 ## Expected Touch Points
 
@@ -45,6 +45,7 @@ to be enabled yet.
   - two-tick default lead
   - monotonic `clientSeq` with prediction toggled off/on
   - execute tick stamping based on latest server tick
+  - rollback-window display for commands whose intended tick is still within 26 ticks
   - missing snapshots before the first estimate
   - disabled setting preserving authoritative-only command behavior
 - Add tri-state scenarios for:
@@ -66,4 +67,5 @@ setting off should remove provisional overlays without corrupting selection or c
 ## Handoff Expectations
 
 The handoff must state how server tick is estimated, how the initial two-tick lead is represented,
-where diagnostics are exposed, and what behavior remains stubbed until server scheduling lands.
+where rollback-aware diagnostics are exposed, and what behavior remains stubbed until server
+scheduling and rollback land.

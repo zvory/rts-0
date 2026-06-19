@@ -1,4 +1,4 @@
-# Phase 1 - Effective-Tick Protocol and Diagnostics
+# Phase 1 - Effective-Tick and Rollback Protocol
 
 ## Phase Status
 
@@ -6,9 +6,10 @@
 
 ## Objective
 
-Add the protocol and diagnostic contract for scheduled command execution while preserving current
-live behavior. This phase should make command timing observable end to end before any server
-scheduling or broader prediction depends on it.
+Add the protocol and diagnostic contract for scheduled command execution and bounded rollback while
+preserving current live behavior. This phase should make command timing, rollback eligibility, and
+fallback execution observable end to end before any server scheduling or broader prediction depends
+on it.
 
 ## Scope
 
@@ -19,10 +20,15 @@ scheduling or broader prediction depends on it.
   - accepted execute tick
   - applied tick, when known
   - late-by tick count
+  - rollback-window eligibility
+  - rollback applied/skipped status
+  - rollback replay tick count and elapsed time when available
   - accepted/rejected/no-op status where the server can state it safely
   - stable reason codes
 - Expose the current per-player server command lead recommendation in owner-only snapshot net
   status or a similarly compact owner-only payload.
+- Document `ROLLBACK_WINDOW_TICKS = 26` as the initial product target. Keep it configurable or
+  centralized so performance phases can tune it without hunting constants.
 - Keep current command execution timing unchanged in this phase; this is a contract and
   observability phase.
 
@@ -48,7 +54,7 @@ scheduling or broader prediction depends on it.
 - Add prediction-controller tests proving receipt/result metadata is diagnostic until later phases
   consume it for reconciliation.
 - Add or update a tri-state scenario that issues a command and records requested/accepted/applied
-  tick metadata without changing visible behavior.
+  tick and rollback metadata without changing visible behavior.
 - Run:
   - `node tests/protocol_parity.mjs`
   - `node tests/prediction_controller.mjs`
@@ -63,5 +69,6 @@ command timing metadata.
 
 ## Handoff Expectations
 
-The handoff must name the final field names, the stable reason codes, the default behavior for old
-or missing execute ticks if any remains, and which later phase should start consuming the metadata.
+The handoff must name the final field names, the rollback constants, the stable reason codes, the
+default behavior for old or missing execute ticks if any remains, and which later phase should start
+consuming the metadata.
