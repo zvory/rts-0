@@ -1420,6 +1420,21 @@ function hotkeyService() {
   health.noteSnapshotArrival(now + 500, true);
   assert(health.metrics().jitterMs === jitterBeforeHidden, "hidden document snapshots do not update jitter");
 
+  const cadenceHealth = new MatchHealth({ net, statusBadge: null, snapshotMs: 33 });
+  cadenceHealth.noteSnapshotArrival(0, false, 10);
+  cadenceHealth.noteSnapshotArrival(1, false, 10);
+  cadenceHealth.noteSnapshotArrival(2, false, 13);
+  cadenceHealth.noteSnapshotArrival(3, false, 12);
+  assert(cadenceHealth.reportStats.duplicateSnapshotCount === 1, "duplicate snapshot ticks feed report stats");
+  assert(cadenceHealth.reportStats.skippedSnapshotCount === 1, "skipped snapshot ticks feed report stats");
+  assert(cadenceHealth.reportStats.staleSnapshotCount === 1, "stale snapshot ticks feed report stats");
+  assert(cadenceHealth.reportStats.snapshotTickGapMax === 3, "snapshot tick gap max is reported");
+  assert(cadenceHealth.reportStats.snapshotBurstCount === 1, "multiple snapshots before a frame count as one burst");
+  assert(cadenceHealth.reportStats.snapshotBurstMax === 4, "snapshot burst max records per-frame receive pressure");
+  cadenceHealth.noteFrameGap(16, 20);
+  cadenceHealth.noteSnapshotArrival(21, false, 14);
+  assert(cadenceHealth.reportStats.snapshotBurstMax === 4, "frame boundaries reset current burst without clearing report max");
+
   health.applyServerNetStatus({
     tickMs: 44,
     serverLagMs: 120,
@@ -3857,7 +3872,30 @@ function fakeAudioContext() {
     msg.join("A", "main", false, true).replayOk === true,
     "join builder can confirm replay joins",
   );
+  const priorPerformance = globalThis.performance;
+  let nowSamples = [0, 2, 2, 5, 10, 13, 13, 17];
+  globalThis.performance = { now: () => nowSamples.shift() ?? 17 };
+  try {
+    const reportNet = new Net("ws://example.invalid");
+    reportNet._onMessage({ data: JSON.stringify({ t: "snapshot", tick: 1, entities: [] }) });
+    reportNet._onMessage({ data: JSON.stringify({ t: "snapshot", tick: 2, entities: [] }) });
+    const stats = reportNet.consumeSnapshotReportStats();
+    assert(stats.snapshotMessageCount === 2, "Net reports snapshot message count");
+    assert(stats.snapshotBytesTotal > stats.snapshotBytesMax, "Net reports bounded snapshot byte totals");
+    assert(stats.snapshotParseMaxMs === 3, "Net reports JSON parse max");
+    assert(stats.snapshotDecodeMaxMs === 4, "Net reports compact decode max");
+    assert(reportNet.consumeSnapshotReportStats().snapshotMessageCount === 0, "Net snapshot report stats reset");
+  } finally {
+    globalThis.performance = priorPerformance;
+  }
   for (const field of [
+    "snapshotBytesTotal",
+    "snapshotParseMaxMs",
+    "snapshotDecodeP95Ms",
+    "snapshotApplyMaxMs",
+    "predictionApplyP95Ms",
+    "snapshotTickGapMax",
+    "snapshotBurstMax",
     "frameWorkMaxMs",
     "frameWorkP95Ms",
     "slowFrameCount",

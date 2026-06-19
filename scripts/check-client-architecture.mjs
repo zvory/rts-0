@@ -34,6 +34,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "net.js": "transport",
   "protocol.js": "transport",
   "lab_client.js": "transport",
+  "report_window_aggregate.js": "transport",
 
   "config.js": "rules-mirror",
 
@@ -95,8 +96,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Quick-cast click suppression keeps guard math in input/quick_cast_selection_guard.js while
   // input/index.js owns the mouse down/move/up routing hooks.
   "input/index.js": 39869,
-  // Room2 Phase 3 renames replay/dev time wiring to neutral room-time handlers.
-  "match.js": 38818,
+  // Net Report Phase 1 wires bounded snapshot diagnostics into the live report path.
+  "match.js": 39020,
   // Room2 Phase 4 mirrors start-payload diagnostic capability constants.
   "protocol.js": 38269,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.

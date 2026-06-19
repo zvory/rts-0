@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -67,14 +67,14 @@ should keep the upload low-noise and should not add a new telemetry service.
 
 ## Implementation Checklist
 
-- [ ] Select the exact stable report fields and document any rejected/noisy candidates.
-- [ ] Add browser aggregation for payload bytes, parse/decode/apply work, and snapshot cadence.
-- [ ] Add bounded frame-profiler aggregates to the report builder.
-- [ ] Extend Rust DTOs, structured logging, notable-report thresholds, and classification.
-- [ ] Update protocol and perf documentation.
-- [ ] Add focused JS/Rust/protocol tests.
-- [ ] Resolve or document overlap with `plans/fps/phase-2.md`.
-- [ ] Mark this phase as done in this file.
+- [x] Select the exact stable report fields and document any rejected/noisy candidates.
+- [x] Add browser aggregation for payload bytes, parse/decode/apply work, and snapshot cadence.
+- [x] Add bounded frame-profiler aggregates to the report builder.
+- [x] Extend Rust DTOs, structured logging, notable-report thresholds, and classification.
+- [x] Update protocol and perf documentation.
+- [x] Add focused JS/Rust/protocol tests.
+- [x] Resolve or document overlap with `plans/fps/phase-2.md`.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
@@ -95,6 +95,12 @@ the browser console has no report errors, and a deliberately induced slow frame 
 produces a structured server log with payload, parse/decode/apply, frame phase, and snapshot cadence
 fields. Inspect `window.__rtsPerf.summary()` during the same session and confirm uploaded aggregate
 labels line up with local-only profiler labels.
+
+## FPS Plan Overlap
+
+`plans/fps/phase-2.md` was already marked done before this phase. This phase preserves that permanent
+frame-profiler upload scope and adds the snapshot payload, browser processing, and cadence fields
+needed by the network lag report plan.
 
 ## Handoff Expectations
 

@@ -5,7 +5,12 @@ import {
   machineGunnerHasAudibleTarget,
   machineGunSoundKey,
 } from "./combat_audio.js";
-import { clientPerfReportFields } from "./client_perf_report.js";
+import {
+  clientPerfReportFields,
+  createSnapshotProcessingReport,
+  recordSnapshotProcessing,
+  snapshotReportFields,
+} from "./client_perf_report.js";
 import { Fog } from "./fog.js";
 import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
 import { FrameProfiler } from "./frame_profiler.js";
@@ -119,6 +124,7 @@ export class Match {
     this.lastSnapshotTick = 0;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
     this.frameProfiler = new FrameProfiler();
+    this.snapshotProcessingReport = createSnapshotProcessingReport();
     this.frameProfilerSurface = this.frameProfiler.debugSurface();
     if (typeof window !== "undefined") window.__rtsPerf = this.frameProfilerSurface;
     this.predictionStartInfo = payload;
@@ -228,11 +234,16 @@ export class Match {
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => {
       const now = performance.now();
-      this.health.noteSnapshotArrival(now, document.hidden);
-      this.prediction.applyAuthoritativeSnapshot(m);
-      this.state.applySnapshot(m);
-      this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
-      this.applyPredictedSnapshot();
+      this.health.noteSnapshotArrival(now, document.hidden, m?.tick);
+      recordSnapshotProcessing(
+        this.snapshotProcessingReport,
+        () => this.prediction.applyAuthoritativeSnapshot(m),
+        () => this.state.applySnapshot(m),
+        () => {
+          this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
+          this.applyPredictedSnapshot();
+        },
+      );
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.replayControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
@@ -323,6 +334,7 @@ export class Match {
   sendNetReport() {
     const stats = this.health.reportStats;
     const metrics = this.health.metrics();
+    const transportStats = this.net.consumeSnapshotReportStats?.() || {};
     const elapsedMs = performance.now() - this.health.reportStartedAt;
     const avgFrameMs = stats.frameCount > 0 ? stats.frameTotalMs / stats.frameCount : 0;
     const report = {
@@ -336,6 +348,11 @@ export class Match {
       snapshotGapMaxMs: clampU16(stats.snapshotGapMaxMs),
       jitterSamples: clampU32(stats.jitterSamples),
       snapshots: clampU32(stats.snapshots),
+      ...snapshotReportFields({
+        reportStats: stats,
+        transportStats,
+        snapshotProcessing: this.snapshotProcessingReport,
+      }),
       frameGapMaxMs: clampU16(stats.frameGapMaxMs),
       fpsEstimate: clampU16(avgFrameMs > 0 ? 1000 / avgFrameMs : 0),
       ...clientPerfReportFields(this.frameProfiler),
@@ -364,6 +381,7 @@ export class Match {
     });
     this.health.resetReportStats();
     this.frameProfiler?.resetReportWindow?.();
+    this.snapshotProcessingReport.reset();
   }
 
   applyPredictionDisplayOverlay(overlay = null) {

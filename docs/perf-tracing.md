@@ -35,8 +35,19 @@ Every `ClientNetReport` upload includes a bounded report-window summary from the
 `rendererMaxMs`, `rendererP95Ms`, `entityCount`, `selectedCount`, `visibleTileCount`,
 `viewportWidth`, `viewportHeight`, and `devicePixelRatioX100`. Report-window profiler counters reset
 after each upload; the `window.__rtsPerf` debug summary remains cumulative until `reset()` is called.
-Raw phase arrays, recent frame records, stack traces, entity ids, command payloads, and replay data
-are intentionally not uploaded.
+
+The same upload also includes bounded snapshot diagnostics:
+
+- Payload size: `snapshotBytesTotal`, `snapshotBytesMax`, `snapshotBytesAvg`, and
+  `snapshotMessageCount`.
+- Browser processing: `snapshotParseMaxMs`/`snapshotParseP95Ms`,
+  `snapshotDecodeMaxMs`/`snapshotDecodeP95Ms`, `snapshotApplyMaxMs`/`snapshotApplyP95Ms`, and
+  `predictionApplyMaxMs`/`predictionApplyP95Ms`.
+- Cadence: `snapshotTickGapMax`, `staleSnapshotCount`, `duplicateSnapshotCount`,
+  `skippedSnapshotCount`, `snapshotBurstCount`, and `snapshotBurstMax`.
+
+Raw snapshot JSON, raw timestamp arrays, raw phase arrays, recent frame records, stack traces, entity
+ids, command payloads, and replay data are intentionally not uploaded.
 
 ## Modes
 
@@ -151,14 +162,28 @@ architecture policy gate.
 - `client_renderer`: `rendererMaxMs >= 33` or `rendererP95Ms >= 16`; inspect `worstFramePhase`,
   entity count, visible tiles, viewport size, and DPR to separate paint-heavy scenes from network
   lag.
+- `payload_pressure`: `snapshotBytesMax >= 262144` or `snapshotBytesAvg >= 131072`; inspect server
+  snapshot/perf rows for projection or compaction pressure.
+- `client_snapshot_parse`: `snapshotParseMaxMs >= 16` or `snapshotParseP95Ms >= 8`; points at
+  browser JSON parsing cost for received snapshot frames.
+- `client_snapshot_decode`: `snapshotDecodeMaxMs >= 16` or `snapshotDecodeP95Ms >= 8`; points at
+  compact-protocol expansion cost after JSON parse.
+- `client_snapshot_apply`: `snapshotApplyMaxMs >= 16`, `snapshotApplyP95Ms >= 8`,
+  `predictionApplyMaxMs >= 16`, or `predictionApplyP95Ms >= 8`; points at applying the decoded
+  snapshot into `GameState` or reconciling prediction overlays.
 - `client_frame_work`: `frameWorkMaxMs >= 33` or `frameWorkP95Ms >= 24`; points at local browser
   work outside pure renderer cost.
 - `client_frame_stall`: `frameGapMaxMs >= 100`, or `slowFrameCount > 0` when frame-work thresholds
   were not crossed; points at requestAnimationFrame gaps even when measured frame work was not the
   dominant issue.
 - Existing buckets continue to separate `network_rtt`, `snapshot_gap`, `snapshot_jitter`,
-  `server_tick`, `server_scheduler_lag`, `websocket_backlog`, `pending_commands`,
+  `snapshot_cadence`, `server_tick`, `server_scheduler_lag`, `websocket_backlog`, `pending_commands`,
   `prediction_correction`, `prediction_disabled`, and `wasm_budget`.
+
+`snapshot_cadence` covers `snapshotTickGapMax >= 3`, stale/duplicate/skipped snapshot counters, or
+`snapshotBurstMax >= 3`. Use it to distinguish receive burst/head-of-line symptoms from high RTT:
+large payload fields plus parse/decode cost point at client payload pressure, while clean payload
+fields plus high RTT/jitter point at the network path.
 
 For Fly or local logs, start with:
 

@@ -3,6 +3,7 @@
 // client and server stay in lockstep; this module owns no game logic.
 
 import { S, decodeServerMessage, msg, cmd as cmdBuilders } from "./protocol.js";
+import { ReportWindowAggregate } from "./report_window_aggregate.js";
 
 /**
  * Thin client transport over a single WebSocket connection.
@@ -31,6 +32,7 @@ export class Net {
     this.latencyUpdatedAt = 0;
     /** performance.now() stamp of the last ping(), used to compute latency. */
     this._lastPingSent = null;
+    this.snapshotReportStats = this.createSnapshotReportStats();
   }
 
   /** Our server-assigned player id, or null before the welcome message. */
@@ -214,6 +216,38 @@ export class Net {
     this._send(msg.netReport(report));
   }
 
+  createSnapshotReportStats() {
+    return {
+      bytesTotal: 0,
+      bytesMax: 0,
+      messageCount: 0,
+      parseMs: new ReportWindowAggregate(),
+      decodeMs: new ReportWindowAggregate(),
+    };
+  }
+
+  consumeSnapshotReportStats() {
+    const stats = this.snapshotReportStats;
+    const parse = stats.parseMs.summary();
+    const decode = stats.decodeMs.summary();
+    const out = {
+      snapshotBytesTotal: stats.bytesTotal,
+      snapshotBytesMax: stats.bytesMax,
+      snapshotBytesAvg: stats.messageCount > 0 ? Math.round(stats.bytesTotal / stats.messageCount) : 0,
+      snapshotMessageCount: stats.messageCount,
+      snapshotParseMaxMs: parse.max,
+      snapshotParseP95Ms: parse.p95,
+      snapshotDecodeMaxMs: decode.max,
+      snapshotDecodeP95Ms: decode.p95,
+    };
+    stats.bytesTotal = 0;
+    stats.bytesMax = 0;
+    stats.messageCount = 0;
+    stats.parseMs.reset();
+    stats.decodeMs.reset();
+    return out;
+  }
+
   /** Bytes queued by the browser for this WebSocket, if available. */
   get bufferedAmount() {
     return this.ws?.bufferedAmount || 0;
@@ -319,18 +353,33 @@ export class Net {
    * @param {MessageEvent} ev
    */
   _onMessage(ev) {
+    const rawBytes = typeof ev.data === "string" ? ev.data.length : undefined;
     let m;
+    let parseMs = 0;
+    let decodeMs = 0;
     try {
-      m = decodeServerMessage(JSON.parse(ev.data));
+      const parseStartedAt = performance.now();
+      const raw = JSON.parse(ev.data);
+      parseMs = performance.now() - parseStartedAt;
+      const decodeStartedAt = performance.now();
+      m = decodeServerMessage(raw);
+      decodeMs = performance.now() - decodeStartedAt;
     } catch (err) {
       // Ignore malformed frames rather than tearing down the connection.
       return;
     }
     if (!m || typeof m.t !== "string") return;
-    const detail = { bytes: typeof ev.data === "string" ? ev.data.length : undefined };
+    const detail = { bytes: rawBytes };
     const label = `server.recv.${m.t}`;
     if (m.t === S.SNAPSHOT || m.t === S.PONG) this.diagnostics?.count(label, detail);
     else this.diagnostics?.mark(label, detail);
+    if (m.t === S.SNAPSHOT) {
+      this.noteSnapshotFrame({
+        bytes: rawBytes,
+        parseMs,
+        decodeMs,
+      });
+    }
 
     switch (m.t) {
       case S.WELCOME:
@@ -368,5 +417,17 @@ export class Net {
         // Isolate handler exceptions so one bad subscriber cannot break dispatch.
       }
     }
+  }
+
+  noteSnapshotFrame({ bytes, parseMs, decodeMs }) {
+    const stats = this.snapshotReportStats;
+    const byteCount = Number(bytes);
+    if (Number.isFinite(byteCount) && byteCount > 0) {
+      stats.bytesTotal += byteCount;
+      stats.bytesMax = Math.max(stats.bytesMax, byteCount);
+    }
+    stats.messageCount += 1;
+    stats.parseMs.add(parseMs);
+    stats.decodeMs.add(decodeMs);
   }
 }

@@ -1,3 +1,5 @@
+import { ReportWindowAggregate } from "./report_window_aggregate.js";
+
 export function clientPerfReportFields(frameProfiler) {
   const perf = frameProfiler?.reportSummary?.() || {};
   const context = perf.context || {};
@@ -16,6 +18,78 @@ export function clientPerfReportFields(frameProfiler) {
     viewportHeight: clampU16(context.viewportHeight),
     devicePixelRatioX100: clampU16(Number(context.devicePixelRatio) * 100),
   };
+}
+
+export function createSnapshotProcessingReport() {
+  return new SnapshotProcessingReport();
+}
+
+export function recordSnapshotProcessing(report, reconcilePrediction, applySnapshot, applyPredictionOverlay) {
+  let predictionMs = report.measure(reconcilePrediction);
+  report.recordSnapshotApply(applySnapshot);
+  predictionMs += report.measure(applyPredictionOverlay);
+  report.recordPredictionApply(predictionMs);
+}
+
+export function snapshotReportFields({ reportStats, transportStats, snapshotProcessing }) {
+  const snapshotApply = snapshotProcessing?.snapshotApplySummary() || {};
+  const predictionApply = snapshotProcessing?.predictionApplySummary() || {};
+  return {
+    snapshotBytesTotal: clampU32(transportStats?.snapshotBytesTotal),
+    snapshotBytesMax: clampU32(transportStats?.snapshotBytesMax),
+    snapshotBytesAvg: clampU32(transportStats?.snapshotBytesAvg),
+    snapshotMessageCount: clampU32(transportStats?.snapshotMessageCount),
+    snapshotParseMaxMs: clampU16(transportStats?.snapshotParseMaxMs),
+    snapshotParseP95Ms: clampU16(transportStats?.snapshotParseP95Ms),
+    snapshotDecodeMaxMs: clampU16(transportStats?.snapshotDecodeMaxMs),
+    snapshotDecodeP95Ms: clampU16(transportStats?.snapshotDecodeP95Ms),
+    snapshotApplyMaxMs: clampU16(snapshotApply.max),
+    snapshotApplyP95Ms: clampU16(snapshotApply.p95),
+    predictionApplyMaxMs: clampU16(predictionApply.max),
+    predictionApplyP95Ms: clampU16(predictionApply.p95),
+    snapshotTickGapMax: clampU32(reportStats?.snapshotTickGapMax),
+    staleSnapshotCount: clampU32(reportStats?.staleSnapshotCount),
+    duplicateSnapshotCount: clampU32(reportStats?.duplicateSnapshotCount),
+    skippedSnapshotCount: clampU32(reportStats?.skippedSnapshotCount),
+    snapshotBurstCount: clampU32(reportStats?.snapshotBurstCount),
+    snapshotBurstMax: clampU32(reportStats?.snapshotBurstMax),
+  };
+}
+
+class SnapshotProcessingReport {
+  constructor() {
+    this.snapshotApplyMs = new ReportWindowAggregate();
+    this.predictionApplyMs = new ReportWindowAggregate();
+  }
+
+  measure(fn) {
+    const startedAt = performance.now();
+    fn();
+    return performance.now() - startedAt;
+  }
+
+  recordSnapshotApply(fn) {
+    const elapsedMs = this.measure(fn);
+    this.snapshotApplyMs.add(elapsedMs);
+    return elapsedMs;
+  }
+
+  recordPredictionApply(elapsedMs) {
+    this.predictionApplyMs.add(elapsedMs);
+  }
+
+  snapshotApplySummary() {
+    return this.snapshotApplyMs.summary();
+  }
+
+  predictionApplySummary() {
+    return this.predictionApplyMs.summary();
+  }
+
+  reset() {
+    this.snapshotApplyMs.reset();
+    this.predictionApplyMs.reset();
+  }
 }
 
 function clampU16(value) {
