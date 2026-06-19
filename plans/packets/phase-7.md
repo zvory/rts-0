@@ -30,15 +30,15 @@ Record, at minimum:
 - client parse/decode/reconstruct/apply p95;
 - server serialize/diff p95;
 - stale/unsupported/malformed/resync counts;
-- code paths or modes where compact JSON fallback was used.
-- the Phase 2.6 compression default, opt-in path, or deferral state.
+- code paths or modes where full-keyframe recovery was used.
+- the Phase 2.6 MessagePack keep/revert state.
 
 ## Rollout Policy
 
 Default to the conservative choice:
 
-- Keep compact JSON full snapshots as the fallback until delta mode has shipped through at least one
-  verified beta window.
+- Keep MessagePack full snapshots as the keyframe/full-snapshot recovery path unless Phase 2.6
+  reverted MessagePack.
 - Enable delta snapshots by default only if representative workloads show a meaningful p95 byte and
   over-budget-rate improvement without a material parse/decode/reconstruct/apply or server serialize
   regression.
@@ -46,29 +46,29 @@ Default to the conservative choice:
   forcing default rollout.
 - If recovery, replay/lab, or fog/privacy issues remain, keep delta mode disabled by default and open
   a follow-up plan before more implementation.
-- Do not silently change the Phase 2.6 compression default or fallback while defaulting deltas unless
-  the measurements explicitly cover that combined mode and rollback path.
+- Do not silently change the Phase 2.6 MessagePack keep/revert decision while defaulting deltas
+  unless the measurements explicitly cover that combined mode and rollback path.
 
 ## Work
 
 - Add or finalize runtime selection:
   - environment flag and/or negotiated capability for delta defaulting;
-  - clear fallback to compact JSON full snapshots;
+  - clear recovery to MessagePack full keyframes;
   - startup/version diagnostics showing which snapshot mode is active.
 - Update diagnostics and tooling:
   - `ClientNetReport` and server structured logs should report active snapshot mode, keyframe/delta
     counts, keyframe reasons, resync counts, and reconstruction cost where available;
   - `scripts/parse-net-report-logs.mjs` should summarize mode, p95 bytes, over-budget rate,
-    keyframe ratio, fallback reasons, and recovery counts;
+    keyframe ratio, recovery reasons, and recovery counts;
   - `scripts/client-perf-harness.mjs` summaries should include the same fields for comparisons.
 - Update docs:
-  - `docs/design/protocol.md` should describe the final default/fallback contract;
+  - `docs/design/protocol.md` should describe the final default and keyframe recovery contract;
   - `docs/perf-tracing.md` should explain how to interpret delta/keyframe metrics;
   - plan phase docs should be marked done only by the implementing phase commits, not retroactively
     in this planning pass.
 - Clean up:
   - remove dead experiment-only candidates that Phase 2 or later phases definitively rejected;
-  - keep compact JSON fallback and tests;
+  - keep MessagePack full-keyframe recovery and tests;
   - keep targeted malformed/recovery tests even if delta becomes default.
 
 ## Expected Touch Points
@@ -92,11 +92,11 @@ Default to the conservative choice:
 
 - [ ] Gather comparison metrics from representative workloads.
 - [ ] Decide default, opt-in, or defer using the rollout policy above.
-- [ ] Implement runtime selection and clear fallback diagnostics.
+- [ ] Implement runtime selection and clear recovery diagnostics.
 - [ ] Update report/log/parser/harness output for final mode metrics.
 - [ ] Update protocol/perf docs.
-- [ ] Remove stale experiment-only code without removing compact JSON fallback.
-- [ ] Add or keep focused fallback, malformed-frame, and recovery tests.
+- [ ] Remove stale experiment-only code without removing MessagePack full-keyframe recovery.
+- [ ] Add or keep focused malformed-frame and recovery tests.
 - [ ] Mark this phase as done in this file.
 
 ## Verification
@@ -114,13 +114,13 @@ missing evidence in the handoff.
 
 ## Manual Test Focus
 
-Run a normal local match in the selected default mode and in the compact JSON fallback mode. Confirm
+Run a normal local match in the selected default mode and in the MessagePack full-keyframe mode. Confirm
 commands, fog, selection, replay entry/seek, spectator view, lab/dev-watch paths, and diagnostics all
 remain understandable. If delta mode is enabled by default, verify that flipping the rollback flag
-returns the connection to compact JSON full snapshots without gameplay changes.
+returns the connection to MessagePack full snapshots without gameplay changes.
 
 ## Handoff Expectations
 
 State the rollout decision plainly: default-on, opt-in only, or deferred. Include the comparison
-table that drove the decision, the rollback flag/capability, the retained fallback tests, and any
+table that drove the decision, the rollback flag/capability, the retained recovery tests, and any
 follow-up plan needed for remaining packet-budget pressure.

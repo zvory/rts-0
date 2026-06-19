@@ -2,8 +2,8 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 2.6 is merged, the final compression decision recommends
-      delta work, and the user explicitly approves moving beyond encoding/compression.
+- [ ] Ready for implementation after Phase 2.6 is merged, the MessagePack keep/revert decision
+      recommends delta work, and the user explicitly approves moving beyond encoding.
 
 ## Objective
 
@@ -11,15 +11,15 @@ Introduce the stateful transport seam for future deltas without depending on a c
 yet. The phase should add a versioned snapshot-frame envelope, per-connection baseline tracking in
 the writer path, forced-keyframe rules, and a client-side reconstructor that still hands a normal
 semantic snapshot to `GameState.applySnapshot`. A keyframe-only opt-in run through this new path must
-behave like the current compact JSON snapshot path before later phases shrink any section.
+behave like the current MessagePack full-snapshot path before later phases shrink any section.
 
 ## Background
 
-Current live snapshots are full, compact JSON text frames. The room task builds a fresh
-per-recipient `Snapshot`, applies fog projection before send, compacts resources out of the entity
-list, and enqueues that full semantic snapshot into a latest-only pending slot. If a client is slow,
-newer snapshots replace older unsent snapshots; the writer task later serializes whichever full
-snapshot it actually takes from the slot.
+After Phase 2.5/2.6, current live snapshots should be full MessagePack binary frames unless the
+MessagePack rollout was reverted. The room task builds a fresh per-recipient `Snapshot`, applies fog
+projection before send, compacts resources out of the entity list, and enqueues that full semantic
+snapshot into a latest-only pending slot. If a client is slow, newer snapshots replace older unsent
+snapshots; the writer task later serializes whichever full snapshot it actually takes from the slot.
 
 That latest-only behavior is only safe for deltas if the server computes deltas from the last frame
 that was actually sent to this connection. Do not update a baseline in the room task, and do not
@@ -27,8 +27,8 @@ store pending delta chains in `LatestSnapshotSlot`.
 
 ## Design Constraints
 
-- Keep default live traffic on the current compact JSON snapshot path unless the phase adds an
-  explicit opt-in flag or negotiated diagnostic capability.
+- Keep default live traffic on the current MessagePack full-snapshot path unless the phase adds an
+  explicit opt-in flag for the keyframe-only delta envelope.
 - Compute the delta/keyframe frame from an already projected per-recipient `Snapshot`; the encoder
   must never see global hidden simulation state for this recipient.
 - Keep `LatestSnapshotSlot` storing full semantic snapshots. Delta encoding belongs in a per-writer
@@ -39,7 +39,7 @@ store pending delta chains in `LatestSnapshotSlot`.
   room task.
 - Keep `GameState.applySnapshot` and renderer/HUD/minimap/input callers receiving semantic snapshots,
   not transport delta frames.
-- Force keyframes on `start`, reconnect, unsupported snapshot-frame version, compact schema/version
+- Force keyframes on `start`, reconnect, unsupported snapshot-frame version, MessagePack/schema version
   change, replay seek, branch promotion/start, lab import/reset/seek/vision change, spectator replay
   vision change, projection-policy change, and a periodic cadence chosen in this phase.
 - Treat client recovery requests as advisory and rate-limited; clients remain untrusted.
@@ -66,10 +66,10 @@ must define one stable shape before code lands. The intended model is:
 - `d` is intentionally empty or absent in this phase; later phases define section-specific delta
   contents.
 
-The client decoder should accept current compact snapshots and the new keyframe-only frame. For a
-keyframe frame, it should decode `k` to the same semantic snapshot object current code produces. For
-a delta frame with no supported baseline, it should reject or ignore the frame without mutating
-client snapshot state, then request or wait for the next keyframe.
+The client decoder should accept the current MessagePack full-snapshot frame and the new
+keyframe-only frame. For a keyframe frame, it should decode `k` to the same semantic snapshot object
+current code produces. For a delta frame with no supported baseline, it should reject or ignore the
+frame without mutating client snapshot state, then request or wait for the next keyframe.
 
 ## Work
 
@@ -79,7 +79,7 @@ client snapshot state, then request or wait for the next keyframe.
   - update baseline only after `sink.send(...)` succeeds;
   - expose metrics for keyframe count, delta count, forced-keyframe reason, and baseline resets.
 - Add a client-side snapshot reconstructor below the `Net` dispatch layer:
-  - decode current compact snapshots unchanged;
+  - decode current MessagePack snapshots unchanged;
   - decode new keyframe frames into the current semantic snapshot shape;
   - validate frame sequence, baseline sequence, version, mode, and maximum section sizes;
   - drop unsupported or stale delta frames without passing partial state into `GameState`.
@@ -98,7 +98,8 @@ client snapshot state, then request or wait for the next keyframe.
   - document the frame envelope, baseline ownership, forced keyframes, and recovery behavior in
     `docs/design/protocol.md`;
   - document new perf/report fields in `docs/perf-tracing.md` if logging/reporting changes;
-  - keep compact JSON fallback and object-shaped dev fallback behavior documented.
+  - keep full-keyframe recovery behavior documented without restoring compact JSON compatibility
+    fallback.
 
 ## Expected Touch Points
 
@@ -125,11 +126,11 @@ Call out any recovery path that was deferred before Phase 4 starts.
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 2.6 applied or deferred the compression rollout, recommends delta work, and user
+- [ ] Confirm Phase 2.6 kept or reverted MessagePack, recommends delta work, and user
       approval exists.
 - [ ] Add a per-writer snapshot frame codec with baseline reset and keyframe-only support.
 - [ ] Keep `LatestSnapshotSlot` storing full semantic snapshots.
-- [ ] Add client reconstruction for current compact snapshots and new keyframe frames.
+- [ ] Add client reconstruction for current MessagePack snapshots and new keyframe frames.
 - [ ] Add unsupported/stale delta handling that cannot corrupt `GameState`.
 - [ ] Add forced-keyframe/reset handling for start, reconnect, replay, branch, lab, dev-watch, and
       projection-policy seams.
