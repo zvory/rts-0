@@ -86,11 +86,13 @@ export class HudSelectionPanel {
   }
 
   /** Render the selection summary: single-entity detail or multi-entity command budget grid. */
-  render() {
+  render(frameViews = null) {
     const panel = this.panel;
     if (!panel) return;
 
-    const sel = typeof this.state?.selectedEntities === "function"
+    const sel = Array.isArray(frameViews?.selectedEntities)
+      ? frameViews.selectedEntities
+      : typeof this.state?.selectedEntities === "function"
       ? this.state.selectedEntities()
       : [];
     if (!sel || sel.length === 0) {

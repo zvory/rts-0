@@ -8,14 +8,19 @@ const EMPTY_ARRAY = Object.freeze([]);
  * transient effect markers stay behind one explicit boundary.
  *
  * @param {object} state GameState-compatible browser model.
- * @param {{clientIntent?:object|null, entities?:Array<object>, now?:number}=} options
+ * @param {{clientIntent?:object|null, entities?:Array<object>, selectedEntities?:Array<object>, now?:number}=} options
  * @returns {object}
  */
-export function buildRendererFeedbackView(state, { clientIntent = null, entities = EMPTY_ARRAY, now = defaultNow() } = {}) {
-  const selectedEntities = typeof state?.selectedEntities === "function"
+export function buildRendererFeedbackView(
+  state,
+  { clientIntent = null, entities = EMPTY_ARRAY, selectedEntities = null, now = defaultNow() } = {},
+) {
+  const selected = Array.isArray(selectedEntities)
+    ? selectedEntities
+    : typeof state?.selectedEntities === "function"
     ? arrayOrEmpty(state.selectedEntities())
     : EMPTY_ARRAY;
-  const entityLookup = buildEntityLookup(entities, selectedEntities);
+  const entityLookup = buildEntityLookup(entities, selected);
   const intent = clientIntent || null;
 
   const commandFeedback = liveArray(intent, "liveCommandFeedback", now);
@@ -34,7 +39,7 @@ export function buildRendererFeedbackView(state, { clientIntent = null, entities
     map: state?.map || null,
     placement: intent?.placement || null,
     commandFeedback,
-    selectedEntities: () => selectedEntities,
+    selectedEntities: () => selected,
     debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,
     showAllDebugPathOverlays: !!state?.showAllDebugPathOverlays,
     antiTankGunSetupPreview: intent?.antiTankGunSetupPreview || null,

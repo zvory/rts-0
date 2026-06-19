@@ -39,6 +39,16 @@ export function playerHasCompletedKind(entities, playerId, kind) {
   return false;
 }
 
+function frameSelectedEntities(state, frameViews = null) {
+  if (Array.isArray(frameViews?.selectedEntities)) return frameViews.selectedEntities;
+  return typeof state?.selectedEntities === "function" ? state.selectedEntities() || [] : [];
+}
+
+function frameCurrentEntities(state, frameViews = null) {
+  if (Array.isArray(frameViews?.currentEntities)) return frameViews.currentEntities;
+  return typeof state?.entitiesInterpolated === "function" ? state.entitiesInterpolated(1) || [] : [];
+}
+
 /**
  * Group cooldown-left values that are visually close enough to share one clock arm.
  * @param {number[]} cooldowns ticks left; ready values (<= 0) are ignored
@@ -145,11 +155,11 @@ export class HUD {
    * Refresh the entire HUD from the latest snapshot/selection. Cheap and idempotent;
    * safe to call every frame.
    */
-  update() {
+  update(frameViews = null) {
     this._renderResources();
-    this._renderControlGroupTabs();
-    this._renderSelectedPanel();
-    this._renderCommandCard();
+    this._renderControlGroupTabs(frameViews);
+    this._renderSelectedPanel(frameViews);
+    this._renderCommandCard(frameViews);
   }
 
   /** Clear DOM-owned HUD state between matches. */
@@ -255,11 +265,11 @@ export class HUD {
   // --- Selected-units panel --------------------------------------------------
 
   /** Render fixed-position, non-clickable tabs for occupied local control groups. */
-  _renderControlGroupTabs() {
+  _renderControlGroupTabs(frameViews = null) {
     const tabs = this.elControlGroups;
     if (!tabs) return;
 
-    const groups = this._controlGroupSummaries();
+    const groups = this._controlGroupSummaries(frameViews);
     const sig = groups.map((g) =>
       g ? `${g.key}:${g.count}:${g.icon}:${g.selected ? 1 : 0}` : "-",
     ).join("|");
@@ -293,10 +303,8 @@ export class HUD {
     tabs.appendChild(frag);
   }
 
-  _controlGroupSummaries() {
-    const selected = typeof this.state.selectedEntities === "function"
-      ? this.state.selectedEntities()
-      : [];
+  _controlGroupSummaries(frameViews = null) {
+    const selected = frameSelectedEntities(this.state, frameViews);
     const selectedIds = new Set(selected.map((e) => e.id));
     const selectedCount = selectedIds.size;
     const out = [];
@@ -348,8 +356,8 @@ export class HUD {
     return true;
   }
 
-  _renderSelectedPanel() {
-    this.selectionPanel?.render();
+  _renderSelectedPanel(frameViews = null) {
+    this.selectionPanel?.render(frameViews);
   }
 
   // --- Command card ----------------------------------------------------------
@@ -369,10 +377,10 @@ export class HUD {
    * requires completed prerequisites). Buttons with available tech but missing
    * resources stay clickable so clicks/hotkeys can play the relevant notice.
    */
-  _renderCommandCard() {
+  _renderCommandCard(frameViews = null) {
     const card = this.elCommand;
     if (!card) return;
-    let descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext());
+    let descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext(frameViews));
     if (this.hotkeyProfiles) descriptorCard = this.hotkeyProfiles.resolveCard(descriptorCard);
     const cardSig = `${descriptorCard.signature}|hotkeys:${this.hotkeyProfiles?.revision || 0}`;
     if (descriptorCard.kind === "spectator") {
@@ -392,13 +400,13 @@ export class HUD {
     this._renderDescriptorCard(card, descriptorCard);
   }
 
-  _commandDescriptorContext() {
+  _commandDescriptorContext(frameViews = null) {
     return {
       spectator: this.state.spectator,
       state: this.state,
       playerId: this.state.playerId,
       factionId: this.state.localFactionId,
-      selection: this.state.selectedEntities() || [],
+      selection: frameSelectedEntities(this.state, frameViews),
       resources: this.state.resources || { steel: 0, oil: 0 },
       optimisticProduction: this.state.optimisticProduction || [],
       upgrades: this.state.upgrades || [],
@@ -406,7 +414,7 @@ export class HUD {
       commandTarget: this._intent()?.commandTarget,
       controlPolicy: this.controlPolicy,
       groupCooldownClocks,
-      playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind),
+      playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind, frameViews),
     };
   }
 
@@ -785,10 +793,10 @@ export class HUD {
   }
 
   /** True if the player owns at least one completed entity of `kind`. */
-  _playerHasCompleteKind(kind) {
-    // entitiesInterpolated(1) reflects the latest snapshot positions but, more
+  _playerHasCompleteKind(kind, frameViews = null) {
+    // currentEntities reflects the latest snapshot positions but, more
     // importantly here, the latest set of entities.
-    return playerHasCompletedKind(this.state.entitiesInterpolated(1), this.state.playerId, kind);
+    return playerHasCompletedKind(frameCurrentEntities(this.state, frameViews), this.state.playerId, kind);
   }
 
   /**

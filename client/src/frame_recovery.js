@@ -1,4 +1,5 @@
 import { collectMatchFrameContext } from "./frame_profiler.js";
+import { buildFrameEntityViews } from "./frame_entity_views.js";
 
 const FRAME_ERROR_LOG_INTERVAL_MS = 5000;
 
@@ -45,19 +46,28 @@ function runMatchFrame(match, now) {
     });
     time("match.input", () => match.input.update(dt));
     time("match.predictionVisual", () => match.advancePredictionVisual());
+    const frameViews = time(
+      "match.frameEntityViews",
+      () => buildFrameEntityViews(match.state, { alpha }),
+    );
+    match.frameProfiler?.setContext({
+      frameEntityViewCalls: frameViews.debug.entitiesInterpolatedCalls,
+      frameSelectedEntityCalls: frameViews.debug.selectedEntitiesCalls,
+    });
     time("match.fog", () => {
-      match.fog.update(match.ownEntities(), match.state.map.tileSize, match.state.visibleTiles);
+      match.fog.update(frameViews.fogSourceEntities, match.state.map.tileSize, match.state.visibleTiles);
     });
 
     time("match.renderer", () => {
       match.renderer.render(match.state, match.camera, match.fog, alpha, {
         clientIntent: match.clientIntent,
+        frameViews,
         profiler: match.frameProfiler,
       });
     });
-    time("match.hud", () => match.hud.update());
-    time("match.minimap", () => match.minimap.render());
-    time("match.observerAnalysis", () => match.observerAnalysisOverlay?.update());
+    time("match.hud", () => match.hud.update(frameViews));
+    time("match.minimap", () => match.minimap.render(frameViews));
+    time("match.observerAnalysis", () => match.observerAnalysisOverlay?.update(frameViews));
     time("match.healthPublish", () => match.health.publish());
   } finally {
     match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });

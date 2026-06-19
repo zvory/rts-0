@@ -199,7 +199,7 @@ export class Renderer {
    * @param {import("./fog.js").Fog} fog
    * @param {number} alpha interpolation factor 0..1 between the two latest snapshots
    */
-  render(state, camera, fog, alpha, { clientIntent = null, profiler = null } = {}) {
+  render(state, camera, fog, alpha, { clientIntent = null, frameViews = null, profiler = null } = {}) {
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
@@ -215,7 +215,9 @@ export class Renderer {
     let colorByOwner = new Map();
     const liveIds = new Set();
     time("renderer.entityPrep", () => {
-      entities = state.entitiesInterpolated(alpha) || [];
+      entities = Array.isArray(frameViews?.interpolatedEntities)
+        ? frameViews.interpolatedEntities
+        : state.entitiesInterpolated(alpha) || [];
       regularEntities = entities.filter((e) => !e.shotReveal);
       shotReveals = entities.filter((e) => e.shotReveal);
       selection = state.selection || new Set();
@@ -230,7 +232,11 @@ export class Renderer {
     });
     const feedbackView = time(
       "renderer.feedbackView",
-      () => buildRendererFeedbackView(state, { clientIntent, entities }),
+      () => buildRendererFeedbackView(state, {
+        clientIntent,
+        entities,
+        selectedEntities: frameViews?.selectedEntities,
+      }),
     );
 
     // Nodes currently being mined: any worker latched to them. Used by

@@ -46,6 +46,7 @@ src/
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
+  frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
@@ -222,7 +223,8 @@ export function buildRendererFeedbackView(state, options?)
   // selected entities, resource mining previews, support-weapon previews,
   // ability target previews, ability objects, smokes, transient projectile/
   // target markers, relationship helpers, and entity lookup for renderer
-  // feedback drawing without exposing the full mutable GameState.
+  // feedback drawing without exposing the full mutable GameState. `options`
+  // may inject frame-local entities and selectedEntities arrays.
 ```
 
 `branch_staging.js`
@@ -244,7 +246,7 @@ createObserverAnalysisOverlayPreferences(storage?)
 export class ObserverAnalysisOverlay {
   constructor({ root, preferences, getEntities, getCameraBounds, getPlayers, stats })
   applyObserverAnalysis(payload)            // renders server-backed production, unit, and losses tabs
-  update()                                // refreshes viewport army value from camera/snapshot state
+  update(frameViews?)                     // refreshes viewport army value from camera/snapshot state
   destroy()
 }
 ```
@@ -257,6 +259,20 @@ client-side and viewport-specific; Production, Units, Units Lost, and Resources 
 latest server-authored `replayAnalysis` payload. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
 harvesting, refunds, and cancelled queues.
+
+`frame_entity_views.js`
+```js
+buildFrameEntityViews(state, { alpha }) // frame-local interpolated/current/authoritative/selected entity arrays
+```
+`frame_recovery.js` builds this object once per requestAnimationFrame after prediction display has
+advanced and before fog, renderer, HUD, minimap, and observer analysis run. The object is not
+authoritative state and must not be retained after the frame; it exists only to share common
+`GameState.entitiesInterpolated()` and `selectedEntities()` results across frame consumers.
+`interpolatedEntities` uses the render alpha and prediction display for the Pixi renderer,
+`currentEntities` uses the latest predicted display positions for minimap blips and HUD tech
+checks, `authoritativeEntities` uses latest no-prediction positions for local fog-source filtering
+and observer Army Value rows, and `fogSourceEntities` removes shot-reveal/vision-only entries plus
+non-vision neutral resources.
 
 `settings_container.js`
 ```js
@@ -435,6 +451,11 @@ command-target arming, hover previews, command feedback, and ability previews. `
 grow compatibility accessors for those intent fields; HUD, input, minimap, and renderer feedback
 use the injected facade or a narrow read model.
 
+Frame-local entity views belong to the app-shell frame loop, not to `GameState`. Rendering, local
+fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
+should accept the injected frame view when called from the RAF path and fall back to `GameState`
+queries only for direct module tests or event handlers outside the frame.
+
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
 rather than relying on the full mutable `GameState`. HUD and input should exchange command intent
@@ -460,7 +481,7 @@ export class Renderer {
   constructor(canvasParent)              // creates PIXI.Application, layers
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
-  render(state, camera, fog, alpha)      // per-frame; draws entities, fog, selection, placement
+  render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // exposes screen->world hit info if helpful; selection box drawing lives here too:
   drawSelectionBox(rectOrNull)
@@ -600,7 +621,7 @@ export function noticeSoundId(msg)
 ```js
 export class HUD {
   constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?)
-  update()                               // refresh resources/supply, selected panel, command card
+  update(frameViews?)                    // refresh resources/supply, selected panel, command card
   // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
 ```
@@ -630,7 +651,7 @@ client-exposed descriptor against the Rust dump.
 ```js
 export class Minimap {
   constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?, {clientIntent?, commandsEnabled?})
-  render()                               // draw terrain + fog + entity blips + viewport rect
+  render(frameViews?)                    // draw terrain + fog + entity blips + viewport rect
   inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)
 }
@@ -654,9 +675,9 @@ export class Lobby {
 `GameState`, `ClientIntent`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`,
 `Input`, starts the rAF loop
 (compute `alpha` from snapshot timing, `camera.update`,
-`audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
-`minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
-once; on `gameOver` show the victory/defeat overlay with the frozen score table. The score table
+`audio.setListener`, `input.update`, `buildFrameEntityViews`, `fog.update`, `renderer.render`,
+`hud.update`, `minimap.render`); on each snapshot it applies state and triggers transient event
+audio exactly once; on `gameOver` show the victory/defeat overlay with the frozen score table. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
 For spectator starts, `match.js` hides the command card and give-up action, computes local fog from

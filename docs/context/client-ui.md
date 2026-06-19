@@ -10,8 +10,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - §4.3 Client architecture workflow
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, `match.js`, `frame_recovery.js`, `match_health.js`,
-  `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `frame_recovery.js`, `frame_entity_views.js`,
+  `match_health.js`, `observer_analysis_overlay.js`, `replay_controls.js`, `replay_viewer.js`,
   `lab_control_policy.js`, `room_capabilities.js`; app lifecycle, dependency injection,
   frame-loop health, observer analysis, and replay/spectator/lab shell wiring.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
