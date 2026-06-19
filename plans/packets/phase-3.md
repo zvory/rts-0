@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 2.5 is merged, the applied encoding decision recommends
+- [ ] Ready for implementation after Phase 2.6 is merged, the final compression decision recommends
       delta work, and the user explicitly approves moving beyond encoding/compression.
 
 ## Objective
@@ -125,8 +125,8 @@ Call out any recovery path that was deferred before Phase 4 starts.
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 2.5 applied the Phase 2 recommendation, recommends delta work, and user approval
-      exists.
+- [ ] Confirm Phase 2.6 applied or deferred the compression rollout, recommends delta work, and user
+      approval exists.
 - [ ] Add a per-writer snapshot frame codec with baseline reset and keyframe-only support.
 - [ ] Keep `LatestSnapshotSlot` storing full semantic snapshots.
 - [ ] Add client reconstruction for current compact snapshots and new keyframe frames.
