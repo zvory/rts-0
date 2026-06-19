@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { CLIENT_NET_REPORT_FIELDS } from "./client_net_report_fields.mjs";
 
 import {
   ABILITY_CODE,
@@ -121,6 +122,10 @@ function assertDocsCodeTable(label, rustCodes) {
   assertSameMap(`docs compact ${label}`, rustCodes, extractMarkdownCodeRow(label));
 }
 
+function camelToSnake(name) {
+  return name.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}`);
+}
+
 assert(protocolContract.schemaVersion === 1, "protocol contract schema version must be 1");
 assert(protocolContract.unknownCodeSentinel === 255, "unknown compact code sentinel must stay 255");
 assertSameMap("server message tags", protocolContract.messageTags.server, S);
@@ -165,6 +170,16 @@ assert(
   "prediction protocol version must match Rust",
 );
 assert(protocolContract.defaultFactionId === DEFAULT_FACTION_ID, "default faction id must match Rust");
+const clientNetReportStruct = rust.match(/pub struct ClientNetReport \{([\s\S]*?)\n\}/);
+assert(clientNetReportStruct, "Rust protocol must define ClientNetReport");
+for (const field of CLIENT_NET_REPORT_FIELDS) {
+  const rustField = camelToSnake(field);
+  assert(
+    new RegExp(`\\bpub\\s+${rustField}\\s*:`).test(clientNetReportStruct[1]),
+    `ClientNetReport Rust DTO missing ${rustField}`,
+  );
+  assert(protocolDoc.includes(`${field}:`), `protocol docs missing ClientNetReport.${field}`);
+}
 assert(
   protocolContract.compactSlotSchemas.snapshot.map((field) => field.name).join(",") ===
     "tick,steel,oil,supplyUsed,supplyCap",

@@ -37,6 +37,10 @@ pub const NET_REPORT_LATENCY_ISSUE_MS: u16 = 180;
 pub const NET_REPORT_JITTER_ISSUE_MS: u16 = 20;
 pub const NET_REPORT_SNAPSHOT_GAP_ISSUE_MS: u16 = 100;
 pub const NET_REPORT_FRAME_GAP_ISSUE_MS: u16 = 100;
+pub const NET_REPORT_FRAME_WORK_ISSUE_MS: u16 = 33;
+pub const NET_REPORT_FRAME_WORK_P95_ISSUE_MS: u16 = 24;
+pub const NET_REPORT_RENDERER_ISSUE_MS: u16 = 33;
+pub const NET_REPORT_RENDERER_P95_ISSUE_MS: u16 = 16;
 pub const NET_REPORT_WS_BUFFERED_BYTES_ISSUE: u32 = 64 * 1024;
 pub const NET_REPORT_SERVER_TICK_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_SERVER_LAG_ISSUE_MS: u16 = 33;
@@ -79,6 +83,19 @@ pub fn log_client_net_report(
         snapshots = report.snapshots,
         frame_gap_max_ms = report.frame_gap_max_ms,
         fps_estimate = report.fps_estimate,
+        frame_work_max_ms = report.frame_work_max_ms,
+        frame_work_p95_ms = report.frame_work_p95_ms,
+        slow_frame_count = report.slow_frame_count,
+        worst_frame_phase = %report.worst_frame_phase,
+        worst_frame_phase_ms = report.worst_frame_phase_ms,
+        renderer_max_ms = report.renderer_max_ms,
+        renderer_p95_ms = report.renderer_p95_ms,
+        entity_count = report.entity_count,
+        selected_count = report.selected_count,
+        visible_tile_count = report.visible_tile_count,
+        viewport_width = report.viewport_width,
+        viewport_height = report.viewport_height,
+        device_pixel_ratio_x100 = report.device_pixel_ratio_x100,
         hidden = report.hidden,
         focused = report.focused,
         ws_buffered_bytes = report.ws_buffered_bytes,
@@ -107,6 +124,11 @@ pub fn is_notable_net_report(report: &ClientNetReport) -> bool {
         || report.jitter_samples > 0
         || report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS
         || report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
+        || report.frame_work_max_ms >= NET_REPORT_FRAME_WORK_ISSUE_MS
+        || report.frame_work_p95_ms >= NET_REPORT_FRAME_WORK_P95_ISSUE_MS
+        || report.slow_frame_count > 0
+        || report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
+        || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
         || report.ws_buffered_bytes >= NET_REPORT_WS_BUFFERED_BYTES_ISSUE
         || report.server_tick_ms >= NET_REPORT_SERVER_TICK_ISSUE_MS
         || report.server_lag_ms >= NET_REPORT_SERVER_LAG_ISSUE_MS
@@ -130,7 +152,17 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
         || report.prediction_replay_ticks >= NET_REPORT_REPLAY_TICK_ISSUE
     {
         "wasm_budget"
-    } else if report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS {
+    } else if report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
+        || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
+    {
+        "client_renderer"
+    } else if report.frame_work_max_ms >= NET_REPORT_FRAME_WORK_ISSUE_MS
+        || report.frame_work_p95_ms >= NET_REPORT_FRAME_WORK_P95_ISSUE_MS
+    {
+        "client_frame_work"
+    } else if report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
+        || report.slow_frame_count > 0
+    {
         "client_frame_stall"
     } else if report.server_tick_ms >= NET_REPORT_SERVER_TICK_ISSUE_MS {
         "server_tick"
@@ -259,6 +291,19 @@ mod tests {
             snapshots: 300,
             frame_gap_max_ms: 18,
             fps_estimate: 60,
+            frame_work_max_ms: 10,
+            frame_work_p95_ms: 8,
+            slow_frame_count: 0,
+            worst_frame_phase: String::new(),
+            worst_frame_phase_ms: 0,
+            renderer_max_ms: 6,
+            renderer_p95_ms: 4,
+            entity_count: 120,
+            selected_count: 0,
+            visible_tile_count: 500,
+            viewport_width: 1280,
+            viewport_height: 720,
+            device_pixel_ratio_x100: 100,
             hidden: false,
             focused: true,
             ws_buffered_bytes: 0,
@@ -290,12 +335,30 @@ mod tests {
         let mut report = clean_report();
         report.snapshot_jitter_ms = NET_REPORT_JITTER_ISSUE_MS;
         assert_eq!(classify_client_net_report(&report), "snapshot_jitter");
-        report.frame_gap_max_ms = NET_REPORT_FRAME_GAP_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "client_frame_stall");
+        report.frame_work_max_ms = NET_REPORT_FRAME_WORK_ISSUE_MS;
+        assert_eq!(classify_client_net_report(&report), "client_frame_work");
+        report.renderer_max_ms = NET_REPORT_RENDERER_ISSUE_MS;
+        assert_eq!(classify_client_net_report(&report), "client_renderer");
         report.correction_count = 1;
         assert_eq!(classify_client_net_report(&report), "prediction_correction");
         report.prediction_disable_count = 1;
         assert_eq!(classify_client_net_report(&report), "prediction_disabled");
+    }
+
+    #[test]
+    fn net_report_classifies_frame_gap_separately_from_work() {
+        let mut report = clean_report();
+        report.frame_gap_max_ms = NET_REPORT_FRAME_GAP_ISSUE_MS;
+        assert!(is_notable_net_report(&report));
+        assert_eq!(classify_client_net_report(&report), "client_frame_stall");
+    }
+
+    #[test]
+    fn net_report_classifies_slow_frame_count_as_frame_stall_without_work_cost() {
+        let mut report = clean_report();
+        report.slow_frame_count = 1;
+        assert!(is_notable_net_report(&report));
+        assert_eq!(classify_client_net_report(&report), "client_frame_stall");
     }
 
     #[test]

@@ -134,6 +134,19 @@ in a match:
   snapshots: u32,           // snapshots received in this report window
   frameGapMaxMs: u16,       // largest requestAnimationFrame gap in this report window
   fpsEstimate: u16,         // coarse average client frame rate for this report window
+  frameWorkMaxMs: u16,      // largest measured JS frame work duration
+  frameWorkP95Ms: u16,      // bucketed p95 measured JS frame work duration
+  slowFrameCount: u32,      // frames whose gap or work crossed the slow-frame threshold
+  worstFramePhase: string,  // bounded profiler label most often worst in this report window
+  worstFramePhaseMs: u16,   // max duration for worstFramePhase
+  rendererMaxMs: u16,       // largest measured match.renderer duration
+  rendererP95Ms: u16,       // bucketed p95 match.renderer duration
+  entityCount: u32,         // latest client-visible entity count context
+  selectedCount: u16,       // latest local selection size context
+  visibleTileCount: u32,    // latest visible-tile count context
+  viewportWidth: u16,       // latest CSS viewport width context
+  viewportHeight: u16,      // latest CSS viewport height context
+  devicePixelRatioX100: u16, // latest devicePixelRatio multiplied by 100
   hidden: bool,             // document.hidden when the report was sent
   focused: bool,            // document.hasFocus() when available
   wsBufferedBytes: u32,     // browser WebSocket bufferedAmount
@@ -152,11 +165,13 @@ in a match:
   predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
 }
 ```
-The server logs this message only when the aggregate contains notable lag, jitter, browser frame
-stalls, WebSocket backlog, server tick/scheduler pressure, or prediction correction/fallback
-signals, alongside the connection's `player_id` and room name. Values are advisory because clients
-are untrusted; use them to diagnose transport/browser/prediction behavior, not as gameplay
-authority.
+The frame-work and renderer fields come from the browser's bounded frame-profiler report window;
+the local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
+recent frames are not uploaded. The server logs this message only when the aggregate contains
+notable lag, jitter, browser frame stalls, local JS frame work, renderer cost, WebSocket backlog,
+server tick/scheduler pressure, or prediction correction/fallback signals, alongside the
+connection's `player_id` and room name. Values are advisory because clients are untrusted; use them
+to diagnose transport/browser/prediction/render behavior, not as gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)
 

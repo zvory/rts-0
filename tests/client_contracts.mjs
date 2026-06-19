@@ -7,6 +7,7 @@
 // is covered with a tiny fake Pixi harness.
 
 import fs from "node:fs";
+import { CLIENT_NET_REPORT_FIELDS } from "./client_net_report_fields.mjs";
 import { Net } from "../client/src/net.js";
 import {
   DEFAULT_AI_PROFILE_ID,
@@ -1308,9 +1309,21 @@ function hotkeyService() {
   assert(unitsPhase?.p95Ms === 12, "FrameProfiler reports bucketed p95 timing");
   assert(summary.worstPhase?.label === "renderer.units", "FrameProfiler reports the most common worst phase");
   assert(profiler.text().includes("renderer.units"), "FrameProfiler text summary is copyable");
+  const report = profiler.reportSummary();
+  assert(report.frameCount === 3, "FrameProfiler report summary counts the report window");
+  assert(report.slowFrameCount === 2, "FrameProfiler report summary counts slow frames");
+  assert(report.frameWorkMaxMs === 25, "FrameProfiler report summary records max frame work");
+  assert(report.frameWorkP95Ms === 33, "FrameProfiler report summary records bucketed frame work p95");
+  assert(report.worstFramePhase === "renderer.units", "FrameProfiler report summary names worst phase");
+  assert(report.worstFramePhaseMs === 9, "FrameProfiler report summary records worst phase max");
+  assert(report.rendererMaxMs === 0, "FrameProfiler report summary tolerates missing renderer phase");
   const surface = profiler.debugSurface();
   assert(typeof surface.summary === "function", "FrameProfiler debug surface exposes summary()");
   assert(typeof surface.copy === "function", "FrameProfiler debug surface exposes copy()");
+  assert(typeof surface.reportSummary === "function", "FrameProfiler debug surface exposes reportSummary()");
+  profiler.resetReportWindow();
+  assert(profiler.reportSummary().frameCount === 0, "FrameProfiler can reset only report-window aggregates");
+  assert(profiler.summary().frameCount === 3, "FrameProfiler report-window reset preserves debug aggregates");
   surface.reset();
   assert(profiler.summary().frameCount === 0, "FrameProfiler debug surface reset clears aggregates");
 }
@@ -1324,6 +1337,7 @@ function hotkeyService() {
     const context = collectMatchFrameContext({
       lastSnapshotTick: 123,
       state: {
+        _curById: new Map([[1, {}], [2, {}], [3, {}]]),
         selection: new Set([1, 2]),
         rememberedBuildings: [{ id: 9 }],
         visibleTiles: Uint8Array.from([1, 0, 1, 1]),
@@ -1333,6 +1347,7 @@ function hotkeyService() {
       prediction: { debugSummary: () => ({ mode: "predicting" }) },
     });
     assert(context.matchTick === 123, "match frame context includes latest match tick");
+    assert(context.entityCount === 3, "match frame context includes current entity count");
     assert(context.selectedCount === 2, "match frame context includes selected count");
     assert(context.rememberedBuildingCount === 1, "match frame context includes remembered building count");
     assert(context.visibleTileCount === 3, "match frame context counts visible tiles");
@@ -3842,6 +3857,17 @@ function fakeAudioContext() {
     msg.join("A", "main", false, true).replayOk === true,
     "join builder can confirm replay joins",
   );
+  for (const field of [
+    "frameWorkMaxMs",
+    "frameWorkP95Ms",
+    "slowFrameCount",
+    "worstFramePhase",
+    "rendererMaxMs",
+    "entityCount",
+    "devicePixelRatioX100",
+  ]) {
+    assert(CLIENT_NET_REPORT_FIELDS.includes(field), `client net-report field list includes ${field}`);
+  }
   assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
   assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
