@@ -24,8 +24,17 @@ remote-echo command feel.
   - worker/perf degradation thresholds
 - Make the cadence and rollback path default for compatible live active-player sessions when
   Movement prediction is enabled.
+- Keep all tuning values centralized and documented with ownership:
+  - protocol constants and compact versions in the protocol crate/mirror
+  - server scheduling, rollback window, future-tick bounds, and fallback thresholds in one
+    live-room scheduling module
+  - client lead defaults and degraded prediction modes in the prediction path
+  - operator-facing thresholds in `docs/perf-tracing.md`
 - Keep spectators, replay viewers, unsupported factions, incompatible builds, and prediction-off
   sessions out of cadence prediction.
+- Do not roll out by silent partial behavior. If a command family remains authoritative-only, the
+  regression matrix must say so and the UI/debug surfaces must not imply local world response for
+  that family.
 - Update docs and operator guidance:
   - `docs/design/protocol.md`
   - `docs/design/server-sim.md`
@@ -38,6 +47,13 @@ remote-echo command feel.
   - authoritative-only side effects
   - required tests
   - known unsupported cases
+- Add an explicit rollout decision record that names:
+  - whether rollback is enabled for human-only rooms, AI-backed rooms, branch-live rooms, and lab
+    rooms
+  - whether the final mode is full visual prediction, reduced prediction, accepted-intent overlay,
+    or authoritative-only for each command family
+  - what evidence would trigger reverting to a higher lead, smaller rollback window, or
+    authoritative-only mode
 
 ## Verification
 
@@ -57,6 +73,9 @@ remote-echo command feel.
   - 250 ms RTT with burst delivery
   - 26-tick rollback command delivery
   - weaker client or CPU-throttled profile
+- Verify the regression matrix mechanically where practical: add or update a small checker or test
+  fixture that fails when a command family is marked predicted without matching tri-state coverage
+  and listed authoritative-only side effects.
 - If practical, run one narrow live Node integration or smoke path with Movement prediction enabled
   and one with it disabled.
 - Rely on the PR `./tests/run-all.sh` gate for full-suite coverage.
@@ -71,8 +90,8 @@ Movement prediction off returns to the old authoritative-only behavior.
 ## Handoff Expectations
 
 The handoff must state the final rollout status, tuning values, rollback window, verification
-commands and results, known caveats, and which player-facing command surfaces should be watched in
-playtests.
+commands and results, known caveats, the regression matrix location, the rollback support matrix,
+and which player-facing command surfaces should be watched in playtests.
 
 ## Done Criteria
 
@@ -82,4 +101,6 @@ playtests.
 - Rollback, late fallback, correction distances, and degraded prediction modes are visible in
   diagnostics.
 - All enabled command families have tri-state coverage.
+- Every command family has an explicit matrix row saying whether it is predicted, intent-only,
+  rollback-supported, or authoritative-only.
 - Docs and context capsules match the implemented contract.
