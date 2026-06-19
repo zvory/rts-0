@@ -1,4 +1,4 @@
-# Phase 4 - Movement Prediction on Effective Ticks
+# Phase 4 - Bounded Server Rollback
 
 ## Phase Status
 
@@ -6,72 +6,75 @@
 
 ## Objective
 
-Rebase existing owned-unit movement prediction onto the effective-tick command cadence. Healthy
-clients should see owned movement begin after the two-tick lead, while authoritative snapshots
-reconcile by replaying forward rather than causing repeated rubberbanding.
+Use the Phase 3 history buffer to honor late commands that arrive within the 26-tick rollback
+window. The server should restore recent authority, insert the late command at its intended
+effective tick, replay to present, and emit corrected snapshots without making rollback an
+unbounded CPU liability.
 
 ## Scope
 
-- Update the WASM adapter and prediction controller so commands begin locally on their intended or
-  accepted effective tick, not immediately on click.
-- Reconcile authoritative snapshots by:
-  - importing the owner-safe baseline at the authoritative tick
-  - dropping commands consumed by authoritative sim ACK
-  - replaying unacknowledged or late-corrected commands in effective-tick order
-  - advancing prediction to the current display tick
-- Keep prediction scoped to owned units for:
-  - move
-  - attack-move movement
-  - stop
-  - hold position
-  - queued movement stages
-- Track correction distance separately for:
-  - ordinary authoritative drift
-  - late-command correction
-  - hidden blocker/path divergence
-- Keep Movement prediction setting as the gate.
+- Define `ROLLBACK_WINDOW_TICKS = 26` as the initial maximum rollback distance.
+- When a command arrives after its requested `executeTick`:
+  - if `currentTick - executeTick <= 26` and history is available, roll back and insert it
+  - if the command is outside the window, execute late at the next legal tick and raise future lead
+  - if rollback replay exceeds budget or fails, execute late and report fallback metadata
+- Replay deterministically from the restored tick to the current tick:
+  - original commands remain in stable effective-tick/order order
+  - inserted late command joins the correct tick with stable ordering
+  - AI commands are replayed deterministically or explicitly excluded until supported
+  - sim events are regenerated from the corrected authority
+- After rollback:
+  - update per-player ACK/result metadata
+  - send corrected latest snapshots
+  - record rollback replay ticks, elapsed time, and fallback reasons
+- Keep anti-cheat out of scope. The server accepts the client's intended execute tick inside the
+  bounded window because play feel is the priority.
 
 ## Expected Touch Points
 
-- `client/src/prediction_controller.js`
-- `client/src/sim_wasm_adapter.js`
-- `client/src/state.js`
-- `server/crates/sim-wasm/src/lib.rs`
-- `tests/prediction_controller.mjs`
-- `tests/sim_wasm_smoke.mjs`
-- `tests/tri_state/scenarios/move_*`
-- `tests/tri_state/scenarios/stop_corrects_predicted_motion.mjs`
-- `tests/tri_state/scenarios/hidden_blocker_correction_no_leak.mjs`
+- `server/src/lobby/room_task.rs`
+- `server/src/lobby/live_tick.rs`
+- `server/src/lobby/replay_session.rs` if reusable replay helpers exist
+- `server/src/lobby/snapshot_fanout.rs`
+- `server/crates/sim/src/game/mod.rs`
+- `server/crates/sim/src/game/replay.rs`
+- `server/crates/sim/src/perf.rs`
+- `docs/design/server-sim.md`
+- `docs/design/protocol.md`
+- Rust rollback and room-task tests
+- tri-state rollback scenarios
 
 ## Verification
 
-- Add or update unit tests for:
-  - local movement does not start before effective tick
-  - movement starts on two-tick cadence when enabled
-  - late authoritative application corrects once and converges
-  - prediction-disabled path renders only authoritative snapshots
-  - queued movement replays in effective-tick order after coalesced snapshots
-- Add tri-state profiles for:
-  - healthy two-tick lead
-  - 5, 10, and 20 tick delayed authoritative snapshots
-  - one late command followed by lead increase
-  - burst delivery and latest-only snapshot coalescing
-  - hidden blocker correction without hidden-state leak
+- Rust tests for:
+  - one late command inside 26 ticks rolls back and applies at intended tick
+  - command exactly at the 26-tick boundary is handled according to the documented rule
+  - command outside the window executes late and records fallback metadata
+  - rollback replay without inserted commands is snapshot-identical to uninterrupted authority
+  - inserted command ordering is deterministic with same-tick existing commands
+  - rollback does not double-consume commands or duplicate ACKs
+  - rollback after deaths/combat either works or is explicitly excluded with a fallback reason
+  - rollback cost metrics are recorded
+- Tri-state scenarios for:
+  - healthy two-tick command needs no rollback
+  - late move inside 26 ticks rolls back and converges
+  - late move outside 26 ticks falls back to late execution
+  - burst of two late commands replays once or in a documented deterministic sequence
+  - prediction disabled still uses authoritative scheduling/rollback without local prediction
 - Run:
-  - `node tests/prediction_controller.mjs`
-  - `node tests/sim_wasm_smoke.mjs` when WASM assets are present
-  - focused movement tri-state scenarios
-  - `cargo test --manifest-path server/Cargo.toml -p rts-sim-wasm`
-  - `node scripts/check-prediction-guardrails.mjs`
+  - focused `cargo test --manifest-path server/Cargo.toml -p rts-server ...`
+  - focused `cargo test --manifest-path server/Cargo.toml -p rts-sim ...`
+  - focused rollback tri-state scenarios
+  - `node tests/protocol_parity.mjs` if protocol metadata changes
 
 ## Manual Testing Focus
 
-Under normal local play, move commands should feel like a tiny stable delay instead of immediate
-then corrected motion. Under artificial latency, one-off late commands may correct, but repeated
-rubberbanding should quickly turn into a higher stable lead.
+Use artificial latency or a test profile that delays command delivery by less than and greater than
+26 ticks. Inside the window, the command should be honored as if it landed on its intended tick;
+outside the window, the game should fall back to late execution and future lead adjustment.
 
 ## Handoff Expectations
 
-The handoff must include measured correction distances from the movement scenarios, the default
-lead used, late-command behavior observed, and any movement cases intentionally left
-authoritative-only.
+The handoff must state whether rollback is enabled for all live rooms or a narrower subset, the
+measured replay costs, the fallback budget, unsupported rollback cases, and whether server-side
+optimization is needed before broader prediction work continues.

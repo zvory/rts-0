@@ -1,4 +1,4 @@
-# Phase 7 - Prediction Worker and Frame-Pacing Budget
+# Phase 7 - Building, Rally, Queue, and Build Intent
 
 ## Phase Status
 
@@ -6,74 +6,88 @@
 
 ## Objective
 
-Keep the command-cadence fix from becoming a frame-pacing problem on weaker clients. Prediction and
-replay work should stay within explicit browser budgets, degrade gracefully, and preserve
-accepted-intent feedback even when full WASM visual prediction is temporarily reduced.
+Make building-facing commands feel accepted on the same command cadence without making the client
+authoritative for economy or completion. This phase moves existing train/rally optimism into the
+scheduled-command and rollback result model and adds reversible local intent for build, research,
+cancel, and queue surfaces.
 
 ## Scope
 
-- Evaluate moving WASM prediction/replay work to a Web Worker or equivalent isolated scheduler.
-- Keep the no-JS-build-step development model unless a generated WASM worker wrapper is explicitly
-  checked in and documented.
-- Preserve the existing Movement prediction setting as the gate for worker-backed prediction.
-- Add budgeted modes:
-  - full visual prediction
-  - reduced horizon or lower-frequency prediction
-  - accepted-intent overlay only
-  - authoritative-only when the Movement prediction setting is off or compatibility fails
-- Report:
-  - prediction worker startup time
-  - replay ticks per frame/window
-  - worker round-trip delay
-  - main-thread prediction apply time
-  - dropped/degraded prediction windows
-  - frame gaps during command bursts
-- Do not hide frame stalls behind prediction. If the client cannot paint the provisional response
-  promptly, the lag requirement is not satisfied.
+- Rally:
+  - keep provisional rally plans, now keyed by effective tick and command result metadata
+  - correct to authoritative `rallyPlan` when snapshots arrive or rollback rewrites the result
+- Train:
+  - keep optimistic queue display
+  - tie confirmation, rejection, timeout, rollback, and late fallback to `clientSeq`
+  - do not spawn units or spend resources locally
+- Research:
+  - show provisional accepted queue/progress intent only after command result metadata or safe
+    owner-visible confirmation
+  - do not grant upgrades locally
+- Cancel:
+  - show reversible queue intent where the owner-visible queue makes the target unambiguous
+  - server snapshots remain authority for refunds and active item state
+- Build:
+  - show a local owner-only build intent ghost at the requested footprint on the command cadence
+  - never reserve tiles, block pathing, spend resources, unlock tech, add supply, or create an
+    authoritative scaffold locally
+  - replace the ghost with the authoritative scaffold only after the server confirms it
+- Progress:
+  - keep already-started production/research extrapolation conservative
+  - do not reopen construction progress unless this phase adds a direct owner-only active-building
+    signal and the interrupted-construction scenarios pass
 
 ## Expected Touch Points
 
-- `client/src/sim_wasm_adapter.js`
-- new prediction worker module if needed
-- `client/src/match.js`
-- `client/src/frame_profiler.js`
-- `client/src/client_perf_report.js`
-- `client/src/protocol.js`
-- `server/crates/protocol/src/lib.rs`
-- `server/src/structured_log.rs`
-- `docs/perf-tracing.md`
-- `tests/client_contracts.mjs`
-- browser perf harness files, if present or added
+- `client/src/prediction_controller.js`
+- `client/src/state.js`
+- `client/src/progress_extrapolator.js`
+- `client/src/hud.js`
+- `client/src/renderer/`
+- `client/src/input/placement.js` or related placement modules
+- `server/src/lobby/room_task.rs`
+- `server/crates/sim/src/game/services/construction.rs`
+- `server/crates/sim/src/game/services/production.rs`
+- `docs/design/protocol.md`
+- `docs/design/client-ui.md`
+- `tests/prediction_controller.mjs`
+- new and existing train/rally/build/research tri-state scenarios
 
 ## Verification
 
-- Unit/contract tests for worker lifecycle:
-  - init success
-  - init failure fallback
-  - match teardown frees worker/WASM resources
-  - prediction toggle off stops worker-backed prediction
-  - reduced mode keeps accepted-intent overlays while clearing full predicted snapshots
-- Perf harness checks for:
-  - representative command burst
-  - high entity count
-  - CPU throttled browser profile if supported
-  - prediction worker startup and steady-state budget
-- Net report/structured log tests if fields change.
+- Unit tests for:
+  - train optimism on effective tick and confirmation by snapshot/result metadata
+  - train/rally correction after rollback
+  - rally correction by authoritative `rallyPlan`
+  - research intent clears on rejection and never grants upgrade locally
+  - cancel intent does not refund locally before authority
+  - build ghost appears on cadence and clears on rejection
+  - build ghost does not affect pathing, selection, tech, supply, or placement legality
+  - prediction disabled clears all provisional building overlays
+- Tri-state scenarios for:
+  - train under two-tick cadence
+  - rally under rollback correction
+  - invalid build rejection
+  - valid build ghost then authoritative scaffold
+  - research rejection and confirmation
+  - cancel queue correction
+  - construction interruption remains authoritative-only unless explicitly supported
 - Run:
-  - `node tests/client_contracts.mjs`
   - `node tests/prediction_controller.mjs`
-  - `node tests/sim_wasm_smoke.mjs` when WASM assets are present
-  - browser perf harness command added or updated by this phase
-  - protocol/logging tests if report fields change
+  - focused tri-state building/queue scenarios
+  - `node tests/client_contracts.mjs`
+  - `node scripts/check-client-architecture.mjs`
+  - protocol parity/Rust tests if metadata changes
 
 ## Manual Testing Focus
 
-Play or replay a busy local match on a weaker machine or throttled browser profile. Movement
-prediction on should still paint provisional command response promptly; if prediction degrades, it
-should degrade to accepted-intent feedback before falling all the way back to remote-feeling
-authoritative-only behavior.
+Under latency, building commands should feel accepted through reversible local intent. Check valid
+and invalid build, train, research, cancel, and rally commands with Movement prediction on and off,
+confirming that resources, supply, spawns, upgrades, and completed buildings only change after
+server authority.
 
 ## Handoff Expectations
 
-The handoff must include the chosen execution model, measured budgets, fallback thresholds, new
-report fields if any, and whether a Worker is required before broad rollout.
+The handoff must list which building surfaces are provisional, which side effects remain
+authoritative-only, whether any owner-only metadata was added, and which construction-related cases
+remain intentionally unsupported.

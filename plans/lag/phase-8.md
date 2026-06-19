@@ -1,4 +1,4 @@
-# Phase 8 - Rollout, Tuning, and Regression Matrix
+# Phase 8 - Rollback and Prediction Performance Budget
 
 ## Phase Status
 
@@ -6,71 +6,91 @@
 
 ## Objective
 
-Make adaptive command cadence the default behavior under the existing Movement prediction setting
-after correctness and performance gates pass. This phase locks in tuning, documentation, and
-regression coverage so future gameplay changes cannot quietly reintroduce remote-echo command feel.
+Prove the server can afford bounded rollback and the client can afford prediction/replay without
+creating frame lag on weaker machines. If the 26-tick rollback target is too expensive, this phase
+must identify the optimization work or temporary lower window needed before broad rollout.
 
 ## Scope
 
-- Finalize tuning:
-  - default `commandLeadTicks = 2`
-  - maximum normal lead
-  - late-arrival threshold for increasing lead
-  - stable-window threshold for decay
-  - correction distance budgets
-  - worker/perf degradation thresholds
-- Make the cadence path default for compatible live active-player sessions when Movement
-  prediction is enabled.
-- Keep spectators, replay viewers, unsupported factions, incompatible builds, and prediction-off
-  sessions out of cadence prediction.
-- Update docs and operator guidance:
-  - `docs/design/protocol.md`
-  - `docs/design/server-sim.md`
-  - `docs/design/client-ui.md`
-  - `docs/perf-tracing.md`
-  - any relevant context capsules if section lists shift
-- Add a concise regression matrix that maps each command family to:
-  - predicted owned-world response
-  - authoritative-only side effects
-  - required tests
-  - known unsupported cases
+- Server rollback budgets:
+  - history memory per active room
+  - average and p95 restore cost
+  - average and p95 replay cost for 5, 10, 20, and 26 ticks
+  - worst-case command burst replay cost
+  - snapshot fanout cost after rollback
+  - fallback threshold when replay would exceed budget
+- Server optimization candidates if needed:
+  - cheaper `Game` clone/keyframe representation
+  - replay snapshots at fixed intervals inside the 26-tick ring
+  - command-log compaction
+  - avoiding unnecessary snapshot projection during replay
+  - narrower rollback support for expensive room modes until optimized
+- Client prediction budgets:
+  - evaluate moving WASM prediction/replay work to a Web Worker or equivalent isolated scheduler
+  - keep the no-JS-build-step development model unless a generated WASM worker wrapper is
+    explicitly checked in and documented
+  - preserve the existing Movement prediction setting as the gate for worker-backed prediction
+- Add budgeted client modes:
+  - full visual prediction
+  - reduced horizon or lower-frequency prediction
+  - accepted-intent overlay only
+  - authoritative-only when the Movement prediction setting is off or compatibility fails
+- Do not hide frame stalls behind prediction. If the client cannot paint the provisional response
+  promptly, the lag requirement is not satisfied.
+
+## Expected Touch Points
+
+- `server/src/lobby/live_tick.rs`
+- `server/src/lobby/room_task.rs`
+- `server/crates/sim/src/perf.rs`
+- `client/src/sim_wasm_adapter.js`
+- new prediction worker module if needed
+- `client/src/match.js`
+- `client/src/frame_profiler.js`
+- `client/src/client_perf_report.js`
+- `client/src/protocol.js`
+- `server/crates/protocol/src/lib.rs`
+- `server/src/structured_log.rs`
+- `docs/perf-tracing.md`
+- `tests/client_contracts.mjs`
+- server perf harnesses and browser perf harness files, if present or added
 
 ## Verification
 
-- Run all focused prediction and cadence suites:
+- Server perf tests or harness runs for:
+  - no rollback baseline
+  - 5, 10, 20, and 26 tick rollback replay
+  - rollback during command bursts
+  - rollback with representative entity counts
+  - fallback path when budget is exceeded
+- Unit/contract tests for client worker lifecycle if a worker is added:
+  - init success
+  - init failure fallback
+  - match teardown frees worker/WASM resources
+  - prediction toggle off stops worker-backed prediction
+  - reduced mode keeps accepted-intent overlays while clearing full predicted snapshots
+- Browser perf harness checks for:
+  - representative command burst
+  - high entity count
+  - CPU throttled browser profile if supported
+  - prediction worker startup and steady-state budget
+- Net report/structured log tests if fields change.
+- Run:
+  - server rollback perf command added or updated by this phase
+  - `node tests/client_contracts.mjs`
   - `node tests/prediction_controller.mjs`
   - `node tests/sim_wasm_smoke.mjs` when WASM assets are present
-  - `node tests/tri_state/self_test.mjs`
-  - all cadence/prediction tri-state scenario groups
-  - `node scripts/check-prediction-guardrails.mjs`
-  - `node scripts/check-client-architecture.mjs`
-  - `node tests/protocol_parity.mjs`
-  - focused Rust room/protocol/sim-wasm tests
-- Run a browser perf harness covering:
-  - healthy local profile
-  - 100 ms RTT with jitter
-  - 250 ms RTT with burst delivery
-  - weaker client or CPU-throttled profile
-- If practical, run one narrow live Node integration or smoke path with Movement prediction enabled
-  and one with it disabled.
-- Rely on the PR `./tests/run-all.sh` gate for full-suite coverage.
+  - browser perf harness command added or updated by this phase
+  - protocol/logging tests if report fields change
 
 ## Manual Testing Focus
 
-Run short online-like matches with Movement prediction on and off. Confirm normal healthy play has
-a small stable command delay, bad conditions adapt upward instead of repeatedly snapping, and
-turning Movement prediction off returns to the old authoritative-only behavior.
+Play or replay a busy local match on a weaker machine or throttled browser profile. Movement
+prediction on should still paint provisional command response promptly; server rollback should not
+cause long stalls or repeated visible correction.
 
 ## Handoff Expectations
 
-The handoff must state the final rollout status, tuning values, verification commands and results,
-known caveats, and which player-facing command surfaces should be watched in playtests.
-
-## Done Criteria
-
-- Adaptive cadence is default under the Movement prediction setting for compatible live active
-  players.
-- Prediction-off fallback is verified.
-- Late arrivals, correction distances, and degraded prediction modes are visible in diagnostics.
-- All enabled command families have tri-state coverage.
-- Docs and context capsules match the implemented contract.
+The handoff must include measured server rollback costs, whether 26 ticks is viable, required
+server optimizations if it is not, the chosen client execution model, fallback thresholds, new
+report fields if any, and whether a Worker is required before broad rollout.

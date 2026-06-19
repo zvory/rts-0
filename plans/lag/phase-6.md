@@ -1,4 +1,4 @@
-# Phase 6 - Building, Rally, Queue, and Build Intent
+# Phase 6 - Unit Intent Surfaces
 
 ## Phase Status
 
@@ -6,87 +6,85 @@
 
 ## Objective
 
-Make building-facing commands feel accepted on the same command cadence without making the client
-authoritative for economy or completion. This phase moves existing train/rally optimism into the
-scheduled-command model and adds reversible local intent for build, research, cancel, and queue
-surfaces.
+Expand provisional owned-world response beyond movement for unit commands. The player should see
+owned units accept attack, gather, setup, teardown, and ability intent on the command cadence while
+the server remains authoritative for targets, damage, resources, visibility, cooldown outcomes, and
+deaths.
 
 ## Scope
 
-- Rally:
-  - keep provisional rally plans, now keyed by effective tick and command result metadata
-  - correct to authoritative `rallyPlan` when snapshots arrive
-- Train:
-  - keep optimistic queue display
-  - tie confirmation, rejection, timeout, and late correction to `clientSeq`
-  - do not spawn units or spend resources locally
-- Research:
-  - show provisional accepted queue/progress intent only after command result metadata or safe
-    owner-visible confirmation
-  - do not grant upgrades locally
-- Cancel:
-  - show reversible queue intent where the owner-visible queue makes the target unambiguous
-  - server snapshots remain authority for refunds and active item state
-- Build:
-  - show a local owner-only build intent ghost at the requested footprint on the command cadence
-  - never reserve tiles, block pathing, spend resources, unlock tech, add supply, or create an
-    authoritative scaffold locally
-  - replace the ghost with the authoritative scaffold only after the server confirms it
-- Progress:
-  - keep already-started production/research extrapolation conservative
-  - do not reopen construction progress unless Phase 6 adds a direct owner-only active-building
-    signal and the interrupted-construction scenarios pass
+Enable local intent response for command families only after command-specific tri-state coverage
+exists:
+
+- `attack`: owned unit posture, target/order marker, and movement toward currently visible targets
+  when owner-safe data is sufficient; no damage, hidden target inference, or kill prediction.
+- `gather`: owned worker gather intent, path/posture, and local target marker; no resource income,
+  depletion, dropoff, or slot-stealing prediction.
+- `setupAntiTankGuns` and `tearDownAntiTankGuns`: owned weapon setup/teardown posture and facing
+  intent; no authoritative range, damage, or completed setup side effects before server confirm.
+- `useAbility` and `recastAbility`: owner-only targeting marker, windup/posture, and conservative
+  cooldown display when safe; no damage, smoke/fog outcome, teleport legality, projectile hit, or
+  recast success before authority.
+- `setAutocast`: local command acceptance state only; authoritative autocast behavior remains
+  server-only.
+
+## Safety Rules
+
+- Prediction may show what the player ordered their owned unit to try.
+- Prediction must not show that a hidden enemy exists or does not exist.
+- Prediction must not show server validation as successful until command result metadata or
+  owner-visible snapshots prove it.
+- Rejected and no-op commands must clear provisional intent by `clientSeq`.
+- Rolled-back commands should reconcile as corrected authority, not as mysterious path snapbacks.
+- Outside-window late commands must remain legible through fallback metadata and future lead
+  adjustment.
 
 ## Expected Touch Points
 
+- `server/crates/sim-wasm/src/lib.rs`
 - `client/src/prediction_controller.js`
 - `client/src/state.js`
-- `client/src/progress_extrapolator.js`
-- `client/src/hud.js`
-- `client/src/renderer/`
-- `client/src/input/placement.js` or related placement modules
-- `server/src/lobby/room_task.rs`
-- `server/crates/sim/src/game/services/construction.rs`
-- `server/crates/sim/src/game/services/production.rs`
-- `docs/design/protocol.md`
-- `docs/design/client-ui.md`
-- `tests/prediction_controller.mjs`
-- new and existing train/rally/build/research tri-state scenarios
+- `client/src/renderer/feedback_view_model.js`
+- `client/src/renderer/feedback.js`
+- `client/src/minimap.js`
+- `client/src/input/`
+- `server/crates/sim/src/game/services/order_planner.rs`
+- `docs/design/protocol.md` if command result metadata expands
+- new tri-state scenarios per command family
 
 ## Verification
 
-- Unit tests for:
-  - train optimism on effective tick and confirmation by snapshot/result metadata
-  - rally correction by authoritative `rallyPlan`
-  - research intent clears on rejection and never grants upgrade locally
-  - cancel intent does not refund locally before authority
-  - build ghost appears on cadence and clears on rejection
-  - build ghost does not affect pathing, selection, tech, supply, or placement legality
-  - prediction disabled clears all provisional building overlays
+- Unit tests for each enabled family:
+  - accepted on healthy two-tick cadence
+  - late arrival inside rollback window converges
+  - outside-window late arrival corrects and raises lead when appropriate
+  - rejected by ownership
+  - rejected by invalid target or missing eligibility
+  - no-op remains legible and clears local intent
+  - prediction-disabled path remains authoritative-only
 - Tri-state scenarios for:
-  - train under two-tick cadence
-  - rally under late correction
-  - invalid build rejection
-  - valid build ghost then authoritative scaffold
-  - research rejection and confirmation
-  - cancel queue correction
-  - construction interruption remains authoritative-only unless explicitly supported
+  - visible attack target intent
+  - hidden attack target correction with no leak
+  - gather intent and no local resource gain
+  - setup/teardown posture correction
+  - ability targeting marker rejection and confirmation
+  - coalesced snapshots replaying mixed pending unit intents
 - Run:
   - `node tests/prediction_controller.mjs`
-  - focused tri-state building/queue scenarios
-  - `node tests/client_contracts.mjs`
-  - `node scripts/check-client-architecture.mjs`
-  - protocol parity/Rust tests if metadata changes
+  - focused tri-state scenarios for every touched family
+  - `node tests/sim_wasm_smoke.mjs` when WASM assets are present
+  - `cargo test --manifest-path server/Cargo.toml -p rts-sim-wasm`
+  - `node scripts/check-prediction-guardrails.mjs`
 
 ## Manual Testing Focus
 
-Under latency, building commands should feel accepted through reversible local intent. Check valid
-and invalid build, train, research, cancel, and rally commands with Movement prediction on and off,
-confirming that resources, supply, spawns, upgrades, and completed buildings only change after
-server authority.
+Under artificial latency, attack, gather, setup, teardown, and ability commands should visibly feel
+accepted for owned units without showing false damage, false income, or hidden enemy information.
+Invalid commands should clear their provisional state with a legible rejection rather than leaving
+stale local intent.
 
 ## Handoff Expectations
 
-The handoff must list which building surfaces are provisional, which side effects remain
-authoritative-only, whether any owner-only metadata was added, and which construction-related cases
-remain intentionally unsupported.
+The handoff must list exactly which unit command families are enabled, which remain
+authoritative-only, the no-op/rejection signals used, and the tri-state artifacts that should be
+inspected if later behavior regresses.
