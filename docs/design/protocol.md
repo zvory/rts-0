@@ -132,6 +132,24 @@ in a match:
   snapshotGapMaxMs: u16,    // largest observed interval between received snapshots
   jitterSamples: u32,       // jitter incidents in this report window
   snapshots: u32,           // snapshots received in this report window
+  snapshotBytesTotal: u32,   // total received snapshot WebSocket text bytes
+  snapshotBytesMax: u32,     // largest received snapshot WebSocket text bytes
+  snapshotBytesAvg: u32,     // average received snapshot WebSocket text bytes
+  snapshotMessageCount: u32, // snapshot frames observed by the transport report window
+  snapshotParseMaxMs: u16,   // max browser JSON.parse cost for snapshot frames
+  snapshotParseP95Ms: u16,   // bucketed p95 JSON.parse cost for snapshot frames
+  snapshotDecodeMaxMs: u16,  // max compact protocol decode cost
+  snapshotDecodeP95Ms: u16,  // bucketed p95 compact protocol decode cost
+  snapshotApplyMaxMs: u16,   // max GameState.applySnapshot cost
+  snapshotApplyP95Ms: u16,   // bucketed p95 GameState.applySnapshot cost
+  predictionApplyMaxMs: u16, // max authoritative prediction reconciliation/overlay cost
+  predictionApplyP95Ms: u16, // bucketed p95 authoritative prediction reconciliation/overlay cost
+  snapshotTickGapMax: u32,   // largest authoritative tick delta between received snapshots
+  staleSnapshotCount: u32,   // snapshots older than the latest accepted snapshot tick
+  duplicateSnapshotCount: u32, // snapshots with the same tick as the latest accepted snapshot
+  skippedSnapshotCount: u32, // snapshots whose tick jumped by more than one
+  snapshotBurstCount: u32,   // frames where more than one snapshot arrived before the next rAF
+  snapshotBurstMax: u32,     // max snapshots received before one rAF boundary
   frameGapMaxMs: u16,       // largest requestAnimationFrame gap in this report window
   fpsEstimate: u16,         // coarse average client frame rate for this report window
   frameWorkMaxMs: u16,      // largest measured JS frame work duration
@@ -165,11 +183,14 @@ in a match:
   predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
 }
 ```
-The frame-work and renderer fields come from the browser's bounded frame-profiler report window;
-the local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
-recent frames are not uploaded. The server logs this message only when the aggregate contains
-notable lag, jitter, browser frame stalls, local JS frame work, renderer cost, WebSocket backlog,
-server tick/scheduler pressure, or prediction correction/fallback signals, alongside the
+The snapshot payload, parse, decode, apply, prediction-apply, and cadence fields are report-window
+aggregates only; raw snapshot JSON, raw timestamp arrays, entity ids, replay data, and command
+payloads are not uploaded. The frame-work and renderer fields come from the browser's bounded
+frame-profiler report window; the local debug surface may keep richer cumulative phase tables, but
+those raw arrays and detailed recent frames are not uploaded. The server logs this message only when
+the aggregate contains notable lag, jitter, browser frame stalls, local JS frame work, payload
+pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
+backlog, server tick/scheduler pressure, or prediction correction/fallback signals, alongside the
 connection's `player_id` and room name. Values are advisory because clients are untrusted; use them
 to diagnose transport/browser/prediction/render behavior, not as gameplay authority.
 

@@ -36,6 +36,16 @@ macro_rules! log_error {
 pub const NET_REPORT_LATENCY_ISSUE_MS: u16 = 180;
 pub const NET_REPORT_JITTER_ISSUE_MS: u16 = 20;
 pub const NET_REPORT_SNAPSHOT_GAP_ISSUE_MS: u16 = 100;
+pub const NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES: u32 = 256 * 1024;
+pub const NET_REPORT_SNAPSHOT_PAYLOAD_AVG_ISSUE_BYTES: u32 = 128 * 1024;
+pub const NET_REPORT_SNAPSHOT_PARSE_ISSUE_MS: u16 = 16;
+pub const NET_REPORT_SNAPSHOT_PARSE_P95_ISSUE_MS: u16 = 8;
+pub const NET_REPORT_SNAPSHOT_DECODE_ISSUE_MS: u16 = 16;
+pub const NET_REPORT_SNAPSHOT_DECODE_P95_ISSUE_MS: u16 = 8;
+pub const NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS: u16 = 16;
+pub const NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS: u16 = 8;
+pub const NET_REPORT_SNAPSHOT_TICK_GAP_ISSUE: u32 = 3;
+pub const NET_REPORT_SNAPSHOT_BURST_ISSUE: u32 = 3;
 pub const NET_REPORT_FRAME_GAP_ISSUE_MS: u16 = 100;
 pub const NET_REPORT_FRAME_WORK_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_FRAME_WORK_P95_ISSUE_MS: u16 = 24;
@@ -81,6 +91,24 @@ pub fn log_client_net_report(
         snapshot_gap_max_ms = report.snapshot_gap_max_ms,
         jitter_samples = report.jitter_samples,
         snapshots = report.snapshots,
+        snapshot_bytes_total = report.snapshot_bytes_total,
+        snapshot_bytes_max = report.snapshot_bytes_max,
+        snapshot_bytes_avg = report.snapshot_bytes_avg,
+        snapshot_message_count = report.snapshot_message_count,
+        snapshot_parse_max_ms = report.snapshot_parse_max_ms,
+        snapshot_parse_p95_ms = report.snapshot_parse_p95_ms,
+        snapshot_decode_max_ms = report.snapshot_decode_max_ms,
+        snapshot_decode_p95_ms = report.snapshot_decode_p95_ms,
+        snapshot_apply_max_ms = report.snapshot_apply_max_ms,
+        snapshot_apply_p95_ms = report.snapshot_apply_p95_ms,
+        prediction_apply_max_ms = report.prediction_apply_max_ms,
+        prediction_apply_p95_ms = report.prediction_apply_p95_ms,
+        snapshot_tick_gap_max = report.snapshot_tick_gap_max,
+        stale_snapshot_count = report.stale_snapshot_count,
+        duplicate_snapshot_count = report.duplicate_snapshot_count,
+        skipped_snapshot_count = report.skipped_snapshot_count,
+        snapshot_burst_count = report.snapshot_burst_count,
+        snapshot_burst_max = report.snapshot_burst_max,
         frame_gap_max_ms = report.frame_gap_max_ms,
         fps_estimate = report.fps_estimate,
         frame_work_max_ms = report.frame_work_max_ms,
@@ -123,6 +151,21 @@ pub fn is_notable_net_report(report: &ClientNetReport) -> bool {
         || report.snapshot_jitter_ms >= NET_REPORT_JITTER_ISSUE_MS
         || report.jitter_samples > 0
         || report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS
+        || report.snapshot_bytes_max >= NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES
+        || report.snapshot_bytes_avg >= NET_REPORT_SNAPSHOT_PAYLOAD_AVG_ISSUE_BYTES
+        || report.snapshot_parse_max_ms >= NET_REPORT_SNAPSHOT_PARSE_ISSUE_MS
+        || report.snapshot_parse_p95_ms >= NET_REPORT_SNAPSHOT_PARSE_P95_ISSUE_MS
+        || report.snapshot_decode_max_ms >= NET_REPORT_SNAPSHOT_DECODE_ISSUE_MS
+        || report.snapshot_decode_p95_ms >= NET_REPORT_SNAPSHOT_DECODE_P95_ISSUE_MS
+        || report.snapshot_apply_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.snapshot_apply_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+        || report.prediction_apply_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.prediction_apply_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+        || report.snapshot_tick_gap_max >= NET_REPORT_SNAPSHOT_TICK_GAP_ISSUE
+        || report.stale_snapshot_count > 0
+        || report.duplicate_snapshot_count > 0
+        || report.skipped_snapshot_count > 0
+        || report.snapshot_burst_max >= NET_REPORT_SNAPSHOT_BURST_ISSUE
         || report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.frame_work_max_ms >= NET_REPORT_FRAME_WORK_ISSUE_MS
         || report.frame_work_p95_ms >= NET_REPORT_FRAME_WORK_P95_ISSUE_MS
@@ -152,6 +195,24 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
         || report.prediction_replay_ticks >= NET_REPORT_REPLAY_TICK_ISSUE
     {
         "wasm_budget"
+    } else if report.snapshot_bytes_max >= NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES
+        || report.snapshot_bytes_avg >= NET_REPORT_SNAPSHOT_PAYLOAD_AVG_ISSUE_BYTES
+    {
+        "payload_pressure"
+    } else if report.snapshot_apply_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.snapshot_apply_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+        || report.prediction_apply_max_ms >= NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS
+        || report.prediction_apply_p95_ms >= NET_REPORT_SNAPSHOT_APPLY_P95_ISSUE_MS
+    {
+        "client_snapshot_apply"
+    } else if report.snapshot_decode_max_ms >= NET_REPORT_SNAPSHOT_DECODE_ISSUE_MS
+        || report.snapshot_decode_p95_ms >= NET_REPORT_SNAPSHOT_DECODE_P95_ISSUE_MS
+    {
+        "client_snapshot_decode"
+    } else if report.snapshot_parse_max_ms >= NET_REPORT_SNAPSHOT_PARSE_ISSUE_MS
+        || report.snapshot_parse_p95_ms >= NET_REPORT_SNAPSHOT_PARSE_P95_ISSUE_MS
+    {
+        "client_snapshot_parse"
     } else if report.renderer_max_ms >= NET_REPORT_RENDERER_ISSUE_MS
         || report.renderer_p95_ms >= NET_REPORT_RENDERER_P95_ISSUE_MS
     {
@@ -180,6 +241,13 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
         "network_rtt"
     } else if report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS {
         "snapshot_gap"
+    } else if report.snapshot_tick_gap_max >= NET_REPORT_SNAPSHOT_TICK_GAP_ISSUE
+        || report.stale_snapshot_count > 0
+        || report.duplicate_snapshot_count > 0
+        || report.skipped_snapshot_count > 0
+        || report.snapshot_burst_max >= NET_REPORT_SNAPSHOT_BURST_ISSUE
+    {
+        "snapshot_cadence"
     } else if report.snapshot_jitter_ms >= NET_REPORT_JITTER_ISSUE_MS || report.jitter_samples > 0 {
         "snapshot_jitter"
     } else {
@@ -289,6 +357,24 @@ mod tests {
             snapshot_gap_max_ms: 45,
             jitter_samples: 0,
             snapshots: 300,
+            snapshot_bytes_total: 1_200_000,
+            snapshot_bytes_max: 5_000,
+            snapshot_bytes_avg: 4_000,
+            snapshot_message_count: 300,
+            snapshot_parse_max_ms: 1,
+            snapshot_parse_p95_ms: 1,
+            snapshot_decode_max_ms: 2,
+            snapshot_decode_p95_ms: 1,
+            snapshot_apply_max_ms: 4,
+            snapshot_apply_p95_ms: 2,
+            prediction_apply_max_ms: 3,
+            prediction_apply_p95_ms: 2,
+            snapshot_tick_gap_max: 1,
+            stale_snapshot_count: 0,
+            duplicate_snapshot_count: 0,
+            skipped_snapshot_count: 0,
+            snapshot_burst_count: 0,
+            snapshot_burst_max: 1,
             frame_gap_max_ms: 18,
             fps_estimate: 60,
             frame_work_max_ms: 10,
@@ -337,8 +423,17 @@ mod tests {
         assert_eq!(classify_client_net_report(&report), "snapshot_jitter");
         report.frame_work_max_ms = NET_REPORT_FRAME_WORK_ISSUE_MS;
         assert_eq!(classify_client_net_report(&report), "client_frame_work");
+        report.snapshot_decode_max_ms = NET_REPORT_SNAPSHOT_DECODE_ISSUE_MS;
+        assert_eq!(
+            classify_client_net_report(&report),
+            "client_snapshot_decode"
+        );
+        report.snapshot_apply_max_ms = NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS;
+        assert_eq!(classify_client_net_report(&report), "client_snapshot_apply");
+        report.snapshot_bytes_max = NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES;
+        assert_eq!(classify_client_net_report(&report), "payload_pressure");
         report.renderer_max_ms = NET_REPORT_RENDERER_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "client_renderer");
+        assert_eq!(classify_client_net_report(&report), "payload_pressure");
         report.correction_count = 1;
         assert_eq!(classify_client_net_report(&report), "prediction_correction");
         report.prediction_disable_count = 1;
@@ -359,6 +454,14 @@ mod tests {
         report.slow_frame_count = 1;
         assert!(is_notable_net_report(&report));
         assert_eq!(classify_client_net_report(&report), "client_frame_stall");
+    }
+
+    #[test]
+    fn net_report_classifies_snapshot_cadence_when_transport_timing_is_clean() {
+        let mut report = clean_report();
+        report.snapshot_tick_gap_max = NET_REPORT_SNAPSHOT_TICK_GAP_ISSUE;
+        assert!(is_notable_net_report(&report));
+        assert_eq!(classify_client_net_report(&report), "snapshot_cadence");
     }
 
     #[test]

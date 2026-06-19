@@ -11,6 +11,8 @@ export class MatchHealth {
     this.lastLatencySampleAt = 0;
     this.snapshotJitterDeltas = [];
     this.lastSnapshotArrivedAt = null;
+    this.lastSnapshotTickForCadence = null;
+    this.snapshotsThisFrame = 0;
     this.reportStartedAt = performance.now();
     this.reportStats = this.createReportStats();
     this.frameSamples = [];
@@ -38,6 +40,12 @@ export class MatchHealth {
       snapshotGapMaxMs: 0,
       jitterSamples: 0,
       snapshots: 0,
+      snapshotTickGapMax: 0,
+      staleSnapshotCount: 0,
+      duplicateSnapshotCount: 0,
+      skippedSnapshotCount: 0,
+      snapshotBurstCount: 0,
+      snapshotBurstMax: 0,
       frameGapMaxMs: 0,
       frameCount: 0,
       frameTotalMs: 0,
@@ -50,6 +58,7 @@ export class MatchHealth {
   }
 
   noteFrameGap(frameGapMs, now = performance.now()) {
+    this.snapshotsThisFrame = 0;
     if (!Number.isFinite(frameGapMs) || frameGapMs < 0) return;
     this.reportStats.frameCount += 1;
     this.reportStats.frameTotalMs += frameGapMs;
@@ -75,8 +84,15 @@ export class MatchHealth {
     if (this.frameSamples.length === 0) this.frameWindowTotalMs = 0;
   }
 
-  noteSnapshotArrival(now, documentHidden) {
+  noteSnapshotArrival(now, documentHidden, tick = null) {
     this.reportStats.snapshots += 1;
+    this.snapshotsThisFrame += 1;
+    this.reportStats.snapshotBurstMax = Math.max(
+      this.reportStats.snapshotBurstMax,
+      this.snapshotsThisFrame,
+    );
+    if (this.snapshotsThisFrame === 2) this.reportStats.snapshotBurstCount += 1;
+    this.noteSnapshotTick(tick);
     if (!documentHidden && this.lastSnapshotArrivedAt != null) {
       const gap = now - this.lastSnapshotArrivedAt;
       this.reportStats.snapshotGapMaxMs = Math.max(this.reportStats.snapshotGapMaxMs, gap);
@@ -94,6 +110,23 @@ export class MatchHealth {
       }
     }
     this.lastSnapshotArrivedAt = now;
+  }
+
+  noteSnapshotTick(tick) {
+    const current = finiteU32(tick);
+    if (current == null) return;
+    const previous = this.lastSnapshotTickForCadence;
+    if (previous != null) {
+      if (current < previous) {
+        this.reportStats.staleSnapshotCount += 1;
+        return;
+      }
+      const gap = current - previous;
+      this.reportStats.snapshotTickGapMax = Math.max(this.reportStats.snapshotTickGapMax, gap);
+      if (gap === 0) this.reportStats.duplicateSnapshotCount += 1;
+      else if (gap > 1) this.reportStats.skippedSnapshotCount += 1;
+    }
+    this.lastSnapshotTickForCadence = current;
   }
 
   applyServerNetStatus(status) {
@@ -136,4 +169,10 @@ export class MatchHealth {
       issues: this.health.issues,
     };
   }
+}
+
+function finiteU32(value) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 0xffffffff) return null;
+  return n;
 }

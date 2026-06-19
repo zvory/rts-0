@@ -228,6 +228,42 @@ pub struct ClientNetReport {
     pub snapshot_gap_max_ms: u16,
     pub jitter_samples: u32,
     pub snapshots: u32,
+    #[serde(default)]
+    pub snapshot_bytes_total: u32,
+    #[serde(default)]
+    pub snapshot_bytes_max: u32,
+    #[serde(default)]
+    pub snapshot_bytes_avg: u32,
+    #[serde(default)]
+    pub snapshot_message_count: u32,
+    #[serde(default)]
+    pub snapshot_parse_max_ms: u16,
+    #[serde(default)]
+    pub snapshot_parse_p95_ms: u16,
+    #[serde(default)]
+    pub snapshot_decode_max_ms: u16,
+    #[serde(default)]
+    pub snapshot_decode_p95_ms: u16,
+    #[serde(default)]
+    pub snapshot_apply_max_ms: u16,
+    #[serde(default)]
+    pub snapshot_apply_p95_ms: u16,
+    #[serde(default)]
+    pub prediction_apply_max_ms: u16,
+    #[serde(default)]
+    pub prediction_apply_p95_ms: u16,
+    #[serde(default)]
+    pub snapshot_tick_gap_max: u32,
+    #[serde(default)]
+    pub stale_snapshot_count: u32,
+    #[serde(default)]
+    pub duplicate_snapshot_count: u32,
+    #[serde(default)]
+    pub skipped_snapshot_count: u32,
+    #[serde(default)]
+    pub snapshot_burst_count: u32,
+    #[serde(default)]
+    pub snapshot_burst_max: u32,
     pub frame_gap_max_ms: u16,
     pub fps_estimate: u16,
     #[serde(default)]
@@ -2208,6 +2244,24 @@ mod tests {
                 "snapshotGapMaxMs":420,
                 "jitterSamples":12,
                 "snapshots":289,
+                "snapshotBytesTotal":18496000,
+                "snapshotBytesMax":92000,
+                "snapshotBytesAvg":64000,
+                "snapshotMessageCount":289,
+                "snapshotParseMaxMs":9,
+                "snapshotParseP95Ms":4,
+                "snapshotDecodeMaxMs":11,
+                "snapshotDecodeP95Ms":8,
+                "snapshotApplyMaxMs":13,
+                "snapshotApplyP95Ms":8,
+                "predictionApplyMaxMs":7,
+                "predictionApplyP95Ms":4,
+                "snapshotTickGapMax":3,
+                "staleSnapshotCount":1,
+                "duplicateSnapshotCount":2,
+                "skippedSnapshotCount":3,
+                "snapshotBurstCount":4,
+                "snapshotBurstMax":5,
                 "frameGapMaxMs":37,
                 "fpsEstimate":58,
                 "frameWorkMaxMs":42,
@@ -2237,6 +2291,9 @@ mod tests {
             ClientMessage::NetReport { report } => {
                 assert_eq!(report.schema_version, 1);
                 assert_eq!(report.snapshot_gap_max_ms, 420);
+                assert_eq!(report.snapshot_bytes_max, 92_000);
+                assert_eq!(report.snapshot_decode_p95_ms, 8);
+                assert_eq!(report.snapshot_burst_max, 5);
                 assert_eq!(report.frame_work_max_ms, 42);
                 assert_eq!(report.worst_frame_phase, "match.renderer");
                 assert_eq!(report.entity_count, 325);
@@ -2280,6 +2337,9 @@ mod tests {
                 assert_eq!(report.worst_frame_phase, "");
                 assert_eq!(report.renderer_p95_ms, 0);
                 assert_eq!(report.entity_count, 0);
+                assert_eq!(report.snapshot_bytes_total, 0);
+                assert_eq!(report.snapshot_parse_max_ms, 0);
+                assert_eq!(report.snapshot_tick_gap_max, 0);
             }
             other => panic!("expected net report, got {other:?}"),
         }
