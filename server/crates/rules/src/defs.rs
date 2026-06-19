@@ -453,7 +453,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::TankTrap,
         stats: balance::BuildingStats {
-            hp: 200,
+            hp: 150,
             sight_tiles: 0,
             cost_steel: 15,
             cost_oil: 0,
@@ -639,7 +639,7 @@ mod tests {
     fn tank_trap_uses_dormant_obstacle_stats() {
         let def = building_def(EntityKind::TankTrap).expect("tank trap def");
 
-        assert_eq!(def.stats.hp, 200);
+        assert_eq!(def.stats.hp, 150);
         assert_eq!(def.stats.sight_tiles, 0);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (15, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
