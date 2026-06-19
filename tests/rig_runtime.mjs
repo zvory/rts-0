@@ -5,20 +5,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIND, STATE } from "../client/src/protocol.js";
 import {
-  WORKER_LEGACY_PARTS,
   _drawUnit,
   _rigRenderContextFor,
-  createLegacyUnitPartCapture,
 } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import { createLiveRigDefinitions, liveRigRoutesFor } from "../client/src/renderer/rigs/live_routing.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import { createRigRenderContext, sampleRigAnimation } from "../client/src/renderer/rigs/animation.js";
 import {
-  UnitRigInstance,
   createUnitRigInstance,
   renderLiveUnitRig,
-  renderRigLegacyComparison,
 } from "../client/src/renderer/rigs/runtime.js";
 import { MACHINE_GUNNER_RIG_SVG, RIFLEMAN_RIG_SVG } from "../client/src/renderer/rigs/infantry_svg.js";
 import {
@@ -120,7 +116,7 @@ test("rig runtime creates one container child per part and updates transforms", 
   assert.equal(instance.container.destroyed, true);
 });
 
-test("rig runtime can update one named part group for part-level fixtures", () => {
+test("rig runtime can update one routed part group", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const instance = createUnitRigInstance(KIND.WORKER, definition, createInspectionPixiFactory());
   instance.update({
@@ -172,51 +168,6 @@ test("geometry-scale animation grows coordinates without scaling stroke width", 
   assert.deepEqual(commands.find((cmd) => cmd.op === "lineStyle"), { op: "lineStyle", width: 2.2, color: 0xd8d0b0, alpha: 1 });
   assert.deepEqual(commands.find((cmd) => cmd.op === "drawPolygon").points, [-1.4, 0, 2.8, -1.2, 2.8, 1.2]);
   instance.destroy();
-});
-
-test("legacy Worker part capture records stable draw names and filters output", () => {
-  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
-  const entity = {
-    id: 12,
-    kind: KIND.WORKER,
-    owner: 1,
-    x: 30,
-    y: 36,
-    facing: Math.PI / 4,
-    state: STATE.BUILD,
-    latchedNode: 9001,
-  };
-  const renderer = makeComparisonRenderer(definition);
-  const capture = createLegacyUnitPartCapture({ includeParts: [WORKER_LEGACY_PARTS.facingTick] });
-
-  _drawUnit.call(renderer, entity, new Map([[1, 0x334455]]), { weaponRecoil: () => 0 }, { partCapture: capture });
-
-  assert.deepEqual(capture.records.map((record) => record.name), [
-    WORKER_LEGACY_PARTS.shadow,
-    WORKER_LEGACY_PARTS.body,
-    WORKER_LEGACY_PARTS.busyIndicator,
-    WORKER_LEGACY_PARTS.facingTick,
-  ]);
-  const unitCommands = renderer._pools.units.get(entity.id).commands;
-  assert.equal(unitCommands.some((cmd) => cmd.op === "drawPolygon"), false);
-  assert.equal(unitCommands.some((cmd) => cmd.op === "lineTo"), true);
-  assert.equal(renderer._pools.unitShadows.has(entity.id), false);
-});
-
-test("side-by-side comparison path is explicit and leaves default unit draw on legacy", () => {
-  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
-  const entity = { id: 2, kind: KIND.WORKER, owner: 1, x: 40, y: 50, facing: 0, state: STATE.IDLE };
-  const renderer = makeComparisonRenderer(definition);
-  renderer._drawUnit(entity, new Map([[1, 0x445566]]), { weaponRecoil: () => 0 });
-  assert.equal(renderer.legacyDraws, 1);
-  assert.equal(renderer._rigComparisonPool.size, 0);
-
-  renderer._rigComparisonEnabled = true;
-  renderer._drawUnit(entity, new Map([[1, 0x445566]]), { weaponRecoil: () => 0 });
-  assert.equal(renderer.legacyDraws, 2);
-  assert.equal(renderer._rigComparisonPool.size, 1);
-  assert.equal(renderer.layers.rigComparisons.children.length, 1);
-  assert.equal(renderer._rigComparisonPool.get(entity.id).container.x, entity.x + 48);
 });
 
 test("live rig definitions compile production SVG sources", () => {
@@ -301,7 +252,9 @@ test("live rig routes expose kind-specific production part groups", () => {
 
   const ekatRoutes = liveRigRoutesFor(KIND.EKAT);
   assert.deepEqual(ekatRoutes[0].parts, ["part.shadow"]);
-  assert.deepEqual(ekatRoutes[1].parts, ["part.body", "part.facingTick"]);
+  assert.equal(ekatRoutes[1].parts.includes("part.dress.core"), true);
+  assert.equal(ekatRoutes[1].parts.includes("part.staff"), true);
+  assert.equal(ekatRoutes[1].parts.includes("part.orb"), true);
 
   const workerRoutes = liveRigRoutesFor(KIND.WORKER);
   assert.deepEqual(workerRoutes[0].parts, ["part.shadow"]);
@@ -318,12 +271,11 @@ test("live rig routes expose kind-specific production part groups", () => {
 test("default Worker draw uses live SVG rig without enabling comparison", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 4, kind: KIND.WORKER, owner: 1, x: 32, y: 44, facing: Math.PI / 2, state: STATE.IDLE };
-  const renderer = makeComparisonRenderer(definition);
+  const renderer = makeRigRenderer();
   renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
 
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
 
-  assert.equal(renderer.legacyDraws, 0);
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
   assert.equal(renderer.layers.unitShadows.children.length, 1);
@@ -344,12 +296,11 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
     weaponFacing: Math.PI / 2,
     state: STATE.IDLE,
   };
-  const renderer = makeComparisonRenderer(definition);
+  const renderer = makeRigRenderer();
   renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, definition]]);
 
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
 
-  assert.equal(renderer.legacyDraws, 0);
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
@@ -359,23 +310,23 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
   assert.equal(unit.parts.get("part.shadow").display.visible, false);
 });
 
-test("non-routed units fall back to legacy procedural drawing", () => {
+test("missing live rig definitions fail closed instead of drawing procedural fallback", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 5, kind: KIND.EKAT, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
-  const renderer = makeComparisonRenderer(definition);
+  const renderer = makeRigRenderer();
   renderer._liveRigDefinitionsByKind = new Map([[KIND.WORKER, definition]]);
 
-  renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 });
-
-  assert.equal(renderer.legacyDraws, 1);
+  assert.throws(
+    () => renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 }),
+    /missing live SVG rig definition/,
+  );
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 0);
-  assert.equal(renderer._pools.units.has(entity.id), true);
 });
 
 test("live rig instances are destroyed through renderer-style sweep", () => {
   const definition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = { id: 6, kind: KIND.WORKER, owner: 1, x: 10, y: 12, facing: 0, state: STATE.IDLE };
-  const renderer = makeComparisonRenderer(definition);
+  const renderer = makeRigRenderer();
   renderLiveUnitRig(renderer, entity, new Map([[1, 0x112233]]), {}, definition, {
     routes: [
       { poolName: "liveUnitRigShadows", layerName: "unitShadows", parts: ["part.shadow"] },
@@ -393,20 +344,6 @@ test("live rig instances are destroyed through renderer-style sweep", () => {
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 0);
 });
 
-test("comparison instances are destroyed through renderer-style teardown and sweep", () => {
-  const definition = compileFixture("rig-worker.svg", KIND.WORKER);
-  const entity = { id: 3, kind: KIND.WORKER, owner: 1, x: 10, y: 12, facing: 0, state: STATE.IDLE };
-  const renderer = makeComparisonRenderer(definition);
-  renderer._rigComparisonEnabled = true;
-  renderRigLegacyComparison(renderer, entity, new Map([[1, 0x112233]]), {}, definition);
-  const instance = renderer._rigComparisonPool.get(entity.id);
-  assert.ok(instance instanceof UnitRigInstance);
-  for (const seen of Object.values(renderer._seen)) seen.clear();
-  renderer._unseen = new Map([[entity.id, 999]]);
-  _sweep.call(renderer);
-  assert.equal(instance._destroyed, true);
-  assert.equal(renderer._rigComparisonPool.size, 0);
-});
 }
 
 function compileFixture(file, expectedKind) {
@@ -415,11 +352,8 @@ function compileFixture(file, expectedKind) {
   return result.definition;
 }
 
-function makeComparisonRenderer(definition) {
+function makeRigRenderer() {
   return {
-    _rigComparisonEnabled: false,
-    _rigDefinitionsByKind: new Map([[KIND.WORKER, definition]]),
-    _rigComparisonPool: new Map(),
     _liveRigDefinitionsByKind: new Map(),
     _liveRigPools: {
       liveUnitRigShadows: new Map(),
@@ -440,7 +374,6 @@ function makeComparisonRenderer(definition) {
       units: new Set(),
       shotRevealShadows: new Set(),
       shotReveals: new Set(),
-      rigComparisons: new Set(),
       liveUnitRigShadows: new Set(),
       liveUnitRigs: new Set(),
       liveShotRevealRigShadows: new Set(),
@@ -451,12 +384,8 @@ function makeComparisonRenderer(definition) {
       units: new FakeContainer(),
       shotRevealShadows: new FakeContainer(),
       shotReveals: new FakeContainer(),
-      rigComparisons: new FakeContainer(),
     },
-    legacyDraws: 0,
     _drawUnit(_entity, _colorByOwner, _state, pools = {}) {
-      const liveRouted = !pools.skipLiveRig && this._liveRigDefinitionsByKind?.has(_entity.kind);
-      if ((!this._rigComparisonEnabled || pools.skipRigComparison) && !liveRouted) this.legacyDraws += 1;
       return _drawUnit.call(this, _entity, _colorByOwner, _state, pools);
     },
     _slot(poolName, id) {

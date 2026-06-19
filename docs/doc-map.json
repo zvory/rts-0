@@ -65,10 +65,9 @@
         "client/src/fog.js",
         "client/src/minimap.js",
         "client/src/resource_icons.js",
-        "tests/svg_migration_guardrails.mjs",
         "tests/rig_*.mjs",
-        "tests/transparent_unit_pixels.mjs",
-        "tests/visual_pixel_compare*.mjs"
+        "tests/svg_rig_importer.mjs",
+        "scripts/check-client-architecture.mjs"
       ],
       "docs": [
         "docs/context/client-ui.md",

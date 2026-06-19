@@ -153,8 +153,8 @@ export class Renderer {
     // Local visual-only track phase for tanks. The server owns movement; this
     // just turns interpolated distance/facing deltas into tread offsets.
     this._tankMotion = new Map();
-    // Live SVG rig instances are routed per unit kind and fall back to legacy
-    // drawing when a definition is absent or rejected by the importer.
+    // Live SVG rig instances are routed per unit kind. Invalid or missing
+    // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
     this._liveRigPools = {
       liveUnitRigShadows: new Map(),
@@ -170,12 +170,6 @@ export class Renderer {
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
 
-    // Dormant SVG rig comparison instances. Tests opt in by enabling
-    // _rigComparisonEnabled and providing _rigDefinitionsByKind.
-    this._rigComparisonEnabled = false;
-    this._rigDefinitionsByKind = new Map();
-    this._rigComparisonPool = new Map();
-    this._seen.rigComparisons = new Set();
     this._renderErrors = new Map();
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
@@ -567,10 +561,6 @@ export class Renderer {
     this._unseen.clear();
     this._setupVisuals.clear();
     this._tankMotion.clear();
-    if (this._rigComparisonPool) {
-      for (const instance of this._rigComparisonPool.values()) instance.destroy();
-      this._rigComparisonPool.clear();
-    }
     if (this._liveRigPools) {
       for (const pool of Object.values(this._liveRigPools)) {
         for (const instance of pool.values()) instance.destroy();

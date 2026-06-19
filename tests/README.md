@@ -184,41 +184,22 @@ node tests/client_smoke.mjs
 # env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to Chrome/Chromium)
 ```
 
-## Transparent unit pixel harness
+## SVG rig checks
 
-`transparent_unit_pixels.mjs` is temporary SVG migration scaffolding for `plans/svg` and should be
-deleted with the equivalence harness in Phase 8. It opens a minimal headless-browser fixture
-through a loopback static server, loads PixiJS, renders manifest-listed legacy procedural output and
-normalized rigs into fixed 96x96 transparent RGBA buffers, then compares the buffers mechanically.
-The manifest source is `tests/fixtures/svg/unit_migration_manifests.mjs`. The default command exits
-non-zero on composition mismatches:
+Unit visuals are SVG-authored rigs rendered through Pixi. The temporary legacy equivalence harness
+has been removed; future unit-art changes should keep the permanent rig contracts green:
 
 ```bash
-node tests/transparent_unit_pixels.mjs
+node tests/rig_schema.mjs
+node tests/svg_rig_importer.mjs
+node tests/rig_runtime.mjs
+node scripts/check-client-architecture.mjs
 ```
 
-Named part comparisons can be run independently. They render only the manifest-listed legacy
-procedural part and mapped rig part or part group before applying stricter per-part thresholds:
-
-```bash
-node tests/transparent_unit_pixels.mjs --parts-only
-```
-
-To run the full migration gate for every live-routed SVG unit, include both part and composition
-comparisons:
-
-```bash
-node tests/svg_migration_guardrails.mjs
-node tests/transparent_unit_pixels.mjs --parts --no-artifacts
-```
-
-`scripts/dump-legacy-unit-parts.mjs` dumps JSON draw-command metadata for one legacy sample and is
-intended as a drafting aid for future manifests/SVGs, for example
-`node scripts/dump-legacy-unit-parts.mjs --kind tank --sample tank/tank-low-oil`.
-
-Failures write `legacy.png`, `rig.png`, `diff.png`, and `report.json` under
-`tests/artifacts/transparent-unit-pixels/<sample-or-sample-part>/`. The artifact directory is
-ignored by git.
+`rig_schema.mjs` and `svg_rig_importer.mjs` validate the normalized data contract and accepted SVG
+authoring subset. `rig_runtime.mjs` covers animation sampling, live route definitions, part-group
+rendering, teardown, and fail-closed behavior for missing rig definitions. The client architecture
+check prevents `renderer/units.js` from regrowing unit-specific procedural drawing branches.
 
 > CI note: `Main test gate` uses `run-all.sh` sub-suite modes in parallel jobs, then reports the
 > required aggregate check as `./tests/run-all.sh`. In a headless CI image without Chrome, the

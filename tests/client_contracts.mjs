@@ -119,7 +119,6 @@ import {
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { Renderer } from "../client/src/renderer/index.js";
-import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
 import { _drawBuilding } from "../client/src/renderer/buildings.js";
 import { buildRendererFeedbackView } from "../client/src/renderer/feedback_view_model.js";
 import {
@@ -6846,43 +6845,6 @@ withFakeDocument(() => {
 }
 
 {
-  const artilleryEntity = {
-    id: 700,
-    owner: 1,
-    kind: KIND.ARTILLERY,
-    x: 128,
-    y: 160,
-    facing: 0,
-    weaponFacing: 0,
-    setupState: SETUP.PACKED,
-    state: STATE.IDLE,
-  };
-  const fakePools = new Map();
-  const fakeRenderer = {
-    _tankMotion: new Map(),
-    _tankMotionVisual,
-    _slot(pool, id) {
-      const key = `${pool}:${id}`;
-      if (!fakePools.has(key)) fakePools.set(key, new FakeGraphics());
-      return fakePools.get(key);
-    },
-    _tintFor() {
-      return 0x4878c8;
-    },
-    _vehicleShadow() {},
-    _shadow() {},
-    _deployedWeaponSetupVisual() {
-      return { prongFactor: 0, barrel: false };
-    },
-  };
-  _drawUnit.call(fakeRenderer, artilleryEntity, new Map([[1, 0x4878c8]]), {
-    playerId: 1,
-    resources: { oil: 10 },
-  });
-  assert(fakePools.has("units:700"), "Artillery renderer draws without a null vehicle body");
-}
-
-{
   const tankTrapEntity = {
     id: 720,
     owner: 1,
@@ -6937,50 +6899,6 @@ withFakeDocument(() => {
     firstBeam?.some((value, index) => Math.abs(value - secondBeam[index]) > 0.1),
     "Tank Trap renderer varies rotation between trap instances",
   );
-}
-
-{
-  const commandCarEntity = {
-    id: 701,
-    owner: 1,
-    kind: KIND.COMMAND_CAR,
-    x: 128,
-    y: 160,
-    facing: 0,
-    weaponFacing: 0,
-    state: STATE.IDLE,
-    breakthroughTicks: 0,
-  };
-  const fakePools = new Map();
-  const fakeRenderer = {
-    _tankMotion: new Map(),
-    _tankMotionVisual,
-    _slot(pool, id) {
-      const key = `${pool}:${id}`;
-      if (!fakePools.has(key)) fakePools.set(key, new RecordingGraphics());
-      return fakePools.get(key);
-    },
-    _tintFor() {
-      return 0x4878c8;
-    },
-    _vehicleShadow() {},
-    _shadow() {},
-    _deployedWeaponSetupVisual() {
-      return { prongFactor: 0, barrel: false };
-    },
-  };
-  _drawUnit.call(fakeRenderer, commandCarEntity, new Map([[1, 0x4878c8]]), {
-    playerId: 1,
-    resources: { oil: 10 },
-  });
-  const unitGraphics = fakePools.get("units:701");
-  const longLine = unitGraphics.calls.some((call, i, calls) => {
-    if (call[0] !== "moveTo" || calls[i + 1]?.[0] !== "lineTo") return false;
-    const dx = calls[i + 1][1] - call[1];
-    const dy = calls[i + 1][2] - call[2];
-    return Math.hypot(dx, dy) > STATS[KIND.COMMAND_CAR].body.length * 0.75;
-  });
-  assert(!longLine, "Command Car renderer should not draw the Scout Car rear machine-gun line");
 }
 
 // ---------------------------------------------------------------------------

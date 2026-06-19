@@ -12,23 +12,6 @@ export function createUnitRigInstance(kind, definition, pixiFactory = createDefa
   return new UnitRigInstance(kind, definition, pixiFactory);
 }
 
-export function renderRigLegacyComparison(renderer, entity, colorByOwner, state, definition) {
-  const legacyPools = { shadow: "unitShadows", unit: "units", skipRigComparison: true };
-  renderer._drawUnit(entity, colorByOwner, state, legacyPools);
-  if (!definition) return null;
-
-  const poolName = "rigComparisons";
-  const instance = renderer._rigComparisonPool.get(entity.id)
-    ?? createUnitRigInstance(entity.kind, definition, renderer._rigPixiFactory ?? createDefaultPixiFactory());
-  renderer._rigComparisonPool.set(entity.id, instance);
-  renderer._seen[poolName].add(entity.id);
-  if (!instance.container.parent && renderer.layers[poolName]) renderer.layers[poolName].addChild(instance.container);
-  const context = renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
-  instance.update(entity, context);
-  instance.container.x += 48;
-  return instance;
-}
-
 export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   if (!definition) return null;
   const context = renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};

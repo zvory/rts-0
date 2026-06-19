@@ -157,6 +157,7 @@ for (const file of files) {
   checkLargeFileBaseline(file, source);
   checkForbiddenGameStateIntentShims(file, source);
   checkRoomCapabilityParser(file, source);
+  checkRigOnlyUnitVisuals(file, source);
 }
 
 for (const mod of modules.values()) {
@@ -269,6 +270,45 @@ function checkRoomCapabilityParser(file, source) {
   for (const [needle, label] of forbidden) {
     if (source.includes(needle)) {
       failures.push(`${file}: room capabilities must read startPayload.capabilities/diagnostics, not ${label}`);
+    }
+  }
+}
+
+function checkRigOnlyUnitVisuals(file, source) {
+  if (file === "renderer/units.js") {
+    const forbidden = [
+      ["new PIXI.Graphics", "direct Pixi graphics allocation"],
+      ["PIXI.Graphics", "direct Pixi graphics access"],
+      ["drawPolygon", "procedural polygon drawing"],
+      ["drawCircle", "procedural circle drawing"],
+      ["drawRect", "procedural rectangle drawing"],
+      ["beginFill", "procedural fill drawing"],
+      ["lineStyle", "procedural stroke drawing"],
+      ["_slot(", "direct renderer graphics pool access"],
+      ["renderRigLegacyComparison", "legacy comparison renderer"],
+      ["createLegacyUnitPartCapture", "legacy part capture"],
+      ["LEGACY_PARTS", "legacy part metadata"],
+      ["partCapture", "migration part-capture hook"],
+      ["skipLiveRig", "live rig bypass flag"],
+      ["skipRigComparison", "comparison bypass flag"],
+    ];
+    for (const [needle, label] of forbidden) {
+      if (source.includes(needle)) {
+        failures.push(`${file}: unit visuals must route through SVG rigs, found ${label}`);
+      }
+    }
+  }
+
+  if (file === "renderer/rigs/runtime.js") {
+    const forbidden = [
+      ["renderRigLegacyComparison", "legacy comparison renderer"],
+      ["_rigComparisonPool", "legacy comparison pool"],
+      ["skipRigComparison", "comparison bypass flag"],
+    ];
+    for (const [needle, label] of forbidden) {
+      if (source.includes(needle)) {
+        failures.push(`${file}: rig runtime must not keep migration comparison plumbing, found ${label}`);
+      }
     }
   }
 }
