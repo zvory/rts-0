@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -38,14 +38,31 @@ browser dependent.
 
 ## Implementation Checklist
 
-- [ ] Add 60/120/240/480 FPS budget reporting to workload and comparison summaries.
-- [ ] Update console output so the next missed budget is visible during local runs.
-- [ ] Document the frame-work budget model and RAF/display-refresh caveat.
-- [ ] Keep warnings advisory and avoid laptop-specific CI gates.
-- [ ] Add focused report-shape coverage where practical.
-- [ ] Run the current render-lag suite and record exact artifact paths.
-- [ ] Run verification and record exact results.
-- [ ] Mark this phase as done in this file.
+- [x] Add 60/120/240/480 FPS budget reporting to workload and comparison summaries.
+- [x] Update console output so the next missed budget is visible during local runs.
+- [x] Document the frame-work budget model and RAF/display-refresh caveat.
+- [x] Keep warnings advisory and avoid laptop-specific CI gates.
+- [x] Add focused report-shape coverage where practical.
+- [x] Run the current render-lag suite and record exact artifact paths.
+- [x] Run verification and record exact results.
+- [x] Mark this phase as done in this file.
+
+Completed verification on 2026-06-19:
+
+- `node --check scripts/client-perf-harness.mjs` passed.
+- `node tests/client_contracts.mjs` passed.
+- `node scripts/check-docs-health.mjs` passed.
+- `git diff --check` passed.
+- `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10` passed.
+  Artifacts:
+  - `target/client-perf/matt-alex-replay/2026-06-19T23-57-48-442Z`
+  - `target/client-perf/vehicle-wall-stress/2026-06-19T23-58-00-084Z`
+  - `target/client-perf/selected-unit-hud-stress/2026-06-19T23-58-11-324Z`
+  - `target/client-perf/render-lag-comparison/2026-06-19T23-58-22-564Z/summary.json`
+
+Local Matt/Alex replay result: `frame.work` p95 was 8 ms, clearing the 60 FPS and 120 FPS
+frame-work budgets locally while missing the 240 FPS headroom budget by 3.83 ms. This is
+machine-local evidence only.
 
 ## Verification
 

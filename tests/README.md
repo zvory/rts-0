@@ -198,9 +198,10 @@ node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --secon
 The harness starts its own local server unless `RTS_URL` or `--base-url` points at a healthy server.
 It fails on runtime errors or missing perf summaries, not on absolute FPS thresholds. The render-lag
 suite writes per-workload summaries and a `target/client-perf/render-lag-comparison/<timestamp>/`
-rollup with advisory 120 FPS budget warnings. Open a generated `summary.json` to inspect workload
-metadata, build/version, viewport, entity/context counts, `renderBudget`, frame timing aggregates,
-worst phases, page errors, and the generated client net report.
+rollup with advisory 60, 120, 240, and 480 FPS frame-work budget margins plus the next missed p95
+budget. Open a generated `summary.json` to inspect workload metadata, build/version, viewport,
+entity/context counts, `renderBudget`, frame timing aggregates, worst phases, page errors, and the
+generated client net report.
 
 ## SVG rig checks
 

@@ -116,10 +116,11 @@ one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>
 `--render-lag-suite` path runs the Matt/Alex replay, the vehicle-wall stress scenario, and a
 selected-unit HUD stress scenario, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
-`renderBudget` advisory output for the 120 FPS target, a `snapshotPacketBudget` block with payload
-p95 bytes, the selected packet budget, over-budget count, and over-budget percentage when the
-generated `ClientNetReport` includes them. Pass `--trace` to also write a Chrome `trace.json`;
-traces are opt-in because they are larger and machine-local.
+`renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
+per-budget margins and the next missed p95 budget. It also includes a `snapshotPacketBudget` block
+with payload p95 bytes, the selected packet budget, over-budget count, and over-budget percentage
+when the generated `ClientNetReport` includes them. Pass `--trace` to also write a Chrome
+`trace.json`; traces are opt-in because they are larger and machine-local.
 
 The default harness result fails for runtime errors, page/console/request errors, and missing
 `window.__rtsPerf` or generated `ClientNetReport` summaries. It deliberately does not fail on an
@@ -127,13 +128,32 @@ absolute FPS, frame time, or trace-timing budget. Treat the numbers as local evi
 optimization branches on the same machine, not as a portable guarantee for other laptops.
 
 For render-lag comparisons, read `renderBudget.frameWork` first: `frame.work` is total browser work
-inside the RAF and should be compared to the 8.33 ms 120 FPS frame budget. Recurring top-level
-`match.*` phases above 1-2 ms p95 are advisory follow-up candidates; `match.renderer` and
-`match.minimap` are top-level phases, while `renderer.*` rows are nested renderer subphases and
-must not be added back into `frame.work`. If local-only minimap probes such as `minimap.*` rows are
-enabled during an investigation, treat them as nested minimap detail under `match.minimap`, not as a
-separate top-level cost. Always inspect p95 bucket, max, worst-phase count, and shape context
-(`entityCount`, `selectedCount`, visible tiles, viewport, and device pixel ratio) together.
+inside the RAF and should be compared to the 16.67 ms, 8.33 ms, 4.17 ms, and 2.08 ms frame-work
+budgets for 60, 120, 240, and 480 FPS. A positive margin means the measured frame-work metric was
+under that budget; a negative margin shows how far it missed. The 120 FPS result remains useful,
+but a workload with p95 near 8 ms is only barely clearing 120 locally and should still be treated as
+risky for weaker hardware if it misses the 240 FPS headroom target.
+
+Use `frame.work` average, p95, and max instead of literal local `requestAnimationFrame` FPS for
+branch comparisons. Local RAF FPS is constrained by display refresh rate, browser scheduling,
+visibility, throttling, and frame gaps outside measured JS work; `frame.work` isolates the measured
+client work inside frames. Average shows steady cost, p95 shows recurring expensive frames, and max
+shows the worst single frame in that sample. Frame-gap and FPS fields still help diagnose pacing,
+but they are not portable headroom guarantees.
+
+Estimate player impact from ratios, not flat FPS deltas. For example, reducing local `frame.work`
+p95 from 12 ms to 6 ms roughly doubles measured p95 work headroom on that machine; do not describe
+it as adding a fixed number of FPS for players. Relative improvement on the same machine and
+workload is more useful evidence than projecting the same millisecond or FPS delta onto weaker
+laptops.
+
+Recurring top-level `match.*` phases above 1-2 ms p95 are advisory follow-up candidates;
+`match.renderer` and `match.minimap` are top-level phases, while `renderer.*` rows are nested
+renderer subphases and must not be added back into `frame.work`. If local-only minimap probes such
+as `minimap.*` rows are enabled during an investigation, treat them as nested minimap detail under
+`match.minimap`, not as a separate top-level cost. Always inspect p95 bucket, max, worst-phase
+count, and shape context (`entityCount`, `selectedCount`, visible tiles, viewport, and device pixel
+ratio) together.
 
 Keep evidence streams separate. Matt and Alex beta FPS/network reports are per-player browser
 observations from deployed matches; `matt-alex-replay` is a local replay of preserved match 54 data;

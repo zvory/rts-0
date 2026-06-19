@@ -15,6 +15,7 @@ import {
 } from "../scripts/snapshot-codec-bakeoff.mjs";
 import {
   RENDER_FRAME_BUDGET_MS,
+  RENDER_FRAME_BUDGET_TARGETS,
   buildRenderBudgetReport,
   formatRenderBudgetConsole,
 } from "../scripts/client-perf-harness.mjs";
@@ -1412,8 +1413,13 @@ function hotkeyService() {
   });
 
   assert(report.target.frameBudgetMs === RENDER_FRAME_BUDGET_MS, "render budget report exposes the 120 FPS frame budget");
+  assert(report.target.frameBudgets.length === RENDER_FRAME_BUDGET_TARGETS.length, "render budget report exposes all FPS frame budgets");
   assert(report.status === "warn", "render budget report warns without failing on over-budget frame work");
+  assert(report.frameWork.avgMs === 7.5, "render budget report includes frame.work average");
   assert(report.frameWork.p95Ms === 12, "render budget report includes frame.work p95");
+  const budget120 = report.frameWork.budgetMargins.find((budget) => budget.fps === 120);
+  assert(budget120.p95MarginMs === -3.67 && budget120.p95Clears === false, "render budget report shows p95 margin to 120 FPS");
+  assert(report.frameWork.nextMissedBudget.fps === 120, "render budget report names the next missed p95 budget");
   assert(report.worstPhase.label === "match.minimap", "render budget report preserves worst-phase count context");
   assert(
     report.recurringPhaseWarnings.some((phase) => phase.label === "match.minimap" && phase.severity === "high"),
@@ -1425,8 +1431,29 @@ function hotkeyService() {
     "render budget report separates top-level match phases from nested renderer phases",
   );
   assert(
+    formatRenderBudgetConsole(report).includes("next missed=120 FPS"),
+    "render budget console summary shows the next missed budget",
+  );
+  assert(
     formatRenderBudgetConsole(report).includes("advisory"),
     "render budget console summary labels warnings as advisory",
+  );
+}
+
+{
+  const report = buildRenderBudgetReport({
+    schemaVersion: 1,
+    frameCount: 120,
+    slowFrameCount: 0,
+    phases: [
+      { label: "frame.work", count: 120, avgMs: 3.8, maxMs: 9, p50Ms: 4, p95Ms: 7.5, slowCount: 0 },
+    ],
+  });
+
+  assert(report.frameWork.nextMissedBudget.fps === 240, "120 FPS work can still miss the next headroom target");
+  assert(
+    report.warnings.some((warning) => warning.kind === "frame_work_p95_misses_headroom_budget"),
+    "render budget report warns when local p95 clears 120 but misses higher headroom",
   );
 }
 
