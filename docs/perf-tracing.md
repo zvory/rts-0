@@ -159,6 +159,35 @@ Codec bake-off artifacts are local developer evidence only. The live protocol st
 compact JSON text, the browser parser rejects binary snapshot frames, and deflate numbers are
 compressed payload bytes from Node zlib rather than verified WebSocket extension wire bytes.
 
+Real WebSocket compression viability:
+
+```bash
+node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6 --snapshot-codec-bakeoff
+node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6 --snapshot-codec-bakeoff
+scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots
+scripts/fly-logs.sh beta recent | rg 'client_net_report|websocket_compression|snapshot_byte_source|writer_send'
+```
+
+Use this pass to answer whether real `permessage-deflate` negotiated in the browser/server path
+before any default changes. The browser harness writes a top-level `websocket` block and the
+generated `ClientNetReport` now includes `websocketExtensions`, `websocketCompression`, and
+`snapshotByteSource`. `scripts/parse-net-report-logs.mjs` surfaces the same fields under Transport
+diagnostics for local or Fly logs.
+
+Interpretation:
+
+- `websocketCompression=permessage-deflate` means Chrome reports the WebSocket extension as
+  negotiated. `snapshotBytes*` still measure browser-delivered application payload bytes, not
+  compressed wire bytes.
+- `websocketCompression=none` means the WebSocket completed without a negotiated compression
+  extension. That is the expected result for the current Axum 0.8 / Tungstenite 0.29 server stack;
+  Tungstenite 0.29 does not implement `permessage-deflate`.
+- If compression is still worth pursuing, the next phase should first choose an implementation route
+  such as replacing the upgrade path with a crate that supports `permessage-deflate`, adding a
+  transport wrapper, or adding an explicit application-level compressed snapshot envelope with a
+  rollback switch. Do not compare `snapshotBytes*` against compressed-wire claims unless the
+  measurement source is explicitly labeled.
+
 The Fly production deploy enables the low-noise spike mode in `fly.toml`:
 
 ```toml

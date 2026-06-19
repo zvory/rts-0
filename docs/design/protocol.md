@@ -134,11 +134,12 @@ in a match:
   snapshotGapMaxMs: u16,    // largest observed interval between received snapshots
   jitterSamples: u32,       // jitter incidents in this report window
   snapshots: u32,           // snapshots received in this report window
-  snapshotBytesTotal: u32,   // total received snapshot WebSocket text bytes
-  snapshotBytesMax: u32,     // largest received snapshot WebSocket text bytes
-  snapshotBytesAvg: u32,     // average received snapshot WebSocket text bytes
+  snapshotBytesTotal: u32,   // total received snapshot application payload bytes
+  snapshotBytesMax: u32,     // largest received snapshot application payload bytes
+  snapshotBytesAvg: u32,     // average received snapshot application payload bytes
   snapshotMessageCount: u32, // snapshot frames observed by the transport report window
-  snapshotBytesP95: u32,     // bucketed p95 received snapshot WebSocket text bytes
+  snapshotByteSource: string, // currently "application-payload"; not compressed wire bytes
+  snapshotBytesP95: u32,     // bucketed p95 received snapshot application payload bytes
   snapshotSegmentBudgetBytes: u32, // payload-byte single-segment budget used by this client
   snapshotOverSegmentBudgetCount: u32, // snapshot frames above snapshotSegmentBudgetBytes
   snapshotOverSegmentBudgetPctX100: u16, // over-budget percentage multiplied by 100
@@ -146,6 +147,8 @@ in a match:
   snapshotParseP95Ms: u16,   // bucketed p95 JSON.parse cost for snapshot frames
   snapshotDecodeMaxMs: u16,  // max compact protocol decode cost
   snapshotDecodeP95Ms: u16,  // bucketed p95 compact protocol decode cost
+  websocketExtensions: string, // bounded browser WebSocket.extensions after open
+  websocketCompression: string, // normalized "permessage-deflate" or "none"
   snapshotApplyMaxMs: u16,   // max GameState.applySnapshot cost
   snapshotApplyP95Ms: u16,   // bucketed p95 GameState.applySnapshot cost
   predictionApplyMaxMs: u16, // max authoritative prediction reconciliation/overlay cost
@@ -487,6 +490,15 @@ codec, and the fallback path. Binary frames are rejected by the browser protocol
 future experiment adds an explicit codec/version and client decoder. Offline bake-off tooling may
 compare protobuf-style, MessagePack, CBOR, deflate, or custom binary candidates, but those artifacts
 do not change live negotiation and must not silently strand older clients.
+
+The live compression diagnostics are report-only. `snapshotBytes*` fields are browser-delivered
+application payload measurements after any transport extension would have been decoded by the
+browser; they are not compressed wire bytes. `websocketExtensions` mirrors the bounded browser
+`WebSocket.extensions` string, and `websocketCompression` is a normalized label that is
+`permessage-deflate` only when that extension appears. With the current Axum 0.8 / Tungstenite 0.29
+server stack, direct `permessage-deflate` negotiation is not available, so the expected live label is
+`none` until a future phase changes the WebSocket implementation or adds an explicit application
+compression envelope.
 
 ```
 {

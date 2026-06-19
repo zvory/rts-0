@@ -235,6 +235,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
         devicePixelRatio: summary.devicePixelRatio,
       },
       build: version,
+      websocket: summary.websocket,
       health: summary.health,
       perf: summary.perf,
       renderBudget,
@@ -313,6 +314,9 @@ function snapshotPacketBudgetSummary(report) {
     snapshotSegmentBudgetBytes: numberOrNull(report.snapshotSegmentBudgetBytes),
     snapshotOverSegmentBudgetCount: numberOrNull(report.snapshotOverSegmentBudgetCount),
     snapshotOverSegmentBudgetPctX100: numberOrNull(report.snapshotOverSegmentBudgetPctX100),
+    snapshotByteSource: stringOrNull(report.snapshotByteSource),
+    websocketCompression: stringOrNull(report.websocketCompression),
+    websocketExtensions: stringOrNull(report.websocketExtensions),
   };
 }
 
@@ -474,6 +478,10 @@ function numberOrNull(value) {
   return Number.isFinite(value) ? value : null;
 }
 
+function stringOrNull(value) {
+  return typeof value === "string" ? value : null;
+}
+
 function phaseByLabel(phases, label) {
   return phases.find((phase) => phase?.label === label) || null;
 }
@@ -533,12 +541,26 @@ async function collectPageSummary(page) {
         match.net.netReport = original;
       }
     }
+    const websocketExtensions = typeof match?.net?.ws?.extensions === "string" ? match.net.ws.extensions : "";
+    const websocketCompression = websocketExtensions
+      .toLowerCase()
+      .split(",")
+      .map((part) => part.trim().split(";")[0]?.trim())
+      .includes("permessage-deflate")
+      ? "permessage-deflate"
+      : "none";
     const canvas = document.querySelector("#viewport canvas");
     return {
       title: document.title,
       location: window.location.href,
       userAgent: navigator.userAgent,
       devicePixelRatio: window.devicePixelRatio,
+      websocket: {
+        extensions: websocketExtensions,
+        compression: websocketCompression,
+        compressionNegotiated: websocketCompression === "permessage-deflate",
+        bufferedAmount: match?.net?.bufferedAmount || 0,
+      },
       canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
       health: healthSnapshot,
       perf: perfSnapshot,
@@ -617,10 +639,12 @@ async function startOrReuseServer(args) {
 
   const port = args.port || await allocatePort();
   const baseUrl = `http://127.0.0.1:${port}/`;
-  const serverBin = process.env.RTS_SERVER_BIN || path.join(cargoTargetDir(), "debug", "rts-server");
+  const targetDir = cargoTargetDir();
+  const serverBin = process.env.RTS_SERVER_BIN || path.join(targetDir, "debug", "rts-server");
   if (!fs.existsSync(serverBin)) {
     runOrThrow("cargo", ["build", "--manifest-path", path.join(SERVER_DIR, "Cargo.toml")], {
       cwd: REPO_ROOT,
+      env: { ...process.env, CARGO_TARGET_DIR: targetDir },
       stdio: "inherit",
     });
   }

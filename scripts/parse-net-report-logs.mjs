@@ -91,6 +91,12 @@ const SUMMARY_FIELDS = [
   "max_pending_command_count",
 ];
 
+const TRANSPORT_DIAGNOSTIC_FIELDS = [
+  ["websocket_compression", "WebSocket compression"],
+  ["websocket_extensions", "WebSocket extensions"],
+  ["snapshot_byte_source", "snapshot byte source"],
+];
+
 const ISSUE_GROUPS = [
   {
     id: "server_tick_scheduler",
@@ -590,6 +596,7 @@ function finalizeMatch(match) {
   const matchPerf = summarizePerf(match);
   const groups = ISSUE_GROUPS.map((group) => classifyGroup(group, players, matchPerf)).filter(Boolean);
   const missing = missingDiagnosticGroups(allRows);
+  const transport = summarizeTransport(allRows);
 
   return {
     match: sourceLabel(match),
@@ -610,10 +617,10 @@ function finalizeMatch(match) {
     writerRows: match.writers.length,
     players,
     matchPerf,
+    transport,
     classifications: groups,
     missing,
-    transportNote:
-      "Unsupported: Fly logs and ClientNetReport do not expose packet loss, retransmits, or per-packet browser transport data. Packet-budget fields are payload bytes only and exclude WebSocket/TLS/TCP/IP overhead.",
+    transportNote: transportNoteFor(transport),
   };
 }
 
@@ -644,8 +651,55 @@ function finalizePlayer(player) {
     lastReportAt: reports.slice().reverse().find((row) => row.timestamp)?.timestamp || "",
     primaryIssues: issues,
     metrics: values,
+    transport: summarizeTransport(reports),
     evidence,
   };
+}
+
+function summarizeTransport(rows) {
+  return Object.fromEntries(
+    TRANSPORT_DIAGNOSTIC_FIELDS.map(([field, label]) => [
+      camelCase(field),
+      {
+        label,
+        samples: rows.filter((row) => row.fields[field] !== undefined).length,
+        values: summarizeStringField(rows, field),
+      },
+    ])
+  );
+}
+
+function summarizeStringField(rows, field) {
+  const counts = new Map();
+  for (const row of rows) {
+    if (row.fields[field] === undefined) {
+      continue;
+    }
+    const value = transportValue(row.fields[field]);
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([value, count]) => ({ value, count }));
+}
+
+function transportValue(value) {
+  const text = String(value ?? "");
+  return text.length > 0 ? text.slice(0, 128) : "(empty)";
+}
+
+function transportNoteFor(transport) {
+  const base =
+    "Unsupported: Fly logs and ClientNetReport do not expose packet loss, retransmits, or per-packet browser transport data. Packet-budget fields are payload bytes only and exclude WebSocket/TLS/TCP/IP overhead.";
+  const compression = transport.websocketCompression;
+  if (!compression || compression.samples === 0) {
+    return `${base} WebSocket compression negotiation was not reported by these rows.`;
+  }
+  const negotiated = compression.values.some((item) => item.value === "permessage-deflate");
+  if (negotiated) {
+    return `${base} Client reports say permessage-deflate negotiated; snapshot byte fields still measure application payload bytes, not compressed wire bytes.`;
+  }
+  return `${base} Client reports did not show negotiated WebSocket compression.`;
 }
 
 function summarizeField(rows, field, mode = "max") {
@@ -783,6 +837,12 @@ function missingDiagnosticGroups(rows) {
   if (!fields.has("snapshot_bytes_p95") && !fields.has("snapshot_over_segment_budget_pct_x100")) {
     missing.push("snapshot packet-budget payload p95/rate: no matching fields in input");
   }
+  if (!fields.has("websocket_compression")) {
+    missing.push("WebSocket compression negotiation: no matching fields in input");
+  }
+  if (!fields.has("snapshot_byte_source")) {
+    missing.push("snapshot byte measurement source: no matching fields in input");
+  }
   return missing;
 }
 
@@ -817,6 +877,7 @@ function formatMarkdown(report) {
     lines.push(
       `- Rows: ${match.reportRows} client reports, ${match.serverTickRows} tick, ${match.snapshotRows} snapshot, ${match.writerRows} writer`
     );
+    lines.push(`- Transport diagnostics: ${formatTransportDiagnostics(match.transport)}`);
 
     lines.push("");
     lines.push("| player | reports | primary issues | RTT max | snapshot gap max | jitter max | payload max | payload p95 | over budget | parse/decode/apply max | frame gap max | frame work max | renderer max | FPS min | command response max | server tick max | server lag max |");
@@ -879,6 +940,20 @@ function metricMin(player, field) {
   return formatValue(player.metrics[field]?.min);
 }
 
+function formatTransportDiagnostics(transport) {
+  return TRANSPORT_DIAGNOSTIC_FIELDS.map(([field, label]) => {
+    const summary = transport[camelCase(field)];
+    return `${label} ${formatTransportCounts(summary)}`;
+  }).join("; ");
+}
+
+function formatTransportCounts(summary) {
+  if (!summary || summary.samples === 0 || summary.values.length === 0) {
+    return "n/a";
+  }
+  return summary.values.map((item) => `${item.value}=${item.count}`).join(", ");
+}
+
 function formatPctX100(value) {
   if (value === null || value === undefined || value === "") {
     return "n/a";
@@ -922,6 +997,10 @@ function formatTsv(report) {
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function camelCase(value) {
+  return value.replace(/_([a-z])/g, (_, ch) => ch.toUpperCase());
 }
 
 function tsvCell(value) {

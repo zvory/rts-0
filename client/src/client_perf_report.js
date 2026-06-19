@@ -39,6 +39,7 @@ export function snapshotReportFields({ reportStats, transportStats, snapshotProc
     snapshotBytesMax: clampU32(transportStats?.snapshotBytesMax),
     snapshotBytesAvg: clampU32(transportStats?.snapshotBytesAvg),
     snapshotMessageCount: clampU32(transportStats?.snapshotMessageCount),
+    snapshotByteSource: clampReportLabel(transportStats?.snapshotByteSource),
     snapshotBytesP95: clampU32(transportStats?.snapshotBytesP95),
     snapshotSegmentBudgetBytes: clampU32(transportStats?.snapshotSegmentBudgetBytes),
     snapshotOverSegmentBudgetCount: clampU32(transportStats?.snapshotOverSegmentBudgetCount),
@@ -47,6 +48,8 @@ export function snapshotReportFields({ reportStats, transportStats, snapshotProc
     snapshotParseP95Ms: clampU16(transportStats?.snapshotParseP95Ms),
     snapshotDecodeMaxMs: clampU16(transportStats?.snapshotDecodeMaxMs),
     snapshotDecodeP95Ms: clampU16(transportStats?.snapshotDecodeP95Ms),
+    websocketExtensions: clampReportText(transportStats?.websocketExtensions),
+    websocketCompression: clampReportLabel(transportStats?.websocketCompression),
     snapshotApplyMaxMs: clampU16(snapshotApply.max),
     snapshotApplyP95Ms: clampU16(snapshotApply.p95),
     predictionApplyMaxMs: clampU16(predictionApply.max),
@@ -110,4 +113,8 @@ function clampU32(value) {
 
 function clampReportLabel(value) {
   return String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 64);
+}
+
+function clampReportText(value) {
+  return String(value || "").replace(/[^A-Za-z0-9_.:;=, -]/g, "_").slice(0, 128);
 }
