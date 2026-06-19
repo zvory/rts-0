@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Ready for implementation after Phase 1 is merged.
+- [x] Done.
 
 ## Objective
 
