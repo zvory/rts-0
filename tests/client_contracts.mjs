@@ -13,6 +13,11 @@ import {
   fixtureSnapshotFrames,
   runSnapshotCodecBakeoff,
 } from "../scripts/snapshot-codec-bakeoff.mjs";
+import {
+  RENDER_FRAME_BUDGET_MS,
+  buildRenderBudgetReport,
+  formatRenderBudgetConsole,
+} from "../scripts/client-perf-harness.mjs";
 import { Net, SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES } from "../client/src/net.js";
 import {
   DEFAULT_AI_PROFILE_ID,
@@ -1390,6 +1395,39 @@ function hotkeyService() {
   assert(profiler.summary().frameCount === 3, "FrameProfiler report-window reset preserves debug aggregates");
   surface.reset();
   assert(profiler.summary().frameCount === 0, "FrameProfiler debug surface reset clears aggregates");
+}
+
+{
+  const report = buildRenderBudgetReport({
+    schemaVersion: 1,
+    frameCount: 120,
+    slowFrameCount: 2,
+    worstPhase: { label: "match.minimap", count: 80 },
+    context: { entityCount: 42, selectedCount: 4 },
+    phases: [
+      { label: "frame.work", count: 120, avgMs: 7.5, maxMs: 14.6, p50Ms: 8, p95Ms: 12, slowCount: 0 },
+      { label: "match.minimap", count: 120, avgMs: 2.6, maxMs: 5.9, p50Ms: 2, p95Ms: 4, slowCount: 0 },
+      { label: "renderer.units", count: 120, avgMs: 0.9, maxMs: 2.4, p50Ms: 1, p95Ms: 2, slowCount: 0 },
+    ],
+  });
+
+  assert(report.target.frameBudgetMs === RENDER_FRAME_BUDGET_MS, "render budget report exposes the 120 FPS frame budget");
+  assert(report.status === "warn", "render budget report warns without failing on over-budget frame work");
+  assert(report.frameWork.p95Ms === 12, "render budget report includes frame.work p95");
+  assert(report.worstPhase.label === "match.minimap", "render budget report preserves worst-phase count context");
+  assert(
+    report.recurringPhaseWarnings.some((phase) => phase.label === "match.minimap" && phase.severity === "high"),
+    "render budget report calls out recurring phases above 2 ms",
+  );
+  assert(
+    report.groups.topLevel.some((phase) => phase.label === "match.minimap")
+      && report.groups.rendererNested.some((phase) => phase.label === "renderer.units"),
+    "render budget report separates top-level match phases from nested renderer phases",
+  );
+  assert(
+    formatRenderBudgetConsole(report).includes("advisory"),
+    "render budget console summary labels warnings as advisory",
+  );
 }
 
 {

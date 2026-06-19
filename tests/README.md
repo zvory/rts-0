@@ -191,14 +191,16 @@ writes machine-readable summaries under `target/client-perf/<workload>/<timestam
 
 ```bash
 node scripts/client-perf-harness.mjs --list
-node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6
-node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6
+node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
+node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
 ```
 
 The harness starts its own local server unless `RTS_URL` or `--base-url` points at a healthy server.
-It fails on runtime errors or missing perf summaries, not on absolute FPS thresholds. Open a
-generated `summary.json` to inspect workload metadata, build/version, viewport, entity/context
-counts, frame timing aggregates, worst phases, page errors, and the generated client net report.
+It fails on runtime errors or missing perf summaries, not on absolute FPS thresholds. The render-lag
+suite writes per-workload summaries and a `target/client-perf/render-lag-comparison/<timestamp>/`
+rollup with advisory 120 FPS budget warnings. Open a generated `summary.json` to inspect workload
+metadata, build/version, viewport, entity/context counts, `renderBudget`, frame timing aggregates,
+worst phases, page errors, and the generated client net report.
 
 ## SVG rig checks
 
