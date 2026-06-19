@@ -1,9 +1,16 @@
+we currently make it so that users can double tap an order to send it, like double tapping A to send an attack order. but sometimes they mean to tap A then click to attack, but accidentally double tap A first and then click. so their units get deselected. i think it should be okay to like, ignore clicks in this case as long as the mouse doesn't move too far, we assume it's just a mistake? i'm not sure how to think about this, from a game control or human computer interaction
+sense. we have a fix, but, who knows if it will cause more grief than it solves. 
+
+
 add an option to see movement waypoints the debug setting while in replays
 
 
 workers building tank traps should take damage if their tank trap is attacked? or, workers hould take attack priority from tank traps? idk, for some reason workers building tank traps seem invulnerable, so tank traps should not block shots like buildings do.
 
 increase AT gun field of fire by 5 degrees
+
+
+
 
 
 when machine gunner spawns, and if it doesn't move, it doesn't seem to attack units that come near it, like maybe it's not setting up or its otherwise stuck
