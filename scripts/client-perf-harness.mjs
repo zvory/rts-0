@@ -17,6 +17,11 @@ const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Ch
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900 });
 const DEFAULT_DURATION_MS = 6000;
 const DEFAULT_CODEC_SAMPLE_LIMIT = 240;
+export const RENDER_TARGET_FPS = 120;
+export const RENDER_FRAME_BUDGET_MS = 8.33;
+export const RECURRING_PHASE_WARN_MS = 1;
+export const RECURRING_PHASE_HIGH_WARN_MS = 2;
+const MAX_RECURRING_WARNINGS = 8;
 const MATT_ALEX_SOURCE = path.join(
   REPO_ROOT,
   "docs",
@@ -41,7 +46,18 @@ const WORKLOADS = Object.freeze([
     kind: "devScenario",
     url: "/dev/scenarios?id=scout_car_wall_chokepoint&unit=tank&count=15",
   },
+  {
+    id: "selected-unit-hud-stress",
+    description: "No-fog dev scenario with four selected tanks to exercise HUD and selection overlays.",
+    kind: "devScenario",
+    url: "/dev/scenarios?id=scout_car_snaking_corridor&unit=tank&count=4",
+    setup: {
+      selectFirstEntities: 4,
+      minSelectedCount: 1,
+    },
+  },
 ]);
+const RENDER_LAG_WORKLOAD_IDS = Object.freeze(WORKLOADS.map((workload) => workload.id));
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -68,6 +84,10 @@ async function main() {
       results.push(result);
       const status = result.status === "passed" ? "PASS" : "FAIL";
       console.log(`${status} ${workload.id} ${result.artifactDir}`);
+      const budgetText = formatRenderBudgetConsole(result.renderBudget);
+      if (budgetText) {
+        for (const line of budgetText.split("\n")) console.log(`  ${line}`);
+      }
       if (result.status !== "passed") {
         failed += 1;
         for (const error of result.errors) console.error(`  ${error}`);
@@ -77,6 +97,9 @@ async function main() {
     await browser.close().catch(() => {});
     await server.close();
   }
+
+  const comparison = results.length > 0 ? writeRenderLagComparisonSummary(results, outputRoot, args) : null;
+  if (comparison) console.log(`render lag comparison summary: ${comparison.summaryJson}`);
 
   if (failed > 0) {
     process.exitCode = 1;
@@ -96,6 +119,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   let tracePath = null;
   let summary = null;
   let snapshotCodecBakeoff = null;
+  let workloadSetup = null;
 
   try {
     await prepareWorkload(workload);
@@ -132,6 +156,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       { timeout: args.startTimeoutMs },
     );
     await page.waitForSelector("#viewport canvas", { timeout: 5000 });
+    workloadSetup = await applyWorkloadSetup(page, workload);
     await page.waitForFunction(
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
       { timeout: Math.max(args.durationMs, 1000) + 10000 },
@@ -183,6 +208,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       error: err.message,
     }));
     const endedAt = new Date().toISOString();
+    const renderBudget = buildRenderBudgetReport(summary.perf?.summary, summary.perf?.reportSummary);
     const artifact = {
       schemaVersion: 1,
       status: "passed",
@@ -201,6 +227,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
         baseUrl: server.baseUrl,
         reusedServer: server.reused,
       },
+      workloadSetup,
       browser: {
         chrome,
         viewport: args.viewport,
@@ -211,6 +238,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       websocket: summary.websocket,
       health: summary.health,
       perf: summary.perf,
+      renderBudget,
       clientNetReport: summary.clientNetReport,
       snapshotPacketBudget: snapshotPacketBudgetSummary(summary.clientNetReport),
       snapshotCodecBakeoff,
@@ -238,6 +266,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     if (!summary.clientNetReport) {
       errors.push("ClientNetReport snapshot could not be generated");
     }
+    errors.push(...workloadSetupErrors(workload, workloadSetup));
     errors.push(...consoleErrors.map((error) => `console error: ${error}`));
     errors.push(...pageErrors.map((error) => `page error: ${error}`));
     errors.push(...requestFailures.map((error) => `request failure: ${error}`));
@@ -249,11 +278,13 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     fs.writeFileSync(path.join(artifactDir, "summary.json"), `${JSON.stringify(artifact, null, 2)}\n`);
     return {
       status: artifact.status,
+      workloadId: workload.id,
       artifactDir,
       errors,
       frameCount: summary.perf?.summary?.frameCount || 0,
       frameWorkP95Ms: summary.perf?.reportSummary?.frameWorkP95Ms || 0,
       rendererP95Ms: summary.perf?.reportSummary?.rendererP95Ms || 0,
+      renderBudget,
     };
   } catch (err) {
     errors.push(err.stack || err.message);
@@ -272,7 +303,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       artifacts: { summaryJson: path.join(artifactDir, "summary.json"), traceJson: tracePath },
     };
     fs.writeFileSync(path.join(artifactDir, "summary.json"), `${JSON.stringify(artifact, null, 2)}\n`);
-    return { status: "failed", artifactDir, errors };
+    return { status: "failed", workloadId: workload.id, artifactDir, errors };
   }
 }
 
@@ -289,12 +320,199 @@ function snapshotPacketBudgetSummary(report) {
   };
 }
 
+export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
+  const phases = Array.isArray(perfSummary?.phases) ? perfSummary.phases : [];
+  const framePhase = phaseByLabel(phases, "frame.work");
+  const frameWorkP95Ms = numericMetric(framePhase?.p95Ms ?? reportSummary?.frameWorkP95Ms);
+  const frameWorkMaxMs = numericMetric(framePhase?.maxMs ?? reportSummary?.frameWorkMaxMs);
+  const worstPhase = perfSummary?.worstPhase || (
+    reportSummary?.worstFramePhase
+      ? { label: reportSummary.worstFramePhase, count: null }
+      : null
+  );
+  const recurringPhaseWarnings = phases
+    .filter((phase) => phase?.label && phase.label !== "frame.work" && phase.label !== "frame.gap")
+    .map((phase) => ({
+      label: phase.label,
+      count: numberOrNull(phase.count),
+      avgMs: numericMetric(phase.avgMs),
+      maxMs: numericMetric(phase.maxMs),
+      p95Ms: numericMetric(phase.p95Ms),
+      worstPhaseCount: worstPhase?.label === phase.label ? numberOrNull(worstPhase.count) : 0,
+    }))
+    .filter((phase) => (phase.p95Ms ?? phase.avgMs ?? 0) >= RECURRING_PHASE_WARN_MS)
+    .sort((a, b) =>
+      (b.p95Ms ?? 0) - (a.p95Ms ?? 0)
+      || (b.maxMs ?? 0) - (a.maxMs ?? 0)
+      || a.label.localeCompare(b.label),
+    )
+    .slice(0, MAX_RECURRING_WARNINGS)
+    .map((phase) => ({
+      ...phase,
+      severity: (phase.p95Ms ?? 0) >= RECURRING_PHASE_HIGH_WARN_MS ? "high" : "warn",
+    }));
+
+  const warnings = [];
+  if (frameWorkP95Ms != null && frameWorkP95Ms > RENDER_FRAME_BUDGET_MS) {
+    warnings.push({
+      kind: "frame_work_p95_over_budget",
+      severity: "high",
+      message: `frame.work p95 ${formatMs(frameWorkP95Ms)} is above the ${formatMs(RENDER_FRAME_BUDGET_MS)} 120 FPS budget`,
+    });
+  }
+  const highRecurring = recurringPhaseWarnings.filter((phase) => phase.severity === "high");
+  if (highRecurring.length > 0) {
+    warnings.push({
+      kind: "recurring_phase_over_2ms",
+      severity: "warn",
+      message: `recurring phase p95 above ${formatMs(RECURRING_PHASE_HIGH_WARN_MS)}: ${highRecurring.map((phase) => `${phase.label}=${formatMs(phase.p95Ms)}`).join(", ")}`,
+    });
+  } else if (recurringPhaseWarnings.length > 0) {
+    warnings.push({
+      kind: "recurring_phase_over_1ms",
+      severity: "info",
+      message: `recurring phase p95 above ${formatMs(RECURRING_PHASE_WARN_MS)}: ${recurringPhaseWarnings.map((phase) => `${phase.label}=${formatMs(phase.p95Ms)}`).join(", ")}`,
+    });
+  }
+
+  return {
+    schemaVersion: 1,
+    status: warnings.length > 0 ? "warn" : "ok",
+    target: {
+      fps: RENDER_TARGET_FPS,
+      frameBudgetMs: RENDER_FRAME_BUDGET_MS,
+      recurringPhaseWarnMs: RECURRING_PHASE_WARN_MS,
+      recurringPhaseHighWarnMs: RECURRING_PHASE_HIGH_WARN_MS,
+    },
+    frameWork: {
+      frameCount: numberOrNull(perfSummary?.frameCount ?? reportSummary?.frameCount),
+      slowFrameCount: numberOrNull(perfSummary?.slowFrameCount ?? reportSummary?.slowFrameCount),
+      p95Ms: frameWorkP95Ms,
+      maxMs: frameWorkMaxMs,
+    },
+    worstPhase: worstPhase ? {
+      label: worstPhase.label || "",
+      count: numberOrNull(worstPhase.count),
+    } : null,
+    recurringPhaseWarnings,
+    groups: {
+      frame: summarizePhaseGroup(phases, (phase) => phase.label?.startsWith("frame.")),
+      topLevel: summarizePhaseGroup(phases, (phase) => phase.label?.startsWith("match.")),
+      rendererNested: summarizePhaseGroup(phases, (phase) => phase.label?.startsWith("renderer.")),
+      minimapNested: summarizePhaseGroup(phases, (phase) => phase.label?.startsWith("minimap.")),
+    },
+    context: perfSummary?.context || reportSummary?.context || {},
+    warnings,
+    notes: [
+      "Advisory only: this report does not fail CI on absolute FPS or frame timing.",
+      "Do not add top-level frame.work to nested renderer/minimap phases when attributing cost.",
+    ],
+  };
+}
+
+export function formatRenderBudgetConsole(report) {
+  if (!report) return "";
+  const frame = report.frameWork || {};
+  const worst = report.worstPhase?.label
+    ? ` worst=${report.worstPhase.label}${report.worstPhase.count == null ? "" : ` x${report.worstPhase.count}`}`
+    : "";
+  const lines = [
+    `render budget advisory: frame.work p95=${formatMs(frame.p95Ms)} max=${formatMs(frame.maxMs)} target=${formatMs(report.target.frameBudgetMs)} (${report.target.fps} FPS) slow=${frame.slowFrameCount || 0}/${frame.frameCount || 0}${worst}`,
+  ];
+  if (report.recurringPhaseWarnings?.length) {
+    lines.push(`recurring phase p95 >= ${formatMs(RECURRING_PHASE_WARN_MS)}: ${
+      report.recurringPhaseWarnings
+        .map((phase) => `${phase.label}=${formatMs(phase.p95Ms)}`)
+        .join(", ")
+    }`);
+  }
+  if (report.warnings?.length) {
+    lines.push(`warnings: ${report.warnings.map((warning) => warning.message).join("; ")}`);
+  }
+  return lines.join("\n");
+}
+
+function writeRenderLagComparisonSummary(results, outputRoot, args) {
+  const timestamp = timestampForPath(new Date());
+  const artifactDir = path.join(outputRoot, "render-lag-comparison", timestamp);
+  fs.mkdirSync(artifactDir, { recursive: true });
+  const summaryJson = path.join(artifactDir, "summary.json");
+  const summary = {
+    schemaVersion: 1,
+    suite: "render-lag-comparison",
+    generatedAt: new Date().toISOString(),
+    target: {
+      fps: RENDER_TARGET_FPS,
+      frameBudgetMs: RENDER_FRAME_BUDGET_MS,
+      recurringPhaseWarnMs: RECURRING_PHASE_WARN_MS,
+      recurringPhaseHighWarnMs: RECURRING_PHASE_HIGH_WARN_MS,
+    },
+    command: {
+      renderLagSuite: !!args.renderLagSuite,
+      durationMs: args.durationMs,
+      trace: !!args.trace,
+      snapshotCodecBakeoff: !!args.snapshotCodecBakeoff,
+    },
+    workloads: results.map((result) => ({
+      id: result.workloadId,
+      status: result.status,
+      artifactDir: result.artifactDir,
+      frameCount: result.frameCount || 0,
+      frameWorkP95Ms: result.renderBudget?.frameWork?.p95Ms ?? null,
+      frameWorkMaxMs: result.renderBudget?.frameWork?.maxMs ?? null,
+      worstPhase: result.renderBudget?.worstPhase || null,
+      warnings: result.renderBudget?.warnings || [],
+      recurringPhaseWarnings: result.renderBudget?.recurringPhaseWarnings || [],
+    })),
+    notes: [
+      "Warnings are advisory and machine-local; compare branches on the same machine.",
+      "Keep beta Matt/Alex per-player reports separate from local replay and dev-scenario measurements.",
+      "Detailed timing and trace artifacts stay under target/client-perf and are ignored by git.",
+    ],
+  };
+  fs.writeFileSync(summaryJson, `${JSON.stringify(summary, null, 2)}\n`);
+  return { artifactDir, summaryJson };
+}
+
 function numberOrNull(value) {
   return Number.isFinite(value) ? value : null;
 }
 
 function stringOrNull(value) {
   return typeof value === "string" ? value : null;
+}
+
+function phaseByLabel(phases, label) {
+  return phases.find((phase) => phase?.label === label) || null;
+}
+
+function summarizePhaseGroup(phases, predicate) {
+  return phases
+    .filter((phase) => phase?.label && predicate(phase))
+    .map((phase) => ({
+      label: phase.label,
+      count: numberOrNull(phase.count),
+      avgMs: numericMetric(phase.avgMs),
+      maxMs: numericMetric(phase.maxMs),
+      p50Ms: numericMetric(phase.p50Ms),
+      p95Ms: numericMetric(phase.p95Ms),
+      slowCount: numberOrNull(phase.slowCount),
+    }))
+    .sort((a, b) => (b.p95Ms ?? 0) - (a.p95Ms ?? 0) || (b.maxMs ?? 0) - (a.maxMs ?? 0));
+}
+
+function numericMetric(value) {
+  if (Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.startsWith(">")) {
+    const parsed = Number(value.slice(1));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function formatMs(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return `${Math.round(value * 100) / 100}ms`;
 }
 
 async function collectPageSummary(page) {
@@ -349,6 +567,57 @@ async function collectPageSummary(page) {
       clientNetReport,
     };
   });
+}
+
+async function applyWorkloadSetup(page, workload) {
+  const setup = workload.setup || null;
+  if (!setup) return null;
+  const selectCount = Number(setup.selectFirstEntities);
+  if (!Number.isInteger(selectCount) || selectCount <= 0) return { skipped: true };
+
+  try {
+    await page.waitForFunction(
+      () => {
+        const state = window.__rts?.match?.state;
+        return !!state?._curById?.size && typeof state.setSelection === "function";
+      },
+      { timeout: 5000 },
+    );
+  } catch (err) {
+    return {
+      action: "selectFirstEntities",
+      requestedCount: selectCount,
+      selectedCount: 0,
+      error: `timed out waiting for selectable entities: ${err.message}`,
+    };
+  }
+
+  return page.evaluate((count) => {
+    const state = window.__rts?.match?.state;
+    const entities = Array.from(state?._curById?.values?.() || [])
+      .filter((entity) => entity && Number.isInteger(entity.id) && !entity.shotReveal && !entity.visionOnly)
+      .sort((a, b) => a.id - b.id);
+    const selectedIds = entities.slice(0, count).map((entity) => entity.id);
+    state.setSelection(selectedIds);
+    return {
+      action: "selectFirstEntities",
+      requestedCount: count,
+      selectedCount: state.selection?.size || 0,
+      selectedIds: Array.from(state.selection || []),
+    };
+  }, selectCount);
+}
+
+function workloadSetupErrors(workload, setupResult) {
+  const minSelected = Number(workload.setup?.minSelectedCount || 0);
+  if (!minSelected) return [];
+  if (!setupResult) return [`${workload.id} setup did not run`];
+  const errors = [];
+  if (setupResult.error) errors.push(`${workload.id} setup failed: ${setupResult.error}`);
+  if ((setupResult.selectedCount || 0) < minSelected) {
+    errors.push(`${workload.id} selected ${setupResult.selectedCount || 0}; expected at least ${minSelected}`);
+  }
+  return errors;
 }
 
 async function prepareWorkload(workload) {
@@ -490,9 +759,10 @@ function ensureTestNodeModules() {
 }
 
 function selectedWorkloads(args) {
-  if (args.workloads.length === 0) return WORKLOADS;
+  const ids = args.renderLagSuite ? RENDER_LAG_WORKLOAD_IDS : args.workloads;
+  if (ids.length === 0) return WORKLOADS;
   const byId = new Map(WORKLOADS.map((workload) => [workload.id, workload]));
-  return args.workloads.map((id) => {
+  return ids.map((id) => {
     const workload = byId.get(id);
     if (!workload) throw new Error(`unknown workload ${id}; run --list`);
     return workload;
@@ -502,6 +772,7 @@ function selectedWorkloads(args) {
 function parseArgs(argv) {
   const args = {
     list: false,
+    renderLagSuite: false,
     workloads: [],
     durationMs: DEFAULT_DURATION_MS,
     outputRoot: DEFAULT_OUTPUT_ROOT,
@@ -524,6 +795,7 @@ function parseArgs(argv) {
       return argv[i];
     };
     if (arg === "--list") args.list = true;
+    else if (arg === "--render-lag-suite") args.renderLagSuite = true;
     else if (arg === "--trace") args.trace = true;
     else if (arg === "--snapshot-codec-bakeoff") args.snapshotCodecBakeoff = true;
     else if (arg === "--snapshot-codec-max-samples") args.snapshotCodecMaxSamples = parsePositiveInt(value(), arg);
@@ -551,6 +823,9 @@ function parseArgs(argv) {
       throw new Error(`unknown arg: ${arg}`);
     }
   }
+  if (args.renderLagSuite && args.workloads.length > 0) {
+    throw new Error("--render-lag-suite cannot be combined with --workload");
+  }
   return args;
 }
 
@@ -559,6 +834,7 @@ function printHelp() {
 
 Options:
   --list                         List available workloads.
+  --render-lag-suite             Run the full render-lag comparison workload set.
   --workload <id>                Run one workload; repeatable. Defaults to all workloads.
   --seconds <n>                  Browser collection time per workload. Default: ${DEFAULT_DURATION_MS / 1000}.
   --duration-ms <n>              Browser collection time per workload in milliseconds.
@@ -673,7 +949,9 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-main().catch((err) => {
-  console.error(err.stack || err.message);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err.stack || err.message);
+    process.exit(1);
+  });
+}

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -44,14 +44,14 @@ CI contract.
 
 ## Implementation Checklist
 
-- [ ] Define the final render-lag comparison workflow and artifact naming.
-- [ ] Add advisory 120 FPS budget warnings without hard failing on absolute timing.
-- [ ] Include selected-unit or HUD-heavy coverage if practical.
-- [ ] Document how to interpret top-level versus nested phase timings.
-- [ ] Document that Matt/Alex per-player beta FPS and local replay measurements must stay separate.
-- [ ] Add focused tests for new parser/reporting behavior where practical.
-- [ ] Run verification and record exact results.
-- [ ] Mark this phase as done in this file.
+- [x] Define the final render-lag comparison workflow and artifact naming.
+- [x] Add advisory 120 FPS budget warnings without hard failing on absolute timing.
+- [x] Include selected-unit or HUD-heavy coverage if practical.
+- [x] Document how to interpret top-level versus nested phase timings.
+- [x] Document that Matt/Alex per-player beta FPS and local replay measurements must stay separate.
+- [x] Add focused tests for new parser/reporting behavior where practical.
+- [x] Run verification and record exact results.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

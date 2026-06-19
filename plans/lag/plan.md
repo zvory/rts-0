@@ -28,11 +28,13 @@ setting is off, the live match must keep the current authoritative-only command 
   are greedily folded into the replay command stream if their accepted tick has not passed the replay
   cursor.
 - If a command arrives during replay after its intended tick has already passed, it is applied at the
-  earliest remaining replay tick or the next live tick, marked `lateDuringReplay` or equivalent in
-  owner-only result metadata, and used to raise that player's future command lead.
+  earliest replay tick whose command list has not yet been drained, marked `lateDuringReplay` or
+  equivalent in owner-only result metadata, and used to raise that player's future command lead.
 - A command that arrives outside the rollback window, or when the replay command-count cap is hit, is
-  applied at the next legal authoritative tick, marked late in owner-only result metadata, and used
-  to raise that player's future command lead.
+  applied at the earliest legal authoritative tick, marked late in owner-only result metadata, and
+  used to raise that player's future command lead. During catch-up, earliest legal means the earliest
+  replay tick whose command list has not yet been drained; after catch-up exits, ordinary live
+  scheduling applies.
 - The client predicts from the intended effective tick, then imports authoritative snapshots and
   replays pending commands forward to the current display tick instead of visually rewinding to an
   old server pose.
@@ -59,8 +61,8 @@ setting is off, the live match must keep the current authoritative-only command 
   correction, or repeated jitter. Decay downward slowly after stable windows.
 - Treat late commands as expected under bad networks, not as fatal desyncs. Commands inside the
   rollback window should be retroactively honored when the replay cursor has not passed their
-  accepted tick; commands outside the window or behind the active replay cursor fall back to the
-  earliest legal catch-up/live tick and lead adjustment.
+  accepted tick; commands outside the window or behind the active replay cursor fall forward to the
+  earliest undrained replay tick during catch-up and adjust future lead.
 - Keep the rollback window bounded. The product target is 6 ticks, exactly 200 ms at 30 Hz. This caps
   the authority rewind distance, not wall-clock CPU time. Trust the current server tick speed for the
   initial rollout, record slow catch-up replay timings, and treat optimization as follow-up evidence
@@ -70,7 +72,11 @@ setting is off, the live match must keep the current authoritative-only command 
 - Catch-up replay should greedily drain newly arrived commands between replay ticks. If the accepted
   tick is still ahead of or equal to the replay cursor, insert the command into that replay tick's
   deterministic command list. If the accepted tick is behind the cursor, apply it at the earliest
-  remaining replay tick or the next live tick.
+  replay tick whose command list has not yet been drained.
+- If catch-up has already replayed through present and there is no remaining replay tick, new
+  commands are no longer part of that catch-up pass. They follow ordinary live scheduling: future
+  accepted ticks remain queued for that future tick, while already-late commands apply on the next
+  live tick.
 - Add a hard replay command-count fuse, initially `MAX_REPLAY_COMMANDS = 1000`, so command bursts
   cannot grow a catch-up pass without bound. Hitting the fuse falls back to late execution and lead
   adjustment; it should also produce structured diagnostics.
@@ -145,9 +151,10 @@ still fall back to late execution until rollback itself lands.
 Use the history buffer to honor late commands that arrive within the six-tick rollback window. The
 server restores the nearest safe state, enters a non-reentrant catch-up mode, inserts commands at
 their intended ticks when the replay cursor has not passed them, replays greedily to present, and
-emits corrected snapshots and rollback diagnostics. If the command misses the history window,
-arrives behind the active replay cursor, or hits the replay command-count fuse, the server falls back
-to earliest-legal late execution and lead adjustment.
+emits corrected snapshots and rollback diagnostics. If the command misses the history window or
+arrives behind the active replay cursor, the server falls forward to the earliest undrained replay
+tick during catch-up and adjusts future lead. If the replay command-count fuse is hit, the command
+uses the ordinary late fallback path and produces command-cap diagnostics.
 
 ### [Phase 5 - Movement Prediction on Effective Ticks](phase-5.md)
 

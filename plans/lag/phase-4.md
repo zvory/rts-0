@@ -22,7 +22,9 @@ present, and emit corrected snapshots.
   should not be hand-coded in the room event handler.
 - When a command arrives after its requested `executeTick`:
   - if `currentTick - executeTick <= 6` and history is available, roll back and insert it
-  - if the command is outside the window, execute late at the next legal tick and raise future lead
+  - if the command is outside the window, execute late at the earliest legal tick and raise future
+    lead; while catch-up is active, earliest legal means the earliest replay tick whose command list
+    has not yet been drained
   - if the replay command-count fuse is hit, execute late and report fallback metadata
 - Rollback is non-reentrant:
   - once catch-up replay starts, no nested rollback may begin until the replay exits
@@ -30,8 +32,11 @@ present, and emit corrected snapshots.
   - if a newly arrived command's accepted tick is still ahead of or equal to the replay cursor, insert
     it into that replay tick's deterministic command list
   - if the accepted tick is already behind the replay cursor, apply the command at the earliest
-    remaining replay tick or the next live tick, mark it `lateDuringReplay` or equivalent, and raise
-    future lead when appropriate
+    replay tick whose command list has not yet been drained, mark it `lateDuringReplay` or
+    equivalent, and raise future lead when appropriate
+  - if catch-up has already replayed through present and there is no remaining replay tick, new
+    commands leave the catch-up path and follow ordinary live scheduling: future accepted ticks stay
+    queued for that future tick, while already-late commands apply on the next live tick
 - Replay deterministically from the restored tick to the current live tick:
   - restore the Phase 3 post-tick keyframe immediately before the inserted command's effective tick
   - original commands remain in stable effective-tick/order order
@@ -80,8 +85,8 @@ present, and emit corrected snapshots.
   - command outside the window executes late and records fallback metadata
   - command inside the window but missing a keyframe or recorded AI stream falls back with
     `rollbackUnsupported`
-  - command inside the window but past the active replay cursor applies at the earliest remaining
-    replay tick or next live tick with `lateDuringReplay`
+  - command inside the window but past the active replay cursor applies at the earliest replay tick
+    whose command list has not yet been drained with `lateDuringReplay`
   - command bursts beyond `MAX_REPLAY_COMMANDS` fall back with `rollbackCommandCapExceeded`
   - rollback replay without inserted commands is snapshot-identical to uninterrupted authority
   - inserted command ordering is deterministic with same-tick existing commands
@@ -100,7 +105,8 @@ present, and emit corrected snapshots.
   - burst of two late commands from one player replays once or in a documented deterministic sequence
   - burst or alternating late commands from two players complete one catch-up pass without nested
     rollback
-  - command arriving behind the active replay cursor executes at the earliest legal catch-up/live tick
+  - command arriving behind the active replay cursor executes at the earliest undrained replay tick
+  - command arriving after catch-up has no remaining replay ticks follows ordinary live scheduling
   - prediction disabled still uses authoritative scheduling/rollback without local prediction
 - Run:
   - focused `cargo test --manifest-path server/Cargo.toml -p rts-server ...`
@@ -113,7 +119,8 @@ present, and emit corrected snapshots.
 Use artificial latency or a test profile that delays command delivery by less than and greater than
 6 ticks. Inside the window, the command should be honored as if it landed on its intended tick unless
 it arrived behind an active replay cursor; outside the window or behind the cursor, the game should
-execute at the earliest legal catch-up/live tick and adjust future lead.
+execute at the earliest undrained replay tick and adjust future lead. Only commands that arrive after
+catch-up has no remaining replay tick should wait for ordinary live scheduling.
 
 ## Handoff Expectations
 
