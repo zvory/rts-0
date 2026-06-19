@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -57,14 +57,14 @@ downstream snapshot delivery, browser processing, or rendering.
 
 ## Implementation Checklist
 
-- [ ] Add or expose `matchRunId` in a way available to `ClientNetReport`.
-- [ ] Design and implement the server-receipt diagnostic with no raw command payload leakage.
-- [ ] Track command milestone aggregates in the client report window.
-- [ ] Keep sim-consumption acknowledgement as the only prediction reconciliation ack.
-- [ ] Extend Rust/JS protocol mirrors and structured logging.
-- [ ] Update protocol/perf docs and command-lifecycle interpretation notes.
-- [ ] Add focused integration/client/tri-state tests.
-- [ ] Mark this phase as done in this file.
+- [x] Add or expose `matchRunId` in a way available to `ClientNetReport`.
+- [x] Design and implement the server-receipt diagnostic with no raw command payload leakage.
+- [x] Track command milestone aggregates in the client report window.
+- [x] Keep sim-consumption acknowledgement as the only prediction reconciliation ack.
+- [x] Extend Rust/JS protocol mirrors and structured logging.
+- [x] Update protocol/perf docs and command-lifecycle interpretation notes.
+- [x] Add focused integration/client/tri-state tests.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

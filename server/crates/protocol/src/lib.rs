@@ -219,6 +219,8 @@ pub enum ClientMessage {
 #[serde(rename_all = "camelCase")]
 pub struct ClientNetReport {
     pub schema_version: u8,
+    #[serde(default)]
+    pub match_run_id: String,
     pub elapsed_ms: u32,
     pub match_tick: u32,
     pub rtt_ms: u16,
@@ -305,6 +307,44 @@ pub struct ClientNetReport {
     pub pending_command_count: u16,
     #[serde(default)]
     pub acknowledged_command_latency_ms: u16,
+    #[serde(default)]
+    pub commands_issued: u32,
+    #[serde(default)]
+    pub command_socket_send_accepted: u32,
+    #[serde(default)]
+    pub command_server_received: u32,
+    #[serde(default)]
+    pub command_sim_acknowledged: u32,
+    #[serde(default)]
+    pub command_rejected: u32,
+    #[serde(default)]
+    pub command_issue_to_server_receipt_latest_ms: u16,
+    #[serde(default)]
+    pub command_issue_to_server_receipt_max_ms: u16,
+    #[serde(default)]
+    pub command_issue_to_server_receipt_p95_ms: u16,
+    #[serde(default)]
+    pub command_server_receipt_to_sim_ack_latest_ms: u16,
+    #[serde(default)]
+    pub command_server_receipt_to_sim_ack_max_ms: u16,
+    #[serde(default)]
+    pub command_server_receipt_to_sim_ack_p95_ms: u16,
+    #[serde(default)]
+    pub command_issue_to_sim_ack_latest_ms: u16,
+    #[serde(default)]
+    pub command_issue_to_sim_ack_max_ms: u16,
+    #[serde(default)]
+    pub command_issue_to_sim_ack_p95_ms: u16,
+    #[serde(default)]
+    pub command_ack_snapshot_received_to_applied_latest_ms: u16,
+    #[serde(default)]
+    pub command_ack_snapshot_received_to_applied_max_ms: u16,
+    #[serde(default)]
+    pub command_ack_snapshot_received_to_applied_p95_ms: u16,
+    #[serde(default)]
+    pub oldest_pending_command_age_ms: u16,
+    #[serde(default)]
+    pub max_pending_command_count: u16,
     #[serde(default)]
     pub correction_distance_px: u16,
     #[serde(default)]
@@ -667,6 +707,14 @@ pub enum ServerMessage {
     },
     Pong {
         ts: f64,
+    },
+    /// Reliable diagnostics-only command receipt. This is not the sim-consumption ack.
+    CommandReceipt {
+        client_seq: u32,
+        server_tick: u32,
+        accepted: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
     },
     Error {
         msg: String,
@@ -1073,6 +1121,7 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("SHUTDOWN_WARNING", "shutdownWarning"),
                 ("GAME_OVER", "gameOver"),
                 ("PONG", "pong"),
+                ("COMMAND_RECEIPT", "commandReceipt"),
                 ("ERROR", "error"),
             ]),
         },
@@ -2235,6 +2284,7 @@ mod tests {
             "t":"netReport",
             "report":{
                 "schemaVersion":1,
+                "matchRunId":"main-123",
                 "elapsedMs":10000,
                 "matchTick":300,
                 "rttMs":82,
@@ -2283,13 +2333,33 @@ mod tests {
                 "serverTickMs":30,
                 "serverLagMs":1,
                 "slowTickCount":2,
-                "headOfLineCount":7
+                "headOfLineCount":7,
+                "commandsIssued":4,
+                "commandSocketSendAccepted":4,
+                "commandServerReceived":3,
+                "commandSimAcknowledged":2,
+                "commandRejected":1,
+                "commandIssueToServerReceiptLatestMs":80,
+                "commandIssueToServerReceiptMaxMs":120,
+                "commandIssueToServerReceiptP95Ms":100,
+                "commandServerReceiptToSimAckLatestMs":33,
+                "commandServerReceiptToSimAckMaxMs":66,
+                "commandServerReceiptToSimAckP95Ms":50,
+                "commandIssueToSimAckLatestMs":113,
+                "commandIssueToSimAckMaxMs":180,
+                "commandIssueToSimAckP95Ms":150,
+                "commandAckSnapshotReceivedToAppliedLatestMs":4,
+                "commandAckSnapshotReceivedToAppliedMaxMs":9,
+                "commandAckSnapshotReceivedToAppliedP95Ms":8,
+                "oldestPendingCommandAgeMs":250,
+                "maxPendingCommandCount":5
             }
         }"#;
         let msg: ClientMessage = serde_json::from_str(raw).unwrap();
         match msg {
             ClientMessage::NetReport { report } => {
                 assert_eq!(report.schema_version, 1);
+                assert_eq!(report.match_run_id, "main-123");
                 assert_eq!(report.snapshot_gap_max_ms, 420);
                 assert_eq!(report.snapshot_bytes_max, 92_000);
                 assert_eq!(report.snapshot_decode_p95_ms, 8);
@@ -2299,6 +2369,12 @@ mod tests {
                 assert_eq!(report.entity_count, 325);
                 assert_eq!(report.device_pixel_ratio_x100, 200);
                 assert_eq!(report.head_of_line_count, 7);
+                assert_eq!(report.commands_issued, 4);
+                assert_eq!(report.command_server_received, 3);
+                assert_eq!(report.command_rejected, 1);
+                assert_eq!(report.command_issue_to_sim_ack_max_ms, 180);
+                assert_eq!(report.oldest_pending_command_age_ms, 250);
+                assert_eq!(report.max_pending_command_count, 5);
             }
             other => panic!("expected net report, got {other:?}"),
         }
@@ -2340,6 +2416,9 @@ mod tests {
                 assert_eq!(report.snapshot_bytes_total, 0);
                 assert_eq!(report.snapshot_parse_max_ms, 0);
                 assert_eq!(report.snapshot_tick_gap_max, 0);
+                assert_eq!(report.match_run_id, "");
+                assert_eq!(report.command_issue_to_server_receipt_max_ms, 0);
+                assert_eq!(report.max_pending_command_count, 0);
             }
             other => panic!("expected net report, got {other:?}"),
         }

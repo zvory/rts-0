@@ -25,6 +25,9 @@ pub struct StartPayload {
     /// Prediction protocol version supported by this live match. Omitted for spectators/replays.
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub prediction_version: u32,
+    /// Room-scoped live match correlation id used only for diagnostics/log joins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_run_id: Option<String>,
     #[serde(default, skip_serializing_if = "RoomCapabilities::is_empty")]
     pub capabilities: RoomCapabilities,
     #[serde(default, skip_serializing_if = "DiagnosticCapabilities::is_empty")]

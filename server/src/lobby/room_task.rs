@@ -1592,35 +1592,70 @@ impl RoomTask {
         }
         if client_seq == 0 {
             crate::log_debug!(room = %self.room, player_id, "ignoring command with reserved clientSeq 0");
+            self.send_command_receipt(player_id, client_seq, 0, false, Some("invalidSeq"));
             return;
         }
         let issuer = self.command_issuer_for_connection(player_id);
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
-        if let Phase::InGame(game) = &mut self.phase {
+        let receipt = if let Phase::InGame(game) = &mut self.phase {
+            let server_tick = game.current_tick();
             if let Some(issuer) = issuer {
-                let Some(player) = self.players.get_mut(&player_id) else {
-                    return;
-                };
-                if client_seq <= player.last_received_client_seq {
-                    crate::log_debug!(
-                        room = %self.room,
-                        player_id,
-                        client_seq,
-                        last_received = player.last_received_client_seq,
-                        "ignoring stale or wrapped command sequence"
-                    );
-                    return;
+                if let Some(player) = self.players.get_mut(&player_id) {
+                    if client_seq <= player.last_received_client_seq {
+                        crate::log_debug!(
+                            room = %self.room,
+                            player_id,
+                            client_seq,
+                            last_received = player.last_received_client_seq,
+                            "ignoring stale or wrapped command sequence"
+                        );
+                        (server_tick, false, Some("staleSeq"))
+                    } else {
+                        player.last_received_client_seq = client_seq;
+                        game.enqueue(issuer.seat_id, cmd);
+                        self.pending_client_command_acks
+                            .push(PendingClientCommandAck {
+                                connection_id: issuer.connection_id,
+                                client_seq,
+                            });
+                        (server_tick, true, None)
+                    }
+                } else {
+                    (server_tick, false, Some("notJoined"))
                 }
-                player.last_received_client_seq = client_seq;
-                game.enqueue(issuer.seat_id, cmd);
-                self.pending_client_command_acks
-                    .push(PendingClientCommandAck {
-                        connection_id: issuer.connection_id,
-                        client_seq,
-                    });
+            } else {
+                (server_tick, false, Some("notPlayer"))
             }
-        }
+        } else {
+            (0, false, Some("notInGame"))
+        };
+        let (server_tick, accepted, reason) = receipt;
+        self.send_command_receipt(player_id, client_seq, server_tick, accepted, reason);
+    }
+
+    fn send_command_receipt(
+        &self,
+        player_id: u32,
+        client_seq: u32,
+        server_tick: u32,
+        accepted: bool,
+        reason: Option<&str>,
+    ) {
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            player_id,
+            &player.msg_tx,
+            ServerMessage::CommandReceipt {
+                client_seq,
+                server_tick,
+                accepted,
+                reason: reason.map(str::to_string),
+            },
+        );
     }
 
     fn on_give_up(&mut self, player_id: u32) {
@@ -2127,7 +2162,6 @@ impl RoomTask {
         } else {
             Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata)
         };
-        let payload = game.start_payload();
         let match_player_count = inits.len();
         let match_human_count = inits.iter().filter(|p| !p.is_ai).count();
         let match_map_name = self.selected_map.clone();
@@ -2138,6 +2172,8 @@ impl RoomTask {
             match_map_name,
             match_participants,
         );
+        let mut payload = game.start_payload();
+        payload.match_run_id = self.match_run_id.clone();
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
@@ -2225,7 +2261,6 @@ impl RoomTask {
         };
 
         let game = launch.game;
-        let payload = game.start_payload();
         self.branch_live_seat_by_connection = launch.seat_by_connection;
         self.record_live_match_started(
             launch.match_player_count,
@@ -2233,6 +2268,8 @@ impl RoomTask {
             launch.map_name,
             launch.participants,
         );
+        let mut payload = game.start_payload();
+        payload.match_run_id = self.match_run_id.clone();
         self.ai_controllers.clear();
         self.dev_driver = None;
         self.dev_view_player_id = None;
@@ -2333,13 +2370,14 @@ impl RoomTask {
         };
         let game =
             Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata);
-        let payload = game.start_payload();
         self.record_live_match_started(
             inits.len(),
             0,
             config.map_name.clone(),
             inits.iter().map(|player| player.name.clone()).collect(),
         );
+        let mut payload = game.start_payload();
+        payload.match_run_id = self.match_run_id.clone();
         self.ai_controllers.clear();
         self.dev_driver = None;
         self.dev_view_player_id = None;
@@ -4661,7 +4699,7 @@ mod tests {
             false,
             DrainHandle::default(),
         );
-        add_test_room_player(&mut task, 1, true);
+        let mut writer = add_test_room_player(&mut task, 1, true);
 
         task.on_command(
             1,
@@ -4678,6 +4716,19 @@ mod tests {
             0,
             "lobby-phase commands must not consume client sequence state"
         );
+        assert!(
+            std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).any(|msg| {
+                matches!(
+                    msg,
+                    ServerMessage::CommandReceipt {
+                        client_seq: 1,
+                        accepted: false,
+                        reason: Some(reason),
+                        ..
+                    } if reason == "notInGame"
+                )
+            })
+        );
     }
 
     #[test]
@@ -4689,9 +4740,10 @@ mod tests {
             false,
             DrainHandle::default(),
         );
-        add_test_room_player(&mut task, 1, true);
+        let mut writer = add_test_room_player(&mut task, 1, true);
 
         task.start_match();
+        while writer.reliable_rx.try_recv().is_ok() {}
         task.on_command(
             1,
             1,
@@ -4704,6 +4756,18 @@ mod tests {
         assert_eq!(task.pending_client_command_acks.len(), 1);
         assert_eq!(task.pending_client_command_acks[0].connection_id, 1);
         assert_eq!(task.pending_client_command_acks[0].client_seq, 1);
+        assert!(
+            std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).any(|msg| {
+                matches!(
+                    msg,
+                    ServerMessage::CommandReceipt {
+                        client_seq: 1,
+                        accepted: true,
+                        ..
+                    }
+                )
+            })
+        );
 
         task.on_tick(TokioInstant::now());
 
