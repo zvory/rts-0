@@ -100,6 +100,7 @@ import {
   tankTrapLineTiles,
   validTankTrapLineSites,
 } from "../client/src/input/tank_trap_line.js";
+import { armPostQuickCastSelectionGuard } from "../client/src/input/quick_cast_selection_guard.js";
 import { CameraNavigationInput } from "../client/src/input/camera_navigation.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
@@ -6320,7 +6321,16 @@ withFakeDocument(() => {
   const originalDocument = globalThis.document;
   const hotkeyTargetedInput = Object.create(Input.prototype);
   const hotkeyIssues = [];
+  const quickCastSelectionClicks = [];
+  const quickCastBoxSelections = [];
   hotkeyTargetedInput.mouse = { x: 420, y: 260 };
+  hotkeyTargetedInput.pointerLocked = false;
+  hotkeyTargetedInput.cameraNavigation = null;
+  hotkeyTargetedInput._panDrag = null;
+  hotkeyTargetedInput._drag = null;
+  hotkeyTargetedInput._dragging = false;
+  hotkeyTargetedInput._placementDrag = null;
+  hotkeyTargetedInput.renderer = { drawSelectionBox() {} };
   hotkeyTargetedInput._handleControlGroupHotkey = () => false;
   hotkeyTargetedInput._quickCastCommandTarget = (ev) => {
     hotkeyIssues.push({ shiftKey: !!ev.shiftKey, mouse: hotkeyTargetedInput.mouse });
@@ -6329,6 +6339,11 @@ withFakeDocument(() => {
   hotkeyTargetedInput._issueTargetedCommand = (p, ev) => {
     hotkeyIssues.push({ issuedAt: p, queued: !!ev.shiftKey });
   };
+  hotkeyTargetedInput._eventScreenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
+  hotkeyTargetedInput._screenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
+  hotkeyTargetedInput._trackMouse = () => {};
+  hotkeyTargetedInput._commitClickSelection = (p) => quickCastSelectionClicks.push(p);
+  hotkeyTargetedInput._commitBoxSelection = (drag) => quickCastBoxSelections.push(drag);
   hotkeyTargetedInput.state = {};
   hotkeyTargetedInput.clientIntent = new ClientIntent();
   globalThis.document = {
@@ -6367,6 +6382,39 @@ withFakeDocument(() => {
   assert(
     hotkeyTargetedInput.clientIntent.commandTarget === null,
     "unqueued quick-cast should consume the armed targeted order",
+  );
+  hotkeyTargetedInput._onLeftDown({ x: 422, y: 261 }, {});
+  hotkeyTargetedInput._handleMouseUp({
+    button: 0,
+    clientX: 422,
+    clientY: 261,
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  });
+  assert(
+    quickCastSelectionClicks.length === 0,
+    "near click after unqueued quick-cast should not become selection",
+  );
+  assert(
+    hotkeyTargetedInput._postQuickCastSelectionGuard === null,
+    "post quick-cast selection guard should be one-shot",
+  );
+
+  armPostQuickCastSelectionGuard(hotkeyTargetedInput, { x: 420, y: 260 });
+  hotkeyTargetedInput._onLeftDown({ x: 420, y: 260 }, {});
+  hotkeyTargetedInput._handleMouseMove({ clientX: 428, clientY: 260 });
+  hotkeyTargetedInput._handleMouseUp({
+    button: 0,
+    clientX: 428,
+    clientY: 260,
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  });
+  assert(
+    quickCastBoxSelections.length === 1,
+    "drag after unqueued quick-cast should still perform box selection",
   );
 
   hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY", { shiftKey: true }));
