@@ -120,6 +120,25 @@ The default harness result fails for runtime errors, page/console/request errors
 absolute FPS, frame time, or trace-timing budget. Treat the numbers as local evidence for comparing
 optimization branches on the same machine, not as a portable guarantee for other laptops.
 
+Snapshot codec bake-off:
+
+```bash
+node scripts/snapshot-codec-bakeoff.mjs --fixture
+node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6 --snapshot-codec-bakeoff
+node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6 --snapshot-codec-bakeoff
+```
+
+The standalone bake-off reads local compact snapshot frames from JSON/JSONL or deterministic
+fixtures and compares compact JSON, offline deflate, a protobuf-style schema TLV, MessagePack, CBOR,
+and a custom positional binary. It reports p50/p95/p99/max encoded bytes, over-budget rate, and
+local encode/decode timings. `--snapshot-codec-bakeoff` makes the browser harness capture bounded
+raw snapshot frames in memory, write `snapshot-frames.jsonl`, and attach `snapshot-codec-bakeoff.*`
+artifacts beside the normal summary.
+
+Codec bake-off artifacts are local developer evidence only. The live protocol still defaults to
+compact JSON text, the browser parser rejects binary snapshot frames, and deflate numbers are
+compressed payload bytes from Node zlib rather than verified WebSocket extension wire bytes.
+
 The Fly production deploy enables the low-noise spike mode in `fly.toml`:
 
 ```toml

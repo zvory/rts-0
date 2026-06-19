@@ -8,6 +8,11 @@
 
 import fs from "node:fs";
 import { CLIENT_NET_REPORT_FIELDS } from "./client_net_report_fields.mjs";
+import {
+  assertMalformedBinaryRejected,
+  fixtureSnapshotFrames,
+  runSnapshotCodecBakeoff,
+} from "../scripts/snapshot-codec-bakeoff.mjs";
 import { Net, SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES } from "../client/src/net.js";
 import {
   DEFAULT_AI_PROFILE_ID,
@@ -65,6 +70,8 @@ import {
 } from "../client/src/combat_audio.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
+  SNAPSHOT_CODEC,
+  SNAPSHOT_CODEC_VERSION,
   DEFAULT_FACTION_ID,
   PREDICTION_PROTOCOL_VERSION,
   ABILITY,
@@ -88,6 +95,7 @@ import {
   UPGRADE_CODE,
   cmd,
   decodeServerMessage,
+  parseServerFrame,
   msg,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
@@ -3676,6 +3684,23 @@ function fakeAudioContext() {
       }),
     "compact snapshot enforces order plan bounds",
   );
+  assert(SNAPSHOT_CODEC.COMPACT_JSON === "compact-json", "client mirrors compact JSON snapshot codec name");
+  assert(SNAPSHOT_CODEC_VERSION === 1, "client mirrors snapshot codec version");
+  assert(
+    parseServerFrame(JSON.stringify({ t: "snapshot", tick: 1 })).t === "snapshot",
+    "protocol frame parser accepts JSON text frames",
+  );
+  assertThrows(
+    () => parseServerFrame(new Uint8Array([1, 2, 3])),
+    "protocol frame parser rejects unsupported binary frames",
+  );
+  const bakeoff = runSnapshotCodecBakeoff({ frames: fixtureSnapshotFrames(), iterations: 1 });
+  assert(
+    bakeoff.candidates.some((candidate) => candidate.id === "compact-json") &&
+      bakeoff.candidates.some((candidate) => candidate.id === "custom-positional-binary"),
+    "snapshot codec bake-off compares baseline and custom binary candidates",
+  );
+  assertMalformedBinaryRejected();
 }
 
 {

@@ -6,6 +6,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { formatBakeoffMarkdown, runSnapshotCodecBakeoff } from "./snapshot-codec-bakeoff.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..");
@@ -15,6 +16,7 @@ const DEFAULT_OUTPUT_ROOT = path.join(REPO_ROOT, "target", "client-perf");
 const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900 });
 const DEFAULT_DURATION_MS = 6000;
+const DEFAULT_CODEC_SAMPLE_LIMIT = 240;
 const MATT_ALEX_SOURCE = path.join(
   REPO_ROOT,
   "docs",
@@ -93,10 +95,14 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   const errors = [];
   let tracePath = null;
   let summary = null;
+  let snapshotCodecBakeoff = null;
 
   try {
     await prepareWorkload(workload);
     const page = await browser.newPage();
+    if (args.snapshotCodecBakeoff) {
+      await installSnapshotCodecCapture(page, args.snapshotCodecMaxSamples);
+    }
     page.on("console", (message) => {
       const text = message.text();
       if (message.type() === "error") consoleErrors.push(text);
@@ -133,6 +139,46 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     await sleep(args.durationMs);
 
     summary = await collectPageSummary(page);
+    if (args.snapshotCodecBakeoff) {
+      const frames = await collectSnapshotCodecFrames(page);
+      const framesPath = path.join(artifactDir, "snapshot-frames.jsonl");
+      fs.writeFileSync(framesPath, frames.map((frame) => JSON.stringify(frame)).join("\n") + "\n");
+      if (frames.length > 0) {
+        const bakeoff = runSnapshotCodecBakeoff({
+          frames,
+          label: workload.id,
+        });
+        const summaryPath = path.join(artifactDir, "snapshot-codec-bakeoff.json");
+        const markdownPath = path.join(artifactDir, "snapshot-codec-bakeoff.md");
+        fs.writeFileSync(summaryPath, `${JSON.stringify(bakeoff, null, 2)}\n`);
+        fs.writeFileSync(markdownPath, formatBakeoffMarkdown(bakeoff));
+        snapshotCodecBakeoff = {
+          samples: frames.length,
+          framesJsonl: framesPath,
+          summaryJson: summaryPath,
+          markdown: markdownPath,
+          recommendation: bakeoff.recommendation,
+          candidates: bakeoff.candidates.map((candidate) => ({
+            id: candidate.id,
+            p95Bytes: candidate.bytes.p95,
+            maxBytes: candidate.bytes.max,
+            overBudgetPctX100: candidate.bytes.overBudgetPctX100,
+            encodeP95Ms: candidate.encodeMs.p95,
+            decodeP95Ms: candidate.decodeMs.p95,
+          })),
+        };
+      } else {
+        snapshotCodecBakeoff = {
+          samples: 0,
+          framesJsonl: framesPath,
+          recommendation: {
+            summary: "No snapshot frames were captured for this workload.",
+            reason: "The page did not receive compact snapshot frames before collection ended.",
+          },
+          candidates: [],
+        };
+      }
+    }
     const version = await fetchText(new URL("/version", server.baseUrl).href).catch((err) => ({
       error: err.message,
     }));
@@ -166,6 +212,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       perf: summary.perf,
       clientNetReport: summary.clientNetReport,
       snapshotPacketBudget: snapshotPacketBudgetSummary(summary.clientNetReport),
+      snapshotCodecBakeoff,
       page: {
         title: summary.title,
         location: summary.location,
@@ -359,6 +406,34 @@ async function launchBrowser(puppeteer, chrome, args) {
   });
 }
 
+async function installSnapshotCodecCapture(page, maxSamples) {
+  await page.evaluateOnNewDocument((limit) => {
+    const NativeWebSocket = window.WebSocket;
+    const frames = [];
+    window.__rtsSnapshotCodecCapture = { frames, limit };
+
+    class SnapshotCaptureWebSocket extends NativeWebSocket {
+      constructor(...args) {
+        super(...args);
+        this.addEventListener("message", (event) => {
+          if (frames.length >= limit || typeof event.data !== "string") return;
+          if (!event.data.startsWith("{\"t\":\"snapshot\"")) return;
+          frames.push(event.data);
+        });
+      }
+    }
+
+    for (const key of ["CONNECTING", "OPEN", "CLOSING", "CLOSED"]) {
+      Object.defineProperty(SnapshotCaptureWebSocket, key, { value: NativeWebSocket[key] });
+    }
+    window.WebSocket = SnapshotCaptureWebSocket;
+  }, maxSamples);
+}
+
+async function collectSnapshotCodecFrames(page) {
+  return page.evaluate(() => window.__rtsSnapshotCodecCapture?.frames || []);
+}
+
 async function loadPuppeteer() {
   ensureTestNodeModules();
   const requireFromTests = createRequire(path.join(TESTS_DIR, "package.json"));
@@ -411,6 +486,8 @@ function parseArgs(argv) {
     baseUrl: "",
     port: 0,
     trace: false,
+    snapshotCodecBakeoff: false,
+    snapshotCodecMaxSamples: DEFAULT_CODEC_SAMPLE_LIMIT,
     navTimeoutMs: 15000,
     startTimeoutMs: 20000,
     serverTimeoutMs: 30000,
@@ -424,6 +501,9 @@ function parseArgs(argv) {
     };
     if (arg === "--list") args.list = true;
     else if (arg === "--trace") args.trace = true;
+    else if (arg === "--snapshot-codec-bakeoff") args.snapshotCodecBakeoff = true;
+    else if (arg === "--snapshot-codec-max-samples") args.snapshotCodecMaxSamples = parsePositiveInt(value(), arg);
+    else if (arg.startsWith("--snapshot-codec-max-samples=")) args.snapshotCodecMaxSamples = parsePositiveInt(arg.slice("--snapshot-codec-max-samples=".length), "--snapshot-codec-max-samples");
     else if (arg === "--workload") args.workloads.push(value());
     else if (arg.startsWith("--workload=")) args.workloads.push(arg.slice("--workload=".length));
     else if (arg === "--duration-ms") args.durationMs = parsePositiveInt(value(), arg);
@@ -460,6 +540,8 @@ Options:
   --duration-ms <n>              Browser collection time per workload in milliseconds.
   --output-root <path>           Artifact root. Default: target/client-perf.
   --trace                        Also write a Chrome trace.json per workload.
+  --snapshot-codec-bakeoff       Capture local raw snapshot frames and write codec bake-off artifacts.
+  --snapshot-codec-max-samples <n> Maximum snapshot frames captured per workload. Default: ${DEFAULT_CODEC_SAMPLE_LIMIT}.
   --base-url <url>               Reuse an already-running server when healthy.
   --port <n>                     Port for a harness-started server.
   --chrome <path>                Chrome/Chromium executable. Defaults to CHROME or common paths.

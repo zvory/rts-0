@@ -829,7 +829,53 @@ pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
 pub const COMPACT_SNAPSHOT_VERSION: u8 = 22;
 
+pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
+
+pub const SNAPSHOT_CODEC_VERSION: u16 = 1;
+
 pub const COMPACT_UNKNOWN_CODE: u8 = 255;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotCodec {
+    CompactJson,
+}
+
+impl SnapshotCodec {
+    pub fn name(self) -> &'static str {
+        match self {
+            SnapshotCodec::CompactJson => SNAPSHOT_CODEC_COMPACT_JSON,
+        }
+    }
+
+    pub fn version(self) -> u16 {
+        match self {
+            SnapshotCodec::CompactJson => SNAPSHOT_CODEC_VERSION,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SnapshotFrame {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
+pub fn default_snapshot_codec() -> SnapshotCodec {
+    SnapshotCodec::CompactJson
+}
+
+pub fn supported_snapshot_codec(name: &str, version: u16) -> bool {
+    name == SNAPSHOT_CODEC_COMPACT_JSON && version == SNAPSHOT_CODEC_VERSION
+}
+
+pub fn encode_snapshot_frame(
+    snapshot: &Snapshot,
+    codec: SnapshotCodec,
+) -> serde_json::Result<SnapshotFrame> {
+    match codec {
+        SnapshotCodec::CompactJson => serialize_compact_snapshot(snapshot).map(SnapshotFrame::Text),
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -837,6 +883,7 @@ pub struct ProtocolContract {
     schema_version: u8,
     compact_snapshot_version: u8,
     prediction_protocol_version: u32,
+    snapshot_codecs: SnapshotCodecContract,
     default_faction_id: &'static str,
     unknown_code_sentinel: u8,
     message_tags: ProtocolMessageTags,
@@ -844,6 +891,15 @@ pub struct ProtocolContract {
     vocabularies: ProtocolVocabularies,
     compact_codes: ProtocolCompactCodes,
     compact_slot_schemas: CompactSlotSchemas,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotCodecContract {
+    default_codec: &'static str,
+    codec_version: u16,
+    supported: Vec<&'static str>,
+    binary_experiment_default: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1081,6 +1137,12 @@ pub fn protocol_contract() -> ProtocolContract {
         schema_version: 1,
         compact_snapshot_version: COMPACT_SNAPSHOT_VERSION,
         prediction_protocol_version: PREDICTION_PROTOCOL_VERSION,
+        snapshot_codecs: SnapshotCodecContract {
+            default_codec: SNAPSHOT_CODEC_COMPACT_JSON,
+            codec_version: SNAPSHOT_CODEC_VERSION,
+            supported: vec![SNAPSHOT_CODEC_COMPACT_JSON],
+            binary_experiment_default: false,
+        },
         default_faction_id: DEFAULT_FACTION_ID,
         unknown_code_sentinel: COMPACT_UNKNOWN_CODE,
         message_tags: ProtocolMessageTags {
@@ -2898,6 +2960,30 @@ mod tests {
             serde_json::json!([7, 10, [320.0, 352.0], 3.0, 120])
         );
         assert_eq!(value["ev"][6], serde_json::json!([8, 336.0, 368.0, 3.0]));
+    }
+
+    #[test]
+    fn snapshot_codec_seam_defaults_to_compact_json_text() {
+        let snapshot = representative_snapshot();
+        assert_eq!(default_snapshot_codec().name(), SNAPSHOT_CODEC_COMPACT_JSON);
+        assert_eq!(default_snapshot_codec().version(), SNAPSHOT_CODEC_VERSION);
+        assert!(supported_snapshot_codec(
+            SNAPSHOT_CODEC_COMPACT_JSON,
+            SNAPSHOT_CODEC_VERSION
+        ));
+        assert!(!supported_snapshot_codec(
+            "custom-positional-binary",
+            SNAPSHOT_CODEC_VERSION
+        ));
+        let frame = encode_snapshot_frame(&snapshot, default_snapshot_codec()).unwrap();
+        match frame {
+            SnapshotFrame::Text(text) => {
+                let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(value["t"], "snapshot");
+                assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
+            }
+            SnapshotFrame::Binary(_) => panic!("default snapshot codec must stay text"),
+        }
     }
 
     #[test]
