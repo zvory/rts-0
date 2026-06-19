@@ -825,11 +825,9 @@ fn percent_of(part: Duration, whole: Duration) -> f64 {
 }
 
 fn pct_x100(part: usize, whole: usize) -> usize {
-    if whole == 0 {
-        0
-    } else {
-        (part * 10_000 + (whole / 2)) / whole
-    }
+    (part * 10_000 + (whole / 2))
+        .checked_div(whole)
+        .unwrap_or(0)
 }
 
 fn duration_div(duration: Duration, divisor: u32) -> Duration {
