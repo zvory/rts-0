@@ -59,6 +59,13 @@ Tick summaries separate simulation, snapshot fanout, scheduler lag, room shape, 
 snapshot coalescing, and the slowest concrete simulation phase. Snapshot and writer lines identify
 whether lag is in per-player projection/compaction, JSON serialization, or socket writes.
 
+## Incident examples
+
+- [2026-06-19 beta Matt/Alex lag incident](network-incident-examples/2026-06-19-beta-matt-alex/)
+  preserves raw Fly logs, replay artifacts, player-report quotes, parsed net reports, and an
+  analysis-only write-up for a case where the server stayed healthy but one player had both
+  network/snapshot jitter and poor local frame pacing.
+
 ## Structured server logging
 
 Server logs in `server/src` must go through `server/src/structured_log.rs`. Use the helper macros
