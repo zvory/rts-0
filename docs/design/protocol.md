@@ -716,8 +716,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
-gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
-or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged enemy
+gameplay alerts: active-player clients play alert audio and ping the minimap at `(x, y)` when
+present, or pulse the minimap border when absent. Replay viewers and live spectators keep the visual
+alert feedback but suppress notice alert audio. `alert:under_attack` is emitted at the damaged enemy
 unit's position to the victim owner only; same-team recipients may still see the attack event through
 shared vision, but they do not receive teammate under-attack alerts. Same-team friendly-fire damage
 does not emit under-attack alerts. Unit attack events are sent to the attacker's team and to enemy

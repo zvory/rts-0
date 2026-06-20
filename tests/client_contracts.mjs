@@ -3429,6 +3429,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     pulseBorder() {},
   };
   noticeAudioMatch.camera = { x: 0, y: 0, viewW: 100, viewH: 100, zoom: 1 };
+  noticeAudioMatch.state = { spectator: false };
   noticeAudioMatch.replayViewer = true;
   noticeAudioMatch.handleNotice({
     e: EVENT.NOTICE,
@@ -3440,6 +3441,17 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(playedNotices.length === 0, "replay notice alerts do not play audio");
   assert(minimapPings === 1, "replay notice alerts still ping the minimap");
   noticeAudioMatch.replayViewer = false;
+  noticeAudioMatch.state = { spectator: true };
+  noticeAudioMatch.handleNotice({
+    e: EVENT.NOTICE,
+    msg: "alert:under_attack",
+    severity: NOTICE_SEVERITY.ALERT,
+    x: 512,
+    y: 768,
+  });
+  assert(playedNotices.length === 0, "live spectator notice alerts do not play audio");
+  assert(minimapPings === 2, "live spectator notice alerts still ping the minimap");
+  noticeAudioMatch.state = { spectator: false };
   noticeAudioMatch.handleNotice({
     e: EVENT.NOTICE,
     msg: "alert:under_attack",

@@ -683,7 +683,8 @@ includes a Team column, highlights every row matching `winnerTeamId`, and falls 
 for singleton FFA compatibility.
 For spectator starts, `match.js` hides the command card and give-up action, computes local fog from
 the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
-with `playerResources`.
+with `playerResources`. Spectators still receive notice toasts and minimap alert pings, but
+`match.js` suppresses notice alert audio so observers do not hear player alert callouts.
 
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
 
