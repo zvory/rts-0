@@ -35,8 +35,8 @@ pub const MORTAR_RANGE_TILES: u32 = 12;
 pub const MORTAR_SHELL_DELAY_TICKS: u32 = (TICK_HZ * 9 + 2) / 4;
 pub const MORTAR_OUTER_RADIUS_TILES: f32 = 1.5;
 pub const MORTAR_INNER_RADIUS_TILES: f32 = 0.5;
-pub const MORTAR_OUTER_DAMAGE: u32 = 30;
-pub const MORTAR_INNER_DAMAGE: u32 = 60;
+pub const MORTAR_OUTER_DAMAGE: u32 = 40;
+pub const MORTAR_INNER_DAMAGE: u32 = 90;
 pub const MORTAR_AUTOFIRE_ERROR_TILES: f32 = 0.35;
 pub const ANTI_TANK_GUN_PACKED_RANGE_TILES: u32 = 5;
 pub const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES: u32 = 14;
@@ -140,8 +140,8 @@ pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
 pub const OIL_DIST_TILES: f32 = 6.0;
 
 // --- Supply -----------------------------------------------------------------
-pub const CITY_CENTRE_SUPPLY: u32 = 10;
 pub const DEPOT_SUPPLY: u32 = 8;
+pub const CITY_CENTRE_SUPPLY: u32 = DEPOT_SUPPLY;
 pub const SUPPLY_CAP_MAX: u32 = 200;
 
 // --- Vehicle bodies ----------------------------------------------------------

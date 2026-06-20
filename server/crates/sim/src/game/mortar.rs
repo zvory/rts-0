@@ -175,21 +175,22 @@ fn resolve_shell(
         }
         let d2 = dist2(shell.x, shell.y, target.pos_x, target.pos_y);
         if d2 <= outer2 {
-            let base = if d2 <= inner2 {
+            let inner_hit = d2 <= inner2;
+            let base = if inner_hit {
                 config::MORTAR_INNER_DAMAGE
             } else {
                 config::MORTAR_OUTER_DAMAGE
             };
-            hits.push((id, base, target.owner, target.pos_x, target.pos_y));
+            hits.push((id, base, inner_hit, target.owner, target.pos_x, target.pos_y));
         }
     }
-    hits.sort_by_key(|(id, _, _, _, _)| *id);
+    hits.sort_by_key(|(id, _, _, _, _, _)| *id);
     let reveal = mortar_reveal_for(entities.get(shell.attacker));
     let mut reveal_recipients = Vec::new();
-    for (id, base, victim_owner, tx, ty) in hits {
+    for (id, base, inner_hit, victim_owner, tx, ty) in hits {
         let effective = entities
             .get(id)
-            .map(|target| mortar_damage(target.kind, base))
+            .map(|target| mortar_damage(target.kind, base, inner_hit))
             .unwrap_or(0);
         if effective == 0 {
             continue;
@@ -237,7 +238,7 @@ fn mortar_reveal_for(attacker: Option<&Entity>) -> Option<AttackReveal> {
     })
 }
 
-fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
+fn mortar_damage(victim_kind: EntityKind, base: u32, inner_hit: bool) -> u32 {
     if !combat::is_armored(victim_kind) {
         return combat::effective_damage(
             EntityKind::MortarTeam,
@@ -245,6 +246,9 @@ fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
             base,
             Some(TerrainKind::Open),
         );
+    }
+    if inner_hit {
+        return base;
     }
     ((base as f32) * 0.625).round() as u32
 }

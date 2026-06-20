@@ -195,9 +195,9 @@ authoritative `rules::defs` records.
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 0` (no setup or teardown), `MORTAR_RANGE_TILES = 12`,
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
-  `MORTAR_OUTER_DAMAGE = 30`, `MORTAR_INNER_DAMAGE = 60`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
-  The inner radius uses semi-armor-piercing damage against armored targets: it applies half of the
-  normal non-AP armor reduction instead of the full reduction. Manual Fire uses hotkey `X`; autocast
+  `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 90`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
+  The inner radius is fully armor-piercing against armored targets; the outer radius keeps
+  semi-armor-piercing damage against armored targets. Manual Fire uses hotkey `X`; autocast
   uses normal idle/attack-move acquisition after Mortar Autocast research completes. Mortar impacts
   apply the same damage to friendly and enemy units/buildings; autocast skips predicted impact
   points that would hit any owned unit or building at its current position, while manual fire remains
@@ -298,7 +298,7 @@ authoritative `rules::defs` records.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 18 steel patches with 1,000 steel each + 3 oil
   patches with 3,333 oil each nearby.
-- Supply: City Centre gives `+10`, Depot gives `+8`, hard cap `200`.
+- Supply: City Centre gives `+8`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
@@ -331,7 +331,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 75  | 30 outer / 60 inner AOE | 12 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| mortar_team     | 75  | 40 outer / 90 inner AOE | 12 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 60 deployed / 45 packed | 14 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 1.3 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
@@ -343,7 +343,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
+| city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 550       | trains worker; +8 supply; players start with one free |
 | zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekat start building; inert in first playable slice |
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |

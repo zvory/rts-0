@@ -16,7 +16,7 @@
 //     honor native key repeat; Esc cancels placement/targeting.
 //     Number keys recall control groups; double-tap jumps to the densest visible
 //     cluster. Alt/Ctrl/Cmd+number replaces a group, and Shift+number adds to it;
-//     on Windows, tabbed browser saves use Alt+number and installed-app saves use Ctrl+number.
+//     on Windows, browser saves use Alt+number; standalone apps save with Ctrl+number.
 //   - Mouse wheel = camera zoom toward the cursor.
 //   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
