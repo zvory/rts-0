@@ -246,3 +246,10 @@ routes. Fixture runs use `--no-codex --fixture <name>` and are the required focu
 path before any live Codex smoke. Classifier decisions are cached under the ignored
 `.docdrift/classifier-cache/` runtime directory by prompt version and commit SHA, and reports can be
 written with `--out-dir`.
+
+`scripts/docdrift-sweep.mjs --generate-docs` reruns or reuses the classifier records, selects only
+`update_docs` decisions, loads targeted authoritative design-doc sections, and asks Codex CLI for
+exact minimal find/replace doc patches. The script applies those patches to the working tree and
+writes `docdrift-generate.{md,json}` with `--out-dir`; operators inspect the resulting docs diff
+before any PR lifecycle step. Fixture runs use the same `--no-codex --fixture <name>` path and must
+remain idempotent, with reruns reporting already-applied patches instead of duplicating text.
