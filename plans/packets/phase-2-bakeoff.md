@@ -25,9 +25,14 @@ Payload budget: 1280 bytes
 
 ## Recommendation
 
-Keep compact JSON as the default and run a focused WebSocket compression follow-up before any binary codec rollout.
+Historical result, superseded by Phase 2.5 and Phase 2.6: use MessagePack compact binary frames as
+the active full-snapshot baseline. Keep this bake-off as local comparison evidence for compact JSON,
+offline deflate, schema-style binary, MessagePack, CBOR, and custom positional binary candidates.
 
-Deflate had the smallest measured p95 (4466 bytes vs compact JSON 17533), but the current measurement is an offline proxy and the server/browser extension path still needs live verification.
+Deflate had the smallest measured p95 (4466 bytes vs compact JSON 17533), but the current
+measurement is an offline proxy and the server/browser extension path was deliberately not promoted
+into a compression rollout. Larger packet reductions should come from the later fog-safe delta
+phases after explicit user approval.
 
 ## Limits
 

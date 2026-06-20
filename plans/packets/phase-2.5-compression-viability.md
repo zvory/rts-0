@@ -2,6 +2,10 @@
 
 Generated: 2026-06-19
 
+Status: historical compression evidence. Phase 2.5 shipped MessagePack compact binary snapshots
+instead of WebSocket compression, and Phase 2.6 keeps that as the full-snapshot baseline for future
+packet work.
+
 ## Stack Finding
 
 The current live WebSocket path is Axum 0.8 `WebSocketUpgrade`, which depends on
@@ -32,12 +36,11 @@ runtime stack cannot directly turn it into negotiated WebSocket compression.
 | AI/server perf harness | not browser-negotiated | serialized compact JSON bytes | `scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots` passed. It serialized 20,000 snapshots, p95 payload 3371 bytes, max 5190 bytes, 78.64% over budget, p95 serialize 22 us, and no slow ticks at or above 33 ms. |
 | beta/Fly logs | not candidate-deployed | not available for new fields | `/version` returned `e4b93fbb460f`; recent beta logs were accessible but had no matching `client_net_report`, `websocket_compression`, `snapshot_byte_source`, or writer rows. Verify again after a candidate build reaches beta. |
 
-## Phase 2.6 Recommendation
+## Superseded Recommendation
 
-Do not roll WebSocket compression default-on from the current stack. Phase 2.6 should be an
-implementation-route follow-up if compression is still desired: either replace the WebSocket upgrade
-path with one that supports `permessage-deflate`, add a safe transport wrapper, or explicitly ship an
-application-level compressed snapshot envelope with compact JSON fallback and a rollback switch.
+Do not roll WebSocket compression default-on from the current stack. The old Phase 2.6
+implementation-route follow-up is superseded by the MessagePack rollout; reopening compression would
+require an explicit user decision outside the current packet phase sequence.
 
-Delta snapshot work should still wait until the compression route is either implemented with
-evidence or deliberately deferred.
+Delta snapshot work should use MessagePack full snapshots as the baseline after Phase 2.6, remain
+fog-safe and per-recipient, and still wait for explicit user approval before implementation begins.

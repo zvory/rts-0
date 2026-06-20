@@ -96,9 +96,10 @@ scripts/ai-perf-harness.sh --ticks 20000
 ```
 
 The harness runs four AI players in one local match, enables sample perf tracing by default, and
-exercises simulation, per-player snapshot fanout, snapshot compaction, and compact JSON
-serialization without requiring browser clients. Override the usual `RTS_PERF*` and `RUST_LOG`
-environment variables when you need a different trace shape, or pass `--perf full` for every tick.
+exercises simulation, per-player snapshot fanout, snapshot compaction, and the active
+`messagepack-compact` snapshot serialization path without requiring browser clients. Override the
+usual `RTS_PERF*` and `RUST_LOG` environment variables when you need a different trace shape, or pass
+`--perf full` for every tick.
 
 Browser client performance harness:
 
@@ -206,11 +207,10 @@ Interpretation:
 - `websocketCompression=none` means the WebSocket completed without a negotiated compression
   extension. That is the expected result for the current Axum 0.8 / Tungstenite 0.29 server stack;
   Tungstenite 0.29 does not implement `permessage-deflate`.
-- If compression is still worth pursuing, the next phase should first choose an implementation route
-  such as replacing the upgrade path with a crate that supports `permessage-deflate`, adding a
-  transport wrapper, or adding an explicit application-level compressed snapshot envelope with a
-  rollback switch. Do not compare `snapshotBytes*` against compressed-wire claims unless the
-  measurement source is explicitly labeled.
+- Compression is no longer the next packet-plan step. Treat WebSocket compression fields as
+  diagnostics only unless the user explicitly reopens that route; compare `snapshotBytes*` against
+  MessagePack full-snapshot baselines and later fog-safe delta measurements, not compressed-wire
+  claims, unless the measurement source is explicitly labeled.
 
 The Fly production deploy enables the low-noise spike mode in `fly.toml`:
 
