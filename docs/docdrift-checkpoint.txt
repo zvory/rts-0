@@ -1,0 +1,4 @@
+# Documentation drift sweeper checkpoint.
+# This is the latest origin/main commit fully reviewed by the sweeper.
+# Phase 4 advances this only after the sweep PR merges and reaches origin/main.
+8058436808651902b528635de4b2a47f92ebf882

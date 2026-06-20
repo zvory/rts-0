@@ -1,6 +1,6 @@
 # Phase 1 - Sweep Contract and Dry Run
 
-Status: draft.
+Status: done.
 
 ## Goal
 
