@@ -19,7 +19,13 @@ The summary includes total frames, slow-frame count, recent frames, approximate 
 time, slow sample count, and worst-phase counts for match phases such as camera, input, prediction
 visual advance, fog, renderer, HUD, minimap, observer analysis, and health publish. Renderer
 sub-phases cover entity preparation, feedback view building, resources/buildings, units,
-selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement.
+selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement. The profiler
+also records `frame.rafDispatch`, the browser callback dispatch delay between the RAF timestamp and
+actual JavaScript entry, and `frame.unattributed`, which is `frame.work` minus top-level `match.*`
+phase time for the same frame. High `frame.rafDispatch` p95 points at scheduling pressure before the
+frame callback starts. High `frame.unattributed` p95 means the benchmark has found frame work that
+the current named phases do not explain yet; use recent long-frame context and, when needed,
+`--trace` to decide where to add finer timing.
 
 Shape context is intentionally bounded: entity counts, selected count, remembered building count,
 visible tile count, viewport/canvas size, device pixel ratio, match mode, local harness workload id,
@@ -50,7 +56,8 @@ path is busy:
 
 Recent slow frames also carry a bounded context block naming the slowest top-level `match.*` phase,
 the slowest nested `renderer.*` phase, the slowest nested `minimap.*` phase, and the largest
-diagnostic counters seen in that frame. Use timings to decide where milliseconds went, and use
+diagnostic counters seen in that frame. They also include RAF dispatch delay, the top-level named
+phase total, and the unattributed frame work for that frame. Use timings to decide where milliseconds went, and use
 counters to explain whether that cost came from object churn, redraw frequency, cache invalidation,
 or a missing measurement category.
 
@@ -148,7 +155,9 @@ one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>
 selected-unit HUD stress scenario, and a fog/combat-heavy Matt/Alex replay fast-forward, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
-per-budget margins and the next missed p95 budget. It also includes a local-only
+per-budget margins and the next missed p95 budget. The same block includes `frameAttribution`,
+which reports top-level named work, `frame.unattributed` average/p95/max, `frame.rafDispatch`, and
+the average percentage of `frame.work` covered by named top-level phases. It also includes a local-only
 `renderDiagnostics` block with the counter groups above, recent long-frame context, and the largest
 nonzero counters for the sample. It also includes a `snapshotPacketBudget` block
 with payload p95 bytes, the selected packet budget, over-budget count, and over-budget percentage
@@ -207,7 +216,10 @@ renderer subphases and must not be added back into `frame.work`. If local-only m
 as `minimap.*` rows are enabled during an investigation, treat them as nested minimap detail under
 `match.minimap`, not as a separate top-level cost. Always inspect p95 bucket, max, worst-phase
 count, and shape context (`entityCount`, `selectedCount`, visible tiles, viewport, and device pixel
-ratio) together.
+ratio) together. If `frame.unattributed` or `frame.rafDispatch` outranks the named `match.*` rows,
+do not start by optimizing the largest named subsystem alone; first inspect recent long frames or a
+trace to explain the missing time, then add a narrower phase label or fix the scheduling,
+off-RAF, or uncaptured work it reveals.
 
 Keep evidence streams separate. Matt and Alex beta FPS/network reports are per-player browser
 observations from deployed matches; `matt-alex-replay` is a local replay of preserved match 54 data;
