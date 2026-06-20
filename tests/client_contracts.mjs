@@ -2553,8 +2553,12 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     "Windows installed-app control-group save uses Ctrl+number",
   );
   assert(
-    !_controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isInstalledApp: true }),
-    "Windows installed-app control-group save does not use Alt+number",
+    _controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isInstalledApp: true }),
+    "Windows installed-app control-group save also uses Alt+number",
+  );
+  assert(
+    _controlGroupSaveModifierActive(ev({ metaKey: true }), { isWindows: true, isInstalledApp: true }),
+    "Windows installed-app control-group save also uses Cmd/Meta+number",
   );
   assert(
     _controlGroupSaveModifierActive(ev({ metaKey: true }), { isWindows: false, isInstalledApp: false }),
