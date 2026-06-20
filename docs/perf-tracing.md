@@ -40,7 +40,8 @@ The same upload also includes bounded snapshot diagnostics:
 
 - Payload size: `snapshotBytesTotal`, `snapshotBytesMax`, `snapshotBytesAvg`,
   `snapshotMessageCount`, `snapshotBytesP95`, `snapshotSegmentBudgetBytes`,
-  `snapshotOverSegmentBudgetCount`, and `snapshotOverSegmentBudgetPctX100`.
+  `snapshotOverSegmentBudgetCount`, `snapshotOverSegmentBudgetPctX100`, `snapshotByteSource`,
+  `snapshotCodec`, `snapshotCodecVersion`, and `snapshotFrameKind`.
 - Browser processing: `snapshotParseMaxMs`/`snapshotParseP95Ms`,
   `snapshotDecodeMaxMs`/`snapshotDecodeP95Ms`, `snapshotApplyMaxMs`/`snapshotApplyP95Ms`, and
   `predictionApplyMaxMs`/`predictionApplyP95Ms`.
@@ -56,10 +57,11 @@ command age, and max pending command count. The server receipt comes from a tiny
 ids, positions, or player-entered text and does not reconcile prediction.
 
 The canonical single-segment payload budget is 1280 bytes. Client measurements count only snapshot
-WebSocket text payload bytes, so they exclude WebSocket framing plus TLS, TCP, and IP overhead; a
-1460-byte JSON payload is not a safe single-segment target. Raw snapshot JSON, raw timestamp arrays,
-raw phase arrays, recent frame records, stack traces, entity ids, command payloads, command targets,
-and replay data are intentionally not uploaded.
+WebSocket application payload bytes, currently `messagepack-application-payload` from binary
+`messagepack-compact` frames, so they exclude WebSocket framing plus TLS, TCP, and IP overhead; a
+1460-byte application payload is not a safe single-segment target. Raw snapshot payloads, raw
+timestamp arrays, raw phase arrays, recent frame records, stack traces, entity ids, command
+payloads, command targets, and replay data are intentionally not uploaded.
 
 ## Modes
 
@@ -172,27 +174,29 @@ The standalone bake-off reads local compact snapshot frames from JSON/JSONL or d
 fixtures and compares compact JSON, offline deflate, a protobuf-style schema TLV, MessagePack, CBOR,
 and a custom positional binary. It reports p50/p95/p99/max encoded bytes, over-budget rate, and
 local encode/decode timings. `--snapshot-codec-bakeoff` makes the browser harness capture bounded
-raw snapshot frames in memory, write `snapshot-frames.jsonl`, and attach `snapshot-codec-bakeoff.*`
-artifacts beside the normal summary.
+snapshot frames in memory, normalize MessagePack frames back to compact snapshot JSONL, write
+`snapshot-frames.jsonl`, and attach `snapshot-codec-bakeoff.*` artifacts beside the normal summary.
 
-Codec bake-off artifacts are local developer evidence only. The live protocol still defaults to
-compact JSON text, the browser parser rejects binary snapshot frames, and deflate numbers are
-compressed payload bytes from Node zlib rather than verified WebSocket extension wire bytes.
+Codec bake-off artifacts are local developer evidence only. The live protocol now defaults to
+`messagepack-compact` binary snapshot frames; compact JSON remains a historical baseline in the
+bake-off report, and deflate numbers are compressed payload bytes from Node zlib rather than
+verified WebSocket extension wire bytes.
 
-Real WebSocket compression viability:
+Snapshot transport diagnostics:
 
 ```bash
 node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 6 --snapshot-codec-bakeoff
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 6 --snapshot-codec-bakeoff
 scripts/ai-perf-harness.sh --ticks 5000 --perf full --no-log-snapshots
-scripts/fly-logs.sh beta recent | rg 'client_net_report|websocket_compression|snapshot_byte_source|writer_send'
+scripts/fly-logs.sh beta recent | rg 'client_net_report|websocket_compression|snapshot_byte_source|snapshot_codec|writer_send'
 ```
 
-Use this pass to answer whether real `permessage-deflate` negotiated in the browser/server path
-before any default changes. The browser harness writes a top-level `websocket` block and the
-generated `ClientNetReport` now includes `websocketExtensions`, `websocketCompression`, and
-`snapshotByteSource`. `scripts/parse-net-report-logs.mjs` surfaces the same fields under Transport
-diagnostics for local or Fly logs.
+Use these commands to compare current MessagePack payloads with local compact JSON baselines and to
+confirm the browser/server transport labels. The browser harness writes a top-level `websocket`
+block and the generated `ClientNetReport` includes `websocketExtensions`, `websocketCompression`,
+`snapshotByteSource`, `snapshotCodec`, `snapshotCodecVersion`, and `snapshotFrameKind`.
+`scripts/parse-net-report-logs.mjs` surfaces the same fields under Transport diagnostics for local
+or Fly logs.
 
 Interpretation:
 
@@ -278,7 +282,7 @@ Classification is evidence-bounded:
   evidence.
 - Client network/snapshot delivery pressure uses RTT, bad RTT samples, snapshot jitter, snapshot gaps,
   stale/duplicate/skipped snapshot counters, and burst counters.
-- Browser processing pressure uses payload size, packet-budget p95/rate, JSON parse, compact decode,
+- Browser processing pressure uses payload size, packet-budget p95/rate, frame parse, compact decode,
   snapshot apply, prediction apply, frame work, renderer timing, frame gaps, and FPS estimates.
 - Command path pressure uses legacy acknowledged-command latency when that is all an old log has, and
   uses the newer upload/server-receipt/sim-ack/downstream-apply milestones when present.
@@ -338,9 +342,9 @@ architecture policy gate.
   separate from `payload_pressure`; it is meant to highlight persistent single-segment budget
   pressure without replacing the older pathological-frame thresholds.
 - `client_snapshot_parse`: `snapshotParseMaxMs >= 16` or `snapshotParseP95Ms >= 8`; points at
-  browser JSON parsing cost for received snapshot frames.
+  browser frame parsing cost for received snapshot frames.
 - `client_snapshot_decode`: `snapshotDecodeMaxMs >= 16` or `snapshotDecodeP95Ms >= 8`; points at
-  compact-protocol expansion cost after JSON parse.
+  compact-protocol expansion cost after frame parse.
 - `client_snapshot_apply`: `snapshotApplyMaxMs >= 16`, `snapshotApplyP95Ms >= 8`,
   `predictionApplyMaxMs >= 16`, or `predictionApplyP95Ms >= 8`; points at applying the decoded
   snapshot into `GameState` or reconciling prediction overlays.

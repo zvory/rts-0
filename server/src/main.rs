@@ -39,6 +39,7 @@ use rts_server::dev_scenarios::{
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::protocol::{
     default_snapshot_codec, encode_snapshot_frame, ClientMessage, ServerMessage, SnapshotFrame,
+    SNAPSHOT_FRAME_KIND_TEXT,
 };
 use rts_server::structured_log;
 use rts_sim::game::map::Map;
@@ -1245,8 +1246,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     let (conn_tx, writer_rx) = lobby::ConnectionSink::new();
 
     // Writer task: serialize each ServerMessage and push it to the socket.
-    // Reliable messages stay object-shaped JSON; snapshots use the negotiated codec seam, which
-    // currently defaults to compact JSON text.
+    // Reliable messages stay object-shaped JSON; snapshots use the default snapshot codec.
     // Reliable messages are FIFO and prioritized over snapshots. Snapshots are latest-only:
     // while the socket is busy, newer snapshots replace older unsent snapshots.
     let writer = tokio::spawn(async move {
@@ -1373,7 +1373,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                 .await;
             }
             Message::Binary(_) => {
-                // The protocol is JSON text only; ignore stray binary frames.
+                // Client-to-server messages remain JSON text only; ignore stray binary frames.
                 rts_server::log_debug!(player_id, "ignoring unexpected binary frame");
             }
             Message::Ping(_) | Message::Pong(_) => {
@@ -1432,36 +1432,49 @@ async fn send_server_message(
         _ => "other",
     };
     let serialize_start = Instant::now();
+    let mut snapshot_codec = "";
+    let mut snapshot_codec_version = 0;
     let encoded = match msg {
         ServerMessage::Snapshot(snapshot) => {
-            encode_snapshot_frame(&snapshot, default_snapshot_codec())
-                .map(ServerFrame::from_snapshot_frame)
+            let codec = default_snapshot_codec();
+            snapshot_codec = codec.name();
+            snapshot_codec_version = codec.version();
+            encode_snapshot_frame(&snapshot, codec).map(ServerFrame::from_snapshot_frame)
         }
-        reliable => serde_json::to_string(&reliable).map(ServerFrame::Text),
+        reliable => serde_json::to_string(&reliable)
+            .map(ServerFrame::Text)
+            .map_err(rts_server::protocol::SnapshotEncodeError::from),
     };
     let serialize_duration = serialize_start.elapsed();
     match encoded {
         Ok(frame) => {
+            let frame_kind = frame.frame_kind();
             let bytes = frame.len();
             let send_start = Instant::now();
             if sink.send(frame.into_message()).await.is_err() {
                 // Socket gone; stop writing. The reader side will emit Leave.
-                perf::log_writer_message(
+                perf::log_writer_message(perf::WriterMessageTiming {
                     player_id,
                     message_kind,
-                    serialize_duration,
-                    send_start.elapsed(),
+                    snapshot_codec,
+                    snapshot_codec_version,
+                    frame_kind,
+                    serialize: serialize_duration,
+                    send: send_start.elapsed(),
                     bytes,
-                );
+                });
                 return false;
             }
-            perf::log_writer_message(
+            perf::log_writer_message(perf::WriterMessageTiming {
                 player_id,
                 message_kind,
-                serialize_duration,
-                send_start.elapsed(),
+                snapshot_codec,
+                snapshot_codec_version,
+                frame_kind,
+                serialize: serialize_duration,
+                send: send_start.elapsed(),
                 bytes,
-            );
+            });
         }
         Err(err) => {
             // Should never happen for our own types, but never let it kill the task.
@@ -1488,6 +1501,13 @@ impl ServerFrame {
         match self {
             ServerFrame::Text(text) => text.len(),
             ServerFrame::Binary(bytes) => bytes.len(),
+        }
+    }
+
+    fn frame_kind(&self) -> &'static str {
+        match self {
+            ServerFrame::Text(_) => SNAPSHOT_FRAME_KIND_TEXT,
+            ServerFrame::Binary(_) => rts_server::protocol::SNAPSHOT_FRAME_KIND_BINARY,
         }
     }
 
@@ -1727,7 +1747,7 @@ async fn handle_client_message(
             let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });
         }
         ClientMessage::NetReport { report } => {
-            structured_log::log_client_net_report(player_id, current_room_name.as_deref(), report);
+            structured_log::log_client_net_report(player_id, current_room_name.as_deref(), *report);
         }
         ClientMessage::SetRoomTimeSpeed { speed } => {
             send_room_event(

@@ -2,9 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after the completed compression-viability pass is archived in
-      [phase-2.5-compression-viability.md](phase-2.5-compression-viability.md) and the
-      user-approved follow-up is MessagePack binary snapshots instead of WebSocket compression.
+- [x] Done.
 
 ## Objective
 
@@ -86,17 +84,34 @@ smoke, the rollback is to revert the MessagePack change rather than carry both s
 
 ## Implementation Checklist
 
-- [ ] Confirm the archived compression-viability evidence is superseded by the MessagePack direction.
-- [ ] Add Rust MessagePack encoding for compact snapshots.
-- [ ] Add browser MessagePack decoding for snapshot binary frames.
-- [ ] Make MessagePack binary frames the normal live snapshot path after local validation.
-- [ ] Keep reliable non-snapshot messages as JSON text.
-- [ ] Add codec/version/frame-kind report, log, parser, and harness fields.
-- [ ] Remove or bypass stale WebSocket compression diagnostics planned for the old Phase 2.5.
-- [ ] Update protocol/perf docs and focused tests.
-- [ ] Run local realistic benchmarks and record compact JSON baseline vs MessagePack results where
+- [x] Confirm the archived compression-viability evidence is superseded by the MessagePack direction.
+- [x] Add Rust MessagePack encoding for compact snapshots.
+- [x] Add browser MessagePack decoding for snapshot binary frames.
+- [x] Make MessagePack binary frames the normal live snapshot path after local validation.
+- [x] Keep reliable non-snapshot messages as JSON text.
+- [x] Add codec/version/frame-kind report, log, parser, and harness fields.
+- [x] Remove or bypass stale WebSocket compression diagnostics planned for the old Phase 2.5.
+- [x] Update protocol/perf docs and focused tests.
+- [x] Run local realistic benchmarks and record compact JSON baseline vs MessagePack results where
       practical.
-- [ ] Mark this phase as done in this file.
+- [x] Mark this phase as done in this file.
+
+## Implementation Notes
+
+- MessagePack dependency choice: no new Rust or browser dependency. The server uses a small
+  in-repo MessagePack writer over the existing `CompactSnapshot` serializer; the browser uses a
+  dependency-free MessagePack reader in `client/src/protocol.js`.
+- Frame shape: binary snapshots start with `RTSM`, one byte snapshot codec version `1`, then a
+  MessagePack map containing the compact snapshot object (`t: "snapshot"`, `v: 22`, and the
+  existing compact slots).
+- Default path: `messagepack-compact` binary snapshots are the normal live snapshot frame; reliable
+  non-snapshot messages remain JSON text. Compact JSON remains only as a local/historical baseline.
+- Local payload evidence: deterministic fixture bake-off reported compact JSON p95 17,533 bytes vs
+  MessagePack p95 8,826 bytes. The AI perf harness reported 20,000 MessagePack snapshots with avg
+  1,096 bytes, p95 1,714 bytes, max 3,194 bytes.
+- Local live smoke note: starting a release server for `tests/server_integration.mjs` was attempted
+  with `RTS_ADDR=127.0.0.1:18081`, but the sandbox denied binding the socket with
+  `Operation not permitted (os error 1)`, so live browser/server smoke remains manual.
 
 ## Verification
 

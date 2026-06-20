@@ -10,6 +10,7 @@ import fs from "node:fs";
 import { CLIENT_NET_REPORT_FIELDS } from "./client_net_report_fields.mjs";
 import {
   assertMalformedBinaryRejected,
+  encodeMessagePack,
   fixtureSnapshotFrames,
   runSnapshotCodecBakeoff,
 } from "../scripts/snapshot-codec-bakeoff.mjs";
@@ -79,6 +80,7 @@ import {
   COMPACT_SNAPSHOT_VERSION,
   SNAPSHOT_CODEC,
   SNAPSHOT_CODEC_VERSION,
+  SNAPSHOT_FRAME_KIND,
   DEFAULT_FACTION_ID,
   PREDICTION_PROTOCOL_VERSION,
   ABILITY,
@@ -205,6 +207,14 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     d && typeof d.get === "function",
     `${msgPrefix || "Object"} missing getter "${name}"`,
   );
+}
+
+function messagePackSnapshotFrame(raw) {
+  const payload = encodeMessagePack(raw);
+  const frame = new Uint8Array(5 + payload.byteLength);
+  frame.set([0x52, 0x54, 0x53, 0x4d, SNAPSHOT_CODEC_VERSION], 0);
+  frame.set(payload, 5);
+  return frame;
 }
 
 function commandCardCtx({
@@ -3865,15 +3875,35 @@ function fakeAudioContext() {
       }),
     "compact snapshot enforces order plan bounds",
   );
-  assert(SNAPSHOT_CODEC.COMPACT_JSON === "compact-json", "client mirrors compact JSON snapshot codec name");
+  assert(SNAPSHOT_CODEC.COMPACT_JSON === "compact-json", "client keeps compact JSON baseline codec name");
+  assert(
+    SNAPSHOT_CODEC.MESSAGEPACK_COMPACT === "messagepack-compact",
+    "client mirrors MessagePack snapshot codec name",
+  );
   assert(SNAPSHOT_CODEC_VERSION === 1, "client mirrors snapshot codec version");
+  assert(SNAPSHOT_FRAME_KIND.BINARY === "binary", "client mirrors binary snapshot frame kind");
   assert(
     parseServerFrame(JSON.stringify({ t: "snapshot", tick: 1 })).t === "snapshot",
     "protocol frame parser accepts JSON text frames",
   );
+  const binarySnapshot = messagePackSnapshotFrame({
+    t: "snapshot",
+    v: COMPACT_SNAPSHOT_VERSION,
+    s: [77, 10, 20, 1, 5],
+    e: [],
+    n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 0, null],
+  });
+  assert(
+    decodeServerMessage(parseServerFrame(binarySnapshot)).tick === 77,
+    "protocol frame parser decodes MessagePack snapshot frames",
+  );
   assertThrows(
     () => parseServerFrame(new Uint8Array([1, 2, 3])),
-    "protocol frame parser rejects unsupported binary frames",
+    "protocol frame parser rejects malformed binary frames",
+  );
+  assertThrows(
+    () => parseServerFrame(new Uint8Array([0x52, 0x54, 0x53, 0x4d, 0xff])),
+    "protocol frame parser rejects unsupported MessagePack frame versions",
   );
   const bakeoff = runSnapshotCodecBakeoff({ frames: fixtureSnapshotFrames(), iterations: 1 });
   assert(
@@ -4084,12 +4114,34 @@ function fakeAudioContext() {
   try {
     const reportNet = new Net("ws://example.invalid");
     reportNet.ws = { extensions: "permessage-deflate; client_max_window_bits" };
-    reportNet._onMessage({ data: JSON.stringify({ t: "snapshot", tick: 1, entities: [] }) });
-    reportNet._onMessage({ data: JSON.stringify({ t: "snapshot", tick: 2, entities: [] }) });
+    reportNet._onMessage({
+      data: messagePackSnapshotFrame({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [1, 0, 0, 0, 0],
+        e: [],
+        n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 0, null],
+      }),
+    });
+    reportNet._onMessage({
+      data: messagePackSnapshotFrame({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [2, 0, 0, 0, 0],
+        e: [],
+        n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 0, null],
+      }),
+    });
     const stats = reportNet.consumeSnapshotReportStats();
     assert(stats.snapshotMessageCount === 2, "Net reports snapshot message count");
     assert(stats.snapshotBytesTotal > stats.snapshotBytesMax, "Net reports bounded snapshot byte totals");
-    assert(stats.snapshotByteSource === "application-payload", "Net labels payload byte measurement source");
+    assert(
+      stats.snapshotByteSource === "messagepack-application-payload",
+      "Net labels MessagePack payload byte measurement source",
+    );
+    assert(stats.snapshotCodec === SNAPSHOT_CODEC.MESSAGEPACK_COMPACT, "Net reports snapshot codec");
+    assert(stats.snapshotCodecVersion === SNAPSHOT_CODEC_VERSION, "Net reports snapshot codec version");
+    assert(stats.snapshotFrameKind === SNAPSHOT_FRAME_KIND.BINARY, "Net reports binary snapshot frame kind");
     assert(
       stats.websocketExtensions.includes("permessage-deflate"),
       "Net reports browser WebSocket extension string",
@@ -4101,17 +4153,22 @@ function fakeAudioContext() {
     assert(stats.snapshotSegmentBudgetBytes === SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES, "Net reports snapshot packet budget");
     assert(stats.snapshotBytesP95 >= stats.snapshotBytesAvg, "Net reports snapshot byte p95");
     assert(stats.snapshotOverSegmentBudgetCount === 0, "small snapshots stay within packet budget");
-    assert(stats.snapshotParseMaxMs === 3, "Net reports JSON parse max");
+    assert(stats.snapshotParseMaxMs === 3, "Net reports snapshot frame parse max");
     assert(stats.snapshotDecodeMaxMs === 4, "Net reports compact decode max");
     const resetStats = reportNet.consumeSnapshotReportStats();
     assert(resetStats.snapshotMessageCount === 0, "Net snapshot report stats reset");
     assert(resetStats.websocketCompression === "permessage-deflate", "Net keeps compression state after stats reset");
     assert(resetStats.snapshotOverSegmentBudgetCount === 0, "Net snapshot packet-budget stats reset");
+    assert(resetStats.snapshotCodec === SNAPSHOT_CODEC.MESSAGEPACK_COMPACT, "Net snapshot codec default resets");
+    assert(resetStats.snapshotFrameKind === SNAPSHOT_FRAME_KIND.BINARY, "Net snapshot frame kind default resets");
 
     reportNet.noteSnapshotFrame({
       bytes: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1,
       parseMs: 0,
       decodeMs: 0,
+      snapshotCodec: SNAPSHOT_CODEC.MESSAGEPACK_COMPACT,
+      snapshotCodecVersion: SNAPSHOT_CODEC_VERSION,
+      frameKind: SNAPSHOT_FRAME_KIND.BINARY,
     });
     const overBudget = reportNet.consumeSnapshotReportStats();
     assert(overBudget.snapshotBytesP95 > SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES, "Net reports over-budget byte p95");
@@ -4123,6 +4180,9 @@ function fakeAudioContext() {
   for (const field of [
     "snapshotBytesTotal",
     "snapshotByteSource",
+    "snapshotCodec",
+    "snapshotCodecVersion",
+    "snapshotFrameKind",
     "snapshotBytesP95",
     "snapshotSegmentBudgetBytes",
     "snapshotOverSegmentBudgetCount",

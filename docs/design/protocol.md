@@ -1,11 +1,13 @@
-## 2. Wire protocol (JSON over WebSocket)
+## 2. Wire protocol (JSON and binary snapshots over WebSocket)
 
-All messages are JSON objects with a `t` field (the discriminator/tag). Field names are
-short but readable. Coordinates are **world pixels** (floats) unless a field name ends in
-`Tile`. The canonical Rust definitions live in `server/crates/protocol/src/lib.rs`; the
-server-shell `server/src/protocol.rs` is an adapter for typed entity-kind conversion and legacy
-imports. The browser mirror lives in `client/src/protocol.js` (builders + constants). Rust and JS
-MUST agree on every tag, field name, and compact transport shape.
+Client-to-server messages and reliable server-to-client messages are JSON objects with a `t` field
+(the discriminator/tag). Live snapshot messages are MessagePack compact binary snapshot frames over
+the same WebSocket. Field names are short but readable. Coordinates are **world pixels** (floats)
+unless a field name ends in `Tile`. The canonical Rust definitions live in
+`server/crates/protocol/src/lib.rs`; the server-shell `server/src/protocol.rs` is an adapter for
+typed entity-kind conversion and legacy imports. The browser mirror lives in `client/src/protocol.js`
+(builders + constants). Rust and JS MUST agree on every tag, field name, and compact transport
+shape.
 
 This is a pre-alpha, latest-version-only protocol. It may change incompatibly with older clients,
 servers, and replay artifacts; keep the current Rust and JS mirrors synchronized instead of
@@ -138,13 +140,16 @@ in a match:
   snapshotBytesMax: u32,     // largest received snapshot application payload bytes
   snapshotBytesAvg: u32,     // average received snapshot application payload bytes
   snapshotMessageCount: u32, // snapshot frames observed by the transport report window
-  snapshotByteSource: string, // currently "application-payload"; not compressed wire bytes
+  snapshotByteSource: string, // currently "messagepack-application-payload"; not compressed wire bytes
+  snapshotCodec: string,      // currently "messagepack-compact"
+  snapshotCodecVersion: u16,  // currently 1
+  snapshotFrameKind: string,  // currently "binary"
   snapshotBytesP95: u32,     // bucketed p95 received snapshot application payload bytes
   snapshotSegmentBudgetBytes: u32, // payload-byte single-segment budget used by this client
   snapshotOverSegmentBudgetCount: u32, // snapshot frames above snapshotSegmentBudgetBytes
   snapshotOverSegmentBudgetPctX100: u16, // over-budget percentage multiplied by 100
-  snapshotParseMaxMs: u16,   // max browser JSON.parse cost for snapshot frames
-  snapshotParseP95Ms: u16,   // bucketed p95 JSON.parse cost for snapshot frames
+  snapshotParseMaxMs: u16,   // max browser frame parse cost for snapshot frames
+  snapshotParseP95Ms: u16,   // bucketed p95 frame parse cost for snapshot frames
   snapshotDecodeMaxMs: u16,  // max compact protocol decode cost
   snapshotDecodeP95Ms: u16,  // bucketed p95 compact protocol decode cost
   websocketExtensions: string, // bounded browser WebSocket.extensions after open
@@ -211,11 +216,11 @@ in a match:
   predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
 }
 ```
-The snapshot payload, parse, decode, apply, prediction-apply, cadence, and command milestone fields
-are report-window aggregates only; raw snapshot JSON, raw timestamp arrays, entity ids, unit ids,
-target ids, positions, replay data, and command payloads are not uploaded. The canonical
+The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, and command milestone
+fields are report-window aggregates only; raw snapshot payloads, raw timestamp arrays, entity ids,
+unit ids, target ids, positions, replay data, and command payloads are not uploaded. The canonical
 single-segment payload budget is 1280 bytes. It is intentionally below a common 1460-byte Ethernet
-TCP MSS because the measured snapshot bytes are only WebSocket text payload bytes and exclude
+TCP MSS because the measured snapshot bytes are only WebSocket application payload bytes and exclude
 WebSocket framing plus TLS, TCP, and IP overhead. Command milestone timing splits local issue to
 receipt, receipt to sim acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to
 browser apply. The frame-work and renderer fields come from the browser's bounded frame-profiler
@@ -480,25 +485,30 @@ dev snapshots include every object and spectator/replay snapshots use the existi
 Enemy objects never carry owner-only state, and `sourceCasterId` is omitted unless the caster is
 safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 
-Live WebSocket snapshot frames are sent with snapshot codec `compact-json`, codec version 1. That
-codec currently means compact JSON text, version 22. `client/src/net.js` decodes this
-transport shape back into the semantic object above before dispatching `S.SNAPSHOT`. Older
-object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
+MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
+starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
+containing the same compact snapshot object shape shown below. The active snapshot codec is
+`messagepack-compact`, codec version 1, compact snapshot version 22. `client/src/net.js` parses the
+binary frame into the raw compact snapshot object, then `decodeCompactSnapshot` expands it back into
+the semantic object above before dispatching `S.SNAPSHOT`.
 
-The codec seam is explicit but conservative: compact JSON is the default, the only live supported
-codec, and the fallback path. Binary frames are rejected by the browser protocol parser until a
-future experiment adds an explicit codec/version and client decoder. Offline bake-off tooling may
-compare protobuf-style, MessagePack, CBOR, deflate, or custom binary candidates, but those artifacts
-do not change live negotiation and must not silently strand older clients.
+The rollout is direct and latest-version-only. Reliable non-snapshot messages (`welcome`, `start`,
+`lobby`, `pong`, errors, room/lab/replay control messages, and game over) remain JSON text. The
+server does not negotiate stale-client capability and does not maintain a compact JSON fallback mode
+for live snapshots; rollback is a normal Git revert of the MessagePack snapshot change. Compact JSON
+serialization remains available in local tooling and tests as a historical size baseline, and the
+browser can still decode object-shaped JSON snapshots for narrow dev/test use, but that is not the
+normal live path.
 
 The live compression diagnostics are report-only. `snapshotBytes*` fields are browser-delivered
-application payload measurements after any transport extension would have been decoded by the
-browser; they are not compressed wire bytes. `websocketExtensions` mirrors the bounded browser
-`WebSocket.extensions` string, and `websocketCompression` is a normalized label that is
-`permessage-deflate` only when that extension appears. With the current Axum 0.8 / Tungstenite 0.29
-server stack, direct `permessage-deflate` negotiation is not available, so the expected live label is
-`none` until a future phase changes the WebSocket implementation or adds an explicit application
-compression envelope.
+MessagePack application payload measurements after any transport extension would have been decoded
+by the browser; they are not compressed wire bytes. `snapshotCodec`, `snapshotCodecVersion`, and
+`snapshotFrameKind` identify the active snapshot path for the report window. `websocketExtensions`
+mirrors the bounded browser `WebSocket.extensions` string, and `websocketCompression` is a
+normalized label that is `permessage-deflate` only when that extension appears. With the current
+Axum 0.8 / Tungstenite 0.29 server stack, direct `permessage-deflate` negotiation is not available,
+so the expected live label is `none` until a future phase changes the WebSocket implementation or
+adds an explicit application compression envelope.
 
 ```
 {

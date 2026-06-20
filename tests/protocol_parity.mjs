@@ -36,6 +36,7 @@ import {
   COMPACT_SNAPSHOT_VERSION,
   SNAPSHOT_CODEC,
   SNAPSHOT_CODEC_VERSION,
+  SNAPSHOT_FRAME_KIND,
   PREDICTION_PROTOCOL_VERSION,
   DEFAULT_FACTION_ID,
   cmd,
@@ -162,14 +163,22 @@ assertSameCodes(
   { [KIND.STEEL]: KIND_CODE[KIND.STEEL], [KIND.OIL]: KIND_CODE[KIND.OIL] },
 );
 assert(protocolContract.compactSnapshotVersion === COMPACT_SNAPSHOT_VERSION, "compact snapshot version must match Rust");
-assert(protocolContract.snapshotCodecs.defaultCodec === SNAPSHOT_CODEC.COMPACT_JSON, "default snapshot codec must match Rust");
+assert(
+  protocolContract.snapshotCodecs.defaultCodec === SNAPSHOT_CODEC.MESSAGEPACK_COMPACT,
+  "default snapshot codec must match Rust",
+);
 assert(protocolContract.snapshotCodecs.codecVersion === SNAPSHOT_CODEC_VERSION, "snapshot codec version must match Rust");
 assert(
-  protocolContract.snapshotCodecs.supported.join(",") === SNAPSHOT_CODEC.COMPACT_JSON,
+  protocolContract.snapshotCodecs.defaultFrameKind === SNAPSHOT_FRAME_KIND.BINARY,
+  "default snapshot frame kind must match Rust",
+);
+assert(
+  protocolContract.snapshotCodecs.supported.join(",") === SNAPSHOT_CODEC.MESSAGEPACK_COMPACT,
   "supported snapshot codecs must match Rust",
 );
 assert(
-  protocolDoc.includes(`compact JSON text, version ${COMPACT_SNAPSHOT_VERSION}`) &&
+  protocolDoc.includes(`MessagePack compact binary snapshot frames`) &&
+    protocolDoc.includes(`compact snapshot version ${COMPACT_SNAPSHOT_VERSION}`) &&
     protocolDoc.includes(`"v": ${COMPACT_SNAPSHOT_VERSION}`),
   "protocol docs must list the current compact snapshot version",
 );

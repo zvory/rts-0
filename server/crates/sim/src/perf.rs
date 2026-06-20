@@ -347,25 +347,33 @@ impl TickPerf {
     }
 }
 
-pub fn log_writer_message(
-    player_id: u32,
-    message_kind: &'static str,
-    serialize: Duration,
-    send: Duration,
-    bytes: usize,
-) {
+pub struct WriterMessageTiming {
+    pub player_id: u32,
+    pub message_kind: &'static str,
+    pub snapshot_codec: &'static str,
+    pub snapshot_codec_version: u16,
+    pub frame_kind: &'static str,
+    pub serialize: Duration,
+    pub send: Duration,
+    pub bytes: usize,
+}
+
+pub fn log_writer_message(record: WriterMessageTiming) {
     let config = PerfConfig::global();
-    if !config.should_log_writer(serialize, send) {
+    if !config.should_log_writer(record.serialize, record.send) {
         return;
     }
     debug!(
         target: PERF_TARGET,
         event = "writer_send",
-        player_id,
-        message_kind,
-        serialize_ms = millis(serialize),
-        send_ms = millis(send),
-        bytes,
+        player_id = record.player_id,
+        message_kind = record.message_kind,
+        snapshot_codec = record.snapshot_codec,
+        snapshot_codec_version = record.snapshot_codec_version,
+        frame_kind = record.frame_kind,
+        serialize_ms = millis(record.serialize),
+        send_ms = millis(record.send),
+        bytes = record.bytes,
         "performance writer timing"
     );
 }

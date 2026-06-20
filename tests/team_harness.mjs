@@ -1,4 +1,4 @@
-import { decodeServerMessage } from "../client/src/protocol.js";
+import { decodeServerMessage, parseServerFrame } from "../client/src/protocol.js";
 
 export const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 
@@ -29,6 +29,7 @@ export class Client {
   constructor(tag, { url = URL } = {}) {
     this.tag = tag;
     this.ws = new WebSocket(url);
+    this.ws.binaryType = "arraybuffer";
     this.playerId = null;
     this.lastSnapshot = null;
     this.msgs = [];
@@ -36,7 +37,7 @@ export class Client {
     this.waiters = [];
     this.nextClientSeq = 1;
     this.ws.onmessage = (event) => {
-      const raw = JSON.parse(event.data);
+      const raw = parseServerFrame(event.data);
       if (raw.t === "snapshot") this.rawSnapshots.push(raw);
       const msg = decodeServerMessage(raw);
       this.msgs.push(msg);
