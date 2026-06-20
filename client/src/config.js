@@ -148,7 +148,7 @@ export const STATS = Object.freeze({
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 6, body: TANK_BODY,
-    rangeTiles: 5, cost: { steel: 300, oil: 150 }, supply: 12, buildTicks: 750,
+    rangeTiles: 5, cost: { steel: 450, oil: 150 }, supply: 6, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 10, body: COMMAND_CAR_BODY,
