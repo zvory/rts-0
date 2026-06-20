@@ -164,7 +164,7 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::MortarTeam,
         stats: balance::UnitStats {
-            hp: 50,
+            hp: 75,
             dmg: balance::MORTAR_OUTER_DAMAGE,
             range_tiles: balance::MORTAR_RANGE_TILES,
             cooldown: 60,
@@ -227,7 +227,7 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::ScoutCar,
         stats: balance::UnitStats {
-            hp: 150,
+            hp: 100,
             dmg: 6,
             range_tiles: 5,
             cooldown: 6,
