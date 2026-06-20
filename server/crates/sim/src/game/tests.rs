@@ -2641,6 +2641,97 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
 }
 
 #[test]
+fn manual_mortar_fire_inner_splash_pierces_armor_and_outer_splash_hits_for_outer_damage() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(12, 8);
+    let outer_pos = game.map.tile_center(13, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    if let Some(mortar_entity) = game.entities.get_mut(mortar) {
+        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+    }
+    let armored_inner = game
+        .entities
+        .spawn_building(2, EntityKind::TankTrap, target_pos.0, target_pos.1, true)
+        .expect("armored target should spawn");
+    let outer_target = game
+        .entities
+        .spawn_unit(1, EntityKind::MachineGunner, outer_pos.0, outer_pos.1)
+        .expect("outer target should spawn");
+    let armored_hp_before = game
+        .entities
+        .get(armored_inner)
+        .expect("armored target exists")
+        .hp;
+    let outer_hp_before = game
+        .entities
+        .get(outer_target)
+        .expect("outer target exists")
+        .hp;
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: false,
+        },
+    );
+    game.tick();
+    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+        game.tick();
+    }
+
+    let armored_hp_after = game
+        .entities
+        .get(armored_inner)
+        .expect("armored target should survive")
+        .hp;
+    let outer_hp_after = game
+        .entities
+        .get(outer_target)
+        .expect("outer target should survive")
+        .hp;
+    assert_eq!(
+        armored_hp_before - armored_hp_after,
+        config::MORTAR_INNER_DAMAGE,
+        "inner mortar splash should deal full damage to armored targets"
+    );
+    assert_eq!(
+        outer_hp_before - outer_hp_after,
+        config::MORTAR_OUTER_DAMAGE,
+        "outer mortar splash should use the outer damage value"
+    );
+}
+
+#[test]
 fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
     let players = [
         PlayerInit {
