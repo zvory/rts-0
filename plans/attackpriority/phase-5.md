@@ -14,6 +14,10 @@ obstructing their movement, while irrelevant nearby traps should not outrank rea
 
 - Add a small sim-owned obstruction context that combat acquisition can ask for without owning
   pathfinding internals.
+- Prefer existing bounded facts first: `Occupancy`, `StaticPathingRelation`, the attacker's current
+  or next path segment, `path_goal`, `move_intent`, movement body class, and any already-recorded
+  path/chase failure signal. Add new state only if the current facts cannot distinguish obstructing
+  from irrelevant Tank Traps.
 - Prefer a narrow helper near movement/pathing/occupancy that can answer questions such as:
   - is this enemy Tank Trap on or adjacent to the attacker's current path segment;
   - is this trap between the attacker and current movement/path goal within a short forward window;
@@ -21,6 +25,12 @@ obstructing their movement, while irrelevant nearby traps should not outrank rea
   - is this trap the reason a recent vehicle-body path/chase request failed or stopped.
 - Keep the helper deterministic and bounded. Do not run expensive full A-star for every candidate
   during combat acquisition.
+- Do not mutate pathing or movement state during ranking. Combat may ask for obstruction facts and
+  rank candidates with those facts; actual path requests, chase paths, repath throttling, and
+  movement recovery remain owned by the movement/pathing coordinator.
+- If this phase requires a new service-to-service import edge or an architecture baseline update,
+  prefer reducing the coupling first. If the edge is truly necessary, document why the helper is a
+  read-only query boundary and include the archcheck evidence in the handoff.
 - Feed obstruction facts into the Phase 2/3 ranking boundary as a high context tier for vehicle-body
   attackers only.
 - Preserve infantry behavior:
@@ -56,6 +66,7 @@ obstructing their movement, while irrelevant nearby traps should not outrank rea
 ## Implementation Checklist
 
 - [ ] Add a bounded obstruction-context helper.
+- [ ] Prove the helper is bounded and does not run per-candidate A* or mutate movement state.
 - [ ] Feed obstruction context into target ranking for vehicle-body attackers.
 - [ ] Keep infantry Tank Trap auto-acquisition filtering intact.
 - [ ] Preserve explicit Tank Trap attack commands.
@@ -88,6 +99,7 @@ trap attacks still work.
 
 ## Handoff Expectations
 
-Report the exact obstruction definition, where the helper lives, and how expensive it is per combat
-tick. Include manual scenario notes for vehicle breaching, irrelevant nearby traps, infantry
-pass-through, and explicit trap attacks.
+Report the exact obstruction definition, where the helper lives, what inputs it reads, and how
+expensive it is per combat tick. Explicitly state whether any service import edge or archcheck
+baseline changed, and why. Include manual scenario notes for vehicle breaching, irrelevant nearby
+traps, infantry pass-through, and explicit trap attacks.

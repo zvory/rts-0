@@ -35,6 +35,9 @@ Tank/anti-armor priority requirements without adding alternate attacks or abilit
   - other AP or anti-armor threats should outrank harmless soft targets;
   - Tanks, Tank Traps, and Mortar Teams should be ranked by named threat/fit terms, not a fixed
     Tank-only kind list where possible.
+- Make all behavior changes through the Phase 2 rank terms. If Phase 3 needs a new branch in
+  `resolve_target`, stop and either add a named rank term/eligibility fact instead or report the
+  missing architecture hook as blocked.
 - Add tests with mixed candidate sets:
   - Rifleman chooses Rifleman/MachineGunner over Tank or Tank Trap when all are legal;
   - Rifleman falls back to Tank or Tank Trap when no soft target is legal;
@@ -63,6 +66,7 @@ Tank/anti-armor priority requirements without adding alternate attacks or abilit
 - [ ] Implement anti-armor and anti-armor-threat preference.
 - [ ] Preserve Anti-Tank Gun as top Tank threat.
 - [ ] Remove or isolate obsolete narrow priority branches after tests cover the new policy.
+- [ ] Verify changed target choices come from rank terms, not new acquisition branches.
 - [ ] Add mixed-target acquisition tests.
 - [ ] Update design docs and patch-note bullets.
 - [ ] Run focused verification and record exact commands.
@@ -95,4 +99,5 @@ targets when no preferred target is available.
 
 Report exact player-facing target-selection changes and any changed docs. The next agent should use
 the new rank terms for retention/hysteresis in Phase 4 instead of adding separate target switching
-logic.
+logic. If any new procedural target-selection branch was unavoidable, report it as a blocker for
+Phase 4 rather than treating the phase as cleanly complete.

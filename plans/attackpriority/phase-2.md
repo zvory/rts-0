@@ -30,6 +30,11 @@ phase should make target selection easier to extend without yet changing what ta
 - Replace repeated nearest-kind scans in acquisition with one legal-candidate collection path plus
   ranking where practical. If a full one-pass replacement is too risky, create the ranking boundary
   first and migrate only the clearly covered branches, but document what remains procedural.
+- Treat the architecture boundary as this phase's primary deliverable. By handoff, normal
+  auto-acquisition should have one obvious ranking path after explicit ordered-attack handling. Do not
+  leave old Tank priority, Anti-Tank Gun preference, unit-over-building preference, retained-target
+  priority, or Tank Trap priority branches as peer decision paths unless the handoff names the narrow
+  reason, the exact remaining branch, and the phase that must remove it.
 - Keep legal filtering in acquisition/world-query helpers. Do not let ranking decide visibility,
   smoke, LOS, friendly-blocker, enemy targetability, or acquisition radius.
 - Add tests that compare Phase 2 ranking outcomes with the Phase 1 baseline scenarios.
@@ -54,6 +59,8 @@ phase should make target selection easier to extend without yet changing what ta
 - [ ] Migrate current Anti-Tank Gun preference into a named rank term or isolated policy function.
 - [ ] Migrate unit-over-building and nearest fallback behavior into ranking.
 - [ ] Preserve moving-fire retained-target semantics.
+- [ ] Confirm `resolve_target` now delegates priority choice to the ranker after explicit ordered
+      target handling, or document a narrow temporary exception.
 - [ ] Add regression tests proving Phase 1 scenarios still pass.
 - [ ] Update design docs if the combat acquisition boundary changes.
 - [ ] Run focused verification and record exact commands.
@@ -82,6 +89,7 @@ manual result is boring: units should appear to choose the same targets as befor
 ## Handoff Expectations
 
 Report the new module/function names, which acquisition branches were migrated, and any procedural
-targeting logic that remains. The next agent should treat this phase as an architecture seam and
-make Phase 3's gameplay changes through the ranking terms, not by adding new branches to
-`resolve_target`.
+targeting logic that remains. Include a go/no-go statement for Phase 3: proceed only if the ranker is
+the single normal priority path, or if any remaining procedural branch is narrow, named, covered by
+tests, and explicitly scheduled for removal. The next agent should make Phase 3's gameplay changes
+through the ranking terms, not by adding new branches to `resolve_target`.

@@ -18,6 +18,9 @@ accidentally becoming an ability planner when grenades and satchels are added la
     Tank;
   - preserve existing ordered-attack behavior separately from auto-acquisition retention;
   - preserve moving-fire semantics for Tanks, Scout Cars, and charged Riflemen.
+- Keep retention in the ranking boundary. Do not reintroduce a separate retained-target branch in
+  `resolve_target` that can bypass the rank terms; retained-target status should be a candidate fact
+  or a clearly named rank/stickiness term.
 - Add tests for target stability:
   - equal-rank nearby targets do not cause oscillation every tick;
   - id/distance tie-breaks remain deterministic on first acquisition;
@@ -46,6 +49,7 @@ accidentally becoming an ability planner when grenades and satchels are added la
 
 - [ ] Add a documented retargeting/stickiness rule.
 - [ ] Preserve explicit ordered attack semantics outside rank-based retention.
+- [ ] Verify retained-target behavior is expressed through rank/stickiness terms, not a bypass path.
 - [ ] Add equal-rank stability tests.
 - [ ] Add high-rank threat override tests.
 - [ ] Add invalid-retained-target clearing tests.
@@ -77,4 +81,5 @@ between equal targets every tick, but do switch when a meaningful threat appears
 
 Report the exact target-retention rule in plain language and point to the tests that protect it. The
 next agent should use this stable rank/retention model when adding Tank Trap obstruction context in
-Phase 5.
+Phase 5. If target retention still depends on a separate procedural branch, report that as an
+architecture cleanup requirement before obstruction context is added.
