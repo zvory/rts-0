@@ -291,7 +291,7 @@ mod tests {
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
         assert_eq!(cost(EntityKind::ScoutCar), (125, 50));
-        assert_eq!(cost(EntityKind::Tank), (300, 150));
+        assert_eq!(cost(EntityKind::Tank), (450, 150));
         assert_eq!(cost(EntityKind::MortarTeam), (100, 50));
         assert_eq!(cost(EntityKind::Factory), (125, 125));
         assert_eq!(cost(EntityKind::CityCentre), (200, 0));
@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(supply_cost(EntityKind::ScoutCar), 3);
         assert_eq!(supply_cost(EntityKind::MortarTeam), 3);
         assert_eq!(cost(EntityKind::Steelworks), (150, 100));
-        assert_eq!(supply_cost(EntityKind::Tank), 12);
+        assert_eq!(supply_cost(EntityKind::Tank), 6);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
         assert_eq!(
             supply_provided(EntityKind::Depot),
