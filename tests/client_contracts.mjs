@@ -17,6 +17,7 @@ import {
 import {
   RENDER_FRAME_BUDGET_MS,
   RENDER_FRAME_BUDGET_TARGETS,
+  buildRenderDiagnosticsReport,
   buildRenderBudgetReport,
   formatRenderBudgetConsole,
 } from "../scripts/client-perf-harness.mjs";
@@ -1362,10 +1363,13 @@ function hotkeyService() {
   profiler.beginFrame({ at: 0, frameGapMs: 16 });
   profiler.recordPhase("match.camera", 3);
   profiler.recordPhase("renderer.units", 9);
+  profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 2);
+  profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 1);
   profiler.endFrame({ at: 25, context: { entityCount: 7, selectedCount: 2, hidden: false, focused: true } });
 
   clock = 40;
   profiler.beginFrame({ at: 40, frameGapMs: 40 });
+  profiler.recordDiagnosticCounter("hud.dirty.resources.hit", 1);
   profiler.time("match.hud", () => { clock = 47; });
   profiler.endFrame({ at: 48, context: { visibleTileCount: 12 } });
 
@@ -1388,7 +1392,19 @@ function hotkeyService() {
   assert(unitsPhase?.p50Ms === 1, "FrameProfiler reports bucketed p50 timing");
   assert(unitsPhase?.p95Ms === 12, "FrameProfiler reports bucketed p95 timing");
   assert(summary.worstPhase?.label === "renderer.units", "FrameProfiler reports the most common worst phase");
+  assert(summary.recentLongFrames.length === 2, "FrameProfiler keeps bounded long-frame context");
+  assert(
+    summary.recentLongFrames[0].rendererNestedPhase?.label === "renderer.units",
+    "FrameProfiler long-frame context names the slowest nested renderer phase",
+  );
+  const createdCounter = summary.renderDiagnostics.counters.find(
+    (counter) => counter.label === "renderer.pixi.displayObject.created.units",
+  );
+  assert(createdCounter?.total === 3, "FrameProfiler aggregates diagnostic counter totals");
+  assert(createdCounter?.frames === 1, "FrameProfiler counts frames where a diagnostic counter appeared");
+  assert(createdCounter?.maxFrame === 3, "FrameProfiler records diagnostic max per frame");
   assert(profiler.text().includes("renderer.units"), "FrameProfiler text summary is copyable");
+  assert(profiler.text().includes("renderer.pixi.displayObject.created.units"), "FrameProfiler text includes diagnostics");
   const report = profiler.reportSummary();
   assert(report.frameCount === 3, "FrameProfiler report summary counts the report window");
   assert(report.slowFrameCount === 2, "FrameProfiler report summary counts slow frames");
@@ -1397,15 +1413,21 @@ function hotkeyService() {
   assert(report.worstFramePhase === "renderer.units", "FrameProfiler report summary names worst phase");
   assert(report.worstFramePhaseMs === 9, "FrameProfiler report summary records worst phase max");
   assert(report.rendererMaxMs === 0, "FrameProfiler report summary tolerates missing renderer phase");
+  assert(
+    report.renderDiagnostics.counters.some((counter) => counter.label === "hud.dirty.resources.hit"),
+    "FrameProfiler report summary includes bounded diagnostics",
+  );
   const surface = profiler.debugSurface();
   assert(typeof surface.summary === "function", "FrameProfiler debug surface exposes summary()");
   assert(typeof surface.copy === "function", "FrameProfiler debug surface exposes copy()");
   assert(typeof surface.reportSummary === "function", "FrameProfiler debug surface exposes reportSummary()");
   profiler.resetReportWindow();
   assert(profiler.reportSummary().frameCount === 0, "FrameProfiler can reset only report-window aggregates");
+  assert(profiler.reportSummary().renderDiagnostics.counters.length === 0, "FrameProfiler report reset clears diagnostics");
   assert(profiler.summary().frameCount === 3, "FrameProfiler report-window reset preserves debug aggregates");
   surface.reset();
   assert(profiler.summary().frameCount === 0, "FrameProfiler debug surface reset clears aggregates");
+  assert(profiler.summary().renderDiagnostics.counters.length === 0, "FrameProfiler reset clears diagnostics");
 }
 
 {
@@ -1468,9 +1490,39 @@ function hotkeyService() {
 }
 
 {
+  const missing = buildRenderDiagnosticsReport(null, null);
+  assert(missing.status === "missing", "render diagnostics report tolerates absent counters");
+
+  const report = buildRenderDiagnosticsReport({
+    schemaVersion: 1,
+    context: { workloadId: "vehicle-wall-stress" },
+    renderDiagnostics: {
+      schemaVersion: 1,
+      counters: [
+        { label: "renderer.rig.redraw.completed", total: 20, frames: 5, maxFrame: 6 },
+        { label: "minimap.invalidate.fog.fog-revision", total: 4, frames: 4, maxFrame: 1 },
+        { label: "hud.dirty.resources.hit", total: 12, frames: 12, maxFrame: 1 },
+      ],
+    },
+    recentLongFrames: [
+      {
+        at: 12,
+        frameWorkMs: 34,
+        topPhase: { label: "match.renderer", ms: 18 },
+        rendererNestedPhase: { label: "renderer.units", ms: 14 },
+      },
+    ],
+  });
+  assert(report.status === "ok", "render diagnostics report summarizes present counters");
+  assert(report.groups.rigRedraws.total === 20, "render diagnostics groups rig redraw counters");
+  assert(report.groups.minimapInvalidations.total === 4, "render diagnostics groups minimap invalidations");
+  assert(report.recentLongFrames[0].rendererNestedPhase.label === "renderer.units", "render diagnostics preserves long-frame context");
+}
+
+{
   const priorWindow = globalThis.window;
   const priorDocument = globalThis.document;
-  globalThis.window = { devicePixelRatio: 2 };
+  globalThis.window = { devicePixelRatio: 2, __rtsPerfWorkloadId: "selected-unit-hud-stress" };
   globalThis.document = { hidden: true, hasFocus: () => false };
   try {
     const context = collectMatchFrameContext({
@@ -1485,6 +1537,8 @@ function hotkeyService() {
       renderer: { app: { view: { width: 1600, height: 1200 }, renderer: {} } },
       prediction: { debugSummary: () => ({ mode: "predicting" }) },
     });
+    assert(context.matchMode === "live", "match frame context includes bounded mode");
+    assert(context.workloadId === "selected-unit-hud-stress", "match frame context includes local workload id");
     assert(context.matchTick === 123, "match frame context includes latest match tick");
     assert(context.entityCount === 3, "match frame context includes current entity count");
     assert(context.selectedCount === 2, "match frame context includes selected count");

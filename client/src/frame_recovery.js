@@ -54,6 +54,14 @@ function runMatchFrame(match, now) {
       frameEntityViewCalls: frameViews.debug.entitiesInterpolatedCalls,
       frameSelectedEntityCalls: frameViews.debug.selectedEntitiesCalls,
     });
+    match.frameProfiler?.recordDiagnosticCounter?.(
+      "entityViews.state.entitiesInterpolatedCalls",
+      frameViews.debug.entitiesInterpolatedCalls,
+    );
+    match.frameProfiler?.recordDiagnosticCounter?.(
+      "entityViews.state.selectedEntitiesCalls",
+      frameViews.debug.selectedEntitiesCalls,
+    );
     time("match.fog", () => {
       match.fog.update(frameViews.fogSourceEntities, match.state.map.tileSize, match.state.visibleTiles);
     });
@@ -65,9 +73,9 @@ function runMatchFrame(match, now) {
         profiler: match.frameProfiler,
       });
     });
-    time("match.hud", () => match.hud.update(frameViews));
-    time("match.minimap", () => match.minimap.render(frameViews));
-    time("match.observerAnalysis", () => match.observerAnalysisOverlay?.update(frameViews));
+    time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
+    time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
+    time("match.observerAnalysis", () => match.observerAnalysisOverlay?.update(frameViews, { profiler: match.frameProfiler }));
     time("match.healthPublish", () => match.health.publish());
   } finally {
     match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });

@@ -88,7 +88,8 @@ export class HudSelectionPanel {
   }
 
   /** Render the selection summary: single-entity detail or multi-entity command budget grid. */
-  render(frameViews = null) {
+  render(frameViews = null, { profiler = null } = {}) {
+    this._profiler = profiler || null;
     const panel = this.panel;
     if (!panel) return;
 
@@ -98,7 +99,11 @@ export class HudSelectionPanel {
       ? this.state.selectedEntities()
       : [];
     if (!sel || sel.length === 0) {
-      if (this._renderSig === "empty") return;
+      if (this._renderSig === "empty") {
+        this._recordSelectionDiagnostic("hud.dirty.selectionPanel.hit");
+        return;
+      }
+      this._recordSelectionDiagnostic("hud.dirty.selectionPanel.miss");
       this._renderSig = "empty";
       panel.innerHTML = "";
       return;
@@ -106,7 +111,11 @@ export class HudSelectionPanel {
 
     if (sel.length === 1) {
       const sig = selectionPanelSignature(sel, null);
-      if (sig === this._renderSig) return;
+      if (sig === this._renderSig) {
+        this._recordSelectionDiagnostic("hud.dirty.selectionPanel.hit");
+        return;
+      }
+      this._recordSelectionDiagnostic("hud.dirty.selectionPanel.miss");
       this._renderSig = sig;
       panel.innerHTML = "";
       panel.appendChild(this._selectionEntityNode(this._singleSelectionNode(sel[0]), sel[0]));
@@ -115,7 +124,11 @@ export class HudSelectionPanel {
 
     const overflow = this._visibleSelectionOverflow();
     const sig = selectionPanelSignature(sel, overflow);
-    if (sig === this._renderSig) return;
+    if (sig === this._renderSig) {
+      this._recordSelectionDiagnostic("hud.dirty.selectionPanel.hit");
+      return;
+    }
+    this._recordSelectionDiagnostic("hud.dirty.selectionPanel.miss");
     this._renderSig = sig;
 
     const model = selectionBudgetGridModel(sel, overflow);
@@ -162,6 +175,10 @@ export class HudSelectionPanel {
 
     panel.innerHTML = "";
     panel.appendChild(frag);
+  }
+
+  _recordSelectionDiagnostic(label, amount = 1) {
+    this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
   _handleClick(ev) {

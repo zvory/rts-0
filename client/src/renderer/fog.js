@@ -49,6 +49,7 @@ import {
 
 export function _drawFog(fog) {
   const g = this._fogGfx;
+  this._recordRenderDiagnostic?.("renderer.graphics.clear.fog");
   g.clear();
   if (!fog || !this._map) return;
   const ts = this._map.tileSize;

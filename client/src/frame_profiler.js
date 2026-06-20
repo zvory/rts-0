@@ -2,7 +2,10 @@ const DEFAULT_BUCKETS_MS = Object.freeze([1, 2, 4, 8, 12, 16, 24, 33, 50, 75, 10
 const DEFAULT_SLOW_FRAME_MS = 33;
 const DEFAULT_SLOW_PHASE_MS = 8;
 const MAX_RECENT_FRAMES = 12;
+const MAX_RECENT_LONG_FRAMES = 8;
 const MAX_LABEL_LENGTH = 64;
+const MAX_DIAGNOSTIC_COUNTERS = 160;
+const MAX_FRAME_DIAGNOSTIC_COUNTERS = 8;
 
 export class FrameProfiler {
   constructor({
@@ -24,8 +27,11 @@ export class FrameProfiler {
     this.worstPhaseCounts = new Map();
     this.reportWorstPhaseCounts = new Map();
     this.recentFrames = [];
+    this.recentLongFrames = [];
     this.latestContext = {};
     this.activeFrame = null;
+    this.diagnosticCounters = new Map();
+    this.reportDiagnosticCounters = new Map();
   }
 
   beginFrame({ at = this.now(), frameGapMs = null } = {}) {
@@ -36,6 +42,7 @@ export class FrameProfiler {
       phaseMs: new Map(),
       worstPhase: null,
       worstPhaseMs: 0,
+      diagnosticCounters: new Map(),
     };
     if (Number.isFinite(frameGapMs)) {
       this.recordPhase("frame.gap", frameGapMs, { slowMs: this.slowFrameMs, includeInWorst: false });
@@ -66,6 +73,20 @@ export class FrameProfiler {
     }
   }
 
+  recordDiagnosticCounter(label, amount = 1) {
+    const safeLabel = normalizeLabel(label);
+    const value = clampCounter(amount);
+    if (value == null) return;
+    const actualLabel = this.counterFor(safeLabel).add(value);
+    this.counterFor(actualLabel, this.reportDiagnosticCounters).add(value);
+    if (this.activeFrame) {
+      this.activeFrame.diagnosticCounters.set(
+        actualLabel,
+        (this.activeFrame.diagnosticCounters.get(actualLabel) || 0) + value,
+      );
+    }
+  }
+
   endFrame({ at = this.now(), context = null } = {}) {
     const frame = this.activeFrame;
     if (!frame) return null;
@@ -88,6 +109,11 @@ export class FrameProfiler {
         (this.reportWorstPhaseCounts.get(frame.worstPhase) || 0) + 1,
       );
     }
+    for (const [label, value] of frame.diagnosticCounters) {
+      this.counterFor(label).addFrame(value);
+      this.counterFor(label, this.reportDiagnosticCounters).addFrame(value);
+    }
+    const longFrameContext = longFrameContextFrom(frame);
     const summary = {
       at: round1(at),
       frameGapMs: round1(frame.frameGapMs),
@@ -95,11 +121,21 @@ export class FrameProfiler {
       slow,
       worstPhase: frame.worstPhase,
       worstPhaseMs: round1(frame.worstPhaseMs),
+      topPhase: longFrameContext.topPhase,
+      rendererNestedPhase: longFrameContext.rendererNestedPhase,
+      minimapNestedPhase: longFrameContext.minimapNestedPhase,
+      diagnosticCounters: longFrameContext.diagnosticCounters,
       context: this.latestContext,
     };
     this.recentFrames.push(summary);
     if (this.recentFrames.length > this.maxRecentFrames) {
       this.recentFrames.splice(0, this.recentFrames.length - this.maxRecentFrames);
+    }
+    if (slow) {
+      this.recentLongFrames.push(summary);
+      if (this.recentLongFrames.length > MAX_RECENT_LONG_FRAMES) {
+        this.recentLongFrames.splice(0, this.recentLongFrames.length - MAX_RECENT_LONG_FRAMES);
+      }
     }
     return summary;
   }
@@ -119,7 +155,9 @@ export class FrameProfiler {
       worstPhase: worstPhaseFrom(this.worstPhaseCounts),
       context: this.latestContext,
       phases: phaseRowsFrom(this.phases),
+      renderDiagnostics: diagnosticSummaryFrom(this.diagnosticCounters, this.frameCount),
       recentFrames: this.recentFrames.slice(),
+      recentLongFrames: this.recentLongFrames.slice(),
     };
   }
 
@@ -139,6 +177,7 @@ export class FrameProfiler {
       rendererMaxMs: aggregateMaxMs(renderer),
       rendererP95Ms: aggregatePercentileMs(renderer, 0.95),
       context: this.latestContext,
+      renderDiagnostics: diagnosticSummaryFrom(this.reportDiagnosticCounters, this.reportFrameCount),
     };
   }
 
@@ -161,6 +200,19 @@ export class FrameProfiler {
       ].join("\t"));
     }
     lines.push(`recent=${JSON.stringify(summary.recentFrames)}`);
+    const diagnostics = summary.renderDiagnostics?.counters || [];
+    if (diagnostics.length > 0) {
+      lines.push("diagnostic\tframes\ttotal\tmaxFrame\tavgPerFrame");
+      for (const counter of diagnostics) {
+        lines.push([
+          counter.label,
+          counter.frames,
+          counter.total,
+          counter.maxFrame,
+          counter.avgPerFrame,
+        ].join("\t"));
+      }
+    }
     return lines.join("\n");
   }
 
@@ -185,7 +237,10 @@ export class FrameProfiler {
     this.worstPhaseCounts.clear();
     this.reportWorstPhaseCounts.clear();
     this.recentFrames = [];
+    this.recentLongFrames = [];
     this.activeFrame = null;
+    this.diagnosticCounters.clear();
+    this.reportDiagnosticCounters.clear();
   }
 
   resetReportWindow() {
@@ -193,6 +248,7 @@ export class FrameProfiler {
     this.reportFrameCount = 0;
     this.reportSlowFrameCount = 0;
     this.reportWorstPhaseCounts.clear();
+    this.reportDiagnosticCounters.clear();
   }
 
   debugSurface() {
@@ -212,6 +268,18 @@ export class FrameProfiler {
       phases.set(label, aggregate);
     }
     return aggregate;
+  }
+
+  counterFor(label, counters = this.diagnosticCounters) {
+    const safeLabel = counters.has(label) || counters.size < MAX_DIAGNOSTIC_COUNTERS
+      ? label
+      : "diagnostics.overflow";
+    let counter = counters.get(safeLabel);
+    if (!counter) {
+      counter = new CounterAggregate(safeLabel);
+      counters.set(safeLabel, counter);
+    }
+    return counter;
   }
 }
 
@@ -249,13 +317,58 @@ class PhaseAggregate {
   }
 }
 
+class CounterAggregate {
+  constructor(label) {
+    this.label = label;
+    this.samples = 0;
+    this.total = 0;
+    this.maxSample = 0;
+    this.frames = 0;
+    this.maxFrame = 0;
+  }
+
+  add(amount) {
+    this.samples += 1;
+    this.total += amount;
+    this.maxSample = Math.max(this.maxSample, amount);
+    return this.label;
+  }
+
+  addFrame(amount) {
+    this.frames += 1;
+    this.maxFrame = Math.max(this.maxFrame, amount);
+  }
+
+  summary(frameCount) {
+    return {
+      label: this.label,
+      samples: this.samples,
+      frames: this.frames,
+      total: round1(this.total),
+      maxSample: round1(this.maxSample),
+      maxFrame: round1(this.maxFrame),
+      avgPerFrame: frameCount > 0 ? round1(this.total / frameCount) : 0,
+      avgActiveFrame: this.frames > 0 ? round1(this.total / this.frames) : 0,
+    };
+  }
+}
+
 export function collectMatchFrameContext(match) {
   const state = match?.state || {};
   const camera = match?.camera || {};
   const renderer = match?.renderer?.app?.renderer || {};
   const canvas = match?.renderer?.app?.view || {};
   const prediction = match?.prediction?.debugSummary?.() || {};
+  const mode = match?.devWatch?.kind === "scenario"
+    ? "dev-scenario"
+    : match?.replayViewer
+      ? "replay"
+      : state.spectator
+        ? "spectator"
+        : "live";
   return {
+    matchMode: mode,
+    workloadId: boundedString(globalThis.window?.__rtsPerfWorkloadId),
     matchTick: finiteOrNull(match?.lastSnapshotTick),
     entityCount: sizeOf(state._curById),
     selectedCount: sizeOf(state.selection),
@@ -310,10 +423,48 @@ function phaseRowsFrom(phases) {
     .sort((a, b) => b.totalMs - a.totalMs || b.maxMs - a.maxMs || a.label.localeCompare(b.label));
 }
 
+function diagnosticSummaryFrom(counters, frameCount) {
+  const rows = Array.from(counters.values())
+    .map((counter) => counter.summary(frameCount))
+    .sort((a, b) => b.total - a.total || b.maxFrame - a.maxFrame || a.label.localeCompare(b.label));
+  return {
+    schemaVersion: 1,
+    counters: rows,
+    topCounters: rows.slice(0, MAX_FRAME_DIAGNOSTIC_COUNTERS),
+  };
+}
+
 function worstPhaseFrom(counts) {
   return Array.from(counts.entries())
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))[0] || null;
+}
+
+function longFrameContextFrom(frame) {
+  return {
+    topPhase: slowestPhaseFrom(frame.phaseMs, (label) => label.startsWith("match.")),
+    rendererNestedPhase: slowestPhaseFrom(frame.phaseMs, (label) => label.startsWith("renderer.")),
+    minimapNestedPhase: slowestPhaseFrom(frame.phaseMs, (label) => label.startsWith("minimap.")),
+    diagnosticCounters: topFrameCounters(frame.diagnosticCounters),
+  };
+}
+
+function slowestPhaseFrom(phaseMs, predicate) {
+  let best = null;
+  for (const [label, ms] of phaseMs || []) {
+    if (!predicate(label)) continue;
+    if (!best || ms > best.ms || (ms === best.ms && label < best.label)) {
+      best = { label, ms };
+    }
+  }
+  return best ? { label: best.label, ms: round1(best.ms) } : null;
+}
+
+function topFrameCounters(counters) {
+  return Array.from(counters || [])
+    .map(([label, total]) => ({ label, total: round1(total) }))
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label))
+    .slice(0, MAX_FRAME_DIAGNOSTIC_COUNTERS);
 }
 
 function aggregateMaxMs(aggregate) {
@@ -344,6 +495,12 @@ function clampDuration(durationMs) {
   return Math.min(ms, 60_000);
 }
 
+function clampCounter(amount) {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.min(value, 1_000_000);
+}
+
 function finiteOrNull(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -364,10 +521,15 @@ function sanitizeContext(context) {
   const out = {};
   for (const [key, value] of Object.entries(context)) {
     if (value == null || typeof value === "boolean" || typeof value === "string") {
-      out[key] = value;
+      out[key] = typeof value === "string" ? boundedString(value) : value;
     } else if (typeof value === "number") {
       out[key] = Number.isFinite(value) ? Math.round(value * 10) / 10 : null;
     }
   }
   return out;
+}
+
+function boundedString(value) {
+  if (typeof value !== "string") return "";
+  return value.slice(0, MAX_LABEL_LENGTH);
 }

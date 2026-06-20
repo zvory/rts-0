@@ -58,8 +58,10 @@ export function _sweep() {
         this.layers[key].removeChild(g);
         g.destroy();
         pool.delete(id);
+        this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.destroyed.${key}`);
       } else {
         g.visible = false;
+        this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.hidden.${key}`);
       }
     }
   }
@@ -71,8 +73,10 @@ export function _sweep() {
         this.layers.buildings.removeChild(t);
         t.destroy();
         this._iconPool.delete(id);
+        this._recordRenderDiagnostic?.("renderer.pixi.displayObject.destroyed.iconText");
       } else {
         t.visible = false;
+        this._recordRenderDiagnostic?.("renderer.pixi.displayObject.hidden.iconText");
       }
     }
   }
@@ -84,8 +88,10 @@ export function _sweep() {
         this.layers.buildings.removeChild(t);
         t.destroy();
         this._queueLabelPool.delete(id);
+        this._recordRenderDiagnostic?.("renderer.pixi.displayObject.destroyed.queueText");
       } else {
         t.visible = false;
+        this._recordRenderDiagnostic?.("renderer.pixi.displayObject.hidden.queueText");
       }
     }
   }
@@ -99,8 +105,10 @@ export function _sweep() {
           this.layers[route.layerName]?.removeChild?.(instance.container);
           instance.destroy();
           pool.delete(id);
+          this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.destroyed.${route.poolName}`);
         } else {
           instance.container.visible = false;
+          this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.hidden.${route.poolName}`);
         }
       }
     }

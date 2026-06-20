@@ -155,7 +155,8 @@ export class HUD {
    * Refresh the entire HUD from the latest snapshot/selection. Cheap and idempotent;
    * safe to call every frame.
    */
-  update(frameViews = null) {
+  update(frameViews = null, { profiler = null } = {}) {
+    this._profiler = profiler || null;
     this._renderResources();
     this._renderControlGroupTabs(frameViews);
     this._renderSelectedPanel(frameViews);
@@ -210,7 +211,11 @@ export class HUD {
     const used = r.supplyUsed ?? 0;
     const cap = r.supplyCap ?? 0;
     const sig = `single:${steel}:${oil}:${used}:${cap}`;
-    if (sig === this._resSig) return;
+    if (sig === this._resSig) {
+      this._recordHudDiagnostic("hud.dirty.resources.hit");
+      return;
+    }
+    this._recordHudDiagnostic("hud.dirty.resources.miss");
     this._resSig = sig;
 
     if (this.elSteel) this.elSteel.textContent = String(steel);
@@ -241,7 +246,11 @@ export class HUD {
     const sig = "multi:" + playerResources.map(
       (p) => `${p.id}:${p.steel}:${p.oil}:${p.supplyUsed}:${p.supplyCap}`,
     ).join("|");
-    if (sig === this._resSig) return;
+    if (sig === this._resSig) {
+      this._recordHudDiagnostic("hud.dirty.resources.hit");
+      return;
+    }
+    this._recordHudDiagnostic("hud.dirty.resources.miss");
     this._resSig = sig;
 
     const players = this.state.players || [];
@@ -279,7 +288,11 @@ export class HUD {
     const sig = groups.map((g) =>
       g ? `${g.key}:${g.count}:${g.icon}:${g.selected ? 1 : 0}` : "-",
     ).join("|");
-    if (sig === this._controlGroupSig) return;
+    if (sig === this._controlGroupSig) {
+      this._recordHudDiagnostic("hud.dirty.controlGroups.hit");
+      return;
+    }
+    this._recordHudDiagnostic("hud.dirty.controlGroups.miss");
     this._controlGroupSig = sig;
 
     const any = groups.some(Boolean);
@@ -363,7 +376,7 @@ export class HUD {
   }
 
   _renderSelectedPanel(frameViews = null) {
-    this.selectionPanel?.render(frameViews);
+    this.selectionPanel?.render(frameViews, { profiler: this._profiler });
   }
 
   // --- Command card ----------------------------------------------------------
@@ -393,20 +406,35 @@ export class HUD {
       if (this._cardSig !== cardSig) {
         card.innerHTML = "";
         this._cardSig = cardSig;
+        this._recordHudDiagnostic("hud.dirty.commandCard.miss");
+      } else {
+        this._recordHudDiagnostic("hud.dirty.commandCard.hit");
       }
       return;
     }
     if (cardSig === this._cardSig) {
+      this._recordHudDiagnostic("hud.dirty.commandCard.hit");
       if (descriptorCard.abilityAffordances) {
         this._syncAbilityCooldownClocks(descriptorCard.abilityAffordances);
       }
       return;
     }
+    this._recordHudDiagnostic("hud.dirty.commandCard.miss");
     this._cardSig = cardSig;
     this._renderDescriptorCard(card, descriptorCard);
   }
 
   _commandDescriptorContext(frameViews = null) {
+    this._recordHudDiagnostic(
+      Array.isArray(frameViews?.selectedEntities)
+        ? "entityViews.cache.hit.hud.selected"
+        : "entityViews.uncached.hud.selected",
+    );
+    this._recordHudDiagnostic(
+      Array.isArray(frameViews?.currentEntities)
+        ? "entityViews.cache.hit.hud.current"
+        : "entityViews.uncached.hud.current",
+    );
     return {
       spectator: this.state.spectator,
       state: this.state,
@@ -832,8 +860,13 @@ export class HUD {
         `button[data-ability="${affordance.definition.ability}"]`,
       );
       if (!button) continue;
+      this._recordHudDiagnostic("hud.dirty.abilityCooldownClocks.sync");
       this._syncCooldownClockElement(button, affordance.cooldownClocks);
     }
+  }
+
+  _recordHudDiagnostic(label, amount = 1) {
+    this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
   _syncCooldownClockElement(button, cooldownClocks) {

@@ -74,6 +74,7 @@ const LINE_PROJECTILE_TRAIL_MIN_STEP_PX = 1.5;
 
 export function _drawPlacement(view, fog) {
   const g = this._placementGfx;
+  this._recordRenderDiagnostic?.("renderer.graphics.clear.placement");
   g.clear();
   const p = view.placement;
   if (!p) return;
@@ -135,6 +136,7 @@ export function _drawPlacement(view, fog) {
 
 export function _drawCommandFeedback(view) {
   const g = this._feedbackGfx;
+  this._recordRenderDiagnostic?.("renderer.graphics.clear.feedback");
   g.clear();
   if (!view || typeof view.liveCommandFeedback !== "function") return;
 
@@ -1315,6 +1317,7 @@ export function _drawMuzzleFlashes(state) {
 
 export function drawSelectionBox(rect) {
   const g = this._dragGfx;
+  this._recordRenderDiagnostic?.("renderer.graphics.clear.dragSelection");
   g.clear();
   if (!rect) return;
   const { x, y, w, h } = normRect(rect);

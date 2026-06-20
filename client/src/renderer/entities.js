@@ -69,10 +69,14 @@ export function _slot(poolName, id) {
     g = new PIXI.Graphics();
     pool.set(id, g);
     this.layers[poolName].addChild(g);
+    this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
+  } else {
+    this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.reused.${poolName}`);
   }
   this._seen[poolName].add(id);
   g.visible = true;
   g.alpha = 1;
+  this._recordRenderDiagnostic?.(`renderer.graphics.clear.${poolName}`);
   g.clear();
   return g;
 }
@@ -214,6 +218,9 @@ export function _icon(e, cx, cy, size, alpha) {
     t.anchor.set(0.5);
     this._iconPool.set(e.id, t);
     this.layers.buildings.addChild(t);
+    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.iconText");
+  } else {
+    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.reused.iconText");
   }
   if (t.text !== glyph) t.text = glyph;
   t.visible = true;
@@ -242,6 +249,9 @@ export function _queueLabel(e, cx, cy, count, bodyAlpha) {
     t.anchor.set(0.5, 0);
     this._queueLabelPool.set(e.id, t);
     this.layers.buildings.addChild(t);
+    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.queueText");
+  } else {
+    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.reused.queueText");
   }
   if (count > 0) {
     const label = `+${count}`;

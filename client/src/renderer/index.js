@@ -200,6 +200,7 @@ export class Renderer {
    * @param {number} alpha interpolation factor 0..1 between the two latest snapshots
    */
   render(state, camera, fog, alpha, { clientIntent = null, frameViews = null, profiler = null } = {}) {
+    this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
@@ -215,6 +216,11 @@ export class Renderer {
     let colorByOwner = new Map();
     const liveIds = new Set();
     time("renderer.entityPrep", () => {
+      this._recordRenderDiagnostic(
+        Array.isArray(frameViews?.interpolatedEntities)
+          ? "entityViews.cache.hit.renderer.interpolated"
+          : "entityViews.uncached.renderer.interpolated",
+      );
       entities = Array.isArray(frameViews?.interpolatedEntities)
         ? frameViews.interpolatedEntities
         : state.entitiesInterpolated(alpha) || [];
@@ -229,6 +235,9 @@ export class Renderer {
         rememberedBuildingCount: Array.isArray(state?.rememberedBuildings) ? state.rememberedBuildings.length : 0,
         selectedCount: typeof state?.selection?.size === "number" ? state.selection.size : 0,
       });
+      this._recordRenderDiagnostic("renderer.entities.total", entities.length);
+      this._recordRenderDiagnostic("renderer.entities.regular", regularEntities.length);
+      this._recordRenderDiagnostic("renderer.entities.shotReveal", shotReveals.length);
     });
     const feedbackView = time(
       "renderer.feedbackView",
@@ -300,8 +309,10 @@ export class Renderer {
 
     // Overlays.
     time("renderer.effectsOverlays", () => {
+      this._recordRenderDiagnostic("renderer.graphics.clear.abilityObjects");
       this._abilityObjectGfx.clear();
       this._drawSafely("abilityObjects", () => this._drawAbilityObjects(feedbackView));
+      this._recordRenderDiagnostic("renderer.graphics.clear.smokes");
       this._smokeGfx.clear();
       this._drawSafely("smokes", () => this._drawSmokes(feedbackView));
     });
@@ -330,20 +341,28 @@ export class Renderer {
   }
 
   _drawSafely(label, draw) {
+    const safeLabel = diagnosticSegment(label);
+    this._recordRenderDiagnostic(`renderer.redraw.attempt.${safeLabel}`);
     try {
       draw();
+      this._recordRenderDiagnostic(`renderer.redraw.completed.${safeLabel}`);
       return true;
     } catch (err) {
+      this._recordRenderDiagnostic(`renderer.redraw.failed.${safeLabel}`);
       this._recordRenderError(label, err);
       return false;
     }
   }
 
   _drawEntitySafely(label, entity, fallbackPool, draw) {
+    const safeLabel = diagnosticSegment(label);
+    this._recordRenderDiagnostic(`renderer.redraw.attempt.${safeLabel}`);
     try {
       draw();
+      this._recordRenderDiagnostic(`renderer.redraw.completed.${safeLabel}`);
       return true;
     } catch (err) {
+      this._recordRenderDiagnostic(`renderer.redraw.failed.${safeLabel}`);
       this._recordRenderError(`${label}:${entity?.kind || "unknown"}`, err);
       try {
         this._drawMissingTexture(entity, fallbackPool);
@@ -352,6 +371,10 @@ export class Renderer {
       }
       return false;
     }
+  }
+
+  _recordRenderDiagnostic(label, amount = 1) {
+    this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
   _drawMissingTexture(entity, poolName) {
@@ -644,3 +667,7 @@ Object.assign(Renderer.prototype, {
   drawSelectionBox,
   _sweep,
 });
+
+function diagnosticSegment(label) {
+  return String(label || "unknown").replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 48) || "unknown";
+}
