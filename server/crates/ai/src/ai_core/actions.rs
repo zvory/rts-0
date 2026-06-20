@@ -263,6 +263,16 @@ fn command_trace_label(command: &Command) -> String {
             tile_y,
             queued
         ),
+        Command::Deconstruct {
+            units,
+            target,
+            queued,
+        } => format!(
+            "deconstruct units={} target={} queued={}",
+            id_list(units),
+            target,
+            queued
+        ),
         Command::Train { building, unit } => {
             format!("train building={} unit={:?}", building, unit)
         }

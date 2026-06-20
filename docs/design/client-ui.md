@@ -566,8 +566,8 @@ read-only selection inspection remains available while command emission stays ga
 checks.
 
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
-gather, build/resume, and placement build commands set `queued: true` and rely on the server
-snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
+gather, build/resume, Tank Trap deconstruct, and placement build commands set `queued: true` and
+rely on the server snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
 or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
 Selection and targeting use `GameState` relationship helpers where the distinction is own/ally/enemy:

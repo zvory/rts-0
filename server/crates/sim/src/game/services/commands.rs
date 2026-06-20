@@ -187,6 +187,37 @@ pub(crate) fn apply_commands(
                     &request
                 );
             }
+            SimCommand::Deconstruct {
+                units,
+                target,
+                queued,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                else {
+                    continue;
+                };
+                let target_valid =
+                    deconstruct_target_valid(entities, &teams, fog, smokes, player, &units, target);
+                let target_point = entities
+                    .get(target)
+                    .map(|target| planner::Point::new(target.pos_x, target.pos_y))
+                    .unwrap_or_else(|| planner::Point::new(0.0, 0.0));
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::Deconstruct {
+                        target,
+                        target_point,
+                        target_valid,
+                    },
+                };
+                apply_planned!(
+                    player,
+                    planner_facts(entities, player, &faction_id, &units, None),
+                    &request
+                );
+            }
             SimCommand::SetupAntiTankGuns {
                 units,
                 x,
@@ -619,7 +650,7 @@ fn planner_facts(
                 .queued_orders()
                 .iter()
                 .any(|intent| matches!(intent, OrderIntent::PointFire(_)));
-            facts.active_build = matches!(e.order(), Order::Build(_));
+            facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
             facts.activity = match e.order() {
                 Order::Idle | Order::HoldPosition => planner::UnitActivity::Idle,
                 Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
@@ -796,6 +827,19 @@ mod planned_actions {
                             events,
                         );
                     }
+                    planner::OrderIntent::Deconstruct(target) => {
+                        if immediate_unit_can_replace(entities, player, unit)
+                            && deconstruct_unit_can_target(
+                                entities, teams, fog, smokes, player, unit, target,
+                            )
+                        {
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.clear_queued_orders();
+                            }
+                            clear_staged_anti_tank_gun_setup(entities, &[unit]);
+                            coordinator.order_deconstruct(entities, unit, target);
+                        }
+                    }
                     planner::OrderIntent::SetupAntiTankGuns { face_toward } => {
                         if immediate_unit_can_replace(entities, player, unit) {
                             execute_anti_tank_gun_setup(
@@ -886,22 +930,34 @@ mod planned_actions {
                         }
                     }
                     if let Some(intent) = entity_order_intent_from_planner(intent) {
-                        if matches!(intent, OrderIntent::Attack(_))
-                            && !matches!(
-                                intent,
-                                OrderIntent::Attack(attack)
-                                    if attack_unit_can_target(
-                                        entities,
-                                        teams,
-                                        fog,
-                                        smokes,
-                                        player,
-                                        unit,
-                                        attack.target
-                                    )
-                            )
-                        {
-                            continue;
+                        match &intent {
+                            OrderIntent::Attack(attack)
+                                if !attack_unit_can_target(
+                                    entities,
+                                    teams,
+                                    fog,
+                                    smokes,
+                                    player,
+                                    unit,
+                                    attack.target,
+                                ) =>
+                            {
+                                continue;
+                            }
+                            OrderIntent::Deconstruct(deconstruct)
+                                if !deconstruct_unit_can_target(
+                                    entities,
+                                    teams,
+                                    fog,
+                                    smokes,
+                                    player,
+                                    unit,
+                                    deconstruct.target,
+                                ) =>
+                            {
+                                continue;
+                            }
+                            _ => {}
                         }
                         if let Some(e) = entities.get_mut(unit) {
                             e.append_queued_order(intent);
@@ -1021,6 +1077,44 @@ fn attack_unit_can_target(
             && !smokes.point_inside(t.pos_x, t.pos_y))
 }
 
+fn deconstruct_target_valid(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    player: u32,
+    units: &[u32],
+    target: u32,
+) -> bool {
+    dedupe_cap_units(units.to_vec()).into_iter().any(|unit| {
+        deconstruct_unit_can_target(entities, teams, fog, smokes, player, unit, target)
+    })
+}
+
+fn deconstruct_unit_can_target(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    player: u32,
+    unit: u32,
+    target: u32,
+) -> bool {
+    if !matches!(entities.get(unit), Some(e) if e.owner == player && e.kind == EntityKind::Worker && e.hp > 0)
+    {
+        return false;
+    }
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    if target.kind != EntityKind::TankTrap || target.hp == 0 || target.under_construction() {
+        return false;
+    }
+    teams.same_team_or_same_owner(player, target.owner)
+        || (rules::projection::team_visible_world(player, target.pos_x, target.pos_y, fog, teams)
+            && !smokes.point_inside(target.pos_x, target.pos_y))
+}
+
 fn gather_node_valid(entities: &EntityStore, player: u32, node: u32) -> bool {
     matches!(entities.get(node), Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0)
         && world_query::resource_has_completed_mining_cc(entities, player, node)
@@ -1050,6 +1144,7 @@ fn entity_order_intent_from_planner(intent: planner::OrderIntent) -> Option<Orde
         }
         planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
         planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
+        planner::OrderIntent::Deconstruct(target) => Some(OrderIntent::deconstruct(target)),
         planner::OrderIntent::Build {
             kind,
             tile_x,
@@ -3172,6 +3267,91 @@ mod tests {
             &[OrderIntent::build(EntityKind::Depot, 9, 16)],
             "idle worker should receive the next queued build"
         );
+    }
+
+    #[test]
+    fn deconstruct_command_assigns_workers_only_to_tank_traps() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 104.0, 100.0)
+            .expect("rifleman should spawn");
+        let trap = entities
+            .spawn_building(2, EntityKind::TankTrap, 132.0, 100.0, true)
+            .expect("tank trap should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Deconstruct {
+                    units: vec![rifle, worker],
+                    target: trap,
+                    queued: false,
+                },
+            )],
+        );
+
+        assert!(matches!(
+            entities.get(worker).expect("worker should exist").order(),
+            Order::Deconstruct(_)
+        ));
+        assert_eq!(
+            entities
+                .get(worker)
+                .expect("worker should exist")
+                .order()
+                .deconstruct_target(),
+            Some(trap)
+        );
+        assert!(matches!(
+            entities.get(rifle).expect("rifleman should exist").order(),
+            Order::Idle
+        ));
+    }
+
+    #[test]
+    fn queued_deconstructs_distribute_across_selected_workers_by_build_queue_load() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let first = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("first worker should spawn");
+        let second = entities
+            .spawn_unit(1, EntityKind::Worker, 132.0, 100.0)
+            .expect("second worker should spawn");
+        let traps: Vec<u32> = (0..4)
+            .map(|i| {
+                entities
+                    .spawn_building(2, EntityKind::TankTrap, 160.0 + i as f32 * 32.0, 100.0, true)
+                    .expect("tank trap should spawn")
+            })
+            .collect();
+
+        apply(
+            &map,
+            &mut entities,
+            traps
+                .iter()
+                .map(|target| {
+                    (
+                        1,
+                        SimCommand::Deconstruct {
+                            units: vec![first, second],
+                            target: *target,
+                            queued: true,
+                        },
+                    )
+                })
+                .collect(),
+        );
+
+        assert_eq!(entities.get(first).unwrap().queued_orders().len(), 2);
+        assert_eq!(entities.get(second).unwrap().queued_orders().len(), 2);
     }
 
     #[test]

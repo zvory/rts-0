@@ -137,6 +137,11 @@ pub enum RequestedOrder {
         target: Point,
         placement_valid: bool,
     },
+    Deconstruct {
+        target: EntityId,
+        target_point: Point,
+        target_valid: bool,
+    },
     SetupAntiTankGuns {
         face_toward: Point,
     },
@@ -179,6 +184,7 @@ pub enum OrderIntent {
         tile_x: u32,
         tile_y: u32,
     },
+    Deconstruct(EntityId),
     SetupAntiTankGuns {
         face_toward: Point,
     },
@@ -276,6 +282,13 @@ pub fn plan_order(
             tile_y,
             target,
         ),
+        RequestedOrder::Deconstruct {
+            target,
+            target_point,
+            target_valid: true,
+        } if target_point.valid() => {
+            plan_deconstruct(config, request.mode, &ordered_facts, target, target_point)
+        }
         RequestedOrder::SetupAntiTankGuns { face_toward } if face_toward.valid() => plan_filtered_units(
             config,
             request.mode,
@@ -376,6 +389,53 @@ fn plan_build(
         }
         IssueMode::Queue => {
             if let Some(unit) = choose_queued_build_worker(&builders, config.max_queue_len, target)
+            {
+                append_or_notice(config, &mut out, unit, intent);
+            } else {
+                for unit in builders {
+                    out.notices.push(PlannerNotice::QueueFull { unit: unit.id });
+                }
+            }
+        }
+    }
+    out
+}
+
+fn plan_deconstruct(
+    config: PlannerConfig,
+    mode: IssueMode,
+    units: &[&UnitFacts],
+    target: EntityId,
+    target_point: Point,
+) -> PlannerOutput {
+    let mut out = PlannerOutput::default();
+    let intent = OrderIntent::Deconstruct(target);
+    let builders: Vec<&UnitFacts> = units.iter().copied().filter(|u| u.can_build).collect();
+    if builders.is_empty() {
+        return out;
+    }
+
+    match mode {
+        IssueMode::Immediate => {
+            let idle: Vec<&UnitFacts> = builders
+                .iter()
+                .copied()
+                .filter(|u| matches!(u.activity, UnitActivity::Idle))
+                .collect();
+            let candidates = if idle.is_empty() {
+                builders.as_slice()
+            } else {
+                idle.as_slice()
+            };
+            if let Some(unit) = closest_unit(candidates, target_point) {
+                out.actions.push(PlannedAction::ReplaceActive {
+                    unit: unit.id,
+                    intent,
+                });
+            }
+        }
+        IssueMode::Queue => {
+            if let Some(unit) = choose_queued_build_worker(&builders, config.max_queue_len, target_point)
             {
                 append_or_notice(config, &mut out, unit, intent);
             } else {
@@ -587,6 +647,18 @@ mod tests {
             mode,
             order: RequestedOrder::AttackMove {
                 to: Point::new(500.0, 100.0),
+            },
+        }
+    }
+
+    fn deconstruct(units: &[UnitId], mode: IssueMode, target: EntityId, x: f32) -> OrderRequest {
+        OrderRequest {
+            units: units.to_vec(),
+            mode,
+            order: RequestedOrder::Deconstruct {
+                target,
+                target_point: Point::new(x, 100.0),
+                target_valid: true,
             },
         }
     }
@@ -884,6 +956,77 @@ mod tests {
                 },
             }]
         );
+    }
+
+    #[test]
+    fn queued_deconstruct_assigns_one_worker_per_click_by_build_queue_load() {
+        let config = PlannerConfig::default();
+        let mut first = unit(1);
+        first.can_build = true;
+        let mut second = unit(2);
+        second.can_build = true;
+        let mut facts = vec![first, second];
+        let mut assigned = Vec::new();
+
+        for i in 0..4 {
+            let out = plan_order(
+                config,
+                &facts,
+                &deconstruct(&[1, 2], IssueMode::Queue, 100 + i, 100.0 + i as f32),
+            );
+            assert!(out.notices.is_empty());
+            assigned.extend(queued_units(&out));
+            apply_queue_appends(&mut facts, &out);
+        }
+
+        assert_eq!(assigned, vec![1, 2, 1, 2]);
+    }
+
+    #[test]
+    fn immediate_deconstruct_prefers_idle_worker_like_build() {
+        let config = PlannerConfig::default();
+        let mut busy_close = unit(1);
+        busy_close.can_build = true;
+        busy_close.activity = UnitActivity::Busy;
+        busy_close.pos = Point::new(100.0, 100.0);
+        let mut idle_far = unit(2);
+        idle_far.can_build = true;
+        idle_far.pos = Point::new(300.0, 100.0);
+
+        let out = plan_order(
+            config,
+            &[busy_close, idle_far],
+            &deconstruct(&[1, 2], IssueMode::Immediate, 99, 96.0),
+        );
+
+        assert_eq!(
+            out.actions,
+            vec![PlannedAction::ReplaceActive {
+                unit: 2,
+                intent: OrderIntent::Deconstruct(99),
+            }]
+        );
+    }
+
+    #[test]
+    fn invalid_deconstruct_target_does_not_create_queued_stage() {
+        let config = PlannerConfig::default();
+        let mut worker = unit(1);
+        worker.can_build = true;
+        let request = OrderRequest {
+            units: vec![1],
+            mode: IssueMode::Queue,
+            order: RequestedOrder::Deconstruct {
+                target: 99,
+                target_point: Point::new(100.0, 100.0),
+                target_valid: false,
+            },
+        };
+
+        let out = plan_order(config, &[worker], &request);
+
+        assert!(out.actions.is_empty());
+        assert!(out.notices.is_empty());
     }
 
     #[test]

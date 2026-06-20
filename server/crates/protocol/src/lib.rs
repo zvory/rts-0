@@ -408,6 +408,12 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    Deconstruct {
+        units: Vec<u32>,
+        target: u32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
+    },
     SetupAntiTankGuns {
         units: Vec<u32>,
         x: f32,
@@ -1189,6 +1195,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_TELEPORT, 12),
     (abilities::EKAT_LINE_SHOT, 13),
     (abilities::EKAT_MAGIC_ANCHOR, 14),
+    ("deconstruct", 15),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -1298,6 +1305,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ("MOVE", "move"),
             ("ATTACK_MOVE", "attackMove"),
             ("ATTACK", "attack"),
+            ("DECONSTRUCT", "deconstruct"),
             ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
             ("TEAR_DOWN_ANTI_TANK_GUNS", "tearDownAntiTankGuns"),
             ("CHARGE", "charge"),
@@ -1453,6 +1461,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("MOVE", "move"),
         ("ATTACK_MOVE", "attackMove"),
         ("ATTACK", "attack"),
+        ("DECONSTRUCT", "deconstruct"),
         ("GATHER", "gather"),
         ("BUILD", "build"),
         ("CHARGE", abilities::CHARGE),
