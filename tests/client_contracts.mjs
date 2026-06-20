@@ -2664,6 +2664,12 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     value: { standalone: false },
   });
   assert(installedAppRuntime(), "standalone display mode marks an installed app runtime");
+  globalThis.matchMedia = (query) => ({ matches: query === "(display-mode: fullscreen)" });
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { standalone: false },
+  });
+  assert(!installedAppRuntime(), "browser fullscreen mode does not mark an installed app runtime");
   globalThis.matchMedia = () => ({ matches: false });
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,

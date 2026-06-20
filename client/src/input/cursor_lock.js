@@ -2,8 +2,7 @@ const CURSOR_LOCK_BROWSER = "browser";
 
 export function installedAppRuntime() {
   const standaloneDisplay = globalThis.matchMedia?.("(display-mode: standalone)")?.matches;
-  const fullscreenDisplay = globalThis.matchMedia?.("(display-mode: fullscreen)")?.matches;
-  return !!standaloneDisplay || !!fullscreenDisplay || globalThis.navigator?.standalone === true;
+  return !!standaloneDisplay || globalThis.navigator?.standalone === true;
 }
 
 export function cursorLockSupported(browserPointerLockSupported) {
