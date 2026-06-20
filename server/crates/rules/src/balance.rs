@@ -129,7 +129,7 @@ pub const OIL_LOAD: u32 = 2;
 pub const HARVEST_TICKS: u32 = 40;
 pub const STEEL_PATCH_AMOUNT: u32 = 1000;
 pub const OIL_GEYSER_AMOUNT: u32 = 3333;
-pub const STEEL_PATCHES_PER_BASE: u32 = 18;
+pub const STEEL_PATCHES_PER_BASE: u32 = 12;
 pub const OIL_PATCHES_PER_BASE: u32 = 3;
 
 pub const CC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;

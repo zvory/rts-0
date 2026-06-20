@@ -89,7 +89,7 @@ pub const UNITS: &[UnitDef] = &[
             cost_steel: 50,
             cost_oil: 0,
             supply: 1,
-            build_ticks: 360,
+            build_ticks: 396,
             radius: 9.0,
         },
         armor_class: ArmorClass::Small,

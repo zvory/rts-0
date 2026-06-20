@@ -297,7 +297,7 @@ authoritative `rules::defs` records.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water), named `sites`, and authored
   player-count-specific spawn `layouts`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one City Centre at the player's start tile, 18 steel patches with 1,000 steel each + 3 oil
+  one City Centre at the player's start tile, 12 steel patches with 1,000 steel each + 3 oil
   patches with 3,333 oil each nearby.
 - Supply: City Centre gives `+8`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
@@ -314,7 +314,7 @@ authoritative `rules::defs` records.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each active main or natural site gets 18 steel patches and 3 oil patches.
+- Starting layout: each active main or natural site gets 12 steel patches and 3 oil patches.
   Map schema v2 stores named main/natural `sites` plus explicit spawn `layouts`. Each layout
   declares a `playerCount` and a list of slots, where each slot pairs one main with one or more
   naturals (`natural` legacy field or `naturals` array). At match start the seed selects one
@@ -329,7 +329,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 360 (~12s) |
+| worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 396 (~13.2s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 12 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
