@@ -198,6 +198,35 @@ pub(crate) fn nearest_enemy_unit_in_range_filtered(
     )
 }
 
+/// Nearest hostile entity of a specific kind to `(px, py)` within `radius_px` that also satisfies
+/// `target_filter`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn nearest_enemy_kind_in_range_filtered(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    spatial: &SpatialIndex,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    radius_px: f32,
+    kind: EntityKind,
+    target_filter: impl Fn(&Entity) -> bool,
+) -> Option<u32> {
+    nearest_matching_enemy_in_range(
+        entities,
+        teams,
+        spatial,
+        self_id,
+        owner,
+        px,
+        py,
+        radius_px,
+        |e| e.kind == kind,
+        target_filter,
+    )
+}
+
 /// Nearest hostile entity to `(px, py)` within `radius_px` that also satisfies `target_filter`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn nearest_enemy_in_range_filtered(

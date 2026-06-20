@@ -1,4 +1,7 @@
-use crate::game::entity::{movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order};
+use crate::config;
+use crate::game::entity::{
+    movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
@@ -10,7 +13,7 @@ use crate::rules::combat as combat_rules;
 use crate::rules::terrain::TerrainKind;
 
 use super::projection::friendly_hard_blocker_between;
-use super::weapons::can_fire_while_moving;
+use super::weapons::{can_fire_while_moving, effective_attack_profile};
 
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
@@ -80,6 +83,15 @@ pub(super) fn resolve_target(
         return None;
     }
 
+    let attacker_kind = entities.get(self_id).map(|e| e.kind);
+    if attacker_kind == Some(EntityKind::Tank) {
+        if let Some(id) = preferred_target_for_tank(
+            map, entities, teams, spatial, los, fog, smokes, self_id, owner, px, py,
+        ) {
+            return Some(id);
+        }
+    }
+
     if let Some(target) = retained_firing_target_for_shoot_while_moving_unit(
         map, entities, teams, los, fog, smokes, self_id, owner, px, py, acquire_px,
     ) {
@@ -88,7 +100,6 @@ pub(super) fn resolve_target(
 
     // Anti-Tank Guns prefer tanks over all other targets; fall back to nearest enemy if no tank
     // is in range.
-    let attacker_kind = entities.get(self_id).map(|e| e.kind);
     let prefers_armored = attacker_kind
         .map(combat_rules::prefers_armored_targets)
         .unwrap_or(false);
@@ -158,6 +169,50 @@ pub(super) fn resolve_target(
 fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -> bool {
     !(movement_body_class(attacker) == MovementBodyClass::InfantryLike
         && target.kind == EntityKind::TankTrap)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn preferred_target_for_tank(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    spatial: &SpatialIndex,
+    los: &LineOfSight<'_>,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+) -> Option<u32> {
+    let attacker = entities.get(self_id)?;
+    let weapon_range_px = weapon_range_px(attacker);
+    for kind in combat_rules::TANK_TARGET_PRIORITY_ORDER {
+        if let Some(id) = world_query::nearest_enemy_kind_in_range_filtered(
+            entities,
+            teams,
+            spatial,
+            self_id,
+            owner,
+            px,
+            py,
+            weapon_range_px,
+            kind,
+            |target| {
+                target_currently_fireable(
+                    map, entities, los, fog, smokes, self_id, owner, px, py, target,
+                )
+            },
+        ) {
+            return Some(id);
+        }
+    }
+    None
+}
+
+fn weapon_range_px(attacker: &Entity) -> f32 {
+    let profile = effective_attack_profile(attacker);
+    profile.range_tiles as f32 * config::TILE_SIZE as f32 + attacker.radius() + super::RANGE_SLACK
 }
 
 #[allow(clippy::too_many_arguments)]
