@@ -1,0 +1,26 @@
+{
+  "name": "classifier-basic",
+  "decisions": [
+    {
+      "subjectIncludes": "Change sim API",
+      "decision": "update_docs",
+      "likelyDocs": [
+        "docs/design/server-sim.md"
+      ],
+      "evidenceNote": "The commit changes the simulation API and the trace map routes it to server simulation docs."
+    },
+    {
+      "pathIncludes": "tests/server_integration.mjs",
+      "decision": "move_on",
+      "likelyDocs": [
+        "docs/design/testing.md"
+      ],
+      "evidenceNote": "The commit adds integration coverage without changing documented behavior."
+    }
+  ],
+  "default": {
+    "decision": "move_on",
+    "likelyDocs": [],
+    "evidenceNote": "Fixture default found no documentation-impacting behavior change."
+  }
+}

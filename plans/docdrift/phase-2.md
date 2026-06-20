@@ -1,6 +1,6 @@
 # Phase 2 - Cheap Commit Classifier
 
-Status: draft.
+Status: done.
 
 ## Goal
 
