@@ -80,6 +80,12 @@ function classifyFailure(args) {
   }
 }
 
+function writeExecutable(name, text) {
+  const absPath = path.join(fixtureRoot, name);
+  fs.writeFileSync(absPath, text, { mode: 0o755 });
+  return absPath;
+}
+
 fs.mkdirSync(repo, { recursive: true });
 
 try {
@@ -95,8 +101,8 @@ try {
         routes: [
           {
             source: ["server/crates/sim/src/game/**"],
-            docs: ["docs/context/server-sim.md", "docs/design/server-sim.md"],
-            notes: "Sim changes route to server sim docs.",
+            docs: ["docs/context/server-sim.md", "docs/design/server-sim.md", "docs/design/testing.md"],
+            notes: "Sim changes route primarily to server sim docs, with a broad testing-doc trace candidate.",
           },
           {
             source: ["tests/**", "scripts/check-*.mjs"],
@@ -175,7 +181,7 @@ try {
   assert.ok(simEntry, "expected sim commit in report");
   assert.equal(simEntry.status, "considered");
   assert.equal(simEntry.body, "Adds a new public helper that may need docs.");
-  assert.deepEqual(simEntry.traceDocs, ["docs/context/server-sim.md", "docs/design/server-sim.md"]);
+  assert.deepEqual(simEntry.traceDocs, ["docs/context/server-sim.md", "docs/design/server-sim.md", "docs/design/testing.md"]);
   assert.equal(simEntry.docsTouched.anyDesign, false);
 
   const docsOnlyEntry = jsonReport.commits.find((commit) => commit.subject === "Clarify testing docs");
@@ -303,7 +309,8 @@ try {
   assert.equal(generateJson.docPatch.summary.updateDocsDecisions, 1);
   assert.equal(generateJson.docPatch.summary.patches, 1);
   assert.equal(generateJson.docPatch.summary.applied, 1);
-  assert.equal(generateJson.docPatch.records[0].docTargets[0], "docs/design/server-sim.md");
+  assert.deepEqual(generateJson.docPatch.records[0].docTargets, ["docs/design/server-sim.md"]);
+  assert.equal(generateJson.docPatch.records[0].docTargetSource, "classifier_likely_docs");
   assert.match(
     fs.readFileSync(path.join(repo, "docs/design/server-sim.md"), "utf8"),
     /Game API helper changes should be reflected here/,
@@ -328,6 +335,56 @@ try {
   );
   assert.equal(idempotentGenerateJson.docPatch.summary.applied, 0);
   assert.equal(idempotentGenerateJson.docPatch.summary.alreadyApplied, 1);
+  assert.equal(idempotentGenerateJson.docPatch.summary.cacheHits, 1);
+  assert.equal(idempotentGenerateJson.docPatch.budget.estimatedPromptTokens, 0);
+  assert.equal(idempotentGenerateJson.docPatch.records[0].cache.reason, "already_applied_patch");
+
+  const fakeCodexArgsPath = path.join(fixtureRoot, "fake-codex-args.json");
+  const fakeCodex = writeExecutable(
+    "fake-codex",
+    [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const args = process.argv.slice(2);",
+      `fs.writeFileSync(${JSON.stringify(fakeCodexArgsPath)}, JSON.stringify(args, null, 2));`,
+      "const outputFlag = args.indexOf('--output-last-message');",
+      "if (outputFlag < 0 || outputFlag + 1 >= args.length) process.exit(2);",
+      "if (args.includes('--ask-for-approval')) process.exit(3);",
+      "if (!args.includes('--json')) process.exit(4);",
+      "if (!args.includes('-c') || !args.includes('approval_policy=\"never\"')) process.exit(5);",
+      "fs.writeFileSync(args[outputFlag + 1], JSON.stringify({ decision: 'move_on', likelyDocs: [], evidenceNote: 'Fake Codex moved this commit on.' }));",
+      "console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 11, output_tokens: 7, total_tokens: 18 } }));",
+      "",
+    ].join("\n"),
+  );
+  const liveShapeJson = JSON.parse(
+    classify([
+      "--base",
+      checkpointCommit,
+      "--head",
+      simCommit,
+      "--codex-command",
+      fakeCodex,
+      "--classifier-cache",
+      ".docdrift/fake-codex-cache",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(liveShapeJson.classifier.summary.totalDecisions, 1);
+  assert.equal(liveShapeJson.classifier.decisions[0].codex.mode, "codex_cli");
+  assert.deepEqual(liveShapeJson.classifier.decisions[0].codex.usage, {
+    inputTokens: 11,
+    cachedInputTokens: null,
+    outputTokens: 7,
+    reasoningTokens: null,
+    totalTokens: 18,
+  });
+  const fakeArgs = JSON.parse(fs.readFileSync(fakeCodexArgsPath, "utf8"));
+  assert.ok(!fakeArgs.includes("--ask-for-approval"));
+  assert.ok(fakeArgs.includes("--json"));
+  assert.ok(fakeArgs.includes("-c"));
+  assert.ok(fakeArgs.includes('approval_policy="never"'));
 
   const generateOutDir = path.join(fixtureRoot, "generate-out");
   generateDocs([
