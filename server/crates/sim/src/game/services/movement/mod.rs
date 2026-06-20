@@ -36,6 +36,9 @@ pub(super) const MAX_UNIT_BOUNDING_RADIUS_PX: f32 = 32.0;
 
 pub(super) const STEERING_MAX_NEIGHBORS: usize = 16;
 
+const MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE: f32 =
+    config::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER - 1.0;
+
 pub(crate) use collision::resolve_collisions;
 #[cfg(test)]
 use pivot_drive::TANK_BODY_TURN_RATE_RAD_PER_TICK;
@@ -123,11 +126,55 @@ pub(crate) fn movement_system_with_events(
         events,
         ability_runtime,
     );
+    apply_magic_anchor_stationary_pull(map, entities, occ, tick, ability_runtime);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_charge();
             e.tick_breakthrough_status();
             e.tick_ability_cooldowns();
+        }
+    }
+}
+
+fn apply_magic_anchor_stationary_pull(
+    map: &Map,
+    entities: &mut EntityStore,
+    occ: &Occupancy,
+    tick: u32,
+    ability_runtime: &AbilityRuntime,
+) {
+    let world_max = map.world_size_px() - 0.01;
+    for id in entities.ids() {
+        let Some((kind, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
+            if !e.is_unit() || !e.path_is_empty() {
+                return None;
+            }
+            let profile = standability::footing_profile(e);
+            let resistance = standability::footing_resistance(profile);
+            if resistance <= 0.0 {
+                return None;
+            }
+            let speed = config::unit_stats(e.kind)?.speed;
+            Some((e.kind, e.pos_x, e.pos_y, e.facing(), speed, resistance))
+        }) else {
+            continue;
+        };
+        let Some((dir, strength)) = ability_runtime.magic_anchor_stationary_pull(x, y, tick) else {
+            continue;
+        };
+        let pull_px =
+            speed * MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE * strength / resistance.sqrt();
+        if pull_px <= 0.0 || !pull_px.is_finite() {
+            continue;
+        }
+        let next_x = (x + dir.0 * pull_px).clamp(0.0, world_max);
+        let next_y = (y + dir.1 * pull_px).clamp(0.0, world_max);
+        if !standability::unit_static_standable(occ, map, kind, next_x, next_y, facing) {
+            continue;
+        }
+        if let Some(e) = entities.get_mut(id) {
+            e.set_position(next_x, next_y);
+            e.set_movement_delta(next_x - x, next_y - y);
         }
     }
 }

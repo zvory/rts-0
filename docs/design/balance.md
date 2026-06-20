@@ -266,7 +266,8 @@ authoritative `rules::defs` records.
   projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 5 tiles, has
   no resource cost, places one replacement-style non-blocking, non-attackable 10-second pull field
   with a 3-tile radius, slows units moving away from the anchor to as low as 0.45x speed near the
-  center, and boosts units moving toward the anchor up to 1.35x speed near the center.
+  center, boosts units moving toward the anchor up to 1.35x speed near the center, and drags idle
+  units toward the anchor with less displacement for braced or heavy units.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles

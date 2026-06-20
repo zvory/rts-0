@@ -1014,6 +1014,58 @@ fn ekat_magic_anchor_pull_field_slows_away_and_boosts_toward_movement() {
     );
 }
 
+#[test]
+fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
+    let players = [
+        ekat_player(),
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Enemy".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let hero_pos = game.map.tile_center(8, 10);
+    let anchor_target = game.map.tile_center(12, 10);
+    let infantry_start = game.map.tile_center(10, 10);
+    let tank_start = game.map.tile_center(10, 12);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, hero_pos.0, hero_pos.1)
+        .expect("hero should spawn");
+    let infantry = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, infantry_start.0, infantry_start.1)
+        .expect("infantry should spawn");
+    let tank = game
+        .entities
+        .spawn_unit(2, EntityKind::Tank, tank_start.0, tank_start.1)
+        .expect("tank should spawn");
+
+    enqueue_ekat_anchor(&mut game, hero, anchor_target);
+    game.tick();
+    game.tick();
+
+    let infantry_delta = entity_distance_to(&game, infantry, infantry_start);
+    let tank_delta = entity_distance_to(&game, tank, tank_start);
+
+    assert!(
+        infantry_delta > 0.01,
+        "stationary infantry should be pulled by Magic Anchor, delta={infantry_delta}"
+    );
+    assert!(
+        tank_delta > 0.01,
+        "stationary tanks should still be pulled by Magic Anchor, delta={tank_delta}"
+    );
+    assert!(
+        tank_delta < infantry_delta,
+        "heavy units should receive less pull than infantry, infantry={infantry_delta}, tank={tank_delta}"
+    );
+}
+
 fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
