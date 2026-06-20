@@ -73,6 +73,16 @@ shape without turning default auto-acquisition into a full tactical ability plan
   and rank policy inputs, but it must not depend on sim state, pathing, fog, or entity stores.
 - Keep sim-local context in sim. Movement obstruction, current order, retained target id, path goal,
   line-of-sight, fog, and smoke belong in `rts-sim` combat/movement services.
+- Keep the ranking boundary real. After Phase 2, normal auto-acquisition should read as: handle
+  explicit ordered-attack intent, collect already-legal candidates, rank them with named terms, and
+  return the winner. If `resolve_target` still contains parallel Tank, Anti-Tank Gun,
+  unit-over-building, retained-target, or Tank Trap priority branches that compete with the ranker,
+  stop before Phase 3 and either fold them into the boundary or document a narrow, temporary
+  exception with an owner and cleanup point.
+- Keep movement obstruction facts one-way into combat. Combat may consume bounded, read-only facts
+  derived from occupancy, current path segment, `path_goal`, `move_intent`, or recent path/chase
+  failure state, but it must not run A* per target, mutate movement/path state while ranking, or reach
+  around `MoveCoordinator`/pathing APIs for implementation details.
 - Do not add per-unit `if kind == ...` branches where a role, weapon profile, armor class, movement
   body class, or target tag expresses the rule. If a one-off is necessary, isolate and name it as an
   explicit policy term.
@@ -114,7 +124,8 @@ it while preserving current behavior. This phase should separate legal-candidate
 comparison, provide stable tie-breaks, and move the existing Tank priority, Anti-Tank Gun preference,
 unit-over-building preference, retained moving-fire target rule, and Tank Trap filters into named rank
 or eligibility terms. Done correctly, Phase 2 should be mostly architecture with tests proving no
-intentional gameplay change.
+intentional gameplay change; if it leaves the old procedural branches alongside the new ranker, later
+gameplay phases should pause instead of building on a split decision path.
 
 ### [Phase 3 - Default Weapon Fit Policy](phase-3.md)
 
@@ -123,6 +134,8 @@ should prefer soft targets over armored or hard targets, anti-armor default atta
 armored/hard targets and anti-armor threats, and Tank target priority should generalize from a fixed
 kind list into a threat/role policy that still puts Anti-Tank Guns first. This phase should update
 rules docs and focused combat tests with player-facing patch notes for the changed targeting behavior.
+Make these behavior changes by adjusting rank terms, not by adding new special-case branches to
+`resolve_target`.
 
 ### [Phase 4 - Retargeting And Future Attack Profile Guardrails](phase-4.md)
 
@@ -139,7 +152,9 @@ add a small sim-owned obstruction context from movement/pathing or occupancy int
 then rank enemy Tank Traps highly only when they block, pinch, or immediately obstruct the unit's
 current route or intended movement. Infantry-like auto-acquisition should still ignore Tank Traps,
 explicit attacks should remain legal, and vehicles should stop wasting priority on irrelevant nearby
-traps while still breaching real obstacles.
+traps while still breaching real obstacles. The obstruction query must stay bounded and read-only; if
+the implementation wants full pathfinding during target ranking, split that design problem out before
+continuing.
 
 ## Phase Index
 
