@@ -839,8 +839,8 @@ export class Match {
   }
 
   /**
-   * Surface one snapshot's transient events exactly once. Notices become toasts
-   * and alerts; combat/death events drive spatial sounds.
+   * Surface events once. Notices become toasts and alerts; combat/death drives
+   * spatial sounds.
    */
   handleSnapshotEvents(events) {
     if (!events || !events.length) return;
@@ -867,7 +867,7 @@ export class Match {
       else this.minimap?.pulseBorder();
     }
 
-    if (this.replayViewer || !this.audio) return;
+    if (this.replayViewer || this.state?.spectator || !this.audio) return;
     if (alertId === UNDER_ATTACK_ID && hasPos && this.pointInViewport(ev.x, ev.y, VIEWPORT_ALERT_MARGIN_PX)) {
       return;
     }
