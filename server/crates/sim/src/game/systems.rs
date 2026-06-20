@@ -9,13 +9,14 @@
 //!   6. gather progression
 //!   7. production progression + spawning
 //!   8. construction progression
-//!   9. ability projectile/runtime progression
-//!   10. deaths
-//!   11. rebuild pre-collision occupancy/spatial indexes
-//!   12. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
+//!   9. deconstruction progression
+//!   10. ability projectile/runtime progression
+//!   11. deaths
+//!   12. rebuild pre-collision occupancy/spatial indexes
+//!   13. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
 //!       produced units that land on the same spawn point are unstacked in the same tick)
-//!   13. recompute supply cap
-//!   14. rebuild final spatial index for snapshot interest filtering
+//!   14. recompute supply cap
+//!   15. rebuild final spatial index for snapshot interest filtering
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -262,6 +263,9 @@ pub(crate) fn run_tick(
             fog,
             active_construction_sites,
         );
+    });
+    crate::perf::timed(perf.as_deref_mut(), "deconstruction", || {
+        services::construction::deconstruction_system(entities, players);
     });
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));

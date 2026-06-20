@@ -65,6 +65,11 @@ export function _onRightClick(p, ev = {}) {
       return;
     }
   }
+  if (target && workers.length > 0 && _isCompletedTankTrap(target)) {
+    this._issueCommand(cmd.deconstruct(workers, target.id, queued));
+    this._addCommandFeedback("move", target.x, target.y, queued);
+    return;
+  }
   if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
     // Enemy entity -> attack.
     this._issueCommand(cmd.attack(ownUnits, target.id, queued));
@@ -186,6 +191,13 @@ function _isOwnIncompleteBuilding(target) {
     isBuilding(target.kind) &&
     typeof target.buildProgress === "number" &&
     target.buildProgress < 1
+  );
+}
+
+function _isCompletedTankTrap(target) {
+  return (
+    target.kind === KIND.TANK_TRAP &&
+    !(typeof target.buildProgress === "number" && target.buildProgress < 1)
   );
 }
 

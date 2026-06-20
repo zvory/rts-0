@@ -31,6 +31,8 @@ pub enum Order {
     /// not exist until the worker arrives, re-validates placement/affordability, and pays
     /// the cost; until then the order carries only the intent (kind + top-left tile).
     Build(BuildOrder),
+    /// Walk to a completed Tank Trap and dismantle it for the issuing player's refund.
+    Deconstruct(DeconstructOrder),
     /// Move into range of a world-targeted ability, then execute it at the target point.
     Ability(AbilityOrder),
     /// Artillery repeats point fire at a fixed world position until interrupted.
@@ -56,6 +58,10 @@ impl Order {
 
     pub fn build(kind: EntityKind, tile_x: u32, tile_y: u32) -> Self {
         Order::Build(BuildOrder::new(kind, tile_x, tile_y))
+    }
+
+    pub fn deconstruct(target: u32) -> Self {
+        Order::Deconstruct(DeconstructOrder::new(target))
     }
 
     pub fn ability(ability: AbilityKind, x: f32, y: f32, staging_x: f32, staging_y: f32) -> Self {
@@ -103,6 +109,13 @@ impl Order {
         }
     }
 
+    pub fn deconstruct_target(&self) -> Option<u32> {
+        match self {
+            Order::Deconstruct(order) => Some(order.intent.target),
+            _ => None,
+        }
+    }
+
     pub fn gather_phase(&self) -> Option<GatherPhase> {
         match self {
             Order::Gather(order) => Some(order.execution.phase),
@@ -120,6 +133,7 @@ pub enum OrderIntent {
     Attack(TargetIntent),
     Gather(GatherIntent),
     Build(BuildIntent),
+    Deconstruct(TargetIntent),
     WorldAbility(AbilityIntent),
     SelfAbility(SelfAbilityIntent),
     SetupAntiTankGuns(PointIntent),
@@ -149,6 +163,10 @@ impl OrderIntent {
             tile_x,
             tile_y,
         })
+    }
+
+    pub fn deconstruct(target: u32) -> Self {
+        OrderIntent::Deconstruct(TargetIntent { target })
     }
 
     pub fn ability(ability: AbilityKind, x: f32, y: f32) -> Self {
@@ -369,6 +387,38 @@ pub enum BuildPhase {
     /// Worker has arrived, the building has been spawned in CONSTRUCT state, and
     /// construction is progressing. `site` is the building entity id.
     Constructing { site: u32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeconstructOrder {
+    pub intent: TargetIntent,
+    pub execution: DeconstructExecution,
+}
+
+impl DeconstructOrder {
+    fn new(target: u32) -> Self {
+        DeconstructOrder {
+            intent: TargetIntent { target },
+            execution: DeconstructExecution {
+                phase: DeconstructPhase::ToTarget,
+                progress: 0,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeconstructExecution {
+    pub phase: DeconstructPhase,
+    pub progress: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeconstructPhase {
+    /// Worker is walking toward the Tank Trap.
+    ToTarget,
+    /// Worker is dismantling the Tank Trap.
+    Deconstructing,
 }
 
 #[derive(Debug, Clone, PartialEq)]

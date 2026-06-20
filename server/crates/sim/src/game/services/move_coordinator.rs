@@ -248,6 +248,52 @@ impl<'a> MoveCoordinator<'a> {
         false
     }
 
+    /// Issue a Tank Trap deconstruction order and walk the worker to the same outside staging ring
+    /// used for construction.
+    pub fn order_deconstruct(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        target: u32,
+    ) -> bool {
+        let (target_x, target_y, tile_x, tile_y) = match entities.get(target) {
+            Some(t) if t.kind == EntityKind::TankTrap => {
+                let (tile_x, tile_y) = self.map.tile_of(t.pos_x, t.pos_y);
+                (t.pos_x, t.pos_y, tile_x, tile_y)
+            }
+            _ => return false,
+        };
+        entities.release_miner(id);
+        if let Some(e) = entities.get_mut(id) {
+            e.replace_active_order(Order::deconstruct(target));
+            e.set_target_id(Some(target));
+            e.set_path_goal(Some((target_x, target_y)));
+            e.reset_gather_state();
+            let (px, py) = (e.pos_x, e.pos_y);
+            e.reset_stuck(px, py);
+        }
+        if self.request_build_path(entities, id, EntityKind::TankTrap, tile_x, tile_y) {
+            return true;
+        }
+        for goal in build_staging_goals(
+            self.map,
+            self.occ,
+            entities,
+            id,
+            EntityKind::TankTrap,
+            tile_x,
+            tile_y,
+        ) {
+            if self.request_exact_path_to_build_goal(entities, id, goal) {
+                return true;
+            }
+        }
+        if let Some(e) = entities.get_mut(id) {
+            e.clear_orders();
+        }
+        false
+    }
+
     // -------------------------------------------------------------------
     // Tick-scoped bulk processing
     // -------------------------------------------------------------------

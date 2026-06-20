@@ -4026,6 +4026,14 @@ function fakeAudioContext() {
       buildCommand.queued === true,
     "build command builder emits selected-worker wire shape",
   );
+  const deconstructCommand = cmd.deconstruct([7, 8], 55, true);
+  assert(
+    deconstructCommand.c === "deconstruct" &&
+      deconstructCommand.units.join(",") === "7,8" &&
+      deconstructCommand.target === 55 &&
+      deconstructCommand.queued === true,
+    "deconstruct command builder emits selected-worker target wire shape",
+  );
   assert(
     JSON.stringify(msg.command(cmd.stop([7]), 3)) ===
       JSON.stringify({ t: "command", clientSeq: 3, cmd: { c: "stop", units: [7] } }),
@@ -4945,6 +4953,7 @@ withFakeDocument(() => {
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_TELEPORT] === 12, "Ekat Teleport compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_LINE_SHOT] === 13, "Ekat Line Shot compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_MAGIC_ANCHOR] === 14, "Ekat Magic Anchor compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.DECONSTRUCT] === 15, "Deconstruct compact order stage code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
@@ -6525,6 +6534,7 @@ withFakeDocument(() => {
     ) === "unit",
     "Tank Trap placement blocker classifies vehicle-body unit blockers",
   );
+  delete input._selectedWorkerIds;
 
   const pairs = (tiles) => tiles.map((site) => [site.tileX, site.tileY]);
   const exactTankTrapSpacing = (tiles) => tiles.every((site, index) => {
@@ -6733,6 +6743,26 @@ withFakeDocument(() => {
       rightClickCommands[0].c === "attack" &&
       rightClickCommands[0].queued === true,
     "Shift right-click on enemies should send queued attack",
+  );
+
+  const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
+  const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [deconstructWorker, enemyTankTrap],
+    selectedEntities: () => [deconstructWorker],
+    addCommandFeedback() {},
+  };
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "deconstruct" &&
+      rightClickCommands[0].units.join(",") === "42" &&
+      rightClickCommands[0].target === enemyTankTrap.id &&
+      rightClickCommands[0].queued === true,
+    "Shift right-click on a Tank Trap with workers selected should send queued deconstruct",
   );
 
   input.dom = { clientWidth: 800, clientHeight: 600 };

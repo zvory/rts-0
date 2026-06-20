@@ -292,7 +292,8 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/rules/src/economy.rs", 101],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
-  ["server/crates/sim/src/game/services/commands.rs", 254],
+  // Tank Trap deconstruction adds worker-only command validation and trap target admission.
+  ["server/crates/sim/src/game/services/commands.rs", 259],
   ["server/crates/sim/src/game/invariants.rs", 13],
 ]);
 const budgetOverruns = [];

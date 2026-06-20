@@ -8,9 +8,10 @@ use crate::rules;
 #[cfg(test)]
 use super::EntityStateGroups;
 use super::{
-    AttackPhase, BuildPhase, CombatState, ConstructionState, EntityKind, GatherPhase, MovePhase,
-    MovementState, Order, OrderIntent, ProdItem, ProductionState, RallyIntent, ResearchItem,
-    ResourceNodeState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
+    AttackPhase, BuildPhase, CombatState, ConstructionState, DeconstructPhase, EntityKind,
+    GatherPhase, MovePhase, MovementState, Order, OrderIntent, ProdItem, ProductionState,
+    RallyIntent, ResearchItem, ResourceNodeState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS,
+    NEUTRAL,
 };
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
@@ -410,6 +411,36 @@ impl Entity {
                 order.execution.phase = phase;
             }
         }
+    }
+
+    pub fn deconstruct_phase(&self) -> Option<DeconstructPhase> {
+        self.movement.as_ref().and_then(|m| match &m.order {
+            Order::Deconstruct(order) => Some(order.execution.phase),
+            _ => None,
+        })
+    }
+
+    pub fn mark_deconstruct_phase(&mut self, phase: DeconstructPhase) {
+        if let Some(m) = self.movement.as_mut() {
+            if let Order::Deconstruct(order) = &mut m.order {
+                order.execution.phase = phase;
+                if phase != DeconstructPhase::Deconstructing {
+                    order.execution.progress = 0;
+                }
+            }
+        }
+    }
+
+    pub fn tick_deconstruction(&mut self) -> Option<u32> {
+        let m = self.movement.as_mut()?;
+        let Order::Deconstruct(order) = &mut m.order else {
+            return None;
+        };
+        if order.execution.phase != DeconstructPhase::Deconstructing {
+            return None;
+        }
+        order.execution.progress = order.execution.progress.saturating_add(1);
+        Some(order.execution.progress)
     }
 
     pub fn path_is_empty(&self) -> bool {
@@ -1095,6 +1126,7 @@ impl Entity {
             Order::Attack(_) => states::ATTACK,
             Order::Gather(_) => states::GATHER,
             Order::Build(_) => states::BUILD,
+            Order::Deconstruct(_) => states::BUILD,
             Order::Ability(_) => states::MOVE,
             Order::ArtilleryPointFire(_) => states::ATTACK,
         }

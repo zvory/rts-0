@@ -485,6 +485,7 @@ impl PlayerMilestones {
             | Command::SetAutocast { .. }
             | Command::Gather { .. }
             | Command::Build { .. }
+            | Command::Deconstruct { .. }
             | Command::Train { .. }
             | Command::Research { .. }
             | Command::Cancel { .. }

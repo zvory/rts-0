@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::config;
-use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
+use crate::game::entity::{BuildPhase, DeconstructPhase, EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::occupancy::{footprint_center, Occupancy};
@@ -196,6 +196,105 @@ pub(crate) fn construction_system(
             }
         }
     }
+}
+
+/// Advance Tank Trap deconstruction orders. A worker must first reach the target trap, then spends
+/// the trap's normal build time dismantling it. Completion refunds the trap cost to the worker's
+/// owner and leaves removal/event fanout to the ordinary death system.
+pub(crate) fn deconstruction_system(
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+) {
+    let arrivals: Vec<(u32, Option<u32>)> = entities
+        .iter()
+        .filter_map(|e| {
+            if e.hp == 0 || !e.is_unit() || e.deconstruct_phase() != Some(DeconstructPhase::ToTarget)
+            {
+                return None;
+            }
+            let target = e.order().deconstruct_target()?;
+            let Some((tx, ty)) = live_completed_tank_trap_position(entities, target) else {
+                return Some((e.id, None));
+            };
+            let arrive = interact_range_for_kind(EntityKind::TankTrap);
+            if dist2(e.pos_x, e.pos_y, tx, ty).sqrt() <= arrive {
+                Some((e.id, Some(target)))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (worker, target) in arrivals {
+        let Some(target) = target else {
+            if let Some(w) = entities.get_mut(worker) {
+                w.clear_active_order();
+            }
+            continue;
+        };
+        if let Some(w) = entities.get_mut(worker) {
+            w.clear_path();
+            w.set_target_id(Some(target));
+            w.mark_deconstruct_phase(DeconstructPhase::Deconstructing);
+        }
+    }
+
+    let working: Vec<(u32, u32)> = entities
+        .iter()
+        .filter_map(|e| {
+            if e.hp == 0
+                || !e.is_unit()
+                || e.deconstruct_phase() != Some(DeconstructPhase::Deconstructing)
+            {
+                return None;
+            }
+            Some((e.id, e.order().deconstruct_target()?))
+        })
+        .collect();
+    let required_ticks = config::building_stats(EntityKind::TankTrap)
+        .map(|stats| stats.build_ticks)
+        .unwrap_or(config::TICK_HZ * 10);
+
+    for (worker, target) in working {
+        if live_completed_tank_trap_position(entities, target).is_none() {
+            if let Some(w) = entities.get_mut(worker) {
+                w.clear_active_order();
+            }
+            continue;
+        }
+        let progress = entities
+            .get_mut(worker)
+            .and_then(|w| w.tick_deconstruction())
+            .unwrap_or(0);
+        if progress < required_ticks {
+            continue;
+        }
+
+        let cost = rules::economy::resource_cost(EntityKind::TankTrap);
+        let dismantled = entities
+            .get_mut(target)
+            .map(|trap| {
+                let hp = trap.hp;
+                trap.apply_damage(hp, None)
+            })
+            .unwrap_or(false);
+        if dismantled {
+            if let Some(owner) = entities.get(worker).map(|w| w.owner) {
+                if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
+                    player.refund_cost(cost);
+                }
+            }
+        }
+        if let Some(w) = entities.get_mut(worker) {
+            w.clear_active_order();
+        }
+    }
+}
+
+fn live_completed_tank_trap_position(entities: &EntityStore, target: u32) -> Option<(f32, f32)> {
+    let trap = entities.get(target)?;
+    (trap.kind == EntityKind::TankTrap && trap.hp > 0 && !trap.under_construction())
+        .then_some((trap.pos_x, trap.pos_y))
 }
 
 pub(crate) fn resumable_site_for_build_intent(
@@ -601,6 +700,91 @@ mod tests {
             w.queued_orders().len(),
             1,
             "queued handoff orders must persist after a scaffold is destroyed"
+        );
+    }
+
+    #[test]
+    fn deconstruction_refunds_worker_owner_and_marks_trap_dead_after_ten_seconds() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (tx, ty) = footprint_center(&map, EntityKind::TankTrap, 4, 4);
+        let trap = entities
+            .spawn_building(2, EntityKind::TankTrap, tx, ty, true)
+            .expect("tank trap should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, tx + config::TILE_SIZE as f32, ty)
+            .expect("worker should spawn");
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.set_order(Order::deconstruct(trap));
+            w.mark_deconstruct_phase(DeconstructPhase::Deconstructing);
+            w.set_target_id(Some(trap));
+        }
+        let mut players = vec![player_state(1), player_state(2)];
+        let steel_before = players[0].steel;
+        let enemy_steel_before = players[1].steel;
+        let required_ticks = config::building_stats(EntityKind::TankTrap)
+            .expect("tank trap stats")
+            .build_ticks;
+
+        for _ in 0..required_ticks {
+            deconstruction_system(&mut entities, &mut players);
+        }
+
+        assert_eq!(
+            players[0].steel,
+            steel_before + rules::economy::resource_cost(EntityKind::TankTrap).steel,
+            "deconstructing player should receive the Tank Trap steel refund"
+        );
+        assert_eq!(
+            players[1].steel, enemy_steel_before,
+            "original owner should not receive the refund"
+        );
+        assert_eq!(
+            entities.get(trap).expect("trap should exist until death runs").hp,
+            0,
+            "completed deconstruction should mark the Tank Trap for normal death cleanup"
+        );
+        assert!(matches!(
+            entities.get(worker).expect("worker should survive").order(),
+            Order::Idle
+        ));
+    }
+
+    #[test]
+    fn deconstruction_completion_preserves_queued_orders_for_handoff() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (tx, ty) = footprint_center(&map, EntityKind::TankTrap, 4, 4);
+        let trap = entities
+            .spawn_building(2, EntityKind::TankTrap, tx, ty, true)
+            .expect("tank trap should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, tx + config::TILE_SIZE as f32, ty)
+            .expect("worker should spawn");
+        let handoff = (tx + 96.0, ty);
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.set_order(Order::deconstruct(trap));
+            w.mark_deconstruct_phase(DeconstructPhase::Deconstructing);
+            w.set_target_id(Some(trap));
+            w.append_queued_order(OrderIntent::move_to(handoff.0, handoff.1));
+        }
+        let mut players = vec![player_state(1), player_state(2)];
+        let required_ticks = config::building_stats(EntityKind::TankTrap)
+            .expect("tank trap stats")
+            .build_ticks;
+
+        for _ in 0..required_ticks {
+            deconstruction_system(&mut entities, &mut players);
+        }
+
+        let w = entities.get(worker).expect("worker should survive");
+        assert!(matches!(w.order(), Order::Idle));
+        assert_eq!(
+            w.queued_orders().len(),
+            1,
+            "deconstruction completion must leave queued handoff orders intact for promotion"
         );
     }
 

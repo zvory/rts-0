@@ -23,7 +23,7 @@ crates/
     fog.rs       # per-player live visibility grids; snapshots union living teammate grids
     building_memory.rs # server-only per-player last-seen enemy building records
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
+    services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction/deconstruction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     replay.rs    # tick-stamped command log replay harness for determinism checks
     src/rules/projection.rs # fog-gated entity/event projection seam
 ```
@@ -557,11 +557,15 @@ Allocation rules:
   issue-time validation. Occupied resource nodes are still valid gather targets; when a worker
   arrives and the patch is already occupied, the economy service redirects it to the nearest
   unoccupied same-resource node within ten tiles, or moves it to nearby open grass if none exists.
-  Build orders allocate one compatible selected worker per click after the placement has passed
-  issue-time validation: immediate builds prefer idle workers and then closest worker to the
-  footprint center; queued builds prefer the lowest build assignment load, then closest worker. Build
-  assignment load is the worker's current queued-order count plus one when its active order is
-  already a build intent.
+  Build and Tank Trap deconstruct orders allocate one compatible selected worker per click after the
+  target has passed issue-time validation: immediate orders prefer idle workers and then closest
+  worker to the footprint/target center; queued orders prefer the lowest work assignment load, then
+  closest worker. Work assignment load is the worker's current queued-order count plus one when its
+  active order is already a build or deconstruct intent. Deconstruct targets must be completed Tank
+  Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps
+  must be visible when accepted or promoted. Deconstruction takes the Tank Trap's build time, is not
+  accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap cost to the
+  deconstructing player.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
   decodable for old command logs but does not create queued or immediate ability work.
 - World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued

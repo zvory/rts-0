@@ -827,6 +827,7 @@ fn command_authority_entities(command: &Command) -> Vec<u32> {
         | Command::RecastAbility { units, .. }
         | Command::SetAutocast { units, .. }
         | Command::Gather { units, .. }
+        | Command::Deconstruct { units, .. }
         | Command::Build { units, .. }
         | Command::Stop { units }
         | Command::HoldPosition { units } => units.clone(),

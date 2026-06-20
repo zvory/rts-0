@@ -371,7 +371,7 @@ impl CorePredictor {
                     }
                 }
             }
-            Command::Build { .. } => {
+            Command::Build { .. } | Command::Deconstruct { .. } => {
                 self.note_disabled("buildPredictionUnsupported");
             }
             Command::Attack { .. }
@@ -712,6 +712,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::Move { .. } => "move",
         Command::AttackMove { .. } => "attackMove",
         Command::Attack { .. } => "attack",
+        Command::Deconstruct { .. } => "deconstruct",
         Command::SetupAntiTankGuns { .. } => "setupAntiTankGuns",
         Command::TearDownAntiTankGuns { .. } => "tearDownAntiTankGuns",
         Command::Charge { .. } => "charge",

@@ -28,6 +28,11 @@ pub enum SimCommand {
         target: u32,
         queued: bool,
     },
+    Deconstruct {
+        units: Vec<u32>,
+        target: u32,
+        queued: bool,
+    },
     SetupAntiTankGuns {
         units: Vec<u32>,
         x: f32,
@@ -145,6 +150,15 @@ impl SimCommand {
                 target,
                 queued,
             } => SimCommand::Attack {
+                units,
+                target,
+                queued,
+            },
+            protocol::Command::Deconstruct {
+                units,
+                target,
+                queued,
+            } => SimCommand::Deconstruct {
                 units,
                 target,
                 queued,
@@ -312,6 +326,15 @@ impl SimCommand {
                 target,
                 queued,
             } => protocol::Command::Attack {
+                units: units.clone(),
+                target: *target,
+                queued: *queued,
+            },
+            SimCommand::Deconstruct {
+                units,
+                target,
+                queued,
+            } => protocol::Command::Deconstruct {
                 units: units.clone(),
                 target: *target,
                 queued: *queued,
@@ -541,6 +564,28 @@ mod tests {
         assert_eq!(
             SimCommand::from_protocol(teardown.clone()).to_protocol(),
             Some(teardown)
+        );
+    }
+
+    #[test]
+    fn protocol_deconstruct_command_round_trips() {
+        let command = protocol::Command::Deconstruct {
+            units: vec![3, 5],
+            target: 77,
+            queued: true,
+        };
+
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()),
+            SimCommand::Deconstruct {
+                units: vec![3, 5],
+                target: 77,
+                queued: true,
+            }
+        );
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()).to_protocol(),
+            Some(command)
         );
     }
 

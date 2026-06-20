@@ -104,8 +104,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "input/index.js": 39869,
   // Pause Phase 1 wires live-pause reliable state, settings action, and overlay lifecycle.
   "match.js": 44950,
-  // Pause Phase 1 adds live pause/unpause tags and builders.
-  "protocol.js": 44386,
+  // Tank Trap deconstruction adds a mirrored command tag, order stage, and builder.
+  "protocol.js": 44592,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,
