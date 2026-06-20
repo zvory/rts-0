@@ -522,7 +522,7 @@ export class Input {
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
   // On Windows, browser saves use Alt+number, including browser fullscreen;
-  // installed-app/standalone saves use Ctrl+number.
+  // installed-app/standalone saves accept Alt/Ctrl/Cmd+number.
   // optional pointer-lock mode traps the browser cursor and drives a visible
   // virtual cursor for edge pan on multi-monitor setups.
   update(dt)                             // continuous handling (edge scroll handled by camera)

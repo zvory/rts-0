@@ -17,10 +17,9 @@ export function _controlGroupIsWindowsPlatform() {
 export function _controlGroupSaveModifierActive(ev, runtime = {}) {
   const isWindows = runtime.isWindows ?? _controlGroupIsWindowsPlatform();
   const isInstalledApp = !!runtime.isInstalledApp;
+  if (isInstalledApp) return ev.altKey || ev.ctrlKey || ev.metaKey;
   if (isWindows) {
-    return isInstalledApp
-      ? ev.ctrlKey && !ev.altKey && !ev.metaKey
-      : ev.altKey && !ev.ctrlKey && !ev.metaKey;
+    return ev.altKey && !ev.ctrlKey && !ev.metaKey;
   }
   return ev.altKey || ev.ctrlKey || ev.metaKey;
 }
