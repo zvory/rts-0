@@ -14,6 +14,10 @@ const EMPTY_VISIBILITY = Object.freeze({
   replayVision: false,
 });
 
+const EMPTY_MATCH_CONTROLS = Object.freeze({
+  pause: false,
+});
+
 const EMPTY_DIAGNOSTICS = Object.freeze({
   movementPaths: MOVEMENT_PATH_DIAGNOSTICS.NONE,
   observerAnalysis: false,
@@ -27,10 +31,12 @@ export function createRoomCapabilities({ startPayload } = {}) {
   const source = startPayload?.capabilities || {};
   const diagnostics = normalizeDiagnostics(startPayload?.diagnostics);
   const roomTime = roomTimeCapabilities(source.roomTime);
+  const matchControls = normalizeMatchControls(source.matchControls);
   const visibility = normalizeVisibility(source.visibility);
   const commands = normalizeCommands(source.commands);
   return Object.freeze({
     roomTime,
+    matchControls: Object.freeze(matchControls),
     diagnostics,
     visibility: Object.freeze(visibility),
     commands: Object.freeze(commands),
@@ -48,6 +54,13 @@ function roomTimeCapabilities(roomTime) {
     seekRelative: roomTime.seekRelative === true,
     seekAbsolute: roomTime.seekAbsolute === true,
     timeline: roomTime.timeline === true,
+  });
+}
+
+function normalizeMatchControls(matchControls) {
+  return Object.freeze({
+    ...EMPTY_MATCH_CONTROLS,
+    pause: matchControls?.pause === true,
   });
 }
 

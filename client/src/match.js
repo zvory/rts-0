@@ -21,6 +21,7 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
+import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { ObserverAnalysisOverlay, shouldMountObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
@@ -38,7 +39,7 @@ import {
   noticeDisplayText,
 } from "./alerts.js";
 import { dom, isTextEntry } from "./bootstrap.js";
-import { buildGiveUpAction, buildSettingsTabs } from "./settings_panels.js";
+import { buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "./settings_panels.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 
 const KAR98K_GAIN = 0.25;
@@ -117,6 +118,14 @@ export class Match {
     this.activeMachineGunSoundKeys = new Map();
     this.replayControls = null;
     this.observerAnalysisOverlay = null;
+    this.livePauseOverlay = null;
+    this.livePauseState = {
+      paused: false,
+      pausesRemaining: null,
+      pauseLimit: null,
+      canPause: false,
+      canUnpause: false,
+    };
     this.giveUpSent = false;
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
@@ -257,12 +266,15 @@ export class Match {
     };
     this.onCommandReceipt = (m) => this.handleCommandReceipt(m);
     this.onRoomTimeState = (m) => this.applyRoomTimeState(m);
+    this.onLivePauseState = (m) => this.applyLivePauseState(m);
     this.onObserverAnalysis = (m) => this.observerAnalysisOverlay?.applyObserverAnalysis(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
     this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
     this.onGiveUpConfirm = this.requestGiveUp.bind(this);
+    this.onPauseGame = this.requestPauseGame.bind(this);
+    this.onUnpauseGame = this.requestUnpauseGame.bind(this);
     this.onPointerLockToggle = this.togglePointerLock.bind(this);
     this.onDebugPathToggle = this.toggleDebugPathOverlays.bind(this);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);
@@ -274,6 +286,7 @@ export class Match {
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     this.net.on(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
+    this.net.on(S.LIVE_PAUSE_STATE, this.onLivePauseState);
     this.net.on(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
@@ -304,6 +317,12 @@ export class Match {
         getEntities: () => this.state.entitiesInterpolated(1, { includePrediction: false }),
         getCameraBounds: () => this.cameraWorldBounds(),
         getPlayers: () => this.state.players,
+      });
+    }
+    if (this.capabilities.matchControls?.pause) {
+      this.livePauseOverlay = new LivePauseOverlay({
+        root: dom.gameScreen,
+        onUnpause: this.onUnpauseGame,
       });
     }
     this.applySpectatorUi();
@@ -623,6 +642,39 @@ export class Match {
     this.net.giveUp();
   }
 
+  requestPauseGame() {
+    if (!this.capabilities.matchControls?.pause) return;
+    if (this.livePauseState.paused || !this.livePauseState.canPause) {
+      this.syncLivePauseUi();
+      return;
+    }
+    this.closeSettingsMenu();
+    this.net.pauseGame();
+    this.livePauseState = { ...this.livePauseState, canPause: false };
+    this.syncLivePauseUi();
+  }
+
+  requestUnpauseGame() {
+    if (!this.capabilities.matchControls?.pause) return;
+    if (!this.livePauseState.paused || !this.livePauseState.canUnpause) return;
+    this.net.unpauseGame();
+    this.livePauseState = { ...this.livePauseState, canUnpause: false };
+    this.syncLivePauseUi();
+  }
+
+  applyLivePauseState(state) {
+    this.livePauseState = {
+      paused: state?.paused === true,
+      pausedBy: Number.isInteger(state?.pausedBy) ? state.pausedBy : null,
+      pausesRemaining: Number.isInteger(state?.pausesRemaining) ? state.pausesRemaining : null,
+      pauseLimit: Number.isInteger(state?.pauseLimit) ? state.pauseLimit : null,
+      canPause: state?.canPause === true,
+      canUnpause: state?.canUnpause === true,
+    };
+    this.livePauseOverlay?.applyLivePauseState(this.livePauseState);
+    this.syncLivePauseUi();
+  }
+
   togglePointerLock() {
     if (!this.input?.pointerLockSupported()) {
       this.toast("Cursor lock is not supported by this browser.");
@@ -692,6 +744,10 @@ export class Match {
     if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
   }
 
+  syncLivePauseUi() {
+    if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
+  }
+
   mountSettings({ keepOpen = false } = {}) {
     if (!this.settings) return;
     const spectator = !!this.state?.spectator || this.replayViewer;
@@ -702,6 +758,13 @@ export class Match {
       spectator,
       replay: this.replayViewer,
       actions: [
+        buildPauseAction({
+          visible: !spectator && this.capabilities.matchControls?.pause && !this.livePauseState.paused,
+          disabled: !this.livePauseState.canPause,
+          label: this.livePauseActionLabel(),
+          title: this.livePauseActionTitle(),
+          onPause: this.onPauseGame,
+        }),
         buildGiveUpAction({
           visible: !spectator && !this.giveUpSent,
           onOpen: this.onGiveUpOpen,
@@ -744,6 +807,19 @@ export class Match {
       }),
     });
     if (wasOpen) this.settings.open({ focus: false });
+  }
+
+  livePauseActionLabel() {
+    const remaining = this.livePauseState.pausesRemaining;
+    if (Number.isInteger(remaining)) return `Pause (${remaining})`;
+    return "Pause";
+  }
+
+  livePauseActionTitle() {
+    const remaining = this.livePauseState.pausesRemaining;
+    if (!Number.isInteger(remaining)) return "Pause the live match.";
+    if (remaining <= 0) return "No pauses remaining.";
+    return `${remaining} pause${remaining === 1 ? "" : "s"} remaining.`;
   }
 
   /** Compute world/viewport sizes and push them into the camera. */
@@ -1025,10 +1101,12 @@ export class Match {
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
+    this.net.off(S.LIVE_PAUSE_STATE, this.onLivePauseState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     this.replayControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
+    this.livePauseOverlay?.destroy();
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     if (typeof window !== "undefined" && window.__rtsPerf === this.frameProfilerSurface) {
@@ -1036,6 +1114,7 @@ export class Match {
     }
     this.replayControls = null;
     this.observerAnalysisOverlay = null;
+    this.livePauseOverlay = null;
     if (this.input && typeof this.input.destroy === "function") {
       this.input.destroy();
       this.input = null;
@@ -1060,6 +1139,7 @@ export class Match {
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
+    this.net.off(S.LIVE_PAUSE_STATE, this.onLivePauseState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
@@ -1069,10 +1149,12 @@ export class Match {
     }
     this.replayControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
+    this.livePauseOverlay?.destroy();
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;
     this.observerAnalysisOverlay = null;
+    this.livePauseOverlay = null;
     if (dom.selectionArea) dom.selectionArea.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;
     if (this.unregisterHudInputZone) {

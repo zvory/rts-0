@@ -59,6 +59,8 @@ lobby/config dump replaces the source scrape.
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
+| `pauseGame` | — | Pause a live match. Honored only from active live players while the room is unpaused and that active seat has successful pause starts remaining. |
+| `unpauseGame` | — | Resume a paused live match. Honored from any active live player while the room is paused. |
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
@@ -243,6 +245,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
+| `livePauseState` | `Live match pause state` (see 2.6). |
 | `replayAnalysis` | `Observer analysis state` (see 2.7). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
 | `replayBranchCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
@@ -315,6 +318,7 @@ Sent once when the match begins. Carries everything static for the whole match.
       seekAbsolute?: bool,
       timeline?: bool
     },
+    matchControls?: { pause?: bool },
     visibility?: { replayVision?: bool },
     commands?: { gameplay?: bool }
   },
@@ -367,7 +371,9 @@ do not receive that movement-path diagnostic affordance. Dev scenario start payl
 projection. Replay viewers and live spectators receive `diagnostics.observerAnalysis: true` only
 when room projection policy will send observer-analysis payloads to that recipient.
 `capabilities` is the neutral control/affordance contract. Live active players receive
-`commands.gameplay: true`; spectators, replay viewers, dev-watch viewers, and lab viewers do not.
+`commands.gameplay: true` and `matchControls.pause: true`; spectators, replay viewers, dev-watch
+viewers, and lab viewers do not. Replay branch live players also receive pause capability only
+when their connection is mapped to an original active seat through the branch-live seat alias path.
 Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
 `visibility.replayVision: true`. Dev scenario watch rooms advertise speed/pause/step room-time
 controls without replay seek or replay-vision controls. Clients must not infer these shared
@@ -774,6 +780,28 @@ speed and tick:
 `keyframeTicks` lists the replay keyframes the server has recorded so far. Clients may display
 them as seek marks, but a seek target is not limited to these ticks; the server restores the nearest
 recorded keyframe at or before the requested tick and fast-forwards from there.
+
+`livePauseState` is a reliable server message that carries the authoritative live-match pause
+state. Normal live and branch-live match recipients receive it after `start` and after accepted or
+rejected pause/unpause transitions. Spectators receive enough state to render the paused overlay but
+do not receive a remaining-count value or unpause authority:
+```
+{
+  t: "livePauseState",
+  paused: bool,
+  pausedBy?: u32,
+  pausesRemaining?: u8,
+  pauseLimit: u8,
+  canPause?: bool,
+  canUnpause?: bool
+}
+```
+Each active seat has three successful pause starts per match. The server decrements the count only
+when a request changes the room from unpaused to paused; any active player can unpause. While live
+pause is active the room task skips the live simulation tick branch, so AI thinking, command-ack
+consumption, `Game::tick`, live snapshot fanout, and defeat checks do not advance, while reliable
+control-plane messages such as ping/pong, net reports, Give up, disconnect handling, and unpause
+still run.
 
 `ReplayVisionRequest` selects fog/vision per viewer:
 ```

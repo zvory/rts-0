@@ -14,11 +14,11 @@ use std::fmt;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
     CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities, EntityView, Event,
-    LabStartMetadata, LabStartRole, LabVisionMode, MapInfo, MovementPathDiagnosticScope,
-    NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
-    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
-    RoomTimeCapabilities, RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
-    TeamId, VisibilityCapabilities, DEFAULT_FACTION_ID,
+    LabStartMetadata, LabStartRole, LabVisionMode, MapInfo, MatchControlCapabilities,
+    MovementPathDiagnosticScope, NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot,
+    PlayerScore, PlayerStart, RememberedBuildingView, ReplayStartMetadata, ResourceDelta,
+    ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState, SmokeCloudView, Snapshot,
+    SnapshotNetStatus, StartPayload, TeamId, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -173,14 +173,16 @@ pub enum ClientMessage {
     },
     /// Give up the current match, removing this player's army and showing the score screen.
     GiveUp,
+    /// Pause a live match. Honored only from active live players with pauses remaining.
+    PauseGame,
+    /// Unpause a paused live match. Honored only from active live players.
+    UnpauseGame,
     /// Leave replay playback and return the room to a clean lobby.
     ReturnToLobby,
     /// Latency probe.
     Ping { ts: f64 },
     /// Client-observed network/render health aggregate for server logs.
-    NetReport {
-        report: Box<ClientNetReport>,
-    },
+    NetReport { report: Box<ClientNetReport> },
     /// Set room-controlled time speed. `0` pauses rooms whose clock supports pause.
     SetRoomTimeSpeed { speed: f32 },
     /// Advance room-controlled time by one simulation tick where the clock allows stepping.
@@ -686,6 +688,8 @@ pub enum ServerMessage {
     Snapshot(Snapshot),
     /// Shared room-controlled time cursor/state. Sent reliably outside snapshot cadence.
     RoomTimeState(RoomTimeState),
+    /// Authoritative live-match pause state. Sent reliably after start and on every transition.
+    LivePauseState(LivePauseState),
     /// Authoritative observer analysis data for replay viewers and live spectators. The wire tag
     /// remains `replayAnalysis` for compatibility while live delivery is gated by the room task.
     #[serde(rename = "replayAnalysis")]
@@ -742,6 +746,21 @@ pub enum ServerMessage {
     Error {
         msg: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LivePauseState {
+    pub paused: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_by: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pauses_remaining: Option<u8>,
+    pub pause_limit: u8,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub can_pause: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub can_unpause: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -1237,6 +1256,8 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("SET_SPECTATOR", "setSpectator"),
                 ("COMMAND", "command"),
                 ("GIVE_UP", "giveUp"),
+                ("PAUSE_GAME", "pauseGame"),
+                ("UNPAUSE_GAME", "unpauseGame"),
                 ("RETURN_TO_LOBBY", "returnToLobby"),
                 ("PING", "ping"),
                 ("NET_REPORT", "netReport"),
@@ -1259,6 +1280,7 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("START", "start"),
                 ("SNAPSHOT", "snapshot"),
                 ("ROOM_TIME_STATE", "roomTimeState"),
+                ("LIVE_PAUSE_STATE", "livePauseState"),
                 ("REPLAY_ANALYSIS", "replayAnalysis"),
                 ("JOIN_REPLAY_PROMPT", "joinReplayPrompt"),
                 ("REPLAY_BRANCH_CREATED", "replayBranchCreated"),

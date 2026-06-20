@@ -176,6 +176,10 @@ pub enum RoomEvent {
     },
     /// A connected player intentionally gave up the active match.
     GiveUp { player_id: u32 },
+    /// A connected active live player requested a live match pause.
+    PauseGame { player_id: u32 },
+    /// A connected active live player requested live match resume.
+    UnpauseGame { player_id: u32 },
     /// A replay viewer asked to leave playback and return their connection to the lobby screen.
     ReturnToLobby { player_id: u32 },
     /// Set room-controlled time speed where the session clock capability allows it.

@@ -46,6 +46,8 @@ pub struct StartPayload {
 pub struct RoomCapabilities {
     #[serde(default, skip_serializing_if = "RoomTimeCapabilities::is_empty")]
     pub room_time: RoomTimeCapabilities,
+    #[serde(default, skip_serializing_if = "MatchControlCapabilities::is_empty")]
+    pub match_controls: MatchControlCapabilities,
     #[serde(default, skip_serializing_if = "VisibilityCapabilities::is_empty")]
     pub visibility: VisibilityCapabilities,
     #[serde(default, skip_serializing_if = "CommandCapabilities::is_empty")]
@@ -54,7 +56,10 @@ pub struct RoomCapabilities {
 
 impl RoomCapabilities {
     pub fn is_empty(&self) -> bool {
-        self.room_time.is_empty() && self.visibility.is_empty() && self.commands.is_empty()
+        self.room_time.is_empty()
+            && self.match_controls.is_empty()
+            && self.visibility.is_empty()
+            && self.commands.is_empty()
     }
 }
 
@@ -86,6 +91,19 @@ impl RoomTimeCapabilities {
             && !self.seek_relative
             && !self.seek_absolute
             && !self.timeline
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchControlCapabilities {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pause: bool,
+}
+
+impl MatchControlCapabilities {
+    pub fn is_empty(&self) -> bool {
+        !self.pause
     }
 }
 

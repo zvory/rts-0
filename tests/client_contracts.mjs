@@ -154,7 +154,8 @@ import {
   _drawPlacement,
   _drawResourceMiningPreview,
 } from "../client/src/renderer/feedback.js";
-import { buildGiveUpAction, buildSettingsTabs } from "../client/src/settings_panels.js";
+import { LivePauseOverlay } from "../client/src/live_pause_overlay.js";
+import { buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "../client/src/settings_panels.js";
 import { readPredictionEnabled, writePredictionEnabled } from "../client/src/prediction_settings.js";
 import {
   HOTKEY_PRESET_CLASSIC,
@@ -967,6 +968,23 @@ function hotkeyService() {
     assert(giveUpOpened, "settings: live give-up action calls injected opener");
     assert(buildGiveUpAction({ visible: false, onOpen: () => {} }).render() === null,
       "settings: spectator/replay contexts omit give-up action");
+  });
+
+  withFakeSettingsDocument(() => {
+    let pauseSent = false;
+    const action = buildPauseAction({
+      visible: true,
+      disabled: false,
+      label: "Pause (3)",
+      onPause: () => { pauseSent = true; },
+    });
+    const button = action.render();
+    assert(button.id === "live-pause-open", "settings: live pause action keeps pinned id");
+    assert(button.textContent === "Pause (3)", "settings: live pause action shows remaining count");
+    button.listeners.click();
+    assert(pauseSent, "settings: live pause action calls injected sender");
+    assert(buildPauseAction({ visible: false }).render() === null,
+      "settings: non-live contexts omit pause action");
   });
 
   {
@@ -3401,10 +3419,11 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   noCapabilityUi.destroy();
 
   const normalCapabilities = createRoomCapabilities({
-    startPayload: { spectator: false, capabilities: { commands: { gameplay: true } } },
+    startPayload: { spectator: false, capabilities: { commands: { gameplay: true }, matchControls: { pause: true } } },
   });
   assert(!normalCapabilities.roomTime.available, "normal matches do not mount room-time controls");
   assert(normalCapabilities.commands.gameplay, "active players keep gameplay command affordances");
+  assert(normalCapabilities.matchControls.pause, "active live players keep live pause affordances");
 
   const spectatorCapabilities = createRoomCapabilities({
     startPayload: {
@@ -3418,6 +3437,26 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     spectatorCapabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.ALL,
     "capability parser keeps diagnostic affordances from the start payload",
   );
+  assert(!spectatorCapabilities.matchControls.pause, "spectators do not get live pause controls by default");
+
+  withFakeOverlayDocument(({ FakeElement }) => {
+    const root = new FakeElement("section");
+    let unpaused = false;
+    const overlay = new LivePauseOverlay({ root, onUnpause: () => { unpaused = true; } });
+    overlay.applyLivePauseState({ paused: true, pausedBy: 2, pauseLimit: 3, canUnpause: true });
+    assert(root.children.length === 1, "live pause overlay mounts generated DOM");
+    assert(!root.children[0].hidden, "live pause overlay shows when paused");
+    const button = root.querySelector("#live-pause-unpause");
+    assert(button && !button.hidden && !button.disabled, "live pause overlay enables unpause for active players");
+    button.listeners.click();
+    assert(unpaused, "live pause overlay calls injected unpause action");
+    overlay.applyLivePauseState({ paused: true, canUnpause: false });
+    assert(button.hidden && button.disabled, "live pause overlay hides spectator unpause control");
+    overlay.applyLivePauseState({ paused: false });
+    assert(root.children[0].hidden, "live pause overlay hides when running");
+    overlay.destroy();
+    assert(root.children.length === 0, "live pause overlay tears down DOM");
+  });
 
   const noticeAudioMatch = Object.create(Match.prototype);
   const playedNotices = [];
@@ -4246,6 +4285,8 @@ function fakeAudioContext() {
   assertHasMethod(net, "ready", "Net");
   assertHasMethod(net, "start", "Net");
   assertHasMethod(net, "giveUp", "Net");
+  assertHasMethod(net, "pauseGame", "Net");
+  assertHasMethod(net, "unpauseGame", "Net");
   assertHasMethod(net, "returnToLobby", "Net");
   assertHasMethod(net, "command", "Net");
   assertHasMethod(net, "ping", "Net");
@@ -4279,8 +4320,11 @@ function fakeAudioContext() {
   assertThrows(() => net.command(cmd.stop([1])), "Net.command requires controller-provided clientSeq");
   net.command(cmd.stop([1]), 7);
   assert(sent[0].clientSeq === 7, "Net.command sends the provided clientSeq");
+  net.pauseGame();
+  net.unpauseGame();
+  assert(sent[1].t === "pauseGame" && sent[2].t === "unpauseGame", "Net live pause helpers send exact tags");
   net.lab(12, { op: "setVision", vision: msg.labVisionFullWorld() });
-  assert(sent[1].t === "lab" && sent[1].requestId === 12, "Net.lab sends lab request envelopes");
+  assert(sent[3].t === "lab" && sent[3].requestId === 12, "Net.lab sends lab request envelopes");
   assert(
     msg.labExportScenario(13, "saved").op.name === "saved",
     "lab export builder includes a scenario name",

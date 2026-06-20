@@ -18,6 +18,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "frame_entity_views.js": "app-shell",
   "observer_analysis_overlay.js": "app-shell",
   "observer_analysis_signatures.js": "app-shell",
+  "live_pause_overlay.js": "app-shell",
   "replay_controls.js": "app-shell",
   "replay_viewer.js": "app-shell",
   "lab_control_policy.js": "app-shell",
@@ -101,10 +102,10 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Quick-cast click suppression keeps guard math in input/quick_cast_selection_guard.js while
   // input/index.js owns the mouse down/move/up routing hooks.
   "input/index.js": 39869,
-  // Net Report Phase 2 wires command receipt diagnostics into the live report path.
-  "match.js": 41905,
-  // Packets Phase 2.5 adds the dependency-free MessagePack snapshot frame decoder.
-  "protocol.js": 44202,
+  // Pause Phase 1 wires live-pause reliable state, settings action, and overlay lifecycle.
+  "match.js": 44950,
+  // Pause Phase 1 adds live pause/unpause tags and builders.
+  "protocol.js": 44386,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,
