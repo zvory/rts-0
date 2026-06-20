@@ -22,8 +22,6 @@ export const CITY_CENTRE_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rts-r
   <rect id="part.tower" x="-9" y="-48" width="18" height="26" fill="#7b96c4" fill-opacity="0.95" data-rts-tint="team-light-strong" />
   <rect id="part.tower.cap" x="-7" y="-48" width="14" height="8" fill="#1a1712" fill-opacity="0.72" />
   <rect id="part.stripe" x="-30" y="-3" width="60" height="5" fill="#1a1712" fill-opacity="0.3" />
-  <circle id="part.seal.left" cx="-16" cy="10" r="7" fill="#d8c267" fill-opacity="0.95" />
-  <circle id="part.seal.right" cx="16" cy="10" r="7" fill="#d8c267" fill-opacity="0.95" />
   <rect id="part.entrance" x="-10" y="30" width="20" height="12" fill="#1a1712" fill-opacity="0.62" />
   <line id="part.flag" x1="0" y1="-48" x2="0" y2="-38" stroke="#d8d0b0" stroke-width="2" opacity="0.85" />
   <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#000000" />
