@@ -1,6 +1,7 @@
 use super::room_task::RoomMode;
 use crate::protocol::{
-    CommandCapabilities, RoomCapabilities, RoomTimeCapabilities, VisibilityCapabilities,
+    CommandCapabilities, MatchControlCapabilities, RoomCapabilities, RoomTimeCapabilities,
+    VisibilityCapabilities,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -574,6 +575,14 @@ impl SessionPolicy {
     pub(super) fn start_capabilities(self, gameplay_commands: bool) -> RoomCapabilities {
         RoomCapabilities {
             room_time: self.room_time_capabilities(),
+            match_controls: MatchControlCapabilities {
+                pause: gameplay_commands
+                    && matches!(
+                        self.mutation,
+                        MutationPolicy::LiveGameplayCommands
+                            | MutationPolicy::BranchLiveSeatAliasGameplay
+                    ),
+            },
             visibility: VisibilityCapabilities {
                 replay_vision: self.visibility == VisibilityPolicy::ReplayVision,
             },
@@ -896,7 +905,9 @@ mod tests {
     fn start_capabilities_are_policy_and_recipient_role_driven() {
         let live = SessionPolicy::new(SessionMode::Normal, SessionPhase::LiveMatch);
         assert!(live.start_capabilities(true).commands.gameplay);
+        assert!(live.start_capabilities(true).match_controls.pause);
         assert!(!live.start_capabilities(false).commands.gameplay);
+        assert!(!live.start_capabilities(false).match_controls.pause);
         assert!(!live.start_capabilities(true).room_time.available);
 
         let replay = SessionPolicy::new(SessionMode::Normal, SessionPhase::ReplayViewer);
@@ -909,6 +920,7 @@ mod tests {
         assert!(replay_caps.room_time.timeline);
         assert!(replay_caps.visibility.replay_vision);
         assert!(!replay_caps.commands.gameplay);
+        assert!(!replay_caps.match_controls.pause);
 
         let dev = SessionPolicy::new(SessionMode::DevScenario, SessionPhase::LiveMatch);
         let dev_caps = dev.start_capabilities(false);
@@ -919,6 +931,11 @@ mod tests {
         assert!(!dev_caps.room_time.seek_relative);
         assert!(!dev_caps.room_time.seek_absolute);
         assert!(!dev_caps.visibility.replay_vision);
+        assert!(!dev_caps.match_controls.pause);
+
+        let branch = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);
+        assert!(branch.start_capabilities(true).match_controls.pause);
+        assert!(!branch.start_capabilities(false).match_controls.pause);
     }
 
     #[test]

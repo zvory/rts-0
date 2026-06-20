@@ -253,11 +253,19 @@ alive.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`,
-  `GiveUp`, `SetRoomTimeSpeed`, `StepRoomTime`, `SeekRoomTime`, `SeekRoomTimeTo`,
-  `SetReplayVision`, `Lab`). The room task is the single writer of game state — no locks around
-  `Game`.
+  `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`, `SeekRoomTime`,
+  `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer of game state —
+  no locks around `Game`.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
   connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
+- Live-match pause state belongs to `RoomTask`, not `Game` and not `tick_control.rs`. Normal live
+  and branch-live active seats can spend up to three successful pause starts per match; spectators,
+  replay viewers, dev-watch viewers, and lab viewers cannot spend pauses. While paused, the room
+  event loop continues handling reliable control messages, Give up, disconnects, and unpause, but
+  the live scheduled tick returns before constructing `LiveTickDriver`, so AI thinking,
+  command-ack consumption, `Game::tick`, snapshot fanout, and defeat checks do not advance.
+  `prepare_live_match_launch`, live-match teardown/replay transition, and empty-room reset all
+  clear pause counters and paused state.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
   `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.

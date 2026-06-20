@@ -242,6 +242,23 @@ assert(
   "command receipt server message must be mirrored in Rust and docs",
 );
 assert(
+  C.PAUSE_GAME === "pauseGame" &&
+    C.UNPAUSE_GAME === "unpauseGame" &&
+    S.LIVE_PAUSE_STATE === "livePauseState",
+  "live pause protocol tags must be mirrored",
+);
+assert(
+  JSON.stringify(msg.pauseGame()) === JSON.stringify({ t: "pauseGame" }) &&
+    JSON.stringify(msg.unpauseGame()) === JSON.stringify({ t: "unpauseGame" }),
+  "live pause builders must emit exact wire shapes",
+);
+assert(
+  rust.includes("LivePauseState") &&
+    rust.includes("pauses_remaining") &&
+    protocolDoc.includes("livePauseState"),
+  "live pause state contract must be documented and mirrored in Rust",
+);
+assert(
   // Temporary source-text allowlist: start payload field-shape assertions are contract DTO checks,
   // not part of this phase's structured protocol export.
   rustContract.includes("prediction_build_id") &&
@@ -271,11 +288,13 @@ assert(
 assert(
   rustContract.includes("RoomCapabilities") &&
     rustContract.includes("RoomTimeCapabilities") &&
+    rustContract.includes("MatchControlCapabilities") &&
     rustContract.includes("VisibilityCapabilities") &&
     rustContract.includes("CommandCapabilities") &&
     protocolDoc.includes("capabilities?:") &&
     roomCapabilities.includes("startPayload?.capabilities") &&
     roomCapabilities.includes("roomTime") &&
+    roomCapabilities.includes("matchControls") &&
     roomCapabilities.includes("replayVision") &&
     roomCapabilities.includes("gameplay"),
   "start payload room capabilities must be documented and mirrored by the client parser",

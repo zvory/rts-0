@@ -15,7 +15,7 @@ use super::tick_control::{RoomTimeClock, RoomTimeSpeed, ScheduledTickAction, Tic
 use super::*;
 use crate::protocol::{
     Command, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
-    LabState, LabVisionMode, RoomTimeState, DEFAULT_FACTION_ID,
+    LabState, LabVisionMode, LivePauseState, RoomTimeState, DEFAULT_FACTION_ID,
 };
 #[cfg(test)]
 use crate::protocol::{
@@ -73,6 +73,7 @@ const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
 const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
 const LAB_PLAYER_ONE_ID: u32 = 1;
 const LAB_PLAYER_TWO_ID: u32 = 2;
+const LIVE_PAUSE_LIMIT: u8 = 3;
 
 fn match_countdown_duration() -> Duration {
     #[cfg(test)]
@@ -553,6 +554,10 @@ pub(super) struct RoomTask {
     outcome_sent: HashSet<u32>,
     /// In replay branch live matches, connected ids differ from original replay player ids.
     branch_live_seat_by_connection: HashMap<u32, u32>,
+    /// Live-match pause is room-owned control-plane state, separate from replay/dev room-time.
+    live_paused: bool,
+    live_paused_by: Option<u32>,
+    live_pause_counts: HashMap<u32, u8>,
     lab_session: Option<LabSession>,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
@@ -607,6 +612,9 @@ impl RoomTask {
             match_human_count: 0,
             outcome_sent: HashSet::new(),
             branch_live_seat_by_connection: HashMap::new(),
+            live_paused: false,
+            live_paused_by: None,
+            live_pause_counts: HashMap::new(),
             lab_session: None,
             dev_driver: None,
             dev_view_player_id: None,
@@ -811,6 +819,8 @@ impl RoomTask {
                 cmd,
             } => self.on_command(player_id, client_seq, cmd),
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
+            RoomEvent::PauseGame { player_id } => self.on_pause_game(player_id),
+            RoomEvent::UnpauseGame { player_id } => self.on_unpause_game(player_id),
             RoomEvent::ReturnToLobby { player_id } => self.on_return_to_lobby(player_id),
             RoomEvent::SetRoomTimeSpeed { player_id, speed } => {
                 self.on_set_room_time_speed(player_id, speed)
@@ -1658,6 +1668,103 @@ impl RoomTask {
         );
     }
 
+    fn live_pause_controls_available(&self) -> bool {
+        self.session_policy()
+            .start_capabilities(true)
+            .match_controls
+            .pause
+    }
+
+    fn live_pause_seat_for_connection(&self, connection_id: u32) -> Option<u32> {
+        if !matches!(self.phase, Phase::InGame(_)) || !self.live_pause_controls_available() {
+            return None;
+        }
+        if self.outcome_sent.contains(&connection_id) {
+            return None;
+        }
+        self.live_connection_is_player(connection_id).then(|| {
+            self.live_seat_id_for_connection(connection_id)
+                .unwrap_or(connection_id)
+        })
+    }
+
+    fn live_pause_state_for(&self, connection_id: u32) -> LivePauseState {
+        let seat_id = self.live_pause_seat_for_connection(connection_id);
+        let pauses_remaining = seat_id.map(|seat_id| {
+            LIVE_PAUSE_LIMIT
+                .saturating_sub(self.live_pause_counts.get(&seat_id).copied().unwrap_or(0))
+        });
+        let can_pause = pauses_remaining
+            .map(|remaining| !self.live_paused && remaining > 0)
+            .unwrap_or(false);
+        LivePauseState {
+            paused: self.live_paused,
+            paused_by: self.live_paused_by,
+            pauses_remaining,
+            pause_limit: LIVE_PAUSE_LIMIT,
+            can_pause,
+            can_unpause: self.live_paused && seat_id.is_some(),
+        }
+    }
+
+    fn send_live_pause_state_to(&self, connection_id: u32) {
+        let Some(player) = self.players.get(&connection_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            connection_id,
+            &player.msg_tx,
+            ServerMessage::LivePauseState(self.live_pause_state_for(connection_id)),
+        );
+    }
+
+    fn broadcast_live_pause_state(&self) {
+        if !matches!(self.phase, Phase::InGame(_)) || !self.live_pause_controls_available() {
+            return;
+        }
+        for &connection_id in &self.order {
+            self.send_live_pause_state_to(connection_id);
+        }
+    }
+
+    fn on_pause_game(&mut self, player_id: u32) {
+        let Some(seat_id) = self.live_pause_seat_for_connection(player_id) else {
+            self.send_live_pause_state_to(player_id);
+            return;
+        };
+        if self.live_paused {
+            self.send_live_pause_state_to(player_id);
+            return;
+        }
+        let used = self.live_pause_counts.get(&seat_id).copied().unwrap_or(0);
+        if used >= LIVE_PAUSE_LIMIT {
+            self.send_live_pause_state_to(player_id);
+            return;
+        }
+        self.live_pause_counts
+            .insert(seat_id, used.saturating_add(1));
+        self.live_paused = true;
+        self.live_paused_by = Some(seat_id);
+        crate::log_info!(room = %self.room, player_id, seat_id, "live match paused");
+        self.broadcast_live_pause_state();
+    }
+
+    fn on_unpause_game(&mut self, player_id: u32) {
+        if self.live_pause_seat_for_connection(player_id).is_none() {
+            self.send_live_pause_state_to(player_id);
+            return;
+        }
+        if !self.live_paused {
+            self.send_live_pause_state_to(player_id);
+            return;
+        }
+        self.live_paused = false;
+        self.live_paused_by = None;
+        crate::log_info!(room = %self.room, player_id, "live match unpaused");
+        self.broadcast_live_pause_state();
+    }
+
     fn on_give_up(&mut self, player_id: u32) {
         if self.is_dev_watch() {
             return;
@@ -2222,6 +2329,7 @@ impl RoomTask {
         });
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
+        self.broadcast_live_pause_state();
     }
 
     fn start_branch_live(&mut self) {
@@ -2324,6 +2432,7 @@ impl RoomTask {
         });
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
+        self.broadcast_live_pause_state();
     }
 
     fn start_lab_session(&mut self) {
@@ -2873,6 +2982,9 @@ impl RoomTask {
                 return;
             }
             ScheduledTickAction::LiveMatch => {}
+        }
+        if self.live_paused && self.live_pause_controls_available() {
+            return;
         }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
@@ -3895,6 +4007,7 @@ impl RoomTask {
     fn prepare_live_match_launch(&mut self) {
         self.match_countdown_deadline = None;
         self.reset_match_net_status();
+        self.reset_live_pause_state();
     }
 
     fn record_live_match_started(
@@ -3918,6 +4031,7 @@ impl RoomTask {
         self.match_human_count = 0;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
+        self.reset_live_pause_state();
         for player in self.players.values_mut() {
             player.ready = false;
             player.msg_tx.clear_pending_snapshot();
@@ -3938,6 +4052,7 @@ impl RoomTask {
         self.match_human_count = 0;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
+        self.reset_live_pause_state();
         self.lab_session = None;
         self.host_id = None;
         // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
@@ -3953,6 +4068,12 @@ impl RoomTask {
         if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
             self.mode = RoomMode::Normal;
         }
+    }
+
+    fn reset_live_pause_state(&mut self) {
+        self.live_paused = false;
+        self.live_paused_by = None;
+        self.live_pause_counts.clear();
     }
 
     fn mark_match_started_for_drain(&mut self) {
@@ -4781,6 +4902,129 @@ mod tests {
             task.players.get(&1).unwrap().last_sim_consumed_client_seq,
             1
         );
+    }
+
+    #[test]
+    fn live_pause_authorizes_active_players_and_tracks_limit() {
+        let mut task = RoomTask::new(
+            "live-pause-authority-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_test_room_player(&mut task, 1, true);
+        let mut writer_b = add_test_room_player(&mut task, 2, true);
+        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+
+        task.start_match();
+        while writer_a.reliable_rx.try_recv().is_ok() {}
+        while writer_b.reliable_rx.try_recv().is_ok() {}
+        while writer_spectator.reliable_rx.try_recv().is_ok() {}
+
+        task.on_pause_game(99);
+        assert!(!task.live_paused, "spectators must not pause live matches");
+
+        task.on_pause_game(1);
+        assert!(task.live_paused);
+        assert_eq!(task.live_paused_by, Some(1));
+        assert_eq!(task.live_pause_counts.get(&1), Some(&1));
+        let active_state = std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok())
+            .find_map(|msg| match msg {
+                ServerMessage::LivePauseState(state) => Some(state),
+                _ => None,
+            })
+            .expect("active pause state");
+        assert_eq!(active_state.pauses_remaining, Some(2));
+        assert!(!active_state.can_pause);
+        assert!(active_state.can_unpause);
+        let spectator_state = std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok())
+            .find_map(|msg| match msg {
+                ServerMessage::LivePauseState(state) => Some(state),
+                _ => None,
+            })
+            .expect("spectator pause state");
+        assert_eq!(spectator_state.pauses_remaining, None);
+        assert!(!spectator_state.can_unpause);
+
+        task.on_pause_game(1);
+        assert_eq!(
+            task.live_pause_counts.get(&1),
+            Some(&1),
+            "repeated pause while paused must not spend another charge"
+        );
+
+        for expected_used in 1..=3 {
+            if !task.live_paused {
+                task.on_pause_game(1);
+            }
+            assert_eq!(task.live_pause_counts.get(&1), Some(&expected_used));
+            task.on_unpause_game(2);
+            assert!(!task.live_paused, "any active player can unpause");
+        }
+
+        task.on_pause_game(1);
+        assert!(
+            !task.live_paused,
+            "fourth successful pause by one player is denied"
+        );
+        assert_eq!(task.live_pause_counts.get(&1), Some(&3));
+        let denied_state = std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok())
+            .filter_map(|msg| match msg {
+                ServerMessage::LivePauseState(state) => Some(state),
+                _ => None,
+            })
+            .last()
+            .expect("denied pause state");
+        assert_eq!(denied_state.pauses_remaining, Some(0));
+        assert!(!denied_state.can_pause);
+        drop(writer_b);
+    }
+
+    #[test]
+    fn live_pause_skips_live_tick_work_until_unpaused() {
+        let mut task = RoomTask::new(
+            "live-pause-tick-skip-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer = add_test_room_player(&mut task, 1, true);
+        add_test_room_player(&mut task, 2, true);
+
+        task.start_match();
+        while writer.reliable_rx.try_recv().is_ok() {}
+        task.on_command(
+            1,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+        task.on_pause_game(1);
+        task.on_tick(TokioInstant::now());
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert_eq!(
+            game.tick_count(),
+            0,
+            "paused scheduled tick must not advance sim"
+        );
+        assert_eq!(
+            task.pending_client_command_acks.len(),
+            1,
+            "paused scheduled tick must not consume command acks"
+        );
+
+        task.on_unpause_game(2);
+        task.on_tick(TokioInstant::now());
+        let Phase::InGame(game) = &task.phase else {
+            panic!("normal live match should remain active");
+        };
+        assert_eq!(game.tick_count(), 1);
+        assert!(task.pending_client_command_acks.is_empty());
     }
 
     #[test]

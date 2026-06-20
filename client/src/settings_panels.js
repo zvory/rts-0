@@ -46,6 +46,23 @@ export function buildGiveUpAction({ visible, onOpen }) {
   };
 }
 
+export function buildPauseAction({ visible, disabled = false, label = "Pause", title = "", onPause }) {
+  return {
+    render() {
+      if (!visible) return null;
+      const button = document.createElement("button");
+      button.id = "live-pause-open";
+      button.type = "button";
+      button.className = "settings-match-action";
+      button.textContent = label;
+      button.disabled = !!disabled;
+      if (title) button.title = title;
+      button.addEventListener("click", () => onPause?.());
+      return button;
+    },
+  };
+}
+
 function renderGamePanel(root, game) {
   root.classList.add("settings-game-panel");
   if (game?.prediction) renderPredictionControl(root, game.prediction);

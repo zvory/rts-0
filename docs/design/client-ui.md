@@ -76,6 +76,8 @@ export class Net {
   setSpectator(spectator, id?)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
   giveUp()
+  pauseGame()
+  unpauseGame()
   returnToLobby()
   ping()
   netReport(report)
@@ -291,6 +293,16 @@ export class SettingsContainer {
 ```js
 buildSettingsTabs({ audio, hotkeyProfiles, game, debug })
 buildGiveUpAction({ visible, onOpen })
+buildPauseAction({ visible, disabled, label, title, onPause })
+```
+
+`live_pause_overlay.js`
+```js
+export class LivePauseOverlay {
+  constructor({ root, onUnpause })
+  applyLivePauseState(state)
+  destroy()
+}
 ```
 
 `room_capabilities.js`
@@ -299,9 +311,9 @@ createRoomCapabilities({ startPayload })
 ```
 `Match` and app-shell controls consume this parsed `startPayload.capabilities` and
 `startPayload.diagnostics` record for room-time controls, diagnostic settings, observer analysis,
-vision controls, and read-only/gameplay command affordances. Product shells may still use product
-metadata for launch/routing and owned controls such as replay branch creation or lab scenario tools,
-but shared affordances must not be inferred from replay/dev/lab identity.
+vision controls, live pause controls, and read-only/gameplay command affordances. Product shells may
+still use product metadata for launch/routing and owned controls such as replay branch creation or
+lab scenario tools, but shared affordances must not be inferred from replay/dev/lab identity.
 
 `lab_client.js`
 ```js
@@ -381,7 +393,9 @@ The long-lived `SettingsContainer` is constructed by `App` with `#settings-butto
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
 spectator, and replay contexts through dependency-injected collaborators. The stable rendered ids
 inside the settings mount point are `#pointer-lock-toggle`, `#debug-path-toggle`, and
-`#give-up-open`; they may not exist until their owning tab/action is visible.
+`#give-up-open` plus live-match action `#live-pause-open`; they may not exist until their owning
+tab/action is visible. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
+`livePauseState` messages; the overlay is read-only for spectators and destroyed with the match.
 
 `state.js`
 ```js

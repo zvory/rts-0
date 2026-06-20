@@ -235,6 +235,16 @@ export class Net {
     this._send(msg.giveUp());
   }
 
+  /** Request a server-authoritative live match pause. */
+  pauseGame() {
+    this._send(msg.pauseGame());
+  }
+
+  /** Request live match resume. */
+  unpauseGame() {
+    this._send(msg.unpauseGame());
+  }
+
   /** Leave replay playback and ask the room to return to lobby. */
   returnToLobby() {
     this._send(msg.returnToLobby());

@@ -1420,6 +1420,7 @@ async fn send_server_message(
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
         ServerMessage::RoomTimeState(_) => "room_time_state",
+        ServerMessage::LivePauseState(_) => "live_pause_state",
         ServerMessage::ObserverAnalysis(_) => "observer_analysis",
         ServerMessage::JoinReplayPrompt { .. } => "join_replay_prompt",
         ServerMessage::LabState(_) => "lab_state",
@@ -1732,6 +1733,17 @@ async fn handle_client_message(
         }
         ClientMessage::GiveUp => {
             send_room_event(player_id, current_room, RoomEvent::GiveUp { player_id }).await;
+        }
+        ClientMessage::PauseGame => {
+            send_room_event(player_id, current_room, RoomEvent::PauseGame { player_id }).await;
+        }
+        ClientMessage::UnpauseGame => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::UnpauseGame { player_id },
+            )
+            .await;
         }
         ClientMessage::ReturnToLobby => {
             if let Some(handle) = current_room.take() {
