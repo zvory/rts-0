@@ -48,6 +48,48 @@ fn visible_fog(map: &Map, entities: &EntityStore) -> Fog {
     fog
 }
 
+fn resolve_tank_test_target(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    tank_id: u32,
+) -> Option<u32> {
+    let los = LineOfSight::new(map);
+    let spatial = SpatialIndex::build(entities, map.size);
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1, 2, 3], entities, map);
+    let smokes = SmokeCloudStore::new();
+    let tank = entities.get(tank_id).expect("tank should exist");
+
+    resolve_target(
+        map,
+        entities,
+        teams,
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        tank_id,
+        tank.owner,
+        tank.pos_x,
+        tank.pos_y,
+        192.0,
+        combat_mode(tank),
+    )
+}
+
+fn spawn_tank_priority_target(
+    entities: &mut EntityStore,
+    kind: EntityKind,
+    x: f32,
+) -> Option<u32> {
+    if kind == EntityKind::TankTrap {
+        entities.spawn_building(2, kind, x, 100.0, true)
+    } else {
+        entities.spawn_unit(2, kind, x, 100.0)
+    }
+}
+
 fn player_state(id: u32, is_ai: bool) -> PlayerState {
     PlayerState {
         id,
@@ -513,6 +555,92 @@ fn anti_tank_gun_tank_preference_ignores_allied_tanks() {
 
     assert_eq!(target, Some(enemy_tank));
     assert_ne!(target, Some(allied_tank));
+}
+
+#[test]
+fn tank_target_priority_uses_declared_order_for_targets_in_weapon_range() {
+    use EntityKind::*;
+
+    let map = open_map(12);
+    let cases: &[(&[EntityKind], EntityKind)] = &[
+        (&[Rifleman, MortarTeam, TankTrap, Tank, AntiTankGun], AntiTankGun),
+        (&[Rifleman, MortarTeam, TankTrap, Tank], Tank),
+        (&[Rifleman, MortarTeam, TankTrap], TankTrap),
+        (&[Rifleman, MortarTeam], MortarTeam),
+        (&[Rifleman], Rifleman),
+    ];
+
+    for (targets, expected_kind) in cases.iter().copied() {
+        let mut entities = EntityStore::new();
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let mut expected_id = None;
+        for (index, kind) in targets.iter().copied().enumerate() {
+            let target_id = spawn_tank_priority_target(&mut entities, kind, 120.0 + index as f32 * 10.0)
+                .expect("priority target should spawn");
+            if kind == expected_kind {
+                expected_id = Some(target_id);
+            }
+        }
+        entities
+            .get_mut(tank)
+            .expect("tank should exist")
+            .set_order(Order::attack_move_to(300.0, 100.0));
+
+        assert_eq!(
+            resolve_tank_test_target(&map, &entities, &default_team_relations(), tank),
+            expected_id,
+            "tank should prefer {expected_kind:?}"
+        );
+    }
+}
+
+#[test]
+fn tank_priority_targets_must_be_in_weapon_range() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let rifleman = entities
+        .spawn_unit(2, EntityKind::Rifleman, 150.0, 100.0)
+        .expect("rifleman should spawn");
+    let anti_tank_gun = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 288.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    entities
+        .get_mut(tank)
+        .expect("tank should exist")
+        .set_order(Order::attack_move_to(320.0, 100.0));
+
+    let target = resolve_tank_test_target(&map, &entities, &default_team_relations(), tank);
+    assert_eq!(target, Some(rifleman));
+    assert_ne!(target, Some(anti_tank_gun));
+}
+
+#[test]
+fn tank_target_priority_overrides_retained_lower_priority_target() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let worker = entities
+        .spawn_unit(2, EntityKind::Worker, 130.0, 100.0)
+        .expect("worker should spawn");
+    let anti_tank_gun = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 160.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    if let Some(tank_entity) = entities.get_mut(tank) {
+        tank_entity.set_order(Order::move_to(300.0, 100.0));
+        tank_entity.set_target_id(Some(worker));
+    }
+
+    assert_eq!(
+        resolve_tank_test_target(&map, &entities, &default_team_relations(), tank),
+        Some(anti_tank_gun)
+    );
 }
 
 #[test]

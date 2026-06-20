@@ -9,6 +9,13 @@ const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
 const FRONT_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.0;
 const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.25;
 const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.75;
+pub const TANK_TARGET_PRIORITY_ORDER: [EntityKind; 4] = [
+    EntityKind::AntiTankGun,
+    EntityKind::Tank,
+    EntityKind::TankTrap,
+    EntityKind::MortarTeam,
+];
+
 /// Attack profile for a combat-capable unit or building.
 pub struct AttackProfile {
     pub range_tiles: u32,
