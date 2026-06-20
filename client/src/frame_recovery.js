@@ -20,9 +20,10 @@ export function runMatchFrameSafely(match, now) {
 }
 
 function runMatchFrame(match, now) {
+  const frameStartedAt = match.frameProfiler?.now?.() ?? now;
   const dt = (now - match.lastFrame) / 1000;
   const frameGapMs = now - match.lastFrame;
-  match.frameProfiler?.beginFrame({ at: now, frameGapMs });
+  match.frameProfiler?.beginFrame({ at: frameStartedAt, frameGapMs, scheduledAt: now });
   const time = (label, fn) => match.frameProfiler ? match.frameProfiler.time(label, fn) : fn();
   match.lastFrame = now;
   try {

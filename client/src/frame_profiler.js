@@ -6,6 +6,7 @@ const MAX_RECENT_LONG_FRAMES = 8;
 const MAX_LABEL_LENGTH = 64;
 const MAX_DIAGNOSTIC_COUNTERS = 160;
 const MAX_FRAME_DIAGNOSTIC_COUNTERS = 8;
+const FRAME_UNATTRIBUTED_LABEL = "frame.unattributed";
 
 export class FrameProfiler {
   constructor({
@@ -34,10 +35,13 @@ export class FrameProfiler {
     this.reportDiagnosticCounters = new Map();
   }
 
-  beginFrame({ at = this.now(), frameGapMs = null } = {}) {
+  beginFrame({ at = this.now(), frameGapMs = null, scheduledAt = null } = {}) {
     if (this.activeFrame) this.endFrame({ at });
+    const rafDispatchMs = Number.isFinite(scheduledAt) ? Math.max(0, at - scheduledAt) : null;
     this.activeFrame = {
       startedAt: at,
+      scheduledAt: finiteOrNull(scheduledAt),
+      rafDispatchMs: finiteOrNull(rafDispatchMs),
       frameGapMs: finiteOrNull(frameGapMs),
       phaseMs: new Map(),
       worstPhase: null,
@@ -46,6 +50,9 @@ export class FrameProfiler {
     };
     if (Number.isFinite(frameGapMs)) {
       this.recordPhase("frame.gap", frameGapMs, { slowMs: this.slowFrameMs, includeInWorst: false });
+    }
+    if (Number.isFinite(rafDispatchMs)) {
+      this.recordPhase("frame.rafDispatch", rafDispatchMs, { slowMs: this.slowPhaseMs });
     }
   }
 
@@ -90,10 +97,13 @@ export class FrameProfiler {
   endFrame({ at = this.now(), context = null } = {}) {
     const frame = this.activeFrame;
     if (!frame) return null;
-    this.activeFrame = null;
     if (context) this.setContext(context);
     const totalWorkMs = Math.max(0, at - frame.startedAt);
+    const topLevelPhaseMs = topLevelFramePhaseTotalMs(frame.phaseMs);
+    const unattributedFrameMs = Math.max(0, totalWorkMs - topLevelPhaseMs);
     this.recordPhase("frame.work", totalWorkMs, { slowMs: this.slowFrameMs, includeInWorst: false });
+    this.recordPhase(FRAME_UNATTRIBUTED_LABEL, unattributedFrameMs, { slowMs: this.slowPhaseMs });
+    this.activeFrame = null;
     this.frameCount += 1;
     this.reportFrameCount += 1;
     const slow = (Number.isFinite(frame.frameGapMs) && frame.frameGapMs >= this.slowFrameMs)
@@ -116,8 +126,12 @@ export class FrameProfiler {
     const longFrameContext = longFrameContextFrom(frame);
     const summary = {
       at: round1(at),
+      scheduledAt: round1(frame.scheduledAt),
+      rafDispatchMs: round1(frame.rafDispatchMs),
       frameGapMs: round1(frame.frameGapMs),
       frameWorkMs: round1(totalWorkMs),
+      topLevelPhaseMs: round1(topLevelPhaseMs),
+      unattributedFrameMs: round1(unattributedFrameMs),
       slow,
       worstPhase: frame.worstPhase,
       worstPhaseMs: round1(frame.worstPhaseMs),
@@ -163,6 +177,8 @@ export class FrameProfiler {
 
   reportSummary() {
     const frameWork = this.reportPhases.get("frame.work");
+    const frameUnattributed = this.reportPhases.get(FRAME_UNATTRIBUTED_LABEL);
+    const frameRafDispatch = this.reportPhases.get("frame.rafDispatch");
     const renderer = this.reportPhases.get("match.renderer");
     const worstFramePhase = worstPhaseFrom(this.reportWorstPhaseCounts);
     const worstAggregate = worstFramePhase ? this.reportPhases.get(worstFramePhase.label) : null;
@@ -172,6 +188,10 @@ export class FrameProfiler {
       slowFrameCount: this.reportSlowFrameCount,
       frameWorkMaxMs: aggregateMaxMs(frameWork),
       frameWorkP95Ms: aggregatePercentileMs(frameWork, 0.95),
+      frameUnattributedMaxMs: aggregateMaxMs(frameUnattributed),
+      frameUnattributedP95Ms: aggregatePercentileMs(frameUnattributed, 0.95),
+      frameRafDispatchMaxMs: aggregateMaxMs(frameRafDispatch),
+      frameRafDispatchP95Ms: aggregatePercentileMs(frameRafDispatch, 0.95),
       worstFramePhase: worstFramePhase?.label || "",
       worstFramePhaseMs: aggregateMaxMs(worstAggregate),
       rendererMaxMs: aggregateMaxMs(renderer),
@@ -421,6 +441,14 @@ function phaseRowsFrom(phases) {
   return Array.from(phases.entries())
     .map(([label, aggregate]) => ({ label, ...aggregate.summary() }))
     .sort((a, b) => b.totalMs - a.totalMs || b.maxMs - a.maxMs || a.label.localeCompare(b.label));
+}
+
+function topLevelFramePhaseTotalMs(phaseMs) {
+  let total = 0;
+  for (const [label, ms] of phaseMs || []) {
+    if (label.startsWith("match.") && Number.isFinite(ms)) total += ms;
+  }
+  return total;
 }
 
 function diagnosticSummaryFrom(counters, frameCount) {

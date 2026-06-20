@@ -201,8 +201,9 @@ It fails on runtime errors or missing perf summaries, not on absolute FPS thresh
 suite writes per-workload summaries and a `target/client-perf/render-lag-comparison/<timestamp>/`
 rollup with advisory 60, 120, 240, and 480 FPS frame-work budget margins plus the next missed p95
 budget. Open a generated `summary.json` to inspect workload metadata, build/version, viewport,
-entity/context counts, `renderBudget`, frame timing aggregates, worst phases, page errors, and the
-generated client net report.
+entity/context counts, `renderBudget`, frame attribution, `frame.unattributed`,
+`frame.rafDispatch`, frame timing aggregates, worst phases, page errors, and the generated client
+net report.
 The stress matrix writes a `target/client-perf/render-stress-matrix/<timestamp>/` rollup with CPU
 throttle, viewport, DPR, repeat, first missed budget, top measured phase, and per-sample artifact
 paths. It is advisory local evidence only; use the longer documented command in

@@ -1365,7 +1365,7 @@ function hotkeyService() {
     maxRecentFrames: 2,
   });
 
-  profiler.beginFrame({ at: 0, frameGapMs: 16 });
+  profiler.beginFrame({ at: 0, frameGapMs: 16, scheduledAt: -5 });
   profiler.recordPhase("match.camera", 3);
   profiler.recordPhase("renderer.units", 9);
   profiler.recordDiagnosticCounter("renderer.pixi.displayObject.created.units", 2);
@@ -1396,8 +1396,14 @@ function hotkeyService() {
   assert(unitsPhase?.maxMs === 9, "FrameProfiler records phase max timing");
   assert(unitsPhase?.p50Ms === 1, "FrameProfiler reports bucketed p50 timing");
   assert(unitsPhase?.p95Ms === 12, "FrameProfiler reports bucketed p95 timing");
-  assert(summary.worstPhase?.label === "renderer.units", "FrameProfiler reports the most common worst phase");
+  const unattributedPhase = summary.phases.find((phase) => phase.label === "frame.unattributed");
+  assert(unattributedPhase?.p95Ms === 24, "FrameProfiler records unattributed frame work");
+  const rafDispatchPhase = summary.phases.find((phase) => phase.label === "frame.rafDispatch");
+  assert(rafDispatchPhase?.p95Ms === 8, "FrameProfiler records RAF dispatch delay separately");
+  assert(summary.worstPhase?.label === "frame.unattributed", "FrameProfiler can report missing frame attribution as the worst phase");
   assert(summary.recentLongFrames.length === 2, "FrameProfiler keeps bounded long-frame context");
+  assert(summary.recentLongFrames[0].rafDispatchMs === 5, "FrameProfiler long-frame context includes RAF dispatch delay");
+  assert(summary.recentLongFrames[0].unattributedFrameMs === 22, "FrameProfiler long-frame context includes unattributed work");
   assert(
     summary.recentLongFrames[0].rendererNestedPhase?.label === "renderer.units",
     "FrameProfiler long-frame context names the slowest nested renderer phase",
@@ -1415,8 +1421,12 @@ function hotkeyService() {
   assert(report.slowFrameCount === 2, "FrameProfiler report summary counts slow frames");
   assert(report.frameWorkMaxMs === 25, "FrameProfiler report summary records max frame work");
   assert(report.frameWorkP95Ms === 33, "FrameProfiler report summary records bucketed frame work p95");
-  assert(report.worstFramePhase === "renderer.units", "FrameProfiler report summary names worst phase");
-  assert(report.worstFramePhaseMs === 9, "FrameProfiler report summary records worst phase max");
+  assert(report.frameUnattributedMaxMs === 22, "FrameProfiler report summary records max unattributed frame work");
+  assert(report.frameUnattributedP95Ms === 24, "FrameProfiler report summary records bucketed unattributed p95");
+  assert(report.frameRafDispatchMaxMs === 5, "FrameProfiler report summary records max RAF dispatch delay");
+  assert(report.frameRafDispatchP95Ms === 8, "FrameProfiler report summary records bucketed RAF dispatch p95");
+  assert(report.worstFramePhase === "frame.unattributed", "FrameProfiler report summary names worst phase");
+  assert(report.worstFramePhaseMs === 22, "FrameProfiler report summary records worst phase max");
   assert(report.rendererMaxMs === 0, "FrameProfiler report summary tolerates missing renderer phase");
   assert(
     report.renderDiagnostics.counters.some((counter) => counter.label === "hud.dirty.resources.hit"),
@@ -1444,6 +1454,7 @@ function hotkeyService() {
     context: { entityCount: 42, selectedCount: 4 },
     phases: [
       { label: "frame.work", count: 120, avgMs: 7.5, maxMs: 14.6, p50Ms: 8, p95Ms: 12, slowCount: 0 },
+      { label: "frame.unattributed", count: 120, avgMs: 4.9, maxMs: 10, p50Ms: 4, p95Ms: 8, slowCount: 4 },
       { label: "match.minimap", count: 120, avgMs: 2.6, maxMs: 5.9, p50Ms: 2, p95Ms: 4, slowCount: 0 },
       { label: "renderer.units", count: 120, avgMs: 0.9, maxMs: 2.4, p50Ms: 1, p95Ms: 2, slowCount: 0 },
     ],
@@ -1454,6 +1465,8 @@ function hotkeyService() {
   assert(report.status === "warn", "render budget report warns without failing on over-budget frame work");
   assert(report.frameWork.avgMs === 7.5, "render budget report includes frame.work average");
   assert(report.frameWork.p95Ms === 12, "render budget report includes frame.work p95");
+  assert(report.frameAttribution.topLevelAvgMs === 2.6, "render budget report sums top-level named work");
+  assert(report.frameAttribution.unattributedP95Ms === 8, "render budget report includes unattributed p95");
   const budget120 = report.frameWork.budgetMargins.find((budget) => budget.fps === 120);
   assert(budget120.p95MarginMs === -3.67 && budget120.p95Clears === false, "render budget report shows p95 margin to 120 FPS");
   assert(report.frameWork.nextMissedBudget.fps === 120, "render budget report names the next missed p95 budget");
@@ -1474,6 +1487,10 @@ function hotkeyService() {
   assert(
     formatRenderBudgetConsole(report).includes("advisory"),
     "render budget console summary labels warnings as advisory",
+  );
+  assert(
+    formatRenderBudgetConsole(report).includes("frame attribution"),
+    "render budget console summary includes frame attribution",
   );
 }
 
@@ -1564,6 +1581,7 @@ function hotkeyService() {
     worstPhase: { label: "match.renderer", count: 80 },
     phases: [
       { label: "frame.work", count: 120, avgMs: 12, maxMs: 22, p95Ms: 18 },
+      { label: "frame.unattributed", count: 120, avgMs: 7, maxMs: 15, p95Ms: 14 },
       { label: "match.renderer", count: 120, avgMs: 5, maxMs: 12, p95Ms: 9 },
       { label: "renderer.units", count: 120, avgMs: 3, maxMs: 7, p95Ms: 5 },
     ],
@@ -1606,8 +1624,8 @@ function hotkeyService() {
     "stress matrix summary ranks the first failing cell",
   );
   assert(
-    matrixSummary.firstFailingCell.topMeasuredPhase.label === "match.renderer",
-    "stress matrix summary reports the top measured phase for the failing cell",
+    matrixSummary.firstFailingCell.topMeasuredPhase.label === "frame.unattributed",
+    "stress matrix summary reports unattributed work when it is the top measured phase",
   );
   assert(
     formatRenderStressMatrixMarkdown(matrixSummary).includes("fog-combat-replay-stress"),
