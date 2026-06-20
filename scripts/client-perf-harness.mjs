@@ -19,6 +19,12 @@ const DEFAULT_DURATION_MS = 6000;
 const DEFAULT_CODEC_SAMPLE_LIMIT = 240;
 export const RENDER_TARGET_FPS = 120;
 export const RENDER_FRAME_BUDGET_MS = 8.33;
+export const RENDER_FRAME_BUDGET_TARGETS = Object.freeze([
+  Object.freeze({ fps: 60, frameBudgetMs: 16.67 }),
+  Object.freeze({ fps: 120, frameBudgetMs: 8.33 }),
+  Object.freeze({ fps: 240, frameBudgetMs: 4.17 }),
+  Object.freeze({ fps: 480, frameBudgetMs: 2.08 }),
+]);
 export const RECURRING_PHASE_WARN_MS = 1;
 export const RECURRING_PHASE_HIGH_WARN_MS = 2;
 const MAX_RECURRING_WARNINGS = 8;
@@ -323,8 +329,15 @@ function snapshotPacketBudgetSummary(report) {
 export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
   const phases = Array.isArray(perfSummary?.phases) ? perfSummary.phases : [];
   const framePhase = phaseByLabel(phases, "frame.work");
+  const frameWorkAvgMs = numericMetric(framePhase?.avgMs);
   const frameWorkP95Ms = numericMetric(framePhase?.p95Ms ?? reportSummary?.frameWorkP95Ms);
   const frameWorkMaxMs = numericMetric(framePhase?.maxMs ?? reportSummary?.frameWorkMaxMs);
+  const frameWorkBudgetMargins = buildFrameWorkBudgetMargins({
+    avgMs: frameWorkAvgMs,
+    p95Ms: frameWorkP95Ms,
+    maxMs: frameWorkMaxMs,
+  });
+  const nextMissedBudget = nextMissedFrameWorkBudget(frameWorkBudgetMargins, "p95");
   const worstPhase = perfSummary?.worstPhase || (
     reportSummary?.worstFramePhase
       ? { label: reportSummary.worstFramePhase, count: null }
@@ -353,11 +366,20 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
     }));
 
   const warnings = [];
-  if (frameWorkP95Ms != null && frameWorkP95Ms > RENDER_FRAME_BUDGET_MS) {
+  if (nextMissedBudget) {
+    const missedByMs = Math.abs(nextMissedBudget.p95MarginMs);
+    const clears120 = frameWorkP95Ms != null && frameWorkP95Ms <= RENDER_FRAME_BUDGET_MS;
     warnings.push({
-      kind: "frame_work_p95_over_budget",
-      severity: "high",
-      message: `frame.work p95 ${formatMs(frameWorkP95Ms)} is above the ${formatMs(RENDER_FRAME_BUDGET_MS)} 120 FPS budget`,
+      kind: nextMissedBudget.fps <= RENDER_TARGET_FPS
+        ? "frame_work_p95_over_budget"
+        : "frame_work_p95_misses_headroom_budget",
+      severity: nextMissedBudget.fps <= RENDER_TARGET_FPS ? "high" : "warn",
+      fps: nextMissedBudget.fps,
+      frameBudgetMs: nextMissedBudget.frameBudgetMs,
+      p95MarginMs: nextMissedBudget.p95MarginMs,
+      message: clears120
+        ? `frame.work p95 ${formatMs(frameWorkP95Ms)} clears 120 FPS locally but misses the ${nextMissedBudget.fps} FPS headroom budget by ${formatMs(missedByMs)}`
+        : `frame.work p95 ${formatMs(frameWorkP95Ms)} misses the ${nextMissedBudget.fps} FPS budget by ${formatMs(missedByMs)}`,
     });
   }
   const highRecurring = recurringPhaseWarnings.filter((phase) => phase.severity === "high");
@@ -381,14 +403,18 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
     target: {
       fps: RENDER_TARGET_FPS,
       frameBudgetMs: RENDER_FRAME_BUDGET_MS,
+      frameBudgets: RENDER_FRAME_BUDGET_TARGETS,
       recurringPhaseWarnMs: RECURRING_PHASE_WARN_MS,
       recurringPhaseHighWarnMs: RECURRING_PHASE_HIGH_WARN_MS,
     },
     frameWork: {
       frameCount: numberOrNull(perfSummary?.frameCount ?? reportSummary?.frameCount),
       slowFrameCount: numberOrNull(perfSummary?.slowFrameCount ?? reportSummary?.slowFrameCount),
+      avgMs: frameWorkAvgMs,
       p95Ms: frameWorkP95Ms,
       maxMs: frameWorkMaxMs,
+      budgetMargins: frameWorkBudgetMargins,
+      nextMissedBudget,
     },
     worstPhase: worstPhase ? {
       label: worstPhase.label || "",
@@ -405,6 +431,7 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
     warnings,
     notes: [
       "Advisory only: this report does not fail CI on absolute FPS or frame timing.",
+      "Frame budget margins are budget minus frame work; positive values clear the target.",
       "Do not add top-level frame.work to nested renderer/minimap phases when attributing cost.",
     ],
   };
@@ -413,11 +440,17 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
 export function formatRenderBudgetConsole(report) {
   if (!report) return "";
   const frame = report.frameWork || {};
+  const p95Margins = Array.isArray(frame.budgetMargins)
+    ? frame.budgetMargins.map((budget) => `${budget.fps}=${formatSignedMs(budget.p95MarginMs)}`).join(" ")
+    : "";
+  const nextMissed = frame.nextMissedBudget
+    ? ` next missed=${frame.nextMissedBudget.fps} FPS by ${formatMs(Math.abs(frame.nextMissedBudget.p95MarginMs))}`
+    : " next missed=none";
   const worst = report.worstPhase?.label
     ? ` worst=${report.worstPhase.label}${report.worstPhase.count == null ? "" : ` x${report.worstPhase.count}`}`
     : "";
   const lines = [
-    `render budget advisory: frame.work p95=${formatMs(frame.p95Ms)} max=${formatMs(frame.maxMs)} target=${formatMs(report.target.frameBudgetMs)} (${report.target.fps} FPS) slow=${frame.slowFrameCount || 0}/${frame.frameCount || 0}${worst}`,
+    `render budget advisory: frame.work avg=${formatMs(frame.avgMs)} p95=${formatMs(frame.p95Ms)} max=${formatMs(frame.maxMs)} p95 margins ${p95Margins}${nextMissed} slow=${frame.slowFrameCount || 0}/${frame.frameCount || 0}${worst}`,
   ];
   if (report.recurringPhaseWarnings?.length) {
     lines.push(`recurring phase p95 >= ${formatMs(RECURRING_PHASE_WARN_MS)}: ${
@@ -444,6 +477,7 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
     target: {
       fps: RENDER_TARGET_FPS,
       frameBudgetMs: RENDER_FRAME_BUDGET_MS,
+      frameBudgets: RENDER_FRAME_BUDGET_TARGETS,
       recurringPhaseWarnMs: RECURRING_PHASE_WARN_MS,
       recurringPhaseHighWarnMs: RECURRING_PHASE_HIGH_WARN_MS,
     },
@@ -458,8 +492,11 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
       status: result.status,
       artifactDir: result.artifactDir,
       frameCount: result.frameCount || 0,
+      frameWorkAvgMs: result.renderBudget?.frameWork?.avgMs ?? null,
       frameWorkP95Ms: result.renderBudget?.frameWork?.p95Ms ?? null,
       frameWorkMaxMs: result.renderBudget?.frameWork?.maxMs ?? null,
+      frameWorkBudgetMargins: result.renderBudget?.frameWork?.budgetMargins || [],
+      nextMissedBudget: result.renderBudget?.frameWork?.nextMissedBudget || null,
       worstPhase: result.renderBudget?.worstPhase || null,
       warnings: result.renderBudget?.warnings || [],
       recurringPhaseWarnings: result.renderBudget?.recurringPhaseWarnings || [],
@@ -480,6 +517,32 @@ function numberOrNull(value) {
 
 function stringOrNull(value) {
   return typeof value === "string" ? value : null;
+}
+
+function buildFrameWorkBudgetMargins({ avgMs, p95Ms, maxMs }) {
+  return RENDER_FRAME_BUDGET_TARGETS.map((budget) => ({
+    fps: budget.fps,
+    frameBudgetMs: budget.frameBudgetMs,
+    avgMarginMs: marginMs(budget.frameBudgetMs, avgMs),
+    avgClears: clearsBudget(budget.frameBudgetMs, avgMs),
+    p95MarginMs: marginMs(budget.frameBudgetMs, p95Ms),
+    p95Clears: clearsBudget(budget.frameBudgetMs, p95Ms),
+    maxMarginMs: marginMs(budget.frameBudgetMs, maxMs),
+    maxClears: clearsBudget(budget.frameBudgetMs, maxMs),
+  }));
+}
+
+function nextMissedFrameWorkBudget(budgets, metric) {
+  const clearsKey = `${metric}Clears`;
+  const marginKey = `${metric}MarginMs`;
+  const missed = budgets.find((budget) => budget[clearsKey] === false);
+  if (!missed) return null;
+  return {
+    fps: missed.fps,
+    frameBudgetMs: missed.frameBudgetMs,
+    metric,
+    [`${metric}MarginMs`]: missed[marginKey],
+  };
 }
 
 function phaseByLabel(phases, label) {
@@ -510,9 +573,30 @@ function numericMetric(value) {
   return null;
 }
 
+function marginMs(budgetMs, valueMs) {
+  if (!Number.isFinite(valueMs)) return null;
+  return roundMetric(budgetMs - valueMs);
+}
+
+function clearsBudget(budgetMs, valueMs) {
+  if (!Number.isFinite(valueMs)) return null;
+  return valueMs <= budgetMs;
+}
+
+function roundMetric(value) {
+  if (!Number.isFinite(value)) return null;
+  return Math.round(value * 100) / 100;
+}
+
 function formatMs(value) {
   if (!Number.isFinite(value)) return "n/a";
   return `${Math.round(value * 100) / 100}ms`;
+}
+
+function formatSignedMs(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  const rounded = Math.round(value * 100) / 100;
+  return `${rounded >= 0 ? "+" : ""}${rounded}ms`;
 }
 
 async function collectPageSummary(page) {
