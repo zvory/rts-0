@@ -9,6 +9,8 @@ import {
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "../config.js";
+import { buildingRigDefinitionFor } from "./rigs/building_routing.js";
+import { renderLiveUnitRig } from "./rigs/runtime.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
@@ -71,35 +73,46 @@ export function _drawBuilding(e, colorByOwner, state) {
   if (e.kind === KIND.TANK_TRAP) {
     drawTankTrap(g, e.x, e.y, ts, e.id, bodyAlpha);
   } else {
-    const tint = this._tintFor(e.owner, colorByOwner);
-    g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
-    g.beginFill(0x2b2a23, bodyAlpha);
-    g.drawRect(x0, y0, w, h);
-    g.endFill();
-
-    // Player-tinted roof/yard slabs, all neutral geometry.
-    g.lineStyle(0);
-    g.beginFill(tint, bodyAlpha * 0.82);
-    if (e.kind === KIND.CITY_CENTRE) {
-      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
-      g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
-      g.beginFill(0x1a1712, bodyAlpha * 0.7);
-      g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
-    } else if (e.kind === KIND.FACTORY) {
-      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
-      g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
-      g.beginFill(0x1a1712, bodyAlpha * 0.55);
-      for (let i = 0; i < 3; i++) g.drawRect(x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
-    } else if (e.kind === KIND.DEPOT) {
-      g.drawRect(x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
-      g.drawRect(x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
+    // SVG rig body — look up the compiled definition and route it through the
+    // buildingRigs pool into the buildings layer. Falls back to imperative
+    // rect drawing if no definition is loaded (e.g. compile error on startup).
+    const definition = buildingRigDefinitionFor(this._buildingRigDefinitions, e.kind);
+    if (definition) {
+      renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+        routes: [{ poolName: "buildingRigs", layerName: "buildings" }],
+        alpha: bodyAlpha,
+      });
     } else {
-      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
-      g.beginFill(0x1a1712, bodyAlpha * 0.42);
-      g.drawRect(x0 + w * 0.22, y0 + h * 0.26, w * 0.56, h * 0.12);
-      g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
+      const tint = this._tintFor(e.owner, colorByOwner);
+      g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
+      g.beginFill(0x2b2a23, bodyAlpha);
+      g.drawRect(x0, y0, w, h);
+      g.endFill();
+
+      // Player-tinted roof/yard slabs, all neutral geometry.
+      g.lineStyle(0);
+      g.beginFill(tint, bodyAlpha * 0.82);
+      if (e.kind === KIND.CITY_CENTRE) {
+        g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
+        g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
+        g.beginFill(0x1a1712, bodyAlpha * 0.7);
+        g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
+      } else if (e.kind === KIND.FACTORY) {
+        g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
+        g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
+        g.beginFill(0x1a1712, bodyAlpha * 0.55);
+        for (let i = 0; i < 3; i++) g.drawRect(x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
+      } else if (e.kind === KIND.DEPOT) {
+        g.drawRect(x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
+        g.drawRect(x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
+      } else {
+        g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
+        g.beginFill(0x1a1712, bodyAlpha * 0.42);
+        g.drawRect(x0 + w * 0.22, y0 + h * 0.26, w * 0.56, h * 0.12);
+        g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
+      }
+      g.endFill();
     }
-    g.endFill();
 
     // Stencil label — pooled Text reused per building id (see _icon).
     this._icon(e, e.x, e.y, Math.min(w, h) * 0.5, bodyAlpha);

@@ -57,6 +57,7 @@ import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
+import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { buildStaticMap } from "./terrain.js";
 import {
@@ -156,17 +157,20 @@ export class Renderer {
     // Live SVG rig instances are routed per unit kind. Invalid or missing
     // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
+    this._buildingRigDefinitions = createBuildingRigDefinitions();
     this._liveRigPools = {
       liveUnitRigShadows: new Map(),
       liveUnitRigs: new Map(),
       liveShotRevealRigShadows: new Map(),
       liveShotRevealRigs: new Map(),
+      buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
       liveUnitRigShadows: { poolName: "liveUnitRigShadows", layerName: "unitShadows" },
       liveUnitRigs: { poolName: "liveUnitRigs", layerName: "units" },
       liveShotRevealRigShadows: { poolName: "liveShotRevealRigShadows", layerName: "shotRevealShadows" },
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
+      buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
 
