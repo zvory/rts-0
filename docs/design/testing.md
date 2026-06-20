@@ -245,14 +245,19 @@ OpenAI Agents SDK, direct API clients, API-key environment variables, or API-bil
 routes. Fixture runs use `--no-codex --fixture <name>` and are the required focused verification
 path before any live Codex smoke. Classifier decisions are cached under the ignored
 `.docdrift/classifier-cache/` runtime directory by prompt version and commit SHA, and reports can be
-written with `--out-dir`.
+written with `--out-dir`. Live Codex calls run read-only with approval policy forced to `never` via
+Codex config override, emit per-commit progress on stderr, and record token usage when the Codex
+JSON event stream includes it.
 
 `scripts/docdrift-sweep.mjs --generate-docs` reruns or reuses the classifier records, selects only
 `update_docs` decisions, loads targeted authoritative design-doc sections, and asks Codex CLI for
-exact minimal find/replace doc patches. The script applies those patches to the working tree and
-writes `docdrift-generate.{md,json}` with `--out-dir`; operators inspect the resulting docs diff
-before any PR lifecycle step. Fixture runs use the same `--no-codex --fixture <name>` path and must
-remain idempotent, with reruns reporting already-applied patches instead of duplicating text.
+exact minimal find/replace doc patches. The generator prefers classifier-selected design docs; docs
+touched in the commit and broad trace-map design docs are fallbacks, not an automatic union. The
+script applies generated patches to the working tree and writes `docdrift-generate.{md,json}` with
+`--out-dir`; operators inspect the resulting docs diff before any PR lifecycle step. Fixture runs
+use the same `--no-codex --fixture <name>` path and must remain idempotent. If a retry sees that a
+cached patch's replacement text is already present, it reports the patch as already applied without
+spending another Codex generation call.
 
 `scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
 uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed
