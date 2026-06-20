@@ -489,6 +489,11 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
     p95Ms: frameWorkP95Ms,
     maxMs: frameWorkMaxMs,
   });
+  const frameAttribution = buildFrameAttributionReport(phases, reportSummary, {
+    avgMs: frameWorkAvgMs,
+    p95Ms: frameWorkP95Ms,
+    maxMs: frameWorkMaxMs,
+  });
   const nextMissedBudget = nextMissedFrameWorkBudget(frameWorkBudgetMargins, "p95");
   const worstPhase = perfSummary?.worstPhase || (
     reportSummary?.worstFramePhase
@@ -568,6 +573,7 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
       budgetMargins: frameWorkBudgetMargins,
       nextMissedBudget,
     },
+    frameAttribution,
     worstPhase: worstPhase ? {
       label: worstPhase.label || "",
       count: numberOrNull(worstPhase.count),
@@ -585,6 +591,7 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
       "Advisory only: this report does not fail CI on absolute FPS or frame timing.",
       "Frame budget margins are budget minus frame work; positive values clear the target.",
       "Do not add top-level frame.work to nested renderer/minimap phases when attributing cost.",
+      "frame.unattributed is frame.work minus top-level match.* phases; high values mean the frame needs finer timing or off-RAF trace inspection.",
     ],
   };
 }
@@ -649,6 +656,15 @@ export function formatRenderBudgetConsole(report) {
   const lines = [
     `render budget advisory: frame.work avg=${formatMs(frame.avgMs)} p95=${formatMs(frame.p95Ms)} max=${formatMs(frame.maxMs)} p95 margins ${p95Margins}${nextMissed} slow=${frame.slowFrameCount || 0}/${frame.frameCount || 0}${worst}`,
   ];
+  const attribution = report.frameAttribution || null;
+  if (attribution) {
+    lines.push(
+      `frame attribution: named top-level avg=${formatMs(attribution.topLevelAvgMs)} `
+        + `unattributed avg=${formatMs(attribution.unattributedAvgMs)} p95=${formatMs(attribution.unattributedP95Ms)} `
+        + `raf dispatch p95=${formatMs(attribution.rafDispatchP95Ms)} `
+        + `coverage=${formatPercent(attribution.avgTopLevelCoveragePct)}`,
+    );
+  }
   if (report.recurringPhaseWarnings?.length) {
     lines.push(`recurring phase p95 >= ${formatMs(RECURRING_PHASE_WARN_MS)}: ${
       report.recurringPhaseWarnings
@@ -699,6 +715,7 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
       frameWorkMaxMs: result.renderBudget?.frameWork?.maxMs ?? null,
       frameWorkBudgetMargins: result.renderBudget?.frameWork?.budgetMargins || [],
       nextMissedBudget: result.renderBudget?.frameWork?.nextMissedBudget || null,
+      frameAttribution: result.renderBudget?.frameAttribution || null,
       worstPhase: result.renderBudget?.worstPhase || null,
       warnings: result.renderBudget?.warnings || [],
       recurringPhaseWarnings: result.renderBudget?.recurringPhaseWarnings || [],
@@ -840,6 +857,7 @@ function summarizeStressMatrixCell(cell) {
   const budgetMargins = buildFrameWorkBudgetMargins(representative);
   const nextMissedBudget = nextMissedFrameWorkBudget(budgetMargins, "p95");
   const topMeasuredPhase = topMeasuredPhaseFromSamples(successful);
+  const frameAttribution = summarizeStressMatrixFrameAttribution(successful);
   return {
     workloadId: cell.workloadId,
     configLabel: cell.configLabel,
@@ -860,6 +878,7 @@ function summarizeStressMatrixCell(cell) {
       p95SampleMaxMs: frameP95.length > 0 ? roundMetric(Math.max(...frameP95)) : null,
       budgetMargins,
     },
+    frameAttribution,
     nextMissedBudget,
     topMeasuredPhase,
     recurringPhaseWarnings: mergeRecurringPhaseWarnings(successful),
@@ -926,6 +945,24 @@ function mergeRecurringPhaseWarnings(samples) {
     .slice(0, MAX_RECURRING_WARNINGS);
 }
 
+function summarizeStressMatrixFrameAttribution(samples) {
+  const attributions = samples
+    .map((sample) => sample.renderBudget?.frameAttribution)
+    .filter((attribution) => attribution && typeof attribution === "object");
+  if (attributions.length === 0) return null;
+  return {
+    topLevelAvgMs: averageMetric(attributions.map((item) => item.topLevelAvgMs).filter(Number.isFinite)),
+    unattributedAvgMs: averageMetric(attributions.map((item) => item.unattributedAvgMs).filter(Number.isFinite)),
+    unattributedP95Ms: averageMetric(attributions.map((item) => item.unattributedP95Ms).filter(Number.isFinite)),
+    unattributedMaxMs: maxMetricFromList(attributions.map((item) => item.unattributedMaxMs)),
+    rafDispatchAvgMs: averageMetric(attributions.map((item) => item.rafDispatchAvgMs).filter(Number.isFinite)),
+    rafDispatchP95Ms: averageMetric(attributions.map((item) => item.rafDispatchP95Ms).filter(Number.isFinite)),
+    rafDispatchMaxMs: maxMetricFromList(attributions.map((item) => item.rafDispatchMaxMs)),
+    avgTopLevelCoveragePct: averageMetric(attributions.map((item) => item.avgTopLevelCoveragePct).filter(Number.isFinite)),
+    sampleCount: attributions.length,
+  };
+}
+
 function compareStressMatrixFailures(a, b) {
   return (a.nextMissedBudget.fps || 0) - (b.nextMissedBudget.fps || 0)
     || (a.nextMissedBudget.p95MarginMs || 0) - (b.nextMissedBudget.p95MarginMs || 0)
@@ -969,6 +1006,11 @@ export function formatRenderStressMatrixMarkdown(summary) {
 function averageMetric(values) {
   if (!values.length) return null;
   return roundMetric(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function maxMetricFromList(values) {
+  const finite = values.filter(Number.isFinite);
+  return finite.length > 0 ? roundMetric(Math.max(...finite)) : null;
 }
 
 function maxMetric(a, b) {
@@ -1036,8 +1078,12 @@ function sanitizeLongFrames(frames) {
   if (!Array.isArray(frames)) return [];
   return frames.slice(-8).map((frame) => ({
     at: numberOrNull(frame?.at),
+    scheduledAt: numberOrNull(frame?.scheduledAt),
+    rafDispatchMs: numberOrNull(frame?.rafDispatchMs),
     frameGapMs: numberOrNull(frame?.frameGapMs),
     frameWorkMs: numberOrNull(frame?.frameWorkMs),
+    topLevelPhaseMs: numberOrNull(frame?.topLevelPhaseMs),
+    unattributedFrameMs: numberOrNull(frame?.unattributedFrameMs),
     worstPhase: stringOrNull(frame?.worstPhase) || "",
     worstPhaseMs: numberOrNull(frame?.worstPhaseMs),
     topPhase: sanitizePhaseContext(frame?.topPhase),
@@ -1080,6 +1126,39 @@ function buildFrameWorkBudgetMargins({ avgMs, p95Ms, maxMs }) {
     maxMarginMs: marginMs(budget.frameBudgetMs, maxMs),
     maxClears: clearsBudget(budget.frameBudgetMs, maxMs),
   }));
+}
+
+function buildFrameAttributionReport(phases, reportSummary, frameWork) {
+  const topLevelRows = summarizePhaseGroup(phases, (phase) => phase.label?.startsWith("match."));
+  const topLevelAvgMs = roundMetric(topLevelRows.reduce((sum, phase) => sum + numberOrZero(phase.avgMs), 0));
+  const unattributedPhase = phaseByLabel(phases, "frame.unattributed");
+  const rafDispatchPhase = phaseByLabel(phases, "frame.rafDispatch");
+  const fallbackUnattributedAvgMs = Number.isFinite(frameWork?.avgMs) && Number.isFinite(topLevelAvgMs)
+    ? Math.max(0, frameWork.avgMs - topLevelAvgMs)
+    : null;
+  const unattributedAvgMs = numericMetric(unattributedPhase?.avgMs) ?? roundMetric(fallbackUnattributedAvgMs);
+  const unattributedP95Ms = numericMetric(unattributedPhase?.p95Ms ?? reportSummary?.frameUnattributedP95Ms);
+  const unattributedMaxMs = numericMetric(unattributedPhase?.maxMs ?? reportSummary?.frameUnattributedMaxMs);
+  const avgTopLevelCoveragePct = Number.isFinite(frameWork?.avgMs) && frameWork.avgMs > 0 && Number.isFinite(topLevelAvgMs)
+    ? roundMetric((topLevelAvgMs / frameWork.avgMs) * 100)
+    : null;
+  return {
+    topLevelAvgMs,
+    unattributedAvgMs,
+    unattributedP95Ms,
+    unattributedMaxMs,
+    rafDispatchAvgMs: numericMetric(rafDispatchPhase?.avgMs),
+    rafDispatchP95Ms: numericMetric(rafDispatchPhase?.p95Ms ?? reportSummary?.frameRafDispatchP95Ms),
+    rafDispatchMaxMs: numericMetric(rafDispatchPhase?.maxMs ?? reportSummary?.frameRafDispatchMaxMs),
+    avgTopLevelCoveragePct,
+    topLevelPhaseCount: topLevelRows.length,
+    topLevelPhases: topLevelRows.slice(0, 8),
+    notes: [
+      "topLevelAvgMs sums match.* phases only, so nested renderer.* and minimap.* rows are not double-counted.",
+      "frame.unattributed is measured per frame by subtracting top-level match.* work from frame.work.",
+      "frame.rafDispatch is browser callback dispatch delay before measured frame.work starts.",
+    ],
+  };
 }
 
 function nextMissedFrameWorkBudget(budgets, metric) {
@@ -1152,6 +1231,11 @@ function formatSignedMs(value) {
 function formatCount(value) {
   if (!Number.isFinite(value)) return "n/a";
   return String(Math.round(value * 10) / 10);
+}
+
+function formatPercent(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return `${Math.round(value * 10) / 10}%`;
 }
 
 async function collectPageSummary(page) {
