@@ -3240,6 +3240,101 @@ fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
 }
 
 #[test]
+fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let blocker = entities
+        .spawn_building(2, EntityKind::Depot, 160.0, 100.0, true)
+        .expect("enemy blocker should spawn");
+    let intended = entities
+        .spawn_unit(2, EntityKind::Worker, 230.0, 100.0)
+        .expect("intended target should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(intended));
+    let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+    let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
+    let map = open_map(12);
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    assert_eq!(attacker_entity.target_id(), Some(intended));
+    assert!(!attacker_entity.path_is_empty());
+    assert_eq!(
+        attacker_entity.attack_cd(),
+        0,
+        "blocked direct attacks must not reset cooldown"
+    );
+    assert_eq!(
+        entities.get(blocker).expect("blocker should exist").hp,
+        blocker_hp_before,
+        "direct attacks should not damage an intervening enemy building"
+    );
+    assert_eq!(
+        entities.get(intended).expect("intended should exist").hp,
+        intended_hp_before,
+        "targets behind enemy buildings should not be damaged until hittable"
+    );
+    assert!(
+        events
+            .values()
+            .flatten()
+            .all(|event| !matches!(event, Event::Attack { from, .. } if *from == attacker)),
+        "blocked direct attacks should not emit attack events"
+    );
+}
+
+#[test]
+fn direct_attack_on_building_chases_passable_perimeter_goal() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let target = entities
+        .spawn_building(2, EntityKind::Depot, 300.0, 100.0, true)
+        .expect("target building should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(target));
+    let map = open_map(16);
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    let goal = attacker_entity
+        .path_goal()
+        .expect("direct attack should request a building chase path");
+    assert_ne!(
+        goal,
+        (300.0, 100.0),
+        "building chase should not path to the blocked building center"
+    );
+    let (goal_tx, goal_ty) = map.tile_of(goal.0, goal.1);
+    let occ = Occupancy::build(&map, &entities);
+    assert!(
+        !occ.building_blocked_at_tile(goal_tx as i32, goal_ty as i32),
+        "building chase goal should be outside static building footprints"
+    );
+    assert!(
+        !attacker_entity.path_is_empty(),
+        "building chase should request a reachable perimeter path"
+    );
+}
+
+#[test]
 fn friendly_tank_between_attacker_and_target_prevents_firing() {
     let mut entities = EntityStore::new();
     let attacker = entities
