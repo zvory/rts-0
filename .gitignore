@@ -21,6 +21,9 @@ tests/artifacts/
 # Logs
 *.log
 
+# Documentation drift sweeper runtime state
+/.docdrift/
+
 # Local Codex-authored unit-design lab generations
 /server/assets/unit-design-lab/**
 !/server/assets/unit-design-lab/.gitkeep

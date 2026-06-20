@@ -1,14 +1,14 @@
 # Capsule: testing
 
-Use when writing or debugging tests, changing CI/hooks, or deciding focused verification before
-claiming a change is done.
+Use when writing/debugging tests, changing CI/hooks, or choosing focused verification.
 
 ## Read first
-- [docs/design/testing.md](../design/testing.md) §9 — API-driven self-play harness
+- [docs/design/testing.md](../design/testing.md) §9 — self-play harness
   (only if touching scripted self-play)
 - [docs/design/testing.md](../design/testing.md) §10 — dev scenario inspection
-- [docs/design/testing.md](../design/testing.md) §11 — package-aware test selection policy
+- [docs/design/testing.md](../design/testing.md) §11 — test selection policy
 - [docs/design/testing.md](../design/testing.md) §12 — PR CI contract
+- [docs/design/testing.md](../design/testing.md) §13 — doc drift sweeper
 
 ## Suites
 - `node tests/server_integration.mjs` — dep-free full server pipeline; needs a running server.

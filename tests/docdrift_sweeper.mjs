@@ -53,6 +53,21 @@ function sweep(args) {
   });
 }
 
+function classify(args) {
+  return run("node", [script, "--classify", "--repo", repo, ...args], {
+    cwd: repoRoot,
+  });
+}
+
+function classifyFailure(args) {
+  try {
+    classify(args);
+    assert.fail("expected classifier command to fail");
+  } catch (error) {
+    return error.stderr.toString();
+  }
+}
+
 fs.mkdirSync(repo, { recursive: true });
 
 try {
@@ -178,6 +193,93 @@ try {
   assert.ok(fs.existsSync(path.join(outDir, "docdrift-sweep.md")));
   assert.ok(fs.existsSync(path.join(outDir, "docdrift-sweep.json")));
   assert.equal(JSON.parse(fs.readFileSync(path.join(outDir, "docdrift-sweep.json"), "utf8")).head.sha, head);
+
+  const classifierCache = ".docdrift/test-classifier-cache";
+  const classifierJson = JSON.parse(
+    classify([
+      "--base",
+      checkpointCommit,
+      "--head",
+      head,
+      "--no-codex",
+      "--fixture",
+      "classifier-basic",
+      "--classifier-cache",
+      classifierCache,
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(classifierJson.mode, "classify");
+  assert.equal(classifierJson.classifier.promptVersion, "docdrift-classifier-v1");
+  assert.equal(classifierJson.classifier.noCodex, true);
+  assert.equal(classifierJson.classifier.fixture, "tests/fixtures/docdrift/classifier-basic.json");
+  assert.equal(classifierJson.classifier.summary.totalDecisions, 2);
+  assert.equal(classifierJson.classifier.summary.updateDocs, 1);
+  assert.equal(classifierJson.classifier.summary.moveOn, 1);
+  assert.equal(classifierJson.classifier.summary.cacheHits, 0);
+
+  const simDecision = classifierJson.classifier.decisions.find((decision) => decision.commitSha === simCommit);
+  assert.ok(simDecision, "expected sim classifier decision");
+  assert.equal(simDecision.decision, "update_docs");
+  assert.deepEqual(simDecision.likelyDocs, ["docs/design/server-sim.md"]);
+  assert.equal(simDecision.codex.mode, "fixture");
+  assert.equal(simDecision.cache.hit, false);
+
+  const testDecision = classifierJson.classifier.decisions.find((decision) => decision.commitSha === testCommit);
+  assert.ok(testDecision, "expected test classifier decision");
+  assert.equal(testDecision.decision, "move_on");
+  assert.deepEqual(testDecision.likelyDocs, ["docs/design/testing.md"]);
+
+  const cachedClassifierJson = JSON.parse(
+    classify([
+      "--base",
+      checkpointCommit,
+      "--head",
+      head,
+      "--no-codex",
+      "--fixture",
+      "classifier-basic",
+      "--classifier-cache",
+      classifierCache,
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(cachedClassifierJson.classifier.summary.cacheHits, 2);
+  assert.ok(cachedClassifierJson.classifier.decisions.every((decision) => decision.cache.hit));
+
+  const classifierOutDir = path.join(fixtureRoot, "classify-out");
+  classify([
+    "--base",
+    checkpointCommit,
+    "--head",
+    head,
+    "--no-codex",
+    "--fixture",
+    "classifier-basic",
+    "--classifier-cache",
+    ".docdrift/out-cache",
+    "--out-dir",
+    classifierOutDir,
+  ]);
+  assert.ok(fs.existsSync(path.join(classifierOutDir, "docdrift-classify.md")));
+  assert.ok(fs.existsSync(path.join(classifierOutDir, "docdrift-classify.json")));
+
+  assert.match(
+    classifyFailure([
+      "--base",
+      checkpointCommit,
+      "--head",
+      head,
+      "--no-codex",
+      "--fixture",
+      "classifier-basic",
+      "--max-commits",
+      "1",
+    ]),
+    /classify budget exceeded: 2 considered commits exceeds --max-commits 1/,
+  );
 
   const checkpointReport = JSON.parse(sweep(["--head", head, "--format", "json"]));
   assert.equal(checkpointReport.base.ref, base);

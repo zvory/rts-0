@@ -231,3 +231,18 @@ pushes to `main` and unrelated branches keep independent results.
 Beta deployment is downstream of the full gate but must only deploy tested `main` push commits. The
 deploy workflow checks that the completed `Main test gate` run came from a push event on `main`
 before checking out and deploying the tested head SHA.
+
+## 13. Documentation drift sweeper
+
+`scripts/docdrift-sweep.mjs --dry-run` is the deterministic operator surface for reviewing commits
+between `docs/docdrift-checkpoint.txt` or `--base` and `--head`. It reads commit metadata,
+changed paths, compact diff stats, docs touched, and `docs/doc-map.json` trace-map candidates, but
+does not edit docs, create PRs, or advance the checkpoint.
+
+`scripts/docdrift-sweep.mjs --classify` adds the cheap Codex CLI classifier. Live classifier runs
+must use Codex CLI authentication through the local `codex exec` path; they must not use the
+OpenAI Agents SDK, direct API clients, API-key environment variables, or API-billed fallback
+routes. Fixture runs use `--no-codex --fixture <name>` and are the required focused verification
+path before any live Codex smoke. Classifier decisions are cached under the ignored
+`.docdrift/classifier-cache/` runtime directory by prompt version and commit SHA, and reports can be
+written with `--out-dir`.
