@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Renderer Preview</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #0a0908; overflow: hidden; }
+
+      #preview-mount {
+        position: fixed;
+        inset: 0;
+      }
+
+      /* Label canvas sits above PixiJS, no pointer events */
+      #preview-labels {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #controls {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: rgba(10, 9, 8, 0.82);
+        border: 1px solid #2e2b25;
+        border-radius: 4px;
+        padding: 7px 12px;
+        font: 12px/1.4 monospace;
+        color: #d8d0b0;
+      }
+
+      #controls label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+      }
+
+      #controls select,
+      #controls input[type="range"] {
+        background: #1a1712;
+        color: #d8d0b0;
+        border: 1px solid #3a3530;
+        border-radius: 2px;
+        padding: 2px 4px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      #controls input[type="range"] {
+        width: 100px;
+        padding: 0;
+        accent-color: #6d89b8;
+      }
+
+      #controls .sep {
+        width: 1px;
+        height: 16px;
+        background: #2e2b25;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preview-mount"></div>
+    <canvas id="preview-labels"></canvas>
+
+    <div id="controls">
+      <label>Zoom <input id="zoom-slider" type="range" min="0.5" max="4" step="0.1" value="1.5" /></label>
+      <span class="sep"></span>
+      <label>
+        Team
+        <select id="team-select">
+          <option value="0">Blue</option>
+          <option value="1">Orange</option>
+          <option value="2">Green</option>
+          <option value="3">Pink</option>
+          <option value="4">Light blue</option>
+          <option value="5">Amber</option>
+          <option value="6">Yellow</option>
+          <option value="7">Purple</option>
+        </select>
+      </label>
+      <span class="sep"></span>
+      <label><input id="animate-toggle" type="checkbox" checked /> Animate</label>
+    </div>
+
+    <!--
+      PixiJS v7 (UMD) — same version and flags as index.html.
+      Must load as a classic script before the module so globalThis.PIXI is ready.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
+    <script type="module" src="/renderer_preview.js"></script>
+  </body>
+</html>
