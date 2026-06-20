@@ -211,25 +211,6 @@ pub(crate) fn combat_system(
             && friendly_hard_blocker_between(map, entities, id, owner, (px, py), (tx, ty));
         let clear_shot = is_mortar_team || (terrain_clear && !friendly_blocked);
 
-        if friendly_blocked && matches!(mode, CombatMode::Ordered) {
-            if let Some(e) = entities.get_mut(id) {
-                if fires_while_moving(e.kind) {
-                    rotate_vehicle_weapon_for_combat(e, target_angle);
-                } else if e.kind == EntityKind::AntiTankGun {
-                    rotate_anti_tank_gun_for_combat(e, target_angle);
-                } else if e.kind == EntityKind::MortarTeam {
-                    rotate_mortar_for_fire(e, target_angle);
-                } else if target_angle.is_finite() {
-                    e.set_facing(target_angle);
-                    mirror_weapon_to_body(e, target_angle);
-                }
-                e.set_target_id(Some(tid));
-                e.mark_attack_phase(AttackPhase::Firing);
-                e.clear_path();
-            }
-            continue;
-        }
-
         if dist <= range_px && clear_shot {
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
             let mut weapon_aligned = true;

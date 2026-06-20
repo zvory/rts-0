@@ -3187,7 +3187,7 @@ fn vehicle_body_auto_acquisition_keeps_enemy_tank_traps_targetable() {
 }
 
 #[test]
-fn friendly_building_between_attacker_and_target_prevents_firing() {
+fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -3214,6 +3214,7 @@ fn friendly_building_between_attacker_and_target_prevents_firing() {
 
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
     assert_eq!(attacker_entity.target_id(), Some(intended));
+    assert!(!attacker_entity.path_is_empty());
     assert_eq!(
         attacker_entity.attack_cd(),
         0,
