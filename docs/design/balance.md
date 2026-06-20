@@ -223,9 +223,9 @@ authoritative `rules::defs` records.
   half the previous tank movement rate. Command Cars use this same movement-oil cost. Tanks, scout
   cars, and command cars cannot advance while their owner has zero oil.
 - Human selection and command bandwidth is supply-based: `BASE_COMMAND_SUPPLY_CAP = 24` command
-  supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 12` and the Command Car's own command weight for each
+  supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the Command Car's own command weight for each
   selected/commanded Command Car. Units use their mirrored supply as command weight, so current Tanks
-  consume 6 command supply and four Tanks fill the base budget; Command Cars still appear as weighted
+  consume 8 command supply and three Tanks fill the base budget; Command Cars still appear as weighted
   selections but their own weight is offset before their bonus is added.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future riflemen for that player are permanently charging:
@@ -336,7 +336,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | anti_tank_gun         | 45  | 60 deployed / 45 packed | 14 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 1.3 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
-| tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 450 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
+| tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 300 | 0   | 0     | 0  | 2.0   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; regenerates 1 HP/s |
 

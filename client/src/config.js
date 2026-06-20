@@ -115,7 +115,7 @@ export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 3.0;
 export const EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER = 0.45;
 export const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER = 1.35;
 export const BASE_COMMAND_SUPPLY_CAP = 24;
-export const COMMAND_CAR_SUPPLY_CAP_BONUS = 12;
+export const COMMAND_CAR_SUPPLY_CAP_BONUS = 20;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -148,7 +148,7 @@ export const STATS = Object.freeze({
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 6, body: TANK_BODY,
-    rangeTiles: 5, cost: { steel: 450, oil: 150 }, supply: 6, buildTicks: 750,
+    rangeTiles: 5, cost: { steel: 425, oil: 150 }, supply: 8, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 10, body: COMMAND_CAR_BODY,
