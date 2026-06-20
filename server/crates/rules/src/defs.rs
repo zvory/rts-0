@@ -299,7 +299,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             cost_oil: 0,
             foot_w: 3,
             foot_h: 3,
-            build_ticks: 400,
+            build_ticks: 550,
             provides_supply: balance::CITY_CENTRE_SUPPLY,
             dmg: 0,
             range_tiles: 0,
@@ -633,6 +633,17 @@ mod tests {
             .stats;
 
         assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
+    }
+
+    #[test]
+    fn city_centre_matches_depot_supply() {
+        let city_centre = building_def(EntityKind::CityCentre)
+            .expect("city centre def")
+            .stats;
+        let depot = building_def(EntityKind::Depot).expect("depot def").stats;
+
+        assert_eq!(city_centre.provides_supply, balance::DEPOT_SUPPLY);
+        assert_eq!(city_centre.provides_supply, depot.provides_supply);
     }
 
     #[test]

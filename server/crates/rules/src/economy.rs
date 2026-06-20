@@ -321,6 +321,10 @@ mod tests {
         assert_eq!(supply_cost(EntityKind::Tank), 12);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
         assert_eq!(
+            supply_provided(EntityKind::CityCentre),
+            crate::balance::DEPOT_SUPPLY
+        );
+        assert_eq!(
             supply_provided(EntityKind::Depot),
             crate::balance::DEPOT_SUPPLY
         );
