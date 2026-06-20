@@ -136,6 +136,7 @@ node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload matt-alex-replay --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
+node scripts/client-perf-harness.mjs --workload fog-combat-replay-stress --seconds 10
 ```
 
 The browser harness starts a local server on an isolated port unless `RTS_URL` or `--base-url`
@@ -143,8 +144,8 @@ points at an already-healthy server. It drives headless Chrome with the existing
 `tests/package.json` `puppeteer-core` dependency path, copies the preserved Matt/Alex replay into
 `server/target/selfplay-artifacts/client_perf_matt_alex_match_54/replay.json` at runtime, and writes
 one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. The
-`--render-lag-suite` path runs the Matt/Alex replay, the vehicle-wall stress scenario, and a
-selected-unit HUD stress scenario, then writes a rollup at
+`--render-lag-suite` path runs the Matt/Alex replay, the vehicle-wall stress scenario, a
+selected-unit HUD stress scenario, and a fog/combat-heavy Matt/Alex replay seek, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
 per-budget margins and the next missed p95 budget. It also includes a local-only
@@ -153,6 +154,27 @@ nonzero counters for the sample. It also includes a `snapshotPacketBudget` block
 with payload p95 bytes, the selected packet budget, over-budget count, and over-budget percentage
 when the generated `ClientNetReport` includes them. Pass `--trace` to also write a Chrome
 `trace.json`; traces are opt-in because they are larger and machine-local.
+
+Render stress matrix:
+
+```bash
+node scripts/client-perf-harness.mjs --stress-matrix --render-lag-suite --seconds 4 --matrix-cpu 1,2 --matrix-viewport default --matrix-dpr 1 --matrix-repeat 1
+node scripts/client-perf-harness.mjs --stress-matrix --render-lag-suite --seconds 10 --matrix-cpu 1,2,4 --matrix-viewport small,default,large --matrix-dpr 1,2 --matrix-repeat 3
+```
+
+The short command is the local low-end substitute smoke run. The longer command is the serious
+before/after comparison: it runs repeated samples across workloads, Chrome CPU throttle factors,
+small/default/large viewports, and explicit device scale factors. Matrix artifacts are written under
+`target/client-perf/render-stress-matrix/<timestamp>/summary.json` and `summary.md`; each workload
+sample still writes its own `target/client-perf/<workload>/<timestamp>/summary.json`. The matrix
+rollup keeps Chrome traces opt-in with `--trace`, includes CPU throttle, viewport, DPR, repeat, and
+artifact paths for every cell, and ranks advisory budget failures by first missed frame-work budget
+and top measured phase.
+
+Interpret CPU/DPR stress as pressure testing, not hardware emulation. Chrome CPU throttling changes
+main-thread scheduling on the local machine, DPR changes canvas backing resolution, and viewport
+changes visible/rendered area. A failing `cpu4-vplarge-dpr2` cell points to the subsystem to inspect
+next on this machine; it does not claim to reproduce Matt's laptop exactly.
 
 The default harness result fails for runtime errors, page/console/request errors, and missing
 `window.__rtsPerf` or generated `ClientNetReport` summaries. It deliberately does not fail on an
