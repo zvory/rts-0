@@ -1,3 +1,108 @@
+
+oti vs matthew
+
+implement pause game in live matches, 3 pauses
+
+we need to make city centre take like five more seconds to build. and does it provide more supply than a supply depot? if so, we should make it provide the same amount of supply
+
+record all player keystrokes and moue clicks so we can diagnose 
+
+spectator should not get alerts that play sound or at all
+
+a moving a unit that sees an enemy but can't attack it beause ther'es a building in the way, player reports that their unit just stands there
+
+riflemen an infantry and cout cars just do too little damage to buidlings. maybe we should bump the HP of all armoed units by like 25% and then make armor block 50% of damage instead of 75%
+
+buildings should block line of sight
+
+get this working on electron
+
+
+----
+
+
+luke playtest
+
+make the debug mdoe more obvious
+
+shift right clicking on windows opens the context menu
+
+selection box doesn't show the production queue (like the +2) obviously enough
+
+would be good to see the ranges of units, either in the description, or when they're selected?
+
+AI is not sending riflemen in waves properly
+
+rally should be attack move
+
+should allow attacking through buildings because it's causing confusing behaviour where units don't attack the enemy
+
+AI should attack with first tank, and it doens't seem to be attacking?
+
+AI is producing workers, but tbecuase the main base is fully saturated, the worker just idle
+
+
+AI machine gunners seem to move to attack? like in the luke vs AI replay, luke's tanks show up, and the MG's seem to unset up, and then set up again?
+
+they AI lost 178 units but luke's say it only killed 78? buildings killed and buildings lost is also fucked
+
+when clicking different players vision, it doesn't like, switch to only showing what that player has explored. you know how there's the stuff you have explored and haven't?
+
+in replay, it should show who is still viewing the replay
+
+attempting to resume from replay, being denied because ther'es AI players, then seeking backwards, will kick the viweer into a kind of replay mode except they don't have seek controls anymore
+
+need to make it so that it's not two tanks per selection
+
+audio attenuation needs work, player looking at base, and has some machine gunners all teh way on the other end of the map, and it sounds like the machine gunners are halfway across the map, not the other end. we need to increase the attenuation
+
+AI should always build vehicle works and gun works towards the enem,y never behind itself
+
+Luke is annoyed that tanks will have backs to the enemy sometimes
+
+two MGs should kill a scout car
+
+auto attacking 
+
+analysis tab is broken and does not update after the first tick
+
+replay seek is broken, i think the player in this case clicked a couple of times, and then we get full fog screen, no units spawned, and no replay controls
+
+
+target fire doens't seem to work, it give sthe player feedback that the unit is target firing, but it doesn't. in this ase it happened with riflemen while methamphetamines was researched, not sure if that's related
+
+methamphetamines should icnrease rifleman attack speed evne more
+
+increase all unit sight range by two
+
+the tech is too quick, the movement out of early game units happens too quickly, such that riflemen just suck, and a player isn't realising they ahve to get off of rifleman ASAP
+
+the riflemen are so slow, that you basically always want to go to the machine gunners, there's no such thing as a rush
+
+should be able to attack own buildings 
+
+
+cant deconstruct your own tank traps
+
+tanks should prioritize shooting anti tank guns
+
+reduce artillery range by 5 and, and put little artillery icons ont he minimap when yhey're firing, like use the ltieral exact artillery thing
+
+make tanks eight supply and doule comand car bonus
+
+pathing is still fucked, units getting suck
+
+if a tank is not moving, it should rotate itself so the front is towards the enemy
+
+AT gun cone qhen shift queued should originate at the position that it's projected to arrive at 
+
+
+should be able to click on a resource patch and see how much is left
+
+
+----
+
+
 we currently make it so that users can double tap an order to send it, like double tapping A to send an attack order. but sometimes they mean to tap A then click to attack, but accidentally double tap A first and then click. so their units get deselected. i think it should be okay to like, ignore clicks in this case as long as the mouse doesn't move too far, we assume it's just a mistake? i'm not sure how to think about this, from a game control or human computer interaction
 sense. we have a fix, but, who knows if it will cause more grief than it solves. 
 
@@ -134,3 +239,6 @@ ecnomy rework:
 - add an APM counter
 - store all played replays in a database and make them replayable from the lobby
 - implement roads that allow faster movement
+
+
+
