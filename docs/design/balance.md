@@ -298,7 +298,7 @@ authoritative `rules::defs` records.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 18 steel patches with 1,000 steel each + 3 oil
   patches with 3,333 oil each nearby.
-- Supply: City Centre gives `+10`, Depot gives `+8`, hard cap `200`.
+- Supply: City Centre gives `+8`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
@@ -343,7 +343,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
+| city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 550       | trains worker; +8 supply; players start with one free |
 | zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekat start building; inert in first playable slice |
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |

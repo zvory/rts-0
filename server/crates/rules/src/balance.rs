@@ -140,8 +140,8 @@ pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
 pub const OIL_DIST_TILES: f32 = 6.0;
 
 // --- Supply -----------------------------------------------------------------
-pub const CITY_CENTRE_SUPPLY: u32 = 10;
 pub const DEPOT_SUPPLY: u32 = 8;
+pub const CITY_CENTRE_SUPPLY: u32 = DEPOT_SUPPLY;
 pub const SUPPLY_CAP_MAX: u32 = 200;
 
 // --- Vehicle bodies ----------------------------------------------------------
