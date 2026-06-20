@@ -1,6 +1,8 @@
 
 oti vs matthew
 
+smoke doens't always go off
+
 implement pause game in live matches, 3 pauses
 
 we need to make city centre take like five more seconds to build. and does it provide more supply than a supply depot? if so, we should make it provide the same amount of supply
@@ -25,7 +27,7 @@ luke playtest
 
 make the debug mdoe more obvious
 
-shift right clicking on windows opens the context menu
+shift right clicking on windows opens the context menu (firefox only)
 
 selection box doesn't show the production queue (like the +2) obviously enough
 
