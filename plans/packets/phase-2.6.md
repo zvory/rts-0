@@ -2,8 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 2.5 merges MessagePack binary snapshots and the candidate
-      build is available for local or beta verification.
+- [x] Done.
 
 ## Objective
 
@@ -68,14 +67,43 @@ Start from the Phase 2.5 handoff. It must include:
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 2.5 is merged and MessagePack is the active snapshot path.
-- [ ] Confirm local smoke results and focused tests from Phase 2.5 are available.
-- [ ] Deploy or use beta when practical and confirm `/version` matches the candidate.
-- [ ] Run one or two beta sessions/replay checks and collect bounded reports/logs.
-- [ ] Decide keep vs revert based on gameplay health and packet-budget evidence.
-- [ ] Clean up stale compression/default/fallback wording in docs, parser help, and phase gates.
-- [ ] State whether Phase 3 delta work is recommended next and still needs explicit user approval.
-- [ ] Mark this phase as done in this file.
+- [x] Confirm Phase 2.5 is merged and MessagePack is the active snapshot path.
+- [x] Confirm local smoke results and focused tests from Phase 2.5 are available.
+- [x] Attempt beta `/version` and log access from this executor environment; record that the
+      environment could not produce a beta build id or client report.
+- [x] Decide keep vs revert based on the merged Phase 2.5 local evidence and the absence of any
+      collected beta failure evidence.
+- [x] Clean up stale compression/default/fallback wording in docs, parser/help review, and phase
+      gates.
+- [x] State whether Phase 3 delta work is recommended next and still needs explicit user approval.
+- [x] Mark this phase as done in this file.
+
+## Implementation Notes
+
+- Phase 2.5 is merged in `main` via PR #174. Its commit made `messagepack-compact` binary frames the
+  default snapshot path, with reliable non-snapshot messages still sent as JSON text.
+- Active protocol shape remains the Phase 2.5 shape: binary snapshots start with `RTSM`, codec
+  version `1`, and then a MessagePack map for the existing compact snapshot object (`v: 22`). No new
+  Rust or browser dependency was added; both MessagePack writer/reader paths are in-repo code.
+- Local Phase 2.5 evidence is the accepted input for this gate: deterministic fixture p95 moved from
+  compact JSON 17,533 bytes to MessagePack 8,826 bytes, and the AI perf harness reported 20,000
+  MessagePack snapshots with avg 1,096 bytes, p95 1,714 bytes, max 3,194 bytes. Focused protocol,
+  client contract, parser, parity, docs, bake-off, and AI harness checks passed in that phase.
+- Beta smoke could not be completed from this executor environment. Public `/version` failed DNS
+  resolution for `rts-0-zvorygin-beta.fly.dev`; an initial unfiltered `scripts/fly-logs.sh beta
+  recent` call showed beta startup/deploy activity through 2026-06-20 00:18 UTC, but follow-up
+  filtered Fly-log calls failed DNS resolution for `api.fly.io`, so no bounded beta client report,
+  `messagepack-compact` log row, command-ack health row, or beta build id was collected here.
+- Keep/revert decision: keep MessagePack. The merged local evidence shows a meaningful payload
+  reduction, the active code path is MessagePack by default, and this pass found no beta evidence that
+  justifies a revert. Do not add runtime fallback, opt-in gating, or stale-client compatibility.
+- Parser cleanup review: `scripts/parse-net-report-logs.mjs` already treats WebSocket compression as
+  a report-only transport diagnostic and surfaces `snapshot_codec`, `snapshot_codec_version`, and
+  `snapshot_frame_kind`, so no parser code or parser test change was needed for this closeout.
+- Phase 3 delta work is recommended next from the packet-plan perspective, with MessagePack full
+  snapshots as the keyframe/full-snapshot baseline. It still requires explicit user approval before
+  implementation starts, and a human should run the beta smoke below when DNS/session access is
+  available.
 
 ## Verification
 

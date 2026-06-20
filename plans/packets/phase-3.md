@@ -2,8 +2,8 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 2.6 is merged, the MessagePack keep/revert decision
-      recommends delta work, and the user explicitly approves moving beyond encoding.
+- [ ] Ready for implementation after Phase 2.6 is merged with MessagePack kept as the accepted
+      full-snapshot baseline, and the user explicitly approves moving beyond encoding.
 
 ## Objective
 
@@ -15,11 +15,12 @@ behave like the current MessagePack full-snapshot path before later phases shrin
 
 ## Background
 
-After Phase 2.5/2.6, current live snapshots should be full MessagePack binary frames unless the
-MessagePack rollout was reverted. The room task builds a fresh per-recipient `Snapshot`, applies fog
-projection before send, compacts resources out of the entity list, and enqueues that full semantic
-snapshot into a latest-only pending slot. If a client is slow, newer snapshots replace older unsent
-snapshots; the writer task later serializes whichever full snapshot it actually takes from the slot.
+Phase 2.6 keeps MessagePack as the accepted full-snapshot baseline for delta work. Current live
+snapshots are full MessagePack binary frames: the room task builds a fresh per-recipient `Snapshot`,
+applies fog projection before send, compacts resources out of the entity list, and enqueues that full
+semantic snapshot into a latest-only pending slot. If a client is slow, newer snapshots replace older
+unsent snapshots; the writer task later serializes whichever full snapshot it actually takes from
+the slot.
 
 That latest-only behavior is only safe for deltas if the server computes deltas from the last frame
 that was actually sent to this connection. Do not update a baseline in the room task, and do not
@@ -126,8 +127,8 @@ Call out any recovery path that was deferred before Phase 4 starts.
 
 ## Implementation Checklist
 
-- [ ] Confirm Phase 2.6 kept or reverted MessagePack, recommends delta work, and user
-      approval exists.
+- [ ] Confirm Phase 2.6 kept MessagePack as the full-snapshot baseline, recommends delta work, and
+      user approval exists.
 - [ ] Add a per-writer snapshot frame codec with baseline reset and keyframe-only support.
 - [ ] Keep `LatestSnapshotSlot` storing full semantic snapshots.
 - [ ] Add client reconstruction for current MessagePack snapshots and new keyframe frames.
