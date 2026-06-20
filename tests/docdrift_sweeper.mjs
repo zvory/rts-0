@@ -59,6 +59,12 @@ function classify(args) {
   });
 }
 
+function generateDocs(args) {
+  return run("node", [script, "--generate-docs", "--repo", repo, ...args], {
+    cwd: repoRoot,
+  });
+}
+
 function classifyFailure(args) {
   try {
     classify(args);
@@ -265,6 +271,76 @@ try {
   ]);
   assert.ok(fs.existsSync(path.join(classifierOutDir, "docdrift-classify.md")));
   assert.ok(fs.existsSync(path.join(classifierOutDir, "docdrift-classify.json")));
+
+  const docPatchCache = ".docdrift/test-doc-patch-cache";
+  const generateJson = JSON.parse(
+    generateDocs([
+      "--base",
+      checkpointCommit,
+      "--head",
+      head,
+      "--no-codex",
+      "--fixture",
+      "classifier-basic",
+      "--classifier-cache",
+      classifierCache,
+      "--doc-patch-cache",
+      docPatchCache,
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(generateJson.mode, "generate-docs");
+  assert.equal(generateJson.docPatch.promptVersion, "docdrift-doc-patch-v1");
+  assert.equal(generateJson.docPatch.noCodex, true);
+  assert.equal(generateJson.docPatch.fixture, "tests/fixtures/docdrift/classifier-basic.json");
+  assert.equal(generateJson.docPatch.summary.updateDocsDecisions, 1);
+  assert.equal(generateJson.docPatch.summary.patches, 1);
+  assert.equal(generateJson.docPatch.summary.applied, 1);
+  assert.equal(generateJson.docPatch.records[0].docTargets[0], "docs/design/server-sim.md");
+  assert.match(
+    fs.readFileSync(path.join(repo, "docs/design/server-sim.md"), "utf8"),
+    /Game API helper changes should be reflected here/,
+  );
+
+  const idempotentGenerateJson = JSON.parse(
+    generateDocs([
+      "--base",
+      checkpointCommit,
+      "--head",
+      head,
+      "--no-codex",
+      "--fixture",
+      "classifier-basic",
+      "--classifier-cache",
+      classifierCache,
+      "--doc-patch-cache",
+      docPatchCache,
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(idempotentGenerateJson.docPatch.summary.applied, 0);
+  assert.equal(idempotentGenerateJson.docPatch.summary.alreadyApplied, 1);
+
+  const generateOutDir = path.join(fixtureRoot, "generate-out");
+  generateDocs([
+    "--base",
+    checkpointCommit,
+    "--head",
+    head,
+    "--no-codex",
+    "--fixture",
+    "classifier-basic",
+    "--classifier-cache",
+    classifierCache,
+    "--doc-patch-cache",
+    docPatchCache,
+    "--out-dir",
+    generateOutDir,
+  ]);
+  assert.ok(fs.existsSync(path.join(generateOutDir, "docdrift-generate.md")));
+  assert.ok(fs.existsSync(path.join(generateOutDir, "docdrift-generate.json")));
 
   assert.match(
     classifyFailure([

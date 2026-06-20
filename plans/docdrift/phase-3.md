@@ -1,6 +1,6 @@
 # Phase 3 - Doc Patch Generator
 
-Status: draft.
+Status: done.
 
 ## Goal
 

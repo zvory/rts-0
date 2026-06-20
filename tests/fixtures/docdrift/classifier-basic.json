@@ -22,5 +22,23 @@
     "decision": "move_on",
     "likelyDocs": [],
     "evidenceNote": "Fixture default found no documentation-impacting behavior change."
+  },
+  "docPatches": [
+    {
+      "subjectIncludes": "Change sim API",
+      "summary": "Document the new simulation API helper expectation.",
+      "patches": [
+        {
+          "path": "docs/design/server-sim.md",
+          "find": "server sim design\n",
+          "replace": "server sim design\n\nGame API helper changes should be reflected here when they alter how callers interact with the authoritative simulation.\n",
+          "rationale": "The source commit changes the simulation API and the classifier routed it to the server simulation design doc."
+        }
+      ]
+    }
+  ],
+  "defaultDocPatch": {
+    "summary": "Fixture default generated no docs patch.",
+    "patches": []
   }
 }
