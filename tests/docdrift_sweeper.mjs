@@ -65,6 +65,12 @@ function generateDocs(args) {
   });
 }
 
+function fullSweep(args) {
+  return run("node", [script, "--full", "--repo", repo, ...args], {
+    cwd: repoRoot,
+  });
+}
+
 function classifyFailure(args) {
   try {
     classify(args);
@@ -366,6 +372,68 @@ try {
   const emptyReport = JSON.parse(sweep(["--base", head, "--head", head, "--format", "json"]));
   assert.equal(emptyReport.summary.noCommits, true);
   assert.match(sweep(["--base", head, "--head", head]), /No commits to sweep/);
+
+  const fullPreviewOutDir = path.join(fixtureRoot, "full-preview");
+  const fullPreview = JSON.parse(
+    fullSweep([
+      "--dry-run",
+      "--base",
+      head,
+      "--head",
+      head,
+      "--out-dir",
+      fullPreviewOutDir,
+      "--run-id",
+      "preview",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(fullPreview.mode, "full");
+  assert.equal(fullPreview.dryRun, true);
+  assert.equal(fullPreview.sweep.action, "noop_no_commits");
+  assert.equal(fullPreview.checkpoint.advanced, false);
+  assert.ok(fullPreview.lifecycle.some((step) => step.name === "open or update owned PR"));
+  assert.ok(fullPreview.lifecycle.some((step) => step.command.includes("scripts/wait-pr.sh")));
+  assert.ok(fs.existsSync(path.join(fullPreviewOutDir, "docdrift-full.json")));
+  assert.ok(fs.existsSync(path.join(fullPreviewOutDir, "docdrift-full.md")));
+
+  const bareOrigin = path.join(fixtureRoot, "origin.git");
+  run("git", ["init", "--bare", bareOrigin], { cwd: fixtureRoot });
+  git(["remote", "add", "origin", bareOrigin]);
+  git(["push", "-u", "origin", "main"]);
+  const docsOnlyHead = commitFile(
+    "docs/design/testing.md",
+    "testing design\nmore detail\ncheckpoint-only cleanup\n",
+    "Refresh testing docs again",
+    "",
+    { date: "2026-06-20T12:05:00Z" },
+  );
+  git(["push", "origin", "main"]);
+
+  const fullNoopOutDir = path.join(fixtureRoot, "full-noop");
+  const fullNoop = JSON.parse(
+    fullSweep([
+      "--base",
+      head,
+      "--head",
+      "origin/main",
+      "--out-dir",
+      fullNoopOutDir,
+      "--run-id",
+      "noop",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(fullNoop.mode, "full");
+  assert.equal(fullNoop.dryRun, false);
+  assert.equal(fullNoop.sweep.action, "noop_no_considered_commits");
+  assert.equal(fullNoop.sweep.prNumber, null);
+  assert.equal(fullNoop.checkpoint.advanced, true);
+  assert.equal(fullNoop.checkpoint.after.sha, docsOnlyHead);
+  assert.match(fs.readFileSync(path.join(repo, ".docdrift/checkpoint.txt"), "utf8"), new RegExp(docsOnlyHead));
+  assert.ok(fs.existsSync(path.join(fullNoopOutDir, "docdrift-full.json")));
 } finally {
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }

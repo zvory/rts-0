@@ -1,6 +1,6 @@
 # Phase 4 - PR Lifecycle, Checkpoint, and Daily Runner
 
-Status: draft.
+Status: done.
 
 ## Goal
 

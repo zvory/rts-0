@@ -1,4 +1,4 @@
 # Documentation drift sweeper checkpoint.
-# This is the latest origin/main commit fully reviewed by the sweeper.
-# Phase 4 advances this only after the sweep PR merges and reaches origin/main.
+# This committed value seeds first-time local runs.
+# Phase 4+ full sweeps advance the ignored local .docdrift/checkpoint.txt state.
 8058436808651902b528635de4b2a47f92ebf882

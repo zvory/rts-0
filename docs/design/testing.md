@@ -253,3 +253,19 @@ exact minimal find/replace doc patches. The script applies those patches to the 
 writes `docdrift-generate.{md,json}` with `--out-dir`; operators inspect the resulting docs diff
 before any PR lifecycle step. Fixture runs use the same `--no-codex --fixture <name>` path and must
 remain idempotent, with reruns reporting already-applied patches instead of duplicating text.
+
+`scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
+uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed
+seed in `docs/docdrift-checkpoint.txt`, creates or reuses `.docdrift/worktrees/docdrift-sweep` on
+`zvorygin/docdrift-sweep`, runs classification plus doc generation there, commits any docs changes,
+pushes the sweep branch, opens or updates the owned PR through `scripts/agent-pr.sh`, and waits with
+`scripts/wait-pr.sh`. The checkpoint advances atomically only after a no-PR range is fully processed
+or after `wait-pr.sh` confirms the sweep PR head is reachable from `origin/main`; failed checks,
+closed PRs, stale branches, dirty sweep worktrees, and Codex failures leave the checkpoint unchanged.
+
+Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including
+`docdrift-full.{md,json}` and any classify/generate reports. Use
+`scripts/docdrift-daily.sh` as the launchd-friendly daily 8 p.m. command; pass normal
+`docdrift-sweep.mjs` options after it, for example `--dry-run` for a lifecycle preview or
+`--run-id <id>` for predictable report paths. The wrapper only runs the command; it does not install
+or require a launchd job for other developers.
