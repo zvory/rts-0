@@ -79,15 +79,16 @@ const WORKLOADS = Object.freeze([
   },
   {
     id: "fog-combat-replay-stress",
-    description: "Matt/Alex replay seeked into a late attack under one player's fog to exercise combat, effects, selection overlays, and minimap fog edges.",
+    description: "Matt/Alex replay fast-forwarded under one player's fog to exercise combat buildup, selection overlays, and minimap fog edges.",
     kind: "replayArtifact",
     replayName: MATT_ALEX_ARTIFACT_NAME,
     source: MATT_ALEX_SOURCE,
     url: `/dev/replay-artifact?replay=${MATT_ALEX_ARTIFACT_NAME}`,
     setup: {
       replayVisionPlayerIndex: 1,
-      seekRoomTimeTo: 7800,
-      setRoomTimeSpeed: 4,
+      setRoomTimeSpeed: 8,
+      waitRoomTimeTo: 1800,
+      roomTimeWaitTimeoutMs: 20000,
       waitForMinEntities: 20,
       selectFirstEntities: 12,
       selectUnitKindsOnly: true,
@@ -270,16 +271,17 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     }, workload.id);
     const targetUrl = new URL(workload.url, server.baseUrl).href;
     const startedAt = new Date().toISOString();
-    await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: args.navTimeoutMs });
+    const timeoutScale = workloadTimeoutScale(args);
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: scaledTimeoutMs(args.navTimeoutMs, timeoutScale) });
     await page.waitForFunction(
       () => !!window.__rts?.match && !!window.__rtsPerf?.summary,
-      { timeout: args.startTimeoutMs },
+      { timeout: scaledTimeoutMs(args.startTimeoutMs, timeoutScale) },
     );
-    await page.waitForSelector("#viewport canvas", { timeout: 5000 });
+    await page.waitForSelector("#viewport canvas", { timeout: scaledTimeoutMs(5000, timeoutScale) });
     workloadSetup = await applyWorkloadSetup(page, workload);
     await page.waitForFunction(
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
-      { timeout: Math.max(args.durationMs, 1000) + 10000 },
+      { timeout: scaledTimeoutMs(Math.max(args.durationMs, 1000) + 10000, timeoutScale) },
     );
     await sleep(args.durationMs);
 
@@ -461,6 +463,19 @@ function snapshotPacketBudgetSummary(report) {
     websocketCompression: stringOrNull(report.websocketCompression),
     websocketExtensions: stringOrNull(report.websocketExtensions),
   };
+}
+
+function workloadTimeoutScale(args) {
+  const rate = Number(args?.cpuThrottleRate || DEFAULT_CPU_THROTTLE_RATE);
+  return Number.isFinite(rate) && rate > 1 ? rate : 1;
+}
+
+function scaledTimeoutMs(timeoutMs, scale) {
+  const timeout = Number(timeoutMs);
+  const factor = Number(scale);
+  if (!Number.isFinite(timeout) || timeout <= 0) return timeoutMs;
+  if (!Number.isFinite(factor) || factor <= 1) return timeout;
+  return Math.ceil(timeout * factor);
 }
 
 export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
@@ -1255,6 +1270,30 @@ async function applyWorkloadSetup(page, workload) {
     }, speed);
     result.actions.push(action);
     if (action.error && !result.error) result.error = action.error;
+  }
+
+  const waitTick = Number(setup.waitRoomTimeTo);
+  if (Number.isInteger(waitTick) && waitTick >= 0) {
+    try {
+      await page.waitForFunction(
+        (tick) => {
+          const match = window.__rts?.match;
+          const roomTick = Number(match?.replayControls?.roomTimeState?.currentTick);
+          const snapshotTick = Number(match?.lastSnapshotTick);
+          return Math.max(
+            Number.isFinite(roomTick) ? roomTick : 0,
+            Number.isFinite(snapshotTick) ? snapshotTick : 0,
+          ) >= tick;
+        },
+        { timeout: Number(setup.roomTimeWaitTimeoutMs) || 20000 },
+        waitTick,
+      );
+      result.actions.push({ action: "waitRoomTimeTo", targetTick: waitTick });
+    } catch (err) {
+      const message = `timed out waiting for replay room time ${waitTick}: ${err.message}`;
+      result.actions.push({ action: "waitRoomTimeTo", targetTick: waitTick, error: message });
+      if (!result.error) result.error = message;
+    }
   }
 
   const minEntities = Number(setup.waitForMinEntities);

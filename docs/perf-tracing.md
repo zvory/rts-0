@@ -145,7 +145,7 @@ points at an already-healthy server. It drives headless Chrome with the existing
 `server/target/selfplay-artifacts/client_perf_matt_alex_match_54/replay.json` at runtime, and writes
 one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>/`. The
 `--render-lag-suite` path runs the Matt/Alex replay, the vehicle-wall stress scenario, a
-selected-unit HUD stress scenario, and a fog/combat-heavy Matt/Alex replay seek, then writes a rollup at
+selected-unit HUD stress scenario, and a fog/combat-heavy Matt/Alex replay fast-forward, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
 per-budget margins and the next missed p95 budget. It also includes a local-only
