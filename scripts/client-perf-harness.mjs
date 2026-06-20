@@ -21,6 +21,17 @@ const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Ch
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900 });
 const DEFAULT_DURATION_MS = 6000;
 const DEFAULT_CODEC_SAMPLE_LIMIT = 240;
+const DEFAULT_CPU_THROTTLE_RATE = 1;
+const DEFAULT_DEVICE_SCALE_FACTOR = 1;
+const DEFAULT_MATRIX_REPEAT_COUNT = 1;
+const DEFAULT_MATRIX_CPU_THROTTLES = Object.freeze([1, 2]);
+const DEFAULT_MATRIX_DEVICE_SCALE_FACTORS = Object.freeze([1]);
+export const MATRIX_VIEWPORT_PRESETS = Object.freeze({
+  small: Object.freeze({ label: "small", width: 1024, height: 768 }),
+  default: Object.freeze({ label: "default", ...DEFAULT_VIEWPORT }),
+  large: Object.freeze({ label: "large", width: 1920, height: 1080 }),
+});
+const DEFAULT_MATRIX_VIEWPORTS = Object.freeze([MATRIX_VIEWPORT_PRESETS.default]);
 export const RENDER_TARGET_FPS = 120;
 export const RENDER_FRAME_BUDGET_MS = 8.33;
 export const RENDER_FRAME_BUDGET_TARGETS = Object.freeze([
@@ -66,6 +77,25 @@ const WORKLOADS = Object.freeze([
       minSelectedCount: 1,
     },
   },
+  {
+    id: "fog-combat-replay-stress",
+    description: "Matt/Alex replay seeked into a late attack under one player's fog to exercise combat, effects, selection overlays, and minimap fog edges.",
+    kind: "replayArtifact",
+    replayName: MATT_ALEX_ARTIFACT_NAME,
+    source: MATT_ALEX_SOURCE,
+    url: `/dev/replay-artifact?replay=${MATT_ALEX_ARTIFACT_NAME}`,
+    setup: {
+      replayVisionPlayerIndex: 1,
+      seekRoomTimeTo: 7800,
+      setRoomTimeSpeed: 4,
+      waitForMinEntities: 20,
+      selectFirstEntities: 12,
+      selectUnitKindsOnly: true,
+      selectReplayVisionPlayer: true,
+      minSelectedCount: 4,
+      focusSelectedEntities: true,
+    },
+  },
 ]);
 const RENDER_LAG_WORKLOAD_IDS = Object.freeze(WORKLOADS.map((workload) => workload.id));
 
@@ -86,32 +116,27 @@ async function main() {
   const server = await startOrReuseServer(args);
   const browser = await launchBrowser(puppeteer, chrome, args);
 
-  const results = [];
-  let failed = 0;
   try {
-    for (const workload of selected) {
-      const result = await runWorkload({ workload, server, browser, outputRoot, args, chrome });
-      results.push(result);
-      const status = result.status === "passed" ? "PASS" : "FAIL";
-      console.log(`${status} ${workload.id} ${result.artifactDir}`);
-      const budgetText = formatRenderBudgetConsole(result.renderBudget);
-      if (budgetText) {
-        for (const line of budgetText.split("\n")) console.log(`  ${line}`);
-      }
-      const diagnosticsText = formatRenderDiagnosticsConsole(result.renderDiagnostics);
-      if (diagnosticsText) {
-        for (const line of diagnosticsText.split("\n")) console.log(`  ${line}`);
-      }
-      if (result.status !== "passed") {
-        failed += 1;
-        for (const error of result.errors) console.error(`  ${error}`);
-      }
+    if (args.stressMatrix) {
+      await runStressMatrix({ selected, server, browser, outputRoot, args, chrome });
+    } else {
+      await runSelectedWorkloads({ selected, server, browser, outputRoot, args, chrome });
     }
   } finally {
     await browser.close().catch(() => {});
     await server.close();
   }
+}
 
+async function runSelectedWorkloads({ selected, server, browser, outputRoot, args, chrome }) {
+  const results = [];
+  let failed = 0;
+  for (const workload of selected) {
+    const result = await runWorkload({ workload, server, browser, outputRoot, args, chrome });
+    results.push(result);
+    reportWorkloadResult(result);
+    if (result.status !== "passed") failed += 1;
+  }
   const comparison = results.length > 0 ? writeRenderLagComparisonSummary(results, outputRoot, args) : null;
   if (comparison) console.log(`render lag comparison summary: ${comparison.summaryJson}`);
 
@@ -119,6 +144,83 @@ async function main() {
     process.exitCode = 1;
   } else if (results.length > 0) {
     console.log(`client perf artifacts: ${outputRoot}`);
+  }
+}
+
+async function runStressMatrix({ selected, server, browser, outputRoot, args, chrome }) {
+  const cells = buildRenderStressMatrixCells({
+    workloads: selected,
+    cpuThrottles: args.matrixCpuThrottles,
+    viewports: args.matrixViewports,
+    deviceScaleFactors: args.matrixDeviceScaleFactors,
+    repeatCount: args.matrixRepeatCount,
+  });
+  const results = [];
+  let failed = 0;
+  console.log(`render stress matrix cells: ${cells.length}`);
+  for (const cell of cells) {
+    const runArgs = {
+      ...args,
+      viewport: {
+        width: cell.viewport.width,
+        height: cell.viewport.height,
+        deviceScaleFactor: cell.deviceScaleFactor,
+      },
+      cpuThrottleRate: cell.cpuThrottleRate,
+      deviceScaleFactor: cell.deviceScaleFactor,
+      activeMatrixCell: cell,
+    };
+    const result = await runWorkload({
+      workload: cell.workload,
+      server,
+      browser,
+      outputRoot,
+      args: runArgs,
+      chrome,
+    });
+    results.push(result);
+    reportWorkloadResult(result);
+    if (result.status !== "passed") failed += 1;
+  }
+
+  const matrix = results.length > 0 ? writeRenderStressMatrixSummary(results, outputRoot, args) : null;
+  if (matrix) {
+    console.log(`render stress matrix summary: ${matrix.summaryJson}`);
+    console.log(`render stress matrix markdown: ${matrix.summaryMarkdown}`);
+    const firstFailure = matrix.summary.rankedFailures?.[0] || null;
+    if (firstFailure) {
+      const missed = firstFailure.nextMissedBudget;
+      console.log(
+        `first failing stress cell: ${firstFailure.workloadId} ${firstFailure.configLabel} `
+        + `misses ${missed.fps} FPS by ${formatMs(Math.abs(missed.p95MarginMs))}; `
+        + `top phase ${firstFailure.topMeasuredPhase?.label || "unknown"}`,
+      );
+    } else {
+      console.log("first failing stress cell: none");
+    }
+  }
+
+  if (failed > 0) {
+    process.exitCode = 1;
+  } else if (results.length > 0) {
+    console.log(`client perf artifacts: ${outputRoot}`);
+  }
+}
+
+function reportWorkloadResult(result) {
+  const status = result.status === "passed" ? "PASS" : "FAIL";
+  const matrix = result.matrixCell ? ` ${result.matrixCell.configLabel} repeat ${result.matrixCell.repeatIndex}/${result.matrixCell.repeatCount}` : "";
+  console.log(`${status} ${result.workloadId}${matrix} ${result.artifactDir}`);
+  const budgetText = formatRenderBudgetConsole(result.renderBudget);
+  if (budgetText) {
+    for (const line of budgetText.split("\n")) console.log(`  ${line}`);
+  }
+  const diagnosticsText = formatRenderDiagnosticsConsole(result.renderDiagnostics);
+  if (diagnosticsText) {
+    for (const line of diagnosticsText.split("\n")) console.log(`  ${line}`);
+  }
+  if (result.status !== "passed") {
+    for (const error of result.errors) console.error(`  ${error}`);
   }
 }
 
@@ -138,6 +240,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   try {
     await prepareWorkload(workload);
     const page = await browser.newPage();
+    const cdpSession = await configurePageEmulation(page, args);
     if (args.snapshotCodecBakeoff) {
       await installSnapshotCodecCapture(page, args.snapshotCodecMaxSamples);
     }
@@ -161,7 +264,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       });
     }
 
-    await page.setViewport(args.viewport);
+    await page.setViewport(puppeteerViewport(args.viewport, args.deviceScaleFactor));
     await page.evaluateOnNewDocument((workloadId) => {
       window.__rtsPerfWorkloadId = workloadId;
     }, workload.id);
@@ -244,11 +347,14 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
         targetUrl,
         baseUrl: server.baseUrl,
         reusedServer: server.reused,
+        cpuThrottleRate: args.cpuThrottleRate,
       },
       workloadSetup,
+      stressMatrix: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
       browser: {
         chrome,
-        viewport: args.viewport,
+        viewport: puppeteerViewport(args.viewport, args.deviceScaleFactor),
+        requestedDeviceScaleFactor: args.deviceScaleFactor,
         userAgent: summary.userAgent,
         devicePixelRatio: summary.devicePixelRatio,
       },
@@ -291,6 +397,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     errors.push(...requestFailures.map((error) => `request failure: ${error}`));
 
     if (args.trace) await page.tracing.stop();
+    await cdpSession?.detach?.().catch(() => {});
     await page.close().catch(() => {});
 
     if (errors.length > 0) artifact.status = "failed";
@@ -303,8 +410,12 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       frameCount: summary.perf?.summary?.frameCount || 0,
       frameWorkP95Ms: summary.perf?.reportSummary?.frameWorkP95Ms || 0,
       rendererP95Ms: summary.perf?.reportSummary?.rendererP95Ms || 0,
+      cpuThrottleRate: args.cpuThrottleRate,
+      deviceScaleFactor: args.deviceScaleFactor,
       renderBudget,
       renderDiagnostics,
+      topMeasuredPhase: topMeasuredPhase(renderBudget),
+      matrixCell: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
     };
   } catch (err) {
     errors.push(err.stack || err.message);
@@ -317,13 +428,22 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       schemaVersion: 1,
       status: "failed",
       workload: { id: workload.id, kind: workload.kind, description: workload.description },
+      stressMatrix: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
       errors,
       partialSummary: summary,
       page: { consoleErrors, pageErrors, requestFailures },
       artifacts: { summaryJson: path.join(artifactDir, "summary.json"), traceJson: tracePath },
     };
     fs.writeFileSync(path.join(artifactDir, "summary.json"), `${JSON.stringify(artifact, null, 2)}\n`);
-    return { status: "failed", workloadId: workload.id, artifactDir, errors };
+    return {
+      status: "failed",
+      workloadId: workload.id,
+      artifactDir,
+      errors,
+      cpuThrottleRate: args.cpuThrottleRate,
+      deviceScaleFactor: args.deviceScaleFactor,
+      matrixCell: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
+    };
   }
 }
 
@@ -548,11 +668,16 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
       durationMs: args.durationMs,
       trace: !!args.trace,
       snapshotCodecBakeoff: !!args.snapshotCodecBakeoff,
+      cpuThrottleRate: args.cpuThrottleRate,
+      viewport: args.viewport,
+      deviceScaleFactor: args.deviceScaleFactor,
     },
     workloads: results.map((result) => ({
       id: result.workloadId,
       status: result.status,
       artifactDir: result.artifactDir,
+      cpuThrottleRate: result.cpuThrottleRate ?? args.cpuThrottleRate,
+      deviceScaleFactor: result.deviceScaleFactor ?? args.deviceScaleFactor,
       frameCount: result.frameCount || 0,
       frameWorkAvgMs: result.renderBudget?.frameWork?.avgMs ?? null,
       frameWorkP95Ms: result.renderBudget?.frameWork?.p95Ms ?? null,
@@ -572,6 +697,291 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
   };
   fs.writeFileSync(summaryJson, `${JSON.stringify(summary, null, 2)}\n`);
   return { artifactDir, summaryJson };
+}
+
+function writeRenderStressMatrixSummary(results, outputRoot, args) {
+  const timestamp = timestampForPath(new Date());
+  const artifactDir = path.join(outputRoot, "render-stress-matrix", timestamp);
+  fs.mkdirSync(artifactDir, { recursive: true });
+  const summary = buildRenderStressMatrixSummary(results, args);
+  const summaryJson = path.join(artifactDir, "summary.json");
+  const summaryMarkdown = path.join(artifactDir, "summary.md");
+  fs.writeFileSync(summaryJson, `${JSON.stringify(summary, null, 2)}\n`);
+  fs.writeFileSync(summaryMarkdown, formatRenderStressMatrixMarkdown(summary));
+  return { artifactDir, summaryJson, summaryMarkdown, summary };
+}
+
+export function buildRenderStressMatrixCells({
+  workloads,
+  cpuThrottles,
+  viewports,
+  deviceScaleFactors,
+  repeatCount,
+}) {
+  const cells = [];
+  for (const workload of workloads) {
+    for (const cpuThrottleRate of cpuThrottles) {
+      for (const viewport of viewports) {
+        for (const deviceScaleFactor of deviceScaleFactors) {
+          const configLabel = matrixConfigLabel({ cpuThrottleRate, viewport, deviceScaleFactor });
+          for (let repeatIndex = 1; repeatIndex <= repeatCount; repeatIndex += 1) {
+            cells.push({
+              id: `${workload.id}__${configLabel}__r${repeatIndex}`,
+              workload,
+              workloadId: workload.id,
+              cpuThrottleRate,
+              viewport,
+              deviceScaleFactor,
+              configLabel,
+              repeatIndex,
+              repeatCount,
+            });
+          }
+        }
+      }
+    }
+  }
+  return cells;
+}
+
+export function buildRenderStressMatrixSummary(results, args = {}) {
+  const generatedAt = new Date().toISOString();
+  const groups = new Map();
+  for (const result of results) {
+    const cell = result.matrixCell || {
+      workloadId: result.workloadId,
+      cpuThrottleRate: result.cpuThrottleRate || DEFAULT_CPU_THROTTLE_RATE,
+      viewport: args.viewport || MATRIX_VIEWPORT_PRESETS.default,
+      deviceScaleFactor: args.deviceScaleFactor || DEFAULT_DEVICE_SCALE_FACTOR,
+      configLabel: "single-run",
+      repeatIndex: 1,
+      repeatCount: 1,
+    };
+    const key = `${cell.workloadId}|${cell.configLabel}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        workloadId: cell.workloadId,
+        configLabel: cell.configLabel,
+        cpuThrottleRate: cell.cpuThrottleRate,
+        viewport: cell.viewport,
+        deviceScaleFactor: cell.deviceScaleFactor,
+        repeatCount: cell.repeatCount,
+        samples: [],
+      });
+    }
+    groups.get(key).samples.push(result);
+  }
+
+  const cells = [...groups.values()].map((cell) => summarizeStressMatrixCell(cell));
+  const rankedFailures = cells
+    .filter((cell) => cell.nextMissedBudget)
+    .sort(compareStressMatrixFailures)
+    .map((cell, index) => ({ rank: index + 1, ...cell }));
+
+  return {
+    schemaVersion: 1,
+    suite: "render-stress-matrix",
+    generatedAt,
+    target: {
+      fps: RENDER_TARGET_FPS,
+      frameBudgetMs: RENDER_FRAME_BUDGET_MS,
+      frameBudgets: RENDER_FRAME_BUDGET_TARGETS,
+      recurringPhaseWarnMs: RECURRING_PHASE_WARN_MS,
+      recurringPhaseHighWarnMs: RECURRING_PHASE_HIGH_WARN_MS,
+    },
+    command: {
+      stressMatrix: true,
+      renderLagSuite: !!args.renderLagSuite,
+      durationMs: args.durationMs || DEFAULT_DURATION_MS,
+      trace: !!args.trace,
+      snapshotCodecBakeoff: !!args.snapshotCodecBakeoff,
+      repeatCount: args.matrixRepeatCount || DEFAULT_MATRIX_REPEAT_COUNT,
+      cpuThrottles: args.matrixCpuThrottles || DEFAULT_MATRIX_CPU_THROTTLES,
+      viewports: args.matrixViewports || DEFAULT_MATRIX_VIEWPORTS,
+      deviceScaleFactors: args.matrixDeviceScaleFactors || DEFAULT_MATRIX_DEVICE_SCALE_FACTORS,
+    },
+    cells,
+    rankedFailures,
+    firstFailingCell: rankedFailures[0] || null,
+    notes: [
+      "Warnings are advisory and machine-local; compare branches on the same machine.",
+      "CPU throttling uses Chrome DevTools Protocol Emulation.setCPUThrottlingRate and is a local stress proxy, not a model of one player's hardware.",
+      "Representative p95 is the average of per-sample frame.work p95 values; p95SampleMaxMs keeps the largest repeated sample visible.",
+      "Traces stay opt-in per workload run.",
+    ],
+  };
+}
+
+function summarizeStressMatrixCell(cell) {
+  const successful = cell.samples.filter((sample) => sample.status === "passed");
+  const frameAvg = successful.map((sample) => sample.renderBudget?.frameWork?.avgMs).filter(Number.isFinite);
+  const frameP95 = successful.map((sample) => sample.renderBudget?.frameWork?.p95Ms).filter(Number.isFinite);
+  const frameMax = successful.map((sample) => sample.renderBudget?.frameWork?.maxMs).filter(Number.isFinite);
+  const representative = {
+    avgMs: averageMetric(frameAvg),
+    p95Ms: averageMetric(frameP95),
+    maxMs: frameMax.length > 0 ? roundMetric(Math.max(...frameMax)) : null,
+  };
+  const budgetMargins = buildFrameWorkBudgetMargins(representative);
+  const nextMissedBudget = nextMissedFrameWorkBudget(budgetMargins, "p95");
+  const topMeasuredPhase = topMeasuredPhaseFromSamples(successful);
+  return {
+    workloadId: cell.workloadId,
+    configLabel: cell.configLabel,
+    cpuThrottleRate: cell.cpuThrottleRate,
+    viewport: cell.viewport,
+    deviceScaleFactor: cell.deviceScaleFactor,
+    repeatCount: cell.repeatCount,
+    sampleCount: cell.samples.length,
+    passedSampleCount: successful.length,
+    failedSampleCount: cell.samples.length - successful.length,
+    status: cell.samples.every((sample) => sample.status === "passed") ? "passed" : "failed",
+    artifactDirs: cell.samples.map((sample) => sample.artifactDir),
+    frameWork: {
+      avgMs: representative.avgMs,
+      p95Ms: representative.p95Ms,
+      maxMs: representative.maxMs,
+      p95SampleMinMs: frameP95.length > 0 ? roundMetric(Math.min(...frameP95)) : null,
+      p95SampleMaxMs: frameP95.length > 0 ? roundMetric(Math.max(...frameP95)) : null,
+      budgetMargins,
+    },
+    nextMissedBudget,
+    topMeasuredPhase,
+    recurringPhaseWarnings: mergeRecurringPhaseWarnings(successful),
+    errors: cell.samples.flatMap((sample) => sample.errors || []),
+  };
+}
+
+function topMeasuredPhaseFromSamples(samples) {
+  const phases = [];
+  for (const sample of samples) {
+    const top = topMeasuredPhase(sample.renderBudget);
+    if (top) phases.push(top);
+  }
+  if (phases.length === 0) return null;
+  return phases.sort((a, b) =>
+    (b.p95Ms ?? 0) - (a.p95Ms ?? 0)
+    || (b.maxMs ?? 0) - (a.maxMs ?? 0)
+    || a.label.localeCompare(b.label),
+  )[0];
+}
+
+function topMeasuredPhase(report) {
+  const recurring = Array.isArray(report?.recurringPhaseWarnings) ? report.recurringPhaseWarnings : [];
+  if (recurring.length > 0) {
+    const phase = recurring[0];
+    return {
+      label: phase.label,
+      p95Ms: phase.p95Ms,
+      maxMs: phase.maxMs,
+      source: "recurringPhaseWarnings",
+    };
+  }
+  if (report?.worstPhase?.label) {
+    return {
+      label: report.worstPhase.label,
+      count: report.worstPhase.count,
+      source: "worstPhase",
+    };
+  }
+  return null;
+}
+
+function mergeRecurringPhaseWarnings(samples) {
+  const byLabel = new Map();
+  for (const sample of samples) {
+    for (const phase of sample.renderBudget?.recurringPhaseWarnings || []) {
+      const current = byLabel.get(phase.label) || {
+        label: phase.label,
+        samples: 0,
+        maxP95Ms: null,
+        maxMs: null,
+        severity: "info",
+      };
+      current.samples += 1;
+      current.maxP95Ms = maxMetric(current.maxP95Ms, phase.p95Ms);
+      current.maxMs = maxMetric(current.maxMs, phase.maxMs);
+      if (phase.severity === "high") current.severity = "high";
+      else if (phase.severity === "warn" && current.severity !== "high") current.severity = "warn";
+      byLabel.set(phase.label, current);
+    }
+  }
+  return [...byLabel.values()]
+    .sort((a, b) => (b.maxP95Ms ?? 0) - (a.maxP95Ms ?? 0) || a.label.localeCompare(b.label))
+    .slice(0, MAX_RECURRING_WARNINGS);
+}
+
+function compareStressMatrixFailures(a, b) {
+  return (a.nextMissedBudget.fps || 0) - (b.nextMissedBudget.fps || 0)
+    || (a.nextMissedBudget.p95MarginMs || 0) - (b.nextMissedBudget.p95MarginMs || 0)
+    || (b.frameWork.p95Ms ?? 0) - (a.frameWork.p95Ms ?? 0)
+    || a.workloadId.localeCompare(b.workloadId)
+    || a.configLabel.localeCompare(b.configLabel);
+}
+
+export function formatRenderStressMatrixMarkdown(summary) {
+  const lines = [
+    "# Render Stress Matrix",
+    "",
+    `Generated: ${summary.generatedAt}`,
+    "",
+    "| Rank | Workload | Config | frame.work p95 | Next missed | Top phase | Artifacts |",
+    "| --- | --- | --- | ---: | --- | --- | --- |",
+  ];
+  const rows = summary.rankedFailures?.length ? summary.rankedFailures : summary.cells || [];
+  for (const row of rows) {
+    const missed = row.nextMissedBudget
+      ? `${row.nextMissedBudget.fps} FPS by ${formatMs(Math.abs(row.nextMissedBudget.p95MarginMs))}`
+      : "none";
+    const rank = row.rank || "";
+    const phase = row.topMeasuredPhase?.label || "unknown";
+    lines.push(
+      `| ${rank} | ${row.workloadId} | ${row.configLabel} | ${formatMs(row.frameWork?.p95Ms)} | ${missed} | ${phase} | ${row.artifactDirs?.length || 0} |`,
+    );
+  }
+  lines.push(
+    "",
+    "Notes:",
+    "",
+    "- Budget failures are advisory and machine-local.",
+    "- CPU throttling is a Chrome stress control, not a hardware-identical low-end laptop model.",
+    "- Inspect each cell's `summary.json` before using the ranking as optimization direction.",
+    "",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function averageMetric(values) {
+  if (!values.length) return null;
+  return roundMetric(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function maxMetric(a, b) {
+  if (!Number.isFinite(a)) return Number.isFinite(b) ? b : null;
+  if (!Number.isFinite(b)) return a;
+  return Math.max(a, b);
+}
+
+function serializeMatrixCell(cell) {
+  return {
+    id: cell.id,
+    workloadId: cell.workloadId,
+    configLabel: cell.configLabel,
+    cpuThrottleRate: cell.cpuThrottleRate,
+    viewport: cell.viewport,
+    deviceScaleFactor: cell.deviceScaleFactor,
+    repeatIndex: cell.repeatIndex,
+    repeatCount: cell.repeatCount,
+  };
+}
+
+function matrixConfigLabel({ cpuThrottleRate, viewport, deviceScaleFactor }) {
+  const viewportLabel = viewport.label || `${viewport.width}x${viewport.height}`;
+  return `cpu${formatNumberToken(cpuThrottleRate)}-vp${viewportLabel}-dpr${formatNumberToken(deviceScaleFactor)}`;
+}
+
+function formatNumberToken(value) {
+  return String(value).replace(/\./g, "p");
 }
 
 function numberOrNull(value) {
@@ -786,8 +1196,95 @@ async function collectPageSummary(page) {
 async function applyWorkloadSetup(page, workload) {
   const setup = workload.setup || null;
   if (!setup) return null;
+  const result = { actions: [] };
+
+  if (setup.replayVisionPlayerIndex != null || setup.replayVisionPlayerId != null) {
+    const action = await page.evaluate((replaySetup) => {
+      const match = window.__rts?.match;
+      const players = Array.isArray(match?.predictionStartInfo?.players)
+        ? match.predictionStartInfo.players
+        : [];
+      const explicitId = Number(replaySetup.replayVisionPlayerId);
+      const playerFromIndex = players[Number(replaySetup.replayVisionPlayerIndex)]?.id;
+      const playerId = Number.isFinite(explicitId) && explicitId > 0 ? explicitId : Number(playerFromIndex);
+      if (!Number.isFinite(playerId) || playerId <= 0 || typeof match?.net?.setReplayVision !== "function") {
+        return { action: "setReplayVision", error: "replay player id or net control unavailable" };
+      }
+      match.net.setReplayVision({ mode: "player", playerId });
+      return { action: "setReplayVision", playerId };
+    }, setup);
+    result.actions.push(action);
+    if (action.error) result.error = action.error;
+  }
+
+  const seekTick = Number(setup.seekRoomTimeTo);
+  if (Number.isInteger(seekTick) && seekTick >= 0) {
+    const action = await page.evaluate((tick) => {
+      const match = window.__rts?.match;
+      if (typeof match?.net?.seekRoomTimeTo !== "function") {
+        return { action: "seekRoomTimeTo", targetTick: tick, error: "replay seek control unavailable" };
+      }
+      match.net.seekRoomTimeTo(tick);
+      return { action: "seekRoomTimeTo", targetTick: tick };
+    }, seekTick);
+    result.actions.push(action);
+    if (action.error) {
+      result.error = action.error;
+    } else {
+      try {
+        await page.waitForFunction(
+          (tick) => (window.__rts?.match?.lastSnapshotTick || 0) >= tick,
+          { timeout: Number(setup.seekTimeoutMs) || 20000 },
+          seekTick,
+        );
+      } catch (err) {
+        result.error = `timed out waiting for replay seek to tick ${seekTick}: ${err.message}`;
+      }
+    }
+  }
+
+  const speed = Number(setup.setRoomTimeSpeed);
+  if (Number.isFinite(speed) && speed >= 0) {
+    const action = await page.evaluate((roomTimeSpeed) => {
+      const match = window.__rts?.match;
+      if (typeof match?.net?.setRoomTimeSpeed !== "function") {
+        return { action: "setRoomTimeSpeed", speed: roomTimeSpeed, error: "room-time speed control unavailable" };
+      }
+      match.net.setRoomTimeSpeed(roomTimeSpeed);
+      return { action: "setRoomTimeSpeed", speed: roomTimeSpeed };
+    }, speed);
+    result.actions.push(action);
+    if (action.error && !result.error) result.error = action.error;
+  }
+
+  const minEntities = Number(setup.waitForMinEntities);
+  if (Number.isInteger(minEntities) && minEntities > 0) {
+    try {
+      await page.waitForFunction(
+        (minimum) => {
+          const state = window.__rts?.match?.state;
+          if (!state?._curById?.values) return false;
+          let count = 0;
+          for (const entity of state._curById.values()) {
+            if (entity && !entity.shotReveal && !entity.visionOnly) count += 1;
+          }
+          return count >= minimum;
+        },
+        { timeout: Number(setup.entityWaitTimeoutMs) || 12000 },
+        minEntities,
+      );
+      result.actions.push({ action: "waitForMinEntities", minEntities });
+    } catch (err) {
+      const message = `timed out waiting for ${minEntities} visible entities: ${err.message}`;
+      result.actions.push({ action: "waitForMinEntities", minEntities, error: message });
+      if (!result.error) result.error = message;
+    }
+  }
+
   const selectCount = Number(setup.selectFirstEntities);
-  if (!Number.isInteger(selectCount) || selectCount <= 0) return { skipped: true };
+  if (!Number.isInteger(selectCount) || selectCount <= 0) {
+    return result.actions.length > 0 ? result : { skipped: true };
+  }
 
   try {
     await page.waitForFunction(
@@ -798,28 +1295,73 @@ async function applyWorkloadSetup(page, workload) {
       { timeout: 5000 },
     );
   } catch (err) {
-    return {
+    const action = {
       action: "selectFirstEntities",
       requestedCount: selectCount,
       selectedCount: 0,
       error: `timed out waiting for selectable entities: ${err.message}`,
     };
+    result.actions.push(action);
+    result.selectedCount = 0;
+    if (!result.error) result.error = action.error;
+    return result;
   }
 
-  return page.evaluate((count) => {
+  const selection = await page.evaluate((selectionSetup) => {
+    const UNIT_KINDS = new Set([
+      "worker",
+      "rifleman",
+      "machine_gunner",
+      "anti_tank_gun",
+      "mortar_team",
+      "artillery",
+      "scout_car",
+      "tank",
+      "command_car",
+      "ekat",
+    ]);
     const state = window.__rts?.match?.state;
+    const players = Array.isArray(window.__rts?.match?.predictionStartInfo?.players)
+      ? window.__rts.match.predictionStartInfo.players
+      : [];
+    const ownerFromReplayVision = players[Number(selectionSetup.replayVisionPlayerIndex)]?.id;
+    const requestedOwner = Number(selectionSetup.selectOwnerId);
+    const ownerId = Number.isFinite(requestedOwner) && requestedOwner > 0
+      ? requestedOwner
+      : selectionSetup.selectReplayVisionPlayer
+        ? Number(ownerFromReplayVision)
+        : null;
     const entities = Array.from(state?._curById?.values?.() || [])
-      .filter((entity) => entity && Number.isInteger(entity.id) && !entity.shotReveal && !entity.visionOnly)
+      .filter((entity) => {
+        if (!entity || !Number.isInteger(entity.id) || entity.shotReveal || entity.visionOnly) return false;
+        if (Number.isFinite(ownerId) && entity.owner !== ownerId) return false;
+        if (selectionSetup.selectUnitKindsOnly && !UNIT_KINDS.has(entity.kind)) return false;
+        return true;
+      })
       .sort((a, b) => a.id - b.id);
-    const selectedIds = entities.slice(0, count).map((entity) => entity.id);
+    const selected = entities.slice(0, selectionSetup.selectFirstEntities);
+    const selectedIds = selected.map((entity) => entity.id);
     state.setSelection(selectedIds);
+    if (selectionSetup.focusSelectedEntities && selected.length > 0 && window.__rts?.match?.camera?.centerOn) {
+      const center = selected.reduce(
+        (sum, entity) => ({ x: sum.x + Number(entity.x || 0), y: sum.y + Number(entity.y || 0) }),
+        { x: 0, y: 0 },
+      );
+      window.__rts.match.camera.centerOn(center.x / selected.length, center.y / selected.length);
+    }
     return {
       action: "selectFirstEntities",
-      requestedCount: count,
+      requestedCount: selectionSetup.selectFirstEntities,
       selectedCount: state.selection?.size || 0,
       selectedIds: Array.from(state.selection || []),
+      ownerId: Number.isFinite(ownerId) ? ownerId : null,
+      unitKindsOnly: !!selectionSetup.selectUnitKindsOnly,
     };
-  }, selectCount);
+  }, setup);
+  result.actions.push(selection);
+  result.selectedCount = selection.selectedCount;
+  result.selectedIds = selection.selectedIds;
+  return result;
 }
 
 function workloadSetupErrors(workload, setupResult) {
@@ -911,6 +1453,22 @@ async function launchBrowser(puppeteer, chrome, args) {
       `--user-data-dir=${profileDir}`,
     ],
   });
+}
+
+async function configurePageEmulation(page, args) {
+  const rate = Number(args.cpuThrottleRate || DEFAULT_CPU_THROTTLE_RATE);
+  if (!Number.isFinite(rate) || rate <= 1) return null;
+  const session = await page.target().createCDPSession();
+  await session.send("Emulation.setCPUThrottlingRate", { rate });
+  return session;
+}
+
+function puppeteerViewport(viewport, deviceScaleFactor = DEFAULT_DEVICE_SCALE_FACTOR) {
+  return {
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor,
+  };
 }
 
 async function installSnapshotCodecCapture(page, maxSamples) {
@@ -1029,6 +1587,13 @@ function parseArgs(argv) {
     durationMs: DEFAULT_DURATION_MS,
     outputRoot: DEFAULT_OUTPUT_ROOT,
     viewport: { ...DEFAULT_VIEWPORT },
+    deviceScaleFactor: DEFAULT_DEVICE_SCALE_FACTOR,
+    cpuThrottleRate: DEFAULT_CPU_THROTTLE_RATE,
+    stressMatrix: false,
+    matrixRepeatCount: DEFAULT_MATRIX_REPEAT_COUNT,
+    matrixCpuThrottles: [...DEFAULT_MATRIX_CPU_THROTTLES],
+    matrixViewports: [...DEFAULT_MATRIX_VIEWPORTS],
+    matrixDeviceScaleFactors: [...DEFAULT_MATRIX_DEVICE_SCALE_FACTORS],
     chrome: process.env.CHROME || "",
     baseUrl: "",
     port: 0,
@@ -1048,6 +1613,7 @@ function parseArgs(argv) {
     };
     if (arg === "--list") args.list = true;
     else if (arg === "--render-lag-suite") args.renderLagSuite = true;
+    else if (arg === "--stress-matrix") args.stressMatrix = true;
     else if (arg === "--trace") args.trace = true;
     else if (arg === "--snapshot-codec-bakeoff") args.snapshotCodecBakeoff = true;
     else if (arg === "--snapshot-codec-max-samples") args.snapshotCodecMaxSamples = parsePositiveInt(value(), arg);
@@ -1068,6 +1634,19 @@ function parseArgs(argv) {
     else if (arg.startsWith("--port=")) args.port = parsePositiveInt(arg.slice("--port=".length), "--port");
     else if (arg === "--viewport") args.viewport = parseViewport(value());
     else if (arg.startsWith("--viewport=")) args.viewport = parseViewport(arg.slice("--viewport=".length));
+    else if (arg === "--device-scale-factor" || arg === "--dpr") args.deviceScaleFactor = parsePositiveNumber(value(), arg);
+    else if (arg.startsWith("--device-scale-factor=")) args.deviceScaleFactor = parsePositiveNumber(arg.slice("--device-scale-factor=".length), "--device-scale-factor");
+    else if (arg.startsWith("--dpr=")) args.deviceScaleFactor = parsePositiveNumber(arg.slice("--dpr=".length), "--dpr");
+    else if (arg === "--cpu-throttle") args.cpuThrottleRate = parsePositiveNumber(value(), arg);
+    else if (arg.startsWith("--cpu-throttle=")) args.cpuThrottleRate = parsePositiveNumber(arg.slice("--cpu-throttle=".length), "--cpu-throttle");
+    else if (arg === "--matrix-repeat") args.matrixRepeatCount = parsePositiveInt(value(), arg);
+    else if (arg.startsWith("--matrix-repeat=")) args.matrixRepeatCount = parsePositiveInt(arg.slice("--matrix-repeat=".length), "--matrix-repeat");
+    else if (arg === "--matrix-cpu") args.matrixCpuThrottles = parsePositiveNumberList(value(), arg);
+    else if (arg.startsWith("--matrix-cpu=")) args.matrixCpuThrottles = parsePositiveNumberList(arg.slice("--matrix-cpu=".length), "--matrix-cpu");
+    else if (arg === "--matrix-viewport") args.matrixViewports = parseMatrixViewportList(value(), arg);
+    else if (arg.startsWith("--matrix-viewport=")) args.matrixViewports = parseMatrixViewportList(arg.slice("--matrix-viewport=".length), "--matrix-viewport");
+    else if (arg === "--matrix-dpr") args.matrixDeviceScaleFactors = parsePositiveNumberList(value(), arg);
+    else if (arg.startsWith("--matrix-dpr=")) args.matrixDeviceScaleFactors = parsePositiveNumberList(arg.slice("--matrix-dpr=".length), "--matrix-dpr");
     else if (arg === "-h" || arg === "--help") {
       printHelp();
       process.exit(0);
@@ -1087,6 +1666,7 @@ function printHelp() {
 Options:
   --list                         List available workloads.
   --render-lag-suite             Run the full render-lag comparison workload set.
+  --stress-matrix                Run workloads across CPU, viewport, DPR, and repeat matrix cells.
   --workload <id>                Run one workload; repeatable. Defaults to all workloads.
   --seconds <n>                  Browser collection time per workload. Default: ${DEFAULT_DURATION_MS / 1000}.
   --duration-ms <n>              Browser collection time per workload in milliseconds.
@@ -1098,6 +1678,12 @@ Options:
   --port <n>                     Port for a harness-started server.
   --chrome <path>                Chrome/Chromium executable. Defaults to CHROME or common paths.
   --viewport <width>x<height>    Browser viewport. Default: ${DEFAULT_VIEWPORT.width}x${DEFAULT_VIEWPORT.height}.
+  --dpr <n>                      Device scale factor for a single workload run. Default: ${DEFAULT_DEVICE_SCALE_FACTOR}.
+  --cpu-throttle <n>             Chrome CPU throttle factor for a single workload run. Default: ${DEFAULT_CPU_THROTTLE_RATE}.
+  --matrix-repeat <n>            Repeat count per stress-matrix cell. Default: ${DEFAULT_MATRIX_REPEAT_COUNT}.
+  --matrix-cpu <list>            Comma list such as 1,2,4. Default: ${DEFAULT_MATRIX_CPU_THROTTLES.join(",")}.
+  --matrix-viewport <list>       Comma list of small,default,large or WxH. Default: default.
+  --matrix-dpr <list>            Comma list of device scale factors. Default: ${DEFAULT_MATRIX_DEVICE_SCALE_FACTORS.join(",")}.
 `);
 }
 
@@ -1107,10 +1693,45 @@ function parsePositiveInt(raw, label) {
   return value;
 }
 
+function parsePositiveNumber(raw, label) {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`${label} must be a positive number`);
+  return value;
+}
+
+export function parsePositiveNumberList(raw, label = "value") {
+  const values = String(raw)
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => parsePositiveNumber(part, label));
+  if (values.length === 0) throw new Error(`${label} must include at least one number`);
+  return [...new Set(values)];
+}
+
 function parseViewport(raw) {
   const match = /^([1-9][0-9]*)x([1-9][0-9]*)$/.exec(raw);
   if (!match) throw new Error("--viewport must look like 1440x900");
   return { width: Number(match[1]), height: Number(match[2]) };
+}
+
+export function parseMatrixViewportList(raw, label = "--matrix-viewport") {
+  const viewports = String(raw)
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const preset = MATRIX_VIEWPORT_PRESETS[part];
+      if (preset) return { ...preset };
+      const parsed = parseViewport(part);
+      return { label: part, ...parsed };
+    });
+  if (viewports.length === 0) throw new Error(`${label} must include at least one viewport`);
+  const byKey = new Map();
+  for (const viewport of viewports) {
+    byKey.set(`${viewport.width}x${viewport.height}`, viewport);
+  }
+  return [...byKey.values()];
 }
 
 function findChrome(explicit) {

@@ -193,6 +193,7 @@ writes machine-readable summaries under `target/client-perf/<workload>/<timestam
 node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
+node scripts/client-perf-harness.mjs --stress-matrix --render-lag-suite --seconds 4 --matrix-cpu 1,2 --matrix-viewport default --matrix-dpr 1 --matrix-repeat 1
 ```
 
 The harness starts its own local server unless `RTS_URL` or `--base-url` points at a healthy server.
@@ -202,6 +203,10 @@ rollup with advisory 60, 120, 240, and 480 FPS frame-work budget margins plus th
 budget. Open a generated `summary.json` to inspect workload metadata, build/version, viewport,
 entity/context counts, `renderBudget`, frame timing aggregates, worst phases, page errors, and the
 generated client net report.
+The stress matrix writes a `target/client-perf/render-stress-matrix/<timestamp>/` rollup with CPU
+throttle, viewport, DPR, repeat, first missed budget, top measured phase, and per-sample artifact
+paths. It is advisory local evidence only; use the longer documented command in
+`docs/perf-tracing.md` for serious before/after comparisons.
 
 ## SVG rig checks
 

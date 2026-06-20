@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending.
+- [x] Done.
 
 ## Objective
 
@@ -44,16 +44,18 @@ target the first measured bottleneck rather than guessing from a normal laptop r
 
 ## Implementation Checklist
 
-- [ ] Add stress-matrix CLI options for workload sets, repeat count, CPU throttle, viewport, and DPR.
-- [ ] Add or reuse a fog/combat-heavy workload that exercises renderer, fog, minimap, effects, and
+- [x] Add stress-matrix CLI options for workload sets, repeat count, CPU throttle, viewport, and DPR.
+- [x] Add or reuse a fog/combat-heavy workload that exercises renderer, fog, minimap, effects, and
       selection overlays.
-- [ ] Include matrix configuration in every artifact and rollup.
-- [ ] Rank failing cells by missed budget and top measured phase.
-- [ ] Keep trace capture opt-in and artifacts under ignored `target/client-perf/` paths.
-- [ ] Add focused parser/report tests.
-- [ ] Run a short matrix locally and record exact artifact paths.
-- [ ] Run verification and record exact results.
-- [ ] Mark this phase as done in this file.
+- [x] Include matrix configuration in every artifact and rollup.
+- [x] Rank failing cells by missed budget and top measured phase.
+- [x] Keep trace capture opt-in and artifacts under ignored `target/client-perf/` paths.
+- [x] Add focused parser/report tests.
+- [x] Attempt a short matrix locally and record exact artifact paths when the executor can bind a
+      local server. This sandbox failed before artifact creation with `listen EPERM: operation not
+      permitted 127.0.0.1`.
+- [x] Run verification and record exact results.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

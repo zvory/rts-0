@@ -17,9 +17,14 @@ import {
 import {
   RENDER_FRAME_BUDGET_MS,
   RENDER_FRAME_BUDGET_TARGETS,
+  buildRenderStressMatrixCells,
+  buildRenderStressMatrixSummary,
   buildRenderDiagnosticsReport,
   buildRenderBudgetReport,
   formatRenderBudgetConsole,
+  formatRenderStressMatrixMarkdown,
+  parseMatrixViewportList,
+  parsePositiveNumberList,
 } from "../scripts/client-perf-harness.mjs";
 import { Net, SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES } from "../client/src/net.js";
 import {
@@ -1517,6 +1522,97 @@ function hotkeyService() {
   assert(report.groups.rigRedraws.total === 20, "render diagnostics groups rig redraw counters");
   assert(report.groups.minimapInvalidations.total === 4, "render diagnostics groups minimap invalidations");
   assert(report.recentLongFrames[0].rendererNestedPhase.label === "renderer.units", "render diagnostics preserves long-frame context");
+}
+
+{
+  const cpus = parsePositiveNumberList("1,2,4", "--matrix-cpu");
+  const dprs = parsePositiveNumberList("1,1.5,2", "--matrix-dpr");
+  const viewports = parseMatrixViewportList("small,1440x900,large");
+  assert(cpus.length === 3 && cpus[2] === 4, "stress matrix parser accepts CPU throttle lists");
+  assert(dprs.includes(1.5), "stress matrix parser accepts fractional DPR values");
+  assert(
+    viewports.some((viewport) => viewport.label === "small" && viewport.width === 1024)
+      && viewports.some((viewport) => viewport.label === "1440x900" && viewport.height === 900),
+    "stress matrix parser accepts presets and explicit viewport sizes",
+  );
+
+  const workloads = [{ id: "matt-alex-replay" }, { id: "fog-combat-replay-stress" }];
+  const cells = buildRenderStressMatrixCells({
+    workloads,
+    cpuThrottles: [1, 4],
+    viewports: viewports.slice(0, 2),
+    deviceScaleFactors: [1, 2],
+    repeatCount: 2,
+  });
+  assert(cells.length === 32, "stress matrix expands workloads, CPU, viewport, DPR, and repeats");
+  assert(
+    cells.some((cell) => cell.configLabel.includes("cpu4") && cell.configLabel.includes("dpr2")),
+    "stress matrix cells include stable config labels",
+  );
+
+  const passingBudget = buildRenderBudgetReport({
+    schemaVersion: 1,
+    frameCount: 120,
+    phases: [
+      { label: "frame.work", count: 120, avgMs: 3, maxMs: 4, p95Ms: 3.5 },
+      { label: "match.renderer", count: 120, avgMs: 0.8, maxMs: 1.2, p95Ms: 1 },
+    ],
+  });
+  const failingBudget = buildRenderBudgetReport({
+    schemaVersion: 1,
+    frameCount: 120,
+    worstPhase: { label: "match.renderer", count: 80 },
+    phases: [
+      { label: "frame.work", count: 120, avgMs: 12, maxMs: 22, p95Ms: 18 },
+      { label: "match.renderer", count: 120, avgMs: 5, maxMs: 12, p95Ms: 9 },
+      { label: "renderer.units", count: 120, avgMs: 3, maxMs: 7, p95Ms: 5 },
+    ],
+  });
+  const matrixSummary = buildRenderStressMatrixSummary([
+    {
+      status: "passed",
+      workloadId: "matt-alex-replay",
+      artifactDir: "target/client-perf/matt-alex-replay/a",
+      renderBudget: passingBudget,
+      matrixCell: {
+        workloadId: "matt-alex-replay",
+        configLabel: "cpu1-vpdefault-dpr1",
+        cpuThrottleRate: 1,
+        viewport: { label: "default", width: 1440, height: 900 },
+        deviceScaleFactor: 1,
+        repeatIndex: 1,
+        repeatCount: 1,
+      },
+    },
+    {
+      status: "passed",
+      workloadId: "fog-combat-replay-stress",
+      artifactDir: "target/client-perf/fog-combat-replay-stress/a",
+      renderBudget: failingBudget,
+      matrixCell: {
+        workloadId: "fog-combat-replay-stress",
+        configLabel: "cpu4-vplarge-dpr2",
+        cpuThrottleRate: 4,
+        viewport: { label: "large", width: 1920, height: 1080 },
+        deviceScaleFactor: 2,
+        repeatIndex: 1,
+        repeatCount: 1,
+      },
+    },
+  ], { durationMs: 1000, matrixRepeatCount: 1 });
+  assert(matrixSummary.cells.length === 2, "stress matrix summary groups runs into cells");
+  assert(
+    matrixSummary.firstFailingCell.workloadId === "fog-combat-replay-stress",
+    "stress matrix summary ranks the first failing cell",
+  );
+  assert(
+    matrixSummary.firstFailingCell.topMeasuredPhase.label === "match.renderer",
+    "stress matrix summary reports the top measured phase for the failing cell",
+  );
+  assert(
+    formatRenderStressMatrixMarkdown(matrixSummary).includes("fog-combat-replay-stress"),
+    "stress matrix markdown includes failing workload rows",
+  );
 }
 
 {
