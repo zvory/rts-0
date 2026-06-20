@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const defaultRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultCheckpointFile = "docs/docdrift-checkpoint.txt";
+const defaultCheckpointFile = ".docdrift/checkpoint.txt";
+const defaultCheckpointSeedFile = "docs/docdrift-checkpoint.txt";
 const defaultTraceMapPath = "docs/doc-map.json";
 const defaultClassifierCacheDir = ".docdrift/classifier-cache";
 const defaultDocPatchCacheDir = ".docdrift/doc-patch-cache";
+const defaultRunRoot = ".docdrift/runs";
+const defaultSweepBranch = "zvorygin/docdrift-sweep";
+const defaultSweepWorktree = ".docdrift/worktrees/docdrift-sweep";
 const classifierPromptVersion = "docdrift-classifier-v1";
 const docPatchPromptVersion = "docdrift-doc-patch-v1";
 const validClassifierDecisions = new Set(["move_on", "update_docs"]);
@@ -21,6 +25,7 @@ function usage() {
   node scripts/docdrift-sweep.mjs --dry-run [options]
   node scripts/docdrift-sweep.mjs --classify [options]
   node scripts/docdrift-sweep.mjs --generate-docs [options]
+  node scripts/docdrift-sweep.mjs --full [--dry-run] [options]
 
 Options:
   --base REF                  Override the reviewed checkpoint ref.
@@ -29,13 +34,20 @@ Options:
   --codex-arg ARG             Extra Codex CLI argument for live classify mode. Repeatable.
   --codex-command COMMAND     Codex CLI command for live classify mode. Default: codex
   --codex-model MODEL         Optional model passed to Codex CLI with --model.
-  --checkpoint-file PATH      Checkpoint file used when --base is omitted. Default: ${defaultCheckpointFile}
+  --checkpoint-file PATH      Local checkpoint used when --base is omitted. Default: ${defaultCheckpointFile}
+  --checkpoint-seed-file PATH Committed fallback checkpoint. Default: ${defaultCheckpointSeedFile}
   --checkpoint-ref REF        Optional checkpoint ref used when --base is omitted.
   --doc-patch-cache DIR       Cache directory for generated doc patch records. Default: ${defaultDocPatchCacheDir}
-  --dry-run                   Build the deterministic Phase 1 report without classification.
+  --dry-run                   Build the deterministic Phase 1 report without classification; with --full, preview lifecycle without mutation.
   --fixture NAME_OR_PATH      Fixture response set for --classify/--generate-docs --no-codex.
+  --full                      Run the full PR/checkpoint lifecycle.
   --generate-docs             Generate and apply minimal docs patches for update_docs decisions.
   --head REF                  Sweep target. Default: origin/main.
+  --pr-title TITLE            PR title for --full. Default: Documentation drift sweep.
+  --run-id ID                 Run id for --full reports. Default: current timestamp.
+  --run-root DIR              Root directory for --full reports. Default: ${defaultRunRoot}
+  --sweep-branch BRANCH       Branch for --full sweep PRs. Default: ${defaultSweepBranch}
+  --sweep-worktree DIR        Isolated worktree for --full. Default: ${defaultSweepWorktree}
   --trace-map PATH            Trace map JSON path. Default: ${defaultTraceMapPath}
   --format markdown|json      Stdout format. Default: markdown.
   --max-commits N             Max considered commits for one classify run. Default: 25
@@ -51,7 +63,9 @@ Options:
 Dry-run mode reads commit metadata and trace-map routing only. Classify mode sends bounded commit
 metadata to Codex CLI, caches decision records, and never edits docs. Generate-docs mode feeds only
 update_docs decisions and targeted design-doc sections to Codex CLI, applies exact minimal doc
-patches in the working tree, and never creates PRs or advances the checkpoint.`);
+patches in the working tree, and never creates PRs or advances the checkpoint. Full mode creates or
+reuses an isolated worktree, generates one docs sweep branch, opens or updates the owned PR, waits
+for merge, and advances the local checkpoint only after the processed head is safe.`);
 }
 
 export function parseArgs(argv) {
@@ -63,11 +77,13 @@ export function parseArgs(argv) {
     codexCommand: "codex",
     codexModel: null,
     checkpointFile: defaultCheckpointFile,
+    checkpointSeedFile: defaultCheckpointSeedFile,
     checkpointRef: null,
     docPatchCacheDir: defaultDocPatchCacheDir,
     dryRun: false,
     fixture: null,
     format: "markdown",
+    full: false,
     generateDocs: false,
     head: "origin/main",
     maxCommits: 25,
@@ -77,7 +93,12 @@ export function parseArgs(argv) {
     maxTotalPromptTokens: 20000,
     noCodex: false,
     outDir: null,
+    prTitle: "Documentation drift sweep",
     repoRoot: defaultRepoRoot,
+    runId: null,
+    runRoot: defaultRunRoot,
+    sweepBranch: defaultSweepBranch,
+    sweepWorktree: defaultSweepWorktree,
     traceMap: defaultTraceMapPath,
   };
 
@@ -117,10 +138,14 @@ export function parseArgs(argv) {
       options.checkpointRef = readValue("--checkpoint-ref");
     } else if (arg === "--checkpoint-file" || arg.startsWith("--checkpoint-file=")) {
       options.checkpointFile = readValue("--checkpoint-file");
+    } else if (arg === "--checkpoint-seed-file" || arg.startsWith("--checkpoint-seed-file=")) {
+      options.checkpointSeedFile = readValue("--checkpoint-seed-file");
     } else if (arg === "--doc-patch-cache" || arg.startsWith("--doc-patch-cache=")) {
       options.docPatchCacheDir = readValue("--doc-patch-cache");
     } else if (arg === "--fixture" || arg.startsWith("--fixture=")) {
       options.fixture = readValue("--fixture");
+    } else if (arg === "--full") {
+      options.full = true;
     } else if (arg === "--head" || arg.startsWith("--head=")) {
       options.head = readValue("--head");
     } else if (arg === "--max-commits" || arg.startsWith("--max-commits=")) {
@@ -147,8 +172,18 @@ export function parseArgs(argv) {
       options.format = readValue("--format");
     } else if (arg === "--out-dir" || arg.startsWith("--out-dir=")) {
       options.outDir = readValue("--out-dir");
+    } else if (arg === "--pr-title" || arg.startsWith("--pr-title=")) {
+      options.prTitle = readValue("--pr-title");
     } else if (arg === "--repo" || arg.startsWith("--repo=")) {
       options.repoRoot = readValue("--repo");
+    } else if (arg === "--run-id" || arg.startsWith("--run-id=")) {
+      options.runId = readValue("--run-id");
+    } else if (arg === "--run-root" || arg.startsWith("--run-root=")) {
+      options.runRoot = readValue("--run-root");
+    } else if (arg === "--sweep-branch" || arg.startsWith("--sweep-branch=")) {
+      options.sweepBranch = readValue("--sweep-branch");
+    } else if (arg === "--sweep-worktree" || arg.startsWith("--sweep-worktree=")) {
+      options.sweepWorktree = readValue("--sweep-worktree");
     } else {
       throw new Error(`unknown option: ${arg}`);
     }
@@ -157,23 +192,31 @@ export function parseArgs(argv) {
   if (!["markdown", "json"].includes(options.format)) {
     throw new Error("--format must be markdown or json");
   }
-  const modeCount = [options.dryRun, options.classify, options.generateDocs].filter(Boolean).length;
+  const modeCount = [options.dryRun && !options.full, options.classify, options.generateDocs, options.full].filter(Boolean).length;
   if (!options.help && modeCount !== 1) {
-    throw new Error("choose exactly one mode: --dry-run, --classify, or --generate-docs");
+    throw new Error("choose exactly one mode: --dry-run, --classify, --generate-docs, or --full");
   }
-  if (!options.help && options.noCodex && (options.classify || options.generateDocs) && !options.fixture) {
-    throw new Error("--no-codex requires --fixture in classify or generate-docs mode");
+  if (
+    !options.help &&
+    options.noCodex &&
+    (options.classify || options.generateDocs || (options.full && !options.dryRun)) &&
+    !options.fixture
+  ) {
+    throw new Error("--no-codex requires --fixture in classify, generate-docs, or mutating full mode");
   }
   if (!options.help && options.fixture && !options.noCodex) {
     throw new Error("--fixture is only valid with --no-codex");
   }
   if (
     !options.help &&
-    (options.classify || options.generateDocs) &&
+    (options.classify || options.generateDocs || (options.full && !options.dryRun)) &&
     !options.noCodex &&
     !path.basename(options.codexCommand).includes("codex")
   ) {
     throw new Error("--codex-command must point to a Codex CLI command");
+  }
+  if (!options.help && options.full && !options.sweepBranch.startsWith("zvorygin/")) {
+    throw new Error("--sweep-branch must start with zvorygin/");
   }
 
   options.repoRoot = path.resolve(options.repoRoot);
@@ -192,10 +235,11 @@ function parsePositiveInteger(value, name) {
 }
 
 function git(repoRoot, args, options = {}) {
-  return execFileSync("git", ["-C", repoRoot, ...args], {
+  const output = execFileSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
-  }).trimEnd();
+  });
+  return typeof output === "string" ? output.trimEnd() : "";
 }
 
 function resolveCommit(repoRoot, ref, label) {
@@ -222,6 +266,34 @@ function readCheckpointFile(repoRoot, checkpointFile) {
     source: repoRelative(repoRoot, absPath),
     value: checkpoint,
   };
+}
+
+function readCheckpoint(repoRoot, checkpointFile, checkpointSeedFile) {
+  const absCheckpoint = path.resolve(repoRoot, checkpointFile);
+  if (existsSync(absCheckpoint)) {
+    return readCheckpointFile(repoRoot, checkpointFile);
+  }
+  if (checkpointSeedFile) {
+    return readCheckpointFile(repoRoot, checkpointSeedFile);
+  }
+  return readCheckpointFile(repoRoot, checkpointFile);
+}
+
+function writeCheckpointAtomic(repoRoot, checkpointFile, sha) {
+  const absPath = path.resolve(repoRoot, checkpointFile);
+  mkdirSync(path.dirname(absPath), { recursive: true });
+  const tempPath = `${absPath}.tmp-${process.pid}`;
+  writeFileSync(
+    tempPath,
+    [
+      "# Documentation drift sweeper local checkpoint.",
+      "# Updated only after a full sweep processes commits safely.",
+      sha,
+      "",
+    ].join("\n"),
+  );
+  renameSync(tempPath, absPath);
+  return repoRelative(repoRoot, absPath);
 }
 
 function repoRelative(repoRoot, pathname) {
@@ -1239,7 +1311,7 @@ export function buildReport(options) {
     baseRef = options.checkpointRef;
     baseSource = "--checkpoint-ref";
   } else if (!baseRef) {
-    const checkpoint = readCheckpointFile(repoRoot, options.checkpointFile);
+    const checkpoint = readCheckpoint(repoRoot, options.checkpointFile, options.checkpointSeedFile);
     baseRef = checkpoint.value;
     baseSource = checkpoint.source;
   }
@@ -1273,6 +1345,370 @@ export function buildReport(options) {
   };
 }
 
+function timestampRunId() {
+  return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+function shellQuote(value) {
+  if (/^[A-Za-z0-9_./:=@+-]+$/.test(value)) {
+    return value;
+  }
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function commandLine(command, args) {
+  return [command, ...args].map(shellQuote).join(" ");
+}
+
+function fullRunDir(options, runId) {
+  return path.resolve(options.repoRoot, options.outDir ?? path.join(options.runRoot, runId));
+}
+
+function recordLifecycle(lifecycle, step) {
+  lifecycle.push({
+    status: step.status ?? "completed",
+    name: step.name,
+    command: step.command ?? null,
+    note: step.note ?? "",
+  });
+}
+
+function runLifecycleCommand(lifecycle, cwd, name, command, args, options = {}) {
+  recordLifecycle(lifecycle, {
+    name,
+    command: commandLine(command, args),
+    status: "running",
+    note: options.note,
+  });
+  try {
+    const output = execFileSync(command, args, {
+      cwd,
+      encoding: "utf8",
+      stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
+      maxBuffer: 1024 * 1024 * 10,
+    });
+    lifecycle[lifecycle.length - 1].status = "completed";
+    return output.trim();
+  } catch (error) {
+    lifecycle[lifecycle.length - 1].status = "failed";
+    const stderr = error.stderr?.toString().trim();
+    lifecycle[lifecycle.length - 1].note = stderr || error.message;
+    throw error;
+  }
+}
+
+function branchExists(repoRoot, branch) {
+  try {
+    git(repoRoot, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function statusShort(repoRoot, pathspecs = []) {
+  const args = ["status", "--short"];
+  if (pathspecs.length > 0) {
+    args.push("--", ...pathspecs);
+  }
+  return git(repoRoot, args);
+}
+
+function ensureSweepWorktree(options, lifecycle, headSha) {
+  const worktreePath = path.resolve(options.repoRoot, options.sweepWorktree);
+  mkdirSync(path.dirname(worktreePath), { recursive: true });
+
+  if (existsSync(worktreePath)) {
+    const topLevel = git(worktreePath, ["rev-parse", "--show-toplevel"]);
+    if (path.resolve(topLevel) !== worktreePath) {
+      throw new Error(`sweep worktree path is not its own checkout: ${worktreePath}`);
+    }
+    const branch = git(worktreePath, ["branch", "--show-current"]);
+    if (branch !== options.sweepBranch) {
+      throw new Error(`sweep worktree is on ${branch || "(detached)"}, expected ${options.sweepBranch}`);
+    }
+    const dirt = statusShort(worktreePath);
+    if (dirt) {
+      throw new Error(`sweep worktree has uncommitted changes; recover or remove ${worktreePath}`);
+    }
+    runLifecycleCommand(lifecycle, worktreePath, "fast-forward sweep worktree", "git", ["merge", "--ff-only", headSha]);
+    return worktreePath;
+  }
+
+  if (branchExists(options.repoRoot, options.sweepBranch)) {
+    runLifecycleCommand(lifecycle, options.repoRoot, "reuse sweep branch worktree", "git", [
+      "worktree",
+      "add",
+      worktreePath,
+      options.sweepBranch,
+    ]);
+    runLifecycleCommand(lifecycle, worktreePath, "fast-forward sweep worktree", "git", ["merge", "--ff-only", headSha]);
+    return worktreePath;
+  }
+
+  runLifecycleCommand(lifecycle, options.repoRoot, "create sweep worktree", "git", [
+    "worktree",
+    "add",
+    worktreePath,
+    "-b",
+    options.sweepBranch,
+    headSha,
+  ]);
+  return worktreePath;
+}
+
+function writeFullPrBody(operatorRepoRoot, runDir, report) {
+  const bodyPath = path.join(runDir, "docdrift-pr-body.md");
+  const lines = [
+    "## Documentation Drift Sweep",
+    "",
+    `- Base: ${report.base.sha}`,
+    `- Head: ${report.head.sha}`,
+    `- Report: ${repoRelative(operatorRepoRoot, path.join(runDir, "docdrift-generate.json"))}`,
+    `- Update-docs decisions: ${report.docPatch?.summary?.updateDocsDecisions ?? 0}`,
+    `- Applied patches: ${report.docPatch?.summary?.applied ?? 0}`,
+    "",
+    "The local checkpoint is advanced only after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`.",
+    "",
+  ];
+  writeFileSync(bodyPath, lines.join("\n"));
+  return bodyPath;
+}
+
+function parseAgentPrOutput(output) {
+  const match = /agent-pr: PR (\d+) ready: (\S+)/.exec(output);
+  if (!match) {
+    throw new Error(`could not parse agent-pr output: ${output}`);
+  }
+  return {
+    number: Number.parseInt(match[1], 10),
+    url: match[2],
+  };
+}
+
+function checkpointAdvanceTarget(report, sweepHeadSha) {
+  return sweepHeadSha || report.head.sha;
+}
+
+function fullReport({ options, runId, runDir, lifecycle, collectionReport, generatedReport, action, checkpointAfter, pr, sweepHeadSha }) {
+  const sourceReport = generatedReport ?? collectionReport;
+  return {
+    version: 1,
+    mode: "full",
+    dryRun: options.dryRun,
+    run: {
+      id: runId,
+      outDir: repoRelative(options.repoRoot, runDir),
+    },
+    base: sourceReport.base,
+    head: sourceReport.head,
+    traceMap: sourceReport.traceMap,
+    summary: sourceReport.summary,
+    classifier: generatedReport?.classifier ?? null,
+    docPatch: generatedReport?.docPatch ?? null,
+    lifecycle,
+    sweep: {
+      action,
+      branch: options.sweepBranch,
+      worktree: repoRelative(options.repoRoot, path.resolve(options.repoRoot, options.sweepWorktree)),
+      headSha: sweepHeadSha ?? null,
+      prNumber: pr?.number ?? null,
+      prUrl: pr?.url ?? null,
+    },
+    checkpoint: {
+      file: options.checkpointFile,
+      seedFile: options.checkpointSeedFile,
+      advanced: Boolean(checkpointAfter),
+      after: checkpointAfter,
+    },
+  };
+}
+
+function plannedFullLifecycle(options) {
+  const worktreePath = path.resolve(options.repoRoot, options.sweepWorktree);
+  return [
+    {
+      status: "planned",
+      name: "fetch origin/main",
+      command: commandLine("git", ["fetch", "origin", "main"]),
+      note: "Refresh the target before collecting commits.",
+    },
+    {
+      status: "planned",
+      name: "create or reuse sweep worktree",
+      command: commandLine("git", ["worktree", "add", worktreePath, "-b", options.sweepBranch, options.head]),
+      note: "Actual runs reuse the existing clean sweep worktree when possible.",
+    },
+    {
+      status: "planned",
+      name: "generate docs",
+      command: commandLine("node", ["scripts/docdrift-sweep.mjs", "--generate-docs", "--base", "<checkpoint>", "--head", options.head]),
+      note: "Runs classifier and doc patch generation inside the isolated worktree.",
+    },
+    {
+      status: "planned",
+      name: "commit docs changes",
+      command: commandLine("git", ["add", "docs/design", "docs/context"]),
+      note: "Skipped when no docs changed.",
+    },
+    {
+      status: "planned",
+      name: "push sweep branch",
+      command: commandLine("git", ["push", "-u", "origin", options.sweepBranch]),
+      note: "Skipped when no docs changed.",
+    },
+    {
+      status: "planned",
+      name: "open or update owned PR",
+      command: commandLine("scripts/agent-pr.sh", ["--title", options.prTitle, "--verification", "docdrift full sweep"]),
+      note: "Arms auto-merge through the standard PR helper.",
+    },
+    {
+      status: "planned",
+      name: "wait for merge",
+      command: commandLine("scripts/wait-pr.sh", ["<pr>"]),
+      note: "Checkpoint advances only after this proves reachability from origin/main.",
+    },
+  ];
+}
+
+export function runFullSweep(options) {
+  const runId = options.runId ?? timestampRunId();
+  const runDir = fullRunDir(options, runId);
+  mkdirSync(runDir, { recursive: true });
+
+  if (options.dryRun) {
+    const collectionReport = buildReport(options);
+    const report = fullReport({
+      options,
+      runId,
+      runDir,
+      lifecycle: plannedFullLifecycle(options),
+      collectionReport,
+      generatedReport: null,
+      action: collectionReport.summary.noCommits ? "noop_no_commits" : "preview_only",
+      checkpointAfter: null,
+      pr: null,
+      sweepHeadSha: null,
+    });
+    writeOutputs(report, runDir);
+    return report;
+  }
+
+  const lifecycle = [];
+  runLifecycleCommand(lifecycle, options.repoRoot, "fetch origin/main", "git", ["fetch", "origin", "main"]);
+  const collectionReport = buildReport(options);
+
+  if (collectionReport.summary.noCommits) {
+    const report = fullReport({
+      options,
+      runId,
+      runDir,
+      lifecycle,
+      collectionReport,
+      generatedReport: null,
+      action: "noop_no_commits",
+      checkpointAfter: null,
+      pr: null,
+      sweepHeadSha: null,
+    });
+    writeOutputs(report, runDir);
+    return report;
+  }
+
+  if (collectionReport.summary.consideredCommits === 0) {
+    const checkpointPath = writeCheckpointAtomic(options.repoRoot, options.checkpointFile, collectionReport.head.sha);
+    const report = fullReport({
+      options,
+      runId,
+      runDir,
+      lifecycle,
+      collectionReport,
+      generatedReport: null,
+      action: "noop_no_considered_commits",
+      checkpointAfter: { path: checkpointPath, sha: collectionReport.head.sha },
+      pr: null,
+      sweepHeadSha: null,
+    });
+    writeOutputs(report, runDir);
+    return report;
+  }
+
+  const worktreePath = ensureSweepWorktree(options, lifecycle, collectionReport.head.sha);
+  const sweepOptions = {
+    ...options,
+    base: collectionReport.base.sha,
+    checkpointRef: null,
+    dryRun: false,
+    full: false,
+    generateDocs: true,
+    outDir: null,
+    repoRoot: worktreePath,
+  };
+  let generatedReport = classifyReport(buildReport(sweepOptions), sweepOptions);
+  generatedReport = generateDocsReport(generatedReport, sweepOptions);
+  writeOutputs(generatedReport, runDir);
+
+  const docsDirt = statusShort(worktreePath, ["docs/design", "docs/context"]);
+  if (!docsDirt) {
+    const checkpointPath = writeCheckpointAtomic(options.repoRoot, options.checkpointFile, generatedReport.head.sha);
+    const report = fullReport({
+      options,
+      runId,
+      runDir,
+      lifecycle,
+      collectionReport,
+      generatedReport,
+      action: "noop_no_doc_changes",
+      checkpointAfter: { path: checkpointPath, sha: generatedReport.head.sha },
+      pr: null,
+      sweepHeadSha: null,
+    });
+    writeOutputs(report, runDir);
+    return report;
+  }
+
+  runLifecycleCommand(lifecycle, worktreePath, "stage docs changes", "git", ["add", "docs/design", "docs/context"]);
+  runLifecycleCommand(lifecycle, worktreePath, "commit docs changes", "git", [
+    "commit",
+    "-m",
+    "Sweep documentation drift",
+    "-m",
+    `Generated docs updates for ${generatedReport.base.sha.slice(0, 12)}..${generatedReport.head.sha.slice(0, 12)}.\n\nReport: ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
+  ]);
+  const sweepHeadSha = git(worktreePath, ["rev-parse", "HEAD"]);
+  runLifecycleCommand(lifecycle, worktreePath, "push sweep branch", "git", ["push", "-u", "origin", options.sweepBranch]);
+
+  const bodyPath = writeFullPrBody(options.repoRoot, runDir, generatedReport);
+  const agentOutput = runLifecycleCommand(lifecycle, worktreePath, "open or update owned PR", path.join(worktreePath, "scripts", "agent-pr.sh"), [
+    "--title",
+    options.prTitle,
+    "--verification",
+    `node scripts/docdrift-sweep.mjs --generate-docs report ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
+    "--body-file",
+    bodyPath,
+  ]);
+  const pr = parseAgentPrOutput(agentOutput);
+  runLifecycleCommand(lifecycle, worktreePath, "wait for PR merge", path.join(worktreePath, "scripts", "wait-pr.sh"), [String(pr.number)]);
+
+  const checkpointSha = checkpointAdvanceTarget(generatedReport, sweepHeadSha);
+  const checkpointPath = writeCheckpointAtomic(options.repoRoot, options.checkpointFile, checkpointSha);
+  const report = fullReport({
+    options,
+    runId,
+    runDir,
+    lifecycle,
+    collectionReport,
+    generatedReport,
+    action: "pr_merged_checkpoint_advanced",
+    checkpointAfter: { path: checkpointPath, sha: checkpointSha },
+    pr,
+    sweepHeadSha,
+  });
+  writeOutputs(report, runDir);
+  return report;
+}
+
 function markdownList(items, emptyText) {
   if (items.length === 0) {
     return `- ${emptyText}`;
@@ -1281,6 +1717,9 @@ function markdownList(items, emptyText) {
 }
 
 export function renderMarkdown(report) {
+  if (report.mode === "full") {
+    return renderFullMarkdown(report);
+  }
   if (report.mode === "generate-docs") {
     return renderGenerateDocsMarkdown(report);
   }
@@ -1455,11 +1894,49 @@ function renderGenerateDocsMarkdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
+function renderFullMarkdown(report) {
+  const lines = [
+    "# Documentation Drift Full Sweep",
+    "",
+    `Run: ${report.run.id}`,
+    `Output: ${report.run.outDir}`,
+    `Dry run: ${report.dryRun ? "yes" : "no"}`,
+    `Action: ${report.sweep.action}`,
+    `Base: ${report.base.ref} (${report.base.sha.slice(0, 12)})`,
+    `Head: ${report.head.ref} (${report.head.sha.slice(0, 12)})`,
+    `Checkpoint: ${report.checkpoint.file}${report.checkpoint.advanced ? ` -> ${report.checkpoint.after.sha.slice(0, 12)}` : " unchanged"}`,
+    "",
+    "## Summary",
+    "",
+    `- Total commits: ${report.summary.totalCommits}`,
+    `- Considered commits: ${report.summary.consideredCommits}`,
+    `- Skipped merge commits: ${report.summary.skippedMergeCommits}`,
+    `- Skipped docs-only churn commits: ${report.summary.skippedDocsOnlyCommits}`,
+    `- Update-docs decisions: ${report.docPatch?.summary?.updateDocsDecisions ?? "not run"}`,
+    `- Applied patches: ${report.docPatch?.summary?.applied ?? "not run"}`,
+    `- PR: ${report.sweep.prUrl ?? "none"}`,
+    "",
+    "## Lifecycle",
+    "",
+  ];
+  for (const step of report.lifecycle) {
+    lines.push(`- ${step.status}: ${step.name}${step.command ? ` (${step.command})` : ""}${step.note ? ` - ${step.note}` : ""}`);
+  }
+  lines.push("");
+  return `${lines.join("\n")}\n`;
+}
+
 function writeOutputs(report, outDir) {
   const absOutDir = path.resolve(outDir);
   mkdirSync(absOutDir, { recursive: true });
   const stem =
-    report.mode === "generate-docs" ? "docdrift-generate" : report.mode === "classify" ? "docdrift-classify" : "docdrift-sweep";
+    report.mode === "full"
+      ? "docdrift-full"
+      : report.mode === "generate-docs"
+        ? "docdrift-generate"
+        : report.mode === "classify"
+          ? "docdrift-classify"
+          : "docdrift-sweep";
   writeFileSync(path.join(absOutDir, `${stem}.json`), `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(path.join(absOutDir, `${stem}.md`), renderMarkdown(report));
 }
@@ -1480,15 +1957,20 @@ function main() {
   }
 
   try {
-    let report = buildReport(options);
-    if (options.classify || options.generateDocs) {
-      report = classifyReport(report, options);
-    }
-    if (options.generateDocs) {
-      report = generateDocsReport(report, options);
-    }
-    if (options.outDir) {
-      writeOutputs(report, options.outDir);
+    let report;
+    if (options.full) {
+      report = runFullSweep(options);
+    } else {
+      report = buildReport(options);
+      if (options.classify || options.generateDocs) {
+        report = classifyReport(report, options);
+      }
+      if (options.generateDocs) {
+        report = generateDocsReport(report, options);
+      }
+      if (options.outDir) {
+        writeOutputs(report, options.outDir);
+      }
     }
     if (options.format === "json") {
       console.log(JSON.stringify(report, null, 2));
