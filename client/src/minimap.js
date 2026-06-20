@@ -52,6 +52,26 @@ const staticSignatureChanged = (prev, next) => {
   return false;
 };
 
+const signatureChangeReasons = (prev, next) => {
+  if (!prev) return ["initial"];
+  const reasons = new Set();
+  for (const [key, value] of Object.entries(next || {})) {
+    if (prev[key] !== value) reasons.add(signatureReasonForKey(key));
+  }
+  return reasons.size > 0 ? [...reasons] : ["unknown"];
+};
+
+const signatureReasonForKey = (key) => {
+  if (key === "revision" || key === "visibleRevision" || key === "exploredRevision") return "fog-revision";
+  if (key === "visibleGrid" || key === "exploredGrid" || key === "fog" || key === "revealAll") return "fog-grid";
+  if (key === "map" || key === "terrain" || key === "resources") return "map-data";
+  if (key === "mapWidth" || key === "mapHeight" || key === "tileSize") return "map-size";
+  if (key === "size" || key === "scale" || key === "offX" || key === "offY" || key === "presentation") return "presentation";
+  if (key === "style") return "style";
+  if (key === "layout") return "resource-layout";
+  return "other";
+};
+
 // Per-terrain fill (matches the renderer palette; rock reads as impassable).
 const terrainFill = (code, tx, ty) => {
   if (code === TERRAIN.ROCK) return hex(COLORS.rock);
@@ -203,7 +223,8 @@ export class Minimap {
   // --- Rendering -------------------------------------------------------------
 
   /** Draw the full minimap for the current frame. */
-  render(frameViews = null) {
+  render(frameViews = null, { profiler = null } = {}) {
+    this._profiler = profiler || null;
     const ctx = this.ctx;
     if (!ctx) return;
     this._syncCanvasSize();
@@ -270,9 +291,13 @@ export class Minimap {
     }
     const signature = this._terrainStaticSignature(map);
     if (staticSignatureChanged(this._terrainLayerSignature, signature)) {
+      this._recordMinimapInvalidation("terrain", this._terrainLayerSignature, signature);
+      this._recordMinimapDiagnostic("minimap.cache.terrain.miss");
       layer.ctx.clearRect(0, 0, this.size, this.size);
       this._paintTerrain(layer.ctx, map);
       this._terrainLayerSignature = signature;
+    } else {
+      this._recordMinimapDiagnostic("minimap.cache.terrain.hit");
     }
     this.ctx.drawImage(layer.canvas, 0, 0);
   }
@@ -311,9 +336,13 @@ export class Minimap {
     }
     const signature = this._resourceStaticSignature(map, resources);
     if (staticSignatureChanged(this._resourceLayerSignature, signature)) {
+      this._recordMinimapInvalidation("resource", this._resourceLayerSignature, signature);
+      this._recordMinimapDiagnostic("minimap.cache.resource.miss");
       layer.ctx.clearRect(0, 0, this.size, this.size);
       this._paintResources(layer.ctx, map);
       this._resourceLayerSignature = signature;
+    } else {
+      this._recordMinimapDiagnostic("minimap.cache.resource.hit");
     }
     this.ctx.drawImage(layer.canvas, 0, 0);
   }
@@ -399,18 +428,24 @@ export class Minimap {
     if (!fog) return;
     const signature = this._fogLayerStaticSignature(map, fog);
     if (!signature) {
+      this._recordMinimapDiagnostic("minimap.cache.fog.uncached");
       this._paintFog(this.ctx, map, fog);
       return;
     }
     const layer = this._ensureStaticLayer("fog");
     if (!layer) {
+      this._recordMinimapDiagnostic("minimap.cache.fog.uncached");
       this._paintFog(this.ctx, map, fog);
       return;
     }
     if (staticSignatureChanged(this._fogLayerSignature, signature)) {
+      this._recordMinimapInvalidation("fog", this._fogLayerSignature, signature);
+      this._recordMinimapDiagnostic("minimap.cache.fog.miss");
       layer.ctx.clearRect(0, 0, this.size, this.size);
       this._paintFog(layer.ctx, map, fog);
       this._fogLayerSignature = signature;
+    } else {
+      this._recordMinimapDiagnostic("minimap.cache.fog.hit");
     }
     this.ctx.drawImage(layer.canvas, 0, 0);
   }
@@ -507,9 +542,15 @@ export class Minimap {
   /** Draw a colored blip for each visible entity (own/enemy/neutral). */
   _drawEntities(frameViews = null) {
     const ctx = this.ctx;
+    this._recordMinimapDiagnostic(
+      Array.isArray(frameViews?.currentEntities)
+        ? "entityViews.cache.hit.minimap.current"
+        : "entityViews.uncached.minimap.current",
+    );
     const entities = Array.isArray(frameViews?.currentEntities)
       ? frameViews.currentEntities
       : this.state.entitiesInterpolated(1);
+    this._recordMinimapDiagnostic("minimap.entities.blips", entities.length);
     for (const e of entities) {
       const p = this._worldToCanvas(e.x, e.y);
       ctx.fillStyle = this._blipColor(e);
@@ -517,6 +558,17 @@ export class Minimap {
       const r = e.owner !== 0 && !isResource(e.kind) ? 1.6 : 2.2;
       ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
     }
+  }
+
+  _recordMinimapInvalidation(kind, prev, next) {
+    this._recordMinimapDiagnostic(`minimap.invalidate.${kind}`);
+    for (const reason of signatureChangeReasons(prev, next)) {
+      this._recordMinimapDiagnostic(`minimap.invalidate.${kind}.${reason}`);
+    }
+  }
+
+  _recordMinimapDiagnostic(label, amount = 1) {
+    this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
   /** Blip color for an entity: own=green, ally=blue, enemy=player color/red, neutral=yellow. */

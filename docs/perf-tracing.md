@@ -22,10 +22,37 @@ sub-phases cover entity preparation, feedback view building, resources/buildings
 selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement.
 
 Shape context is intentionally bounded: entity counts, selected count, remembered building count,
-visible tile count, viewport/canvas size, device pixel ratio, prediction mode, and
-hidden/focused state. Use `copy()` when filing a local browser performance note; it writes a
+visible tile count, viewport/canvas size, device pixel ratio, match mode, local harness workload id,
+prediction mode, and hidden/focused state. Use `copy()` when filing a local browser performance note; it writes a
 tab-separated phase table to the clipboard when the browser allows clipboard access, otherwise it
 prints the same text to the console.
+
+`window.__rtsPerf.summary().renderDiagnostics` adds local-only bounded counters next to the timing
+phases. These counters do not contain raw frames, raw entity arrays, entity ids, replay data, stack
+traces, or command payloads; they are aggregate labels and counts that explain why a measured frame
+path is busy:
+
+- `renderer.pixi.displayObject.*` counts Pixi object churn: objects created, reused, hidden, or
+  destroyed by the renderer pools.
+- `renderer.rig.*` counts live rig instance reuse and SVG rig part redraws attempted, skipped, or
+  completed. High completed redraws point at rig geometry churn; high skipped redraws mean the rig
+  cache is doing useful work.
+- `renderer.graphics.clear.*` counts `Graphics.clear()` calls for pooled entities, HP bars,
+  selection rings, fog, placement, feedback, smoke, ability-object, and rig-part graphics.
+- `renderer.redraw.*` counts draw-path attempts, completions, and failures for entities and named
+  overlays. Pair this with `renderer.*` timing rows to identify which overlay needs deeper timing.
+- `minimap.cache.*` and `minimap.invalidate.*` count static, resource, and fog-layer cache hits,
+  misses, and stable invalidation reasons such as presentation, map data, resource layout, or fog
+  revision.
+- `entityViews.*` counts shared frame-view hits and intentional uncached fallback call sites.
+- `hud.dirty.*` and `observer.dirty.*` count dirty-guard hits and misses for DOM panels that should
+  not rebuild every RAF.
+
+Recent slow frames also carry a bounded context block naming the slowest top-level `match.*` phase,
+the slowest nested `renderer.*` phase, the slowest nested `minimap.*` phase, and the largest
+diagnostic counters seen in that frame. Use timings to decide where milliseconds went, and use
+counters to explain whether that cost came from object churn, redraw frequency, cache invalidation,
+or a missing measurement category.
 
 Optional server-side performance tracing is controlled by environment variables. It is off by
 default and emits structured `tracing` logs under the `server::perf` target when enabled.
@@ -117,7 +144,9 @@ one `summary.json` per workload under `target/client-perf/<workload>/<timestamp>
 selected-unit HUD stress scenario, then writes a rollup at
 `target/client-perf/render-lag-comparison/<timestamp>/summary.json`. Each workload summary includes
 `renderBudget` advisory output for 60, 120, 240, and 480 FPS frame-work budgets, including
-per-budget margins and the next missed p95 budget. It also includes a `snapshotPacketBudget` block
+per-budget margins and the next missed p95 budget. It also includes a local-only
+`renderDiagnostics` block with the counter groups above, recent long-frame context, and the largest
+nonzero counters for the sample. It also includes a `snapshotPacketBudget` block
 with payload p95 bytes, the selected packet budget, over-budget count, and over-budget percentage
 when the generated `ClientNetReport` includes them. Pass `--trace` to also write a Chrome
 `trace.json`; traces are opt-in because they are larger and machine-local.

@@ -241,9 +241,9 @@ export class ObserverAnalysisOverlay {
     this.renderBody(tab);
   }
 
-  update(frameViews = null) {
+  update(frameViews = null, { profiler = null } = {}) {
     if (!this.bodyEl || this.bodyEl.hidden || this.preferences.selectedTab !== ARMY_VALUE_TAB_ID) return;
-    this.renderBody(OBSERVER_ANALYSIS_TABS[0], frameViews);
+    this.renderBody(OBSERVER_ANALYSIS_TABS[0], frameViews, { profiler });
   }
 
   applyObserverAnalysis(payload) {
@@ -263,7 +263,7 @@ export class ObserverAnalysisOverlay {
     }
   }
 
-  renderBody(tab, frameViews = null) {
+  renderBody(tab, frameViews = null, { profiler = null } = {}) {
     renderObserverAnalysisBody(this, tab, frameViews, {
       armyValue: ARMY_VALUE_TAB_ID,
       production: PRODUCTION_TAB_ID,
@@ -271,7 +271,12 @@ export class ObserverAnalysisOverlay {
       unitsLost: UNITS_LOST_TAB_ID,
       resourcesLost: RESOURCES_LOST_TAB_ID,
       calculateViewportArmyValue,
-    });
+    }, { profiler });
+    profiler?.recordDiagnosticCounter?.(
+      Array.isArray(frameViews?.authoritativeEntities)
+        ? "entityViews.cache.hit.observer.authoritative"
+        : "entityViews.uncached.observer.authoritative",
+    );
   }
 
   renderArmyValue(rows) {

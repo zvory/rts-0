@@ -94,6 +94,10 @@ async function main() {
       if (budgetText) {
         for (const line of budgetText.split("\n")) console.log(`  ${line}`);
       }
+      const diagnosticsText = formatRenderDiagnosticsConsole(result.renderDiagnostics);
+      if (diagnosticsText) {
+        for (const line of diagnosticsText.split("\n")) console.log(`  ${line}`);
+      }
       if (result.status !== "passed") {
         failed += 1;
         for (const error of result.errors) console.error(`  ${error}`);
@@ -154,6 +158,9 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     }
 
     await page.setViewport(args.viewport);
+    await page.evaluateOnNewDocument((workloadId) => {
+      window.__rtsPerfWorkloadId = workloadId;
+    }, workload.id);
     const targetUrl = new URL(workload.url, server.baseUrl).href;
     const startedAt = new Date().toISOString();
     await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: args.navTimeoutMs });
@@ -215,6 +222,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     }));
     const endedAt = new Date().toISOString();
     const renderBudget = buildRenderBudgetReport(summary.perf?.summary, summary.perf?.reportSummary);
+    const renderDiagnostics = buildRenderDiagnosticsReport(summary.perf?.summary, summary.perf?.reportSummary);
     const artifact = {
       schemaVersion: 1,
       status: "passed",
@@ -245,6 +253,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       health: summary.health,
       perf: summary.perf,
       renderBudget,
+      renderDiagnostics,
       clientNetReport: summary.clientNetReport,
       snapshotPacketBudget: snapshotPacketBudgetSummary(summary.clientNetReport),
       snapshotCodecBakeoff,
@@ -291,6 +300,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       frameWorkP95Ms: summary.perf?.reportSummary?.frameWorkP95Ms || 0,
       rendererP95Ms: summary.perf?.reportSummary?.rendererP95Ms || 0,
       renderBudget,
+      renderDiagnostics,
     };
   } catch (err) {
     errors.push(err.stack || err.message);
@@ -437,6 +447,51 @@ export function buildRenderBudgetReport(perfSummary, reportSummary = null) {
   };
 }
 
+export function buildRenderDiagnosticsReport(perfSummary, reportSummary = null) {
+  const diagnostics = perfSummary?.renderDiagnostics || reportSummary?.renderDiagnostics || null;
+  const counters = Array.isArray(diagnostics?.counters) ? diagnostics.counters.map(normalizeCounterRow) : [];
+  const topCounters = counters
+    .filter((counter) => counter.total > 0)
+    .sort(compareDiagnosticCounterRows)
+    .slice(0, 12);
+  return {
+    schemaVersion: 1,
+    status: counters.length > 0 ? "ok" : "missing",
+    topCounters,
+    groups: {
+      pixiObjectChurn: summarizeDiagnosticGroup(counters, ["renderer.pixi.displayObject."]),
+      rigRedraws: summarizeDiagnosticGroup(counters, ["renderer.rig."]),
+      graphicsClears: summarizeDiagnosticGroup(counters, ["renderer.graphics.clear."]),
+      overlayRedraws: summarizeDiagnosticGroup(counters, ["renderer.redraw."]),
+      minimapInvalidations: summarizeDiagnosticGroup(counters, ["minimap.invalidate.", "minimap.cache."]),
+      entityViews: summarizeDiagnosticGroup(counters, ["entityViews."]),
+      hudDirtyGuards: summarizeDiagnosticGroup(counters, ["hud.dirty."]),
+      observerDirtyGuards: summarizeDiagnosticGroup(counters, ["observer.dirty."]),
+    },
+    likelyNextCounter: topCounters.find((counter) => !counter.label.endsWith(".total")) || topCounters[0] || null,
+    recentLongFrames: sanitizeLongFrames(perfSummary?.recentLongFrames),
+    context: perfSummary?.context || reportSummary?.context || {},
+    notes: [
+      "Local-only bounded counters; normal ClientNetReport uploads do not include raw frames or raw entity data.",
+      "Counter totals explain churn and invalidation frequency. Use timing phases for milliseconds.",
+    ],
+  };
+}
+
+export function formatRenderDiagnosticsConsole(report) {
+  if (!report || report.status === "missing") return "";
+  const groups = Object.entries(report.groups || {})
+    .filter(([, group]) => (group?.total || 0) > 0)
+    .sort((a, b) => (b[1].total || 0) - (a[1].total || 0))
+    .slice(0, 5)
+    .map(([name, group]) => `${name}=${formatCount(group.total)}`)
+    .join(" ");
+  const next = report.likelyNextCounter
+    ? ` top=${report.likelyNextCounter.label}:${formatCount(report.likelyNextCounter.total)}`
+    : "";
+  return `render diagnostics: ${groups || "no nonzero groups"}${next}`;
+}
+
 export function formatRenderBudgetConsole(report) {
   if (!report) return "";
   const frame = report.frameWork || {};
@@ -500,6 +555,7 @@ function writeRenderLagComparisonSummary(results, outputRoot, args) {
       worstPhase: result.renderBudget?.worstPhase || null,
       warnings: result.renderBudget?.warnings || [],
       recurringPhaseWarnings: result.renderBudget?.recurringPhaseWarnings || [],
+      renderDiagnostics: result.renderDiagnostics || null,
     })),
     notes: [
       "Warnings are advisory and machine-local; compare branches on the same machine.",
@@ -515,8 +571,70 @@ function numberOrNull(value) {
   return Number.isFinite(value) ? value : null;
 }
 
+function normalizeCounterRow(counter) {
+  return {
+    label: typeof counter?.label === "string" ? counter.label : "",
+    samples: numberOrZero(counter?.samples),
+    frames: numberOrZero(counter?.frames),
+    total: numberOrZero(counter?.total),
+    maxSample: numberOrZero(counter?.maxSample),
+    maxFrame: numberOrZero(counter?.maxFrame),
+    avgPerFrame: numberOrZero(counter?.avgPerFrame),
+    avgActiveFrame: numberOrZero(counter?.avgActiveFrame),
+  };
+}
+
+function summarizeDiagnosticGroup(counters, prefixes) {
+  const rows = counters
+    .filter((counter) => prefixes.some((prefix) => counter.label.startsWith(prefix)))
+    .sort(compareDiagnosticCounterRows);
+  return {
+    total: roundMetric(rows.reduce((sum, counter) => sum + counter.total, 0)),
+    counters: rows.slice(0, 8),
+  };
+}
+
+function compareDiagnosticCounterRows(a, b) {
+  return (b.total || 0) - (a.total || 0)
+    || (b.maxFrame || 0) - (a.maxFrame || 0)
+    || a.label.localeCompare(b.label);
+}
+
+function sanitizeLongFrames(frames) {
+  if (!Array.isArray(frames)) return [];
+  return frames.slice(-8).map((frame) => ({
+    at: numberOrNull(frame?.at),
+    frameGapMs: numberOrNull(frame?.frameGapMs),
+    frameWorkMs: numberOrNull(frame?.frameWorkMs),
+    worstPhase: stringOrNull(frame?.worstPhase) || "",
+    worstPhaseMs: numberOrNull(frame?.worstPhaseMs),
+    topPhase: sanitizePhaseContext(frame?.topPhase),
+    rendererNestedPhase: sanitizePhaseContext(frame?.rendererNestedPhase),
+    minimapNestedPhase: sanitizePhaseContext(frame?.minimapNestedPhase),
+    diagnosticCounters: Array.isArray(frame?.diagnosticCounters)
+      ? frame.diagnosticCounters.slice(0, 8).map((counter) => ({
+        label: stringOrNull(counter?.label) || "",
+        total: numberOrNull(counter?.total),
+      }))
+      : [],
+    context: frame?.context && typeof frame.context === "object" ? frame.context : {},
+  }));
+}
+
+function sanitizePhaseContext(phase) {
+  if (!phase || typeof phase !== "object") return null;
+  return {
+    label: stringOrNull(phase.label) || "",
+    ms: numberOrNull(phase.ms),
+  };
+}
+
 function stringOrNull(value) {
   return typeof value === "string" ? value : null;
+}
+
+function numberOrZero(value) {
+  return Number.isFinite(value) ? value : 0;
 }
 
 function buildFrameWorkBudgetMargins({ avgMs, p95Ms, maxMs }) {
@@ -597,6 +715,11 @@ function formatSignedMs(value) {
   if (!Number.isFinite(value)) return "n/a";
   const rounded = Math.round(value * 100) / 100;
   return `${rounded >= 0 ? "+" : ""}${rounded}ms`;
+}
+
+function formatCount(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  return String(Math.round(value * 10) / 10);
 }
 
 async function collectPageSummary(page) {

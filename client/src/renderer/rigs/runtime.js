@@ -20,13 +20,23 @@ export function renderLiveUnitRig(renderer, entity, colorByOwner, state, definit
   for (const route of options.routes || []) {
     const pool = renderer._liveRigPools?.[route.poolName];
     if (!pool) continue;
-    const instance = pool.get(entity.id)
-      ?? createUnitRigInstance(entity.kind, definition, renderer._rigPixiFactory ?? createDefaultPixiFactory());
+    let instance = pool.get(entity.id);
+    if (!instance) {
+      instance = createUnitRigInstance(entity.kind, definition, renderer._rigPixiFactory ?? createDefaultPixiFactory());
+      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.created.${route.poolName}`);
+      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigContainer");
+      renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.liveRigPart", instance.parts?.size || 0);
+    } else {
+      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.reused.${route.poolName}`);
+    }
     pool.set(entity.id, instance);
     renderer._seen[route.poolName]?.add(entity.id);
     const layer = renderer.layers[route.layerName];
     if (!instance.container.parent && layer) layer.addChild(instance.container);
-    instance.update(entity, context, { includeParts: route.parts });
+    instance.update(entity, context, {
+      includeParts: route.parts,
+      diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
+    });
     rendered.push(instance);
   }
   return rendered;
@@ -63,9 +73,10 @@ export class UnitRigInstance {
       const partState = sampled.parts[partId];
       if (!partState || (includeParts && !includeParts.has(partId))) {
         rec.display.visible = false;
+        options.diagnostics?.("renderer.rig.redraw.skipped.hidden");
         continue;
       }
-      applyPartState(rec.display, rec.definition, partState, sampled.context);
+      applyPartState(rec.display, rec.definition, partState, sampled.context, options.diagnostics);
     }
   }
 
@@ -80,18 +91,27 @@ export class UnitRigInstance {
   }
 }
 
-function applyPartState(display, part, state, context) {
+function applyPartState(display, part, state, context, diagnostics = null) {
   display.visible = state.visible;
-  if (!state.visible) return;
+  if (!state.visible) {
+    diagnostics?.("renderer.rig.redraw.skipped.hidden");
+    return;
+  }
 
   applyDisplayTransform(display, displayTransform(state));
   const tint = tintForSlot(state.tintSlot, context);
   const drawKey = partDrawKey(state, tint);
-  if (display.rtsRigDrawKey === drawKey) return;
+  diagnostics?.("renderer.rig.redraw.attempted");
+  if (display.rtsRigDrawKey === drawKey) {
+    diagnostics?.("renderer.rig.redraw.skipped.unchanged");
+    return;
+  }
 
   display.clear?.();
+  diagnostics?.("renderer.graphics.clear.liveRigPart");
   drawPart(display, part.geometry, part.paint, tint, state.geometryScale);
   display.rtsRigDrawKey = drawKey;
+  diagnostics?.("renderer.rig.redraw.completed");
 }
 
 function displayTransform(state) {

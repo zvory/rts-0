@@ -1,9 +1,13 @@
 const BODY_SIGNATURES = new WeakMap();
 
-export function renderObserverAnalysisBody(overlay, tab, frameViews, ids) {
+export function renderObserverAnalysisBody(overlay, tab, frameViews, ids, { profiler = null } = {}) {
   if (!overlay?.bodyEl || !tab) return;
-  const replace = (signature, buildNode) =>
-    replaceObserverAnalysisBody(overlay.bodyEl, `${tab.id}:${signature}`, buildNode);
+  const replace = (signature, buildNode) => {
+    const changed = replaceObserverAnalysisBody(overlay.bodyEl, `${tab.id}:${signature}`, buildNode);
+    profiler?.recordDiagnosticCounter?.(
+      `observer.dirty.${observerDiagnosticTab(tab.id)}.${changed ? "miss" : "hit"}`,
+    );
+  };
   if (tab.id === ids.armyValue) {
     const rows = ids.calculateViewportArmyValue({
       entities: Array.isArray(frameViews?.authoritativeEntities)
@@ -66,4 +70,8 @@ function formatValue(value) {
 
 function safeCssColor(color) {
   return typeof color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : "#e7dfc5";
+}
+
+function observerDiagnosticTab(tabId) {
+  return String(tabId || "unknown").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 32) || "unknown";
 }
