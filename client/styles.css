@@ -2357,7 +2357,8 @@ input[type="text"]:focus {
 }
 #selected-panel .sel-budget-block.weight-4,
 #selected-panel .sel-budget-block.weight-5,
-#selected-panel .sel-budget-block.weight-6 {
+#selected-panel .sel-budget-block.weight-6,
+#selected-panel .sel-budget-block.weight-8 {
   font-size: 13px;
 }
 #selected-panel .sel-budget-block.has-reserved-cell::after {
