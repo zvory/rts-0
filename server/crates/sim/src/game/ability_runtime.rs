@@ -412,6 +412,40 @@ impl AbilityRuntime {
             .max(0.0)
     }
 
+    pub(crate) fn magic_anchor_stationary_pull(
+        &self,
+        x: f32,
+        y: f32,
+        tick: u32,
+    ) -> Option<((f32, f32), f32)> {
+        if !x.is_finite() || !y.is_finite() {
+            return None;
+        }
+        self.world_objects()
+            .filter(|object| {
+                object.kind == AbilityWorldObjectKind::MagicAnchor
+                    && object.active_at(tick)
+                    && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
+            })
+            .filter_map(|object| {
+                let AbilityObjectPayload::MagicAnchor { radius } = object.payload else {
+                    return None;
+                };
+                if radius <= 0.0 || !radius.is_finite() {
+                    return None;
+                }
+                let dx = object.x - x;
+                let dy = object.y - y;
+                let dist = (dx * dx + dy * dy).sqrt();
+                if dist > radius || dist <= 0.0001 {
+                    return None;
+                }
+                let strength = 1.0 - (dist / radius).clamp(0.0, 1.0);
+                Some((((dx / dist), (dy / dist)), strength))
+            })
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
     pub(in crate::game) fn tick_projectiles(
         &mut self,
         entities: &mut EntityStore,
