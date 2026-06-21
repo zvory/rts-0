@@ -44,7 +44,7 @@ Open the game in one or more browser windows.
 - The host can add AI opponents from the lobby.
 - All human players must ready up before the host starts the match.
 - A one-player match with no AI is a never-ending sandbox.
-- The lobby's "Start with more money mode" gives every player a larger opening economy.
+- The lobby's "Debug mode" starts the next match with extra resources and a prebuilt setup.
 
 Matches support up to four total players, counting humans and AI.
 

@@ -409,10 +409,12 @@ fall back to authoritative snapshots/tracking instead of running local visual re
 
 Replay start payloads include `replay` metadata so the client can display or cache a
 self-describing playback session. The server validates replay artifacts before playback: artifact
-schema version, server build SHA, map name, map schema version, and map content hash must match the
-running server/map asset or the replay is rejected with a clear error. Saved self-play artifacts use
-the same `ReplayArtifactV1` contract as post-match and match-history replays; pre-unified dev-only
-artifact payloads are rejected instead of falling back to a separate loader.
+schema version, map name, map schema version, and map content hash must match the running
+server/map asset or the replay is rejected with a clear error. A server build-SHA mismatch is
+warning-compatible: replay metadata keeps the original `serverBuildSha`, and the server logs or
+surfaces a warning while attempting playback. Saved self-play artifacts use the same
+`ReplayArtifactV1` contract as post-match and match-history replays; pre-unified dev-only artifact
+payloads are rejected instead of falling back to a separate loader.
 
 Replay artifact schema version 2 stores ordered `players[]` with each original `team_id` and
 required `faction_id`, plus `playerLoadouts[]` with one `{ playerId, factionId, loadoutId,
