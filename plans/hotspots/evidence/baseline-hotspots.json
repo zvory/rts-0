@@ -1,0 +1,4268 @@
+{
+  "schema": "hotspots-baseline-v1",
+  "generated_at": "2026-06-21T19:34:08.802Z",
+  "base_ref": "origin/main",
+  "base_sha": "63a7de9749e3c77e7adf100fec0f7e1188aa6b50",
+  "recent_window_days": 14,
+  "recent_since": "2026-06-07",
+  "source_filter": {
+    "included_roots": [
+      "server/",
+      "client/",
+      "tests/",
+      "scripts/"
+    ],
+    "included_extensions": [
+      ".rs",
+      ".js",
+      ".mjs",
+      ".sh",
+      ".css",
+      ".html"
+    ],
+    "excluded_path_fragments": [
+      "target/",
+      "node_modules/",
+      "dist/",
+      "build/",
+      "coverage/",
+      "tmp/",
+      "replay/",
+      "replays/",
+      "artifacts/"
+    ]
+  },
+  "ranking_formula": "100 * (0.22*sqrt(non_empty_loc/max) + 0.23*sqrt(rename_aware_touches/max) + 0.22*sqrt(total_churn/max) + 0.13*sqrt(recent_churn/max) + 0.10*sqrt(fix_like_touches/max) + 0.10*sqrt(recent_cochange_degree/max))",
+  "totals": {
+    "current_source_files": 370,
+    "current_non_empty_loc": 162765,
+    "current_rename_aware_touches": 5805,
+    "current_rename_aware_churn": 284262,
+    "recent_commits_with_source_files": 646,
+    "rename_events_affecting_source": 121,
+    "raw_paths_seen": 532,
+    "stale_raw_paths_seen": 162
+  },
+  "current_file_hotspots": [
+    {
+      "file": "tests/client_contracts.mjs",
+      "group": "protocol-and-contracts",
+      "loc": 9388,
+      "non_empty_loc": 9028,
+      "touches": 279,
+      "added_lines": 10883,
+      "deleted_lines": 1470,
+      "recent_touches": 224,
+      "recent_churn": 10721,
+      "fix_like_touches": 35,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 12353,
+      "recent_cochange_degree": 220,
+      "recent_cochange_commits": 211,
+      "hotspot_score": 95.43,
+      "rank": 1
+    },
+    {
+      "file": "server/src/lobby/room_task.rs",
+      "group": "server-lobby-runtime",
+      "loc": 8219,
+      "non_empty_loc": 7664,
+      "touches": 167,
+      "added_lines": 12640,
+      "deleted_lines": 4198,
+      "recent_touches": 119,
+      "recent_churn": 13503,
+      "fix_like_touches": 26,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 16838,
+      "recent_cochange_degree": 181,
+      "recent_cochange_commits": 118,
+      "hotspot_score": 90.75,
+      "rank": 2
+    },
+    {
+      "file": "server/crates/sim/src/game/services/commands.rs",
+      "group": "sim-command-service",
+      "loc": 5482,
+      "non_empty_loc": 5208,
+      "touches": 117,
+      "added_lines": 8243,
+      "deleted_lines": 2337,
+      "recent_touches": 73,
+      "recent_churn": 7831,
+      "fix_like_touches": 12,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 10580,
+      "recent_cochange_degree": 169,
+      "recent_cochange_commits": 63,
+      "hotspot_score": 73.56,
+      "rank": 3
+    },
+    {
+      "file": "server/crates/sim/src/game/tests.rs",
+      "group": "sim-tests",
+      "loc": 5485,
+      "non_empty_loc": 5124,
+      "touches": 83,
+      "added_lines": 6422,
+      "deleted_lines": 937,
+      "recent_touches": 67,
+      "recent_churn": 5659,
+      "fix_like_touches": 3,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 7359,
+      "recent_cochange_degree": 177,
+      "recent_cochange_commits": 56,
+      "hotspot_score": 63.98,
+      "rank": 4
+    },
+    {
+      "file": "server/crates/ai/src/selfplay/tests.rs",
+      "group": "ai",
+      "loc": 1885,
+      "non_empty_loc": 1775,
+      "touches": 123,
+      "added_lines": 7015,
+      "deleted_lines": 5180,
+      "recent_touches": 42,
+      "recent_churn": 1567,
+      "fix_like_touches": 16,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 12195,
+      "recent_cochange_degree": 152,
+      "recent_cochange_commits": 36,
+      "hotspot_score": 63.25,
+      "rank": 5
+    },
+    {
+      "file": "server/crates/protocol/src/lib.rs",
+      "group": "protocol-and-contracts",
+      "loc": 3387,
+      "non_empty_loc": 3209,
+      "touches": 133,
+      "added_lines": 4319,
+      "deleted_lines": 843,
+      "recent_touches": 82,
+      "recent_churn": 3765,
+      "fix_like_touches": 6,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 5162,
+      "recent_cochange_degree": 192,
+      "recent_cochange_commits": 78,
+      "hotspot_score": 61.52,
+      "rank": 6
+    },
+    {
+      "file": "client/styles.css",
+      "group": "client-ui",
+      "loc": 3800,
+      "non_empty_loc": 3573,
+      "touches": 101,
+      "added_lines": 4680,
+      "deleted_lines": 814,
+      "recent_touches": 64,
+      "recent_churn": 3694,
+      "fix_like_touches": 6,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 5494,
+      "recent_cochange_degree": 81,
+      "recent_cochange_commits": 62,
+      "hotspot_score": 57.25,
+      "rank": 7
+    },
+    {
+      "file": "server/crates/sim/src/game/services/movement/tests.rs",
+      "group": "sim-movement-service",
+      "loc": 5231,
+      "non_empty_loc": 4803,
+      "touches": 51,
+      "added_lines": 6011,
+      "deleted_lines": 773,
+      "recent_touches": 21,
+      "recent_churn": 563,
+      "fix_like_touches": 9,
+      "latest_touch": "2026-06-17",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 6784,
+      "recent_cochange_degree": 139,
+      "recent_cochange_commits": 20,
+      "hotspot_score": 55.52,
+      "rank": 8
+    },
+    {
+      "file": "server/src/main.rs",
+      "group": "server-backend",
+      "loc": 2087,
+      "non_empty_loc": 1954,
+      "touches": 108,
+      "added_lines": 2823,
+      "deleted_lines": 708,
+      "recent_touches": 73,
+      "recent_churn": 2390,
+      "fix_like_touches": 9,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 3531,
+      "recent_cochange_degree": 178,
+      "recent_cochange_commits": 72,
+      "hotspot_score": 54.15,
+      "rank": 9
+    },
+    {
+      "file": "client/src/match.js",
+      "group": "client-match-shell",
+      "loc": 1268,
+      "non_empty_loc": 1184,
+      "touches": 115,
+      "added_lines": 2793,
+      "deleted_lines": 1523,
+      "recent_touches": 73,
+      "recent_churn": 2426,
+      "fix_like_touches": 6,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 4316,
+      "recent_cochange_degree": 160,
+      "recent_cochange_commits": 68,
+      "hotspot_score": 52.05,
+      "rank": 10
+    },
+    {
+      "file": "server/crates/sim/src/game/services/combat/tests.rs",
+      "group": "sim-combat-service",
+      "loc": 3713,
+      "non_empty_loc": 3389,
+      "touches": 54,
+      "added_lines": 3980,
+      "deleted_lines": 267,
+      "recent_touches": 41,
+      "recent_churn": 2157,
+      "fix_like_touches": 1,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 4247,
+      "recent_cochange_degree": 159,
+      "recent_cochange_commits": 39,
+      "hotspot_score": 50.03,
+      "rank": 11
+    },
+    {
+      "file": "server/crates/ai/src/ai_core/decision/tests.rs",
+      "group": "ai",
+      "loc": 4101,
+      "non_empty_loc": 3819,
+      "touches": 33,
+      "added_lines": 4440,
+      "deleted_lines": 394,
+      "recent_touches": 26,
+      "recent_churn": 1974,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 4834,
+      "recent_cochange_degree": 106,
+      "recent_cochange_commits": 24,
+      "hotspot_score": 48.31,
+      "rank": 12
+    },
+    {
+      "file": "server/crates/sim/src/game/setup.rs",
+      "group": "sim-core",
+      "loc": 805,
+      "non_empty_loc": 748,
+      "touches": 62,
+      "added_lines": 2764,
+      "deleted_lines": 1957,
+      "recent_touches": 44,
+      "recent_churn": 3386,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-19",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 4721,
+      "recent_cochange_degree": 176,
+      "recent_cochange_commits": 40,
+      "hotspot_score": 47.66,
+      "rank": 13
+    },
+    {
+      "file": "server/crates/sim/src/game/mod.rs",
+      "group": "sim-core",
+      "loc": 484,
+      "non_empty_loc": 447,
+      "touches": 111,
+      "added_lines": 2599,
+      "deleted_lines": 2094,
+      "recent_touches": 32,
+      "recent_churn": 374,
+      "fix_like_touches": 12,
+      "latest_touch": "2026-06-18",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 4693,
+      "recent_cochange_degree": 161,
+      "recent_cochange_commits": 27,
+      "hotspot_score": 47.59,
+      "rank": 14
+    },
+    {
+      "file": "client/src/hud.js",
+      "group": "client-hud",
+      "loc": 1003,
+      "non_empty_loc": 921,
+      "touches": 80,
+      "added_lines": 2406,
+      "deleted_lines": 1403,
+      "recent_touches": 50,
+      "recent_churn": 2427,
+      "fix_like_touches": 9,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 3809,
+      "recent_cochange_degree": 108,
+      "recent_cochange_commits": 49,
+      "hotspot_score": 47.4,
+      "rank": 15
+    },
+    {
+      "file": "client/src/protocol.js",
+      "group": "protocol-and-contracts",
+      "loc": 1285,
+      "non_empty_loc": 1198,
+      "touches": 106,
+      "added_lines": 1551,
+      "deleted_lines": 254,
+      "recent_touches": 67,
+      "recent_churn": 1103,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 1805,
+      "recent_cochange_degree": 184,
+      "recent_cochange_commits": 64,
+      "hotspot_score": 45.64,
+      "rank": 16
+    },
+    {
+      "file": "server/crates/sim/src/game/services/move_coordinator.rs",
+      "group": "sim-services",
+      "loc": 2076,
+      "non_empty_loc": 1898,
+      "touches": 58,
+      "added_lines": 2640,
+      "deleted_lines": 545,
+      "recent_touches": 13,
+      "recent_churn": 477,
+      "fix_like_touches": 8,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 3185,
+      "recent_cochange_degree": 114,
+      "recent_cochange_commits": 11,
+      "hotspot_score": 44.57,
+      "rank": 17
+    },
+    {
+      "file": "client/src/state.js",
+      "group": "client-match-shell",
+      "loc": 1118,
+      "non_empty_loc": 1031,
+      "touches": 73,
+      "added_lines": 1680,
+      "deleted_lines": 562,
+      "recent_touches": 44,
+      "recent_churn": 1423,
+      "fix_like_touches": 5,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 2242,
+      "recent_cochange_degree": 147,
+      "recent_cochange_commits": 42,
+      "hotspot_score": 43.4,
+      "rank": 18
+    },
+    {
+      "file": "server/crates/sim/src/game/services/pathing.rs",
+      "group": "sim-services",
+      "loc": 1985,
+      "non_empty_loc": 1826,
+      "touches": 39,
+      "added_lines": 2743,
+      "deleted_lines": 760,
+      "recent_touches": 7,
+      "recent_churn": 396,
+      "fix_like_touches": 7,
+      "latest_touch": "2026-06-18",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 3503,
+      "recent_cochange_degree": 114,
+      "recent_cochange_commits": 7,
+      "hotspot_score": 42.42,
+      "rank": 19
+    },
+    {
+      "file": "client/src/config.js",
+      "group": "balance-and-config-mirror",
+      "loc": 522,
+      "non_empty_loc": 498,
+      "touches": 126,
+      "added_lines": 886,
+      "deleted_lines": 364,
+      "recent_touches": 66,
+      "recent_churn": 800,
+      "fix_like_touches": 6,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 1250,
+      "recent_cochange_degree": 129,
+      "recent_cochange_commits": 62,
+      "hotspot_score": 41.58,
+      "rank": 20
+    },
+    {
+      "file": "server/crates/sim/src/game/systems.rs",
+      "group": "sim-core",
+      "loc": 433,
+      "non_empty_loc": 406,
+      "touches": 66,
+      "added_lines": 2205,
+      "deleted_lines": 1772,
+      "recent_touches": 29,
+      "recent_churn": 199,
+      "fix_like_touches": 5,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 3977,
+      "recent_cochange_degree": 157,
+      "recent_cochange_commits": 26,
+      "hotspot_score": 40.35,
+      "rank": 21
+    },
+    {
+      "file": "client/src/renderer/feedback.js",
+      "group": "client-renderer",
+      "loc": 1328,
+      "non_empty_loc": 1225,
+      "touches": 44,
+      "added_lines": 1616,
+      "deleted_lines": 288,
+      "recent_touches": 37,
+      "recent_churn": 1400,
+      "fix_like_touches": 5,
+      "latest_touch": "2026-06-19",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1904,
+      "recent_cochange_degree": 126,
+      "recent_cochange_commits": 36,
+      "hotspot_score": 40.17,
+      "rank": 22
+    },
+    {
+      "file": "client/src/input/index.js",
+      "group": "client-input",
+      "loc": 1090,
+      "non_empty_loc": 999,
+      "touches": 53,
+      "added_lines": 1357,
+      "deleted_lines": 267,
+      "recent_touches": 39,
+      "recent_churn": 929,
+      "fix_like_touches": 10,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1624,
+      "recent_cochange_degree": 103,
+      "recent_cochange_commits": 30,
+      "hotspot_score": 39.77,
+      "rank": 23
+    },
+    {
+      "file": "server/crates/sim/src/game/services/order_queue.rs",
+      "group": "sim-services",
+      "loc": 1492,
+      "non_empty_loc": 1389,
+      "touches": 37,
+      "added_lines": 1747,
+      "deleted_lines": 254,
+      "recent_touches": 34,
+      "recent_churn": 1506,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-05",
+      "total_churn": 2001,
+      "recent_cochange_degree": 148,
+      "recent_cochange_commits": 30,
+      "hotspot_score": 39.52,
+      "rank": 24
+    },
+    {
+      "file": "server/crates/rules/src/balance.rs",
+      "group": "balance-and-config-mirror",
+      "loc": 225,
+      "non_empty_loc": 202,
+      "touches": 123,
+      "added_lines": 874,
+      "deleted_lines": 647,
+      "recent_touches": 41,
+      "recent_churn": 314,
+      "fix_like_touches": 8,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 1521,
+      "recent_cochange_degree": 123,
+      "recent_cochange_commits": 39,
+      "hotspot_score": 39.41,
+      "rank": 25
+    },
+    {
+      "file": "server/crates/sim/src/protocol.rs",
+      "group": "sim-core",
+      "loc": 72,
+      "non_empty_loc": 64,
+      "touches": 70,
+      "added_lines": 1617,
+      "deleted_lines": 1542,
+      "recent_touches": 19,
+      "recent_churn": 1762,
+      "fix_like_touches": 3,
+      "latest_touch": "2026-06-16",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 3159,
+      "recent_cochange_degree": 132,
+      "recent_cochange_commits": 13,
+      "hotspot_score": 38.27,
+      "rank": 26
+    },
+    {
+      "file": "server/crates/sim/src/game/map.rs",
+      "group": "sim-core",
+      "loc": 601,
+      "non_empty_loc": 541,
+      "touches": 43,
+      "added_lines": 1830,
+      "deleted_lines": 1187,
+      "recent_touches": 16,
+      "recent_churn": 1241,
+      "fix_like_touches": 5,
+      "latest_touch": "2026-06-14",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 3017,
+      "recent_cochange_degree": 80,
+      "recent_cochange_commits": 16,
+      "hotspot_score": 37.48,
+      "rank": 27
+    },
+    {
+      "file": "server/src/protocol.rs",
+      "group": "protocol-and-contracts",
+      "loc": 29,
+      "non_empty_loc": 25,
+      "touches": 70,
+      "added_lines": 1569,
+      "deleted_lines": 1537,
+      "recent_touches": 19,
+      "recent_churn": 1709,
+      "fix_like_touches": 3,
+      "latest_touch": "2026-06-16",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 3106,
+      "recent_cochange_degree": 120,
+      "recent_cochange_commits": 15,
+      "hotspot_score": 37.07,
+      "rank": 28
+    },
+    {
+      "file": "server/crates/sim/src/rules/projection.rs",
+      "group": "sim-core",
+      "loc": 1101,
+      "non_empty_loc": 1025,
+      "touches": 44,
+      "added_lines": 1352,
+      "deleted_lines": 251,
+      "recent_touches": 28,
+      "recent_churn": 982,
+      "fix_like_touches": 1,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-02",
+      "total_churn": 1603,
+      "recent_cochange_degree": 146,
+      "recent_cochange_commits": 21,
+      "hotspot_score": 36.68,
+      "rank": 29
+    },
+    {
+      "file": "server/crates/ai/src/ai_core/actions.rs",
+      "group": "ai",
+      "loc": 1645,
+      "non_empty_loc": 1517,
+      "touches": 31,
+      "added_lines": 1791,
+      "deleted_lines": 120,
+      "recent_touches": 16,
+      "recent_churn": 667,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-02",
+      "total_churn": 1911,
+      "recent_cochange_degree": 116,
+      "recent_cochange_commits": 15,
+      "hotspot_score": 36.64,
+      "rank": 30
+    },
+    {
+      "file": "server/src/lobby/mod.rs",
+      "group": "server-lobby-runtime",
+      "loc": 822,
+      "non_empty_loc": 752,
+      "touches": 54,
+      "added_lines": 947,
+      "deleted_lines": 121,
+      "recent_touches": 50,
+      "recent_churn": 897,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1068,
+      "recent_cochange_degree": 119,
+      "recent_cochange_commits": 50,
+      "hotspot_score": 36.09,
+      "rank": 31
+    },
+    {
+      "file": "server/crates/sim/src/game/entity/entity.rs",
+      "group": "sim-core",
+      "loc": 1224,
+      "non_empty_loc": 1088,
+      "touches": 36,
+      "added_lines": 1272,
+      "deleted_lines": 56,
+      "recent_touches": 26,
+      "recent_churn": 574,
+      "fix_like_touches": 3,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1328,
+      "recent_cochange_degree": 152,
+      "recent_cochange_commits": 21,
+      "hotspot_score": 36,
+      "rank": 32
+    },
+    {
+      "file": "server/crates/rules/src/defs.rs",
+      "group": "rules",
+      "loc": 659,
+      "non_empty_loc": 627,
+      "touches": 63,
+      "added_lines": 1023,
+      "deleted_lines": 364,
+      "recent_touches": 39,
+      "recent_churn": 892,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-02",
+      "total_churn": 1387,
+      "recent_cochange_degree": 113,
+      "recent_cochange_commits": 38,
+      "hotspot_score": 35.94,
+      "rank": 33
+    },
+    {
+      "file": "client/src/minimap.js",
+      "group": "client-ui",
+      "loc": 1098,
+      "non_empty_loc": 1004,
+      "touches": 38,
+      "added_lines": 1249,
+      "deleted_lines": 151,
+      "recent_touches": 24,
+      "recent_churn": 884,
+      "fix_like_touches": 6,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 1400,
+      "recent_cochange_degree": 59,
+      "recent_cochange_commits": 21,
+      "hotspot_score": 34.81,
+      "rank": 34
+    },
+    {
+      "file": "tests/run-all.sh",
+      "group": "integration-and-contract-tests",
+      "loc": 747,
+      "non_empty_loc": 693,
+      "touches": 46,
+      "added_lines": 1030,
+      "deleted_lines": 283,
+      "recent_touches": 34,
+      "recent_churn": 870,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 1313,
+      "recent_cochange_degree": 85,
+      "recent_cochange_commits": 29,
+      "hotspot_score": 34.47,
+      "rank": 35
+    },
+    {
+      "file": "server/crates/sim/src/config.rs",
+      "group": "sim-core",
+      "loc": 8,
+      "non_empty_loc": 7,
+      "touches": 94,
+      "added_lines": 746,
+      "deleted_lines": 735,
+      "recent_touches": 12,
+      "recent_churn": 274,
+      "fix_like_touches": 7,
+      "latest_touch": "2026-06-16",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 1481,
+      "recent_cochange_degree": 121,
+      "recent_cochange_commits": 9,
+      "hotspot_score": 34.23,
+      "rank": 36
+    },
+    {
+      "file": "server/crates/ai/src/ai_core/facts.rs",
+      "group": "ai",
+      "loc": 634,
+      "non_empty_loc": 580,
+      "touches": 52,
+      "added_lines": 772,
+      "deleted_lines": 136,
+      "recent_touches": 34,
+      "recent_churn": 261,
+      "fix_like_touches": 3,
+      "latest_touch": "2026-06-19",
+      "oldest_touch": "2026-06-02",
+      "total_churn": 908,
+      "recent_cochange_degree": 162,
+      "recent_cochange_commits": 30,
+      "hotspot_score": 33.93,
+      "rank": 37
+    },
+    {
+      "file": "server/crates/sim/src/game/invariants.rs",
+      "group": "sim-core",
+      "loc": 919,
+      "non_empty_loc": 864,
+      "touches": 34,
+      "added_lines": 1178,
+      "deleted_lines": 259,
+      "recent_touches": 12,
+      "recent_churn": 144,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 1437,
+      "recent_cochange_degree": 134,
+      "recent_cochange_commits": 11,
+      "hotspot_score": 33.79,
+      "rank": 38
+    },
+    {
+      "file": "server/crates/ai/src/ai_core/profiles.rs",
+      "group": "ai",
+      "loc": 987,
+      "non_empty_loc": 943,
+      "touches": 33,
+      "added_lines": 1265,
+      "deleted_lines": 278,
+      "recent_touches": 15,
+      "recent_churn": 582,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-02",
+      "total_churn": 1543,
+      "recent_cochange_degree": 105,
+      "recent_cochange_commits": 13,
+      "hotspot_score": 33.68,
+      "rank": 39
+    },
+    {
+      "file": "server/crates/sim/src/game/services/ability_orders.rs",
+      "group": "sim-services",
+      "loc": 765,
+      "non_empty_loc": 741,
+      "touches": 35,
+      "added_lines": 905,
+      "deleted_lines": 140,
+      "recent_touches": 35,
+      "recent_churn": 1045,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-16",
+      "oldest_touch": "2026-06-07",
+      "total_churn": 1045,
+      "recent_cochange_degree": 126,
+      "recent_cochange_commits": 32,
+      "hotspot_score": 33.5,
+      "rank": 40
+    },
+    {
+      "file": "server/crates/sim/src/game/services/construction.rs",
+      "group": "sim-services",
+      "loc": 817,
+      "non_empty_loc": 768,
+      "touches": 35,
+      "added_lines": 1023,
+      "deleted_lines": 206,
+      "recent_touches": 12,
+      "recent_churn": 339,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 1229,
+      "recent_cochange_degree": 117,
+      "recent_cochange_commits": 11,
+      "hotspot_score": 33.24,
+      "rank": 41
+    },
+    {
+      "file": "client/src/lobby.js",
+      "group": "client-ui",
+      "loc": 875,
+      "non_empty_loc": 792,
+      "touches": 32,
+      "added_lines": 1295,
+      "deleted_lines": 426,
+      "recent_touches": 24,
+      "recent_churn": 1264,
+      "fix_like_touches": 6,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 1721,
+      "recent_cochange_degree": 31,
+      "recent_cochange_commits": 24,
+      "hotspot_score": 33.21,
+      "rank": 42
+    },
+    {
+      "file": "server/src/dev_scenarios.rs",
+      "group": "server-backend",
+      "loc": 1204,
+      "non_empty_loc": 1178,
+      "touches": 16,
+      "added_lines": 1324,
+      "deleted_lines": 126,
+      "recent_touches": 11,
+      "recent_churn": 1069,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-17",
+      "oldest_touch": "2026-06-06",
+      "total_churn": 1450,
+      "recent_cochange_degree": 107,
+      "recent_cochange_commits": 11,
+      "hotspot_score": 32.93,
+      "rank": 43
+    },
+    {
+      "file": "scripts/check-client-architecture.mjs",
+      "group": "scripts-tooling",
+      "loc": 387,
+      "non_empty_loc": 345,
+      "touches": 57,
+      "added_lines": 460,
+      "deleted_lines": 73,
+      "recent_touches": 57,
+      "recent_churn": 533,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-11",
+      "total_churn": 533,
+      "recent_cochange_degree": 145,
+      "recent_cochange_commits": 57,
+      "hotspot_score": 32.69,
+      "rank": 44
+    },
+    {
+      "file": "server/crates/ai/src/selfplay/replay.rs",
+      "group": "ai",
+      "loc": 963,
+      "non_empty_loc": 906,
+      "touches": 33,
+      "added_lines": 1219,
+      "deleted_lines": 253,
+      "recent_touches": 29,
+      "recent_churn": 864,
+      "fix_like_touches": 0,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1472,
+      "recent_cochange_degree": 141,
+      "recent_cochange_commits": 26,
+      "hotspot_score": 32.68,
+      "rank": 45
+    },
+    {
+      "file": "client/src/hud_command_card.js",
+      "group": "client-hud",
+      "loc": 798,
+      "non_empty_loc": 731,
+      "touches": 22,
+      "added_lines": 948,
+      "deleted_lines": 150,
+      "recent_touches": 22,
+      "recent_churn": 1098,
+      "fix_like_touches": 4,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-11",
+      "total_churn": 1098,
+      "recent_cochange_degree": 113,
+      "recent_cochange_commits": 22,
+      "hotspot_score": 32.59,
+      "rank": 46
+    },
+    {
+      "file": "server/crates/sim/src/game/services/production.rs",
+      "group": "sim-services",
+      "loc": 753,
+      "non_empty_loc": 690,
+      "touches": 24,
+      "added_lines": 875,
+      "deleted_lines": 122,
+      "recent_touches": 14,
+      "recent_churn": 497,
+      "fix_like_touches": 5,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 997,
+      "recent_cochange_degree": 137,
+      "recent_cochange_commits": 14,
+      "hotspot_score": 32.35,
+      "rank": 47
+    },
+    {
+      "file": "client/src/input/commands.js",
+      "group": "client-input",
+      "loc": 499,
+      "non_empty_loc": 468,
+      "touches": 37,
+      "added_lines": 678,
+      "deleted_lines": 179,
+      "recent_touches": 30,
+      "recent_churn": 550,
+      "fix_like_touches": 6,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 857,
+      "recent_cochange_degree": 110,
+      "recent_cochange_commits": 27,
+      "hotspot_score": 32.18,
+      "rank": 48
+    },
+    {
+      "file": "server/crates/ai/src/ai_core/observation.rs",
+      "group": "ai",
+      "loc": 647,
+      "non_empty_loc": 604,
+      "touches": 36,
+      "added_lines": 927,
+      "deleted_lines": 280,
+      "recent_touches": 23,
+      "recent_churn": 494,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-19",
+      "oldest_touch": "2026-06-02",
+      "total_churn": 1207,
+      "recent_cochange_degree": 121,
+      "recent_cochange_commits": 19,
+      "hotspot_score": 32.14,
+      "rank": 49
+    },
+    {
+      "file": "server/crates/ai/src/ai_shared.rs",
+      "group": "ai",
+      "loc": 597,
+      "non_empty_loc": 564,
+      "touches": 47,
+      "added_lines": 826,
+      "deleted_lines": 224,
+      "recent_touches": 15,
+      "recent_churn": 127,
+      "fix_like_touches": 5,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-31",
+      "total_churn": 1050,
+      "recent_cochange_degree": 94,
+      "recent_cochange_commits": 9,
+      "hotspot_score": 32.01,
+      "rank": 50
+    },
+    {
+      "file": "server/crates/sim/src/game/services/occupancy.rs",
+      "group": "sim-services",
+      "loc": 958,
+      "non_empty_loc": 879,
+      "touches": 21,
+      "added_lines": 1147,
+      "deleted_lines": 189,
+      "recent_touches": 8,
+      "recent_churn": 733,
+      "fix_like_touches": 3,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-05-30",
+      "total_churn": 1336,
+      "recent_cochange_degree": 97,
+      "recent_cochange_commits": 8,
+      "hotspot_score": 31.97,
+      "rank": 51
+    },
+    {
+      "file": "server/crates/sim/src/game/setup/dev_scenarios/tests.rs",
+      "group": "sim-tests",
+      "loc": 1107,
+      "non_empty_loc": 1050,
+      "touches": 13,
+      "added_lines": 1202,
+      "deleted_lines": 95,
+      "recent_touches": 13,
+      "recent_churn": 1297,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-18",
+      "oldest_touch": "2026-06-09",
+      "total_churn": 1297,
+      "recent_cochange_degree": 106,
+      "recent_cochange_commits": 13,
+      "hotspot_score": 31.93,
+      "rank": 52
+    },
+    {
+      "file": "server/crates/ai/src/ai_core/decision/mod.rs",
+      "group": "ai",
+      "loc": 913,
+      "non_empty_loc": 866,
+      "touches": 18,
+      "added_lines": 1263,
+      "deleted_lines": 348,
+      "recent_touches": 15,
+      "recent_churn": 807,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1611,
+      "recent_cochange_degree": 102,
+      "recent_cochange_commits": 14,
+      "hotspot_score": 31.84,
+      "rank": 53
+    },
+    {
+      "file": "client/src/renderer/units.js",
+      "group": "client-renderer",
+      "loc": 145,
+      "non_empty_loc": 132,
+      "touches": 33,
+      "added_lines": 888,
+      "deleted_lines": 743,
+      "recent_touches": 28,
+      "recent_churn": 1330,
+      "fix_like_touches": 3,
+      "latest_touch": "2026-06-18",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1631,
+      "recent_cochange_degree": 114,
+      "recent_cochange_commits": 28,
+      "hotspot_score": 31.62,
+      "rank": 54
+    },
+    {
+      "file": "server/crates/rules/src/economy.rs",
+      "group": "rules",
+      "loc": 404,
+      "non_empty_loc": 373,
+      "touches": 42,
+      "added_lines": 565,
+      "deleted_lines": 160,
+      "recent_touches": 24,
+      "recent_churn": 391,
+      "fix_like_touches": 5,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-01",
+      "total_churn": 725,
+      "recent_cochange_degree": 123,
+      "recent_cochange_commits": 24,
+      "hotspot_score": 31.43,
+      "rank": 55
+    },
+    {
+      "file": "server/crates/sim/src/game/services/movement/waypoints.rs",
+      "group": "sim-movement-service",
+      "loc": 831,
+      "non_empty_loc": 795,
+      "touches": 27,
+      "added_lines": 1102,
+      "deleted_lines": 276,
+      "recent_touches": 12,
+      "recent_churn": 234,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-16",
+      "oldest_touch": "2026-06-04",
+      "total_churn": 1378,
+      "recent_cochange_degree": 111,
+      "recent_cochange_commits": 11,
+      "hotspot_score": 31.18,
+      "rank": 56
+    },
+    {
+      "file": "scripts/client-perf-harness.mjs",
+      "group": "scripts-tooling",
+      "loc": 1953,
+      "non_empty_loc": 1838,
+      "touches": 11,
+      "added_lines": 2008,
+      "deleted_lines": 55,
+      "recent_touches": 11,
+      "recent_churn": 2063,
+      "fix_like_touches": 0,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-18",
+      "total_churn": 2063,
+      "recent_cochange_degree": 32,
+      "recent_cochange_commits": 11,
+      "hotspot_score": 31.09,
+      "rank": 57
+    },
+    {
+      "file": "scripts/docdrift-sweep.mjs",
+      "group": "scripts-tooling",
+      "loc": 2167,
+      "non_empty_loc": 2041,
+      "touches": 6,
+      "added_lines": 2281,
+      "deleted_lines": 114,
+      "recent_touches": 6,
+      "recent_churn": 2395,
+      "fix_like_touches": 2,
+      "latest_touch": "2026-06-20",
+      "oldest_touch": "2026-06-20",
+      "total_churn": 2395,
+      "recent_cochange_degree": 2,
+      "recent_cochange_commits": 6,
+      "hotspot_score": 30.95,
+      "rank": 58
+    },
+    {
+      "file": "tests/protocol_parity.mjs",
+      "group": "protocol-and-contracts",
+      "loc": 467,
+      "non_empty_loc": 452,
+      "touches": 36,
+      "added_lines": 626,
+      "deleted_lines": 137,
+      "recent_touches": 36,
+      "recent_churn": 763,
+      "fix_like_touches": 1,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-06-08",
+      "total_churn": 763,
+      "recent_cochange_degree": 146,
+      "recent_cochange_commits": 36,
+      "hotspot_score": 30.79,
+      "rank": 59
+    },
+    {
+      "file": "tests/client_smoke.mjs",
+      "group": "integration-and-contract-tests",
+      "loc": 434,
+      "non_empty_loc": 411,
+      "touches": 37,
+      "added_lines": 664,
+      "deleted_lines": 230,
+      "recent_touches": 18,
+      "recent_churn": 559,
+      "fix_like_touches": 8,
+      "latest_touch": "2026-06-21",
+      "oldest_touch": "2026-05-29",
+      "total_churn": 894,
+      "recent_cochange_degree": 51,
+      "recent_cochange_commits": 18,
+      "hotspot_score": 30.38,
+      "rank": 60
+    }
+  ],
+  "group_hotspots": [
+    {
+      "group": "sim-core",
+      "files": 41,
+      "non_empty_loc": 13698,
+      "touches": 805,
+      "total_churn": 37015,
+      "recent_churn": 18198,
+      "fix_like_touches": 59,
+      "top_files": [
+        {
+          "file": "server/crates/sim/src/game/setup.rs",
+          "rank": 13,
+          "hotspot_score": 47.66
+        },
+        {
+          "file": "server/crates/sim/src/game/mod.rs",
+          "rank": 14,
+          "hotspot_score": 47.59
+        },
+        {
+          "file": "server/crates/sim/src/game/systems.rs",
+          "rank": 21,
+          "hotspot_score": 40.35
+        },
+        {
+          "file": "server/crates/sim/src/protocol.rs",
+          "rank": 26,
+          "hotspot_score": 38.27
+        },
+        {
+          "file": "server/crates/sim/src/game/map.rs",
+          "rank": 27,
+          "hotspot_score": 37.48
+        }
+      ]
+    },
+    {
+      "group": "ai",
+      "files": 36,
+      "non_empty_loc": 17233,
+      "touches": 567,
+      "total_churn": 33656,
+      "recent_churn": 9958,
+      "fix_like_touches": 36,
+      "top_files": [
+        {
+          "file": "server/crates/ai/src/selfplay/tests.rs",
+          "rank": 5,
+          "hotspot_score": 63.25
+        },
+        {
+          "file": "server/crates/ai/src/ai_core/decision/tests.rs",
+          "rank": 12,
+          "hotspot_score": 48.31
+        },
+        {
+          "file": "server/crates/ai/src/ai_core/actions.rs",
+          "rank": 30,
+          "hotspot_score": 36.64
+        },
+        {
+          "file": "server/crates/ai/src/ai_core/facts.rs",
+          "rank": 37,
+          "hotspot_score": 33.93
+        },
+        {
+          "file": "server/crates/ai/src/ai_core/profiles.rs",
+          "rank": 39,
+          "hotspot_score": 33.68
+        }
+      ]
+    },
+    {
+      "group": "client-ui",
+      "files": 38,
+      "non_empty_loc": 15564,
+      "touches": 469,
+      "total_churn": 26009,
+      "recent_churn": 17984,
+      "fix_like_touches": 33,
+      "top_files": [
+        {
+          "file": "client/styles.css",
+          "rank": 7,
+          "hotspot_score": 57.25
+        },
+        {
+          "file": "client/src/minimap.js",
+          "rank": 34,
+          "hotspot_score": 34.81
+        },
+        {
+          "file": "client/src/lobby.js",
+          "rank": 42,
+          "hotspot_score": 33.21
+        },
+        {
+          "file": "client/map-editor.html",
+          "rank": 70,
+          "hotspot_score": 29.12
+        },
+        {
+          "file": "client/src/app.js",
+          "rank": 79,
+          "hotspot_score": 27.35
+        }
+      ]
+    },
+    {
+      "group": "server-lobby-runtime",
+      "files": 17,
+      "non_empty_loc": 13075,
+      "touches": 333,
+      "total_churn": 24196,
+      "recent_churn": 20056,
+      "fix_like_touches": 35,
+      "top_files": [
+        {
+          "file": "server/src/lobby/room_task.rs",
+          "rank": 2,
+          "hotspot_score": 90.75
+        },
+        {
+          "file": "server/src/lobby/mod.rs",
+          "rank": 31,
+          "hotspot_score": 36.09
+        },
+        {
+          "file": "server/src/lobby/session_policy.rs",
+          "rank": 61,
+          "hotspot_score": 30.34
+        },
+        {
+          "file": "server/src/lobby/tests.rs",
+          "rank": 62,
+          "hotspot_score": 30.29
+        },
+        {
+          "file": "server/src/lobby/replay_session.rs",
+          "rank": 104,
+          "hotspot_score": 23.87
+        }
+      ]
+    },
+    {
+      "group": "protocol-and-contracts",
+      "files": 5,
+      "non_empty_loc": 13912,
+      "touches": 624,
+      "total_churn": 23189,
+      "recent_churn": 18061,
+      "fix_like_touches": 49,
+      "top_files": [
+        {
+          "file": "tests/client_contracts.mjs",
+          "rank": 1,
+          "hotspot_score": 95.43
+        },
+        {
+          "file": "server/crates/protocol/src/lib.rs",
+          "rank": 6,
+          "hotspot_score": 61.52
+        },
+        {
+          "file": "client/src/protocol.js",
+          "rank": 16,
+          "hotspot_score": 45.64
+        },
+        {
+          "file": "server/src/protocol.rs",
+          "rank": 28,
+          "hotspot_score": 37.07
+        },
+        {
+          "file": "tests/protocol_parity.mjs",
+          "rank": 59,
+          "hotspot_score": 30.79
+        }
+      ]
+    },
+    {
+      "group": "sim-services",
+      "files": 20,
+      "non_empty_loc": 12901,
+      "touches": 397,
+      "total_churn": 19578,
+      "recent_churn": 6622,
+      "fix_like_touches": 43,
+      "top_files": [
+        {
+          "file": "server/crates/sim/src/game/services/move_coordinator.rs",
+          "rank": 17,
+          "hotspot_score": 44.57
+        },
+        {
+          "file": "server/crates/sim/src/game/services/pathing.rs",
+          "rank": 19,
+          "hotspot_score": 42.42
+        },
+        {
+          "file": "server/crates/sim/src/game/services/order_queue.rs",
+          "rank": 24,
+          "hotspot_score": 39.52
+        },
+        {
+          "file": "server/crates/sim/src/game/services/ability_orders.rs",
+          "rank": 40,
+          "hotspot_score": 33.5
+        },
+        {
+          "file": "server/crates/sim/src/game/services/construction.rs",
+          "rank": 41,
+          "hotspot_score": 33.24
+        }
+      ]
+    },
+    {
+      "group": "server-backend",
+      "files": 17,
+      "non_empty_loc": 9375,
+      "touches": 240,
+      "total_churn": 12201,
+      "recent_churn": 9905,
+      "fix_like_touches": 18,
+      "top_files": [
+        {
+          "file": "server/src/main.rs",
+          "rank": 9,
+          "hotspot_score": 54.15
+        },
+        {
+          "file": "server/src/dev_scenarios.rs",
+          "rank": 43,
+          "hotspot_score": 32.93
+        },
+        {
+          "file": "server/crates/sim-wasm/src/lib.rs",
+          "rank": 65,
+          "hotspot_score": 29.98
+        },
+        {
+          "file": "server/crates/contract/src/lib.rs",
+          "rank": 67,
+          "hotspot_score": 29.91
+        },
+        {
+          "file": "server/crates/archcheck/src/lib.rs",
+          "rank": 71,
+          "hotspot_score": 28.85
+        }
+      ]
+    },
+    {
+      "group": "scripts-tooling",
+      "files": 27,
+      "non_empty_loc": 8734,
+      "touches": 138,
+      "total_churn": 12040,
+      "recent_churn": 12020,
+      "fix_like_touches": 10,
+      "top_files": [
+        {
+          "file": "scripts/check-client-architecture.mjs",
+          "rank": 44,
+          "hotspot_score": 32.69
+        },
+        {
+          "file": "scripts/client-perf-harness.mjs",
+          "rank": 57,
+          "hotspot_score": 31.09
+        },
+        {
+          "file": "scripts/docdrift-sweep.mjs",
+          "rank": 58,
+          "hotspot_score": 30.95
+        },
+        {
+          "file": "scripts/parse-net-report-logs.mjs",
+          "rank": 117,
+          "hotspot_score": 22.24
+        },
+        {
+          "file": "scripts/snapshot-codec-bakeoff.mjs",
+          "rank": 123,
+          "hotspot_score": 21.62
+        }
+      ]
+    },
+    {
+      "group": "sim-command-service",
+      "files": 3,
+      "non_empty_loc": 5842,
+      "touches": 138,
+      "total_churn": 11403,
+      "recent_churn": 8235,
+      "fix_like_touches": 12,
+      "top_files": [
+        {
+          "file": "server/crates/sim/src/game/services/commands.rs",
+          "rank": 3,
+          "hotspot_score": 73.56
+        },
+        {
+          "file": "server/crates/sim/src/game/command.rs",
+          "rank": 83,
+          "hotspot_score": 26.47
+        },
+        {
+          "file": "server/crates/sim/src/game/commands.rs",
+          "rank": 284,
+          "hotspot_score": 8.86
+        }
+      ]
+    },
+    {
+      "group": "sim-movement-service",
+      "files": 8,
+      "non_empty_loc": 7652,
+      "touches": 138,
+      "total_churn": 11222,
+      "recent_churn": 1314,
+      "fix_like_touches": 16,
+      "top_files": [
+        {
+          "file": "server/crates/sim/src/game/services/movement/tests.rs",
+          "rank": 8,
+          "hotspot_score": 55.52
+        },
+        {
+          "file": "server/crates/sim/src/game/services/movement/waypoints.rs",
+          "rank": 56,
+          "hotspot_score": 31.18
+        },
+        {
+          "file": "server/crates/sim/src/game/services/movement/scout_car.rs",
+          "rank": 77,
+          "hotspot_score": 27.81
+        },
+        {
+          "file": "server/crates/sim/src/game/services/movement/pivot_drive.rs",
+          "rank": 89,
+          "hotspot_score": 25.15
+        },
+        {
+          "file": "server/crates/sim/src/game/services/movement/collision.rs",
+          "rank": 144,
+          "hotspot_score": 18.41
+        }
+      ]
+    },
+    {
+      "group": "sim-tests",
+      "files": 8,
+      "non_empty_loc": 7912,
+      "touches": 135,
+      "total_churn": 10722,
+      "recent_churn": 8715,
+      "fix_like_touches": 6,
+      "top_files": [
+        {
+          "file": "server/crates/sim/src/game/tests.rs",
+          "rank": 4,
+          "hotspot_score": 63.98
+        },
+        {
+          "file": "server/crates/sim/src/game/setup/dev_scenarios/tests.rs",
+          "rank": 52,
+          "hotspot_score": 31.93
+        },
+        {
+          "file": "server/crates/sim/src/game/setup/tests.rs",
+          "rank": 94,
+          "hotspot_score": 24.29
+        },
+        {
+          "file": "server/crates/sim/src/game/entity/tests.rs",
+          "rank": 140,
+          "hotspot_score": 19.38
+        },
+        {
+          "file": "server/crates/sim/src/game/phase7_privacy_tests.rs",
+          "rank": 145,
+          "hotspot_score": 18.21
+        }
+      ]
+    },
+    {
+      "group": "integration-and-contract-tests",
+      "files": 25,
+      "non_empty_loc": 7319,
+      "touches": 278,
+      "total_churn": 10477,
+      "recent_churn": 9068,
+      "fix_like_touches": 36,
+      "top_files": [
+        {
+          "file": "tests/run-all.sh",
+          "rank": 35,
+          "hotspot_score": 34.47
+        },
+        {
+          "file": "tests/client_smoke.mjs",
+          "rank": 60,
+          "hotspot_score": 30.38
+        },
+        {
+          "file": "tests/prediction_controller.mjs",
+          "rank": 82,
+          "hotspot_score": 26.69
+        },
+        {
+          "file": "tests/minimap_input_contracts.mjs",
+          "rank": 84,
+          "hotspot_score": 26.23
+        },
+        {
+          "file": "tests/hud_command_card.mjs",
+          "rank": 85,
+          "hotspot_score": 26.14
+        }
+      ]
+    },
+    {
+      "group": "client-renderer",
+      "files": 25,
+      "non_empty_loc": 6135,
+      "touches": 205,
+      "total_churn": 9887,
+      "recent_churn": 7007,
+      "fix_like_touches": 11,
+      "top_files": [
+        {
+          "file": "client/src/renderer/feedback.js",
+          "rank": 22,
+          "hotspot_score": 40.17
+        },
+        {
+          "file": "client/src/renderer/units.js",
+          "rank": 54,
+          "hotspot_score": 31.62
+        },
+        {
+          "file": "client/src/renderer/index.js",
+          "rank": 69,
+          "hotspot_score": 29.57
+        },
+        {
+          "file": "client/src/renderer/shared.js",
+          "rank": 92,
+          "hotspot_score": 24.54
+        },
+        {
+          "file": "client/src/renderer/buildings.js",
+          "rank": 130,
+          "hotspot_score": 20.45
+        }
+      ]
+    },
+    {
+      "group": "client-match-shell",
+      "files": 13,
+      "non_empty_loc": 4626,
+      "touches": 267,
+      "total_churn": 9722,
+      "recent_churn": 6701,
+      "fix_like_touches": 17,
+      "top_files": [
+        {
+          "file": "client/src/match.js",
+          "rank": 10,
+          "hotspot_score": 52.05
+        },
+        {
+          "file": "client/src/state.js",
+          "rank": 18,
+          "hotspot_score": 43.4
+        },
+        {
+          "file": "client/src/net.js",
+          "rank": 72,
+          "hotspot_score": 28.69
+        },
+        {
+          "file": "client/src/prediction_controller.js",
+          "rank": 73,
+          "hotspot_score": 28.6
+        },
+        {
+          "file": "client/src/replay_controls.js",
+          "rank": 168,
+          "hotspot_score": 16.93
+        }
+      ]
+    },
+    {
+      "group": "balance-and-config-mirror",
+      "files": 9,
+      "non_empty_loc": 3102,
+      "touches": 396,
+      "total_churn": 7819,
+      "recent_churn": 4955,
+      "fix_like_touches": 32,
+      "top_files": [
+        {
+          "file": "client/src/config.js",
+          "rank": 20,
+          "hotspot_score": 41.58
+        },
+        {
+          "file": "server/crates/rules/src/balance.rs",
+          "rank": 25,
+          "hotspot_score": 39.41
+        },
+        {
+          "file": "server/crates/rules/src/faction.rs",
+          "rank": 64,
+          "hotspot_score": 30.14
+        },
+        {
+          "file": "server/src/config.rs",
+          "rank": 75,
+          "hotspot_score": 28.37
+        },
+        {
+          "file": "scripts/check-faction-catalog-parity.mjs",
+          "rank": 99,
+          "hotspot_score": 24.13
+        }
+      ]
+    },
+    {
+      "group": "sim-combat-service",
+      "files": 11,
+      "non_empty_loc": 5477,
+      "touches": 155,
+      "total_churn": 7588,
+      "recent_churn": 4110,
+      "fix_like_touches": 3,
+      "top_files": [
+        {
+          "file": "server/crates/sim/src/game/services/combat/tests.rs",
+          "rank": 11,
+          "hotspot_score": 50.03
+        },
+        {
+          "file": "server/crates/sim/src/game/services/combat/mod.rs",
+          "rank": 63,
+          "hotspot_score": 30.19
+        },
+        {
+          "file": "server/crates/sim/src/game/services/combat/acquisition.rs",
+          "rank": 98,
+          "hotspot_score": 24.2
+        },
+        {
+          "file": "server/crates/sim/src/game/services/combat/weapons.rs",
+          "rank": 112,
+          "hotspot_score": 22.73
+        },
+        {
+          "file": "server/crates/sim/src/game/services/combat/damage.rs",
+          "rank": 135,
+          "hotspot_score": 19.83
+        }
+      ]
+    },
+    {
+      "group": "client-hud",
+      "files": 7,
+      "non_empty_loc": 2211,
+      "touches": 112,
+      "total_churn": 5557,
+      "recent_churn": 4175,
+      "fix_like_touches": 14,
+      "top_files": [
+        {
+          "file": "client/src/hud.js",
+          "rank": 15,
+          "hotspot_score": 47.4
+        },
+        {
+          "file": "client/src/hud_command_card.js",
+          "rank": 46,
+          "hotspot_score": 32.59
+        },
+        {
+          "file": "client/src/hud_selection_panel.js",
+          "rank": 179,
+          "hotspot_score": 15.75
+        },
+        {
+          "file": "client/src/command_budget.js",
+          "rank": 268,
+          "hotspot_score": 10.03
+        },
+        {
+          "file": "client/src/hud_unit_commands.js",
+          "rank": 299,
+          "hotspot_score": 8.06
+        }
+      ]
+    },
+    {
+      "group": "client-input",
+      "files": 13,
+      "non_empty_loc": 2864,
+      "touches": 162,
+      "total_churn": 4679,
+      "recent_churn": 2927,
+      "fix_like_touches": 27,
+      "top_files": [
+        {
+          "file": "client/src/input/index.js",
+          "rank": 23,
+          "hotspot_score": 39.77
+        },
+        {
+          "file": "client/src/input/commands.js",
+          "rank": 48,
+          "hotspot_score": 32.18
+        },
+        {
+          "file": "client/src/input/placement.js",
+          "rank": 108,
+          "hotspot_score": 23.23
+        },
+        {
+          "file": "client/src/input/camera_controls.js",
+          "rank": 125,
+          "hotspot_score": 21.23
+        },
+        {
+          "file": "client/src/input/selection.js",
+          "rank": 126,
+          "hotspot_score": 21.11
+        }
+      ]
+    },
+    {
+      "group": "tri-state-tests",
+      "files": 41,
+      "non_empty_loc": 3288,
+      "touches": 93,
+      "total_churn": 3816,
+      "recent_churn": 3816,
+      "fix_like_touches": 2,
+      "top_files": [
+        {
+          "file": "tests/tri_state/run.mjs",
+          "rank": 102,
+          "hotspot_score": 23.92
+        },
+        {
+          "file": "tests/tri_state/lanes/client_lane.mjs",
+          "rank": 109,
+          "hotspot_score": 23.02
+        },
+        {
+          "file": "tests/tri_state/dsl.mjs",
+          "rank": 173,
+          "hotspot_score": 16.42
+        },
+        {
+          "file": "tests/tri_state/lanes/remote_lane.mjs",
+          "rank": 180,
+          "hotspot_score": 15.73
+        },
+        {
+          "file": "tests/tri_state/lanes/local_lane.mjs",
+          "rank": 199,
+          "hotspot_score": 14.18
+        }
+      ]
+    },
+    {
+      "group": "rules",
+      "files": 6,
+      "non_empty_loc": 1845,
+      "touches": 153,
+      "total_churn": 3486,
+      "recent_churn": 2092,
+      "fix_like_touches": 8,
+      "top_files": [
+        {
+          "file": "server/crates/rules/src/defs.rs",
+          "rank": 33,
+          "hotspot_score": 35.94
+        },
+        {
+          "file": "server/crates/rules/src/economy.rs",
+          "rank": 55,
+          "hotspot_score": 31.43
+        },
+        {
+          "file": "server/crates/rules/src/combat.rs",
+          "rank": 74,
+          "hotspot_score": 28.55
+        },
+        {
+          "file": "server/crates/rules/src/kind.rs",
+          "rank": 127,
+          "hotspot_score": 20.83
+        },
+        {
+          "file": "server/crates/rules/src/terrain.rs",
+          "rank": 288,
+          "hotspot_score": 8.52
+        }
+      ]
+    }
+  ],
+  "recent_temporal_coupling": {
+    "top_pairs": [
+      {
+        "a": "client/src/protocol.js",
+        "b": "server/crates/protocol/src/lib.rs",
+        "commits": 62,
+        "groups": [
+          "protocol-and-contracts",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/match.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 54,
+        "groups": [
+          "client-match-shell",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/src/lobby/room_task.rs",
+        "b": "server/src/main.rs",
+        "commits": 50,
+        "groups": [
+          "server-lobby-runtime",
+          "server-backend"
+        ]
+      },
+      {
+        "a": "server/crates/protocol/src/lib.rs",
+        "b": "tests/client_contracts.mjs",
+        "commits": 49,
+        "groups": [
+          "protocol-and-contracts",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/src/lobby/mod.rs",
+        "b": "server/src/lobby/room_task.rs",
+        "commits": 49,
+        "groups": [
+          "server-lobby-runtime",
+          "server-lobby-runtime"
+        ]
+      },
+      {
+        "a": "scripts/check-client-architecture.mjs",
+        "b": "tests/client_contracts.mjs",
+        "commits": 43,
+        "groups": [
+          "scripts-tooling",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/protocol.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 40,
+        "groups": [
+          "protocol-and-contracts",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/hud.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 39,
+        "groups": [
+          "client-hud",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/protocol/src/lib.rs",
+        "b": "server/src/lobby/room_task.rs",
+        "commits": 37,
+        "groups": [
+          "protocol-and-contracts",
+          "server-lobby-runtime"
+        ]
+      },
+      {
+        "a": "client/src/config.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 36,
+        "groups": [
+          "balance-and-config-mirror",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/config.js",
+        "b": "server/crates/rules/src/balance.rs",
+        "commits": 33,
+        "groups": [
+          "balance-and-config-mirror",
+          "balance-and-config-mirror"
+        ]
+      },
+      {
+        "a": "server/crates/contract/src/lib.rs",
+        "b": "server/crates/protocol/src/lib.rs",
+        "commits": 33,
+        "groups": [
+          "server-backend",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/protocol.js",
+        "b": "server/src/lobby/room_task.rs",
+        "commits": 32,
+        "groups": [
+          "protocol-and-contracts",
+          "server-lobby-runtime"
+        ]
+      },
+      {
+        "a": "client/styles.css",
+        "b": "tests/client_contracts.mjs",
+        "commits": 32,
+        "groups": [
+          "client-ui",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/protocol/src/lib.rs",
+        "b": "tests/protocol_parity.mjs",
+        "commits": 32,
+        "groups": [
+          "protocol-and-contracts",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/protocol/src/lib.rs",
+        "b": "server/src/main.rs",
+        "commits": 30,
+        "groups": [
+          "protocol-and-contracts",
+          "server-backend"
+        ]
+      },
+      {
+        "a": "server/crates/sim/src/game/services/commands.rs",
+        "b": "server/crates/sim/src/game/services/order_queue.rs",
+        "commits": 30,
+        "groups": [
+          "sim-command-service",
+          "sim-services"
+        ]
+      },
+      {
+        "a": "server/src/lobby/mod.rs",
+        "b": "server/src/main.rs",
+        "commits": 30,
+        "groups": [
+          "server-lobby-runtime",
+          "server-backend"
+        ]
+      },
+      {
+        "a": "client/src/protocol.js",
+        "b": "server/crates/contract/src/lib.rs",
+        "commits": 29,
+        "groups": [
+          "protocol-and-contracts",
+          "server-backend"
+        ]
+      },
+      {
+        "a": "server/src/lobby/room_task.rs",
+        "b": "tests/client_contracts.mjs",
+        "commits": 29,
+        "groups": [
+          "server-lobby-runtime",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/protocol.js",
+        "b": "server/src/main.rs",
+        "commits": 28,
+        "groups": [
+          "protocol-and-contracts",
+          "server-backend"
+        ]
+      },
+      {
+        "a": "server/crates/sim/src/game/services/commands.rs",
+        "b": "server/crates/sim/src/game/tests.rs",
+        "commits": 28,
+        "groups": [
+          "sim-command-service",
+          "sim-tests"
+        ]
+      },
+      {
+        "a": "client/src/config.js",
+        "b": "server/crates/rules/src/defs.rs",
+        "commits": 27,
+        "groups": [
+          "balance-and-config-mirror",
+          "rules"
+        ]
+      },
+      {
+        "a": "client/src/match.js",
+        "b": "scripts/check-client-architecture.mjs",
+        "commits": 27,
+        "groups": [
+          "client-match-shell",
+          "scripts-tooling"
+        ]
+      },
+      {
+        "a": "client/src/protocol.js",
+        "b": "server/crates/sim/src/game/services/commands.rs",
+        "commits": 27,
+        "groups": [
+          "protocol-and-contracts",
+          "sim-command-service"
+        ]
+      },
+      {
+        "a": "client/src/protocol.js",
+        "b": "tests/protocol_parity.mjs",
+        "commits": 27,
+        "groups": [
+          "protocol-and-contracts",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/state.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 27,
+        "groups": [
+          "client-match-shell",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/protocol/src/lib.rs",
+        "b": "server/crates/sim/src/game/services/commands.rs",
+        "commits": 27,
+        "groups": [
+          "protocol-and-contracts",
+          "sim-command-service"
+        ]
+      },
+      {
+        "a": "client/src/input/index.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 26,
+        "groups": [
+          "client-input",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/src/lobby/room_task.rs",
+        "b": "tests/protocol_parity.mjs",
+        "commits": 25,
+        "groups": [
+          "server-lobby-runtime",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/sim/src/game/services/commands.rs",
+        "b": "tests/client_contracts.mjs",
+        "commits": 24,
+        "groups": [
+          "sim-command-service",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/input/commands.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 23,
+        "groups": [
+          "client-input",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/sim/src/game/services/ability_orders.rs",
+        "b": "server/crates/sim/src/game/services/commands.rs",
+        "commits": 23,
+        "groups": [
+          "sim-services",
+          "sim-command-service"
+        ]
+      },
+      {
+        "a": "server/crates/sim/src/game/services/ability_orders.rs",
+        "b": "server/crates/sim/src/game/tests.rs",
+        "commits": 23,
+        "groups": [
+          "sim-services",
+          "sim-tests"
+        ]
+      },
+      {
+        "a": "server/src/main.rs",
+        "b": "tests/client_contracts.mjs",
+        "commits": 23,
+        "groups": [
+          "server-backend",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/config.js",
+        "b": "server/crates/sim/src/game/services/commands.rs",
+        "commits": 22,
+        "groups": [
+          "balance-and-config-mirror",
+          "sim-command-service"
+        ]
+      },
+      {
+        "a": "client/src/net.js",
+        "b": "server/crates/protocol/src/lib.rs",
+        "commits": 22,
+        "groups": [
+          "client-match-shell",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/ai/src/ai_core/facts.rs",
+        "b": "server/crates/protocol/src/lib.rs",
+        "commits": 22,
+        "groups": [
+          "ai",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "server/crates/sim/src/game/tests.rs",
+        "b": "tests/client_contracts.mjs",
+        "commits": 22,
+        "groups": [
+          "sim-tests",
+          "protocol-and-contracts"
+        ]
+      },
+      {
+        "a": "client/src/net.js",
+        "b": "tests/client_contracts.mjs",
+        "commits": 21,
+        "groups": [
+          "client-match-shell",
+          "protocol-and-contracts"
+        ]
+      }
+    ],
+    "high_degree_files": [
+      {
+        "file": "tests/client_contracts.mjs",
+        "group": "protocol-and-contracts",
+        "partner_count": 220,
+        "recent_cochange_commits": 211
+      },
+      {
+        "file": "server/crates/protocol/src/lib.rs",
+        "group": "protocol-and-contracts",
+        "partner_count": 192,
+        "recent_cochange_commits": 78
+      },
+      {
+        "file": "client/src/protocol.js",
+        "group": "protocol-and-contracts",
+        "partner_count": 184,
+        "recent_cochange_commits": 64
+      },
+      {
+        "file": "server/src/lobby/room_task.rs",
+        "group": "server-lobby-runtime",
+        "partner_count": 181,
+        "recent_cochange_commits": 118
+      },
+      {
+        "file": "server/src/main.rs",
+        "group": "server-backend",
+        "partner_count": 178,
+        "recent_cochange_commits": 72
+      },
+      {
+        "file": "server/crates/sim/src/game/tests.rs",
+        "group": "sim-tests",
+        "partner_count": 177,
+        "recent_cochange_commits": 56
+      },
+      {
+        "file": "server/crates/sim/src/game/setup.rs",
+        "group": "sim-core",
+        "partner_count": 176,
+        "recent_cochange_commits": 40
+      },
+      {
+        "file": "server/crates/sim/src/game/services/commands.rs",
+        "group": "sim-command-service",
+        "partner_count": 169,
+        "recent_cochange_commits": 63
+      },
+      {
+        "file": "server/crates/ai/src/ai_core/facts.rs",
+        "group": "ai",
+        "partner_count": 162,
+        "recent_cochange_commits": 30
+      },
+      {
+        "file": "server/crates/sim/src/game/mod.rs",
+        "group": "sim-core",
+        "partner_count": 161,
+        "recent_cochange_commits": 27
+      },
+      {
+        "file": "client/src/match.js",
+        "group": "client-match-shell",
+        "partner_count": 160,
+        "recent_cochange_commits": 68
+      },
+      {
+        "file": "server/crates/sim/src/game/services/combat/tests.rs",
+        "group": "sim-combat-service",
+        "partner_count": 159,
+        "recent_cochange_commits": 39
+      },
+      {
+        "file": "server/crates/sim/src/game/systems.rs",
+        "group": "sim-core",
+        "partner_count": 157,
+        "recent_cochange_commits": 26
+      },
+      {
+        "file": "server/crates/ai/src/selfplay/tests.rs",
+        "group": "ai",
+        "partner_count": 152,
+        "recent_cochange_commits": 36
+      },
+      {
+        "file": "server/crates/sim/src/game/entity/entity.rs",
+        "group": "sim-core",
+        "partner_count": 152,
+        "recent_cochange_commits": 21
+      },
+      {
+        "file": "server/crates/sim/src/game/services/order_queue.rs",
+        "group": "sim-services",
+        "partner_count": 148,
+        "recent_cochange_commits": 30
+      },
+      {
+        "file": "client/src/state.js",
+        "group": "client-match-shell",
+        "partner_count": 147,
+        "recent_cochange_commits": 42
+      },
+      {
+        "file": "tests/protocol_parity.mjs",
+        "group": "protocol-and-contracts",
+        "partner_count": 146,
+        "recent_cochange_commits": 36
+      },
+      {
+        "file": "server/crates/sim/src/rules/projection.rs",
+        "group": "sim-core",
+        "partner_count": 146,
+        "recent_cochange_commits": 21
+      },
+      {
+        "file": "scripts/check-client-architecture.mjs",
+        "group": "scripts-tooling",
+        "partner_count": 145,
+        "recent_cochange_commits": 57
+      },
+      {
+        "file": "server/crates/contract/src/lib.rs",
+        "group": "server-backend",
+        "partner_count": 144,
+        "recent_cochange_commits": 36
+      },
+      {
+        "file": "server/crates/ai/src/selfplay/replay.rs",
+        "group": "ai",
+        "partner_count": 141,
+        "recent_cochange_commits": 26
+      },
+      {
+        "file": "server/crates/sim/src/game/services/combat/mod.rs",
+        "group": "sim-combat-service",
+        "partner_count": 139,
+        "recent_cochange_commits": 24
+      },
+      {
+        "file": "server/crates/sim/src/game/services/movement/tests.rs",
+        "group": "sim-movement-service",
+        "partner_count": 139,
+        "recent_cochange_commits": 20
+      },
+      {
+        "file": "server/crates/sim-wasm/src/lib.rs",
+        "group": "server-backend",
+        "partner_count": 139,
+        "recent_cochange_commits": 16
+      },
+      {
+        "file": "server/crates/sim/src/game/services/production.rs",
+        "group": "sim-services",
+        "partner_count": 137,
+        "recent_cochange_commits": 14
+      },
+      {
+        "file": "server/crates/sim/src/game/invariants.rs",
+        "group": "sim-core",
+        "partner_count": 134,
+        "recent_cochange_commits": 11
+      },
+      {
+        "file": "server/crates/sim/src/protocol.rs",
+        "group": "sim-core",
+        "partner_count": 132,
+        "recent_cochange_commits": 13
+      },
+      {
+        "file": "server/crates/sim/src/game/services/combat/acquisition.rs",
+        "group": "sim-combat-service",
+        "partner_count": 130,
+        "recent_cochange_commits": 13
+      },
+      {
+        "file": "client/src/config.js",
+        "group": "balance-and-config-mirror",
+        "partner_count": 129,
+        "recent_cochange_commits": 62
+      }
+    ]
+  },
+  "blame_freshness_top_current_hotspots": [
+    {
+      "file": "tests/client_contracts.mjs",
+      "group": "protocol-and-contracts",
+      "blamed_lines": 9388,
+      "median_line_age_days": 8,
+      "pct_lines_14_days_or_newer": 85.7,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "ae243ce8d539215183d8697e465434fd8fbfbed4",
+          "lines": 226
+        },
+        {
+          "hash": "2db6dd33ba50f4487b326db6ed90e5eca9f7ad4c",
+          "lines": 214
+        },
+        {
+          "hash": "f9099e6b0aea7ba7ce1e422b2dc996a0932b143a",
+          "lines": 188
+        }
+      ]
+    },
+    {
+      "file": "server/src/lobby/room_task.rs",
+      "group": "server-lobby-runtime",
+      "blamed_lines": 8219,
+      "median_line_age_days": 8,
+      "pct_lines_14_days_or_newer": 85.5,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "6b83b527b952ca9446ce4a883f33a63202a61426",
+          "lines": 584
+        },
+        {
+          "hash": "61397ae6ec36b36314a758753139334901a0ef85",
+          "lines": 452
+        },
+        {
+          "hash": "544c0af56a292cf97383cc05486b8307b21ad341",
+          "lines": 396
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/services/commands.rs",
+      "group": "sim-command-service",
+      "blamed_lines": 5482,
+      "median_line_age_days": 13,
+      "pct_lines_14_days_or_newer": 67.9,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "f60f897109c9e3b43797703124790473363c245d",
+          "lines": 454
+        },
+        {
+          "hash": "46ce4475aac9775b74bf47dc0369bcb20ae0766f",
+          "lines": 367
+        },
+        {
+          "hash": "c397072ab72ae071f56d10364fa892a2979f302a",
+          "lines": 277
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/tests.rs",
+      "group": "sim-tests",
+      "blamed_lines": 5485,
+      "median_line_age_days": 10,
+      "pct_lines_14_days_or_newer": 67.2,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "2a8e36b24e720eba1ac182c20a333a7acb13bc87",
+          "lines": 388
+        },
+        {
+          "hash": "e7792a4316ff7cab1f1d6b9edc94a006459daac8",
+          "lines": 265
+        },
+        {
+          "hash": "22fcb3f0a3414d5f65724650b1af3811abdf0a0a",
+          "lines": 264
+        }
+      ]
+    },
+    {
+      "file": "server/crates/ai/src/selfplay/tests.rs",
+      "group": "ai",
+      "blamed_lines": 1885,
+      "median_line_age_days": 16,
+      "pct_lines_14_days_or_newer": 37.2,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "2a4923b491eacef20c5e36d670f30daac2f61ed1",
+          "lines": 268
+        },
+        {
+          "hash": "3742e708ddb67e243fdfe0e9c1d42402742f3bef",
+          "lines": 267
+        },
+        {
+          "hash": "8b712229f399d4b4cf5bfd1af4c1eee6c9a90921",
+          "lines": 190
+        }
+      ]
+    },
+    {
+      "file": "server/crates/protocol/src/lib.rs",
+      "group": "protocol-and-contracts",
+      "blamed_lines": 3387,
+      "median_line_age_days": 8,
+      "pct_lines_14_days_or_newer": 77.6,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "e3617477c51325d065ae2546d71b69722f0524e5",
+          "lines": 686
+        },
+        {
+          "hash": "70198ddd37c4659923b9f084094b39738f2c9bcb",
+          "lines": 333
+        },
+        {
+          "hash": "fa7e17e797272ff4f8569bcc6a04d3311a631482",
+          "lines": 282
+        }
+      ]
+    },
+    {
+      "file": "client/styles.css",
+      "group": "client-ui",
+      "blamed_lines": 3800,
+      "median_line_age_days": 11,
+      "pct_lines_14_days_or_newer": 60.4,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "a5c5a2949c4eeff442c28d644f6faa745ea932b0",
+          "lines": 693
+        },
+        {
+          "hash": "a6027a907d3466a8d7a3eb58d39430a863fcd269",
+          "lines": 416
+        },
+        {
+          "hash": "0e39a47f86fd0c9d8f48aa651abb265229f96faf",
+          "lines": 216
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/services/movement/tests.rs",
+      "group": "sim-movement-service",
+      "blamed_lines": 5231,
+      "median_line_age_days": 16,
+      "pct_lines_14_days_or_newer": 5.8,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "2d416a47e6f316fcf45ba71410110460cdbd5f20",
+          "lines": 960
+        },
+        {
+          "hash": "b09eab026ab6c9f2e5fe8555188f1447ac31c1ba",
+          "lines": 507
+        },
+        {
+          "hash": "87965f7cd26c52765d5abff64b78b71d4d005835",
+          "lines": 433
+        }
+      ]
+    },
+    {
+      "file": "server/src/main.rs",
+      "group": "server-backend",
+      "blamed_lines": 2087,
+      "median_line_age_days": 12,
+      "pct_lines_14_days_or_newer": 64.7,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "a5c5a2949c4eeff442c28d644f6faa745ea932b0",
+          "lines": 296
+        },
+        {
+          "hash": "c3c1aa285784d6deb9d848922e5361ab584885af",
+          "lines": 199
+        },
+        {
+          "hash": "986bfdfc2a9e7fe24370b6d1b6a19cb0064e35db",
+          "lines": 120
+        }
+      ]
+    },
+    {
+      "file": "client/src/match.js",
+      "group": "client-match-shell",
+      "blamed_lines": 1268,
+      "median_line_age_days": 10,
+      "pct_lines_14_days_or_newer": 63.5,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "a5c5a2949c4eeff442c28d644f6faa745ea932b0",
+          "lines": 139
+        },
+        {
+          "hash": "c33a6a8a6f925bf3bbaa88c98b2bdb7232e77ff4",
+          "lines": 79
+        },
+        {
+          "hash": "7a69ed192d7c7fd1d9027b961161af3393a79b37",
+          "lines": 57
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/services/combat/tests.rs",
+      "group": "sim-combat-service",
+      "blamed_lines": 3713,
+      "median_line_age_days": 16,
+      "pct_lines_14_days_or_newer": 35.4,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "c576c77d8eadf38a10f28644b809cc8dcb6d31f4",
+          "lines": 357
+        },
+        {
+          "hash": "e9c46276045c21e48e4416a59c40d2177dfd0adb",
+          "lines": 244
+        },
+        {
+          "hash": "241cefbc47ba6e4a3fe649cad7b3bd32e3b5f4de",
+          "lines": 209
+        }
+      ]
+    },
+    {
+      "file": "server/crates/ai/src/ai_core/decision/tests.rs",
+      "group": "ai",
+      "blamed_lines": 4101,
+      "median_line_age_days": 16,
+      "pct_lines_14_days_or_newer": 18.2,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "2179471995dd384b8c267031d9ae326e75ca6bf4",
+          "lines": 1010
+        },
+        {
+          "hash": "a7063a409a047061e0cdba2fd54f55d91152c98a",
+          "lines": 655
+        },
+        {
+          "hash": "8b225e638bc8a910b2eff7a2848f8ea4ab681a0c",
+          "lines": 218
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/setup.rs",
+      "group": "sim-core",
+      "blamed_lines": 805,
+      "median_line_age_days": 15,
+      "pct_lines_14_days_or_newer": 41.9,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "90ecf87354d622b900f22f7369f0b05f23c41010",
+          "lines": 111
+        },
+        {
+          "hash": "55bb187b8552db05e53019837584a22d6100b5b5",
+          "lines": 87
+        },
+        {
+          "hash": "2a8e36b24e720eba1ac182c20a333a7acb13bc87",
+          "lines": 73
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/mod.rs",
+      "group": "sim-core",
+      "blamed_lines": 484,
+      "median_line_age_days": 16,
+      "pct_lines_14_days_or_newer": 41.5,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "a5c5a2949c4eeff442c28d644f6faa745ea932b0",
+          "lines": 103
+        },
+        {
+          "hash": "86b01445c2592c3ed13c7ebb609070ee340233c9",
+          "lines": 38
+        },
+        {
+          "hash": "96bbf6e7ea341e33fabb74336b0eb478cf8198b7",
+          "lines": 27
+        }
+      ]
+    },
+    {
+      "file": "client/src/hud.js",
+      "group": "client-hud",
+      "blamed_lines": 1003,
+      "median_line_age_days": 13,
+      "pct_lines_14_days_or_newer": 52.9,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "a5c5a2949c4eeff442c28d644f6faa745ea932b0",
+          "lines": 156
+        },
+        {
+          "hash": "2db6dd33ba50f4487b326db6ed90e5eca9f7ad4c",
+          "lines": 94
+        },
+        {
+          "hash": "df24f589fdd6685b863e3d920f755e15dff5d750",
+          "lines": 93
+        }
+      ]
+    },
+    {
+      "file": "client/src/protocol.js",
+      "group": "protocol-and-contracts",
+      "blamed_lines": 1285,
+      "median_line_age_days": 12,
+      "pct_lines_14_days_or_newer": 61.1,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "70198ddd37c4659923b9f084094b39738f2c9bcb",
+          "lines": 202
+        },
+        {
+          "hash": "fa7e17e797272ff4f8569bcc6a04d3311a631482",
+          "lines": 137
+        },
+        {
+          "hash": "63ac4445ededa0b1b5d91172c6e14286c5d301e4",
+          "lines": 85
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/services/move_coordinator.rs",
+      "group": "sim-services",
+      "blamed_lines": 2076,
+      "median_line_age_days": 17,
+      "pct_lines_14_days_or_newer": 15.6,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "c01cf64289b17a6b523af43953260916ca1b2026",
+          "lines": 347
+        },
+        {
+          "hash": "be605a64e844b816bf65a6f946d4d8fa347ac70b",
+          "lines": 286
+        },
+        {
+          "hash": "891a531729edd69b48501253082d026638e62ae4",
+          "lines": 226
+        }
+      ]
+    },
+    {
+      "file": "client/src/state.js",
+      "group": "client-match-shell",
+      "blamed_lines": 1118,
+      "median_line_age_days": 13,
+      "pct_lines_14_days_or_newer": 53.8,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "a5c5a2949c4eeff442c28d644f6faa745ea932b0",
+          "lines": 189
+        },
+        {
+          "hash": "7448ecc856edb769e3e9d118d1a0906934589508",
+          "lines": 68
+        },
+        {
+          "hash": "2877a62b328608569e17a635e6a7437b11064446",
+          "lines": 68
+        }
+      ]
+    },
+    {
+      "file": "server/crates/sim/src/game/services/pathing.rs",
+      "group": "sim-services",
+      "blamed_lines": 1985,
+      "median_line_age_days": 17,
+      "pct_lines_14_days_or_newer": 16.8,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "5d3b2155b08e49f8d02a4d93e1e6f394781f4e99",
+          "lines": 361
+        },
+        {
+          "hash": "0dc2fc5c5232169a804bd82731ad284426202e97",
+          "lines": 224
+        },
+        {
+          "hash": "89a73270c49033e6a7feacd6674f1396a6dcf500",
+          "lines": 168
+        }
+      ]
+    },
+    {
+      "file": "client/src/config.js",
+      "group": "balance-and-config-mirror",
+      "blamed_lines": 522,
+      "median_line_age_days": 9,
+      "pct_lines_14_days_or_newer": 77.6,
+      "pct_lines_30_days_or_newer": 100,
+      "pct_lines_90_days_or_newer": 100,
+      "dominant_line_commits": [
+        {
+          "hash": "9e65ba6fbe8ff20443cd48da86f49d137a0c923b",
+          "lines": 106
+        },
+        {
+          "hash": "63ac4445ededa0b1b5d91172c6e14286c5d301e4",
+          "lines": 34
+        },
+        {
+          "hash": "613d8355befde2414ce0c85bd4654c8643873e5f",
+          "lines": 30
+        }
+      ]
+    }
+  ],
+  "raw_path_churn_top": [
+    {
+      "path": "server/src/lobby/room_task.rs",
+      "touches": 130,
+      "added_lines": 11698,
+      "deleted_lines": 3256,
+      "fix_like_touches": 19,
+      "recent_touches": 119,
+      "recent_churn": 13503,
+      "total_churn": 14954,
+      "is_current_source_path": true,
+      "group": "server-lobby-runtime"
+    },
+    {
+      "path": "tests/client_contracts.mjs",
+      "touches": 279,
+      "added_lines": 10883,
+      "deleted_lines": 1470,
+      "fix_like_touches": 35,
+      "recent_touches": 224,
+      "recent_churn": 10721,
+      "total_churn": 12353,
+      "is_current_source_path": true,
+      "group": "protocol-and-contracts"
+    },
+    {
+      "path": "server/src/game/ai_core/decision.rs",
+      "touches": 34,
+      "added_lines": 5969,
+      "deleted_lines": 5885,
+      "fix_like_touches": 8,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 11854,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/selfplay.rs",
+      "touches": 75,
+      "added_lines": 5925,
+      "deleted_lines": 5922,
+      "fix_like_touches": 14,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 11847,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/movement/tests.rs",
+      "touches": 32,
+      "added_lines": 5582,
+      "deleted_lines": 5582,
+      "fix_like_touches": 9,
+      "recent_touches": 2,
+      "recent_churn": 4943,
+      "total_churn": 11164,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/movement.rs",
+      "touches": 47,
+      "added_lines": 4356,
+      "deleted_lines": 4356,
+      "fix_like_touches": 6,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 8712,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/services/commands.rs",
+      "touches": 63,
+      "added_lines": 6994,
+      "deleted_lines": 1516,
+      "fix_like_touches": 4,
+      "recent_touches": 63,
+      "recent_churn": 8510,
+      "total_churn": 8510,
+      "is_current_source_path": true,
+      "group": "sim-command-service"
+    },
+    {
+      "path": "server/crates/sim/src/game/tests.rs",
+      "touches": 56,
+      "added_lines": 6344,
+      "deleted_lines": 881,
+      "fix_like_touches": 1,
+      "recent_touches": 56,
+      "recent_churn": 7225,
+      "total_churn": 7225,
+      "is_current_source_path": true,
+      "group": "sim-tests"
+    },
+    {
+      "path": "server/src/game/services/combat.rs",
+      "touches": 50,
+      "added_lines": 3068,
+      "deleted_lines": 3068,
+      "fix_like_touches": 4,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 6136,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/ai_core/decision/tests.rs",
+      "touches": 2,
+      "added_lines": 2905,
+      "deleted_lines": 2905,
+      "fix_like_touches": 0,
+      "recent_touches": 2,
+      "recent_churn": 5810,
+      "total_churn": 5810,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/ai_core/decision/tests.rs",
+      "touches": 9,
+      "added_lines": 2876,
+      "deleted_lines": 2933,
+      "fix_like_touches": 2,
+      "recent_touches": 2,
+      "recent_churn": 2949,
+      "total_churn": 5809,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/commands.rs",
+      "touches": 54,
+      "added_lines": 2875,
+      "deleted_lines": 2877,
+      "fix_like_touches": 8,
+      "recent_touches": 10,
+      "recent_churn": 3003,
+      "total_churn": 5752,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/services/movement/tests.rs",
+      "touches": 20,
+      "added_lines": 5356,
+      "deleted_lines": 118,
+      "fix_like_touches": 0,
+      "recent_touches": 20,
+      "recent_churn": 5474,
+      "total_churn": 5474,
+      "is_current_source_path": true,
+      "group": "sim-movement-service"
+    },
+    {
+      "path": "client/styles.css",
+      "touches": 100,
+      "added_lines": 4614,
+      "deleted_lines": 814,
+      "fix_like_touches": 6,
+      "recent_touches": 64,
+      "recent_churn": 3694,
+      "total_churn": 5428,
+      "is_current_source_path": true,
+      "group": "client-ui"
+    },
+    {
+      "path": "client/src/renderer.js",
+      "touches": 58,
+      "added_lines": 2638,
+      "deleted_lines": 2639,
+      "fix_like_touches": 1,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 5277,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/ai/src/ai_core/decision/tests.rs",
+      "touches": 24,
+      "added_lines": 4464,
+      "deleted_lines": 361,
+      "fix_like_touches": 0,
+      "recent_touches": 24,
+      "recent_churn": 4825,
+      "total_churn": 4825,
+      "is_current_source_path": true,
+      "group": "ai"
+    },
+    {
+      "path": "server/src/game/mod.rs",
+      "touches": 84,
+      "added_lines": 2395,
+      "deleted_lines": 2377,
+      "fix_like_touches": 12,
+      "recent_touches": 6,
+      "recent_churn": 456,
+      "total_churn": 4772,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/pathing.rs",
+      "touches": 33,
+      "added_lines": 2366,
+      "deleted_lines": 2368,
+      "fix_like_touches": 6,
+      "recent_touches": 1,
+      "recent_churn": 1627,
+      "total_churn": 4734,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/setup.rs",
+      "touches": 40,
+      "added_lines": 2701,
+      "deleted_lines": 1896,
+      "fix_like_touches": 1,
+      "recent_touches": 40,
+      "recent_churn": 4597,
+      "total_churn": 4597,
+      "is_current_source_path": true,
+      "group": "sim-core"
+    },
+    {
+      "path": "server/src/game/tests.rs",
+      "touches": 28,
+      "added_lines": 2309,
+      "deleted_lines": 2287,
+      "fix_like_touches": 2,
+      "recent_touches": 12,
+      "recent_churn": 2896,
+      "total_churn": 4596,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/ai.rs",
+      "touches": 56,
+      "added_lines": 2275,
+      "deleted_lines": 2276,
+      "fix_like_touches": 10,
+      "recent_touches": 1,
+      "recent_churn": 404,
+      "total_churn": 4551,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/move_coordinator.rs",
+      "touches": 47,
+      "added_lines": 2231,
+      "deleted_lines": 2231,
+      "fix_like_touches": 6,
+      "recent_touches": 3,
+      "recent_churn": 1777,
+      "total_churn": 4462,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/combat/tests.rs",
+      "touches": 16,
+      "added_lines": 2216,
+      "deleted_lines": 2216,
+      "fix_like_touches": 0,
+      "recent_touches": 3,
+      "recent_churn": 2342,
+      "total_churn": 4432,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/phaserunner/src/runner.rs",
+      "touches": 6,
+      "added_lines": 2204,
+      "deleted_lines": 2204,
+      "fix_like_touches": 0,
+      "recent_touches": 6,
+      "recent_churn": 4408,
+      "total_churn": 4408,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/services/combat/tests.rs",
+      "touches": 39,
+      "added_lines": 3938,
+      "deleted_lines": 225,
+      "fix_like_touches": 1,
+      "recent_touches": 39,
+      "recent_churn": 4163,
+      "total_churn": 4163,
+      "is_current_source_path": true,
+      "group": "sim-combat-service"
+    },
+    {
+      "path": "server/src/game/systems.rs",
+      "touches": 41,
+      "added_lines": 2077,
+      "deleted_lines": 2077,
+      "fix_like_touches": 5,
+      "recent_touches": 4,
+      "recent_churn": 376,
+      "total_churn": 4154,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/protocol/src/lib.rs",
+      "touches": 78,
+      "added_lines": 3811,
+      "deleted_lines": 338,
+      "fix_like_touches": 3,
+      "recent_touches": 78,
+      "recent_churn": 4149,
+      "total_churn": 4149,
+      "is_current_source_path": true,
+      "group": "protocol-and-contracts"
+    },
+    {
+      "path": "server/src/game/entity.rs",
+      "touches": 50,
+      "added_lines": 2007,
+      "deleted_lines": 1985,
+      "fix_like_touches": 6,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 3992,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/lobby.rs",
+      "touches": 38,
+      "added_lines": 1963,
+      "deleted_lines": 1963,
+      "fix_like_touches": 7,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 3926,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "client/src/hud.js",
+      "touches": 80,
+      "added_lines": 2406,
+      "deleted_lines": 1403,
+      "fix_like_touches": 9,
+      "recent_touches": 50,
+      "recent_churn": 2427,
+      "total_churn": 3809,
+      "is_current_source_path": true,
+      "group": "client-hud"
+    },
+    {
+      "path": "server/src/main.rs",
+      "touches": 108,
+      "added_lines": 2823,
+      "deleted_lines": 708,
+      "fix_like_touches": 9,
+      "recent_touches": 73,
+      "recent_churn": 2390,
+      "total_churn": 3531,
+      "is_current_source_path": true,
+      "group": "server-backend"
+    },
+    {
+      "path": "server/src/game/selfplay/tests.rs",
+      "touches": 12,
+      "added_lines": 1726,
+      "deleted_lines": 1728,
+      "fix_like_touches": 1,
+      "recent_touches": 6,
+      "recent_churn": 1876,
+      "total_churn": 3454,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/selfplay/tests.rs",
+      "touches": 2,
+      "added_lines": 1647,
+      "deleted_lines": 1647,
+      "fix_like_touches": 0,
+      "recent_touches": 2,
+      "recent_churn": 3294,
+      "total_churn": 3294,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "client/src/match.js",
+      "touches": 88,
+      "added_lines": 2231,
+      "deleted_lines": 963,
+      "fix_like_touches": 5,
+      "recent_touches": 73,
+      "recent_churn": 2426,
+      "total_churn": 3194,
+      "is_current_source_path": true,
+      "group": "client-match-shell"
+    },
+    {
+      "path": "server/src/protocol.rs",
+      "touches": 69,
+      "added_lines": 1566,
+      "deleted_lines": 1537,
+      "fix_like_touches": 3,
+      "recent_touches": 19,
+      "recent_churn": 1709,
+      "total_churn": 3103,
+      "is_current_source_path": true,
+      "group": "protocol-and-contracts"
+    },
+    {
+      "path": "server/crates/ai/src/selfplay/tests.rs",
+      "touches": 36,
+      "added_lines": 2420,
+      "deleted_lines": 535,
+      "fix_like_touches": 1,
+      "recent_touches": 36,
+      "recent_churn": 2955,
+      "total_churn": 2955,
+      "is_current_source_path": true,
+      "group": "ai"
+    },
+    {
+      "path": "client/map-editor.html",
+      "touches": 16,
+      "added_lines": 2043,
+      "deleted_lines": 902,
+      "fix_like_touches": 0,
+      "recent_touches": 10,
+      "recent_churn": 2036,
+      "total_churn": 2945,
+      "is_current_source_path": true,
+      "group": "client-ui"
+    },
+    {
+      "path": "server/src/game/services/geometry.rs",
+      "touches": 11,
+      "added_lines": 1363,
+      "deleted_lines": 1360,
+      "fix_like_touches": 0,
+      "recent_touches": 1,
+      "recent_churn": 1339,
+      "total_churn": 2723,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/setup.rs",
+      "touches": 23,
+      "added_lines": 1309,
+      "deleted_lines": 1307,
+      "fix_like_touches": 3,
+      "recent_touches": 5,
+      "recent_churn": 1281,
+      "total_churn": 2616,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/map.rs",
+      "touches": 28,
+      "added_lines": 1264,
+      "deleted_lines": 1222,
+      "fix_like_touches": 4,
+      "recent_touches": 1,
+      "recent_churn": 710,
+      "total_churn": 2486,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "client/src/input.js",
+      "touches": 29,
+      "added_lines": 1222,
+      "deleted_lines": 1202,
+      "fix_like_touches": 6,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 2424,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/ai_core/actions.rs",
+      "touches": 16,
+      "added_lines": 1211,
+      "deleted_lines": 1185,
+      "fix_like_touches": 2,
+      "recent_touches": 1,
+      "recent_churn": 1152,
+      "total_churn": 2396,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "scripts/docdrift-sweep.mjs",
+      "touches": 6,
+      "added_lines": 2281,
+      "deleted_lines": 114,
+      "fix_like_touches": 2,
+      "recent_touches": 6,
+      "recent_churn": 2395,
+      "total_churn": 2395,
+      "is_current_source_path": true,
+      "group": "scripts-tooling"
+    },
+    {
+      "path": "server/crates/sim/src/game/ai_core/actions.rs",
+      "touches": 2,
+      "added_lines": 1152,
+      "deleted_lines": 1152,
+      "fix_like_touches": 0,
+      "recent_touches": 2,
+      "recent_churn": 2304,
+      "total_churn": 2304,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "client/src/state.js",
+      "touches": 73,
+      "added_lines": 1680,
+      "deleted_lines": 562,
+      "fix_like_touches": 5,
+      "recent_touches": 44,
+      "recent_churn": 1423,
+      "total_churn": 2242,
+      "is_current_source_path": true,
+      "group": "client-match-shell"
+    },
+    {
+      "path": "server/src/game/invariants.rs",
+      "touches": 24,
+      "added_lines": 1117,
+      "deleted_lines": 1117,
+      "fix_like_touches": 3,
+      "recent_touches": 2,
+      "recent_churn": 941,
+      "total_churn": 2234,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/services/move_coordinator.rs",
+      "touches": 11,
+      "added_lines": 2129,
+      "deleted_lines": 53,
+      "fix_like_touches": 2,
+      "recent_touches": 11,
+      "recent_churn": 2182,
+      "total_churn": 2182,
+      "is_current_source_path": true,
+      "group": "sim-services"
+    },
+    {
+      "path": "scripts/client-perf-harness.mjs",
+      "touches": 11,
+      "added_lines": 2008,
+      "deleted_lines": 55,
+      "fix_like_touches": 0,
+      "recent_touches": 11,
+      "recent_churn": 2063,
+      "total_churn": 2063,
+      "is_current_source_path": true,
+      "group": "scripts-tooling"
+    },
+    {
+      "path": "client/src/main.js",
+      "touches": 28,
+      "added_lines": 1024,
+      "deleted_lines": 1014,
+      "fix_like_touches": 1,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 2038,
+      "is_current_source_path": true,
+      "group": "client-ui"
+    },
+    {
+      "path": "server/crates/sim/src/game/services/pathing.rs",
+      "touches": 7,
+      "added_lines": 2004,
+      "deleted_lines": 19,
+      "fix_like_touches": 1,
+      "recent_touches": 7,
+      "recent_churn": 2023,
+      "total_churn": 2023,
+      "is_current_source_path": true,
+      "group": "sim-services"
+    }
+  ],
+  "raw_path_stale_examples": [
+    {
+      "path": "server/src/game/ai_core/decision.rs",
+      "touches": 34,
+      "added_lines": 5969,
+      "deleted_lines": 5885,
+      "fix_like_touches": 8,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 11854,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/selfplay.rs",
+      "touches": 75,
+      "added_lines": 5925,
+      "deleted_lines": 5922,
+      "fix_like_touches": 14,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 11847,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/movement/tests.rs",
+      "touches": 32,
+      "added_lines": 5582,
+      "deleted_lines": 5582,
+      "fix_like_touches": 9,
+      "recent_touches": 2,
+      "recent_churn": 4943,
+      "total_churn": 11164,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/movement.rs",
+      "touches": 47,
+      "added_lines": 4356,
+      "deleted_lines": 4356,
+      "fix_like_touches": 6,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 8712,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/combat.rs",
+      "touches": 50,
+      "added_lines": 3068,
+      "deleted_lines": 3068,
+      "fix_like_touches": 4,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 6136,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/ai_core/decision/tests.rs",
+      "touches": 2,
+      "added_lines": 2905,
+      "deleted_lines": 2905,
+      "fix_like_touches": 0,
+      "recent_touches": 2,
+      "recent_churn": 5810,
+      "total_churn": 5810,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/ai_core/decision/tests.rs",
+      "touches": 9,
+      "added_lines": 2876,
+      "deleted_lines": 2933,
+      "fix_like_touches": 2,
+      "recent_touches": 2,
+      "recent_churn": 2949,
+      "total_churn": 5809,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/commands.rs",
+      "touches": 54,
+      "added_lines": 2875,
+      "deleted_lines": 2877,
+      "fix_like_touches": 8,
+      "recent_touches": 10,
+      "recent_churn": 3003,
+      "total_churn": 5752,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "client/src/renderer.js",
+      "touches": 58,
+      "added_lines": 2638,
+      "deleted_lines": 2639,
+      "fix_like_touches": 1,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 5277,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/mod.rs",
+      "touches": 84,
+      "added_lines": 2395,
+      "deleted_lines": 2377,
+      "fix_like_touches": 12,
+      "recent_touches": 6,
+      "recent_churn": 456,
+      "total_churn": 4772,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/pathing.rs",
+      "touches": 33,
+      "added_lines": 2366,
+      "deleted_lines": 2368,
+      "fix_like_touches": 6,
+      "recent_touches": 1,
+      "recent_churn": 1627,
+      "total_churn": 4734,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/tests.rs",
+      "touches": 28,
+      "added_lines": 2309,
+      "deleted_lines": 2287,
+      "fix_like_touches": 2,
+      "recent_touches": 12,
+      "recent_churn": 2896,
+      "total_churn": 4596,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/ai.rs",
+      "touches": 56,
+      "added_lines": 2275,
+      "deleted_lines": 2276,
+      "fix_like_touches": 10,
+      "recent_touches": 1,
+      "recent_churn": 404,
+      "total_churn": 4551,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/move_coordinator.rs",
+      "touches": 47,
+      "added_lines": 2231,
+      "deleted_lines": 2231,
+      "fix_like_touches": 6,
+      "recent_touches": 3,
+      "recent_churn": 1777,
+      "total_churn": 4462,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/combat/tests.rs",
+      "touches": 16,
+      "added_lines": 2216,
+      "deleted_lines": 2216,
+      "fix_like_touches": 0,
+      "recent_touches": 3,
+      "recent_churn": 2342,
+      "total_churn": 4432,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/phaserunner/src/runner.rs",
+      "touches": 6,
+      "added_lines": 2204,
+      "deleted_lines": 2204,
+      "fix_like_touches": 0,
+      "recent_touches": 6,
+      "recent_churn": 4408,
+      "total_churn": 4408,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/systems.rs",
+      "touches": 41,
+      "added_lines": 2077,
+      "deleted_lines": 2077,
+      "fix_like_touches": 5,
+      "recent_touches": 4,
+      "recent_churn": 376,
+      "total_churn": 4154,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/entity.rs",
+      "touches": 50,
+      "added_lines": 2007,
+      "deleted_lines": 1985,
+      "fix_like_touches": 6,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 3992,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/lobby.rs",
+      "touches": 38,
+      "added_lines": 1963,
+      "deleted_lines": 1963,
+      "fix_like_touches": 7,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 3926,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/selfplay/tests.rs",
+      "touches": 12,
+      "added_lines": 1726,
+      "deleted_lines": 1728,
+      "fix_like_touches": 1,
+      "recent_touches": 6,
+      "recent_churn": 1876,
+      "total_churn": 3454,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/crates/sim/src/game/selfplay/tests.rs",
+      "touches": 2,
+      "added_lines": 1647,
+      "deleted_lines": 1647,
+      "fix_like_touches": 0,
+      "recent_touches": 2,
+      "recent_churn": 3294,
+      "total_churn": 3294,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/services/geometry.rs",
+      "touches": 11,
+      "added_lines": 1363,
+      "deleted_lines": 1360,
+      "fix_like_touches": 0,
+      "recent_touches": 1,
+      "recent_churn": 1339,
+      "total_churn": 2723,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/setup.rs",
+      "touches": 23,
+      "added_lines": 1309,
+      "deleted_lines": 1307,
+      "fix_like_touches": 3,
+      "recent_touches": 5,
+      "recent_churn": 1281,
+      "total_churn": 2616,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "server/src/game/map.rs",
+      "touches": 28,
+      "added_lines": 1264,
+      "deleted_lines": 1222,
+      "fix_like_touches": 4,
+      "recent_touches": 1,
+      "recent_churn": 710,
+      "total_churn": 2486,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    },
+    {
+      "path": "client/src/input.js",
+      "touches": 29,
+      "added_lines": 1222,
+      "deleted_lines": 1202,
+      "fix_like_touches": 6,
+      "recent_touches": 0,
+      "recent_churn": 0,
+      "total_churn": 2424,
+      "is_current_source_path": false,
+      "group": "stale-or-removed-path"
+    }
+  ],
+  "repository_rename_events": [
+    {
+      "hash": "5b734a0e8222c749f6b89d32ee1c93a7c8faa1e9",
+      "date": "2026-06-13",
+      "subject": "Execute live-analysis phase-2",
+      "similarity": 94,
+      "from": "client/src/replay_analysis_overlay.js",
+      "to": "client/src/observer_analysis_overlay.js",
+      "current_target_exists": true
+    },
+    {
+      "hash": "c0cc6ee55a16e6e6e263971a5a71ac935fc0c67d",
+      "date": "2026-06-11",
+      "subject": "Move command composer out of input",
+      "similarity": 100,
+      "from": "client/src/input/command_composer.js",
+      "to": "client/src/command_composer.js",
+      "current_target_exists": true
+    },
+    {
+      "hash": "056f44caee8fe121c3d8a17bbaac5b641bee34cc",
+      "date": "2026-06-08",
+      "subject": "Move tool binaries behind split crates",
+      "similarity": 99,
+      "from": "server/src/ai_balance_matrix.rs",
+      "to": "server/crates/ai/src/tools/balance_matrix.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "056f44caee8fe121c3d8a17bbaac5b641bee34cc",
+      "date": "2026-06-08",
+      "subject": "Move tool binaries behind split crates",
+      "similarity": 99,
+      "from": "server/src/ai_matchup.rs",
+      "to": "server/crates/ai/src/tools/matchup.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "056f44caee8fe121c3d8a17bbaac5b641bee34cc",
+      "date": "2026-06-08",
+      "subject": "Move tool binaries behind split crates",
+      "similarity": 99,
+      "from": "server/src/ai_perf_harness.rs",
+      "to": "server/src/tools/ai_perf_harness.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 97,
+      "from": "server/crates/sim/src/game/ai_core/actions.rs",
+      "to": "server/crates/ai/src/ai_core/actions.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 99,
+      "from": "server/crates/sim/src/game/ai_core/decision/defense.rs",
+      "to": "server/crates/ai/src/ai_core/decision/defense.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 99,
+      "from": "server/crates/sim/src/game/ai_core/decision/expansion.rs",
+      "to": "server/crates/ai/src/ai_core/decision/expansion.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 100,
+      "from": "server/crates/sim/src/game/ai_core/decision/geometry.rs",
+      "to": "server/crates/ai/src/ai_core/decision/geometry.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 98,
+      "from": "server/crates/sim/src/game/ai_core/decision/mod.rs",
+      "to": "server/crates/ai/src/ai_core/decision/mod.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 100,
+      "from": "server/crates/sim/src/game/ai_core/decision/policies.rs",
+      "to": "server/crates/ai/src/ai_core/decision/policies.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 89,
+      "from": "server/crates/sim/src/game/ai_core/decision/production.rs",
+      "to": "server/crates/ai/src/ai_core/decision/production.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 99,
+      "from": "server/crates/sim/src/game/ai_core/decision/proxy.rs",
+      "to": "server/crates/ai/src/ai_core/decision/proxy.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 100,
+      "from": "server/crates/sim/src/game/ai_core/decision/raids.rs",
+      "to": "server/crates/ai/src/ai_core/decision/raids.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 99,
+      "from": "server/crates/sim/src/game/ai_core/decision/resources.rs",
+      "to": "server/crates/ai/src/ai_core/decision/resources.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 99,
+      "from": "server/crates/sim/src/game/ai_core/decision/tests.rs",
+      "to": "server/crates/ai/src/ai_core/decision/tests.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 81,
+      "from": "server/crates/sim/src/game/ai_core/facts.rs",
+      "to": "server/crates/ai/src/ai_core/facts.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 100,
+      "from": "server/crates/sim/src/game/ai_core/mod.rs",
+      "to": "server/crates/ai/src/ai_core/mod.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 59,
+      "from": "server/crates/sim/src/game/ai_core/observation.rs",
+      "to": "server/crates/ai/src/ai_core/observation.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 99,
+      "from": "server/crates/sim/src/game/ai_core/profiles.rs",
+      "to": "server/crates/ai/src/ai_core/profiles.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 94,
+      "from": "server/crates/sim/src/game/ai_shared.rs",
+      "to": "server/crates/ai/src/ai_shared.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 95,
+      "from": "server/crates/sim/src/game/selfplay/live.rs",
+      "to": "server/crates/ai/src/selfplay/live.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 99,
+      "from": "server/crates/sim/src/game/selfplay/milestones.rs",
+      "to": "server/crates/ai/src/selfplay/milestones.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 90,
+      "from": "server/crates/sim/src/game/selfplay/mod.rs",
+      "to": "server/crates/ai/src/selfplay/mod.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 90,
+      "from": "server/crates/sim/src/game/selfplay/pending_build.rs",
+      "to": "server/crates/ai/src/selfplay/pending_build.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 90,
+      "from": "server/crates/sim/src/game/selfplay/player_view.rs",
+      "to": "server/crates/ai/src/selfplay/player_view.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 98,
+      "from": "server/crates/sim/src/game/selfplay/replay.rs",
+      "to": "server/crates/ai/src/selfplay/replay.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 96,
+      "from": "server/crates/sim/src/game/selfplay/scripts.rs",
+      "to": "server/crates/ai/src/selfplay/scripts.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 98,
+      "from": "server/crates/sim/src/game/selfplay/tests.rs",
+      "to": "server/crates/ai/src/selfplay/tests.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "f8aa044af9ec7f9112f3b3f354170a85ecf4c00f",
+      "date": "2026-06-07",
+      "subject": "Split AI and self-play into rts-ai crate",
+      "similarity": 98,
+      "from": "server/crates/sim/src/game/selfplay/validation.rs",
+      "to": "server/crates/ai/src/selfplay/validation.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ability.rs",
+      "to": "server/crates/sim/src/game/ability.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai.rs",
+      "to": "server/crates/sim/src/game/ai.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/actions.rs",
+      "to": "server/crates/sim/src/game/ai_core/actions.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/defense.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/defense.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/expansion.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/expansion.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/geometry.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/geometry.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/mod.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/mod.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/policies.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/policies.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/production.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/production.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/proxy.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/proxy.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/raids.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/raids.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/resources.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/resources.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/decision/tests.rs",
+      "to": "server/crates/sim/src/game/ai_core/decision/tests.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/facts.rs",
+      "to": "server/crates/sim/src/game/ai_core/facts.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/mod.rs",
+      "to": "server/crates/sim/src/game/ai_core/mod.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/observation.rs",
+      "to": "server/crates/sim/src/game/ai_core/observation.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_core/profiles.rs",
+      "to": "server/crates/sim/src/game/ai_core/profiles.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/ai_shared.rs",
+      "to": "server/crates/sim/src/game/ai_shared.rs",
+      "current_target_exists": false
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/command.rs",
+      "to": "server/crates/sim/src/game/command.rs",
+      "current_target_exists": true
+    },
+    {
+      "hash": "b2697b51320c23c1183fb9ca1b98d2d0b868e1bb",
+      "date": "2026-06-07",
+      "subject": "Split simulation into rts-sim crate",
+      "similarity": 100,
+      "from": "server/src/game/commands.rs",
+      "to": "server/crates/sim/src/game/commands.rs",
+      "current_target_exists": true
+    }
+  ],
+  "generator_notes": {
+    "temporary_script": "Node.js one-shot using git ls-tree, git log --follow --find-renames=40% --numstat per current file, git log --since name-only for coupling, git blame -w -M -C -C for top hotspots, raw git log --no-renames --numstat, and git log --find-renames=40% --name-status for renames.",
+    "committed_script": false
+  }
+}
