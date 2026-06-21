@@ -13,6 +13,7 @@ import {
   LobbyBrowserView,
   LobbyCreateModal,
   lobbyJoinIntent,
+  suggestLobbyName,
 } from "./lobby_browser_view.js";
 import {
   DEFAULT_AI_PROFILE_ID,
@@ -322,7 +323,9 @@ export class Lobby {
 
   _openCreateLobby(trigger) {
     if (this._joined || this._browserActionPending || !this._browserConnected) return;
-    this.createModal?.open(trigger);
+    this.createModal?.open(trigger, {
+      initialValue: suggestLobbyName(this.elName?.value),
+    });
   }
 
   async _submitCreateLobby(room) {

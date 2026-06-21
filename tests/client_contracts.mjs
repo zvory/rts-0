@@ -45,6 +45,7 @@ import {
   lobbyActionLabel,
   lobbyStatusLabel,
   sortLobbySummaries,
+  suggestLobbyName,
   validateLobbyName,
 } from "../client/src/lobby_browser_view.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
@@ -4509,6 +4510,12 @@ function fakeAudioContext() {
   assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
   assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
   assert(!validateLobbyName("x".repeat(65)).ok, "lobby create mirrors the server byte-length cap");
+  assert(suggestLobbyName("Alex") === "Alex's lobby", "lobby create suggests a lobby from player name");
+  assert(suggestLobbyName("") === "Commander's lobby", "lobby create suggestion falls back when player name is blank");
+  assert(validateLobbyName(suggestLobbyName("x".repeat(120))).ok,
+    "lobby create suggestion stays within the public lobby name limit");
+  assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
+    "lobby create suggestion avoids reserved internal prefixes");
   const indexHtml = fs.readFileSync(new URL("../client/index.html", import.meta.url), "utf8");
   assert(indexHtml.includes('class="lobby-manual-room" hidden'),
     "manual room-name join controls stay outside the normal pre-join product path");
@@ -4666,12 +4673,13 @@ function fakeAudioContext() {
         return false;
       },
     });
-    modal.open(trigger);
+    modal.open(trigger, { initialValue: "Alex's lobby" });
     await new Promise((resolve) => setTimeout(resolve, 0));
     const input = findFakes(host, (el) => el.tagName === "INPUT")[0];
     const submit = findFakes(host, (el) => el.tagName === "BUTTON" && el.textContent === "Create lobby")[0];
     assert(document.activeElement === input, "create lobby modal moves focus to the name input");
-    assert(submit.disabled, "create lobby modal disables submit while the name is invalid");
+    assert(input.value === "Alex's lobby", "create lobby modal prepopulates the suggested lobby name");
+    assert(!submit.disabled, "create lobby modal enables submit when the suggested lobby name is valid");
     input.value = "taken";
     input.listeners.input?.({ target: input });
     assert(!submit.disabled, "create lobby modal enables submit for a valid name");

@@ -33,6 +33,8 @@ const RESERVED_LOBBY_PREFIXES = Object.freeze([
   "__replay_branch__",
   "__lab__:",
 ]);
+const DEFAULT_LOBBY_OWNER_NAME = "Commander";
+const SUGGESTED_LOBBY_SUFFIX = "'s lobby";
 
 export const LOBBY_BROWSER_POLL_MS = 1500;
 
@@ -106,6 +108,13 @@ export function validateLobbyName(rawName) {
     return { ok: false, room, error: "Lobby name is reserved." };
   }
   return { ok: true, room, error: "" };
+}
+
+export function suggestLobbyName(playerName) {
+  const ownerName = normalizeLobbyOwnerName(playerName) || DEFAULT_LOBBY_OWNER_NAME;
+  const suggested = fittedSuggestedLobbyName(ownerName);
+  if (validateLobbyName(suggested).ok) return suggested;
+  return fittedSuggestedLobbyName(`${DEFAULT_LOBBY_OWNER_NAME} ${ownerName}`);
 }
 
 export class LobbyBrowserView {
@@ -260,11 +269,11 @@ export class LobbyCreateModal {
     this._onKeydown = (ev) => this._handleKeydown(ev);
   }
 
-  open(trigger = null) {
+  open(trigger = null, { initialValue = "" } = {}) {
     this._build();
     if (!this.root || !this.input) return;
     this.returnFocus = isHTMLElement(trigger) ? trigger : activeHTMLElement();
-    this.input.value = "";
+    this.input.value = String(initialValue ?? "");
     this.dirty = false;
     this.pending = false;
     this.setError("");
@@ -468,6 +477,27 @@ function integerOr(value, fallback) {
 function boundedText(value, fallback) {
   const text = String(value ?? "").trim();
   return text || fallback;
+}
+
+function normalizeLobbyOwnerName(value) {
+  return String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fittedSuggestedLobbyName(ownerName) {
+  const suffixBytes = utf8ByteLength(SUGGESTED_LOBBY_SUFFIX);
+  const maxOwnerBytes = Math.max(0, PUBLIC_LOBBY_NAME_MAX_BYTES - suffixBytes);
+  let fittedOwner = "";
+  for (const char of ownerName) {
+    const next = `${fittedOwner}${char}`;
+    if (utf8ByteLength(next) > maxOwnerBytes) break;
+    fittedOwner = next;
+  }
+  const candidate = `${(fittedOwner.trim() || DEFAULT_LOBBY_OWNER_NAME)}${SUGGESTED_LOBBY_SUFFIX}`;
+  if (!RESERVED_LOBBY_PREFIXES.some((prefix) => candidate.startsWith(prefix))) return candidate;
+  return fittedSuggestedLobbyName(`Player ${ownerName}`);
 }
 
 function utf8ByteLength(value) {

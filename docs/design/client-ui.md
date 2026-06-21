@@ -788,6 +788,7 @@ export function lobbyStatusLabel(joinState)
 export function lobbyActionLabel(joinState)
 export function lobbyJoinIntent(row)
 export function validateLobbyName(rawName)
+export function suggestLobbyName(playerName)
 export class LobbyBrowserView {
   constructor(rootEl)
   render({ rows?, loading?, connected?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
@@ -795,7 +796,7 @@ export class LobbyBrowserView {
 }
 export class LobbyCreateModal {
   constructor(hostEl, { onSubmit? })
-  open(trigger?)
+  open(trigger?, { initialValue? }?)
   close({ restoreFocus? }?)
   setError(message)
   setPending(pending)
