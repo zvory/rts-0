@@ -1,6 +1,6 @@
 # Phase 3 - Extraction Candidate Ranking
 
-Status: planned.
+Status: done.
 
 ## Goal
 
