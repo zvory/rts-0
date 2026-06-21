@@ -1,4 +1,4 @@
-import { UNIT_KINDS } from "../../protocol.js";
+import { UNIT_KINDS, BUILDING_KINDS } from "../../protocol.js";
 
 export const RIG_SCHEMA_VERSION = 1;
 
@@ -70,7 +70,7 @@ export const ANIMATION_PROPERTIES = Object.freeze([
   "tintSlot",
 ]);
 
-const UNIT_KIND_SET = new Set(UNIT_KINDS);
+const UNIT_KIND_SET = new Set([...UNIT_KINDS, ...BUILDING_KINDS]);
 const TINT_SLOT_SET = new Set(TINT_SLOTS);
 const GEOMETRY_TYPE_SET = new Set(GEOMETRY_TYPES);
 const ANIMATION_INPUT_SET = new Set(ANIMATION_INPUTS);

@@ -241,7 +241,8 @@
     {
       "source": [
         "server/src/db.rs",
-        "server/src/lobby/*match*",
+        "server/src/main.rs",
+        "server/src/lobby/room_task.rs",
         "server/src/lobby/*replay*",
         "server/migrations/**",
         "client/src/match_history.js"

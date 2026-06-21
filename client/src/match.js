@@ -110,6 +110,8 @@ export class Match {
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
+    this.onLabToolChange = options.onLabToolChange || null;
+    this.labToolWorldClickHandler = null;
     this.replayViewer = !!options.replayViewer;
     this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
@@ -221,6 +223,10 @@ export class Match {
           this.inputRouter,
           this.hotkeyProfiles,
           this.clientIntent,
+          {
+            consumeWorldClick: (event) => this.consumeLabToolWorldClick(event),
+            cancel: (reason) => this.cancelLabTool(reason),
+          },
         ),
     );
 
@@ -584,10 +590,55 @@ export class Match {
   }
 
   applySpectatorUi() {
-    const spectator = !!this.state?.spectator || this.replayViewer;
-    if (dom.selectionArea) dom.selectionArea.hidden = spectator;
-    if (dom.commandCard) dom.commandCard.hidden = spectator;
+    const hidden = this.replayViewer ||
+      !((this.state?.controlPolicy || this.labControlPolicy)?.canUseCommandSurface?.(this.state) ?? !this.state?.spectator);
+    if (dom.selectionArea) dom.selectionArea.hidden = hidden;
+    if (dom.commandCard) dom.commandCard.hidden = hidden;
     if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
+  }
+
+  armLabTool(tool, callbacks = {}) {
+    if (!this.clientIntent || typeof this.clientIntent.beginLabTool !== "function") return null;
+    const onWorldClick = typeof callbacks === "function"
+      ? callbacks
+      : callbacks?.onWorldClick;
+    this.labToolWorldClickHandler = typeof onWorldClick === "function" ? onWorldClick : null;
+    const active = this.clientIntent.beginLabTool(tool);
+    this.publishLabToolChange({ type: "armed", tool: active });
+    return active;
+  }
+
+  cancelLabTool(reason = "cancelled") {
+    this.labToolWorldClickHandler = null;
+    const cancelled = this.clientIntent?.cancelLabTool?.(reason) || null;
+    if (cancelled) this.publishLabToolChange({ type: "cancelled", reason, tool: cancelled });
+    return cancelled;
+  }
+
+  consumeLabToolWorldClick(event) {
+    const active = this.clientIntent?.activeLabTool || null;
+    if (!active || event?.tool?.id !== active.id) return;
+    const handler = this.labToolWorldClickHandler;
+    try {
+      const result = handler?.({ ...event, tool: active });
+      if (result && typeof result.catch === "function") {
+        result.catch((err) => this.handleLabToolActionError(err));
+      }
+    } catch (err) {
+      this.handleLabToolActionError(err);
+    } finally {
+      this.cancelLabTool("worldClick");
+    }
+  }
+
+  handleLabToolActionError(err) {
+    console.error("Lab tool world-click handler failed", err);
+    this.toast?.("Lab tool action failed.");
+  }
+
+  publishLabToolChange(change) {
+    if (typeof this.onLabToolChange !== "function") return;
+    this.onLabToolChange(change);
   }
 
   handleMenuKeyDown(ev) {
@@ -1107,6 +1158,7 @@ export class Match {
     this.replayControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
     this.livePauseOverlay?.destroy();
+    this.cancelLabTool("freeze");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     if (typeof window !== "undefined" && window.__rtsPerf === this.frameProfilerSurface) {
@@ -1150,6 +1202,7 @@ export class Match {
     this.replayControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
     this.livePauseOverlay?.destroy();
+    this.cancelLabTool("destroy");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;

@@ -114,6 +114,11 @@ pub(crate) fn death_system(
                     .build_site()
                     .map(|site| !entities.contains(site))
                     .unwrap_or(false),
+                Order::Deconstruct(_) => e
+                    .order()
+                    .deconstruct_target()
+                    .map(|target| !entities.contains(target))
+                    .unwrap_or(false),
                 _ => false,
             }
         };

@@ -1,6 +1,6 @@
 //! Pure combat rules: classification predicates and damage formula.
 
-use crate::defs::{self, ArmorClass, TargetPriority, WeaponClass};
+use crate::defs::{self, ArmorClass, WeaponClass};
 use crate::terrain::{self, TerrainKind};
 use crate::EntityKind;
 
@@ -9,13 +9,6 @@ const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
 const FRONT_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.0;
 const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.25;
 const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.75;
-pub const TANK_TARGET_PRIORITY_ORDER: [EntityKind; 4] = [
-    EntityKind::AntiTankGun,
-    EntityKind::Tank,
-    EntityKind::TankTrap,
-    EntityKind::MortarTeam,
-];
-
 /// Attack profile for a combat-capable unit or building.
 pub struct AttackProfile {
     pub range_tiles: u32,
@@ -28,6 +21,22 @@ pub enum ArmorFacing {
     Front,
     Side,
     Rear,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetThreatRole {
+    Ordinary,
+    AntiArmorThreat,
+    FieldObstacle,
+    SupportWeapon,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WeaponTargetFit {
+    PreferredThreat,
+    PreferredArmor,
+    PreferredSoft,
+    Fallback,
 }
 
 /// Returns the attack profile for the given kind, or zeroes if non-combatant.
@@ -55,22 +64,70 @@ pub fn attack_profile(kind: EntityKind) -> AttackProfile {
 
 /// Armored targets take 75% damage reduction from non-AP weapons.
 pub fn is_armored(kind: EntityKind) -> bool {
-    let armor_class = defs::unit_def(kind)
-        .map(|d| d.armor_class)
-        .or_else(|| defs::building_def(kind).map(|d| d.armor_class));
-    matches!(armor_class, Some(ArmorClass::Armored | ArmorClass::Hard))
+    matches!(
+        armor_class(kind),
+        Some(ArmorClass::Armored | ArmorClass::Hard)
+    )
 }
 
 /// AP weapons deal full damage to armored targets.
 pub fn is_ap(kind: EntityKind) -> bool {
-    weapon(kind) == WeaponClass::AntiTank
+    weapon_class(kind) == WeaponClass::AntiTank
 }
 
-/// Anti-Tank Guns prefer armored targets over all others.
-pub fn prefers_armored_targets(kind: EntityKind) -> bool {
+/// Rules-owned armor classification for target ranking and damage policy.
+pub fn armor_class(kind: EntityKind) -> Option<ArmorClass> {
     defs::unit_def(kind)
-        .map(|d| d.target_priority == TargetPriority::PrefersArmored)
-        .unwrap_or(false)
+        .map(|d| d.armor_class)
+        .or_else(|| defs::building_def(kind).map(|d| d.armor_class))
+}
+
+/// Rules-owned weapon classification for target ranking and threat policy.
+pub fn weapon_class(kind: EntityKind) -> WeaponClass {
+    defs::unit_def(kind)
+        .map(|d| d.weapon)
+        .or_else(|| defs::building_def(kind).map(|d| d.weapon))
+        .unwrap_or(WeaponClass::None)
+}
+
+/// Rules-owned threat role used by sim-local target ranking.
+pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
+    if weapon_class(kind) == WeaponClass::AntiTank {
+        TargetThreatRole::AntiArmorThreat
+    } else if kind == EntityKind::TankTrap {
+        TargetThreatRole::FieldObstacle
+    } else if matches!(kind, EntityKind::MortarTeam | EntityKind::Artillery) {
+        TargetThreatRole::SupportWeapon
+    } else {
+        TargetThreatRole::Ordinary
+    }
+}
+
+/// Pure default-weapon fit vocabulary for target ranking.
+pub fn default_weapon_target_fit(
+    attacker_weapon: WeaponClass,
+    target_armor: Option<ArmorClass>,
+    target_role: TargetThreatRole,
+) -> WeaponTargetFit {
+    match attacker_weapon {
+        WeaponClass::SmallArms => {
+            if target_armor == Some(ArmorClass::Small) {
+                WeaponTargetFit::PreferredSoft
+            } else {
+                WeaponTargetFit::Fallback
+            }
+        }
+        WeaponClass::AntiTank => {
+            if target_role == TargetThreatRole::AntiArmorThreat {
+                WeaponTargetFit::PreferredThreat
+            } else if matches!(target_armor, Some(ArmorClass::Armored | ArmorClass::Hard)) {
+                WeaponTargetFit::PreferredArmor
+            } else {
+                WeaponTargetFit::Fallback
+            }
+        }
+        WeaponClass::None => WeaponTargetFit::Fallback,
+    }
 }
 
 /// Miss probability [0.0, 1.0) for an attack. anti-tank guns have a high miss rate against
@@ -98,9 +155,7 @@ pub fn effective_damage(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    let armor_class = defs::unit_def(victim_kind)
-        .map(|d| d.armor_class)
-        .or_else(|| defs::building_def(victim_kind).map(|d| d.armor_class));
+    let armor_class = armor_class(victim_kind);
     let armor_adjusted = match (is_ap(attacker_kind), armor_class) {
         (false, Some(ArmorClass::Armored)) => base_dmg / 4,
         (false, Some(ArmorClass::Hard)) => ((base_dmg as f32) * 0.75).round() as u32,
@@ -161,13 +216,6 @@ pub fn effective_damage_with_facing(
     let facing = classify_armor_facing(victim_facing, victim_pos, attacker_pos);
     let multiplier = facing_damage_multiplier(attacker_kind, victim_kind, facing);
     ((damage as f32) * multiplier).round().max(0.0) as u32
-}
-
-fn weapon(kind: EntityKind) -> WeaponClass {
-    defs::unit_def(kind)
-        .map(|d| d.weapon)
-        .or_else(|| defs::building_def(kind).map(|d| d.weapon))
-        .unwrap_or(WeaponClass::None)
 }
 
 fn normalized_angle_delta(from: f32, to: f32) -> f32 {
@@ -258,48 +306,151 @@ mod tests {
     }
 
     #[test]
-    fn combat_classification_matches_phase_1_table() {
+    fn combat_classification_matches_default_weapon_policy_table() {
         let expected = [
-            (EntityKind::Worker, false, false, false),
-            (EntityKind::Rifleman, false, false, false),
-            (EntityKind::MachineGunner, false, false, false),
-            (EntityKind::AntiTankGun, false, true, true),
-            (EntityKind::MortarTeam, false, false, false),
-            (EntityKind::ScoutCar, false, false, false),
-            (EntityKind::Tank, true, true, false),
-            (EntityKind::CityCentre, true, false, false),
-            (EntityKind::Depot, true, false, false),
-            (EntityKind::Barracks, true, false, false),
-            (EntityKind::TrainingCentre, true, false, false),
-            (EntityKind::Factory, true, false, false),
-            (EntityKind::Steelworks, true, false, false),
-            (EntityKind::TankTrap, true, false, false),
-            (EntityKind::Steel, false, false, false),
-            (EntityKind::Oil, false, false, false),
+            (EntityKind::Worker, false, false, TargetThreatRole::Ordinary),
+            (
+                EntityKind::Rifleman,
+                false,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::MachineGunner,
+                false,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::AntiTankGun,
+                false,
+                true,
+                TargetThreatRole::AntiArmorThreat,
+            ),
+            (
+                EntityKind::MortarTeam,
+                false,
+                false,
+                TargetThreatRole::SupportWeapon,
+            ),
+            (
+                EntityKind::ScoutCar,
+                false,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::Tank,
+                true,
+                true,
+                TargetThreatRole::AntiArmorThreat,
+            ),
+            (
+                EntityKind::CityCentre,
+                true,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (EntityKind::Depot, true, false, TargetThreatRole::Ordinary),
+            (
+                EntityKind::Barracks,
+                true,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::TrainingCentre,
+                true,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (EntityKind::Factory, true, false, TargetThreatRole::Ordinary),
+            (
+                EntityKind::Steelworks,
+                true,
+                false,
+                TargetThreatRole::Ordinary,
+            ),
+            (
+                EntityKind::TankTrap,
+                true,
+                false,
+                TargetThreatRole::FieldObstacle,
+            ),
+            (EntityKind::Steel, false, false, TargetThreatRole::Ordinary),
+            (EntityKind::Oil, false, false, TargetThreatRole::Ordinary),
         ];
 
-        for (kind, armored, ap, prefers_armored) in expected {
+        for (kind, armored, ap, threat_role) in expected {
             assert_eq!(is_armored(kind), armored, "{kind} armor classification");
             assert_eq!(is_ap(kind), ap, "{kind} AP classification");
             assert_eq!(
-                prefers_armored_targets(kind),
-                prefers_armored,
-                "{kind} target priority"
+                target_threat_role(kind),
+                threat_role,
+                "{kind} target threat role"
             );
         }
     }
 
     #[test]
+    fn default_weapon_fit_prefers_soft_or_anti_armor_targets() {
+        assert_eq!(
+            default_weapon_target_fit(
+                WeaponClass::SmallArms,
+                Some(ArmorClass::Small),
+                TargetThreatRole::Ordinary,
+            ),
+            WeaponTargetFit::PreferredSoft
+        );
+        assert_eq!(
+            default_weapon_target_fit(
+                WeaponClass::SmallArms,
+                Some(ArmorClass::Armored),
+                TargetThreatRole::Ordinary,
+            ),
+            WeaponTargetFit::Fallback
+        );
+        assert_eq!(
+            default_weapon_target_fit(
+                WeaponClass::AntiTank,
+                Some(ArmorClass::Small),
+                TargetThreatRole::AntiArmorThreat,
+            ),
+            WeaponTargetFit::PreferredThreat
+        );
+        assert_eq!(
+            default_weapon_target_fit(
+                WeaponClass::AntiTank,
+                Some(ArmorClass::Armored),
+                TargetThreatRole::Ordinary,
+            ),
+            WeaponTargetFit::PreferredArmor
+        );
+    }
+
+    #[test]
     fn anti_tank_gun_miss_chance_applies_only_to_infantry_sized_targets() {
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Worker), 0.65);
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman), 0.65);
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Worker),
+            0.65
+        );
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman),
+            0.65
+        );
         assert_eq!(
             miss_chance(EntityKind::AntiTankGun, EntityKind::MachineGunner),
             0.65
         );
 
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar), 0.0);
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun), 0.0);
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar),
+            0.0
+        );
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun),
+            0.0
+        );
         assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Tank), 0.0);
     }
 

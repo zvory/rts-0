@@ -19,6 +19,8 @@ const classifierPromptVersion = "docdrift-classifier-v1";
 const docPatchPromptVersion = "docdrift-doc-patch-v1";
 const validClassifierDecisions = new Set(["move_on", "update_docs"]);
 const validDocPatchPrefixes = ["docs/design/", "docs/context/"];
+const maxDocSectionsPerTarget = 3;
+const maxDocSectionChars = 3000;
 
 function usage() {
   console.log(`Usage:
@@ -443,6 +445,9 @@ function collectCommit(repoRoot, traceMap, sha) {
   if (parents.length > 1) {
     status = "skipped";
     skipReason = "merge_commit";
+  } else if (paths.length === 0) {
+    status = "skipped";
+    skipReason = "empty_commit";
   } else if (isDocsOnlyChurn(paths)) {
     status = "skipped";
     skipReason = "docs_only_churn";
@@ -630,7 +635,7 @@ function fixtureDecisionForCommit(fixture, commit) {
 }
 
 function codexInvocationArgs(options, outputPath) {
-  const args = ["exec", "--sandbox", "read-only", "--ask-for-approval", "never", "--ephemeral"];
+  const args = ["exec", "--sandbox", "read-only", "-c", 'approval_policy="never"', "--ephemeral", "--json"];
   if (options.codexModel) {
     args.push("--model", options.codexModel);
   }
@@ -638,12 +643,88 @@ function codexInvocationArgs(options, outputPath) {
   return args;
 }
 
+function numericValue(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function normalizeUsageObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const inputTokens = numericValue(value.input_tokens ?? value.inputTokens ?? value.prompt_tokens ?? value.promptTokens);
+  const cachedInputTokens = numericValue(value.cached_input_tokens ?? value.cachedInputTokens);
+  const outputTokens = numericValue(value.output_tokens ?? value.outputTokens ?? value.completion_tokens ?? value.completionTokens);
+  const reasoningTokens = numericValue(value.reasoning_tokens ?? value.reasoningTokens);
+  const totalTokens = numericValue(
+    value.total_tokens ??
+      value.totalTokens ??
+      (inputTokens !== null || outputTokens !== null || reasoningTokens !== null
+        ? (inputTokens ?? 0) + (outputTokens ?? 0) + (reasoningTokens ?? 0)
+        : null),
+  );
+  if (inputTokens === null && cachedInputTokens === null && outputTokens === null && reasoningTokens === null && totalTokens === null) {
+    return null;
+  }
+  return {
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningTokens,
+    totalTokens,
+  };
+}
+
+function findUsageObject(value) {
+  const direct = normalizeUsageObject(value);
+  if (direct) {
+    return direct;
+  }
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const usage = findUsageObject(item);
+      if (usage) {
+        return usage;
+      }
+    }
+    return null;
+  }
+  for (const key of ["usage", "token_usage", "tokenUsage"]) {
+    const usage = findUsageObject(value[key]);
+    if (usage) {
+      return usage;
+    }
+  }
+  return null;
+}
+
+function codexUsageFromStdout(stdout) {
+  let latest = null;
+  for (const line of String(stdout ?? "").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) {
+      continue;
+    }
+    try {
+      const usage = findUsageObject(JSON.parse(trimmed));
+      if (usage) {
+        latest = usage;
+      }
+    } catch {
+      // Ignore non-event output; --output-last-message remains the source of the model answer.
+    }
+  }
+  return latest;
+}
+
 function classifyWithCodex(options, prompt) {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "rts-docdrift-codex-"));
   const outputPath = path.join(tempDir, "last-message.txt");
   const args = codexInvocationArgs(options, outputPath);
   try {
-    execFileSync(options.codexCommand, args, {
+    const stdout = execFileSync(options.codexCommand, args, {
       cwd: options.repoRoot,
       encoding: "utf8",
       input: prompt,
@@ -660,6 +741,7 @@ function classifyWithCodex(options, prompt) {
         args,
         mode: "codex_cli",
         promptVersion: classifierPromptVersion,
+        usage: codexUsageFromStdout(stdout),
       },
     };
   } catch (error) {
@@ -746,9 +828,12 @@ export function classifyReport(report, options) {
 
   const loadedFixture = options.noCodex ? loadClassifierFixture(options.repoRoot, options.fixture) : null;
   const decisions = [];
-  for (const entry of promptEntries) {
+  for (const [index, entry] of promptEntries.entries()) {
     const relativeCachePath = repoRelative(options.repoRoot, entry.cachePath);
     if (entry.cached?.cache?.promptHash === entry.promptHash) {
+      if (!options.noCodex) {
+        console.error(`docdrift: classify ${index + 1}/${promptEntries.length} ${entry.commit.shortSha} cache=hit`);
+      }
       decisions.push({
         ...entry.cached,
         cache: {
@@ -772,6 +857,9 @@ export function classifyReport(report, options) {
         promptVersion: classifierPromptVersion,
       };
     } else {
+      console.error(
+        `docdrift: classify ${index + 1}/${promptEntries.length} ${entry.commit.shortSha} cache=miss prompt_estimate=${entry.promptTokens}`,
+      );
       const codexResult = classifyWithCodex(options, entry.prompt);
       rawDecision = parseJsonObject(codexResult.rawText, `Codex output for ${entry.commit.shortSha}`);
       invocation = codexResult.invocation;
@@ -820,21 +908,35 @@ export function classifyReport(report, options) {
 }
 
 function designDocTargetsForDecision(decision, commit) {
-  const docs = new Set();
-  for (const doc of decision.likelyDocs ?? []) {
-    if (doc.startsWith("docs/design/")) {
-      docs.add(doc);
-    }
+  const designDocs = (docs) => [...new Set((docs ?? []).filter((doc) => doc.startsWith("docs/design/")))].sort();
+  const likelyDesignDocs = designDocs(decision.likelyDocs);
+  if (likelyDesignDocs.length > 0) {
+    return likelyDesignDocs;
   }
-  for (const doc of commit.traceDocs ?? []) {
-    if (doc.startsWith("docs/design/")) {
-      docs.add(doc);
-    }
+  const touchedDesignDocs = designDocs(commit.docsTouched?.design);
+  if (touchedDesignDocs.length > 0) {
+    return touchedDesignDocs;
   }
-  for (const doc of commit.docsTouched?.design ?? []) {
-    docs.add(doc);
+  const traceDesignDocs = designDocs(commit.traceDocs);
+  return traceDesignDocs;
+}
+
+function designDocTargetSource(decision, commit) {
+  if ((decision.likelyDocs ?? []).some((doc) => doc.startsWith("docs/design/"))) {
+    return "classifier_likely_docs";
   }
-  return [...docs].sort();
+  if ((commit.docsTouched?.design ?? []).length > 0) {
+    return "docs_touched";
+  }
+  return "trace_map";
+}
+
+function allCachedPatchReplacementsPresent(repoRoot, rawPatch, commit) {
+  const patchResult = sanitizeDocPatchResult(rawPatch, commit);
+  return patchResult.patches.every((patch) => {
+    const absPath = path.resolve(repoRoot, patch.path);
+    return existsSync(absPath) && readFileSync(absPath, "utf8").includes(patch.replace);
+  });
 }
 
 function commitKeywords(commit, decision) {
@@ -918,16 +1020,17 @@ function selectDocSections(repoRoot, docPath, keywords) {
       return { section, score, index };
     })
     .sort((a, b) => b.score - a.score || a.index - b.index);
-  const selected = scored
-    .filter((entry, index) => entry.score > 0 || index < 2)
-    .slice(0, 4)
+  const matched = scored.filter((entry) => entry.score > 0);
+  const selectedSource = matched.length > 0 ? matched : scored.slice(0, 1);
+  const selected = selectedSource
+    .slice(0, maxDocSectionsPerTarget)
     .sort((a, b) => a.index - b.index)
     .map((entry) => ({
       heading: entry.section.heading,
       level: entry.section.level,
       startLine: entry.section.startLine,
       endLine: entry.section.endLine,
-      text: entry.section.text.slice(0, 5000),
+      text: entry.section.text.slice(0, maxDocSectionChars),
     }));
   return {
     path: docPath,
@@ -946,6 +1049,7 @@ function docPatchPromptInput({ commit, decision, docTargets, docSections, priorC
       "Use only the supplied commit metadata, classifier evidence, trace-map routing, and doc sections.",
       "Patch docs/design/*.md first. Patch docs/context/*.md only if section structure or entry points change.",
       "Do not add speculative strategy claims. Describe concrete behavior only.",
+      "If the supplied docs already cover the requested behavior, return an empty patches array instead of restating it.",
       "Do not use OpenAI Agents SDK, direct OpenAI API clients, API keys, or API-billed fallback routes.",
       "Return exact find/replace edits that can be applied idempotently.",
     ],
@@ -1093,7 +1197,7 @@ function generateDocPatchWithCodex(options, prompt) {
   const outputPath = path.join(tempDir, "last-message.txt");
   const args = codexInvocationArgs(options, outputPath);
   try {
-    execFileSync(options.codexCommand, args, {
+    const stdout = execFileSync(options.codexCommand, args, {
       cwd: options.repoRoot,
       encoding: "utf8",
       input: prompt,
@@ -1110,6 +1214,7 @@ function generateDocPatchWithCodex(options, prompt) {
         args,
         mode: "codex_cli",
         promptVersion: docPatchPromptVersion,
+        usage: codexUsageFromStdout(stdout),
       },
     };
   } catch (error) {
@@ -1120,7 +1225,21 @@ function generateDocPatchWithCodex(options, prompt) {
   }
 }
 
-function buildDocPatchRecord({ commit, decision, docTargets, docSections, patchResult, promptHash, promptTokens, cachePath, cacheHit, invocation, applications }) {
+function buildDocPatchRecord({
+  commit,
+  decision,
+  docTargets,
+  docTargetSource,
+  docSections,
+  patchResult,
+  promptHash,
+  promptTokens,
+  cachePath,
+  cacheHit,
+  cacheReason,
+  invocation,
+  applications,
+}) {
   return {
     promptVersion: docPatchPromptVersion,
     commitSha: commit.sha,
@@ -1131,6 +1250,7 @@ function buildDocPatchRecord({ commit, decision, docTargets, docSections, patchR
       evidenceNote: decision.evidenceNote,
     },
     docTargets,
+    docTargetSource,
     docSections: docSections.map((doc) => ({
       path: doc.path,
       missing: doc.missing,
@@ -1150,6 +1270,7 @@ function buildDocPatchRecord({ commit, decision, docTargets, docSections, patchR
     applications,
     cache: {
       hit: cacheHit,
+      reason: cacheReason,
       path: cachePath,
       promptHash,
     },
@@ -1177,56 +1298,79 @@ function enforceDocPatchBudgets(entries, options) {
   }
 }
 
+function buildDocPatchEntry({ options, decision, commit }) {
+  const docTargets = designDocTargetsForDecision(decision, commit);
+  const docTargetSource = designDocTargetSource(decision, commit);
+  const keywords = commitKeywords(commit, decision);
+  const docSections = docTargets.map((docPath) => selectDocSections(options.repoRoot, docPath, keywords));
+  const cachePath = docPatchCachePath(options.repoRoot, options.docPatchCacheDir, commit.sha);
+  const cached = readCachedClassifierRecord(cachePath);
+  const cacheInput = docPatchPromptInput({ commit, decision, docTargets, docSections, priorCachedPatch: null });
+  const promptHash = sha256(JSON.stringify(stableJson(cacheInput)));
+  const promptHashHit = cached?.cache?.promptHash === promptHash;
+  const cachedPatchAlreadyApplied = cached?.rawPatch
+    ? allCachedPatchReplacementsPresent(options.repoRoot, cached.rawPatch, commit)
+    : false;
+  const priorCachedPatch = cached
+    ? {
+        summary: cached.summary,
+        patches: cached.patches,
+        promptHash: cached.cache?.promptHash,
+      }
+    : null;
+  const cacheHit = promptHashHit || cachedPatchAlreadyApplied;
+  const promptInput = cacheHit
+    ? cacheInput
+    : docPatchPromptInput({ commit, decision, docTargets, docSections, priorCachedPatch });
+  const prompt = renderDocPatchPrompt(promptInput);
+  return {
+    commit,
+    decision,
+    docTargets,
+    docTargetSource,
+    docSections,
+    cachePath,
+    cached,
+    cacheHit,
+    cacheReason: promptHashHit ? "prompt_hash" : cachedPatchAlreadyApplied ? "already_applied_patch" : null,
+    prompt,
+    promptHash,
+    promptTokens: estimatePromptTokens(prompt),
+  };
+}
+
 export function generateDocsReport(classifierReport, options) {
   const updateDecisions = classifierReport.classifier.decisions.filter((decision) => decision.decision === "update_docs");
   const commitBySha = new Map(classifierReport.commits.map((commit) => [commit.sha, commit]));
   const cacheRoot = path.resolve(options.repoRoot, options.docPatchCacheDir);
-  const entries = updateDecisions.map((decision) => {
+
+  const loadedFixture = options.noCodex ? loadDocPatchFixture(options.repoRoot, options.fixture) : null;
+  const patchRecords = [];
+  let estimatedPromptTokens = 0;
+  for (const [index, decision] of updateDecisions.entries()) {
     const commit = commitBySha.get(decision.commitSha);
     if (!commit) {
       throw new Error(`classifier decision references missing commit: ${decision.commitSha}`);
     }
-    const docTargets = designDocTargetsForDecision(decision, commit);
-    const keywords = commitKeywords(commit, decision);
-    const docSections = docTargets.map((docPath) => selectDocSections(options.repoRoot, docPath, keywords));
-    const cachePath = docPatchCachePath(options.repoRoot, options.docPatchCacheDir, commit.sha);
-    const cached = readCachedClassifierRecord(cachePath);
-    const cacheInput = docPatchPromptInput({ commit, decision, docTargets, docSections, priorCachedPatch: null });
-    const promptHash = sha256(JSON.stringify(stableJson(cacheInput)));
-    const priorCachedPatch = cached
-      ? {
-          summary: cached.summary,
-          patches: cached.patches,
-          promptHash: cached.cache?.promptHash,
-        }
-      : null;
-    const cacheHit = cached?.cache?.promptHash === promptHash;
-    const promptInput = cacheHit
-      ? cacheInput
-      : docPatchPromptInput({ commit, decision, docTargets, docSections, priorCachedPatch });
-    const prompt = renderDocPatchPrompt(promptInput);
-    return {
-      commit,
-      decision,
-      docTargets,
-      docSections,
-      cachePath,
-      cached,
-      cacheHit,
-      prompt,
-      promptHash,
-      promptTokens: estimatePromptTokens(prompt),
-    };
-  });
-  enforceDocPatchBudgets(entries, options);
-
-  const loadedFixture = options.noCodex ? loadDocPatchFixture(options.repoRoot, options.fixture) : null;
-  const patchRecords = [];
-  for (const entry of entries) {
+    const entry = buildDocPatchEntry({ options, decision, commit });
+    if (!entry.cacheHit) {
+      enforceDocPatchBudgets([entry], options);
+      if (estimatedPromptTokens + entry.promptTokens > options.maxTotalDocPromptTokens) {
+        throw new Error(
+          `doc patch budget exceeded: prompt estimate ${estimatedPromptTokens + entry.promptTokens} tokens exceeds --max-total-doc-prompt-tokens ${options.maxTotalDocPromptTokens}`,
+        );
+      }
+      estimatedPromptTokens += entry.promptTokens;
+    }
     const relativeCachePath = repoRelative(options.repoRoot, entry.cachePath);
     let patchResult;
     let invocation;
     if (entry.cacheHit && entry.cached?.rawPatch) {
+      if (!options.noCodex) {
+        console.error(
+          `docdrift: generate-docs ${index + 1}/${updateDecisions.length} ${entry.commit.shortSha} cache=hit reason=${entry.cacheReason}`,
+        );
+      }
       patchResult = sanitizeDocPatchResult(entry.cached.rawPatch, entry.commit);
       invocation = {
         ...entry.cached.codex,
@@ -1242,6 +1386,9 @@ export function generateDocsReport(classifierReport, options) {
         promptVersion: docPatchPromptVersion,
       };
     } else {
+      console.error(
+        `docdrift: generate-docs ${index + 1}/${updateDecisions.length} ${entry.commit.shortSha} cache=miss prompt_estimate=${entry.promptTokens} targets=${entry.docTargets.join(",") || "none"}`,
+      );
       const codexResult = generateDocPatchWithCodex(options, entry.prompt);
       patchResult = sanitizeDocPatchResult(parseJsonObject(codexResult.rawText, `Codex doc patch output for ${entry.commit.shortSha}`), entry.commit);
       invocation = codexResult.invocation;
@@ -1251,12 +1398,14 @@ export function generateDocsReport(classifierReport, options) {
       commit: entry.commit,
       decision: entry.decision,
       docTargets: entry.docTargets,
+      docTargetSource: entry.docTargetSource,
       docSections: entry.docSections,
       patchResult,
       promptHash: entry.promptHash,
       promptTokens: entry.promptTokens,
       cachePath: relativeCachePath,
       cacheHit: entry.cacheHit,
+      cacheReason: entry.cacheReason,
       invocation,
       applications,
     });
@@ -1287,7 +1436,7 @@ export function generateDocsReport(classifierReport, options) {
       budget: {
         maxDocPromptTokens: options.maxDocPromptTokens,
         maxTotalDocPromptTokens: options.maxTotalDocPromptTokens,
-        estimatedPromptTokens: entries.filter((entry) => !entry.cacheHit).reduce((sum, entry) => sum + entry.promptTokens, 0),
+        estimatedPromptTokens,
       },
       records: patchRecords,
       summary: {
@@ -1321,6 +1470,7 @@ export function buildReport(options) {
   const shas = revListOutput.split("\n").map((line) => line.trim()).filter(Boolean);
   const commits = shas.map((sha) => collectCommit(repoRoot, traceMap, sha));
   const skippedMerge = commits.filter((commit) => commit.skipReason === "merge_commit").length;
+  const skippedEmpty = commits.filter((commit) => commit.skipReason === "empty_commit").length;
   const skippedDocsOnly = commits.filter((commit) => commit.skipReason === "docs_only_churn").length;
   const considered = commits.filter((commit) => commit.status === "considered").length;
 
@@ -1338,6 +1488,7 @@ export function buildReport(options) {
       totalCommits: commits.length,
       consideredCommits: considered,
       skippedMergeCommits: skippedMerge,
+      skippedEmptyCommits: skippedEmpty,
       skippedDocsOnlyCommits: skippedDocsOnly,
       noCommits: commits.length === 0,
     },
@@ -1716,6 +1867,29 @@ function markdownList(items, emptyText) {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
+function formatUsage(usage) {
+  if (!usage) {
+    return "unavailable";
+  }
+  const parts = [];
+  if (usage.inputTokens !== null) {
+    parts.push(`input=${usage.inputTokens}`);
+  }
+  if (usage.cachedInputTokens !== null) {
+    parts.push(`cached_input=${usage.cachedInputTokens}`);
+  }
+  if (usage.outputTokens !== null) {
+    parts.push(`output=${usage.outputTokens}`);
+  }
+  if (usage.reasoningTokens !== null) {
+    parts.push(`reasoning=${usage.reasoningTokens}`);
+  }
+  if (usage.totalTokens !== null) {
+    parts.push(`total=${usage.totalTokens}`);
+  }
+  return parts.length > 0 ? parts.join(", ") : "unavailable";
+}
+
 export function renderMarkdown(report) {
   if (report.mode === "full") {
     return renderFullMarkdown(report);
@@ -1739,6 +1913,7 @@ export function renderMarkdown(report) {
     `- Total commits: ${report.summary.totalCommits}`,
     `- Considered commits: ${report.summary.consideredCommits}`,
     `- Skipped merge commits: ${report.summary.skippedMergeCommits}`,
+    `- Skipped empty commits: ${report.summary.skippedEmptyCommits}`,
     `- Skipped docs-only churn commits: ${report.summary.skippedDocsOnlyCommits}`,
     "",
   ];
@@ -1820,8 +1995,9 @@ function renderClassifierMarkdown(report) {
       `- Decision: ${decision.decision}`,
       `- Likely docs: ${decision.likelyDocs.length > 0 ? decision.likelyDocs.join(", ") : "none"}`,
       `- Evidence: ${decision.evidenceNote}`,
-      `- Cache: ${decision.cache.hit ? "hit" : "miss"} (${decision.cache.path})`,
+      `- Cache: ${decision.cache.hit ? "hit" : "miss"}${decision.cache.reason ? ` (${decision.cache.reason})` : ""} (${decision.cache.path})`,
       `- Invocation mode: ${decision.codex.mode}`,
+      `- Codex usage: ${formatUsage(decision.codex.usage)}`,
       "",
     );
   }
@@ -1877,8 +2053,10 @@ function renderGenerateDocsMarkdown(report) {
       `- Summary: ${record.summary}`,
       `- Evidence: ${record.decision.evidenceNote}`,
       `- Target docs: ${record.docTargets.length > 0 ? record.docTargets.join(", ") : "none"}`,
-      `- Cache: ${record.cache.hit ? "hit" : "miss"} (${record.cache.path})`,
+      `- Target source: ${record.docTargetSource}`,
+      `- Cache: ${record.cache.hit ? "hit" : "miss"}${record.cache.reason ? ` (${record.cache.reason})` : ""} (${record.cache.path})`,
       `- Invocation mode: ${record.codex.mode}`,
+      `- Codex usage: ${formatUsage(record.codex.usage)}`,
       "",
     );
     if (record.applications.length === 0) {
@@ -1911,6 +2089,7 @@ function renderFullMarkdown(report) {
     `- Total commits: ${report.summary.totalCommits}`,
     `- Considered commits: ${report.summary.consideredCommits}`,
     `- Skipped merge commits: ${report.summary.skippedMergeCommits}`,
+    `- Skipped empty commits: ${report.summary.skippedEmptyCommits}`,
     `- Skipped docs-only churn commits: ${report.summary.skippedDocsOnlyCommits}`,
     `- Update-docs decisions: ${report.docPatch?.summary?.updateDocsDecisions ?? "not run"}`,
     `- Applied patches: ${report.docPatch?.summary?.applied ?? "not run"}`,

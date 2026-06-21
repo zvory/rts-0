@@ -16,6 +16,10 @@ import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js"
 
 export function _onRightClick(p, ev = {}) {
   const intent = clientIntent(this);
+  if (intent?.activeLabTool) {
+    cancelActiveLabTool(this, "rightClick");
+    return;
+  }
   // During placement, right-click cancels.
   if (intent?.placement) {
     this._cancelPlacementDrag?.();
@@ -64,6 +68,11 @@ export function _onRightClick(p, ev = {}) {
       this._addCommandFeedback("move", target.x, target.y, queued);
       return;
     }
+  }
+  if (target && workers.length > 0 && _isCompletedTankTrap(target)) {
+    this._issueCommand(cmd.deconstruct(workers, target.id, queued));
+    this._addCommandFeedback("move", target.x, target.y, queued);
+    return;
   }
   if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
     // Enemy entity -> attack.
@@ -186,6 +195,13 @@ function _isOwnIncompleteBuilding(target) {
     isBuilding(target.kind) &&
     typeof target.buildProgress === "number" &&
     target.buildProgress < 1
+  );
+}
+
+function _isCompletedTankTrap(target) {
+  return (
+    target.kind === KIND.TANK_TRAP &&
+    !(typeof target.buildProgress === "number" && target.buildProgress < 1)
   );
 }
 
@@ -428,6 +444,10 @@ export function _cancel() {
   if (typeof intent?.closeCommandCardMenu === "function" && intent.closeCommandCardMenu()) {
     return;
   }
+  if (intent?.activeLabTool) {
+    cancelActiveLabTool(this, "escape");
+    return;
+  }
   if (intent?.placement) {
     this._cancelPlacementDrag?.();
     intent.endPlacement?.();
@@ -442,4 +462,11 @@ export function _cancel() {
 
 function clientIntent(input) {
   return input?.clientIntent || null;
+}
+
+function cancelActiveLabTool(input, reason) {
+  const intent = clientIntent(input);
+  if (!intent?.activeLabTool) return null;
+  const cancelled = input?.labToolController?.cancel?.(reason);
+  return cancelled || intent.cancelLabTool?.(reason) || null;
 }

@@ -131,7 +131,7 @@ import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { LabClient, labVision, labVisionLabel } from "../client/src/lab_client.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "../client/src/lab_control_policy.js";
-import { LabPanel } from "../client/src/lab_panel.js";
+import { LabPanel, labSpawnFactionOptions, labSpawnUnitKindsForFaction } from "../client/src/lab_panel.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
@@ -234,18 +234,24 @@ function commandCardCtx({
   commandCardMode = null,
   commandTarget = null,
   spectator = false,
+  commandSurfaceEnabled = undefined,
   factionId = DEFAULT_FACTION_ID,
+  state = null,
+  controlPolicy = null,
 } = {}) {
   return {
     spectator,
+    ...(typeof commandSurfaceEnabled === "boolean" ? { commandSurfaceEnabled } : {}),
     playerId,
     factionId,
     selection,
+    state,
     resources,
     optimisticProduction,
     upgrades,
     commandCardMode,
     commandTarget,
+    controlPolicy,
     groupCooldownClocks,
     playerHasCompleteKind: (kind) => playerHasCompletedKind(entities, playerId, kind),
   };
@@ -270,6 +276,10 @@ function buttonByLabel(card, label) {
 function withFakeDocument(fn) {
   const priorDocument = globalThis.document;
   const created = [];
+  const restore = () => {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  };
   globalThis.document = {
     createElement(tagName) {
       const el = {
@@ -318,10 +328,13 @@ function withFakeDocument(fn) {
     },
   };
   try {
-    return fn(created);
-  } finally {
-    if (priorDocument === undefined) delete globalThis.document;
-    else globalThis.document = priorDocument;
+    const result = fn(created);
+    if (result && typeof result.finally === "function") return result.finally(restore);
+    restore();
+    return result;
+  } catch (err) {
+    restore();
+    throw err;
   }
 }
 
@@ -1138,6 +1151,56 @@ function hotkeyService() {
   const spectatorCard = buildCommandCardDescriptors(commandCardCtx({ spectator: true }));
   assert(spectatorCard.kind === "spectator", "spectator command card should be hidden");
   assert(spectatorCard.slots.length === 0, "spectator command card should emit no slots");
+
+  const labWorker = { id: 14, owner: 2, kind: KIND.WORKER };
+  const labState = {
+    selectedEntities() {
+      return [labWorker];
+    },
+  };
+  const labPolicy = createLabControlPolicy({ metadata: { role: "operator" } });
+  const labOperatorCard = buildCommandCardDescriptors(commandCardCtx({
+    spectator: true,
+    commandSurfaceEnabled: labPolicy.canUseCommandSurface(labState),
+    playerId: 99,
+    selection: [labWorker],
+    entities: [labWorker],
+    state: labState,
+    controlPolicy: labPolicy,
+  }));
+  assert(buttonByAction(labOperatorCard, "move"), "lab operator spectator-shaped starts expose unit command buttons");
+  assert(
+    buttonByAction(labOperatorCard, "stop").intent.unitIds.join(",") === String(labWorker.id),
+    "lab operator command descriptors target the controllable selected owner",
+  );
+  const labViewerPolicy = createLabControlPolicy({ metadata: { role: "viewer" } });
+  const labViewerCard = buildCommandCardDescriptors(commandCardCtx({
+    spectator: true,
+    commandSurfaceEnabled: labViewerPolicy.canUseCommandSurface(labState),
+    selection: [labWorker],
+    state: labState,
+    controlPolicy: labViewerPolicy,
+  }));
+  assert(labViewerCard.kind === "spectator", "read-only lab viewers keep the command card hidden");
+  const mixedLabSelection = [
+    { id: 15, owner: 1, kind: KIND.RIFLEMAN },
+    { id: 16, owner: 2, kind: KIND.RIFLEMAN },
+  ];
+  const mixedLabState = {
+    selectedEntities() {
+      return mixedLabSelection;
+    },
+  };
+  const mixedLabCard = buildCommandCardDescriptors(commandCardCtx({
+    spectator: true,
+    commandSurfaceEnabled: labPolicy.canUseCommandSurface(mixedLabState),
+    playerId: 99,
+    selection: mixedLabSelection,
+    entities: mixedLabSelection,
+    state: mixedLabState,
+    controlPolicy: labPolicy,
+  }));
+  assert(commandButtons(mixedLabCard).length === 0, "mixed-owner lab selections stay non-commandable");
 
   const worker = { id: 10, owner: 1, kind: KIND.WORKER };
   const cityCentre = { id: 11, owner: 1, kind: KIND.CITY_CENTRE };
@@ -2326,6 +2389,18 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     inRange: true,
   });
   assert(intent.resourceMiningPreview?.resourceId === 200, "ClientIntent owns resource hover previews");
+  const armedLabTool = intent.beginLabTool({ kind: "fieldPoint", payload: { xField: "spawn-x", yField: "spawn-y" } });
+  assert(armedLabTool.id && armedLabTool.kind === "fieldPoint", "ClientIntent arms lab tools with stable ids");
+  assert(intent.commandTarget === null && intent.placement === null, "ClientIntent lab tools clear placement and command targeting");
+  assert(intent.resourceMiningPreview === null, "ClientIntent lab tools clear hover previews");
+  intent.beginPlacement(KIND.DEPOT);
+  assert(intent.activeLabTool === null, "ClientIntent placement cancels active lab tools");
+  intent.beginLabTool({ kind: "fieldPoint" });
+  intent.beginCommandTarget("move");
+  assert(intent.activeLabTool === null, "ClientIntent command targeting cancels active lab tools");
+  intent.beginLabTool({ kind: "fieldPoint" });
+  assert(intent.cancelLabTool("escape")?.reason === "escape", "ClientIntent reports lab tool cancellation reason");
+  assert(intent.activeLabTool === null, "ClientIntent clears lab tool cancellation state");
 
   const state = new GameState({
     playerId: 1,
@@ -2336,6 +2411,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(!("clientIntent" in state), "GameState no longer owns browser-local intent state");
   assert(!("placement" in state), "GameState no longer exposes placement intent shims");
   assert(!("commandTarget" in state), "GameState no longer exposes command-target intent shims");
+  assert(!("activeLabTool" in state), "GameState no longer exposes lab-tool intent shims");
 
   const explicitHudIntent = new ClientIntent();
   const facadeHud = Object.create(HUD.prototype);
@@ -2372,6 +2448,24 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   facadeInput._cancel();
   assert(explicitInputIntent.placement === null, "Input cancellation clears placement through injected ClientIntent");
   assert(facadeSelectionCleared === 0, "Input placement cancellation does not fall through to selection clear");
+
+  const labIntent = new ClientIntent();
+  labIntent.beginLabTool({ kind: "fieldPoint" });
+  const labCancelInput = Object.create(Input.prototype);
+  let labSelectionCleared = 0;
+  let labCancelReason = null;
+  labCancelInput.state = { clearSelection() { labSelectionCleared += 1; } };
+  labCancelInput.clientIntent = labIntent;
+  labCancelInput.labToolController = {
+    cancel(reason) {
+      labCancelReason = reason;
+      return labIntent.cancelLabTool(reason);
+    },
+  };
+  labCancelInput._cancel();
+  assert(labIntent.activeLabTool === null, "Input cancellation clears active lab tools through ClientIntent");
+  assert(labCancelReason === "escape", "Input cancellation reports active lab-tool cancellation through the controller");
+  assert(labSelectionCleared === 0, "Input lab tool cancellation does not fall through to selection clear");
 }
 
 {
@@ -2964,6 +3058,52 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     liveMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "live player match restores the selected-unit HUD area");
     assert(!commandCard.hidden, "live player match restores the command card");
+
+    selectionArea.hidden = true;
+    commandCard.hidden = true;
+    const labOperatorMatch = Object.create(Match.prototype);
+    labOperatorMatch.replayViewer = false;
+    labOperatorMatch.state = {
+      spectator: true,
+      controlPolicy: createLabControlPolicy({ metadata: { role: "operator" } }),
+    };
+    labOperatorMatch.applySpectatorUi();
+    assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
+    assert(!commandCard.hidden, "lab operator keeps the command card visible");
+
+    selectionArea.hidden = false;
+    commandCard.hidden = false;
+    const labViewerMatch = Object.create(Match.prototype);
+    labViewerMatch.replayViewer = false;
+    labViewerMatch.state = {
+      spectator: true,
+      controlPolicy: createLabControlPolicy({ metadata: { role: "viewer" } }),
+    };
+    labViewerMatch.applySpectatorUi();
+    assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
+    assert(commandCard.hidden, "read-only lab viewer hides the command card");
+
+    const labToolMatch = Object.create(Match.prototype);
+    labToolMatch.clientIntent = new ClientIntent();
+    const labToolChanges = [];
+    labToolMatch.publishLabToolChange = (change) => labToolChanges.push(change);
+    let labToolWorldClick = null;
+    const active = labToolMatch.armLabTool(
+      { kind: "fieldPoint", payload: { xField: "spawn-x" } },
+      { onWorldClick: (event) => { labToolWorldClick = event; } },
+    );
+    assert(labToolChanges.at(-1)?.type === "armed", "Match lab tool controller publishes armed state");
+    labToolMatch.consumeLabToolWorldClick({
+      tool: active,
+      x: 44.5,
+      y: 88.25,
+      world: { x: 44.5, y: 88.25 },
+      screen: { x: 10, y: 20 },
+    });
+    assert(labToolWorldClick?.tool.id === active.id, "Match lab tool controller routes world clicks with the active tool");
+    assert(labToolWorldClick.x === 44.5 && labToolWorldClick.y === 88.25, "Match lab tool controller preserves exact world coordinates");
+    assert(labToolMatch.clientIntent.activeLabTool === null, "Match lab tool controller clears consumed tools");
+    assert(labToolChanges.at(-1)?.reason === "worldClick", "Match lab tool controller publishes world-click cancellation");
   }
   {
     const priorWindowForReplayInput = globalThis.window;
@@ -3873,6 +4013,7 @@ function fakeAudioContext() {
     fg: [1, 2, 3, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
+      [EVENT_CODE[EVENT.OVERPENETRATION], 22],
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
       [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.CITY_CENTRE]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
@@ -3970,30 +4111,34 @@ function fakeAudioContext() {
     "compact snapshot decodes server visibility grid",
   );
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
-  assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");
-  assert(decoded.events[3].msg === "Not enough steel", "notice event decodes");
-  assert(decoded.events[3].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
-  assert(decoded.events[4].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
-  assert(decoded.events[4].x === 512 && decoded.events[4].y === 768, "notice position decodes");
   assert(
-    decoded.events[5].e === EVENT.MORTAR_LAUNCH &&
-      decoded.events[5].from === 9 &&
-      decoded.events[5].fromX === 256 &&
-      decoded.events[5].toY === 352 &&
-      decoded.events[5].delayTicks === 68,
+    decoded.events[1].e === EVENT.OVERPENETRATION && decoded.events[1].to === 22,
+    "overpenetration event decodes",
+  );
+  assert(decoded.events[2].kind === KIND.STEEL, "death event kind decodes");
+  assert(decoded.events[4].msg === "Not enough steel", "notice event decodes");
+  assert(decoded.events[4].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
+  assert(decoded.events[5].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
+  assert(decoded.events[5].x === 512 && decoded.events[5].y === 768, "notice position decodes");
+  assert(
+    decoded.events[6].e === EVENT.MORTAR_LAUNCH &&
+      decoded.events[6].from === 9 &&
+      decoded.events[6].fromX === 256 &&
+      decoded.events[6].toY === 352 &&
+      decoded.events[6].delayTicks === 68,
     "mortar launch event decodes",
   );
   assert(
-    decoded.events[6].e === EVENT.ARTILLERY_TARGET &&
-      decoded.events[6].from === 10 &&
-      decoded.events[6].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
-      decoded.events[6].radiusTiles === 3,
+    decoded.events[7].e === EVENT.ARTILLERY_TARGET &&
+      decoded.events[7].from === 10 &&
+      decoded.events[7].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
+      decoded.events[7].radiusTiles === 3,
     "artillery target event decodes",
   );
   assert(
-    decoded.events[7].e === EVENT.ARTILLERY_IMPACT &&
-      decoded.events[7].x === 336 &&
-      decoded.events[7].y === 368,
+    decoded.events[8].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[8].x === 336 &&
+      decoded.events[8].y === 368,
     "artillery impact event decodes",
   );
 
@@ -4025,6 +4170,14 @@ function fakeAudioContext() {
       buildCommand.tileY === 14 &&
       buildCommand.queued === true,
     "build command builder emits selected-worker wire shape",
+  );
+  const deconstructCommand = cmd.deconstruct([7, 8], 55, true);
+  assert(
+    deconstructCommand.c === "deconstruct" &&
+      deconstructCommand.units.join(",") === "7,8" &&
+      deconstructCommand.target === 55 &&
+      deconstructCommand.queued === true,
+    "deconstruct command builder emits selected-worker target wire shape",
   );
   assert(
     JSON.stringify(msg.command(cmd.stop([7]), 3)) ===
@@ -4536,6 +4689,7 @@ function fakeAudioContext() {
   };
   assert(policy.canControlOwner(2, state), "lab control policy controls a single selected owner");
   assert(!policy.canControlOwner(1, state), "lab control policy rejects non-selected owners");
+  assert(policy.canUseCommandSurface(state), "lab operator can use the command surface");
   const issued = await policy.issueCommand(cmd.move([11], 20, 30), { state });
   assert(issued.sent && requests[0].playerId === 2, "lab control policy routes gameplay commands through issue-as");
   const mixedState = {
@@ -4544,10 +4698,36 @@ function fakeAudioContext() {
     },
   };
   assert(!policy.canIssueGameplayCommand(cmd.stop([11, 12]), mixedState).ok, "lab policy rejects mixed-owner gameplay commands");
+  assert(
+    !createLabControlPolicy({ metadata: { role: "viewer" } }).canUseCommandSurface(state),
+    "read-only lab viewers cannot use the command surface",
+  );
+  assert(!createDefaultControlPolicy().canUseCommandSurface({ spectator: true }), "default spectators cannot use the command surface");
   assert(!createDefaultControlPolicy().canIssueAs(1), "default control policy does not issue-as");
 }
 
-withFakeDocument(() => {
+{
+  assertDeepEqual(
+    labSpawnFactionOptions().map((entry) => entry.id),
+    ["kriegsia", "ekat"],
+    "LabPanel spawn palette exposes product-playable faction catalogs",
+  );
+  assert(
+    labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.RIFLEMAN),
+    "LabPanel spawn palette includes Kriegsia catalog units",
+  );
+  assert(
+    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.CITY_CENTRE),
+    "LabPanel spawn palette excludes buildings from primary unit options",
+  );
+  assertDeepEqual(
+    labSpawnUnitKindsForFaction("ekat"),
+    [KIND.EKAT],
+    "LabPanel spawn palette filters Ekat to Ekat units",
+  );
+}
+
+await withFakeDocument(async () => {
   const sent = [];
   const net = new Net("ws://example.test/ws");
   net.ws = {
@@ -4559,6 +4739,40 @@ withFakeDocument(() => {
   };
   const root = document.createElement("div");
   const labClient = new LabClient(net);
+  let armedTool = null;
+  let armedCallbacks = null;
+  let cancelledToolReason = null;
+  let selectedEntities = [];
+  let panel = null;
+  const match = {
+    clientIntent: new ClientIntent(),
+    camera: { x: 320, y: 352 },
+    state: {
+      map: { width: 64, height: 64 },
+      playerResources: [{ steel: 500, oil: 200 }],
+      selectedEntities() {
+        return selectedEntities;
+      },
+    },
+    armLabTool(tool, callbacks) {
+      armedTool = this.clientIntent.beginLabTool({ id: "lab-tool-test", ...tool });
+      armedCallbacks = {
+        onWorldClick: (event) => {
+          const result = callbacks.onWorldClick(event);
+          this.cancelLabTool("worldClick");
+          return result;
+        },
+      };
+      panel?.applyLabToolChange({ type: "armed", tool: armedTool });
+      return armedTool;
+    },
+    cancelLabTool(reason) {
+      cancelledToolReason = reason;
+      const cancelled = this.clientIntent.cancelLabTool(reason);
+      if (cancelled) panel?.applyLabToolChange({ type: "cancelled", reason, tool: cancelled });
+      return cancelled;
+    },
+  };
   labClient.setInitialState({
     room: "__lab__:sandbox:map=Default",
     operatorId: 1,
@@ -4567,7 +4781,7 @@ withFakeDocument(() => {
     dirty: false,
     operationCount: 0,
   });
-  const panel = new LabPanel({
+  panel = new LabPanel({
     root,
     labClient,
     launch: { publicRoom: "sandbox", map: "Default" },
@@ -4575,20 +4789,145 @@ withFakeDocument(() => {
       map: { name: "Default" },
       players: [{ id: 1, teamId: 1 }, { id: 2, teamId: 2 }],
     },
+    match,
   });
+  const buttonByText = (label) => findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === label)[0];
+  const resolveLastLabResult = (options = {}) => {
+    const envelope = sent.at(-1);
+    net._emit("labResult", {
+      t: "labResult",
+      requestId: envelope.requestId,
+      ok: options.ok !== false,
+      op: envelope.op.op,
+      error: options.error || "",
+      outcome: options.outcome || null,
+    });
+  };
+
   assert(root.children.length === 1, "LabPanel mounts inside the app-owned root");
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
+  assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
   const teamButton = root.children[0].children
     .flatMap((child) => child.children || [])
     .find((child) => child.textContent === "Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
-  panel.fields.get("spawn-kind").value = KIND.RIFLEMAN;
   panel.fields.get("spawn-owner").value = "2";
-  panel.fields.get("spawn-x").value = "128";
-  panel.fields.get("spawn-y").value = "160";
-  void panel.spawnEntity();
-  assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.owner === 2, "LabPanel spawn control sends setup mutation");
+  panel.fields.get("spawn-completed").checked = false;
+  panel.armSpawnPaletteTool(KIND.RIFLEMAN);
+  assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
+  assert(textWithin(root).includes("Armed: Spawn Rifleman"), "LabPanel shows the armed spawn tool state");
+  assert(!buttonByText("Cancel tool").disabled, "LabPanel enables tool cancellation while a setup tool is armed");
+  assert(
+    armedTool.payload.owner === 2 &&
+      armedTool.payload.kind === KIND.RIFLEMAN &&
+      armedTool.payload.factionId === DEFAULT_FACTION_ID &&
+      armedTool.payload.completed === false,
+    "LabPanel unit palette captures owner, faction, kind, and completion in tool payload",
+  );
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128.5, y: 160.25 });
+  assert(
+    sent.at(-1).op.op === "spawnEntity" &&
+      sent.at(-1).op.owner === 2 &&
+      sent.at(-1).op.kind === KIND.RIFLEMAN &&
+      sent.at(-1).op.x === 128.5 &&
+      sent.at(-1).op.y === 160.25 &&
+      sent.at(-1).op.completed === false,
+    "LabPanel spawn tool sends clicked world coordinates through LabClient",
+  );
+  net._emit("labResult", {
+    t: "labResult",
+    requestId: sent.at(-1).requestId,
+    ok: false,
+    op: "spawnEntity",
+    error: "occupied placement",
+  });
+  assert(textWithin(root).includes("occupied placement"), "LabPanel surfaces rejected spawn results through the status path");
+  panel.armSpawnPaletteTool(KIND.RIFLEMAN);
+  match.cancelLabTool("escape");
+  assert(textWithin(root).includes("Spawn Rifleman cancelled."), "LabPanel surfaces keyboard cancellation through the status path");
+  panel.fields.get("spawn-faction").value = "ekat";
+  panel.fields.get("spawn-faction").listeners.change();
+  assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
+  panel.fields.get("advanced-spawn-kind").value = KIND.CITY_CENTRE;
+  panel.fields.get("advanced-spawn-owner").value = "1";
+  panel.fields.get("advanced-spawn-completed").checked = true;
+  panel.armAdvancedSpawnTool();
+  assert(
+    armedTool?.kind === "spawnEntity" &&
+      armedTool.payload.kind === KIND.CITY_CENTRE &&
+      armedTool.payload.owner === 1 &&
+      armedTool.payload.completed === true,
+    "LabPanel advanced spawn preserves building spawn on the click-to-world tool path",
+  );
+  assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
+  assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
+  assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");
+  selectedEntities = [
+    { id: 31, owner: 1, kind: KIND.RIFLEMAN },
+    { id: 32, owner: 2, kind: KIND.RIFLEMAN },
+  ];
+  panel.render();
+  assert(!buttonByText("Move to point").disabled, "LabPanel enables selected move for selected entities");
+  buttonByText("Move to point").listeners.click();
+  assert(
+    armedTool?.kind === "moveSelected" && armedTool.payload.entityIds.join(",") === "31,32",
+    "LabPanel move-selected tool captures the selected entity ids in the tool payload",
+  );
+  assert(textWithin(root).includes("Armed: Move 2 selected"), "LabPanel shows the armed selected-move tool state");
+  match.cancelLabTool("rightClick");
+  assert(textWithin(root).includes("Move 2 selected cancelled."), "LabPanel surfaces pointer cancellation through the status path");
+  buttonByText("Move to point").listeners.click();
+  const movePromise = armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 129.4, y: 160.6 });
+  assert(
+    sent.at(-1).op.op === "moveEntity" &&
+      sent.at(-1).op.entityId === 31 &&
+      sent.at(-1).op.x === 129.4 &&
+      sent.at(-1).op.y === 160.6,
+    "LabPanel selected move sends the clicked world coordinates for the first selected entity",
+  );
+  resolveLastLabResult({ outcome: { entityId: 31, x: 129.4, y: 160.6 } });
+  await Promise.resolve();
+  assert(
+    sent.at(-1).op.op === "moveEntity" &&
+      sent.at(-1).op.entityId === 32 &&
+      sent.at(-1).op.x === 129.4 &&
+      sent.at(-1).op.y === 160.6,
+    "LabPanel selected move reuses the clicked world coordinates for each selected entity",
+  );
+  resolveLastLabResult({ ok: false, error: "entity 32 not found" });
+  await movePromise;
+  assert(
+    textWithin(root).includes("Moved 1 entity; 1 rejected: #32: entity 32 not found."),
+    "LabPanel summarizes partial selected-move rejections",
+  );
+  panel.fields.get("set-owner").value = "1";
+  const setOwnerPromise = buttonByText("Set owner").listeners.click();
+  assert(
+    sent.at(-1).op.op === "setEntityOwner" &&
+      sent.at(-1).op.entityId === 31 &&
+      sent.at(-1).op.owner === 1,
+    "LabPanel selected owner change sends the requested owner for the first selected entity",
+  );
+  resolveLastLabResult({ outcome: { entityId: 31, owner: 1 } });
+  await Promise.resolve();
+  assert(
+    sent.at(-1).op.op === "setEntityOwner" &&
+      sent.at(-1).op.entityId === 32 &&
+      sent.at(-1).op.owner === 1,
+    "LabPanel selected owner change sends all selected entity ids",
+  );
+  resolveLastLabResult({ outcome: { entityId: 32, owner: 1 } });
+  await setOwnerPromise;
+  assert(textWithin(root).includes("Updated owner for 2 entities."), "LabPanel summarizes accepted owner changes");
+  const deletePromise = buttonByText("Delete").listeners.click();
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 31, "LabPanel selected delete sends the first selected entity id");
+  resolveLastLabResult({ outcome: { entityId: 31 } });
+  await Promise.resolve();
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 32, "LabPanel selected delete sends all selected entity ids");
+  resolveLastLabResult({ outcome: { entityId: 32 } });
+  await deletePromise;
+  assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes accepted deletes");
   panel.fields.get("resource-player").value = "1";
   panel.fields.get("resource-steel").value = "900";
   panel.fields.get("resource-oil").value = "300";
@@ -4607,6 +4946,7 @@ withFakeDocument(() => {
   assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted scenario JSON");
   panel.destroy();
   labClient.destroy();
+  assert(cancelledToolReason === "panelDestroy", "LabPanel cancels an active lab tool on teardown");
   assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");
 });
 
@@ -4945,9 +5285,11 @@ withFakeDocument(() => {
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_TELEPORT] === 12, "Ekat Teleport compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_LINE_SHOT] === 13, "Ekat Line Shot compact order stage code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_MAGIC_ANCHOR] === 14, "Ekat Magic Anchor compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.DECONSTRUCT] === 15, "Deconstruct compact order stage code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.OVERPENETRATION] === 10, "Overpenetration compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
   assert(
@@ -5879,6 +6221,19 @@ withFakeDocument(() => {
   assert(artilleryRevealState.liveMuzzleFlashes(performance.now()).length === 0, "artillery self-reveal does not draw a tracer");
   assert(artilleryRevealState.weaponRecoil(99, KIND.ARTILLERY, performance.now()) > 0, "artillery self-reveal still recoils the gun");
 
+  const overpenEventState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  overpenEventState.applySnapshot({
+    tick: 12,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [{ id: 22, owner: 2, kind: KIND.WORKER, x: 166, y: 108, hp: 30, maxHp: 40, state: STATE.IDLE }],
+    events: [{ e: EVENT.OVERPENETRATION, to: 22 }],
+  });
+  assert(overpenEventState.liveMuzzleFlashes(performance.now()).length === 0, "overpenetration event does not draw a tracer");
+  assert(overpenEventState.weaponRecoil(22, KIND.WORKER, performance.now()) === 0, "overpenetration event does not trigger weapon recoil");
+
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);
   const entsOver = state.entitiesInterpolated(1.5);
@@ -6525,6 +6880,7 @@ withFakeDocument(() => {
     ) === "unit",
     "Tank Trap placement blocker classifies vehicle-body unit blockers",
   );
+  delete input._selectedWorkerIds;
 
   const pairs = (tiles) => tiles.map((site) => [site.tileX, site.tileY]);
   const exactTankTrapSpacing = (tiles) => tiles.every((site, index) => {
@@ -6733,6 +7089,26 @@ withFakeDocument(() => {
       rightClickCommands[0].c === "attack" &&
       rightClickCommands[0].queued === true,
     "Shift right-click on enemies should send queued attack",
+  );
+
+  const deconstructWorker = { id: 42, owner: 1, kind: KIND.WORKER, x: 150, y: 150 };
+  const enemyTankTrap = { id: 43, owner: 2, kind: KIND.TANK_TRAP, x: 180, y: 180 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [deconstructWorker, enemyTankTrap],
+    selectedEntities: () => [deconstructWorker],
+    addCommandFeedback() {},
+  };
+  rightClickCommands.length = 0;
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "deconstruct" &&
+      rightClickCommands[0].units.join(",") === "42" &&
+      rightClickCommands[0].target === enemyTankTrap.id &&
+      rightClickCommands[0].queued === true,
+    "Shift right-click on a Tank Trap with workers selected should send queued deconstruct",
   );
 
   input.dom = { clientWidth: 800, clientHeight: 600 };
@@ -6945,6 +7321,48 @@ withFakeDocument(() => {
     metaKey: false,
   });
   assert(selectionClicks.length === 0, "attack targeting click should not also select on mouse-up");
+
+  const labToolInput = Object.create(Input.prototype);
+  const labToolEvents = [];
+  const labToolSelections = [];
+  let labToolConsumedCancel = null;
+  labToolInput.clientIntent = new ClientIntent();
+  labToolInput.clientIntent.beginLabTool({ kind: "fieldPoint", payload: { xField: "spawn-x" } });
+  labToolInput.labToolController = {
+    consumeWorldClick(event) {
+      labToolEvents.push(event);
+    },
+    cancel(reason) {
+      labToolConsumedCancel = reason;
+      return labToolInput.clientIntent.cancelLabTool(reason);
+    },
+  };
+  labToolInput._worldAt = (x, y) => ({ x: x + 100, y: y + 200 });
+  labToolInput._commitClickSelection = (p) => labToolSelections.push(p);
+  labToolInput._onLeftDown({ x: 12, y: 24 }, { shiftKey: true });
+  assert(labToolEvents.length === 1, "active lab tool consumes the next world click");
+  assert(labToolEvents[0].x === 112 && labToolEvents[0].y === 224, "lab tool click callback receives exact world coordinates");
+  assert(labToolEvents[0].tool.payload.xField === "spawn-x", "lab tool click callback receives current tool payload");
+  assert(labToolInput.clientIntent.activeLabTool === null, "lab tool clears after consuming a world click");
+  assert(labToolConsumedCancel === "worldClick", "lab tool world-click cancellation flows through the controller");
+  assert(labToolInput._drag == null && labToolSelections.length === 0, "lab tool click does not fall through to selection drag");
+
+  const labRightClickInput = Object.create(Input.prototype);
+  let labRightClickCancel = null;
+  labRightClickInput.clientIntent = new ClientIntent();
+  labRightClickInput.clientIntent.beginLabTool({ kind: "fieldPoint" });
+  labRightClickInput.labToolController = {
+    cancel(reason) {
+      labRightClickCancel = reason;
+      return labRightClickInput.clientIntent.cancelLabTool(reason);
+    },
+  };
+  labRightClickInput._selectedOwnUnitIds = () => {
+    throw new Error("right-click lab tool cancellation must not issue normal commands");
+  };
+  labRightClickInput._onRightClick({ x: 5, y: 6 }, {});
+  assert(labRightClickInput.clientIntent.activeLabTool === null, "right-click cancels an active lab tool");
+  assert(labRightClickCancel === "rightClick", "right-click lab tool cancellation flows through the controller");
 
   targetedInput.clientIntent.endCommandTarget();
   targetedInput._drag = null;

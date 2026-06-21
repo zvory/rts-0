@@ -61,6 +61,7 @@ export const CMD = Object.freeze({
   MOVE: "move",
   ATTACK_MOVE: "attackMove",
   ATTACK: "attack",
+  DECONSTRUCT: "deconstruct",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
   TEAR_DOWN_ANTI_TANK_GUNS: "tearDownAntiTankGuns",
   CHARGE: "charge",
@@ -164,6 +165,7 @@ export const EVENT = Object.freeze({
   MORTAR_IMPACT: "mortarImpact",
   ARTILLERY_TARGET: "artilleryTarget",
   ARTILLERY_IMPACT: "artilleryImpact",
+  OVERPENETRATION: "overpenetration",
 });
 
 export const ABILITY_OBJECT_KIND = Object.freeze({
@@ -293,12 +295,14 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.ARTILLERY_TARGET]: 7,
   [EVENT.ARTILLERY_IMPACT]: 8,
   [EVENT.MORTAR_LAUNCH]: 9,
+  [EVENT.OVERPENETRATION]: 10,
 });
 
 export const ORDER_STAGE = Object.freeze({
   MOVE: "move",
   ATTACK_MOVE: "attackMove",
   ATTACK: "attack",
+  DECONSTRUCT: "deconstruct",
   GATHER: "gather",
   BUILD: "build",
   CHARGE: "charge",
@@ -327,6 +331,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EKAT_TELEPORT]: 12,
   [ORDER_STAGE.EKAT_LINE_SHOT]: 13,
   [ORDER_STAGE.EKAT_MAGIC_ANCHOR]: 14,
+  [ORDER_STAGE.DECONSTRUCT]: 15,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -914,6 +919,12 @@ function decodeCompactEvent(record, index) {
         }
         return ev;
       }
+    case EVENT.OVERPENETRATION:
+      requireLength(fields, 2, `overpenetration event ${index}`);
+      return {
+        e: EVENT.OVERPENETRATION,
+        to: readU32(fields[1], "event.overpenetration.to"),
+      };
     case EVENT.DEATH:
       requireLength(fields, 5, `death event ${index}`);
       return {
@@ -1229,6 +1240,8 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
   attack: (units, target, queued = false) =>
     withQueued({ c: CMD.ATTACK, units, target }, queued),
+  deconstruct: (units, target, queued = false) =>
+    withQueued({ c: CMD.DECONSTRUCT, units, target }, queued),
   setupAntiTankGuns: (units, x, y, queued = false) =>
     withQueued({ c: CMD.SETUP_ANTI_TANK_GUNS, units, x, y }, queued),
   tearDownAntiTankGuns: (units) => ({ c: CMD.TEAR_DOWN_ANTI_TANK_GUNS, units }),

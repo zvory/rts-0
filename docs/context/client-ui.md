@@ -10,22 +10,24 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - §4.3 Client architecture workflow
 
 ## Code map
-- `app-shell`: `main.js`, `app.js`, `match.js`, `frame_recovery.js`, `frame_entity_views.js`,
-  `match_health.js`, `observer_analysis_overlay.js`, `observer_analysis_signatures.js`,
-  `replay_controls.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`; app lifecycle, dependency injection,
-  frame-loop health, observer analysis, and replay/spectator/lab shell wiring.
+- `app-shell`: `main.js`, `app.js`, `match.js`, `client_perf_report.js`, `frame_profiler.js`,
+  `frame_recovery.js`, `frame_entity_views.js`, `match_health.js`, `live_pause_overlay.js`,
+  `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
+  `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`; app lifecycle, dependency
+  injection, frame-loop health, observer analysis, and replay/spectator/lab shell wiring.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, prediction controllers/adapters, and browser-local display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
-- `ui`: HUD, command card, hotkeys, lobby controller/view, match history, resource icons,
-  scoreboard, status badge, minimap, branch staging, lab panel, and settings.
+- `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
+  controller/view, match history, resource icons, scoreboard, status badge, minimap, branch
+  staging, lab panel, and settings.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
 - `renderer`: `renderer/` Pixi facade, layers, terrain, entities, fog, feedback, art helpers,
   rig schema/import/runtime, and renderer-local palette helpers.
 - `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`,
-  and `prediction_settings.js`.
+  `prediction_settings.js`, and `report_window_aggregate.js`.
 
 ## Invariants
 - **No framework, no JS build step.** Plain ES2020 modules. PixiJS v7 is the global `PIXI`; do not
@@ -42,7 +44,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   and `startPayload.diagnostics`; shared controls must not be inferred from replay/dev/lab identity.
 - **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,
   minimap, and renderer feedback. Do not read or write placement, command targeting, command-card
-  mode, previews, or command feedback through `GameState` shims.
+  mode, active lab tools, previews, or command feedback through `GameState` shims. Lab setup tools
+  are armed through `Match` and consumed by input world clicks, not by panel-owned viewport
+  listeners.
 - **Teardown.** Any module that holds DOM/window listeners or GPU resources must implement
   `destroy()`. `Match.destroy()` calls it on every module between matches.
 - **Coordinates.** World pixels on the wire and in client code, except fields ending in `Tile`.

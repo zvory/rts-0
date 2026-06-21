@@ -6,17 +6,22 @@ PixiJS is loaded globally from CDN as `PIXI`.
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
 map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
+renderer_preview.html / renderer_preview.js
+                  # standalone Renderer preview linked from the Dev links menu
+unit-lab.html / unit-lab.js
+                  # unit design lab UI; `/dev/unit-lab` redirects here and reads `/api/unit-designs`
 styles.css        # HUD, lobby, menus, command card
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
   config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
+  report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   prediction_compatibility.js # server/client prediction-build compatibility guard
   prediction_settings.js # localStorage-backed prediction toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
-  client_intent.js # ClientIntent: browser-local placement, command targeting, previews, feedback
+  client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
@@ -27,16 +32,24 @@ src/
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
+  hud_command_card.js # Command-card descriptors, faction command ids, and grid hotkeys
+  hud_selection_panel.js # Selected-unit strip/details panel
+  hud_unit_commands.js # Unit tactical command descriptors
+  hotkey_profiles.js # Local hotkey presets, custom profile storage, import/export
+  hotkey_editor.js # Settings Hotkeys tab editor
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen controller: name/room, ready/start, host controls
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
+  match_history.js # Lobby match-history table and replay launch affordance
   scoreboard.js   # Shared score/result formatting helpers
+  status_badge.js # Build/network/frame status badge with copyable diagnostics
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   observer_analysis_signatures.js # dirty-body signatures for observer analysis DOM updates
   client_perf_report.js # bounded client frame-profiler upload field shaping
   match_health.js # match network/render health reporter
   frame_profiler.js # bounded client frame phase profiler and debug summary API
+  live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
@@ -81,6 +94,9 @@ export class Net {
   returnToLobby()
   ping()
   netReport(report)
+  createSnapshotReportStats()
+  consumeSnapshotReportStats()
+  noteSnapshotFrame({bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind})
   setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario time
   stepRoomTime()                         // paused dev-scenario room time
   seekRoomTime(ticksBack)                // room-controlled replay time; pass huge N for full reset
@@ -100,16 +116,20 @@ export class Net {
 `prediction_controller.js`
 ```js
 export class PredictionController {
-  constructor({sendCommand, enabled, now?, commandTimeoutMs?})
+  constructor({sendCommand, predictor?, enabled, now?, commandTimeoutMs?, uiConfirmationSnapshots?})
   issueCommand(cmd)                      // allocates clientSeq, records pending, calls sendCommand(cmd, seq)
-  applyAuthoritativeSnapshot(snapshot)   // consumes snapshot.netStatus sim-consumption ack metadata
+  applyAuthoritativeSnapshot(snapshot, {allowStale?}?)
+                                         // consumes snapshot.netStatus sim-consumption ack metadata
   applySimAcknowledgement(clientSeq, serverTick?)
-  recordSocketReceipt(clientSeq, detail?)// diagnostic only; does not reconcile
+  recordSocketReceipt(clientSeq, detail?)// diagnostic only; idempotent for duplicate receipts; does not reconcile
   recordCommandRejection(clientSeq, reason?)
+  recordAckSnapshotApplied(clientSeq, snapshotReceivedAt)
   enterPredicting(), beginResync(correction?), finishResync()
   predictionDisplayOverlay()             // view data for optimistic production/rally display only
-  reset({enabled?})
+  reset({enabled?, preserveClientSeq?, reason?})
   debugSummary()                         // pending count/seqs, latest authoritative tick, ack/correction metrics
+  consumeCommandReportStats(now?)
+  peekCommandReportStats(now?)
   get pendingCommandCount()
 }
 ```
@@ -280,11 +300,12 @@ non-vision neutral resources.
 `settings_container.js`
 ```js
 export class SettingsContainer {
-  constructor({ button, menu, title })
+  constructor({ button, menu, title? })
   setContext({ kind, spectator, replay, actions, tabs }) // mounts context-specific tabs/actions
   setTabs(tabs)                         // [{id,label,visible,render(panel, context)}]
   open({ focus }), close({ restoreFocus }), toggle()
   isOpen()
+  activateTab(id)
   destroy()
 }
 ```
@@ -332,8 +353,18 @@ export const labVision                   // fullWorld(), team(teamId), teams(tea
 
 `lab_panel.js`
 ```js
+export function labSpawnFactionOptions()
+export function labSpawnUnitKindsForFaction(factionId)
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload })
+  constructor({ root, labClient, launch, startPayload, match? })
+  applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
+  armSpawnPaletteTool(kind?)             // arms a Match-owned spawnEntity world-click tool
+  armAdvancedSpawnTool()                 // same tool path for secondary building/setup spawns
+  armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
+  cancelActiveTool()
+  setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
+  deleteSelected()                       // applies selected-entity delete mutation with batch result summary
+  exportScenario(), importScenario()
   destroy()
 }
 ```
@@ -348,7 +379,32 @@ export function createDefaultControlPolicy()
 `lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
 constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
 MVP exposes room-local vision, setup mutations, issue-as commands, and scenario import/export
-through those collaborators while keeping the normal match screen authentic.
+through those collaborators while keeping the normal match screen authentic. Lab operator starts
+are still spectator-shaped for projection and prediction, but the injected control policy exposes
+`canUseCommandSurface(state)` so `Match` and HUD can keep selection plus the real command card
+available for operators while read-only lab viewers, replay viewers, and normal spectators remain
+passive. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
+`LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
+owner.
+
+Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
+may ask `Match.armLabTool(tool, { onWorldClick })` to arm a tool, and normal `Input` consumes the
+next left world click before selection, command targeting, or placement. The callback receives the
+active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears the tool for
+Esc, right-click, blur, teardown, or panel-driven cancellation. `Input` routes those cancellations
+through the injected lab tool controller so `Match` can publish an active/cancelled change back to
+the app-owned `LabPanel`, keeping the panel status and cancel affordance synchronized with keyboard,
+pointer, blur, world-click, and teardown paths. Starting ordinary placement, command targeting, or
+command-card build menus cancels the active lab tool so setup tools do not share state with
+gameplay command modes. Unit spawning is a lab panel palette backed by the client faction catalog
+mirror and playable faction labels; the palette arms a `spawnEntity` lab tool and sends the clicked
+world coordinates through `LabClient`. Secondary building/setup spawns use the same click-to-world
+spawn tool path instead of primary manual coordinate entry. Selected-entity repositioning also uses
+the shared tool path: `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends
+`moveEntity` requests for each id at the clicked world point, and leaves stale-id or partial-failure
+reporting visible through the lab result status. Delete and owner reassignment stay contextual to
+the current selection, disable themselves when no selected entity ids are available, and summarize
+accepted plus rejected per-entity mutations after the individual server replies return.
 
 `hotkey_profiles.js`
 ```js
@@ -356,6 +412,7 @@ export class HotkeyProfileService {
   constructor({storage?, catalog?, profilesKey?, activeKey?})
   allProfiles()
   getActiveProfile()
+  hasProfile(id)
   profileById(id)
   setActiveProfile(id)
   createCustomFromPreset(presetId, metadata?)
@@ -368,10 +425,23 @@ export class HotkeyProfileService {
   parseImportText(text, options?)
   resolveCard(card, profile?)
   resolveSlot(slot, profile?)
+  storedProfilePayload(profile)
 }
 
 buildHotkeyCommandCatalog(cards)
 normalizeHotkey(value)
+profileBindingForCommand(profile, commandId)
+setProfileBindingForCommand(profile, commandId, key)
+```
+
+`hotkey_editor.js`
+```js
+export function renderHotkeyEditor(root, hotkeyProfiles, context?)
+export class HotkeyEditor {
+  constructor(root, hotkeyProfiles, context?)
+  render()
+  destroy()
+}
 ```
 
 Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
@@ -443,10 +513,11 @@ export class ClientIntent {
   beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
   holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
   releaseCommandTargetShift()
-  commandFeedback, liveCommandFeedback(now)
+  commandFeedback, addCommandFeedback(kind, x, y, append?, radiusTiles?, now?), liveCommandFeedback(now)
   resourceMiningPreview, updateResourceMiningPreview(preview)
   antiTankGunSetupPreview, updateAntiTankGunSetupPreview(preview)
   abilityTargetPreview, updateAbilityTargetPreview(preview)
+  activeLabTool, beginLabTool(tool), cancelLabTool(reason?)
 }
 ```
 
@@ -469,14 +540,27 @@ use the injected facade or a narrow read model.
 Frame-local entity views belong to the app-shell frame loop, not to `GameState`. Rendering, local
 fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
 should accept the injected frame view when called from the RAF path and fall back to `GameState`
-queries only for direct module tests or event handlers outside the frame.
+queries only for direct module tests or event handlers outside the frame. Static resource nodes with
+no remaining resources are omitted from frame-local entity views and minimap blips. Frame-local
+entity views may carry bounded render diagnostics for local profiling consumers without changing the
+authoritative snapshot model.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
-rather than relying on the full mutable `GameState`. HUD and input should exchange command intent
-through descriptor/facade methods, while gameplay command emission continues to flow through
-`commandIssuer.issueCommand`. `PredictionController` owns client sequence allocation and optimistic
-bookkeeping; `GameState` applies named display overlays but does not own prediction policy.
+rather than relying on the full mutable `GameState`. Tank Trap placement previews keep normal
+terrain, resource, building, and map-bounds checks, allow infantry overlap, and reject vehicle-body
+units. Tank Trap line dragging treats terrain, building, and map-bounds blockers as skipped sites,
+omits illegal build commands for those sites, and resumes on the far side; vehicle-body unit blockers
+  still break the line. HUD and input should exchange command intent through descriptor/facade
+  methods, while gameplay command emission continues to flow through
+  `commandIssuer.issueCommand`. HUD selected-unit strip cells support direct selection refinement:
+  left-click selects only that unit, Shift-click removes it from the selection, and Ctrl/Meta-click
+  or control context-click filters the current selection to that unit kind. Unit command-card
+  descriptors include Stop on S and Hold Position on W; Command Car selections also expose
+  Breakthrough on E. In lab rooms, injected lab control policy owns selection, inspection, and
+  single-owner issue-as routing without changing the client player id. `PredictionController` owns
+  client sequence allocation and optimistic bookkeeping; `GameState` applies named display overlays
+  but does not own prediction policy.
 
 `camera.js`
 ```js
@@ -496,7 +580,7 @@ export class Renderer {
   constructor(canvasParent)              // creates PIXI.Application, layers
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
-  render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement
+  render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement, Tank Traps
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // exposes screen->world hit info if helpful; selection box drawing lives here too:
   drawSelectionBox(rectOrNull)
@@ -506,9 +590,10 @@ export class Renderer {
 `fog.js`
 ```js
 export class Fog {
-  constructor(mapWidth, mapHeight)
+  constructor(mapWidth, mapHeight, terrain?)
   update(ownEntities, tileSize, serverVisibleTiles?) // copy server visibility when provided; accumulate explored
   isVisible(tileX,tileY), isExplored(tileX,tileY)
+  setRevealAll(enabled)
   // renderer reads the grids to draw the black/dim overlay; minimap caches against revision
   visibleGrid, exploredGrid              // Uint8Array length w*h
   revision, visibleRevision, exploredRevision
@@ -520,9 +605,10 @@ provide `visibleTiles`, so the overlay follows server-authoritative fog includin
 local stamping remains a fallback for older/dev object snapshots.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
-`command_budget.js`: 24 base command supply plus 12 and the Command Car's own command weight per
-admitted Command Car, with unit supply as weight and a fallback weight of 1. Drag selection,
-shift-add, double-click same-kind selection, and control-group save/add/recall preserve their normal
+`command_budget.js`: 24 base command supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the
+Command Car's own command weight per admitted Command Car, with unit supply as weight and a fallback
+weight of 1. Drag selection, shift-add, double-click same-kind selection, and control-group
+save/add/recall preserve their normal
 candidate ordering, except Command Cars in the
 candidate set are admitted first so their budget bonus is reliable. Overflow candidates are ignored
 client-side and surface `selectionBudgetOverflow` for the HUD; outgoing commands that still exceed
@@ -531,7 +617,7 @@ the budget are blocked before `Net.command`.
 `input/index.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?)
+  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?, labToolController?)
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
@@ -566,8 +652,8 @@ read-only selection inspection remains available while command emission stays ga
 checks.
 
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
-gather, build/resume, and placement build commands set `queued: true` and rely on the server
-snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
+gather, build/resume, Tank Trap deconstruct, and placement build commands set `queued: true` and
+rely on the server snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
 or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
 Selection and targeting use `GameState` relationship helpers where the distinction is own/ally/enemy:
@@ -636,7 +722,7 @@ export function noticeSoundId(msg)
 `hud.js`
 ```js
 export class HUD {
-  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?)
+  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?, controlPolicy?)
   update(frameViews?)                    // refresh resources/supply, selected panel, command card
   // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
@@ -687,7 +773,7 @@ export class Lobby {
 ```
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
-`window.location`, and shows `Lobby`; on `start` it creates `Match`. `match.js` builds
+`window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds
 `GameState`, `ClientIntent`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`,
 `Input`, starts the rAF loop
 (compute `alpha` from snapshot timing, `camera.update`,
@@ -696,9 +782,12 @@ export class Lobby {
 audio exactly once; on `gameOver` show the victory/defeat overlay with the frozen score table. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
-For spectator starts, `match.js` hides the command card and give-up action, computes local fog from
-the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
-with `playerResources`. Spectators still receive notice toasts and minimap alert pings, but
+For spectator starts without command-surface permission, `match.js` hides the command card and
+give-up action, computes local fog from the server-filtered union snapshot, and keeps the ordinary
+renderer/minimap/HUD pointed at snapshots with `playerResources`. Lab operators are the exception:
+their projection remains spectator-shaped, but `LabControlPolicy.canUseCommandSurface(state)` keeps
+the selected-unit panel and real command card visible while prediction stays disabled and issue-as
+remains the command authority. Spectators still receive notice toasts and minimap alert pings, but
 `match.js` suppresses notice alert audio so observers do not hear player alert callouts.
 
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
@@ -772,6 +861,9 @@ and unit layer):
   shadows → units → selection rings → health bars → fog overlay → shot-revealed units →
   command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
+- `/renderer_preview.html` is a standalone dev entry point linked from the index Dev links menu; it
+  mounts the real Renderer on a synthetic grass map to preview all unit and building visuals with
+  zoom, team color, and animation controls outside a full match.
 - Units: SVG-authored rig parts rendered into Pixi containers, with low-detail hard-edged
   silhouettes tinted by player color, a dark drop shadow, dark outline, HP bar above when
   damaged/selected, and glowing selection ring when selected.
@@ -779,7 +871,9 @@ and unit layer):
   infantry body with oversized role weapons; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
-  flat-shaded armor).
+  flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret and
+  barrel parts, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
+  support-weapon rig routed through the live renderer).
   Riflemen carry a rifle, Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
@@ -800,9 +894,10 @@ and unit layer):
   visual intel only.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
-  small progress arc. Owned scaffolds may locally extrapolate `buildProgress` only while the
-  latest authoritative snapshot marks them `buildActive`; the display clamps below completion and
-  never unlocks supply, tech, production, pathing, or command behavior before the server snapshot.
+  small progress arc. Tank Traps render as neutral steel I-beam hedgehogs with deterministic per-id
+  rotation. Owned scaffolds may locally extrapolate `buildProgress` only while the latest
+  authoritative snapshot marks them `buildActive`; the display clamps below completion and never
+  unlocks supply, tech, production, pathing, or command behavior before the server snapshot.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre
@@ -843,19 +938,23 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `client_perf_report.js`, `match_health.js`,
-  `frame_profiler.js`, `observer_analysis_overlay.js`, `observer_analysis_signatures.js`,
-  `replay_controls.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
+  `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
+  `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
+  `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
-- `ui`: HUD, command card, lobby controller/view, match history, minimap, resource icons,
-  scoreboard, status badge, branch staging, lab panel, settings.
+- `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
+  controller/view, match history, minimap, resource icons, scoreboard, status badge, branch
+  staging, lab panel, settings. The in-match debug status badge displays live and rolling
+  one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, audio, combat audio, alerts, fog, camera, prediction settings.
+- `platform`: bootstrap, audio, combat audio, alerts, fog, camera, prediction settings,
+  `report_window_aggregate.js`.
 
 Import rules:
 - `protocol.js` and `config.js` are shared mirrors and may be imported where needed.

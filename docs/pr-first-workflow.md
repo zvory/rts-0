@@ -16,7 +16,8 @@ Rust/architecture, live Node, and browser/tri-state suites, then fails the aggre
 required coverage job fails. The Rust/architecture job installs `cargo-nextest` and runs
 `./tests/run-all.sh --only-rust`, matching the local nextest-backed Rust command path. Local hooks
 are intentionally cheap; they catch staged whitespace errors outside the human-owned
-`playtest_notes.md` and run opportunistic cleanup on `main`.
+`playtest_notes.md`, run `node scripts/check-docs-health.mjs`, and run opportunistic cleanup on
+`main`.
 
 When the Rust job is slow, use the ordinary job log first: the Rust context lines show
 `CARGO_TARGET_DIR`, Rust/cargo/nextest versions, and the Actions Cargo cache exact-hit result,
@@ -85,7 +86,7 @@ Before relying on a changed workflow broadly, run three canaries:
   gate.
 - A throwaway docs-only phased plan through
   `scripts/phase-runner.sh --plan <name> --from <start> --to <end> --pr --wait`
-  to prove the Rust-backed runner waits for each PR to merge before continuing.
+  to prove the maintained Node runner waits for each PR to merge before continuing.
 
 After canaries, run `scripts/pr-sweep.sh` and confirm there are no unowned open
 `zvorygin/*` PRs and no unexpected stale, failed, conflicted, or missing

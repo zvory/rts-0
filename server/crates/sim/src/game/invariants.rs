@@ -291,6 +291,22 @@ impl Game {
                         );
                     }
                 }
+                Order::Deconstruct(_) => {
+                    let Some(target) = e.order().deconstruct_target() else {
+                        continue;
+                    };
+                    if let Some(t) = self.entities.get(target) {
+                        assert!(
+                            t.kind == EntityKind::TankTrap && t.hp > 0 && !t.under_construction(),
+                            "invariant: entity {} Deconstruct order targets invalid trap {} (kind {:?} hp {} under_construction {})",
+                            e.id,
+                            target,
+                            t.kind,
+                            t.hp,
+                            t.under_construction()
+                        );
+                    }
+                }
                 _ => {}
             }
         }

@@ -32,6 +32,28 @@ preset concepts.
 - Stale or disabled rows must not look clickable. When the server says a room is in-game, gray the
   row and disable its action.
 
+## Current Architecture Refresh
+
+Reviewed against `origin/main` on 2026-06-21. The plan is still good to implement, but the server
+pieces should be built on the room-policy refactor that now exists instead of adding a parallel
+mode taxonomy.
+
+- `Lobby` still owns only a room-name registry and `RoomEvent` senders. It should collect browser
+  summaries by asking each room task for a bounded, browser-safe DTO; it should not inspect raw
+  `RoomTask` state from the registry.
+- `RoomTask` now classifies room behavior through `SessionPolicy::for_room(&self.mode,
+  self.session_phase())`. Browser summaries should use that policy to decide whether a room is a
+  public normal room. Non-normal sessions stay hidden, including dev scenarios, saved replay
+  artifacts, persisted match replays, replay branches, and lab rooms.
+- Create-lobby must be a separate normal-room creation API, not the existing
+  `get_or_create_join_target` path. It should reject duplicate names and any name that resolves to
+  an internal room mode or reserved prefix, then create `RoomMode::Normal` intentionally.
+- Countdown is now explicit room state through `match_countdown_deadline`. The browser contract
+  should represent countdown/starting separately from open waiting lobbies and in-game matches.
+- Current post-join lobby UI is still owned by `client/src/lobby.js` plus `LobbyRosterView` in
+  `client/src/lobby_view.js`. The browser should replace the pre-join room-name entry path while
+  preserving that joined-lobby slot UI.
+
 ## UI Design Contract
 
 The browser should feel like an operational lobby board, not a marketing page. It should prioritize
@@ -130,7 +152,7 @@ rows, responsive rendering, and the updated design/protocol docs.
 - Keep the `Game` API seam intact. Lobby browser work should live in lobby/room orchestration and
   client lobby UI, not by reaching into simulation internals.
 - Hide internal rooms from the public browser, including dev self-play rooms, dev scenario rooms,
-  match replay rooms, and replay branch rooms.
+  saved replay artifact rooms, match replay rooms, replay branch rooms, and lab rooms.
 - Do not reintroduce commander/spectator role selection as a separate pre-join choice. The row
   state determines whether the click is an active join or spectator join.
 - Keep the existing slot-based joined lobby behavior. Teams are host-managed slots, not presets,

@@ -114,6 +114,7 @@ export class Input {
    * @param {import("./router.js").MatchInputRouter} [inputRouter] optional UI input router
    * @param {import("../hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey profile service.
    * @param {import("../client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
+   * @param {{consumeWorldClick?: (event: object) => void, cancel?: (reason:string) => object|null}} [labToolController] active lab setup tool callback seam.
    */
   constructor(
     domElement,
@@ -126,6 +127,7 @@ export class Input {
     inputRouter = null,
     hotkeyProfiles = null,
     clientIntent = null,
+    labToolController = null,
   ) {
     this.dom = domElement;
     this.camera = camera;
@@ -137,6 +139,7 @@ export class Input {
     this.inputRouter = inputRouter;
     this.hotkeyProfiles = hotkeyProfiles;
     this.clientIntent = clientIntent;
+    this.labToolController = labToolController;
 
     this.cameraNavigation = new CameraNavigationInput(domElement, camera);
     this.keys = this.cameraNavigation.keys;
@@ -261,6 +264,33 @@ export class Input {
 
   _placement() {
     return this._intent()?.placement;
+  }
+
+  _labTool() {
+    return this._intent()?.activeLabTool || null;
+  }
+
+  _consumeLabToolWorldClick(p, ev) {
+    const intent = this._intent();
+    const tool = intent?.activeLabTool || null;
+    if (!tool) return false;
+    const world = this._worldAt(p.x, p.y);
+    const event = {
+      tool,
+      x: world.x,
+      y: world.y,
+      world,
+      screen: { x: p.x, y: p.y },
+      originalEvent: ev,
+    };
+    try {
+      this.labToolController?.consumeWorldClick?.(event);
+    } finally {
+      if (intent.activeLabTool?.id === tool.id) {
+        this.labToolController?.cancel?.("worldClick") || intent.cancelLabTool?.("worldClick");
+      }
+    }
+    return true;
   }
 
   _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
@@ -871,6 +901,11 @@ export class Input {
   // --- Left-button logic --------------------------------------------------
 
   _onLeftDown(p, ev) {
+    if (this._labTool()) {
+      clearPostQuickCastSelectionGuard(this);
+      this._consumeLabToolWorldClick(p, ev);
+      return;
+    }
     // Build placement: a valid left-click confirms the build with a selected worker.
     if (this._placement()) {
       clearPostQuickCastSelectionGuard(this);
@@ -899,7 +934,7 @@ export class Input {
 
   _handleMacControlClickSelection(p, ev) {
     if (!ev.ctrlKey || ev.metaKey || !isMacPlatform()) return false;
-    if (this._placement() || this._commandTarget()) return false;
+    if (this._placement() || this._commandTarget() || this._labTool()) return false;
 
     const world = this._worldAt(p.x, p.y);
     const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);

@@ -63,6 +63,35 @@ pub(super) fn friendly_hard_blocker_between(
     })
 }
 
+pub(super) fn shot_hits_intended_target(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    attacker: u32,
+    attacker_owner: u32,
+    intended_victim: u32,
+    start: (f32, f32),
+) -> bool {
+    let Some(target) = entities.get(intended_victim) else {
+        return false;
+    };
+    let end = (target.pos_x, target.pos_y);
+    if friendly_hard_blocker_between(map, entities, attacker, attacker_owner, start, end) {
+        return false;
+    }
+    resolve_shot_victim(
+        map,
+        entities,
+        teams,
+        attacker,
+        intended_victim,
+        attacker_owner,
+        start.0,
+        start.1,
+    )
+    .is_some_and(|victim| victim == intended_victim)
+}
+
 pub(super) fn shot_blocker_intersection(
     map: &Map,
     entity: &Entity,

@@ -75,6 +75,9 @@ enum PromotedIntent {
         tx: u32,
         ty: u32,
     },
+    Deconstruct {
+        target: u32,
+    },
     WorldAbility {
         ability: crate::game::ability::AbilityKind,
         x: f32,
@@ -188,6 +191,9 @@ pub(crate) fn promote_ready_orders(
             PromotedIntent::Build { kind, tx, ty } => {
                 coordinator.order_build(entities, id, kind, tx, ty);
             }
+            PromotedIntent::Deconstruct { target } => {
+                coordinator.order_deconstruct(entities, id, target);
+            }
             PromotedIntent::WorldAbility { ability, x, y } => {
                 let Some(owner) = entities.get(id).map(|e| e.owner) else {
                     continue;
@@ -273,7 +279,10 @@ fn ready_for_next_order(
             !e.queued_orders().is_empty()
                 && attack_order_complete(map, entities, teams, fog, e, order.intent.target)
         }
-        Order::Gather(_) | Order::Build(_) | Order::ArtilleryPointFire(_) => false,
+        Order::Gather(_)
+        | Order::Build(_)
+        | Order::Deconstruct(_)
+        | Order::ArtilleryPointFire(_) => false,
         Order::Ability(_) => matches!(
             e.move_phase(),
             Some(MovePhase::Arrived | MovePhase::PathFailed)
@@ -339,6 +348,13 @@ fn pop_next_valid_intent(
                         kind: build.kind,
                         tx: build.tile_x,
                         ty: build.tile_y,
+                    });
+                }
+            }
+            OrderIntent::Deconstruct(intent) => {
+                if deconstruct_intent_valid(entities, teams, fog, owner, id, intent.target) {
+                    return Some(PromotedIntent::Deconstruct {
+                        target: intent.target,
                     });
                 }
             }
@@ -598,6 +614,28 @@ fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u3
         return false;
     }
     true
+}
+
+fn deconstruct_intent_valid(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    owner: u32,
+    worker: u32,
+    target: u32,
+) -> bool {
+    if !matches!(entities.get(worker), Some(e) if e.owner == owner && e.kind == EntityKind::Worker && e.hp > 0)
+    {
+        return false;
+    }
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    if target.kind != EntityKind::TankTrap || target.hp == 0 || target.under_construction() {
+        return false;
+    }
+    teams.same_team_or_same_owner(owner, target.owner)
+        || rules::projection::team_visible_world(owner, target.pos_x, target.pos_y, fog, teams)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1071,6 +1109,58 @@ mod tests {
             entity.queued_orders().is_empty(),
             "promotion should drain bounded invalid intents instead of retrying forever"
         );
+    }
+
+    #[test]
+    fn idle_worker_promotes_queued_deconstruct_on_visible_tank_trap() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        let trap = entities
+            .spawn_building(2, EntityKind::TankTrap, 132.0, 100.0, true)
+            .expect("tank trap should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .append_queued_order(OrderIntent::deconstruct(trap));
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let entity = entities.get(worker).expect("worker should exist");
+        assert!(matches!(entity.order(), Order::Deconstruct(_)));
+        assert_eq!(entity.order().deconstruct_target(), Some(trap));
+        assert_eq!(entity.target_id(), Some(trap));
+        assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_deconstruct_skips_non_tank_trap_and_promotes_next_stage() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        let depot = entities
+            .spawn_building(2, EntityKind::Depot, 132.0, 100.0, true)
+            .expect("depot should spawn");
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.append_queued_order(OrderIntent::deconstruct(depot));
+            w.append_queued_order(OrderIntent::move_to(220.0, 100.0));
+        }
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let entity = entities.get(worker).expect("worker should exist");
+        assert!(
+            matches!(entity.order(), Order::Move(_)),
+            "invalid deconstruct target should be skipped and the next queued stage should promote"
+        );
+        assert!(entity.queued_orders().is_empty());
     }
 
     #[test]

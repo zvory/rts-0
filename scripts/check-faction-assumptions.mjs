@@ -240,6 +240,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/combat/damage.rs",
   "server/crates/sim/src/game/services/combat/events.rs",
   "server/crates/sim/src/game/services/combat/mod.rs",
+  // Default combat target policy is still current-roster based until catalog combat roles exist.
+  "server/crates/sim/src/game/services/combat/priority.rs",
   "server/crates/sim/src/game/services/combat/projection.rs",
   "server/crates/sim/src/game/services/combat/weapons.rs",
   "server/crates/sim/src/game/services/commands.rs",
@@ -292,7 +294,8 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/rules/src/economy.rs", 101],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
-  ["server/crates/sim/src/game/services/commands.rs", 254],
+  // Tank Trap deconstruction adds worker-only command validation and trap target admission.
+  ["server/crates/sim/src/game/services/commands.rs", 259],
   ["server/crates/sim/src/game/invariants.rs", 13],
 ]);
 const budgetOverruns = [];

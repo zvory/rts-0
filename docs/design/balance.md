@@ -58,7 +58,7 @@ This is an inventory only; it does not change balance, gameplay, or client rende
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
 | `TICK_HZ`, `TICK_MS`, `TILE_SIZE`, simulation timing scalars | `server/crates/rules/src/balance.rs`, re-exported by `server/src/config.rs` and `server/crates/sim/src/config.rs` | `client/src/config.js` `TICK_HZ`, `SNAPSHOT_MS`, interpolation delay constants | balance scalar | `scripts/check-faction-catalog-parity.mjs` checks `TICK_HZ` and client-visible duration constants against the Rust rules dump | Extend the structured dump if another timing scalar becomes client-visible | Interpolation delay is client-only smoothing; `TICK_HZ` is mirrored | No compact impact unless snapshot cadence or compact fields change |
 | Unit and building costs, supply, sight, footprint/radius, train/build times, and command-card stat rows | `server/crates/rules/src/defs.rs` and `server/crates/rules/src/balance.rs`; faction legality in `server/crates/rules/src/faction.rs` | `client/src/config.js` `STATS`, `WORKER_BUILDABLE`, `FACTION_CATALOGS` | balance scalar / faction catalog fact | `scripts/check-faction-catalog-parity.mjs` checks catalog legality, costs, supply, sight, ranges, build ticks, building footprints, requirements, train lists, research lists, and non-body unit render radius; `node scripts/check-wiki.mjs` covers generated wiki stats when run | Future work can move client-only labels/icons into Rust catalogs if they should become authoritative | Client-only labels/icons in `STATS` are presentation unless the Rust catalog exports them; `STATS.size` for body-driven vehicles is presentation because the Rust-owned body dimensions are checked separately | No compact impact |
-| Vehicle/body dimensions | `server/crates/rules/src/balance.rs` `*_BODY_*` constants | `client/src/config.js` `TANK_BODY`, `ANTI_TANK_GUN_BODY`, `ARTILLERY_BODY`, `SCOUT_CAR_BODY`, `COMMAND_CAR_BODY` | balance scalar | `scripts/check-faction-catalog-parity.mjs` checks every client body length, width, and clearance against the Rust rules dump | Keep adding new body records to the dump/check when body-driven units are added | None; client uses these for art, selection, and advisory placement previews, while Rust collision is authoritative | No compact impact |
+| Vehicle/body dimensions | `server/crates/rules/src/balance.rs` `*_BODY_*` constants | `client/src/config.js` `TANK_BODY`, `ANTI_TANK_GUN_BODY`, `ARTILLERY_BODY`, `SCOUT_CAR_BODY`, `COMMAND_CAR_BODY` | balance scalar | `scripts/check-faction-catalog-parity.mjs` checks every client body length, width, and clearance against the Rust rules dump | Keep adding new body records to the dump/check when body-driven units are added | None; client uses these for art, selection, and advisory placement previews, including Tank Trap preview rejection for vehicle-body units, while Rust collision is authoritative | No compact impact |
 | Ability descriptors, carrier lists, target mode, range, cooldown, cost, queueability, autocast, command-card label/icon/hotkey/title | `server/crates/rules/src/faction.rs` plus scalar constants in `server/crates/rules/src/balance.rs` | `client/src/config.js` `ABILITIES` and imported `ABILITY` ids | faction catalog fact / balance scalar | `scripts/check-faction-catalog-parity.mjs` checks exported command-card descriptors, carriers, target mode, range, cooldown, cost, queueability, autocast, compact codes, and Rust-owned effect fields present on descriptors such as radius, delay, duration, pull multipliers, speed, and damage; protocol parity checks ability compact codes | Future effect fields should be added to the Rust dump and descriptor assertion when they become client-visible | Not UI-only when the field is exported by Rust faction catalogs or balance constants; purely local affordance copy belongs in the documented exclusion list | Code changes may affect compact ability/order-stage codes; descriptor-only changes do not |
 | Upgrade descriptors, research building, prerequisites, cost, and research time | `server/crates/rules/src/faction.rs` plus `server/crates/rules/src/balance.rs` upgrade constants | `client/src/config.js` `UPGRADES` and imported `UPGRADE` ids | faction catalog fact / balance scalar | `scripts/check-faction-catalog-parity.mjs` checks research building, list membership, upgrade costs, research ticks, and prerequisite upgrade ids | Labels/icons/descriptions can be moved into Rust catalogs later if they should become authoritative | Labels/icons/descriptions are client-only today unless moved into the Rust catalog | No compact impact unless upgrade ids/codes change |
 | Resource node starting amounts and economy resource names | `server/crates/rules/src/balance.rs` `STEEL_PATCH_AMOUNT`, `OIL_GEYSER_AMOUNT`; fixed Steel/Oil economy fields in sim/protocol | `client/src/config.js` `RESOURCE_AMOUNTS`, `KIND.STEEL`, `KIND.OIL`, HUD/resource render helpers | balance scalar / wire DTO | `scripts/check-faction-catalog-parity.mjs` checks node starting amounts; protocol parity checks resource kind codes | Add future client-visible resource amounts to the rules dump/check | Resource render labels and sizes are client presentation; amounts affect minimap/tooltips/render assumptions | Resource kind/code changes affect protocol/compact; amount changes do not |
@@ -124,7 +124,8 @@ or regime-specific iconography.
 
 MVP scope:
 - No air forces.
-- No late-game artillery yet; Mortar Teams provide the current early delayed-area fire tool.
+- Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
+  early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
   do have a simple hull-facing armor rule for anti-tank damage.
 
@@ -184,11 +185,29 @@ still hold position once a target is in weapon range. Scout cars also fire while
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
 Plain `Move` tanks and scout cars only fire at enemies already in
-weapon range, while `AttackMove` tanks and scout cars can chase acquired targets. When they chase an acquired
-target from outside weapon range, they path to a standoff point inside firing range instead of the
-target center. Forest-specific rules are future work. The unit, building, and resource-node tables
-below are the human-readable form of the
-authoritative `rules::defs` records.
+weapon range, while `AttackMove` tanks and scout cars can chase acquired targets. When they chase an
+acquired target from outside weapon range, they path to a standoff point inside firing range instead
+of the target center. Tank auto-targeting first checks in-range Anti-Tank Guns, Tanks, Tank Traps,
+and Mortar Teams, in that order, before generic acquisition; this priority can replace a retained
+lower-priority moving-fire target but does not chase out-of-range priority targets or override
+explicit player attack orders. Forest-specific rules are future work. The unit, building, and
+resource-node tables below are the human-readable form of the authoritative `rules::defs` records.
+
+Default auto-acquisition ranks already-legal targets by weapon fit before distance. Small-arms
+default weapons prefer soft targets (`ArmorClass::Small`) over armored or hard targets, but they
+still fire at armor, buildings, or vehicle obstacles when no better legal target exists; infantry-like
+units still do not auto-acquire Tank Traps without a direct attack order. Anti-armor default weapons
+prefer anti-armor threats and armored/hard targets over ordinary soft targets. Tanks keep a narrower
+immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
+other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
+Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on
+the unit's current short route window or helps close a vehicle-body gap across that route; nearby
+irrelevant traps remain attackable fallbacks but no longer outrank ordinary combat targets.
+Moving-fire retention is sticky but not absolute: Tanks, Scout Cars, and charged Riflemen keep a
+current legal target across equal-rank comparisons so they do not flicker between similar enemies,
+but higher-rank default-weapon threats still steal focus. This ranking scope is limited to default
+attacks; future grenades, satchels, or demolition attacks need separate attack profiles and explicit
+activation/autocast policy instead of being folded into default targeting.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons).
@@ -297,9 +316,9 @@ authoritative `rules::defs` records.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water), named `sites`, and authored
   player-count-specific spawn `layouts`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one City Centre at the player's start tile, 18 steel patches with 1,000 steel each + 3 oil
+  one City Centre at the player's start tile, 12 steel patches with 1,000 steel each + 3 oil
   patches with 3,333 oil each nearby.
-- Supply: City Centre gives `+8`, Depot gives `+8`, hard cap `200`.
+- Supply: City Centre, Zamok, and Depot each give `+8`; hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
@@ -314,7 +333,7 @@ authoritative `rules::defs` records.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each active main or natural site gets 18 steel patches and 3 oil patches.
+- Starting layout: each active main or natural site gets 12 steel patches and 3 oil patches.
   Map schema v2 stores named main/natural `sites` plus explicit spawn `layouts`. Each layout
   declares a `playerCount` and a list of slots, where each slot pairs one main with one or more
   naturals (`natural` legacy field or `naturals` array). At match start the seed selects one
@@ -329,12 +348,12 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 360 (~12s) |
+| worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 396 (~13.2s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 12 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 60 deployed / 45 packed | 14 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 1.3 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
+| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
@@ -345,7 +364,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
 | city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 550       | trains worker; +8 supply; players start with one free |
-| zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekat start building; inert in first playable slice |
+| zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekat start building; +8 supply; no trains/research in first playable slice |
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |

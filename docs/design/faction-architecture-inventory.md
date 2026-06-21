@@ -58,7 +58,8 @@ The current production catalog is in `server/crates/rules/src/defs.rs`:
 - Units: Worker, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank,
   Command Car, and Ekat.
 - Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, Gun
-  Works, and Tank Trap.
+  Works, and Tank Trap. Tank Trap construction is server-authoritative after Training Centre
+  eligibility and is exposed through the mirrored worker build menu.
 - Resource nodes: Steel and Oil.
 
 Temporary compatibility shim policy: direct global kind checks are approved in the current rules
@@ -107,13 +108,20 @@ reconstruction APIs.
 
 ## Current Tech Tree
 
-Workers build City Centre, Depot, Barracks, Training Centre, R&D Complex, Factory, and Gun Works.
-City Centre trains Workers. Barracks trains Riflemen and Machine Gunners. Factory trains Scout
-Cars, Tanks, and Command Cars. Gun Works trains Mortar Teams, Anti-Tank Guns, and Artillery.
+Workers can place City Centre and Supply Depot immediately. Barracks requires a completed City
+Centre; Training Centre requires a completed City Centre and Barracks; R&D Complex, Factory, and
+Gun Works require a completed City Centre and Training Centre; Tank Trap requires a completed
+Training Centre. City Centre trains Workers. Barracks trains Riflemen immediately and Machine
+Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately, Tanks
+after Tank Production research, and Command Cars after Command Car research. Gun Works trains
+Mortar Teams immediately, Anti-Tank Guns after Anti-Tank Gun Crews research, and Artillery after
+Unlock Artillery research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
-`client/src/config.js`: Methamphetamines, Anti-Tank Gun Unlock, Tank Unlock, Artillery Unlock,
-Command Car Unlock, and Mortar Autocast.
+`client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
+Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; Unlock
+Artillery requires completed Anti-Tank Gun Crews research, and Command Car requires completed Tank
+Production research.
 
 ## Current Ability Surface
 
@@ -182,9 +190,11 @@ paths. Later phases must update this section whenever they touch one of those li
   code parity.
 - `tests/hud_command_card.mjs` locks representative current command-card descriptors.
 - `node scripts/check-faction-catalog-parity.mjs` compares every client-exposed catalog with the
-  Rust dump and verifies that all Rust catalogs are dumpable while fixture/future catalogs stay
-  deliberately bounded on the client surface. Every real-faction descriptor exposed in
-  `client/src/config.js` must be compared against the Rust dump by this gate.
+  Rust dump across catalog ids, loadout ids, train and research keys, builder/gatherer/production
+  anchors, ability command-card metadata, costs, and playable selector ids. It verifies that all
+  Rust catalogs are dumpable, that fixture catalogs stay mirrored for tests, and that
+  fixture/future catalogs are not exposed as playable lobby options. Every real-faction descriptor
+  exposed in `client/src/config.js` must be compared against the Rust dump by this gate.
 
 ## Guardrail Map For Future Faction Work
 

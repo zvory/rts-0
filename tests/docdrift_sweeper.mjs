@@ -80,6 +80,12 @@ function classifyFailure(args) {
   }
 }
 
+function writeExecutable(name, text) {
+  const absPath = path.join(fixtureRoot, name);
+  fs.writeFileSync(absPath, text, { mode: 0o755 });
+  return absPath;
+}
+
 fs.mkdirSync(repo, { recursive: true });
 
 try {
@@ -95,8 +101,8 @@ try {
         routes: [
           {
             source: ["server/crates/sim/src/game/**"],
-            docs: ["docs/context/server-sim.md", "docs/design/server-sim.md"],
-            notes: "Sim changes route to server sim docs.",
+            docs: ["docs/context/server-sim.md", "docs/design/server-sim.md", "docs/design/testing.md"],
+            notes: "Sim changes route primarily to server sim docs, with a broad testing-doc trace candidate.",
           },
           {
             source: ["tests/**", "scripts/check-*.mjs"],
@@ -143,6 +149,8 @@ try {
     "",
     { date: "2026-06-20T12:02:00Z" },
   );
+  git(["commit", "--allow-empty", "-m", "Retrigger main test gate"], { date: "2026-06-20T12:02:30Z" });
+  const emptyCommit = git(["rev-parse", "HEAD"]);
   git(["checkout", "-b", "feature-test-route"]);
   const testCommit = commitFile(
     "tests/server_integration.mjs",
@@ -164,9 +172,10 @@ try {
   assert.equal(jsonReport.head.sha, head);
   assert.equal(jsonReport.traceMap.path, "docs/doc-map.json");
   assert.deepEqual(jsonReport.summary, {
-    totalCommits: 4,
+    totalCommits: 5,
     consideredCommits: 2,
     skippedMergeCommits: 1,
+    skippedEmptyCommits: 1,
     skippedDocsOnlyCommits: 1,
     noCommits: false,
   });
@@ -175,7 +184,7 @@ try {
   assert.ok(simEntry, "expected sim commit in report");
   assert.equal(simEntry.status, "considered");
   assert.equal(simEntry.body, "Adds a new public helper that may need docs.");
-  assert.deepEqual(simEntry.traceDocs, ["docs/context/server-sim.md", "docs/design/server-sim.md"]);
+  assert.deepEqual(simEntry.traceDocs, ["docs/context/server-sim.md", "docs/design/server-sim.md", "docs/design/testing.md"]);
   assert.equal(simEntry.docsTouched.anyDesign, false);
 
   const docsOnlyEntry = jsonReport.commits.find((commit) => commit.subject === "Clarify testing docs");
@@ -183,6 +192,11 @@ try {
   assert.equal(docsOnlyEntry.status, "skipped");
   assert.equal(docsOnlyEntry.skipReason, "docs_only_churn");
   assert.equal(docsOnlyEntry.docsTouched.anyDesign, true);
+
+  const emptyEntry = jsonReport.commits.find((commit) => commit.sha === emptyCommit);
+  assert.ok(emptyEntry, "expected empty commit in report");
+  assert.equal(emptyEntry.status, "skipped");
+  assert.equal(emptyEntry.skipReason, "empty_commit");
 
   const testEntry = jsonReport.commits.find((commit) => commit.sha === testCommit);
   assert.ok(testEntry, "expected test commit in report");
@@ -198,6 +212,7 @@ try {
   assert.match(markdown, /Change sim API/);
   assert.match(markdown, /docs\/design\/server-sim\.md/);
   assert.match(markdown, /docs_only_churn/);
+  assert.match(markdown, /empty_commit/);
   assert.match(markdown, /merge_commit/);
 
   const outDir = path.join(fixtureRoot, "out");
@@ -303,7 +318,8 @@ try {
   assert.equal(generateJson.docPatch.summary.updateDocsDecisions, 1);
   assert.equal(generateJson.docPatch.summary.patches, 1);
   assert.equal(generateJson.docPatch.summary.applied, 1);
-  assert.equal(generateJson.docPatch.records[0].docTargets[0], "docs/design/server-sim.md");
+  assert.deepEqual(generateJson.docPatch.records[0].docTargets, ["docs/design/server-sim.md"]);
+  assert.equal(generateJson.docPatch.records[0].docTargetSource, "classifier_likely_docs");
   assert.match(
     fs.readFileSync(path.join(repo, "docs/design/server-sim.md"), "utf8"),
     /Game API helper changes should be reflected here/,
@@ -328,6 +344,194 @@ try {
   );
   assert.equal(idempotentGenerateJson.docPatch.summary.applied, 0);
   assert.equal(idempotentGenerateJson.docPatch.summary.alreadyApplied, 1);
+  assert.equal(idempotentGenerateJson.docPatch.summary.cacheHits, 1);
+  assert.equal(idempotentGenerateJson.docPatch.budget.estimatedPromptTokens, 0);
+  assert.equal(idempotentGenerateJson.docPatch.records[0].cache.reason, "already_applied_patch");
+
+  const sequentialRepo = path.join(fixtureRoot, "sequential-repo");
+  fs.mkdirSync(sequentialRepo, { recursive: true });
+  const seqGit = (args, options = {}) => run("git", args, { cwd: sequentialRepo, ...options }).trim();
+  const seqWrite = (name, text) => {
+    const absPath = path.join(sequentialRepo, name);
+    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    fs.writeFileSync(absPath, text);
+  };
+  const seqCommit = (name, text, subject, options = {}) => {
+    seqWrite(name, text);
+    seqGit(["add", name]);
+    seqGit(["commit", "-m", subject], options);
+    return seqGit(["rev-parse", "HEAD"]);
+  };
+  run("git", ["init", "--initial-branch=main"], { cwd: sequentialRepo });
+  seqGit(["config", "user.email", "agent@example.invalid"]);
+  seqGit(["config", "user.name", "Agent"]);
+  seqWrite(
+    "docs/doc-map.json",
+    JSON.stringify(
+      {
+        version: 1,
+        routes: [
+          {
+            source: ["server/crates/sim/src/game/**"],
+            docs: ["docs/design/server-sim.md"],
+          },
+        ],
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  seqWrite("docs/design/server-sim.md", "server sim design\n");
+  seqGit(["add", "."]);
+  seqGit(["commit", "-m", "Initial docs"]);
+  const sequentialBase = seqGit(["rev-parse", "HEAD"]);
+  seqCommit(
+    "server/crates/sim/src/game/mod.rs",
+    "pub struct Game;\n",
+    "Change sim API",
+    { date: "2026-06-20T12:10:00Z" },
+  );
+  seqCommit(
+    "server/crates/sim/src/game/mod.rs",
+    "pub struct Game;\npub fn helper() {}\n",
+    "Refine sim API",
+    { date: "2026-06-20T12:11:00Z" },
+  );
+  const sequentialHead = seqGit(["rev-parse", "HEAD"]);
+  const sequentialFixture = path.join(fixtureRoot, "classifier-sequential.json");
+  fs.writeFileSync(
+    sequentialFixture,
+    JSON.stringify(
+      {
+        decisions: [
+          {
+            subjectIncludes: "Change sim API",
+            decision: "update_docs",
+            likelyDocs: ["docs/design/server-sim.md"],
+            evidenceNote: "First sim API commit needs server sim docs.",
+          },
+          {
+            subjectIncludes: "Refine sim API",
+            decision: "update_docs",
+            likelyDocs: ["docs/design/server-sim.md"],
+            evidenceNote: "Second sim API commit needs the same server sim docs.",
+          },
+        ],
+        default: {
+          decision: "move_on",
+          likelyDocs: [],
+          evidenceNote: "No docs update needed.",
+        },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  const sequentialClassifierCache = ".docdrift/sequential-classifier-cache";
+  classify([
+    "--repo",
+    sequentialRepo,
+    "--base",
+    sequentialBase,
+    "--head",
+    sequentialHead,
+    "--no-codex",
+    "--fixture",
+    sequentialFixture,
+    "--classifier-cache",
+    sequentialClassifierCache,
+    "--format",
+    "json",
+  ]);
+  const fakeSequentialCodex = writeExecutable(
+    "fake-sequential-doc-codex",
+    [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const args = process.argv.slice(2);",
+      "const outputFlag = args.indexOf('--output-last-message');",
+      "if (outputFlag < 0 || outputFlag + 1 >= args.length) process.exit(2);",
+      "const prompt = fs.readFileSync(0, 'utf8');",
+      "const response = prompt.includes('First generated detail.')",
+      "  ? { summary: 'Add second generated detail.', patches: [{ path: 'docs/design/server-sim.md', find: 'First generated detail.\\n', replace: 'First generated detail.\\nSecond generated detail.\\n', rationale: 'The second prompt saw the first generated detail.' }] }",
+      "  : { summary: 'Add first generated detail.', patches: [{ path: 'docs/design/server-sim.md', find: 'server sim design\\n', replace: 'server sim design\\n\\nFirst generated detail.\\n', rationale: 'The first prompt adds the initial detail.' }] };",
+      "fs.writeFileSync(args[outputFlag + 1], JSON.stringify(response));",
+      "console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 5, output_tokens: 4, total_tokens: 9 } }));",
+      "",
+    ].join("\n"),
+  );
+  const sequentialGenerate = JSON.parse(
+    generateDocs([
+      "--repo",
+      sequentialRepo,
+      "--base",
+      sequentialBase,
+      "--head",
+      sequentialHead,
+      "--codex-command",
+      fakeSequentialCodex,
+      "--classifier-cache",
+      sequentialClassifierCache,
+      "--doc-patch-cache",
+      ".docdrift/sequential-doc-patch-cache",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(sequentialGenerate.classifier.summary.cacheHits, 2);
+  assert.equal(sequentialGenerate.docPatch.summary.applied, 2);
+  assert.equal(sequentialGenerate.docPatch.summary.alreadyApplied, 0);
+  assert.equal(sequentialGenerate.docPatch.records[1].summary, "Add second generated detail.");
+  const sequentialDoc = fs.readFileSync(path.join(sequentialRepo, "docs/design/server-sim.md"), "utf8");
+  assert.match(sequentialDoc, /First generated detail/);
+  assert.match(sequentialDoc, /Second generated detail/);
+
+  const fakeCodexArgsPath = path.join(fixtureRoot, "fake-codex-args.json");
+  const fakeCodex = writeExecutable(
+    "fake-codex",
+    [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const args = process.argv.slice(2);",
+      `fs.writeFileSync(${JSON.stringify(fakeCodexArgsPath)}, JSON.stringify(args, null, 2));`,
+      "const outputFlag = args.indexOf('--output-last-message');",
+      "if (outputFlag < 0 || outputFlag + 1 >= args.length) process.exit(2);",
+      "if (args.includes('--ask-for-approval')) process.exit(3);",
+      "if (!args.includes('--json')) process.exit(4);",
+      "if (!args.includes('-c') || !args.includes('approval_policy=\"never\"')) process.exit(5);",
+      "fs.writeFileSync(args[outputFlag + 1], JSON.stringify({ decision: 'move_on', likelyDocs: [], evidenceNote: 'Fake Codex moved this commit on.' }));",
+      "console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 11, output_tokens: 7, total_tokens: 18 } }));",
+      "",
+    ].join("\n"),
+  );
+  const liveShapeJson = JSON.parse(
+    classify([
+      "--base",
+      checkpointCommit,
+      "--head",
+      simCommit,
+      "--codex-command",
+      fakeCodex,
+      "--classifier-cache",
+      ".docdrift/fake-codex-cache",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(liveShapeJson.classifier.summary.totalDecisions, 1);
+  assert.equal(liveShapeJson.classifier.decisions[0].codex.mode, "codex_cli");
+  assert.deepEqual(liveShapeJson.classifier.decisions[0].codex.usage, {
+    inputTokens: 11,
+    cachedInputTokens: null,
+    outputTokens: 7,
+    reasoningTokens: null,
+    totalTokens: 18,
+  });
+  const fakeArgs = JSON.parse(fs.readFileSync(fakeCodexArgsPath, "utf8"));
+  assert.ok(!fakeArgs.includes("--ask-for-approval"));
+  assert.ok(fakeArgs.includes("--json"));
+  assert.ok(fakeArgs.includes("-c"));
+  assert.ok(fakeArgs.includes('approval_policy="never"'));
 
   const generateOutDir = path.join(fixtureRoot, "generate-out");
   generateDocs([
@@ -366,7 +570,7 @@ try {
   const checkpointReport = JSON.parse(sweep(["--head", head, "--format", "json"]));
   assert.equal(checkpointReport.base.ref, base);
   assert.equal(checkpointReport.base.source, "docs/docdrift-checkpoint.txt");
-  assert.equal(checkpointReport.summary.totalCommits, 5);
+  assert.equal(checkpointReport.summary.totalCommits, 6);
   assert.equal(checkpointReport.summary.consideredCommits, 2);
 
   const emptyReport = JSON.parse(sweep(["--base", head, "--head", head, "--format", "json"]));

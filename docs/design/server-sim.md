@@ -23,7 +23,7 @@ crates/
     fog.rs       # per-player live visibility grids; snapshots union living teammate grids
     building_memory.rs # server-only per-player last-seen enemy building records
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
+    services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction/deconstruction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     replay.rs    # tick-stamped command log replay harness for determinism checks
     src/rules/projection.rs # fog-gated entity/event projection seam
 ```
@@ -48,6 +48,11 @@ new code should prefer the owning crate directly when that does not make local c
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
 `game-core` implementer: provide exactly these. `server-shell` implementer: call only these.
+The server shell may also serve non-simulation HTTP routes such as `/wiki`, `/wiki/`, and
+`/wiki/{*path}`. Those routes generate the wiki index from the allowlisted packaged Markdown docs
+roots (`docs/context` and `docs/design`), route canonical `/wiki/docs/...` doc pages while
+preserving legacy short aliases, rewrite allowlisted relative Markdown doc links under `/wiki` with
+anchors preserved, render allowlisted docs Markdown as no-cache HTML, and do not call into `Game`.
 
 ```rust
 pub struct Game { /* private */ }
@@ -252,12 +257,18 @@ alive.
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
-  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`,
-  `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`, `SeekRoomTime`,
-  `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer of game state —
-  no locks around `Game`.
-- The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
-  connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
+  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
+  `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
+  `SeekRoomTime`, `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer
+  of game state — no locks around `Game`.
+- Room-mode and phase-dependent lobby checks use a lobby-local `SessionPolicy` descriptor for the
+  current room mode and phase matrix, including dev-watch, replay-room, branch-staging, countdown,
+  speed-source, and match-history decisions.
+- The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
+  per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
+  `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay
+  per-viewer vision, dev full-world snapshots, and observer-analysis audiences; `SnapshotFanout`
+  owns compacting, net status, and perf accounting. Lobby phase: broadcast `lobby` on changes.
 - Live-match pause state belongs to `RoomTask`, not `Game` and not `tick_control.rs`. Normal live
   and branch-live active seats can spend up to three successful pause starts per match; spectators,
   replay viewers, dev-watch viewers, and lab viewers cannot spend pauses. While paused, the room
@@ -280,9 +291,9 @@ alive.
   projection and fanout helpers to send watchers full-world snapshots for the configured view
   player. Saved self-play artifacts are normal `ReplayArtifactV1` files and load through
   `Phase::ReplayViewer` via the neutral replay-artifact room path.
-- Replay viewer rooms use `Phase::ReplayViewer`, which owns a `ReplaySession`:
-  the immutable `ReplayArtifactV1`, rebuilt `Game`, command cursor, shared playback speed, and
-  per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
+- Replay viewer rooms use `Phase::ReplayViewer`, which owns a lobby-local
+  `replay_session::ReplaySession`: the immutable `ReplayArtifactV1`, rebuilt `Game`, command
+  cursor, shared playback speed, and per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, never full-world state.
 
 Lobby-owned runtime boundaries stay in `server/src/lobby/`; none of these helpers move transport,
@@ -346,8 +357,8 @@ state-reading exception: it reads `Entity`, `Fog`, and smoke state so snapshot a
 policy is centralized instead of scattered through services.
 
 - `rules::defs` — immutable unit/building/node definition tables keyed by `EntityKind`. These
-  records are the source of truth for kind-specific stats, armor class, weapon class, target
-  priority, production chains, tech requirements, and resource-node amounts.
+  records are the source of truth for kind-specific stats, armor class, weapon class, production
+  chains, tech requirements, and resource-node amounts.
 - `rules::faction` — faction catalogs keyed by stable faction id. Catalogs reference global
   `EntityKind`, upgrade id, ability id, and Steel/Oil/Supply costs; reuse a global id across
   factions only when gameplay semantics are identical for every faction that can use it. Divergent
@@ -355,8 +366,8 @@ policy is centralized instead of scattered through services.
   catalog availability. The default catalog is `kriegsia`; `ekat` exposes the current Ekat hero
   and Zamok slice; `phase2_empty_fixture` exists only as a command-validation test fixture.
   Server-side lifecycle policy lives in `server/src/lobby/faction_validation.rs`.
-- `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
-  `attack_profile(kind) -> AttackProfile`, and
+- `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`), target-ranking classifiers
+  (`target_threat_role`, `default_weapon_target_fit`), `attack_profile(kind) -> AttackProfile`, and
   `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.
 - `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
   `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,
@@ -511,9 +522,10 @@ Keyboard latching, double-tap quick-cast, Shift lifetime, and cursor previews ar
 simulation contract begins when a `SimCommand` reaches `services::commands`: the command service
 dedupes and caps unit-id lists, rejects over-budget human unit-list commands, builds issue-time
 facts for the referenced units/targets, and must produce unit-local actions that match the policy
-below. Human command budget is supply-based: 24 base command supply plus 12 per submitted owned
-Command Car plus that Command Car's own mirrored supply weight, so Command Cars offset their own
-weight before adding bonus capacity. AI-owned players are exempt from this budget because live AI
+below. Human command budget is supply-based: 24 base command supply plus
+`COMMAND_CAR_SUPPLY_CAP_BONUS = 20` per submitted owned Command Car plus that Command Car's own
+mirrored supply weight, so Command Cars offset their own weight before adding bonus capacity.
+AI-owned players are exempt from this budget because live AI
 still issues ordinary `SimCommand`s through
 `Game::enqueue`. `services::order_planner` is the pure
 reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
@@ -536,8 +548,49 @@ General rules:
   validity/visibility, finite points, ability carrier kind, ability readiness/cooldown/uses, and
   other command-specific facts before planning. It does not project future movement, future
   cooldown expiry, future tech, or future affordability.
+- Same-tile movement goals count as arrived rather than path-failed. Plain move orders clear back to
+  idle on arrival; attack-move orders keep their aggressive stance.
+- `HoldPosition` clears each selected unit's active order and queued intents, then marks the unit as
+  held. Held units do not voluntarily move or chase targets, but they keep normal collision behavior
+  and may fire at enemies already inside current weapon range.
+- Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
+  hard blocker would absorb the current shot; mobile attackers then use the existing chase path to
+  seek a fireable position. Tank Traps are not combat shot blockers, so damage continues to the
+  target behind them; tanks and normal buildings still block shots. Building targets and statically
+  blocked target tiles use a passable perimeter chase goal instead of the blocked footprint center.
+  Tank Traps keep generic building targeting and cleanup behavior but do not count for elimination
+  survival. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
+  bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
+  acquisition remains stricter and prefers targets that are currently fireable.
+- Normal combat auto-acquisition first filters already-legal hostile candidates in
+  `services::combat::acquisition`, then chooses between them through the sim-local
+  `services::combat::priority` ranker. The ranker owns priority terms such as default-weapon fit,
+  Tank immediate-threat order, shoot-while-moving target retention, unit-over-building preference,
+  and nearest/id tie-breaks; it does not decide fog, smoke, line-of-sight, blocker, ownership, or
+  acquisition-radius legality. Default small-arms weapons prefer soft targets while keeping armored
+  or hard targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
+  armored/hard targets, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
+  Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
+  `services::occupancy` reports that the trap is on the current bounded route segment or forms a
+  closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose
+  to real combat targets. The obstruction query is read-only, uses the current waypoint, `path_goal`,
+  or movement intent, and does not run pathfinding during target ranking.
+  Retention is intentionally a stickiness term inside the ranker rather than a separate branch:
+  Tanks, Scout Cars, and charged Riflemen keep a still-legal current target when competing targets
+  have the same material rank, but they switch when a higher-rank default-weapon threat appears.
+  Dead, friendly, hidden, smoke-covered, or non-fireable retained targets are filtered out before
+  ranking and cannot bypass legality.
+- The auto-acquisition ranker chooses only for the current default attack profile. Future grenades,
+  satchels, sticky bombs, melee demolition, or other special attacks must be represented as separate
+  profiles with explicit activation policy; explicit-only special attacks can be added without
+  changing default auto-acquisition, and autocast special attacks need their own conservative plan
+  and tests.
 - Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
-  unaffordable later is skipped or rejected by the execution/promotion path.
+  unaffordable later is skipped or rejected by the execution/promotion path. Tank Trap construction
+  is server-authoritative after Training Centre eligibility and uses vehicle-body-only placement
+  blocking. Constructed buildings spawn with their full max HP but only 10% current HP, then
+  linearly gain current HP with construction progress until completion restores them to full
+  health; prebuilt starting buildings are unchanged.
 - Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear
   future intents. `stop` always clears both active and queued unit orders.
 - Queueable commands append future unit-local intents. Unit queues are capped at 8 intents today;
@@ -557,11 +610,15 @@ Allocation rules:
   issue-time validation. Occupied resource nodes are still valid gather targets; when a worker
   arrives and the patch is already occupied, the economy service redirects it to the nearest
   unoccupied same-resource node within ten tiles, or moves it to nearby open grass if none exists.
-  Build orders allocate one compatible selected worker per click after the placement has passed
-  issue-time validation: immediate builds prefer idle workers and then closest worker to the
-  footprint center; queued builds prefer the lowest build assignment load, then closest worker. Build
-  assignment load is the worker's current queued-order count plus one when its active order is
-  already a build intent.
+  Build and Tank Trap deconstruct orders allocate one compatible selected worker per click after the
+  target has passed issue-time validation: immediate orders prefer idle workers and then closest
+  worker to the footprint/target center; queued orders prefer the lowest work assignment load, then
+  closest worker. Work assignment load is the worker's current queued-order count plus one when its
+  active order is already a build or deconstruct intent. Deconstruct targets must be completed Tank
+  Traps; friendly/allied traps are always legal targets for their team's workers, while enemy traps
+  must be visible when accepted or promoted. Deconstruction takes the Tank Trap's build time, is not
+  accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap cost to the
+  deconstructing player.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
   decodable for old command logs but does not create queued or immediate ability work.
 - World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued

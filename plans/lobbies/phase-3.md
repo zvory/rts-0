@@ -21,6 +21,8 @@ players, join full waiting rows as spectators, and no longer use a manual room-n
     new joins during countdown.
 - Persist the edited player name before create or join, using the existing name storage behavior.
 - Remove visible room-name joining from `client/index.html` and `client/src/lobby.js`.
+- Update the pinned DOM-contract comment and nearby client tests so the normal pre-join path no
+  longer promises `#lobby-room`/`#lobby-join` as visible product controls.
 - Refresh the lobby list immediately after create failure, join rejection, stale row detection, and
   successful leave/return-to-lobby flows where appropriate.
 
@@ -67,6 +69,9 @@ players, join full waiting rows as spectators, and no longer use a manual room-n
 
 - Do not keep the old room-name field hidden-but-focusable. If compatibility markup remains for
   tests, it must be inaccessible from the normal product flow.
+- Do not remove lower-level join-by-room protocol support that tests, direct URLs, replay prompts,
+  or dev flows still use. This phase removes the normal product UI affordance, not the underlying
+  server join capability.
 - Do not let `Create Lobby` race into joining an existing room. Duplicate create is an error.
 - Do not make users choose active vs spectator manually. Full waiting rows choose spectator
   automatically; open waiting rows choose active automatically.

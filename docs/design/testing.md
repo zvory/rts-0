@@ -31,13 +31,13 @@ depends on long matches.
 **Profile-backed coverage.** The long profile-backed tests spawn AI-profile players through the
 self-play adapter and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo nextest run
 --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default`. The
-profiles gather steel and oil, construct supply and tech structures, train Riflemen and Tanks, and launch
-attack-move waves at public enemy start tiles. The self-play adapter owns harness-only state such as
-pending build intents, failed build spots, and staging/attack guards needed to interpret
-fog-filtered snapshots without duplicating profile strategy logic. The harness checks per-tick
-invariants for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds
-positions, and non-finite progress values. It also enforces progress deadlines so a stuck
-economy/tech/combat loop fails as a deadlock instead of timing out silently.
+profiles gather steel and oil, construct supply and tech structures, train Riflemen, Scout Cars, and
+Tanks, and launch attack-move waves at public enemy start tiles. The self-play adapter owns
+harness-only state such as pending build intents, failed build spots, and staging/attack guards
+needed to interpret fog-filtered snapshots without duplicating profile strategy logic. The harness
+checks per-tick invariants for invalid resources, supply overflow, malformed entity snapshots,
+out-of-bounds positions, and non-finite progress values. It also enforces progress deadlines so a
+stuck economy/tech/combat loop fails as a deadlock instead of timing out silently.
 
 Special harness scripts remain where they cover behavior that is not a normal AI strategy profile:
 `WorkerRushScript` is an all-in worker-pull scenario, and `MineOnlyScript` is passive mining/fairness
@@ -68,8 +68,9 @@ write a replay artifact:
 
 ```bash
 cd server
-cargo run --bin ai-matchup -- rush tech
-cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
+cargo run --bin ai-matchup -- ai ai
+cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
+cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
@@ -91,14 +92,14 @@ open "http://localhost:<port>/dev/scenarios"
 The index lists every supported launch and links to the current URL shape:
 
 ```text
-/dev/scenarios?id=<scenario_id>&unit=<unit>&count=<count>[&blocker=<unit|none>]
+/dev/scenarios?id=<scenario_id>&unit=<unit>&count=<count>[&blocker=<unit|none>][&case=<case>]
 ```
 
 The handler redirects into the normal client with `watchScenario=1`; the client auto-joins a
 reserved spectator room named:
 
 ```text
-__dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>]
+__dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>][:case=<case>]
 ```
 
 Current scenario ids:
@@ -131,6 +132,8 @@ The Tank Trap pathing matrix scenarios are harnesses for owner-aware pathing, in
 pass-through, explicit infantry attacks, and attack-move acquisition filtering. Enemy Tank Traps are
 breachable for vehicle path planning only; physical movement and standability still treat live Tank
 Trap footprints and closed one-tile gaps as vehicle-body blockers until combat removes enough traps.
+Combat acquisition should prioritize a Tank Trap only when that trap lies on the vehicle's bounded
+route window or closes a gap across it; irrelevant nearby traps should lose to combat targets.
 
 ## 11. Package-aware test selection policy
 
@@ -139,6 +142,9 @@ usually be narrower and selected by the changed files or contracts. Use
 `node tests/select-suites.mjs --from=<base-ref>` or pass changed paths directly to see the expected
 suites.
 
+- Phase runner plan/path handling: run `node tests/phase_runner_agents.mjs` when changing
+  `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
+  names and sanitized worktree/log slugs.
 - `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS
   protocol mirror/decode tests, and Node integration when a top-level message or compact shape
   changed.
@@ -147,13 +153,33 @@ suites.
   notes.
 - Faction guardrails: run `node scripts/check-faction-assumptions.mjs` for faction docs, lifecycle
   policy, lobby admission, protocol/config vocabulary, or checker changes. Run
-  `node scripts/check-faction-catalog-parity.mjs` when faction catalog facts or client mirrors can
-  change, including `server/crates/rules/src/faction.rs`, `client/src/config.js`,
+  `node scripts/check-faction-catalog-parity.mjs` when faction catalog facts, the Rust catalog dump,
+  or client mirrors can change, including `server/crates/rules/src/faction.rs`,
+  `server/crates/rules/src/bin/dump-faction-catalog.rs`, `client/src/config.js`,
   `client/src/lobby_view.js`, protocol/config mirror files, or the catalog parity checker itself.
   Docs-only faction policy edits should select these guardrails without requiring live-server
   suites.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
-  changed behavior that crosses the room/network boundary.
+  changed behavior that crosses the room/network boundary. Tank Trap blocker/pathing changes should
+  include the focused gap/pathability regression and constructible horizontal, vertical, and
+  diagonal dev scenario coverage.
+- SVG legacy unit renderer oracle: run `node tests/legacy_unit_visual_oracle.mjs` when legacy unit
+  rendering behavior or `tests/fixtures/svg/legacy-unit-oracle.baseline.json` changes. The oracle
+  uses a deterministic Node fixture, semantic measurements, and bounded pixel-diff thresholds across
+  current unit kinds and representative animation states.
+- Client performance harness: run `node --check scripts/client-perf-harness.mjs` and
+  `node scripts/client-perf-harness.mjs --list` when changing the fixed browser performance
+  workloads, stress-matrix dimensions, harness script, or documented performance workflow. Workload
+  execution uses local headless Chrome against a local server and writes bounded JSON summaries
+  under `target/client-perf`; it is measurement-only and does not add FPS gates. Stress-matrix runs
+  vary CPU throttle, viewport, DPR, and repeat count, then write JSON and Markdown rollups.
+  Render-lag summaries report advisory 60/120/240/480 FPS frame-work budget targets, p95 margin,
+  next missed headroom budget, grouped render diagnostics, and long-frame context from local
+  evidence instead of portable RAF FPS claims. `ClientNetReport` uploads are unchanged by these local
+  artifacts.
+- Transparent SVG rig pixel gates: run `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
+  when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
+  change. The harness compares Worker and Tank part and composition samples.
 - Team-aware authored start assignment is covered by `cargo nextest run map` for deterministic
   FFA compatibility, current authored map proximity, 1v2/1v3 team layouts, synthetic larger layouts,
   start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
@@ -198,8 +224,11 @@ changed-file mapping selects the skipped behavior.
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
 It is an aggregate check over split coverage jobs for server binary build, Rust/architecture, live
 Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
-The split jobs run `tests/run-all.sh` sub-modes so the required aggregate gate preserves the same
-coverage as the portable repo-root command without serializing every suite in one runner.
+The split jobs run `tests/run-all.sh` sub-modes under CI so the required aggregate gate preserves
+client smoke plus tri-state browser coverage without serializing every suite in one runner. Local
+`tests/run-all.sh` runs keep client smoke in the default browser gate but skip the latency-sensitive
+tri-state browser scenarios unless `--with-tri-state-browser` or `RTS_RUN_TRI_STATE_BROWSER=1` is
+set.
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative
@@ -213,6 +242,9 @@ contract.
 `node scripts/check-docs-health.mjs` runs in the early changed-files CI lane before expensive split
 jobs. It validates `docs/doc-map.json`, enforces the 5 KiB `docs/context/*.md` capsule cap, and
 checks local Markdown links in `docs/` and `plans/`.
+
+The `PR ownership` workflow validates owned agent PR metadata for `zvorygin/*` branches with
+`scripts/check-pr-ownership.sh`.
 
 The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
 live Node, and browser coverage is owned by the split `Main test gate` jobs under the required
@@ -237,7 +269,8 @@ before checking out and deploying the tested head SHA.
 `scripts/docdrift-sweep.mjs --dry-run` is the deterministic operator surface for reviewing commits
 between `docs/docdrift-checkpoint.txt` or `--base` and `--head`. It reads commit metadata,
 changed paths, compact diff stats, docs touched, and `docs/doc-map.json` trace-map candidates, but
-does not edit docs, create PRs, or advance the checkpoint.
+does not edit docs, create PRs, or advance the checkpoint. Merge commits, empty commits, and
+docs-only churn are skipped before classifier prompts are built.
 
 `scripts/docdrift-sweep.mjs --classify` adds the cheap Codex CLI classifier. Live classifier runs
 must use Codex CLI authentication through the local `codex exec` path; they must not use the
@@ -245,14 +278,22 @@ OpenAI Agents SDK, direct API clients, API-key environment variables, or API-bil
 routes. Fixture runs use `--no-codex --fixture <name>` and are the required focused verification
 path before any live Codex smoke. Classifier decisions are cached under the ignored
 `.docdrift/classifier-cache/` runtime directory by prompt version and commit SHA, and reports can be
-written with `--out-dir`.
+written with `--out-dir`. Live Codex calls run read-only with approval policy forced to `never` via
+Codex config override, emit per-commit progress on stderr, and record token usage when the Codex
+JSON event stream includes it.
 
 `scripts/docdrift-sweep.mjs --generate-docs` reruns or reuses the classifier records, selects only
 `update_docs` decisions, loads targeted authoritative design-doc sections, and asks Codex CLI for
-exact minimal find/replace doc patches. The script applies those patches to the working tree and
-writes `docdrift-generate.{md,json}` with `--out-dir`; operators inspect the resulting docs diff
-before any PR lifecycle step. Fixture runs use the same `--no-codex --fixture <name>` path and must
-remain idempotent, with reruns reporting already-applied patches instead of duplicating text.
+exact minimal find/replace doc patches. The generator prefers classifier-selected design docs; docs
+touched in the commit and broad trace-map design docs are fallbacks, not an automatic union. It
+builds and applies doc-patch prompts sequentially so later `update_docs` decisions see docs already
+changed by earlier decisions in the same sweep; if the supplied sections already cover the behavior,
+the generator should return an empty patch set instead of restating it. The script applies generated
+patches to the working tree and writes `docdrift-generate.{md,json}` with `--out-dir`; operators
+inspect the resulting docs diff before any PR lifecycle step. Fixture runs use the same
+`--no-codex --fixture <name>` path and must remain idempotent. If a retry sees that a cached patch's
+replacement text is already present, it reports the patch as already applied without spending
+another Codex generation call.
 
 `scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
 uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed

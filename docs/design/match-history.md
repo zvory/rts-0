@@ -69,14 +69,16 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   human player and `debug_mode = false`; AI-only and lobby Debug/quickstart rows may be persisted
   with replay artifacts but stay out of the lobby table. Local-only rows are included only when the
   request peer address is loopback; public beta/mainline requests filter them out. Each summary
-  includes `replayAvailable` plus `replayUnavailableReason`. Availability is true only when a
-  replay row exists and its artifact schema, build SHA, map schema, and map content hash are
-  compatible with the running server.
+  includes `replayAvailable` plus `replayUnavailableReason`. Availability is false when no replay
+  row exists or its artifact schema, map schema, or map content hash is incompatible with the
+  running server. Build-SHA mismatches are warning-compatible: `replayAvailable` remains true and
+  `replayUnavailableReason` carries the compatibility warning.
 - **Replay launch**: `POST /api/matches/{id}/replay` — read-only launch request. The server loads
   the persisted artifact only if the match is visible to the request scope, validates it against
-  the running build, map metadata, and the shared replay faction/loadout validator used by replay
-  rooms, creates a spectator replay room, and returns `{ "room": "..." }`. Incompatible or missing
-  replays return a clear JSON `{ "error": "..." }` instead of trying partial playback.
+  the running map metadata and the shared replay faction/loadout validator used by replay rooms,
+  creates a spectator replay room, and returns `{ "room": "..." }`. Build-SHA mismatches log a
+  warning and remain launchable. Schema, map, faction/loadout, or missing replay failures return a
+  clear JSON `{ "error": "..." }` instead of trying partial playback.
 - **Write**: none. Clients cannot write history. Period.
 
 ## Code seams
@@ -155,9 +157,10 @@ include historical local-only rows from the request peer address. Only loopback 
   `migrations/` filenames are timestamp-prefixed and sequential.
 - **Slow write**: detached task means the room is unblocked. Worst case the row appears seconds
   later in `/api/matches`.
-- **Replay incompatible with current build/map**: summaries show `replayAvailable: false` with a
-  reason, and launch returns `409` with the same class of explanation. The server never attempts
-  best-effort playback across build or map drift.
+- **Replay incompatible with current schema/map/faction/loadout**: summaries show
+  `replayAvailable: false` with a reason, and launch returns `409` with the same class of
+  explanation. Build-SHA drift is warning-compatible (`replayAvailable: true` with a warning);
+  schema, map, faction, and loadout drift are rejecting.
 
 ## Secrets and rotation
 

@@ -1,5 +1,6 @@
-import { LAB_ROLE, msg } from "./protocol.js";
-import { STATS, UPGRADES } from "./config.js";
+import { PLAYABLE_FACTIONS } from "./lobby_view.js";
+import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
+import { factionCatalog, STATS, UPGRADES } from "./config.js";
 
 const labVision = Object.freeze({
   fullWorld: () => msg.labVisionFullWorld(),
@@ -16,6 +17,17 @@ export class LabPanel {
     this.match = match;
     this.state = labClient?.state || startPayload?.lab || null;
     this.lastResult = labClient?.lastResult || null;
+    this.spawnPalette = {
+      owner: null,
+      factionId: DEFAULT_FACTION_ID,
+      kind: "",
+      completed: true,
+    };
+    this.advancedSpawn = {
+      owner: null,
+      kind: "",
+      completed: true,
+    };
     this.teamInputs = new Map();
     this.fields = new Map();
     this.listeners = [];
@@ -100,9 +112,7 @@ export class LabPanel {
     const result = document.createElement("p");
     result.className = "lab-result";
     if (this.lastResult) {
-      result.textContent = this.lastResult.ok
-        ? `${this.lastResult.op || "request"} accepted`
-        : this.lastResult.error || `${this.lastResult.op || "request"} rejected`;
+      result.textContent = this.resultText(this.lastResult);
       result.dataset.state = this.lastResult.ok ? "ok" : "error";
     } else {
       result.textContent = "Ready";
@@ -117,27 +127,35 @@ export class LabPanel {
     root.setAttribute("aria-label", "Lab setup tools");
 
     const selection = this.selectedEntities();
-    const selectedIds = selection.map((entity) => entity.id);
+    const selectedIds = selectedEntityIds(selection);
     const issueOwner = singleOwner(selection);
-    const point = this.defaultWorldPoint();
+    const hasSelection = selectedIds.length > 0;
+    const selectedActionDisabled = !hasSelection;
+    const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
 
-    root.appendChild(this.fieldset("Spawn", [
-      this.selectField("spawn-kind", "Kind", spawnKinds(), KIND_LABELS),
-      this.playerSelectField("spawn-owner", "Owner"),
-      this.numberField("spawn-x", "X", point.x),
-      this.numberField("spawn-y", "Y", point.y),
-      this.checkboxField("spawn-completed", "Complete", true),
-      this.button("Spawn", () => this.spawnEntity()),
-    ]));
+    root.appendChild(this.renderActiveToolStatus());
+    root.appendChild(this.renderSpawnPalette());
+    root.appendChild(this.renderAdvancedSpawn());
 
     root.appendChild(this.fieldset("Selected", [
       this.readout(`${selectedIds.length} selected`),
-      this.numberField("move-x", "X", point.x),
-      this.numberField("move-y", "Y", point.y),
-      this.button("Move", () => this.batchSelected((entity) => this.labClient.moveEntity(entity.id, this.num("move-x"), this.num("move-y")))),
-      this.playerSelectField("set-owner", "Owner"),
-      this.button("Set owner", () => this.batchSelected((entity) => this.labClient.setEntityOwner(entity.id, this.int("set-owner")))),
-      this.button("Delete", () => this.batchSelected((entity) => this.labClient.deleteEntity(entity.id))),
+      this.button("Move to point", () => this.armMoveSelectedTool(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+        dataset: { active: this.activeLabTool()?.kind === "moveSelected" ? "true" : "false" },
+      }),
+      this.playerSelectField("set-owner", "Owner", {
+        value: issueOwner ?? undefined,
+        disabled: selectedActionDisabled,
+      }),
+      this.button("Set owner", () => this.setSelectedOwner(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+      }),
+      this.button("Delete", () => this.deleteSelected(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+      }),
       this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
     ]));
 
@@ -170,6 +188,31 @@ export class LabPanel {
     return root;
   }
 
+  renderActiveToolStatus() {
+    const active = this.activeLabTool();
+    const section = document.createElement("section");
+    section.className = "lab-active-tool";
+    section.dataset.active = active ? "true" : "false";
+    section.setAttribute("aria-live", "polite");
+
+    const label = this.readout(active ? `Armed: ${labToolLabel(active)}` : "No setup tool armed");
+    label.className = "lab-readout lab-active-tool-label";
+    section.appendChild(label);
+
+    if (active) {
+      const detail = this.readout("Click the map to apply. Right-click or Esc cancels.");
+      detail.className = "lab-readout lab-active-tool-detail";
+      section.appendChild(detail);
+    }
+
+    section.appendChild(this.button("Cancel tool", () => this.cancelActiveTool(), {
+      disabled: !active,
+      title: active ? `Cancel ${labToolLabel(active)}` : "No active setup tool",
+      className: "lab-btn lab-cancel-tool",
+    }));
+    return section;
+  }
+
   addStatus(root, label, value) {
     const row = document.createElement("div");
     const dt = document.createElement("dt");
@@ -180,13 +223,34 @@ export class LabPanel {
     root.appendChild(row);
   }
 
-  button(label, onClick) {
+  resultText(result) {
+    const summary = result?.outcome?.summary;
+    if (typeof summary === "string" && summary) return summary;
+    if (result?.ok) return `${result.op || "request"} accepted`;
+    return result?.error || `${result?.op || "request"} rejected`;
+  }
+
+  listen(target, type, handler) {
+    target.addEventListener(type, handler);
+    this.listeners.push([target, type, handler]);
+  }
+
+  button(label, onClick, options = {}) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "lab-btn";
+    button.className = options.className || "lab-btn";
     button.textContent = label;
-    button.addEventListener("click", onClick);
-    this.listeners.push([button, "click", onClick]);
+    if (options.title) button.title = options.title;
+    if (options.disabled) {
+      button.disabled = true;
+      button.setAttribute("aria-disabled", "true");
+    }
+    if (options.dataset) {
+      for (const [key, value] of Object.entries(options.dataset)) {
+        button.dataset[key] = String(value);
+      }
+    }
+    this.listen(button, "click", onClick);
     return button;
   }
 
@@ -214,21 +278,29 @@ export class LabPanel {
     return wrap;
   }
 
-  checkboxField(id, label, checked) {
+  checkboxField(id, label, checked, options = {}) {
     const wrap = this.fieldWrap(label);
     const input = document.createElement("input");
     input.type = "checkbox";
     input.checked = !!checked;
+    if (options.disabled) input.disabled = true;
+    if (typeof options.onChange === "function") {
+      this.listen(input, "change", () => options.onChange(!!input.checked));
+    }
     this.fields.set(id, input);
     wrap.appendChild(input);
     return wrap;
   }
 
-  inputField(id, label, type, value) {
+  inputField(id, label, type, value, options = {}) {
     const wrap = this.fieldWrap(label);
     const input = document.createElement("input");
     input.type = type;
     input.value = String(value ?? "");
+    if (options.disabled) input.disabled = true;
+    if (typeof options.onChange === "function") {
+      this.listen(input, "change", () => options.onChange(input.value));
+    }
     this.fields.set(id, input);
     wrap.appendChild(input);
     return wrap;
@@ -244,7 +316,7 @@ export class LabPanel {
     return wrap;
   }
 
-  selectField(id, label, values, labels = {}) {
+  selectField(id, label, values, labels = {}, options = {}) {
     const wrap = this.fieldWrap(label);
     const select = document.createElement("select");
     for (const value of values) {
@@ -253,18 +325,25 @@ export class LabPanel {
       option.textContent = labels[value] || String(value);
       select.appendChild(option);
     }
+    if (values.map(String).includes(String(options.value))) {
+      select.value = String(options.value);
+    }
+    if (options.disabled) select.disabled = true;
+    if (typeof options.onChange === "function") {
+      this.listen(select, "change", () => options.onChange(select.value));
+    }
     this.fields.set(id, select);
     wrap.appendChild(select);
     return wrap;
   }
 
-  playerSelectField(id, label) {
+  playerSelectField(id, label, options = {}) {
     const labels = {};
     const values = this.players().map((player) => {
       labels[player.id] = player.name ? `P${player.id} ${player.name}` : `P${player.id}`;
       return player.id;
     });
-    return this.selectField(id, label, values, labels);
+    return this.selectField(id, label, values, labels, options);
   }
 
   fieldWrap(labelText) {
@@ -276,14 +355,287 @@ export class LabPanel {
     return label;
   }
 
-  spawnEntity() {
-    return this.labClient.spawnEntity({
-      kind: this.value("spawn-kind"),
-      owner: this.int("spawn-owner"),
-      x: this.num("spawn-x"),
-      y: this.num("spawn-y"),
-      completed: this.bool("spawn-completed"),
+  renderSpawnPalette() {
+    this.normalizeSpawnPalette();
+    const factionOptions = labSpawnFactionOptions();
+    const factionLabels = Object.fromEntries(factionOptions.map((entry) => [entry.id, entry.label]));
+    const unitKinds = labSpawnUnitKindsForFaction(this.spawnPalette.factionId);
+    const controls = [
+      this.playerSelectField("spawn-owner", "Owner", {
+        value: this.spawnPalette.owner,
+        onChange: (value) => {
+          this.spawnPalette.owner = toIntOrNull(value);
+        },
+      }),
+      this.selectField(
+        "spawn-faction",
+        "Faction",
+        factionOptions.map((entry) => entry.id),
+        factionLabels,
+        {
+          value: this.spawnPalette.factionId,
+          onChange: (value) => {
+            this.spawnPalette.factionId = value;
+            this.spawnPalette.kind = "";
+            this.render();
+          },
+        },
+      ),
+      this.checkboxField("spawn-completed", "Complete", this.spawnPalette.completed, {
+        onChange: (checked) => {
+          this.spawnPalette.completed = checked;
+        },
+      }),
+      this.spawnPaletteReadout(unitKinds),
+      this.spawnPaletteGrid(unitKinds),
+    ];
+    return this.fieldset("Unit Spawn", controls);
+  }
+
+  renderAdvancedSpawn() {
+    this.normalizeAdvancedSpawn();
+    return this.fieldset("Advanced Spawn", [
+      this.selectField("advanced-spawn-kind", "Kind", spawnKinds(), KIND_LABELS, {
+        value: this.advancedSpawn.kind,
+        onChange: (value) => {
+          this.advancedSpawn.kind = value;
+        },
+      }),
+      this.playerSelectField("advanced-spawn-owner", "Owner", {
+        value: this.advancedSpawn.owner,
+        onChange: (value) => {
+          this.advancedSpawn.owner = toIntOrNull(value);
+        },
+      }),
+      this.checkboxField("advanced-spawn-completed", "Complete", this.advancedSpawn.completed, {
+        onChange: (checked) => {
+          this.advancedSpawn.completed = checked;
+        },
+      }),
+      this.button("Arm spawn", () => this.armAdvancedSpawnTool(), {
+        dataset: { active: this.spawnToolActive(this.advancedSpawn.kind) ? "true" : "false" },
+      }),
+    ]);
+  }
+
+  spawnPaletteGrid(unitKinds) {
+    const grid = document.createElement("div");
+    grid.className = "lab-spawn-palette";
+    for (const kind of unitKinds) {
+      const stats = STATS[kind] || {};
+      const button = this.button(stats.label || kind, () => this.armSpawnPaletteTool(kind), {
+        className: "lab-btn lab-spawn-option",
+        title: `Spawn ${stats.label || kind}`,
+        dataset: {
+          kind,
+          selected: kind === this.spawnPalette.kind ? "true" : "false",
+          active: this.spawnToolActive(kind) ? "true" : "false",
+        },
+      });
+      grid.appendChild(button);
+    }
+    return grid;
+  }
+
+  spawnPaletteReadout(unitKinds) {
+    if (unitKinds.length > 0) {
+      return this.readout(`${factionLabel(this.spawnPalette.factionId)} units`);
+    }
+    return this.readout("No unit catalog entries");
+  }
+
+  armSpawnPaletteTool(kind = this.spawnPalette.kind) {
+    this.captureSpawnPaletteFields();
+    if (!kind) return null;
+    this.spawnPalette.kind = kind;
+    const payload = {
+      owner: this.spawnPalette.owner,
+      factionId: this.spawnPalette.factionId,
+      kind,
+      completed: this.spawnPalette.completed,
+    };
+    return this.armSpawnTool(payload);
+  }
+
+  armAdvancedSpawnTool() {
+    this.captureAdvancedSpawnFields();
+    if (!this.advancedSpawn.kind) return null;
+    return this.armSpawnTool({
+      owner: this.advancedSpawn.owner,
+      kind: this.advancedSpawn.kind,
+      completed: this.advancedSpawn.completed,
     });
+  }
+
+  armSpawnTool(payload) {
+    if (typeof this.match?.armLabTool !== "function") return null;
+    const kind = payload?.kind || "";
+    const armed = this.match.armLabTool(
+      {
+        kind: "spawnEntity",
+        payload: { ...payload },
+        label: `Spawn ${KIND_LABELS[kind] || kind}`,
+      },
+      { onWorldClick: (event) => this.spawnEntityAt(event) },
+    );
+    this.render();
+    return armed;
+  }
+
+  spawnEntityAt(event) {
+    const payload = event?.tool?.payload || {};
+    if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) return Promise.resolve(null);
+    return this.labClient.spawnEntity({
+      kind: payload.kind,
+      owner: Number(payload.owner),
+      x: event.x,
+      y: event.y,
+      completed: !!payload.completed,
+    });
+  }
+
+  normalizeSpawnPalette() {
+    this.spawnPalette.owner = this.validOwner(this.spawnPalette.owner);
+    const factions = labSpawnFactionOptions();
+    if (!factions.some((entry) => entry.id === this.spawnPalette.factionId)) {
+      this.spawnPalette.factionId = factions[0]?.id || DEFAULT_FACTION_ID;
+    }
+    const unitKinds = labSpawnUnitKindsForFaction(this.spawnPalette.factionId);
+    if (!unitKinds.includes(this.spawnPalette.kind)) {
+      this.spawnPalette.kind = unitKinds[0] || "";
+    }
+    this.spawnPalette.completed = !!this.spawnPalette.completed;
+  }
+
+  normalizeAdvancedSpawn() {
+    this.advancedSpawn.owner = this.validOwner(this.advancedSpawn.owner);
+    const kinds = spawnKinds();
+    if (!kinds.includes(this.advancedSpawn.kind)) {
+      this.advancedSpawn.kind = kinds[0] || "";
+    }
+    this.advancedSpawn.completed = !!this.advancedSpawn.completed;
+  }
+
+  validOwner(owner) {
+    const numericOwner = Number(owner);
+    const owners = this.players().map((player) => Number(player.id)).filter((id) => Number.isFinite(id));
+    return owners.includes(numericOwner) ? numericOwner : (owners[0] ?? 1);
+  }
+
+  captureSpawnPaletteFields() {
+    this.spawnPalette.owner = this.int("spawn-owner") || this.spawnPalette.owner;
+    this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
+    this.spawnPalette.completed = this.bool("spawn-completed");
+  }
+
+  captureAdvancedSpawnFields() {
+    this.advancedSpawn.owner = this.int("advanced-spawn-owner") || this.advancedSpawn.owner;
+    this.advancedSpawn.kind = this.value("advanced-spawn-kind") || this.advancedSpawn.kind;
+    this.advancedSpawn.completed = this.bool("advanced-spawn-completed");
+  }
+
+  armMoveSelectedTool() {
+    if (typeof this.match?.armLabTool !== "function") return null;
+    const entityIds = selectedEntityIds(this.selectedEntities());
+    if (entityIds.length === 0) {
+      return this.publishLocalResult("moveEntity", false, "Select an entity first.");
+    }
+    const armed = this.match.armLabTool(
+      {
+        kind: "moveSelected",
+        payload: { entityIds },
+        label: `Move ${entityIds.length} selected`,
+      },
+      { onWorldClick: (event) => this.moveSelectedTo(event) },
+    );
+    this.render();
+    return armed;
+  }
+
+  cancelActiveTool() {
+    return this.match?.cancelLabTool?.("panelCancel") || null;
+  }
+
+  applyLabToolChange(change) {
+    if (change?.type === "cancelled" && shouldSurfaceToolCancellation(change.reason)) {
+      const summary = `${labToolLabel(change.tool)} cancelled.`;
+      this.lastResult = {
+        requestId: 0,
+        ok: true,
+        op: "labTool",
+        error: "",
+        outcome: { summary },
+      };
+    }
+    this.render();
+  }
+
+  moveSelectedTo(event) {
+    const entityIds = selectedEntityIdsFromPayload(event?.tool?.payload?.entityIds);
+    if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) {
+      return this.publishLocalResult("moveEntity", false, "Pick a valid world point.");
+    }
+    return this.batchEntityMutation("moveEntity", entityIds, (entityId) => (
+      this.labClient.moveEntity(entityId, event.x, event.y)
+    ));
+  }
+
+  setSelectedOwner() {
+    const owner = this.validOwner(this.int("set-owner"));
+    return this.batchEntityMutation("setEntityOwner", selectedEntityIds(this.selectedEntities()), (entityId) => (
+      this.labClient.setEntityOwner(entityId, owner)
+    ));
+  }
+
+  deleteSelected() {
+    return this.batchEntityMutation("deleteEntity", selectedEntityIds(this.selectedEntities()), (entityId) => (
+      this.labClient.deleteEntity(entityId)
+    ));
+  }
+
+  async batchEntityMutation(op, entityIds, request) {
+    const ids = selectedEntityIdsFromPayload(entityIds);
+    if (ids.length === 0) {
+      return this.publishLocalResult(op, false, "Select an entity first.");
+    }
+    const results = [];
+    for (const entityId of ids) {
+      const result = await request(entityId);
+      results.push({ entityId, result });
+    }
+    return this.publishBatchResult(op, results);
+  }
+
+  publishBatchResult(op, results) {
+    const failures = results
+      .filter(({ result }) => !result?.ok)
+      .map(({ entityId, result }) => ({
+        entityId,
+        error: result?.error || `${op} rejected`,
+      }));
+    const accepted = results.length - failures.length;
+    const summary = batchResultSummary(op, accepted, failures);
+    return this.publishLocalResult(op, failures.length === 0, summary, {
+      requestId: results.at(-1)?.result?.requestId,
+      outcome: {
+        summary,
+        accepted,
+        rejected: failures.length,
+        failures,
+      },
+    });
+  }
+
+  publishLocalResult(op, ok, message, options = {}) {
+    this.lastResult = {
+      requestId: Number.isFinite(options.requestId) ? options.requestId : 0,
+      ok: !!ok,
+      op,
+      error: ok ? "" : message,
+      outcome: options.outcome || (ok ? { summary: message } : null),
+    };
+    this.render();
+    return Promise.resolve(this.lastResult);
   }
 
   async exportScenario() {
@@ -315,31 +667,19 @@ export class LabPanel {
     return this.labClient.importScenario(scenario);
   }
 
-  batchSelected(request) {
-    const selected = this.selectedEntities();
-    if (selected.length === 0) return Promise.resolve(null);
-    return selected.reduce(
-      (chain, entity) => chain.then(() => request(entity)),
-      Promise.resolve(null),
-    );
-  }
-
   selectedEntities() {
     return typeof this.match?.state?.selectedEntities === "function"
       ? this.match.state.selectedEntities()
       : [];
   }
 
-  defaultWorldPoint() {
-    const camera = this.match?.camera;
-    const map = this.match?.state?.map;
-    if (camera && Number.isFinite(camera.x) && Number.isFinite(camera.y)) {
-      return { x: Math.round(camera.x), y: Math.round(camera.y) };
-    }
-    return {
-      x: Math.round((map?.width || 1024) / 2),
-      y: Math.round((map?.height || 1024) / 2),
-    };
+  activeLabTool() {
+    return this.match?.clientIntent?.activeLabTool || null;
+  }
+
+  spawnToolActive(kind) {
+    const active = this.activeLabTool();
+    return active?.kind === "spawnEntity" && active?.payload?.kind === kind;
   }
 
   resourcesForFirstPlayer() {
@@ -437,6 +777,7 @@ export class LabPanel {
   }
 
   destroy() {
+    this.match?.cancelLabTool?.("panelDestroy");
     this.unsubscribeState?.();
     this.unsubscribeResult?.();
     this.removeListeners();
@@ -452,6 +793,23 @@ function spawnKinds() {
   return Object.keys(STATS).filter((kind) => STATS[kind]?.cost || STATS[kind]?.trains);
 }
 
+export function labSpawnFactionOptions() {
+  return PLAYABLE_FACTIONS.filter((entry) => labSpawnUnitKindsForFaction(entry.id).length > 0);
+}
+
+export function labSpawnUnitKindsForFaction(factionId) {
+  return factionCatalog(factionId).units.filter((kind) => STATS[kind]);
+}
+
+function factionLabel(factionId) {
+  return labSpawnFactionOptions().find((entry) => entry.id === factionId)?.label || String(factionId || "");
+}
+
+function toIntOrNull(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.trunc(numeric) : null;
+}
+
 function upgradeLabels() {
   return Object.fromEntries(
     Object.entries(UPGRADES).map(([upgrade, def]) => [upgrade, def.label || upgrade]),
@@ -461,6 +819,67 @@ function upgradeLabels() {
 function singleOwner(selection) {
   const owners = new Set((selection || []).map((entity) => Number(entity.owner)).filter((owner) => owner > 0));
   return owners.size === 1 ? Array.from(owners)[0] : null;
+}
+
+function selectedEntityIds(selection) {
+  return selectedEntityIdsFromPayload((selection || []).map((entity) => entity?.id));
+}
+
+function selectedEntityIdsFromPayload(entityIds) {
+  if (!Array.isArray(entityIds)) return [];
+  const seen = new Set();
+  const ids = [];
+  for (const value of entityIds) {
+    const id = Number(value);
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function batchResultSummary(op, accepted, failures) {
+  const label = batchOperationLabel(op);
+  const rejected = failures.length;
+  const acceptedText = accepted > 0 ? `${label.success} ${accepted} ${entityNoun(accepted)}` : "";
+  const rejectedText = rejected > 0
+    ? `${rejected} rejected${failureDetails(failures)}`
+    : "";
+  if (acceptedText && rejectedText) return `${acceptedText}; ${rejectedText}`;
+  if (acceptedText) return `${acceptedText}.`;
+  return `${label.failure} rejected for ${rejected} ${entityNoun(rejected)}${failureDetails(failures)}`;
+}
+
+function batchOperationLabel(op) {
+  if (op === "moveEntity") return { success: "Moved", failure: "Move" };
+  if (op === "setEntityOwner") return { success: "Updated owner for", failure: "Owner change" };
+  if (op === "deleteEntity") return { success: "Deleted", failure: "Delete" };
+  return { success: `${op} accepted for`, failure: op };
+}
+
+function labToolLabel(tool) {
+  if (typeof tool?.label === "string" && tool.label) return tool.label;
+  if (tool?.kind === "spawnEntity") {
+    const kind = tool?.payload?.kind || "";
+    return kind ? `Spawn ${KIND_LABELS[kind] || kind}` : "Spawn";
+  }
+  if (tool?.kind === "moveSelected") return "Move selected";
+  return "Setup tool";
+}
+
+function shouldSurfaceToolCancellation(reason) {
+  return reason === "escape" || reason === "rightClick" || reason === "blur" || reason === "panelCancel";
+}
+
+function entityNoun(count) {
+  return count === 1 ? "entity" : "entities";
+}
+
+function failureDetails(failures) {
+  if (!failures.length) return "";
+  const shown = failures.slice(0, 3).map((failure) => `#${failure.entityId}: ${failure.error}`);
+  const suffix = failures.length > shown.length ? `; +${failures.length - shown.length} more` : "";
+  return `: ${shown.join("; ")}${suffix}.`;
 }
 
 function roleLabel(role) {
