@@ -1,6 +1,6 @@
 # Phase 1 - Baseline Hotspot Dataset
 
-Status: planned.
+Status: done.
 
 ## Goal
 
