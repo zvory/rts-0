@@ -38,6 +38,7 @@ import {
 } from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
 import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
+import { attackEventsForFiredShots } from "../client/src/attack_events.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
@@ -5887,6 +5888,43 @@ withFakeDocument(() => {
   assert(artilleryRevealState.entityById(99)?.shotReveal === true, "artillery self-attack event creates a fog shot reveal");
   assert(artilleryRevealState.liveMuzzleFlashes(performance.now()).length === 0, "artillery self-reveal does not draw a tracer");
   assert(artilleryRevealState.weaponRecoil(99, KIND.ARTILLERY, performance.now()) > 0, "artillery self-reveal still recoils the gun");
+
+  const overpenPrimaryAttack = { e: EVENT.ATTACK, from: 20, to: 21, toPos: [140, 100] };
+  const overpenFollowupAttack = { e: EVENT.ATTACK, from: 20, to: 22, toPos: [166, 108] };
+  const independentAttack = { e: EVENT.ATTACK, from: 23, to: 24, toPos: [220, 180] };
+  const firedShotEvents = attackEventsForFiredShots([
+    overpenPrimaryAttack,
+    overpenFollowupAttack,
+    independentAttack,
+  ]);
+  assert(
+    firedShotEvents.length === 2 &&
+      firedShotEvents[0] === overpenPrimaryAttack &&
+      firedShotEvents[1] === independentAttack,
+    "same-attacker overpenetration events collapse to one fired-shot event",
+  );
+
+  const overpenTracerState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  overpenTracerState.applySnapshot({
+    tick: 12,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [
+      { id: 20, owner: 1, kind: KIND.RIFLEMAN, x: 100, y: 100, hp: 40, maxHp: 40, state: STATE.IDLE, facing: 0 },
+      { id: 21, owner: 2, kind: KIND.RIFLEMAN, x: 140, y: 100, hp: 30, maxHp: 40, state: STATE.IDLE },
+      { id: 22, owner: 2, kind: KIND.WORKER, x: 166, y: 108, hp: 30, maxHp: 40, state: STATE.IDLE },
+    ],
+    events: [overpenPrimaryAttack, overpenFollowupAttack],
+  });
+  const overpenFlashes = overpenTracerState.liveMuzzleFlashes(performance.now());
+  assert(overpenFlashes.length === 1, "overpenetration draws one tracer for the fired shot");
+  assert(overpenFlashes[0].to === 21, "overpenetration tracer stays anchored to the primary hit");
+  assert(
+    overpenFlashes[0].targetPos?.x === 140 && overpenFlashes[0].targetPos?.y === 100,
+    "overpenetration tracer continues from the primary hit position",
+  );
 
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);

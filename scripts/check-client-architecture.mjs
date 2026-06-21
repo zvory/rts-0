@@ -25,6 +25,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "room_capabilities.js": "app-shell",
 
   "state.js": "model",
+  "attack_events.js": "model",
   "client_intent.js": "model",
   "command_budget.js": "model",
   "command_composer.js": "model",
