@@ -18,6 +18,7 @@ pub(super) struct EconomyPlan {
     pub(super) mineable_steel_nodes: BTreeSet<u32>,
     pub(super) mineable_oil_nodes: BTreeSet<u32>,
     pub(super) max_worker_resource_distance_px: Option<f32>,
+    pub(super) remote_worker_assignment_fallback: bool,
 }
 
 pub(super) fn plan_economy(
@@ -63,6 +64,12 @@ pub(super) fn plan_economy(
         .copied()
         .unwrap_or(0);
     let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
+    let max_worker_resource_distance_px = max_worker_resource_assignment_distance_px(
+        observation,
+        facts,
+        profile,
+        recovery_active,
+    );
     EconomyPlan {
         target_steel_workers,
         desired_oil_workers,
@@ -73,12 +80,11 @@ pub(super) fn plan_economy(
         occupied_nodes: occupied_resource_nodes(observation),
         mineable_steel_nodes: availability.free_mineable_node_ids(EntityKind::Steel),
         mineable_oil_nodes: availability.free_mineable_node_ids(EntityKind::Oil),
-        max_worker_resource_distance_px: max_worker_resource_assignment_distance_px(
-            observation,
-            facts,
-            profile,
-            recovery_active,
-        ),
+        max_worker_resource_distance_px,
+        remote_worker_assignment_fallback: max_worker_resource_distance_px.is_some()
+            && active_expansion(observation, profile, recovery_active)
+                .map(|expansion| expansion.remote_worker_assignment_fallback)
+                .unwrap_or(false),
     }
 }
 

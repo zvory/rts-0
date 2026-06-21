@@ -345,6 +345,7 @@ fn assign_steel_workers(
             allow_latched_reassignment: false,
             max_assignments: None,
             max_worker_resource_distance_px: None,
+            remote_worker_assignment_fallback: false,
         },
     );
 }

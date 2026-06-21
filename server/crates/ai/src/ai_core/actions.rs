@@ -597,6 +597,7 @@ pub(crate) struct ResourceAssignmentPolicy<'a> {
     pub(crate) allow_latched_reassignment: bool,
     pub(crate) max_assignments: Option<usize>,
     pub(crate) max_worker_resource_distance_px: Option<f32>,
+    pub(crate) remote_worker_assignment_fallback: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -796,7 +797,8 @@ fn nearest_unreserved_node(
     policy: &ResourceAssignmentPolicy<'_>,
     reservations: &AiReservations,
 ) -> Option<u32> {
-    let mut best: Option<(u32, f32)> = None;
+    let mut best_local: Option<(u32, f32)> = None;
+    let mut best_remote: Option<(u32, f32)> = None;
     let max_distance2 = policy
         .max_worker_resource_distance_px
         .filter(|distance| distance.is_finite() && *distance >= 0.0)
@@ -814,17 +816,23 @@ fn nearest_unreserved_node(
             continue;
         }
         let d = dist2(worker.x, worker.y, node.x, node.y);
-        if max_distance2.map(|max| d > max).unwrap_or(false) {
+        let beyond_preferred_distance = max_distance2.map(|max| d > max).unwrap_or(false);
+        if beyond_preferred_distance && !policy.remote_worker_assignment_fallback {
             continue;
         }
+        let best = if beyond_preferred_distance {
+            &mut best_remote
+        } else {
+            &mut best_local
+        };
         let better = best
             .map(|(best_id, best_dist)| d < best_dist || (d == best_dist && node.id < best_id))
             .unwrap_or(true);
         if better {
-            best = Some((node.id, d));
+            *best = Some((node.id, d));
         }
     }
-    best.map(|(id, _)| id)
+    best_local.or(best_remote).map(|(id, _)| id)
 }
 
 fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
@@ -1282,6 +1290,7 @@ mod tests {
                 allow_latched_reassignment: false,
                 max_assignments: None,
                 max_worker_resource_distance_px: None,
+                remote_worker_assignment_fallback: false,
             },
         );
 
@@ -1326,6 +1335,7 @@ mod tests {
                 allow_latched_reassignment: true,
                 max_assignments: None,
                 max_worker_resource_distance_px: None,
+                remote_worker_assignment_fallback: false,
             },
         );
 
@@ -1374,11 +1384,60 @@ mod tests {
                 allow_latched_reassignment: false,
                 max_assignments: None,
                 max_worker_resource_distance_px: Some(128.0),
+                remote_worker_assignment_fallback: false,
             },
         );
 
         assert!(assigned.is_empty());
         assert!(ctx.into_commands().is_empty());
+    }
+
+    #[test]
+    fn resource_assignment_can_fall_back_to_remote_node_after_local_nodes_fill() {
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 10,
+            },
+            vec![worker(10, 0.0, 0.0, AiEntityState::Idle)],
+            vec![
+                resource(30, EntityKind::Steel, 64.0, 0.0),
+                resource(31, EntityKind::Steel, 640.0, 0.0),
+            ],
+        );
+        let facts = facts_from_observation(&observation);
+        let mut ctx = context_from_facts(&facts, &observation);
+        let reserved = BTreeSet::from([30]);
+        let empty = BTreeSet::new();
+        let assignable_node_ids = BTreeSet::from([30, 31]);
+
+        let assigned = assign_workers_to_resource(
+            &mut ctx,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Steel,
+                assignable_node_ids: &assignable_node_ids,
+                candidate_worker_ids: None,
+                skip_workers: &empty,
+                pre_reserved_nodes: &reserved,
+                idle_only: true,
+                allow_latched_reassignment: false,
+                max_assignments: None,
+                max_worker_resource_distance_px: Some(128.0),
+                remote_worker_assignment_fallback: true,
+            },
+        );
+
+        assert_eq!(
+            assigned,
+            vec![ResourceAssignment {
+                worker: 10,
+                node: 31
+            }]
+        );
     }
 
     #[test]
@@ -1415,6 +1474,7 @@ mod tests {
                 allow_latched_reassignment: false,
                 max_assignments: Some(1),
                 max_worker_resource_distance_px: None,
+                remote_worker_assignment_fallback: false,
             },
         );
 
@@ -1443,6 +1503,7 @@ mod tests {
                 allow_latched_reassignment: false,
                 max_assignments: Some(1),
                 max_worker_resource_distance_px: None,
+                remote_worker_assignment_fallback: false,
             },
         );
 
@@ -1494,6 +1555,7 @@ mod tests {
                 allow_latched_reassignment: false,
                 max_assignments: Some(1),
                 max_worker_resource_distance_px: None,
+                remote_worker_assignment_fallback: false,
             },
         );
 
