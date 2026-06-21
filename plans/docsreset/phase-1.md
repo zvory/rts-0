@@ -1,6 +1,6 @@
 # Phase 1 - Obsolete Names and Generated Stats
 
-Status: pending.
+Status: done.
 
 ## Goal
 
