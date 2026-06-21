@@ -253,7 +253,10 @@ async function main() {
 
   closeClients(Host, StaleJoiner, SpectatorJoiner);
   await waitForLobbyGone(lifecycleRoom, "empty room cleanup hides browser row");
-  const recreatedLifecycle = await createLobby(lifecycleRoom);
+  const recreatedLifecycle = await waitForCreateAvailable(
+    lifecycleRoom,
+    "empty public room cleanup",
+  );
   ok(recreatedLifecycle.status === 201,
     `empty public room has no reconnect grace and releases the name (${recreatedLifecycle.status})`);
 
