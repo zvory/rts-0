@@ -3,9 +3,11 @@
 Computer opponents are **opt-in**: a room has none unless the host adds them from the lobby
 (`addAi` / `removeAi`, host-only, lobby phase only). `addAi` accepts an optional `teamId` for
 scripted team setup; when omitted, the server seats the AI into the next deterministic slot for
-the current preset. The lobby also has a host-only
-`setQuickstart` toggle labeled "Debug mode", which causes the next match to begin
-with 99,999 steel and 99,999 oil for every player plus a prebuilt human-only army/base loadout.
+the current preset. The legacy host-only `setQuickstart` compatibility command can still start the
+next match with 99,999 steel and 99,999 oil for every player plus a prebuilt human-only
+army/base loadout, but the normal lobby no longer exposes that command as a visible Debug mode
+toggle. Use lab rooms for player-facing experimentation until debug-style starts return as explicit
+lab presets or scenarios.
 They are capped with humans at
 `MAX_PLAYERS = 4` (the bundled maps have v2 spawn layouts for one through four active players).
 AI players are seated after the humans in the lobby player list; their colors come
@@ -67,9 +69,11 @@ remain visible to expansion planning as future candidates, but economy worker as
 oil demand when there is no free mineable oil and passes only free mineable node ids to
 `assign_workers_to_resource`. The action layer also requires callers to provide that assignable set,
 so an upstream economy mistake cannot knowingly emit a `Gather` command to non-mineable oil while
-free mineable steel exists. Self-play regression coverage preserves the pre-expansion case where
-oil is known but outside completed-City-Centre mining range, and the post-expansion case where oil
-assignment begins after the expansion City Centre completes.
+free mineable steel exists. Post-expansion assignment prefers workers near the expansion resource
+line, and profiles that opt into remote fallback can still send a main-base idle worker to the
+expansion once the main line is saturated instead of leaving it idle. Self-play regression coverage
+preserves the pre-expansion case where oil is known but outside completed-City-Centre mining range,
+and the post-expansion case where oil assignment begins after the expansion City Centre completes.
 The AI 1.0 profile is `ai_1_0_tech`; it parameterizes worker targets,
 supply buffers, building/tech goals, production priorities, resource timing, expansion timing, and
 attack thresholds without providing its own `think()` function. It opens with

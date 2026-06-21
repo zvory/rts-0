@@ -285,9 +285,10 @@ alive.
   command-ack consumption, `Game::tick`, snapshot fanout, and defeat checks do not advance.
   `prepare_live_match_launch`, live-match teardown/replay transition, and empty-room reset all
   clear pause counters and paused state.
-- Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
-  `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
-  snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
+- Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
+  read-only live spectator attach. Spectators receive `StartPayload.spectator = true` and live
+  `game.snapshot_for_spectator(active_player_ids)` snapshots, but are not included in `PlayerInit`,
+  command routing, elimination, pause authority, or match-player counts.
 - Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
   room-owned collaborator session record. Direct lab joiners currently receive the operator role;
   the original joiner remains in `operatorId` metadata for compatibility, not as the only mutation

@@ -129,14 +129,14 @@ match modules.
       attacks, queued abilities, cancellation, and mode toggles for the unit.
 - [ ] Ensure the client understands every movement, attack, ability, order, event, and status field
       emitted for the unit.
-- [ ] Add debug-mode creation or scenario support so humans can quickly spawn and inspect the unit.
+- [ ] Add lab creation or scenario support so humans can quickly spawn and inspect the unit.
 - [ ] Update dev scenarios, self-play fixtures, or manual debug scenarios where this unit should
       appear.
 - [ ] Ensure teardown remains clean for any new listeners, timers, textures, sounds, or GPU objects.
 
 Exit criteria:
 
-- [ ] A reviewer can create the unit from debug mode without playing a full tech path.
+- [ ] A reviewer can create the unit from a lab or scenario without playing a full tech path.
 - [ ] The unit can be controlled from the client using normal and queued commands.
 
 ## Phase 5: Visual Design And Animation

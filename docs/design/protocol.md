@@ -46,7 +46,7 @@ lobby/config dump replaces the source scrape.
 
 | `t`        | Fields | Meaning |
 |------------|--------|---------|
-| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as a lobby observer. `room` defaults to `"main"`. Spectator joins and lobby role switches are observer-only and must happen before match start. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
+| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as an observer. `room` defaults to `"main"`. Normal live matches accept `spectator: true` after match start and attach the connection as a read-only live spectator; active late joins and countdown joins are rejected. Lobby role switches are observer-only and must happen before match start. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). |
 | `setTeamPreset` | `preset: string` | Deprecated compatibility command. The server ignores it; lobby teams are host-managed slots. |
@@ -55,7 +55,7 @@ lobby/config dump replaces the source scrape.
 | `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. `aiProfileId` may be one of the supported live AI profiles; omitted or unknown values default to the highest supported live AI version. |
 | `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects the live AI profile for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile ids are ignored. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
-| `setQuickstart` | `enabled: bool` | Host toggles "Debug mode" for the next match in this room. |
+| `setQuickstart` | `enabled: bool` | Legacy host-only quickstart compatibility command for internal/test callers. The normal lobby UI does not expose it. |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
@@ -358,13 +358,14 @@ Sent once when the match begins. Carries everything static for the whole match.
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
-the player's own starting City Centre + workers. When the lobby's `setQuickstart` toggle is
-enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening
-resources, and each human player also starts with five supply depots, one Gun Works
+the player's own starting City Centre + workers. When the legacy `setQuickstart` compatibility
+command is enabled, every player starts with 99,999 steel and 99,999 oil instead of the default
+opening resources, and each human player also starts with five supply depots, one Gun Works
 (`steelworks` kind), one R&D Complex (`research_complex` kind), one Training Centre, two Barracks,
-two Vehicle Works (`factory` kind), and five of each unit kind including Command Cars. Debug mode also adds one inert enemy player in the clockwise-adjacent
-corner from the first human start, with five deployed Mortar Teams clumped around one Scout Car
-and four enemy Supply Depots five tiles north/east/south/west of the clump. It also sets
+two Vehicle Works (`factory` kind), and five of each unit kind including Command Cars. The legacy
+quickstart preset also adds one inert enemy player in the clockwise-adjacent corner from the first
+human start, with five deployed Mortar Teams clumped around one Scout Car and four enemy Supply
+Depots five tiles north/east/south/west of the clump. It also sets
 `diagnostics.movementPaths: "ownerOnly"` for active players, which lets the client expose local
 movement-waypoint overlay controls for the owner-only `debugPath` fields in snapshots. Spectators
 do not receive that movement-path diagnostic affordance. Dev scenario start payloads may advertise
@@ -380,7 +381,9 @@ Replay playback advertises room-time speed/pause/relative seek/absolute seek/tim
 controls without replay seek or replay-vision controls. Clients must not infer these shared
 affordances from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
-list only active match players in `players`.
+list only active match players in `players`. Late live spectator joins receive the same live start
+payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
+omitted and live spectator capabilities/diagnostics applied for that recipient.
 
 Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
 metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and
@@ -617,11 +620,12 @@ them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
 `debugPath` is present only when the room's projection policy enables movement-path diagnostics for
-that recipient and only while the unit has remaining movement waypoints. Lobby Debug mode enables
-owner-only movement paths for active players. Dev scenario rooms may enable full projected movement
-paths. It carries `{ waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks,
-totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path points in traversal
-order and `waypoints[0]` is the current movement target. The compact slot encodes this as
+that recipient and only while the unit has remaining movement waypoints. The legacy quickstart/debug
+compatibility path enables owner-only movement paths for active players. Dev scenario rooms may
+enable full projected movement paths. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
+staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
+points in traversal order and `waypoints[0]` is the current movement target. The compact slot
+encodes this as
 `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`, with points
 encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
@@ -882,6 +886,8 @@ Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timel
 lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
 fine-grained multi-operator permissions, visual iteration hot reload, and `/dev/scenario`
 migration. Those require separate typed messages instead of overloading `LabClientOp`.
+The legacy quickstart debug preset is intentionally not modeled as a lab preset here; debug-style
+prebuilt setups should return later as explicit lab scenario/preset protocol.
 
 ### 2.7 Observer analysis state
 

@@ -85,7 +85,7 @@ export class Net {
   addAi(teamId?, aiProfileId?)
   setAiProfile(id, aiProfileId)
   removeAi(id)
-  setQuickstart(enabled)
+  setQuickstart(enabled)                 // legacy compatibility command; no normal lobby control
   setSpectator(spectator, id?)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
   giveUp()
@@ -763,6 +763,9 @@ export class Minimap {
   // click/drag -> camera.centerOn or issue move command (right-click)
 }
 ```
+`commandsEnabled` may be a boolean or a zero-argument predicate. When `state.controlPolicy` is the
+lab policy, the minimap uses that policy so lab operators can issue minimap commands even though
+their start payload remains spectator-shaped.
 
 `lobby.js`
 ```js
@@ -774,6 +777,8 @@ export class Lobby {
   // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
+  // The normal product lobby exposes an Open Lab route affordance instead of a Debug mode
+  // quickstart toggle; Net.setQuickstart remains for internal/test compatibility only.
   // Teams are layout groups only; player colors come from each player record.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }
@@ -803,6 +808,9 @@ export class LobbyCreateModal {
   destroy()
 }
 ```
+The pre-join lobby browser keeps in-progress rows labeled `In match` and exposes a spectator
+action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending
+`join` with `spectator: true`. Countdown, stale, and unknown rows remain disabled.
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
 `window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds

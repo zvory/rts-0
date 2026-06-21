@@ -419,6 +419,43 @@ async fn create_lobby_rejects_duplicate_names() {
 }
 
 #[tokio::test]
+async fn create_lobby_reclaims_abandoned_empty_reservation() {
+    let lobby = Lobby::new();
+
+    let room = lobby
+        .create_lobby("  alex's lobby  ")
+        .await
+        .expect("first create should reserve normalized lobby name");
+    assert_eq!(room, "alex's lobby");
+    assert!(lobby.summaries().await.is_empty());
+
+    assert!(matches!(
+        lobby.create_lobby("alex's lobby").await,
+        Err(CreateLobbyError::Duplicate)
+    ));
+
+    tokio::time::sleep(Duration::from_millis(EMPTY_LOBBY_RESERVATION_TTL_MS + 5)).await;
+
+    let recreated = lobby
+        .create_lobby("alex's lobby")
+        .await
+        .expect("abandoned empty reservation should be reusable");
+    assert_eq!(recreated, "alex's lobby");
+
+    let handle = lobby
+        .get_or_create_join_target("alex's lobby")
+        .await
+        .expect("recreated lobby should stay joinable");
+    let _writer = join_room_handle(&handle, 9002, "Alex", false).await;
+    let summaries = lobby.summaries().await;
+    let summary = summaries
+        .iter()
+        .find(|summary| summary.room == "alex's lobby")
+        .expect("joined reclaimed lobby should be summarized");
+    assert_eq!(summary.host_name.as_deref(), Some("Alex"));
+}
+
+#[tokio::test]
 async fn create_lobby_rejects_invalid_and_reserved_names() {
     let lobby = Lobby::new();
     let too_long = "x".repeat(PUBLIC_LOBBY_NAME_MAX_BYTES + 1);

@@ -109,6 +109,7 @@ import {
   EVENT_CODE,
   KIND,
   KIND_CODE,
+  LAB_ROLE,
   MOVEMENT_PATH_DIAGNOSTICS,
   NOTICE_SEVERITY,
   ORDER_STAGE,
@@ -1188,7 +1189,7 @@ function hotkeyService() {
       return [labWorker];
     },
   };
-  const labPolicy = createLabControlPolicy({ metadata: { role: "operator" } });
+  const labPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
   const labOperatorCard = buildCommandCardDescriptors(commandCardCtx({
     spectator: true,
     commandSurfaceEnabled: labPolicy.canUseCommandSurface(labState),
@@ -1203,7 +1204,7 @@ function hotkeyService() {
     buttonByAction(labOperatorCard, "stop").intent.unitIds.join(",") === String(labWorker.id),
     "lab operator command descriptors target the controllable selected owner",
   );
-  const labViewerPolicy = createLabControlPolicy({ metadata: { role: "viewer" } });
+  const labViewerPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } });
   const labViewerCard = buildCommandCardDescriptors(commandCardCtx({
     spectator: true,
     commandSurfaceEnabled: labViewerPolicy.canUseCommandSurface(labState),
@@ -3097,7 +3098,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     labOperatorMatch.replayViewer = false;
     labOperatorMatch.state = {
       spectator: true,
-      controlPolicy: createLabControlPolicy({ metadata: { role: "operator" } }),
+      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
     };
     labOperatorMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
@@ -3109,7 +3110,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     labViewerMatch.replayViewer = false;
     labViewerMatch.state = {
       spectator: true,
-      controlPolicy: createLabControlPolicy({ metadata: { role: "viewer" } }),
+      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }),
     };
     labViewerMatch.applySpectatorUi();
     assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
@@ -4499,13 +4500,16 @@ function fakeAudioContext() {
   assert(lobbyStatusLabel("fullSpectatorOnly") === "Full", "full lobby rows get a distinct status label");
   assert(lobbyActionLabel("fullSpectatorOnly") === "Join as spectator",
     "full lobby rows advertise spectator joining");
+  assert(lobbyActionLabel("inGame") === "Spectate",
+    "in-progress lobby rows advertise live spectating");
   assertDeepEqual(lobbyJoinIntent({ joinState: "open" }), { state: "open", joinable: true, spectator: false },
     "open lobby rows join as active players");
   assertDeepEqual(lobbyJoinIntent({ joinState: "fullSpectatorOnly" }),
     { state: "fullSpectatorOnly", joinable: true, spectator: true },
     "full waiting lobby rows join as spectators");
-  assert(!lobbyJoinIntent({ joinState: "inGame" }).joinable,
-    "in-progress lobby rows are not joinable");
+  assertDeepEqual(lobbyJoinIntent({ joinState: "inGame" }),
+    { state: "inGame", joinable: true, spectator: true },
+    "in-progress lobby rows join as spectators");
   assert(validateLobbyName(" Alpha ").ok, "lobby create accepts trimmed plain names");
   assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
   assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
@@ -4521,6 +4525,14 @@ function fakeAudioContext() {
     "manual room-name join controls stay outside the normal pre-join product path");
   assert(indexHtml.includes("#lobby-room and #lobby-join remain hidden compatibility controls"),
     "DOM contract documents room-name controls as hidden compatibility only");
+  assert(indexHtml.includes('id="lobby-lab-open"'),
+    "normal lobby exposes a direct lab entry affordance");
+  assert(indexHtml.includes('href="/lab?room=default&map=Default"'),
+    "normal lobby lab entry uses the direct shared lab URL contract");
+  assert(!indexHtml.includes('id="lobby-quickstart"'),
+    "normal lobby does not render the legacy quickstart control");
+  assert(!indexHtml.includes("Debug mode"),
+    "normal lobby copy no longer advertises Debug mode as the experimentation path");
 
   const sorted = sortLobbySummaries([
     { room: "old-open", hostName: "A", createdAtUnixMs: 100, joinState: "open" },
@@ -4531,8 +4543,8 @@ function fakeAudioContext() {
   ]);
   assertDeepEqual(
     sorted.map((row) => row.room),
-    ["new-open", "old-open", "full", "starting", "in-game"],
-    "lobby browser sorts open, full, starting, and in-game rows by joinability then age",
+    ["new-open", "old-open", "full", "in-game", "starting"],
+    "lobby browser sorts open, full, in-game, and starting rows by joinability then age",
   );
 
   withFakeDocument(() => {
@@ -4627,12 +4639,12 @@ function fakeAudioContext() {
     const buttons = findFakes(rowsRoot, (el) => el.tagName === "BUTTON");
     const openButton = buttons.find((button) => button.textContent === "Join lobby");
     const spectatorButton = buttons.find((button) => button.textContent === "Join as spectator");
-    const inGameButton = buttons.find((button) => button.textContent === "In match");
+    const inGameButton = buttons.find((button) => button.textContent === "Spectate");
     const startingButton = buttons.find((button) => button.textContent === "Starting");
     const staleButton = buttons.find((button) => button.textContent === "Stale");
     assert(!openButton?.disabled, "open lobby row action is enabled");
     assert(!spectatorButton?.disabled, "full lobby row action joins as spectator");
-    assert(inGameButton?.disabled, "in-game lobby row action stays disabled");
+    assert(!inGameButton?.disabled, "in-game lobby row action joins as spectator");
     assert(startingButton?.disabled, "countdown lobby row action stays disabled");
     assert(staleButton?.disabled, "unknown lobby row action stays disabled as stale");
     openButton.click();
@@ -4641,6 +4653,7 @@ function fakeAudioContext() {
     assertDeepEqual(joins, [
       { room: "Open Lobby", spectator: false },
       { room: "Alpha Long Lobby", spectator: true },
+      { room: "Locked Match", spectator: true },
     ], "lobby browser row actions carry active vs spectator join intent");
     view.render({
       rows: [
@@ -4926,7 +4939,7 @@ function fakeAudioContext() {
   labClient.setInitialState({
     room: "__lab__:sandbox:map=Default",
     operatorId: 1,
-    role: "operator",
+    role: LAB_ROLE.OPERATOR,
     vision: labVision.fullWorld(),
     dirty: false,
     operationCount: 0,
@@ -4956,7 +4969,7 @@ function fakeAudioContext() {
   const requests = [];
   const policy = createLabControlPolicy({
     labClient: { request: (op) => { requests.push(op); return Promise.resolve({ ok: true }); } },
-    metadata: { role: "operator" },
+    metadata: { role: LAB_ROLE.OPERATOR },
   });
   assert(policy.kind === "lab" && policy.canIssueAs(1), "lab control policy gates issue-as to operator");
   const state = {
@@ -4976,7 +4989,7 @@ function fakeAudioContext() {
   };
   assert(!policy.canIssueGameplayCommand(cmd.stop([11, 12]), mixedState).ok, "lab policy rejects mixed-owner gameplay commands");
   assert(
-    !createLabControlPolicy({ metadata: { role: "viewer" } }).canUseCommandSurface(state),
+    !createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }).canUseCommandSurface(state),
     "read-only lab viewers cannot use the command surface",
   );
   assert(!createDefaultControlPolicy().canUseCommandSurface({ spectator: true }), "default spectators cannot use the command surface");
@@ -5003,6 +5016,82 @@ function fakeAudioContext() {
     "LabPanel spawn palette filters Ekat to Ekat units",
   );
 }
+
+await withFakeDocument(async () => {
+  const buildLabClient = (role) => {
+    const net = new Net("ws://example.test/ws");
+    const labClient = new LabClient(net);
+    labClient.setInitialState({
+      room: "__lab__:sandbox:map=Default",
+      operatorId: 1,
+      role,
+      vision: labVision.fullWorld(),
+      dirty: true,
+      operationCount: 7,
+    });
+    return labClient;
+  };
+  const buildMatch = (panelRef) => ({
+    clientIntent: new ClientIntent(),
+    state: {
+      map: { width: 64, height: 64 },
+      playerResources: [],
+      selectedEntities() {
+        return [];
+      },
+    },
+    armLabTool(tool) {
+      const armed = this.clientIntent.beginLabTool({ id: `tool-${tool.kind}-${panelRef.root.children.length}`, ...tool });
+      panelRef.panel?.applyLabToolChange({ type: "armed", tool: armed });
+      return armed;
+    },
+    cancelLabTool(reason) {
+      const cancelled = this.clientIntent.cancelLabTool(reason);
+      if (cancelled) panelRef.panel?.applyLabToolChange({ type: "cancelled", reason, tool: cancelled });
+      return cancelled;
+    },
+  });
+  const startPayload = {
+    map: { name: "Default" },
+    players: [{ id: 1, teamId: 1 }, { id: 2, teamId: 2 }],
+  };
+
+  const rootA = document.createElement("div");
+  const rootB = document.createElement("div");
+  const refA = { root: rootA, panel: null };
+  const refB = { root: rootB, panel: null };
+  const operatorA = buildLabClient(LAB_ROLE.OPERATOR);
+  const operatorB = buildLabClient(LAB_ROLE.OPERATOR);
+  const matchA = buildMatch(refA);
+  const matchB = buildMatch(refB);
+  refA.panel = new LabPanel({ root: rootA, labClient: operatorA, startPayload, match: matchA });
+  refB.panel = new LabPanel({ root: rootB, labClient: operatorB, startPayload, match: matchB });
+
+  assert(textWithin(rootB).includes("Operator"), "later lab joiner operator role renders as Operator");
+  assert(refB.panel.fields.has("lab-player"), "later lab joiner operator receives setup tools");
+  refA.panel.armSpawnPaletteTool(KIND.RIFLEMAN);
+  assert(textWithin(rootA).includes("Armed: Spawn Rifleman"), "one lab tab can arm a setup tool locally");
+  assert(textWithin(rootB).includes("No setup tool armed"), "another lab tab keeps its own setup tool state");
+
+  const readOnlyRoot = document.createElement("div");
+  const readOnlyClient = buildLabClient(LAB_ROLE.READ_ONLY);
+  const readOnlyRef = { root: readOnlyRoot, panel: null };
+  readOnlyRef.panel = new LabPanel({
+    root: readOnlyRoot,
+    labClient: readOnlyClient,
+    startPayload,
+    match: buildMatch(readOnlyRef),
+  });
+  assert(textWithin(readOnlyRoot).includes("Read-only"), "read-only lab role renders read-only status");
+  assert(!readOnlyRef.panel.fields.has("lab-player"), "read-only lab role does not expose setup tools");
+
+  refA.panel.destroy();
+  refB.panel.destroy();
+  readOnlyRef.panel.destroy();
+  operatorA.destroy();
+  operatorB.destroy();
+  readOnlyClient.destroy();
+});
 
 await withFakeDocument(async () => {
   const sent = [];
@@ -5054,7 +5143,7 @@ await withFakeDocument(async () => {
   labClient.setInitialState({
     room: "__lab__:sandbox:map=Default",
     operatorId: 1,
-    role: "operator",
+    role: LAB_ROLE.OPERATOR,
     vision: labVision.fullWorld(),
     dirty: false,
     operationCount: 0,

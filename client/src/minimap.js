@@ -130,6 +130,7 @@ export class Minimap {
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
    * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
    * @param {import("./client_intent.js").ClientIntent} [options.clientIntent] browser-local command/placement intent facade.
+   * @param {boolean|function(): boolean} [options.commandsEnabled] whether minimap clicks may issue commands.
    */
   constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter = null, options = {}) {
     this.canvas = canvasEl;
@@ -140,7 +141,7 @@ export class Minimap {
     this.commandIssuer = commandIssuer;
     this.clientIntent = options.clientIntent || null;
     this.inputRouter = inputRouter;
-    this.commandsEnabled = options.commandsEnabled !== false;
+    this.commandsEnabled = options.commandsEnabled ?? true;
     this._unregisterInputZone = null;
     this._hoverWorld = null;
     this._hoverShiftKey = false;
@@ -855,6 +856,14 @@ export class Minimap {
     return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
   }
 
+  _commandsEnabled() {
+    if (this.state?.controlPolicy?.kind === "lab") {
+      return !!this.state.controlPolicy.canUseCommandSurface?.(this.state);
+    }
+    if (typeof this.commandsEnabled === "function") return this.commandsEnabled() !== false;
+    return this.commandsEnabled !== false;
+  }
+
   _handleCanvasMouseDown(ev) {
     if (this.inputRouter) {
       if (this.inputRouter.pointerDown(this._routerEvent(ev, "dom"))) {
@@ -874,7 +883,7 @@ export class Minimap {
       // Right-click: issue a context-sensitive order for the currently selected own units.
       ev.originalEvent?.preventDefault();
       ev.originalEvent?.stopPropagation();
-      if (!this.commandsEnabled) return true;
+      if (!this._commandsEnabled()) return true;
       this._issueOrder(w.x, w.y, !!ev.shiftKey);
       return true;
     } else if (ev.button === 0) {
