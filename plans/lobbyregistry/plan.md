@@ -5,8 +5,8 @@
 Make lobby names mean one thing: a name is in use only while the lobby registry has a live room that
 should still exist. Empty public lobby shells should not be hidden-but-reserved, and abandoned
 create-lobby reservations should be removed from the registry instead of reclaimed through a special
-duplicate-create path. The end state should make normal lobbies, replay rooms, branch rooms, lab
-rooms, and dev rooms explicit about whether they are disposable when empty.
+duplicate-create path. The end state should make public lobby deletion strict: after the short
+pending-create window, an empty public lobby is gone.
 
 ## Current Situation
 
@@ -22,10 +22,12 @@ rooms, and dev rooms explicit about whether they are disposable when empty.
 
 ## Desired Invariant
 
-The lobby registry owns room identity. A room task may keep running only while it has occupants,
-visible public state, an active authoritative session, replay viewers, or another explicit reason
-to remain. When a room becomes empty and disposable, the registry removes the matching handle and
-the room task exits because its event channel is dropped.
+The lobby registry owns room identity. Public normal lobby names are occupied only while the lobby
+has at least one connected human, is running a live match/post-match viewer session for connected
+humans, or is inside the short pending-create lease before the creator joins. When a public normal
+lobby becomes empty outside that pending-create lease, the registry removes the matching handle
+immediately and the room task exits because its event channel is dropped. There is no host reconnect
+grace period and no empty-public-lobby retention path; a returning host can create the lobby again.
 
 ## Overall Constraints
 
@@ -37,8 +39,11 @@ the room task exits because its event channel is dropped.
   public rooms are still rejected while drain is active.
 - Keep internal room modes private. Replay, replay branch, lab, and dev rooms must not decay into
   public normal lobbies just because their last viewer leaves.
-- Avoid an immortal hidden reservation model. If create-lobby needs a short join deadline, expiration
-  should remove the room from the registry rather than adding a duplicate-create reclaim path.
+- Avoid every immortal hidden reservation model. The only allowed empty public lobby state is a short
+  pending-create lease while the accepted creator joins over WebSocket; lease expiration removes the
+  room from the registry.
+- Do not add host reconnect grace for public lobby names. If every human disconnects, the room name
+  becomes available again.
 - Update design docs only if a phase changes a documented cross-file contract or room lifecycle
   policy; otherwise keep the plan and tests as the active handoff.
 - Use focused verification for each phase and rely on the PR `./tests/run-all.sh` gate for broad
@@ -57,24 +62,26 @@ the room task exits because its event channel is dropped.
 ### [Phase 1 - Registry Disposal Primitive](phase-1.md)
 
 Introduce a registry-owned room disposal path without changing public lobby behavior yet. Room tasks
-should be able to report that they are empty and disposable, and the lobby registry should remove
+should be able to report that they are empty and removal-eligible, and the lobby registry should remove
 only the exact matching room handle. This phase proves stale disposal signals cannot remove a newer
 room under the same name.
 
 ### [Phase 2 - Public Lobby Deletion Semantics](phase-2.md)
 
 Use the disposal primitive for normal public lobbies and create-lobby reservations. A fresh
-create-lobby request may reserve the name briefly for the browser's follow-up WebSocket join, but
-if the join never arrives the room is removed from the registry. When the last human leaves a normal
-public lobby or match room, the name should become available because the old room is gone.
+create-lobby request reserves the name only as a pending-create lease for the browser's follow-up
+WebSocket join; if the join never arrives the room is removed from the registry. When the last human
+leaves a normal public lobby or match room, the old room is removed immediately and the name becomes
+available.
 
 ### [Phase 3 - Internal Room Cleanup And Browser Coverage](phase-3.md)
 
-Extend or explicitly decline empty-room deletion for replay, replay branch, lab, and dev rooms
-based on each mode's lifecycle needs. The lobby browser and live integration coverage should prove
-that abandoned public reservations disappear, ordinary empty lobbies stop occupying names, in-game
-and spectator-visible rows remain stable while occupied, and internal rooms do not leak into the
-public browser. This phase also updates any lifecycle docs that became stale.
+Audit replay, replay branch, lab, and dev rooms after public lobbies have strict deletion semantics.
+Those internal modes are not public lobbies: delete them when empty unless a mode has an explicit
+non-public state source that must remain alive. The lobby browser and live integration coverage
+should prove that abandoned public reservations disappear, ordinary empty lobbies stop occupying
+names, in-game and spectator-visible rows remain stable while occupied, and internal rooms do not
+leak into the public browser.
 
 ## Phase Index
 
