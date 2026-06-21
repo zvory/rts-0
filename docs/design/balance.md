@@ -224,7 +224,7 @@ activation/autocast policy instead of being folded into default targeting.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 14`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 45 degrees total`.
-- Artillery uses `ARTILLERY_MIN_RANGE_TILES = 15`, `ARTILLERY_MAX_RANGE_TILES = 60`,
+- Artillery uses `ARTILLERY_MIN_RANGE_TILES = 15`, `ARTILLERY_MAX_RANGE_TILES = 55`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
   `ARTILLERY_AMMO_COST_STEEL = 10`.
@@ -353,7 +353,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 12 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 60 deployed / 45 packed | 14 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
+| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-55 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |

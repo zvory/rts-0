@@ -3695,6 +3695,24 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     "live notice alerts still play audio outside the current viewport",
   );
 
+  const artilleryMarkerMatch = Object.create(Match.prototype);
+  const artilleryMarkers = [];
+  artilleryMarkerMatch.audio = null;
+  artilleryMarkerMatch.minimap = {
+    markArtilleryFiring(ev) {
+      artilleryMarkers.push(ev);
+    },
+  };
+  artilleryMarkerMatch.handleSnapshotEvents([
+    { e: EVENT.ARTILLERY_FIRING, owner: 2, x: 288, y: 304, facing: 0.25 },
+  ]);
+  assert(
+    artilleryMarkers.length === 1 &&
+      artilleryMarkers[0].owner === 2 &&
+      artilleryMarkers[0].x === 288,
+    "artillery firing events are forwarded to the minimap marker layer",
+  );
+
   const predictionPolicyMatch = Object.create(Match.prototype);
   predictionPolicyMatch.replayViewer = false;
   predictionPolicyMatch.state = {
@@ -4062,6 +4080,7 @@ function fakeAudioContext() {
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
       [EVENT_CODE[EVENT.MORTAR_LAUNCH], 9, [256, 272], [320, 352], 1.5, 68],
       [EVENT_CODE[EVENT.ARTILLERY_TARGET], 10, [320, 352], 3, ARTILLERY_SHELL_DELAY_TICKS],
+      [EVENT_CODE[EVENT.ARTILLERY_FIRING], 1, 288, 304, 0.25],
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
     ],
   });
@@ -4178,9 +4197,16 @@ function fakeAudioContext() {
     "artillery target event decodes",
   );
   assert(
-    decoded.events[8].e === EVENT.ARTILLERY_IMPACT &&
-      decoded.events[8].x === 336 &&
-      decoded.events[8].y === 368,
+    decoded.events[8].e === EVENT.ARTILLERY_FIRING &&
+      decoded.events[8].owner === 1 &&
+      decoded.events[8].x === 288 &&
+      decoded.events[8].facing === 0.25,
+    "artillery firing minimap event decodes",
+  );
+  assert(
+    decoded.events[9].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[9].x === 336 &&
+      decoded.events[9].y === 368,
     "artillery impact event decodes",
   );
 
@@ -5599,6 +5625,7 @@ await withFakeDocument(async () => {
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
   assert(EVENT_CODE[EVENT.OVERPENETRATION] === 10, "Overpenetration compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.ARTILLERY_FIRING] === 11, "Artillery firing compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
   assert(
@@ -8141,8 +8168,8 @@ await withFakeDocument(async () => {
     "Point Fire preview exposes minimum range in pixels",
   );
   assert(
-    ARTILLERY_MIN_RANGE_TILES === 15 && ARTILLERY_MAX_RANGE_TILES === 60,
-    "Artillery point-fire range mirrors the 15-60 tile balance band",
+    ARTILLERY_MIN_RANGE_TILES === 15 && ARTILLERY_MAX_RANGE_TILES === 55,
+    "Artillery point-fire range mirrors the 15-55 tile balance band",
   );
   const deployedArtillery = {
     ...selectedArtillery,

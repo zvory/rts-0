@@ -21,6 +21,7 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
+import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { ObserverAnalysisOverlay, shouldMountObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
@@ -206,6 +207,7 @@ export class Match {
       () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandIssuer, this.inputRouter, {
         commandsEnabled: !!this.capabilities.commands.gameplay,
         clientIntent: this.clientIntent,
+        artilleryIconSvg: ARTILLERY_RIG_SVG,
       }),
     );
     this.input = this._timeInit(
@@ -976,6 +978,8 @@ export class Match {
         this.handleNotice(ev);
       } else if (ev && ev.e === EVENT.ATTACK) {
         this.playAttackSound(ev);
+      } else if (ev && ev.e === EVENT.ARTILLERY_FIRING) {
+        this.minimap?.markArtilleryFiring(ev);
       } else if (ev && (ev.e === EVENT.MORTAR_LAUNCH || ev.e === EVENT.ARTILLERY_TARGET)) {
         this.playPointFireSound(ev);
       }

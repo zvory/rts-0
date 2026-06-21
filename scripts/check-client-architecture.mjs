@@ -103,10 +103,10 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "state.js": 39267,
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   "input/index.js": 40927,
-  // Lab MVP2 Phase 5 publishes lab setup-tool state changes back to the app-owned panel.
-  "match.js": 46952,
-  // Overpenetration event split adds a mirrored event tag, compact code, and decoder branch.
-  "protocol.js": 44877,
+  // Artillery minimap markers forward the visual-only firing event and inject the rig icon.
+  "match.js": 47157,
+  // Artillery minimap markers add a compact visual-only firing event.
+  "protocol.js": 45366,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,
