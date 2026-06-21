@@ -104,7 +104,7 @@ export class PredictionController {
   issueCommand(cmd)                      // allocates clientSeq, records pending, calls sendCommand(cmd, seq)
   applyAuthoritativeSnapshot(snapshot)   // consumes snapshot.netStatus sim-consumption ack metadata
   applySimAcknowledgement(clientSeq, serverTick?)
-  recordSocketReceipt(clientSeq, detail?)// diagnostic only; does not reconcile
+  recordSocketReceipt(clientSeq, detail?)// diagnostic only; idempotent for duplicate receipts; does not reconcile
   recordCommandRejection(clientSeq, reason?)
   enterPredicting(), beginResync(correction?), finishResync()
   predictionDisplayOverlay()             // view data for optimistic production/rally display only
@@ -469,16 +469,27 @@ use the injected facade or a narrow read model.
 Frame-local entity views belong to the app-shell frame loop, not to `GameState`. Rendering, local
 fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
 should accept the injected frame view when called from the RAF path and fall back to `GameState`
-queries only for direct module tests or event handlers outside the frame.
+queries only for direct module tests or event handlers outside the frame. Static resource nodes with
+no remaining resources are omitted from frame-local entity views and minimap blips. Frame-local
+entity views may carry bounded render diagnostics for local profiling consumers without changing the
+authoritative snapshot model.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
 rather than relying on the full mutable `GameState`. Tank Trap placement previews keep normal
 terrain, resource, building, and map-bounds checks, allow infantry overlap, and reject vehicle-body
-units. HUD and input should exchange command intent through descriptor/facade methods, while gameplay
-command emission continues to flow through `commandIssuer.issueCommand`. `PredictionController` owns
-client sequence allocation and optimistic bookkeeping; `GameState` applies named display overlays
-but does not own prediction policy.
+units. Tank Trap line dragging treats terrain, building, and map-bounds blockers as skipped sites,
+omits illegal build commands for those sites, and resumes on the far side; vehicle-body unit blockers
+  still break the line. HUD and input should exchange command intent through descriptor/facade
+  methods, while gameplay command emission continues to flow through
+  `commandIssuer.issueCommand`. HUD selected-unit strip cells support direct selection refinement:
+  left-click selects only that unit, Shift-click removes it from the selection, and Ctrl/Meta-click
+  or control context-click filters the current selection to that unit kind. Unit command-card
+  descriptors include Stop on S and Hold Position on W; Command Car selections also expose
+  Breakthrough on E. In lab rooms, injected lab control policy owns selection, inspection, and
+  single-owner issue-as routing without changing the client player id. `PredictionController` owns
+  client sequence allocation and optimistic bookkeeping; `GameState` applies named display overlays
+  but does not own prediction policy.
 
 `camera.js`
 ```js
@@ -774,6 +785,9 @@ and unit layer):
   shadows → units → selection rings → health bars → fog overlay → shot-revealed units →
   command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
+- `/renderer_preview.html` is a standalone dev entry point linked from the index Dev links menu; it
+  mounts the real Renderer on a synthetic grass map to preview all unit and building visuals with
+  zoom, team color, and animation controls outside a full match.
 - Units: SVG-authored rig parts rendered into Pixi containers, with low-detail hard-edged
   silhouettes tinted by player color, a dark drop shadow, dark outline, HP bar above when
   damaged/selected, and glowing selection ring when selected.
@@ -781,7 +795,9 @@ and unit layer):
   infantry body with oversized role weapons; Anti-Tank Gun: wheeled gun; mortar team: crewless
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
-  flat-shaded armor).
+  flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret and
+  barrel parts, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: SVG-authored
+  support-weapon rig routed through the live renderer).
   Riflemen carry a rifle, Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
@@ -854,7 +870,8 @@ Current areas:
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card, lobby controller/view, match history, minimap, resource icons,
-  scoreboard, status badge, branch staging, lab panel, settings.
+  scoreboard, status badge, branch staging, lab panel, settings. The in-match debug status badge
+  displays live and rolling one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.

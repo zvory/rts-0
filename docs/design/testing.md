@@ -139,6 +139,9 @@ usually be narrower and selected by the changed files or contracts. Use
 `node tests/select-suites.mjs --from=<base-ref>` or pass changed paths directly to see the expected
 suites.
 
+- Phase runner plan/path handling: run `node tests/phase_runner_agents.mjs` when changing
+  `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
+  names and sanitized worktree/log slugs.
 - `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS
   protocol mirror/decode tests, and Node integration when a top-level message or compact shape
   changed.
@@ -154,11 +157,26 @@ suites.
   Docs-only faction policy edits should select these guardrails without requiring live-server
   suites.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
-  changed behavior that crosses the room/network boundary.
+  changed behavior that crosses the room/network boundary. Tank Trap blocker/pathing changes should
+  include the focused gap/pathability regression and constructible horizontal, vertical, and
+  diagonal dev scenario coverage.
 - SVG legacy unit renderer oracle: run `node tests/legacy_unit_visual_oracle.mjs` when legacy unit
   rendering behavior or `tests/fixtures/svg/legacy-unit-oracle.baseline.json` changes. The oracle
   uses a deterministic Node fixture, semantic measurements, and bounded pixel-diff thresholds across
   current unit kinds and representative animation states.
+- Client performance harness: run `node --check scripts/client-perf-harness.mjs` and
+  `node scripts/client-perf-harness.mjs --list` when changing the fixed browser performance
+  workloads, stress-matrix dimensions, harness script, or documented performance workflow. Workload
+  execution uses local headless Chrome against a local server and writes bounded JSON summaries
+  under `target/client-perf`; it is measurement-only and does not add FPS gates. Stress-matrix runs
+  vary CPU throttle, viewport, DPR, and repeat count, then write JSON and Markdown rollups.
+  Render-lag summaries report advisory 60/120/240/480 FPS frame-work budget targets, p95 margin,
+  next missed headroom budget, grouped render diagnostics, and long-frame context from local
+  evidence instead of portable RAF FPS claims. `ClientNetReport` uploads are unchanged by these local
+  artifacts.
+- Transparent SVG rig pixel gates: run `node tests/transparent_unit_pixels.mjs --parts --no-artifacts`
+  when SVG rig runtime/schema behavior, rig importer fixtures, or transparent unit pixel comparisons
+  change. The harness compares Worker and Tank part and composition samples.
 - Team-aware authored start assignment is covered by `cargo nextest run map` for deterministic
   FFA compatibility, current authored map proximity, 1v2/1v3 team layouts, synthetic larger layouts,
   start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
