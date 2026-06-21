@@ -1,6 +1,6 @@
 # Phase 5 - Client UI, Prediction, Renderer, and Lab
 
-Status: pending.
+Status: done.
 
 ## Goal
 

@@ -6,11 +6,16 @@ PixiJS is loaded globally from CDN as `PIXI`.
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
 map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
+renderer_preview.html / renderer_preview.js
+                  # standalone Renderer preview linked from the Dev links menu
+unit-lab.html / unit-lab.js
+                  # unit design lab UI; `/dev/unit-lab` redirects here and reads `/api/unit-designs`
 styles.css        # HUD, lobby, menus, command card
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
   config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
+  report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   prediction_compatibility.js # server/client prediction-build compatibility guard
   prediction_settings.js # localStorage-backed prediction toggle
@@ -27,16 +32,24 @@ src/
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
+  hud_command_card.js # Command-card descriptors, faction command ids, and grid hotkeys
+  hud_selection_panel.js # Selected-unit strip/details panel
+  hud_unit_commands.js # Unit tactical command descriptors
+  hotkey_profiles.js # Local hotkey presets, custom profile storage, import/export
+  hotkey_editor.js # Settings Hotkeys tab editor
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen controller: name/room, ready/start, host controls
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
+  match_history.js # Lobby match-history table and replay launch affordance
   scoreboard.js   # Shared score/result formatting helpers
+  status_badge.js # Build/network/frame status badge with copyable diagnostics
   observer_analysis_overlay.js # replay/live spectator analysis overlay
   observer_analysis_signatures.js # dirty-body signatures for observer analysis DOM updates
   client_perf_report.js # bounded client frame-profiler upload field shaping
   match_health.js # match network/render health reporter
   frame_profiler.js # bounded client frame phase profiler and debug summary API
+  live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
@@ -81,6 +94,9 @@ export class Net {
   returnToLobby()
   ping()
   netReport(report)
+  createSnapshotReportStats()
+  consumeSnapshotReportStats()
+  noteSnapshotFrame({bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind})
   setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario time
   stepRoomTime()                         // paused dev-scenario room time
   seekRoomTime(ticksBack)                // room-controlled replay time; pass huge N for full reset
@@ -100,16 +116,20 @@ export class Net {
 `prediction_controller.js`
 ```js
 export class PredictionController {
-  constructor({sendCommand, enabled, now?, commandTimeoutMs?})
+  constructor({sendCommand, predictor?, enabled, now?, commandTimeoutMs?, uiConfirmationSnapshots?})
   issueCommand(cmd)                      // allocates clientSeq, records pending, calls sendCommand(cmd, seq)
-  applyAuthoritativeSnapshot(snapshot)   // consumes snapshot.netStatus sim-consumption ack metadata
+  applyAuthoritativeSnapshot(snapshot, {allowStale?}?)
+                                         // consumes snapshot.netStatus sim-consumption ack metadata
   applySimAcknowledgement(clientSeq, serverTick?)
   recordSocketReceipt(clientSeq, detail?)// diagnostic only; idempotent for duplicate receipts; does not reconcile
   recordCommandRejection(clientSeq, reason?)
+  recordAckSnapshotApplied(clientSeq, snapshotReceivedAt)
   enterPredicting(), beginResync(correction?), finishResync()
   predictionDisplayOverlay()             // view data for optimistic production/rally display only
-  reset({enabled?})
+  reset({enabled?, preserveClientSeq?, reason?})
   debugSummary()                         // pending count/seqs, latest authoritative tick, ack/correction metrics
+  consumeCommandReportStats(now?)
+  peekCommandReportStats(now?)
   get pendingCommandCount()
 }
 ```
@@ -280,11 +300,12 @@ non-vision neutral resources.
 `settings_container.js`
 ```js
 export class SettingsContainer {
-  constructor({ button, menu, title })
+  constructor({ button, menu, title? })
   setContext({ kind, spectator, replay, actions, tabs }) // mounts context-specific tabs/actions
   setTabs(tabs)                         // [{id,label,visible,render(panel, context)}]
   open({ focus }), close({ restoreFocus }), toggle()
   isOpen()
+  activateTab(id)
   destroy()
 }
 ```
@@ -340,8 +361,10 @@ export class LabPanel {
   armSpawnPaletteTool(kind?)             // arms a Match-owned spawnEntity world-click tool
   armAdvancedSpawnTool()                 // same tool path for secondary building/setup spawns
   armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
+  cancelActiveTool()
   setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
   deleteSelected()                       // applies selected-entity delete mutation with batch result summary
+  exportScenario(), importScenario()
   destroy()
 }
 ```
@@ -389,6 +412,7 @@ export class HotkeyProfileService {
   constructor({storage?, catalog?, profilesKey?, activeKey?})
   allProfiles()
   getActiveProfile()
+  hasProfile(id)
   profileById(id)
   setActiveProfile(id)
   createCustomFromPreset(presetId, metadata?)
@@ -401,10 +425,23 @@ export class HotkeyProfileService {
   parseImportText(text, options?)
   resolveCard(card, profile?)
   resolveSlot(slot, profile?)
+  storedProfilePayload(profile)
 }
 
 buildHotkeyCommandCatalog(cards)
 normalizeHotkey(value)
+profileBindingForCommand(profile, commandId)
+setProfileBindingForCommand(profile, commandId, key)
+```
+
+`hotkey_editor.js`
+```js
+export function renderHotkeyEditor(root, hotkeyProfiles, context?)
+export class HotkeyEditor {
+  constructor(root, hotkeyProfiles, context?)
+  render()
+  destroy()
+}
 ```
 
 Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
@@ -476,10 +513,11 @@ export class ClientIntent {
   beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
   holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
   releaseCommandTargetShift()
-  commandFeedback, liveCommandFeedback(now)
+  commandFeedback, addCommandFeedback(kind, x, y, append?, radiusTiles?, now?), liveCommandFeedback(now)
   resourceMiningPreview, updateResourceMiningPreview(preview)
   antiTankGunSetupPreview, updateAntiTankGunSetupPreview(preview)
   abilityTargetPreview, updateAbilityTargetPreview(preview)
+  activeLabTool, beginLabTool(tool), cancelLabTool(reason?)
 }
 ```
 
@@ -552,9 +590,10 @@ export class Renderer {
 `fog.js`
 ```js
 export class Fog {
-  constructor(mapWidth, mapHeight)
+  constructor(mapWidth, mapHeight, terrain?)
   update(ownEntities, tileSize, serverVisibleTiles?) // copy server visibility when provided; accumulate explored
   isVisible(tileX,tileY), isExplored(tileX,tileY)
+  setRevealAll(enabled)
   // renderer reads the grids to draw the black/dim overlay; minimap caches against revision
   visibleGrid, exploredGrid              // Uint8Array length w*h
   revision, visibleRevision, exploredRevision
@@ -578,7 +617,7 @@ the budget are blocked before `Net.command`.
 `input/index.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?)
+  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?, labToolController?)
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
@@ -734,7 +773,7 @@ export class Lobby {
 ```
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
-`window.location`, and shows `Lobby`; on `start` it creates `Match`. `match.js` builds
+`window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds
 `GameState`, `ClientIntent`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`,
 `Input`, starts the rAF loop
 (compute `alpha` from snapshot timing, `camera.update`,
@@ -899,20 +938,23 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `client_perf_report.js`, `match_health.js`,
-  `frame_profiler.js`, `observer_analysis_overlay.js`, `observer_analysis_signatures.js`,
-  `replay_controls.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
+  `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
+  `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
+  `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
-- `ui`: HUD, command card, lobby controller/view, match history, minimap, resource icons,
-  scoreboard, status badge, branch staging, lab panel, settings. The in-match debug status badge
-  displays live and rolling one-minute FPS metrics from `MatchHealth`.
+- `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
+  controller/view, match history, minimap, resource icons, scoreboard, status badge, branch
+  staging, lab panel, settings. The in-match debug status badge displays live and rolling
+  one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, audio, combat audio, alerts, fog, camera, prediction settings.
+- `platform`: bootstrap, audio, combat audio, alerts, fog, camera, prediction settings,
+  `report_window_aggregate.js`.
 
 Import rules:
 - `protocol.js` and `config.js` are shared mirrors and may be imported where needed.
