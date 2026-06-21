@@ -18,14 +18,19 @@ export class LabPanel {
     this.match = match;
     this.state = labClient?.state || startPayload?.lab || null;
     this.lastResult = labClient?.lastResult || null;
+    this.targetPlayerId = null;
+    this.playerState = {
+      steel: null,
+      oil: null,
+      researchUpgrade: "",
+      researchCompleted: true,
+    };
     this.spawnPalette = {
-      owner: null,
       factionId: DEFAULT_FACTION_ID,
       kind: "",
       completed: true,
     };
     this.advancedSpawn = {
-      owner: null,
       kind: "",
       completed: true,
     };
@@ -135,6 +140,7 @@ export class LabPanel {
     const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
 
     root.appendChild(this.renderActiveToolStatus());
+    root.appendChild(this.renderTargetPlayer());
     root.appendChild(this.renderSpawnPalette());
     root.appendChild(this.renderAdvancedSpawn());
 
@@ -160,23 +166,31 @@ export class LabPanel {
       this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
     ]));
 
+    this.normalizePlayerState();
     root.appendChild(this.fieldset("Player State", [
-      this.playerSelectField("resource-player", "Player"),
-      this.numberField("resource-steel", "Steel", this.resourcesForFirstPlayer().steel),
-      this.numberField("resource-oil", "Oil", this.resourcesForFirstPlayer().oil),
-      this.button("Set resources", () => this.labClient.setPlayerResources(
-        this.int("resource-player"),
-        this.uint("resource-steel"),
-        this.uint("resource-oil"),
-      )),
-      this.playerSelectField("research-player", "Player"),
-      this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels()),
-      this.checkboxField("research-completed", "Complete", true),
-      this.button("Set research", () => this.labClient.setCompletedResearch(
-        this.int("research-player"),
-        this.value("research-upgrade"),
-        this.bool("research-completed"),
-      )),
+      this.numberField("resource-steel", "Steel", this.playerState.steel, {
+        onChange: (value) => {
+          this.playerState.steel = toUint(value);
+        },
+      }),
+      this.numberField("resource-oil", "Oil", this.playerState.oil, {
+        onChange: (value) => {
+          this.playerState.oil = toUint(value);
+        },
+      }),
+      this.button("Set resources", () => this.setPlayerResources()),
+      this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels(), {
+        value: this.playerState.researchUpgrade,
+        onChange: (value) => {
+          this.playerState.researchUpgrade = value;
+        },
+      }),
+      this.checkboxField("research-completed", "Complete", this.playerState.researchCompleted, {
+        onChange: (checked) => {
+          this.playerState.researchCompleted = checked;
+        },
+      }),
+      this.button("Set research", () => this.setCompletedResearch()),
     ]));
 
     root.appendChild(this.fieldset("Scenario", [
@@ -275,8 +289,8 @@ export class LabPanel {
     return node;
   }
 
-  numberField(id, label, value) {
-    const wrap = this.inputField(id, label, "number", value);
+  numberField(id, label, value, options = {}) {
+    const wrap = this.inputField(id, label, "number", value, options);
     const input = this.fields.get(id);
     input.step = "1";
     return wrap;
@@ -303,7 +317,9 @@ export class LabPanel {
     input.value = String(value ?? "");
     if (options.disabled) input.disabled = true;
     if (typeof options.onChange === "function") {
-      this.listen(input, "change", () => options.onChange(input.value));
+      const handleChange = () => options.onChange(input.value);
+      this.listen(input, "input", handleChange);
+      this.listen(input, "change", handleChange);
     }
     this.fields.set(id, input);
     wrap.appendChild(input);
@@ -359,18 +375,23 @@ export class LabPanel {
     return label;
   }
 
+  renderTargetPlayer() {
+    return this.fieldset("Target Player", [
+      this.playerSelectField("lab-player", "Player", {
+        value: this.targetPlayer(),
+        onChange: (value) => {
+          this.targetPlayerId = this.validOwner(value);
+        },
+      }),
+    ]);
+  }
+
   renderSpawnPalette() {
     this.normalizeSpawnPalette();
     const factionOptions = labSpawnFactionOptions();
     const factionLabels = Object.fromEntries(factionOptions.map((entry) => [entry.id, entry.label]));
     const unitKinds = labSpawnUnitKindsForFaction(this.spawnPalette.factionId);
     const controls = [
-      this.playerSelectField("spawn-owner", "Owner", {
-        value: this.spawnPalette.owner,
-        onChange: (value) => {
-          this.spawnPalette.owner = toIntOrNull(value);
-        },
-      }),
       this.selectField(
         "spawn-faction",
         "Faction",
@@ -403,12 +424,6 @@ export class LabPanel {
         value: this.advancedSpawn.kind,
         onChange: (value) => {
           this.advancedSpawn.kind = value;
-        },
-      }),
-      this.playerSelectField("advanced-spawn-owner", "Owner", {
-        value: this.advancedSpawn.owner,
-        onChange: (value) => {
-          this.advancedSpawn.owner = toIntOrNull(value);
         },
       }),
       this.checkboxField("advanced-spawn-completed", "Complete", this.advancedSpawn.completed, {
@@ -453,7 +468,7 @@ export class LabPanel {
     if (!kind) return null;
     this.spawnPalette.kind = kind;
     const payload = {
-      owner: this.spawnPalette.owner,
+      owner: this.targetPlayer(),
       factionId: this.spawnPalette.factionId,
       kind,
       completed: this.spawnPalette.completed,
@@ -465,7 +480,7 @@ export class LabPanel {
     this.captureAdvancedSpawnFields();
     if (!this.advancedSpawn.kind) return null;
     return this.armSpawnTool({
-      owner: this.advancedSpawn.owner,
+      owner: this.targetPlayer(),
       kind: this.advancedSpawn.kind,
       completed: this.advancedSpawn.completed,
     });
@@ -500,7 +515,7 @@ export class LabPanel {
   }
 
   normalizeSpawnPalette() {
-    this.spawnPalette.owner = this.validOwner(this.spawnPalette.owner);
+    this.targetPlayerId = this.validOwner(this.targetPlayerId);
     const factions = labSpawnFactionOptions();
     if (!factions.some((entry) => entry.id === this.spawnPalette.factionId)) {
       this.spawnPalette.factionId = factions[0]?.id || DEFAULT_FACTION_ID;
@@ -513,7 +528,7 @@ export class LabPanel {
   }
 
   normalizeAdvancedSpawn() {
-    this.advancedSpawn.owner = this.validOwner(this.advancedSpawn.owner);
+    this.targetPlayerId = this.validOwner(this.targetPlayerId);
     const kinds = spawnKinds();
     if (!kinds.includes(this.advancedSpawn.kind)) {
       this.advancedSpawn.kind = kinds[0] || "";
@@ -528,15 +543,63 @@ export class LabPanel {
   }
 
   captureSpawnPaletteFields() {
-    this.spawnPalette.owner = this.int("spawn-owner") || this.spawnPalette.owner;
+    this.captureTargetPlayerField();
     this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
     this.spawnPalette.completed = this.bool("spawn-completed");
   }
 
   captureAdvancedSpawnFields() {
-    this.advancedSpawn.owner = this.int("advanced-spawn-owner") || this.advancedSpawn.owner;
+    this.captureTargetPlayerField();
     this.advancedSpawn.kind = this.value("advanced-spawn-kind") || this.advancedSpawn.kind;
     this.advancedSpawn.completed = this.bool("advanced-spawn-completed");
+  }
+
+  captureTargetPlayerField() {
+    this.targetPlayerId = this.validOwner(this.int("lab-player") || this.targetPlayerId);
+    return this.targetPlayerId;
+  }
+
+  targetPlayer() {
+    this.targetPlayerId = this.validOwner(this.targetPlayerId);
+    return this.targetPlayerId;
+  }
+
+  normalizePlayerState() {
+    this.targetPlayer();
+    const resources = this.resourcesForTargetPlayer();
+    if (this.playerState.steel == null) this.playerState.steel = resources.steel;
+    if (this.playerState.oil == null) this.playerState.oil = resources.oil;
+    const upgrades = Object.keys(UPGRADES);
+    if (!upgrades.includes(this.playerState.researchUpgrade)) {
+      this.playerState.researchUpgrade = upgrades[0] || "";
+    }
+    this.playerState.researchCompleted = !!this.playerState.researchCompleted;
+  }
+
+  capturePlayerStateFields() {
+    this.captureTargetPlayerField();
+    this.playerState.steel = this.uint("resource-steel");
+    this.playerState.oil = this.uint("resource-oil");
+    this.playerState.researchUpgrade = this.value("research-upgrade") || this.playerState.researchUpgrade;
+    this.playerState.researchCompleted = this.bool("research-completed");
+  }
+
+  setPlayerResources() {
+    this.capturePlayerStateFields();
+    return this.labClient.setPlayerResources(
+      this.targetPlayer(),
+      this.playerState.steel,
+      this.playerState.oil,
+    );
+  }
+
+  setCompletedResearch() {
+    this.capturePlayerStateFields();
+    return this.labClient.setCompletedResearch(
+      this.targetPlayer(),
+      this.playerState.researchUpgrade,
+      this.playerState.researchCompleted,
+    );
   }
 
   armMoveSelectedTool() {
@@ -687,9 +750,13 @@ export class LabPanel {
     return active?.kind === "spawnEntity" && active?.payload?.kind === kind;
   }
 
-  resourcesForFirstPlayer() {
-    const first = this.match?.state?.playerResources?.[0] || null;
-    return { steel: first?.steel ?? 0, oil: first?.oil ?? 0 };
+  resourcesForTargetPlayer() {
+    const target = this.targetPlayer();
+    const rows = this.match?.state?.playerResources || [];
+    const byId = rows.find((row) => Number(row?.id) === target);
+    const fallback = rows[target - 1] || rows[0] || null;
+    const resources = byId || fallback;
+    return { steel: resources?.steel ?? 0, oil: resources?.oil ?? 0 };
   }
 
   value(id) {
@@ -814,6 +881,11 @@ function factionLabel(factionId) {
 function toIntOrNull(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.trunc(numeric) : null;
+}
+
+function toUint(value) {
+  const numeric = toIntOrNull(value);
+  return numeric == null ? 0 : Math.max(0, numeric);
 }
 
 function upgradeLabels() {

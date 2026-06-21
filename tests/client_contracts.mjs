@@ -5006,12 +5006,20 @@ await withFakeDocument(async () => {
   );
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
+  assert(panel.fields.has("lab-player"), "LabPanel exposes one shared player selector for lab setup tools");
+  assert(
+    !panel.fields.has("spawn-owner") &&
+      !panel.fields.has("advanced-spawn-owner") &&
+      !panel.fields.has("resource-player") &&
+      !panel.fields.has("research-player"),
+    "LabPanel does not render per-tool player selectors for spawn or player-state controls",
+  );
   const teamButton = root.children[0].children
     .flatMap((child) => child.children || [])
     .find((child) => child.textContent === "Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
-  panel.fields.get("spawn-owner").value = "2";
+  panel.fields.get("lab-player").value = "2";
   panel.fields.get("spawn-completed").checked = false;
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
@@ -5053,7 +5061,7 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
   panel.fields.get("advanced-spawn-kind").value = KIND.CITY_CENTRE;
-  panel.fields.get("advanced-spawn-owner").value = "1";
+  panel.fields.get("lab-player").value = "1";
   panel.fields.get("advanced-spawn-completed").checked = true;
   panel.armAdvancedSpawnTool();
   assert(
@@ -5131,11 +5139,44 @@ await withFakeDocument(async () => {
   resolveLastLabResult({ outcome: { entityId: 32 } });
   await deletePromise;
   assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes accepted deletes");
-  panel.fields.get("resource-player").value = "1";
+  panel.fields.get("lab-player").value = "1";
   panel.fields.get("resource-steel").value = "900";
   panel.fields.get("resource-oil").value = "300";
-  void labClient.setPlayerResources(panel.int("resource-player"), panel.uint("resource-steel"), panel.uint("resource-oil"));
-  assert(sent.at(-1).op.op === "setPlayerResources" && sent.at(-1).op.steel === 900, "LabPanel resource fields normalize player state edits");
+  buttonByText("Set resources").listeners.click();
+  assert(
+    sent.at(-1).op.op === "setPlayerResources" &&
+      sent.at(-1).op.playerId === 1 &&
+      sent.at(-1).op.steel === 900 &&
+      sent.at(-1).op.oil === 300,
+    "LabPanel resource fields normalize player state edits through the shared player selector",
+  );
+  resolveLastLabResult({ outcome: { playerId: 1, steel: 900, oil: 300 } });
+  assert(
+    panel.fields.get("lab-player").value === "1" &&
+      panel.fields.get("resource-steel").value === "900" &&
+      panel.fields.get("resource-oil").value === "300",
+    "LabPanel preserves resource form values after set-resources results re-render the panel",
+  );
+  panel.fields.get("lab-player").value = "2";
+  panel.fields.get("research-upgrade").value = UPGRADE.TANK_UNLOCK;
+  panel.fields.get("research-completed").checked = false;
+  buttonByText("Set research").listeners.click();
+  assert(
+    sent.at(-1).op.op === "setCompletedResearch" &&
+      sent.at(-1).op.playerId === 2 &&
+      sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK &&
+      sent.at(-1).op.completed === false,
+    "LabPanel research edits use the shared player selector",
+  );
+  resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: false } });
+  assert(
+    panel.fields.get("lab-player").value === "2" &&
+      panel.fields.get("resource-steel").value === "900" &&
+      panel.fields.get("resource-oil").value === "300" &&
+      panel.fields.get("research-upgrade").value === UPGRADE.TANK_UNLOCK &&
+      panel.fields.get("research-completed").checked === false,
+    "LabPanel preserves resource and research form values after set-research results re-render the panel",
+  );
   panel.fields.get("scenario-name").value = "saved setup";
   void labClient.exportScenario(panel.value("scenario-name"));
   assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabPanel scenario name feeds export requests");
