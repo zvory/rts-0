@@ -3749,6 +3749,7 @@ impl RoomTask {
         let start_diagnostics = self
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
+        let start_capabilities = self.session_policy().start_capabilities(false);
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
             let seek_result = session.seek_back(&self.room, viewer_count, player_id, ticks_back);
@@ -3759,6 +3760,7 @@ impl RoomTask {
                         self.players.get(viewer_id).map(|player| {
                             let mut start = session.start_payload_for(*viewer_id);
                             start.diagnostics = start_diagnostics;
+                            start.capabilities = start_capabilities;
                             (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
@@ -3806,6 +3808,7 @@ impl RoomTask {
         let start_diagnostics = self
             .projection_policy()
             .diagnostic_capabilities_for(RecipientRole::Spectator);
+        let start_capabilities = self.session_policy().start_capabilities(false);
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
             let seek_result = session.seek_to(&self.room, viewer_count, player_id, tick);
@@ -3816,6 +3819,7 @@ impl RoomTask {
                         self.players.get(viewer_id).map(|player| {
                             let mut start = session.start_payload_for(*viewer_id);
                             start.diagnostics = start_diagnostics;
+                            start.capabilities = start_capabilities;
                             (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
@@ -4914,7 +4918,17 @@ mod tests {
         task.phase = Phase::ReplayViewer(Box::new(replay));
 
         task.on_seek_room_time(99, 1);
-        assert!(std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+        let first_seek_messages: Vec<_> =
+            std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(first_seek_messages.iter().any(|msg| matches!(
+            msg,
+            ServerMessage::Start(payload)
+                if payload.capabilities.room_time.seek_relative
+                    && payload.capabilities.room_time.seek_absolute
+                    && payload.capabilities.visibility.replay_vision
+        )));
+        assert!(first_seek_messages
+            .iter()
             .any(|msg| matches!(msg, ServerMessage::RoomTimeState(_))));
 
         task.on_seek_room_time(99, 1);
@@ -4960,6 +4974,13 @@ mod tests {
         task.on_seek_room_time_to(99, 1);
         let seek_messages: Vec<_> =
             std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(seek_messages.iter().any(|msg| matches!(
+            msg,
+            ServerMessage::Start(payload)
+                if payload.capabilities.room_time.seek_relative
+                    && payload.capabilities.room_time.seek_absolute
+                    && payload.capabilities.visibility.replay_vision
+        )));
         assert!(seek_messages.iter().any(|msg| matches!(
             msg,
             ServerMessage::ObserverAnalysis(analysis) if analysis.tick == 1 && analysis.players.len() == 2
