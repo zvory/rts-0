@@ -75,6 +75,8 @@ const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
 const LAB_PLAYER_ONE_ID: u32 = 1;
 const LAB_PLAYER_TWO_ID: u32 = 2;
 const LIVE_PAUSE_LIMIT: u8 = 3;
+const DRAINING_NEW_MATCHES_DISABLED_MSG: &str =
+    "Server is draining for deploy; new matches are disabled.";
 
 fn match_countdown_duration() -> Duration {
     #[cfg(test)]
@@ -807,8 +809,19 @@ impl RoomTask {
         self.session_policy().is_dev_watch()
     }
 
+    fn live_session_policy(&self) -> SessionPolicy {
+        SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch)
+    }
+
+    fn new_live_session_blocked_by_drain(&self) -> bool {
+        self.drain.is_draining()
+            && !self
+                .live_session_policy()
+                .allows_new_session_while_draining()
+    }
+
     fn should_persist_match_history(&self) -> bool {
-        let match_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
+        let match_policy = self.live_session_policy();
         self.match_player_count >= 1
             && match_policy.has_authoritative_mutation()
             && match_policy.allows_match_history()
@@ -817,12 +830,12 @@ impl RoomTask {
     }
 
     fn should_capture_post_match_replay(&self) -> bool {
-        let match_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
+        let match_policy = self.live_session_policy();
         match_policy.captures_post_match_replay()
     }
 
     fn should_attach_match_history_replay_artifact(&self) -> bool {
-        let match_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
+        let match_policy = self.live_session_policy();
         match_policy.attaches_match_history_replay_artifact()
     }
 
@@ -1362,14 +1375,14 @@ impl RoomTask {
         if self.match_countdown_deadline.is_some() {
             return;
         }
-        if self.drain.is_draining() {
+        if self.new_live_session_blocked_by_drain() {
             if let Some(player) = self.players.get(&player_id) {
                 send_or_log(
                     &self.room,
                     player_id,
                     &player.msg_tx,
                     ServerMessage::Error {
-                        msg: "Server is draining for deploy; new matches are disabled.".to_string(),
+                        msg: DRAINING_NEW_MATCHES_DISABLED_MSG.to_string(),
                     },
                 );
             }
@@ -2266,6 +2279,23 @@ impl RoomTask {
                 return;
             }
         };
+        if matches!(self.phase, Phase::Lobby) && self.new_live_session_blocked_by_drain() {
+            send_or_log(
+                &self.room,
+                player_id,
+                &msg_tx,
+                ServerMessage::Error {
+                    msg: DRAINING_NEW_MATCHES_DISABLED_MSG.to_string(),
+                },
+            );
+            crate::log_debug!(
+                room = %self.room,
+                player_id,
+                "rejecting lab join; launch blocked while server is draining"
+            );
+            let _ = ack.send(false);
+            return;
+        }
         if self.lab_session.is_none() {
             self.lab_session = Some(LabSession::new(&config, player_id));
         } else if let Some(session) = &mut self.lab_session {
@@ -2320,9 +2350,9 @@ impl RoomTask {
 
     fn can_start_now(&self) -> bool {
         if let Phase::BranchStaging(staging) = &self.phase {
-            return !self.drain.is_draining() && staging.can_start();
+            return !self.new_live_session_blocked_by_drain() && staging.can_start();
         }
-        !self.drain.is_draining()
+        !self.new_live_session_blocked_by_drain()
             && self.total_player_count() > 0
             && self.team_composition_valid()
             && self
@@ -3880,11 +3910,8 @@ impl RoomTask {
         if self.match_countdown_deadline.is_some() {
             return;
         }
-        if self.drain.is_draining() {
-            self.send_error_to(
-                player_id,
-                "Server is draining for deploy; new matches are disabled.",
-            );
+        if self.new_live_session_blocked_by_drain() {
+            self.send_error_to(player_id, DRAINING_NEW_MATCHES_DISABLED_MSG);
             return;
         }
         let Some(staging) = self.branch_staging() else {
@@ -4366,7 +4393,9 @@ impl RoomTask {
     }
 
     fn mark_match_started_for_drain(&mut self) {
-        if !self.match_tracked_for_drain && !self.is_dev_watch() {
+        if !self.match_tracked_for_drain
+            && self.live_session_policy().tracks_active_session_for_drain()
+        {
             self.match_tracked_for_drain = true;
             self.drain.match_started();
         }
@@ -5726,12 +5755,13 @@ mod tests {
 
     #[test]
     fn lab_room_join_launches_real_game_with_lab_start_metadata() {
+        let drain = DrainHandle::default();
         let mut task = RoomTask::new(
             "__lab__:sandbox:map=Default".to_string(),
             RoomMode::Lab(lab_config()),
             None,
             false,
-            DrainHandle::default(),
+            drain.clone(),
         );
         let (msg_tx, mut writer) = ConnectionSink::new();
         let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
@@ -5740,6 +5770,8 @@ mod tests {
 
         assert_eq!(ack_rx.try_recv(), Ok(true));
         assert!(matches!(task.phase, Phase::InGame(_)));
+        assert_eq!(drain.active_matches(), 1);
+        assert!(task.match_tracked_for_drain);
         assert_eq!(task.match_player_count, 2);
         assert_eq!(task.match_human_count, 0);
         assert!(!task.session_policy().allows_match_history());
@@ -5765,6 +5797,72 @@ mod tests {
         assert_eq!(lab.vision, LabVisionMode::FullWorld);
         assert!(!lab.dirty);
         assert_eq!(lab.operation_count, 0);
+    }
+
+    #[test]
+    fn lab_room_first_join_during_drain_is_rejected_without_starting_session() {
+        let drain = DrainHandle::default();
+        drain.begin_draining(Duration::from_secs(295));
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            drain.clone(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(false));
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::Error { msg } if msg == DRAINING_NEW_MATCHES_DISABLED_MSG
+            )
+        }));
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert!(task.players.is_empty());
+        assert!(task.order.is_empty());
+        assert!(task.lab_session.is_none());
+        assert!(!task.match_tracked_for_drain);
+        assert_eq!(drain.active_matches(), 0);
+    }
+
+    #[test]
+    fn failed_lab_room_start_does_not_increment_drain_accounting() {
+        let drain = DrainHandle::default();
+        let mut config = lab_config();
+        config.map_name = "MissingLabMap".to_string();
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=MissingLabMap".to_string(),
+            RoomMode::Lab(config),
+            None,
+            false,
+            drain.clone(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert!(task.lab_session.is_some());
+        assert!(!task.match_tracked_for_drain);
+        assert_eq!(drain.active_matches(), 0);
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::Error { msg } if msg.contains("Cannot load lab map")
+            )
+        }));
+        assert!(!messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::Start(_))));
     }
 
     #[test]
@@ -5805,6 +5903,71 @@ mod tests {
         assert_eq!(lab.operator_id, 99);
         assert_eq!(lab.role, LabStartRole::Operator);
         assert_eq!(lab.vision, LabVisionMode::FullWorld);
+    }
+
+    #[test]
+    fn running_lab_room_collaborator_can_join_during_drain() {
+        let drain = DrainHandle::default();
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            drain.clone(),
+        );
+        let (operator_tx, _operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        assert!(matches!(task.phase, Phase::InGame(_)));
+        assert_eq!(drain.active_matches(), 1);
+        let notice = drain.begin_draining(Duration::from_secs(295));
+
+        let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
+        let (viewer_ack, mut viewer_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Collaborator".to_string(),
+            true,
+            false,
+            viewer_tx,
+            viewer_ack,
+        );
+
+        assert_eq!(viewer_ack_rx.try_recv(), Ok(true));
+        assert_eq!(drain.active_matches(), 1);
+        assert!(matches!(task.phase, Phase::InGame(_)));
+        let messages: Vec<_> =
+            std::iter::from_fn(|| viewer_writer.reliable_rx.try_recv().ok()).collect();
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::ShutdownWarning {
+                    deadline_unix_ms,
+                    seconds_remaining,
+                } if *deadline_unix_ms == notice.deadline_unix_ms && *seconds_remaining == 295
+            )
+        }));
+        let start = messages
+            .iter()
+            .find_map(|msg| match msg {
+                ServerMessage::Start(payload) => Some(payload),
+                _ => None,
+            })
+            .expect("collaborator should receive lab start");
+        let lab = start.lab.as_ref().expect("lab metadata");
+        assert_eq!(lab.operator_id, 99);
+        assert_eq!(lab.role, LabStartRole::Operator);
+        assert_eq!(
+            task.lab_session.as_ref().unwrap().role_for(100),
+            LabStartRole::Operator
+        );
     }
 
     #[test]
@@ -6309,6 +6472,8 @@ mod tests {
         let (msg_tx, _writer) = ConnectionSink::new();
         let (ack, _ack_rx) = tokio::sync::oneshot::channel();
         task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+        assert_eq!(drain.active_matches(), 1);
+        assert!(task.match_tracked_for_drain);
 
         task.on_leave(99);
 
