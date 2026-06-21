@@ -1,6 +1,7 @@
 import { PLAYABLE_FACTIONS } from "./lobby_view.js";
 import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
 import { factionCatalog, STATS, UPGRADES } from "./config.js";
+import { LabPanelWindowChrome } from "./lab_panel_window.js";
 
 const labVision = Object.freeze({
   fullWorld: () => msg.labVisionFullWorld(),
@@ -38,6 +39,7 @@ export class LabPanel {
     this.el.className = "lab-panel";
     this.el.setAttribute("aria-label", "Lab controls");
     this.root.appendChild(this.el);
+    this.windowChrome = new LabPanelWindowChrome(this.el);
     this.render();
     this.unsubscribeState = this.labClient.subscribeState((state) => {
       this.state = state;
@@ -51,17 +53,15 @@ export class LabPanel {
 
   render() {
     this.removeListeners();
+    this.windowChrome.clearRenderListeners();
     this.teamInputs.clear();
     this.fields.clear();
     this.el.replaceChildren();
 
-    const header = document.createElement("header");
-    const kicker = document.createElement("span");
-    kicker.textContent = "Lab";
-    const title = document.createElement("h2");
-    title.textContent = this.publicRoomName();
-    header.append(kicker, title);
-    this.el.appendChild(header);
+    this.el.appendChild(this.windowChrome.renderHeader({
+      kicker: "Lab",
+      title: this.publicRoomName(),
+    }));
 
     const status = document.createElement("dl");
     status.className = "lab-status-grid";
@@ -119,6 +119,7 @@ export class LabPanel {
       result.dataset.state = "idle";
     }
     this.el.appendChild(result);
+    this.el.appendChild(this.windowChrome.renderResizeHandle());
   }
 
   renderSetupTools() {
@@ -781,6 +782,7 @@ export class LabPanel {
     this.unsubscribeState?.();
     this.unsubscribeResult?.();
     this.removeListeners();
+    this.windowChrome.destroy();
     this.el.remove();
   }
 }

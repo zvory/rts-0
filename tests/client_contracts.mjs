@@ -132,6 +132,7 @@ import { ClientIntent } from "../client/src/client_intent.js";
 import { LabClient, labVision, labVisionLabel } from "../client/src/lab_client.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import { LabPanel, labSpawnFactionOptions, labSpawnUnitKindsForFaction } from "../client/src/lab_panel.js";
+import { LabPanelWindowChrome } from "../client/src/lab_panel_window.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
@@ -4805,6 +4806,11 @@ await withFakeDocument(async () => {
   };
 
   assert(root.children.length === 1, "LabPanel mounts inside the app-owned root");
+  assert(textWithin(root).includes("Reset"), "LabPanel exposes a reset affordance for its movable panel");
+  assert(
+    root.children[0].children.some((child) => child.className === "lab-panel-resize-handle"),
+    "LabPanel exposes a visible resize handle",
+  );
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
   const teamButton = root.children[0].children
@@ -4948,6 +4954,71 @@ await withFakeDocument(async () => {
   labClient.destroy();
   assert(cancelledToolReason === "panelDestroy", "LabPanel cancels an active lab tool on teardown");
   assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");
+});
+
+await withFakeDocument(async () => {
+  const root = document.createElement("div");
+  const el = document.createElement("aside");
+  root.appendChild(el);
+  const storage = fakeStorage();
+  const windowListeners = new Map();
+  const windowObj = {
+    innerWidth: 1000,
+    innerHeight: 800,
+    localStorage: storage,
+    addEventListener(type, handler) {
+      windowListeners.set(type, handler);
+    },
+    removeEventListener(type, handler) {
+      if (windowListeners.get(type) === handler) windowListeners.delete(type);
+    },
+  };
+  const chrome = new LabPanelWindowChrome(el, {
+    windowObj,
+    storage,
+    storageKey: "test.lab.panel.window",
+  });
+  const header = chrome.renderHeader({ kicker: "Lab", title: "sandbox" });
+  const resizeHandle = chrome.renderResizeHandle();
+  el.append(header, resizeHandle);
+
+  const dragHandle = header.children[0];
+  const resetButton = header.children[1];
+  dragHandle.listeners.pointerdown({
+    button: 0,
+    pointerId: 7,
+    clientX: 900,
+    clientY: 90,
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  windowListeners.get("pointermove")({
+    pointerId: 7,
+    clientX: 840,
+    clientY: 126,
+    preventDefault() {},
+  });
+  assert(el.style.left === "608px" && el.style.top === "94px", "LabPanelWindowChrome drags the panel by pointer delta");
+  windowListeners.get("pointerup")({ pointerId: 7 });
+  assert(storage.values.has("test.lab.panel.window"), "LabPanelWindowChrome persists moved panel geometry");
+
+  resizeHandle.listeners.keydown({
+    key: "ArrowRight",
+    shiftKey: true,
+    preventDefault() {},
+  });
+  assert(el.style.width === "392px", "LabPanelWindowChrome keyboard resize increases width by the large step");
+  dragHandle.listeners.keydown({
+    key: "ArrowLeft",
+    preventDefault() {},
+  });
+  assert(el.style.left === "572px", "LabPanelWindowChrome keyboard move nudges the clamped panel");
+
+  resetButton.listeners.click();
+  assert(el.dataset.windowed === "false", "LabPanelWindowChrome reset returns to the stylesheet layout");
+  assert(!storage.values.has("test.lab.panel.window"), "LabPanelWindowChrome reset clears stored geometry");
+  chrome.destroy();
+  assert(!windowListeners.has("resize"), "LabPanelWindowChrome removes global listeners on destroy");
 });
 
 // ---------------------------------------------------------------------------

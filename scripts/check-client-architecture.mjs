@@ -55,6 +55,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "minimap.js": "ui",
   "branch_staging.js": "ui",
   "lab_panel.js": "ui",
+  "lab_panel_window.js": "ui",
   "settings_container.js": "ui",
   "settings_panels.js": "ui",
   "scoreboard.js": "ui",

@@ -1,0 +1,398 @@
+const DEFAULT_STORAGE_KEY = "rts.labPanel.window.v1";
+const DEFAULT_MARGIN = 12;
+const DEFAULT_TOP = 58;
+const DEFAULT_WIDTH = 320;
+const DEFAULT_HEIGHT = 432;
+const DEFAULT_MAX_HEIGHT = 560;
+const DEFAULT_COMMAND_CARD_CLEARANCE = 368;
+const MIN_WIDTH = 260;
+const MIN_HEIGHT = 220;
+const KEYBOARD_STEP = 24;
+const KEYBOARD_LARGE_STEP = 72;
+
+export class LabPanelWindowChrome {
+  constructor(el, options = {}) {
+    this.el = el;
+    this.windowObj = options.windowObj ?? globalThis.window ?? null;
+    this.storage = options.storage ?? this.windowObj?.localStorage ?? null;
+    this.storageKey = options.storageKey || DEFAULT_STORAGE_KEY;
+    this.renderListeners = [];
+    this.windowListeners = [];
+    this.activeListeners = [];
+    this.activeInteraction = null;
+
+    this.restoreGeometry();
+    this.listenWindow("resize", () => this.constrainToViewport());
+  }
+
+  renderHeader({ kicker = "Lab", title = "" } = {}) {
+    this.clearRenderListeners();
+
+    const header = document.createElement("header");
+    header.className = "lab-panel-titlebar";
+
+    const dragHandle = document.createElement("div");
+    dragHandle.className = "lab-panel-drag-handle";
+    dragHandle.tabIndex = 0;
+    dragHandle.setAttribute("role", "button");
+    dragHandle.setAttribute("aria-label", "Move lab controls panel");
+    dragHandle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight Home");
+    dragHandle.title = "Drag to move. Arrow keys nudge. Home resets.";
+    dragHandle.dataset.labPanelDragHandle = "true";
+
+    const grip = document.createElement("span");
+    grip.className = "lab-panel-grip";
+    grip.setAttribute("aria-hidden", "true");
+    grip.textContent = "::::";
+
+    const titleGroup = document.createElement("span");
+    titleGroup.className = "lab-panel-title";
+    const kickerNode = document.createElement("span");
+    kickerNode.className = "lab-panel-kicker";
+    kickerNode.textContent = kicker;
+    const titleNode = document.createElement("h2");
+    titleNode.textContent = title;
+    titleGroup.append(kickerNode, titleNode);
+    dragHandle.append(grip, titleGroup);
+
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "lab-btn lab-panel-reset";
+    reset.textContent = "Reset";
+    reset.title = "Reset lab panel position and size";
+    reset.setAttribute("aria-label", "Reset lab panel position and size");
+
+    this.listenRender(dragHandle, "pointerdown", (event) => this.beginInteraction("move", event));
+    this.listenRender(dragHandle, "keydown", (event) => this.handleMoveKey(event));
+    this.listenRender(reset, "click", () => this.resetGeometry());
+
+    header.append(dragHandle, reset);
+    return header;
+  }
+
+  renderResizeHandle() {
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "lab-panel-resize-handle";
+    handle.title = "Drag to resize. Arrow keys resize.";
+    handle.setAttribute("aria-label", "Resize lab controls panel");
+    handle.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight");
+    this.listenRender(handle, "pointerdown", (event) => this.beginInteraction("resize", event));
+    this.listenRender(handle, "keydown", (event) => this.handleResizeKey(event));
+    return handle;
+  }
+
+  destroy() {
+    this.finishInteraction(false);
+    this.clearRenderListeners();
+    for (const [target, type, handler] of this.windowListeners) {
+      target.removeEventListener?.(type, handler);
+    }
+    this.windowListeners = [];
+  }
+
+  beginInteraction(mode, event) {
+    if (!isPrimaryPointer(event)) return;
+    const point = eventPoint(event);
+    if (!point) return;
+
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+
+    const rect = this.currentGeometry();
+    this.applyGeometry(rect);
+    this.activeInteraction = {
+      mode,
+      pointerId: event.pointerId,
+      startX: point.x,
+      startY: point.y,
+      rect,
+    };
+    this.el.dataset.panelInteraction = mode;
+
+    this.listenActive("pointermove", (moveEvent) => this.updateInteraction(moveEvent));
+    this.listenActive("pointerup", (upEvent) => this.finishPointerInteraction(upEvent));
+    this.listenActive("pointercancel", (cancelEvent) => this.finishPointerInteraction(cancelEvent));
+    this.listenActive("blur", () => this.finishInteraction(true));
+  }
+
+  updateInteraction(event) {
+    if (!this.activeInteraction) return;
+    if (!samePointer(this.activeInteraction, event)) return;
+    const point = eventPoint(event);
+    if (!point) return;
+    event.preventDefault?.();
+
+    const dx = point.x - this.activeInteraction.startX;
+    const dy = point.y - this.activeInteraction.startY;
+    const base = this.activeInteraction.rect;
+    const next = this.activeInteraction.mode === "resize"
+      ? { ...base, width: base.width + dx, height: base.height + dy }
+      : { ...base, left: base.left + dx, top: base.top + dy };
+    this.applyGeometry(next);
+  }
+
+  finishPointerInteraction(event) {
+    if (this.activeInteraction && !samePointer(this.activeInteraction, event)) return;
+    this.finishInteraction(true);
+  }
+
+  finishInteraction(save) {
+    for (const [target, type, handler] of this.activeListeners) {
+      target.removeEventListener?.(type, handler);
+    }
+    this.activeListeners = [];
+    if (save && this.activeInteraction) this.saveGeometry(this.currentGeometry());
+    this.activeInteraction = null;
+    delete this.el.dataset.panelInteraction;
+  }
+
+  handleMoveKey(event) {
+    const key = event?.key;
+    if (key === "Home") {
+      event.preventDefault?.();
+      this.resetGeometry();
+      return;
+    }
+    const delta = arrowDelta(event);
+    if (!delta) return;
+    event.preventDefault?.();
+    const rect = this.currentGeometry();
+    this.applyGeometry({
+      ...rect,
+      left: rect.left + delta.x,
+      top: rect.top + delta.y,
+    });
+    this.saveGeometry(this.currentGeometry());
+  }
+
+  handleResizeKey(event) {
+    const delta = arrowDelta(event);
+    if (!delta) return;
+    event.preventDefault?.();
+    const rect = this.currentGeometry();
+    this.applyGeometry({
+      ...rect,
+      width: rect.width + delta.x,
+      height: rect.height + delta.y,
+    });
+    this.saveGeometry(this.currentGeometry());
+  }
+
+  constrainToViewport() {
+    if (this.el.dataset.windowed !== "true") return;
+    this.applyGeometry(this.currentGeometry());
+    this.saveGeometry(this.currentGeometry());
+  }
+
+  restoreGeometry() {
+    const saved = this.readGeometry();
+    if (saved) this.applyGeometry(saved);
+    else this.el.dataset.windowed = "false";
+  }
+
+  resetGeometry() {
+    this.removeStoredGeometry();
+    this.clearGeometryStyles();
+    this.el.dataset.windowed = "false";
+  }
+
+  currentGeometry() {
+    const viewport = this.viewport();
+    const rect = this.el.getBoundingClientRect?.();
+    const width = finitePositive(rect?.width) || parsePixels(this.el.style.width) || defaultWidth(viewport);
+    const height = finitePositive(rect?.height) || parsePixels(this.el.style.height) || defaultHeight(viewport);
+    const left = finiteNumber(rect?.left) ?? parsePixels(this.el.style.left) ?? defaultLeft(viewport, width);
+    const top = finiteNumber(rect?.top) ?? parsePixels(this.el.style.top) ?? DEFAULT_TOP;
+    return this.constrainGeometry({ left, top, width, height });
+  }
+
+  constrainGeometry(geometry) {
+    const viewport = this.viewport();
+    const margin = DEFAULT_MARGIN;
+    const maxWidth = Math.max(1, viewport.width - margin * 2);
+    const maxHeight = Math.max(1, viewport.height - margin * 2);
+    const minWidth = Math.min(MIN_WIDTH, maxWidth);
+    const minHeight = Math.min(MIN_HEIGHT, maxHeight);
+    const width = clamp(finitePositive(geometry.width) || defaultWidth(viewport), minWidth, maxWidth);
+    const height = clamp(finitePositive(geometry.height) || defaultHeight(viewport), minHeight, maxHeight);
+    const maxLeft = Math.max(margin, viewport.width - width - margin);
+    const maxTop = Math.max(margin, viewport.height - height - margin);
+    return {
+      left: Math.round(clamp(finiteNumber(geometry.left) ?? defaultLeft(viewport, width), margin, maxLeft)),
+      top: Math.round(clamp(finiteNumber(geometry.top) ?? DEFAULT_TOP, margin, maxTop)),
+      width: Math.round(width),
+      height: Math.round(height),
+    };
+  }
+
+  applyGeometry(geometry) {
+    const next = this.constrainGeometry(geometry);
+    this.el.dataset.windowed = "true";
+    setStyle(this.el, "left", `${next.left}px`);
+    setStyle(this.el, "top", `${next.top}px`);
+    setStyle(this.el, "width", `${next.width}px`);
+    setStyle(this.el, "height", `${next.height}px`);
+    setStyle(this.el, "right", "auto");
+    setStyle(this.el, "bottom", "auto");
+    setStyle(this.el, "max-height", "none");
+  }
+
+  clearGeometryStyles() {
+    clearStyle(this.el, "left");
+    clearStyle(this.el, "top");
+    clearStyle(this.el, "width");
+    clearStyle(this.el, "height");
+    clearStyle(this.el, "right");
+    clearStyle(this.el, "bottom");
+    clearStyle(this.el, "max-height");
+  }
+
+  viewport() {
+    const documentElement = globalThis.document?.documentElement;
+    return {
+      width: finitePositive(this.windowObj?.innerWidth) ||
+        finitePositive(documentElement?.clientWidth) ||
+        1440,
+      height: finitePositive(this.windowObj?.innerHeight) ||
+        finitePositive(documentElement?.clientHeight) ||
+        900,
+    };
+  }
+
+  listenRender(target, type, handler) {
+    target.addEventListener(type, handler);
+    this.renderListeners.push([target, type, handler]);
+  }
+
+  clearRenderListeners() {
+    for (const [target, type, handler] of this.renderListeners) {
+      target.removeEventListener?.(type, handler);
+    }
+    this.renderListeners = [];
+  }
+
+  listenWindow(type, handler) {
+    if (!this.windowObj?.addEventListener) return;
+    this.windowObj.addEventListener(type, handler);
+    this.windowListeners.push([this.windowObj, type, handler]);
+  }
+
+  listenActive(type, handler) {
+    if (!this.windowObj?.addEventListener) return;
+    this.windowObj.addEventListener(type, handler);
+    this.activeListeners.push([this.windowObj, type, handler]);
+  }
+
+  readGeometry() {
+    try {
+      const raw = this.storage?.getItem?.(this.storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed?.schemaVersion !== 1) return null;
+      const geometry = {
+        left: Number(parsed.left),
+        top: Number(parsed.top),
+        width: Number(parsed.width),
+        height: Number(parsed.height),
+      };
+      return Object.values(geometry).every(Number.isFinite) ? geometry : null;
+    } catch {
+      return null;
+    }
+  }
+
+  saveGeometry(geometry) {
+    try {
+      const next = this.constrainGeometry(geometry);
+      this.storage?.setItem?.(this.storageKey, JSON.stringify({
+        schemaVersion: 1,
+        ...next,
+      }));
+    } catch {
+      // Local storage is an ergonomic hint, not a requirement for lab controls.
+    }
+  }
+
+  removeStoredGeometry() {
+    try {
+      this.storage?.removeItem?.(this.storageKey);
+    } catch {
+      // Ignore unavailable storage.
+    }
+  }
+}
+
+function defaultWidth(viewport) {
+  return Math.min(DEFAULT_WIDTH, Math.max(1, viewport.width - DEFAULT_MARGIN * 2));
+}
+
+function defaultHeight(viewport) {
+  return Math.min(
+    DEFAULT_MAX_HEIGHT,
+    Math.max(MIN_HEIGHT, finitePositive(viewport.height - DEFAULT_COMMAND_CARD_CLEARANCE) || DEFAULT_HEIGHT),
+  );
+}
+
+function defaultLeft(viewport, width) {
+  return Math.max(DEFAULT_MARGIN, viewport.width - width - DEFAULT_MARGIN);
+}
+
+function arrowDelta(event) {
+  const step = event?.shiftKey ? KEYBOARD_LARGE_STEP : KEYBOARD_STEP;
+  if (event?.key === "ArrowLeft") return { x: -step, y: 0 };
+  if (event?.key === "ArrowRight") return { x: step, y: 0 };
+  if (event?.key === "ArrowUp") return { x: 0, y: -step };
+  if (event?.key === "ArrowDown") return { x: 0, y: step };
+  return null;
+}
+
+function eventPoint(event) {
+  const x = Number(event?.clientX);
+  const y = Number(event?.clientY);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+function isPrimaryPointer(event) {
+  if (event?.button != null && event.button !== 0) return false;
+  if (event?.isPrimary === false) return false;
+  return true;
+}
+
+function samePointer(active, event) {
+  return active.pointerId == null || event?.pointerId == null || active.pointerId === event.pointerId;
+}
+
+function parsePixels(value) {
+  if (typeof value !== "string" || !value.endsWith("px")) return null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function finiteNumber(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function finitePositive(value) {
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function clamp(value, min, max) {
+  if (max < min) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function setStyle(el, property, value) {
+  el.style.setProperty?.(property, value);
+  el.style[toCamelCase(property)] = value;
+}
+
+function clearStyle(el, property) {
+  el.style.removeProperty?.(property);
+  el.style[toCamelCase(property)] = "";
+}
+
+function toCamelCase(property) {
+  return property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+}
