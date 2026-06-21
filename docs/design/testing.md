@@ -237,7 +237,8 @@ before checking out and deploying the tested head SHA.
 `scripts/docdrift-sweep.mjs --dry-run` is the deterministic operator surface for reviewing commits
 between `docs/docdrift-checkpoint.txt` or `--base` and `--head`. It reads commit metadata,
 changed paths, compact diff stats, docs touched, and `docs/doc-map.json` trace-map candidates, but
-does not edit docs, create PRs, or advance the checkpoint.
+does not edit docs, create PRs, or advance the checkpoint. Merge commits, empty commits, and
+docs-only churn are skipped before classifier prompts are built.
 
 `scripts/docdrift-sweep.mjs --classify` adds the cheap Codex CLI classifier. Live classifier runs
 must use Codex CLI authentication through the local `codex exec` path; they must not use the
@@ -252,12 +253,15 @@ JSON event stream includes it.
 `scripts/docdrift-sweep.mjs --generate-docs` reruns or reuses the classifier records, selects only
 `update_docs` decisions, loads targeted authoritative design-doc sections, and asks Codex CLI for
 exact minimal find/replace doc patches. The generator prefers classifier-selected design docs; docs
-touched in the commit and broad trace-map design docs are fallbacks, not an automatic union. The
-script applies generated patches to the working tree and writes `docdrift-generate.{md,json}` with
-`--out-dir`; operators inspect the resulting docs diff before any PR lifecycle step. Fixture runs
-use the same `--no-codex --fixture <name>` path and must remain idempotent. If a retry sees that a
-cached patch's replacement text is already present, it reports the patch as already applied without
-spending another Codex generation call.
+touched in the commit and broad trace-map design docs are fallbacks, not an automatic union. It
+builds and applies doc-patch prompts sequentially so later `update_docs` decisions see docs already
+changed by earlier decisions in the same sweep; if the supplied sections already cover the behavior,
+the generator should return an empty patch set instead of restating it. The script applies generated
+patches to the working tree and writes `docdrift-generate.{md,json}` with `--out-dir`; operators
+inspect the resulting docs diff before any PR lifecycle step. Fixture runs use the same
+`--no-codex --fixture <name>` path and must remain idempotent. If a retry sees that a cached patch's
+replacement text is already present, it reports the patch as already applied without spending
+another Codex generation call.
 
 `scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
 uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed

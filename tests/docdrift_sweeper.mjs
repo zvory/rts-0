@@ -149,6 +149,8 @@ try {
     "",
     { date: "2026-06-20T12:02:00Z" },
   );
+  git(["commit", "--allow-empty", "-m", "Retrigger main test gate"], { date: "2026-06-20T12:02:30Z" });
+  const emptyCommit = git(["rev-parse", "HEAD"]);
   git(["checkout", "-b", "feature-test-route"]);
   const testCommit = commitFile(
     "tests/server_integration.mjs",
@@ -170,9 +172,10 @@ try {
   assert.equal(jsonReport.head.sha, head);
   assert.equal(jsonReport.traceMap.path, "docs/doc-map.json");
   assert.deepEqual(jsonReport.summary, {
-    totalCommits: 4,
+    totalCommits: 5,
     consideredCommits: 2,
     skippedMergeCommits: 1,
+    skippedEmptyCommits: 1,
     skippedDocsOnlyCommits: 1,
     noCommits: false,
   });
@@ -190,6 +193,11 @@ try {
   assert.equal(docsOnlyEntry.skipReason, "docs_only_churn");
   assert.equal(docsOnlyEntry.docsTouched.anyDesign, true);
 
+  const emptyEntry = jsonReport.commits.find((commit) => commit.sha === emptyCommit);
+  assert.ok(emptyEntry, "expected empty commit in report");
+  assert.equal(emptyEntry.status, "skipped");
+  assert.equal(emptyEntry.skipReason, "empty_commit");
+
   const testEntry = jsonReport.commits.find((commit) => commit.sha === testCommit);
   assert.ok(testEntry, "expected test commit in report");
   assert.deepEqual(testEntry.traceDocs, ["docs/context/testing.md", "docs/design/testing.md"]);
@@ -204,6 +212,7 @@ try {
   assert.match(markdown, /Change sim API/);
   assert.match(markdown, /docs\/design\/server-sim\.md/);
   assert.match(markdown, /docs_only_churn/);
+  assert.match(markdown, /empty_commit/);
   assert.match(markdown, /merge_commit/);
 
   const outDir = path.join(fixtureRoot, "out");
@@ -339,6 +348,144 @@ try {
   assert.equal(idempotentGenerateJson.docPatch.budget.estimatedPromptTokens, 0);
   assert.equal(idempotentGenerateJson.docPatch.records[0].cache.reason, "already_applied_patch");
 
+  const sequentialRepo = path.join(fixtureRoot, "sequential-repo");
+  fs.mkdirSync(sequentialRepo, { recursive: true });
+  const seqGit = (args, options = {}) => run("git", args, { cwd: sequentialRepo, ...options }).trim();
+  const seqWrite = (name, text) => {
+    const absPath = path.join(sequentialRepo, name);
+    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    fs.writeFileSync(absPath, text);
+  };
+  const seqCommit = (name, text, subject, options = {}) => {
+    seqWrite(name, text);
+    seqGit(["add", name]);
+    seqGit(["commit", "-m", subject], options);
+    return seqGit(["rev-parse", "HEAD"]);
+  };
+  run("git", ["init", "--initial-branch=main"], { cwd: sequentialRepo });
+  seqGit(["config", "user.email", "agent@example.invalid"]);
+  seqGit(["config", "user.name", "Agent"]);
+  seqWrite(
+    "docs/doc-map.json",
+    JSON.stringify(
+      {
+        version: 1,
+        routes: [
+          {
+            source: ["server/crates/sim/src/game/**"],
+            docs: ["docs/design/server-sim.md"],
+          },
+        ],
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  seqWrite("docs/design/server-sim.md", "server sim design\n");
+  seqGit(["add", "."]);
+  seqGit(["commit", "-m", "Initial docs"]);
+  const sequentialBase = seqGit(["rev-parse", "HEAD"]);
+  seqCommit(
+    "server/crates/sim/src/game/mod.rs",
+    "pub struct Game;\n",
+    "Change sim API",
+    { date: "2026-06-20T12:10:00Z" },
+  );
+  seqCommit(
+    "server/crates/sim/src/game/mod.rs",
+    "pub struct Game;\npub fn helper() {}\n",
+    "Refine sim API",
+    { date: "2026-06-20T12:11:00Z" },
+  );
+  const sequentialHead = seqGit(["rev-parse", "HEAD"]);
+  const sequentialFixture = path.join(fixtureRoot, "classifier-sequential.json");
+  fs.writeFileSync(
+    sequentialFixture,
+    JSON.stringify(
+      {
+        decisions: [
+          {
+            subjectIncludes: "Change sim API",
+            decision: "update_docs",
+            likelyDocs: ["docs/design/server-sim.md"],
+            evidenceNote: "First sim API commit needs server sim docs.",
+          },
+          {
+            subjectIncludes: "Refine sim API",
+            decision: "update_docs",
+            likelyDocs: ["docs/design/server-sim.md"],
+            evidenceNote: "Second sim API commit needs the same server sim docs.",
+          },
+        ],
+        default: {
+          decision: "move_on",
+          likelyDocs: [],
+          evidenceNote: "No docs update needed.",
+        },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  const sequentialClassifierCache = ".docdrift/sequential-classifier-cache";
+  classify([
+    "--repo",
+    sequentialRepo,
+    "--base",
+    sequentialBase,
+    "--head",
+    sequentialHead,
+    "--no-codex",
+    "--fixture",
+    sequentialFixture,
+    "--classifier-cache",
+    sequentialClassifierCache,
+    "--format",
+    "json",
+  ]);
+  const fakeSequentialCodex = writeExecutable(
+    "fake-sequential-doc-codex",
+    [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const args = process.argv.slice(2);",
+      "const outputFlag = args.indexOf('--output-last-message');",
+      "if (outputFlag < 0 || outputFlag + 1 >= args.length) process.exit(2);",
+      "const prompt = fs.readFileSync(0, 'utf8');",
+      "const response = prompt.includes('First generated detail.')",
+      "  ? { summary: 'Add second generated detail.', patches: [{ path: 'docs/design/server-sim.md', find: 'First generated detail.\\n', replace: 'First generated detail.\\nSecond generated detail.\\n', rationale: 'The second prompt saw the first generated detail.' }] }",
+      "  : { summary: 'Add first generated detail.', patches: [{ path: 'docs/design/server-sim.md', find: 'server sim design\\n', replace: 'server sim design\\n\\nFirst generated detail.\\n', rationale: 'The first prompt adds the initial detail.' }] };",
+      "fs.writeFileSync(args[outputFlag + 1], JSON.stringify(response));",
+      "console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 5, output_tokens: 4, total_tokens: 9 } }));",
+      "",
+    ].join("\n"),
+  );
+  const sequentialGenerate = JSON.parse(
+    generateDocs([
+      "--repo",
+      sequentialRepo,
+      "--base",
+      sequentialBase,
+      "--head",
+      sequentialHead,
+      "--codex-command",
+      fakeSequentialCodex,
+      "--classifier-cache",
+      sequentialClassifierCache,
+      "--doc-patch-cache",
+      ".docdrift/sequential-doc-patch-cache",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(sequentialGenerate.classifier.summary.cacheHits, 2);
+  assert.equal(sequentialGenerate.docPatch.summary.applied, 2);
+  assert.equal(sequentialGenerate.docPatch.summary.alreadyApplied, 0);
+  assert.equal(sequentialGenerate.docPatch.records[1].summary, "Add second generated detail.");
+  const sequentialDoc = fs.readFileSync(path.join(sequentialRepo, "docs/design/server-sim.md"), "utf8");
+  assert.match(sequentialDoc, /First generated detail/);
+  assert.match(sequentialDoc, /Second generated detail/);
+
   const fakeCodexArgsPath = path.join(fixtureRoot, "fake-codex-args.json");
   const fakeCodex = writeExecutable(
     "fake-codex",
@@ -423,7 +570,7 @@ try {
   const checkpointReport = JSON.parse(sweep(["--head", head, "--format", "json"]));
   assert.equal(checkpointReport.base.ref, base);
   assert.equal(checkpointReport.base.source, "docs/docdrift-checkpoint.txt");
-  assert.equal(checkpointReport.summary.totalCommits, 5);
+  assert.equal(checkpointReport.summary.totalCommits, 6);
   assert.equal(checkpointReport.summary.consideredCommits, 2);
 
   const emptyReport = JSON.parse(sweep(["--base", head, "--head", head, "--format", "json"]));
