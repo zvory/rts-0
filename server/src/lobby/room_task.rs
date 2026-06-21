@@ -1293,12 +1293,16 @@ impl RoomTask {
         self.reassign_host_if_needed();
         crate::log_debug!(room = %self.room, player_id, "left");
 
-        // If the room emptied out, fully reset it to a clean lobby so its name is never stuck
-        // mid-match (otherwise a 1-player sandbox — which never "ends" — would poison the room
-        // for the next person who joins under the same name). The idle room task lives on cheaply.
+        // If the room emptied out, fully reset it so teardown bookkeeping is complete before the
+        // registry drops the public normal room. Internal modes keep their existing mode-specific
+        // empty-room behavior.
         if self.players.is_empty() {
+            let dispose_public_room = self.should_dispose_when_empty();
             self.mark_match_finished_for_drain();
             self.reset_empty_room_state();
+            if dispose_public_room {
+                self.report_disposable_if_empty();
+            }
             crate::log_debug!(room = %self.room, "room emptied; reset to lobby");
             return;
         }
@@ -4381,6 +4385,10 @@ impl RoomTask {
                 lifecycle.request_disposal();
             }
         }
+    }
+
+    fn should_dispose_when_empty(&self) -> bool {
+        matches!(self.mode, RoomMode::Normal)
     }
 
     // -- Sending helpers -----------------------------------------------------

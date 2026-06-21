@@ -420,15 +420,40 @@ async fn create_lobby_rejects_duplicate_names() {
     let lobby = Lobby::new();
 
     let room = lobby
-        .create_lobby("  browser-one  ")
+        .create_lobby("  alex's lobby  ")
         .await
         .expect("first create should reserve normalized lobby name");
-    assert_eq!(room, "browser-one");
+    assert_eq!(room, "alex's lobby");
 
     assert!(matches!(
-        lobby.create_lobby("browser-one").await,
+        lobby.create_lobby("alex's lobby").await,
         Err(CreateLobbyError::Duplicate)
     ));
+}
+
+#[tokio::test]
+async fn create_lobby_abandoned_reservation_expires_and_name_can_be_recreated() {
+    let lobby = Lobby::new();
+
+    let room = lobby
+        .create_lobby("abandoned-browser-room")
+        .await
+        .expect("first create should reserve the lobby name");
+
+    assert!(matches!(
+        lobby.create_lobby(&room).await,
+        Err(CreateLobbyError::Duplicate)
+    ));
+
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    assert_eq!(
+        lobby
+            .create_lobby(&room)
+            .await
+            .expect("expired pending create lease should release the name"),
+        room
+    );
 }
 
 #[tokio::test]
@@ -570,12 +595,56 @@ async fn lobby_summaries_collect_browser_safe_rows_from_room_tasks() {
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::Open);
     assert_eq!(summary.occupied_slots, 1);
+    assert!(matches!(
+        lobby.create_lobby(&room).await,
+        Err(CreateLobbyError::Duplicate)
+    ));
 
     handle
         .event_tx
         .send(RoomEvent::Leave { player_id: 9001 })
         .await
         .expect("cleanup leave should send");
+}
+
+#[tokio::test]
+async fn empty_public_lobby_has_no_reconnect_grace_and_releases_name() {
+    let lobby = Lobby::new();
+    let room = lobby
+        .create_lobby("no-reconnect-grace")
+        .await
+        .expect("lobby should be created");
+    let handle = lobby
+        .get_or_create_join_target(&room)
+        .await
+        .expect("created lobby should stay joinable");
+    let _writer = join_room_handle(&handle, 42, "Departing Host", false).await;
+
+    assert!(lobby
+        .summaries()
+        .await
+        .iter()
+        .any(|summary| summary.room == room));
+
+    handle
+        .event_tx
+        .send(RoomEvent::Leave { player_id: 42 })
+        .await
+        .expect("leave should send");
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    assert!(!lobby
+        .summaries()
+        .await
+        .iter()
+        .any(|summary| summary.room == room));
+    assert_eq!(
+        lobby
+            .create_lobby(&room)
+            .await
+            .expect("empty public lobby name should be available immediately"),
+        room
+    );
 }
 
 #[tokio::test]
