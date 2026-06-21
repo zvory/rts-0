@@ -264,6 +264,10 @@ alive.
 - Room-mode and phase-dependent lobby checks use a lobby-local `SessionPolicy` descriptor for the
   current room mode and phase matrix, including dev-watch, replay-room, branch-staging, countdown,
   speed-source, and match-history decisions.
+- The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead
+  of reading room internals. Only normal lobby/countdown/live-match rooms are summarized; dev,
+  replay, replay-artifact, replay-branch, and lab modes stay hidden, and create-only lobby
+  reservation rejects duplicate or reserved/internal names before the later WebSocket join path.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
   `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay
