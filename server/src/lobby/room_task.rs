@@ -5714,6 +5714,67 @@ mod tests {
     }
 
     #[test]
+    fn lab_read_only_role_rejects_privileged_ops() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
+        let (viewer_ack, _viewer_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Read Only".to_string(),
+            true,
+            false,
+            viewer_tx,
+            viewer_ack,
+        );
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        while viewer_writer.reliable_rx.try_recv().is_ok() {}
+        task.lab_session
+            .as_mut()
+            .unwrap()
+            .viewer_roles
+            .insert(100, LabStartRole::ReadOnly);
+
+        task.on_lab_request(
+            100,
+            32,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 456,
+                oil: 78,
+            },
+        );
+
+        let results = lab_results(&mut viewer_writer);
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].ok);
+        assert_eq!(results[0].request_id, 32);
+        assert!(results[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("only lab operators"));
+        let session = task.lab_session.as_ref().unwrap();
+        assert_eq!(session.role_for(100), LabStartRole::ReadOnly);
+        assert!(session.operation_log.is_empty());
+    }
+
+    #[test]
     fn lab_scenario_export_and_import_round_trip_through_room_ops() {
         let mut task = RoomTask::new(
             "__lab__:sandbox:map=Default".to_string(),
@@ -5828,6 +5889,55 @@ mod tests {
             .as_deref()
             .unwrap()
             .contains("lab rooms"));
+    }
+
+    #[test]
+    fn replay_viewer_rejects_lab_requests_and_gameplay_commands() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 1);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new(
+            "replay-lab-reject-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer = add_test_room_spectator(&mut task, 99);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        task.on_lab_request(
+            99,
+            33,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 999,
+                oil: 999,
+            },
+        );
+        task.on_command(
+            99,
+            1,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        let results = lab_results(&mut writer);
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].ok);
+        assert_eq!(results[0].request_id, 33);
+        assert!(results[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("lab rooms"));
+        let Phase::ReplayViewer(session) = &task.phase else {
+            panic!("replay viewer should remain active");
+        };
+        assert!(session.game().command_log().is_empty());
+        assert_eq!(task.players.get(&99).unwrap().last_received_client_seq, 0);
+        assert!(task.lab_session.is_none());
     }
 
     #[test]

@@ -28,8 +28,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `selectMap { map }` is the host-only map selector command.
 - `lobby` carries `map` (selected stable map name) and `maps[]` (`{name, description}` catalog
   rows). Replay start metadata separately uses `mapName`.
-- Lab start payloads carry `lab` metadata with the public lab id, operator id, role, full-world
-  vision mode, dirty flag, and operation count.
+- Lab start payloads carry `lab` metadata with the public lab id, original operator id, recipient
+  role, current shared lab vision mode, dirty flag, and operation count.
 - Start payloads carry recipient-scoped `capabilities` metadata for shared room-time, replay-vision,
   and gameplay-command affordances. The client parser must not infer these from replay/dev/lab
   mode names.
