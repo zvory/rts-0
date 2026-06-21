@@ -4,9 +4,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   frames are rejected and the connection closed before they reach serde.
 - **Command unit cap and budget** (`services/commands.rs`): unit-list commands inspect at most
   `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject over-budget
-  human commands before planning. The human command budget is 24 supply plus 12 and the Command
-  Car's own command weight for each submitted owned Command Car, with mirrored unit supply as command
-  weight and a fallback weight of 1.
+  human commands before planning. The human command budget is 24 supply plus
+  `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the Command Car's own command weight for each submitted
+  owned Command Car, with mirrored unit supply as command weight and a fallback weight of 1.
   AI-owned players are exempt from the command-budget gameplay limit because live AI still enqueues
   ordinary `SimCommand`s through the same `Game::enqueue` seam as humans. Rejection drops the whole
   malformed human command and emits a private "Command supply exceeded" notice; the server does not
@@ -184,11 +184,17 @@ The server treats every client as potentially hostile. Limits live next to the c
   100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
   use the charging movement/fire model permanently, move at tank speed, and attack 25% faster.
   Legacy `charge` commands remain decodable but have no eligible carriers.
-- **Stage-two unit unlock research**: R&D Complex can queue `anti_tank_gun_unlock` for 200 steel / 75 oil
-  over 600 ticks, unlocking Anti-Tank Gun training at Gun Works for that player. R&D Complex can queue
-  `tank_unlock` for 150 steel / 100 oil over 600 ticks, unlocking Tank training at Vehicle Works
-  for that player. Server-side train validation checks both the producer kind and the completed
-  player upgrade set, so clients cannot bypass these locks by sending `train` commands directly.
+- **Advanced research locks**: R&D Complex can queue `anti_tank_gun_unlock` for 200 steel / 75 oil
+  over 600 ticks, unlocking Anti-Tank Gun training at Gun Works for that player. It can queue
+  `artillery_unlock` for 300 steel / 200 oil over 900 ticks after completed
+  `anti_tank_gun_unlock`, unlocking Artillery training at Gun Works; `tank_unlock` for
+  150 steel / 100 oil over 600 ticks, unlocking Tank training at Vehicle Works;
+  `command_car_unlock` for 150 steel / 150 oil over 900 ticks after completed `tank_unlock`,
+  unlocking Command Car training at Vehicle Works; and `mortar_autocast` for 150 steel / 150 oil
+  over 600 ticks, enabling Mortar Team autocast for current and future owned Mortar Teams.
+  Server-side research validation checks the research building and prerequisite upgrades, while
+  train validation checks both the producer kind and completed player upgrade set, so clients cannot
+  bypass these locks by sending `research` or `train` commands directly.
 - **Tank armor facing**: tank and Anti-Tank Gun attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

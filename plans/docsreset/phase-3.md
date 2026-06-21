@@ -1,6 +1,6 @@
 # Phase 3 - Economy, Production, and Tech Tree
 
-Status: pending.
+Status: done.
 
 ## Goal
 
