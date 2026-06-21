@@ -29,7 +29,7 @@ scope, or the lobby front-page table.
   rows unless they are dev/scenario/replay rooms or automated test fingerprints. Local `cargo run`
   with the gate off can read history but does not upload rows or replay artifacts.
 - **Recent Matches visibility.** `/api/matches` returns only rows with `human_count >= 1` and
-  `debug_mode = false`, so AI-only and lobby Debug/quickstart rows can be stored for replay launch
+  `debug_mode = false`, so AI-only and legacy quickstart/debug rows can be stored for replay launch
   without appearing in the lobby table.
 - **Score-screen schema.** `score_screen` is JSONB holding `Vec<PlayerScore>` from
   `contract::PlayerScore`. Adding fields requires no migration.

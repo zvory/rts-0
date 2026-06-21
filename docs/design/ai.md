@@ -3,9 +3,11 @@
 Computer opponents are **opt-in**: a room has none unless the host adds them from the lobby
 (`addAi` / `removeAi`, host-only, lobby phase only). `addAi` accepts an optional `teamId` for
 scripted team setup; when omitted, the server seats the AI into the next deterministic slot for
-the current preset. The lobby also has a host-only
-`setQuickstart` toggle labeled "Debug mode", which causes the next match to begin
-with 99,999 steel and 99,999 oil for every player plus a prebuilt human-only army/base loadout.
+the current preset. The legacy host-only `setQuickstart` compatibility command can still start the
+next match with 99,999 steel and 99,999 oil for every player plus a prebuilt human-only
+army/base loadout, but the normal lobby no longer exposes that command as a visible Debug mode
+toggle. Use lab rooms for player-facing experimentation until debug-style starts return as explicit
+lab presets or scenarios.
 They are capped with humans at
 `MAX_PLAYERS = 4` (the bundled maps have v2 spawn layouts for one through four active players).
 AI players are seated after the humans in the lobby player list; their colors come

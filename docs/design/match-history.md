@@ -66,7 +66,7 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - **Read**: `GET /api/matches?limit=N` — JSON array, newest first, `limit` clamped server-side to
   `[1, 100]`, defaults to 20. Returns `[]` when no DB is configured (so the client never needs
   to special-case missing-DB). The Recent Matches feed includes only rows with at least one
-  human player and `debug_mode = false`; AI-only and lobby Debug/quickstart rows may be persisted
+  human player and `debug_mode = false`; AI-only and legacy quickstart/debug rows may be persisted
   with replay artifacts but stay out of the lobby table. Local-only rows are included only when the
   request peer address is loopback; public beta/mainline requests filter them out. Each summary
   includes `replayAvailable` plus `replayUnavailableReason`. Availability is false when no replay

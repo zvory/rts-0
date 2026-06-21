@@ -26,10 +26,12 @@
     <!--
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
         Lobby:  #lobby-screen, #lobby-browser, #lobby-browser-rows, #lobby-name,
-                #lobby-create, #lobby-players, #lobby-ready, #lobby-add-ai,
-                #lobby-quickstart, #lobby-start, #lobby-status
+                #lobby-create, #lobby-lab-open, #lobby-players, #lobby-ready,
+                #lobby-add-ai, #lobby-start, #lobby-status
                 #lobby-room and #lobby-join remain hidden compatibility controls, not visible
                 pre-join product controls.
+                Legacy quickstart remains a protocol/test compatibility command, not a visible
+                normal lobby control.
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selection-area, #control-group-tabs,
@@ -125,6 +127,16 @@
                 <input id="lobby-name" type="text" maxlength="16" placeholder="Commander" autocomplete="off" />
               </label>
               <button id="lobby-create" class="btn primary" type="button" disabled>Create Lobby</button>
+              <div class="lobby-lab-entry" aria-label="Lab entry">
+                <span>Shared Lab</span>
+                <a
+                  id="lobby-lab-open"
+                  class="btn"
+                  href="/lab?room=default&map=Default"
+                  target="_blank"
+                  rel="noreferrer"
+                >Open Lab</a>
+              </div>
               <div class="lobby-manual-room" hidden>
                 <label>
                   Room
@@ -135,10 +147,6 @@
 
               <div class="lobby-host-tools lobby-joined-only">
                 <button id="lobby-add-ai" class="btn host-only" hidden>Add AI</button>
-                <label id="lobby-quickstart" class="toggle host-only" hidden>
-                  <input type="checkbox" />
-                  <span>Debug mode</span>
-                </label>
               </div>
             </div>
 
