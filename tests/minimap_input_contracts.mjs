@@ -93,6 +93,24 @@ function recordingContext(label) {
     stroke() {
       this.calls.push({ op: "stroke" });
     },
+    fill() {
+      this.calls.push({ op: "fill", fillStyle: this.fillStyle, globalAlpha: this.globalAlpha });
+    },
+    translate(...args) {
+      this.calls.push({ op: "translate", args });
+    },
+    rotate(...args) {
+      this.calls.push({ op: "rotate", args });
+    },
+    moveTo(...args) {
+      this.calls.push({ op: "moveTo", args });
+    },
+    lineTo(...args) {
+      this.calls.push({ op: "lineTo", args });
+    },
+    closePath() {
+      this.calls.push({ op: "closePath" });
+    },
   };
 }
 
@@ -523,6 +541,65 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(
     countCalls(fogLayer.context, "fillRect") === fogFillsAfterVisibleChange,
     "reveal-all fog cache clears without repainting hidden fog",
+  );
+  minimap.destroy();
+}
+
+// Global artillery firing markers draw over fog using the supplied artillery icon image.
+{
+  installWindowStub();
+  const layers = [];
+  const canvas = fakeRenderableCanvas({ width: 16, height: 16 });
+  const state = {
+    playerId: 1,
+    map: {
+      width: 4,
+      height: 4,
+      tileSize: 1,
+      terrain: new Array(16).fill(TERRAIN.GRASS),
+      resources: [],
+    },
+    selectedEntities() {
+      return [];
+    },
+    entitiesInterpolated() {
+      return [];
+    },
+    players: [{ id: 2, color: "#d55e00" }],
+  };
+  const fog = {
+    width: 4,
+    height: 4,
+    visibleGrid: new Uint8Array(16),
+    exploredGrid: new Uint8Array(16),
+    revision: 1,
+    visibleRevision: 1,
+    exploredRevision: 1,
+    revealAll: false,
+    isVisible() {
+      return false;
+    },
+    isExplored() {
+      return false;
+    },
+  };
+  const minimap = new Minimap(canvas, state, { x: 0, y: 0, zoom: 1, viewW: 4, viewH: 4 }, fog, { issueCommand() {} }, null, {
+    artilleryIconImage: { label: "artillery-icon" },
+    staticCanvasFactory: staticCanvasFactory(layers),
+  });
+  minimap.markArtilleryFiring({ owner: 2, x: 2, y: 2, facing: 0.5 });
+  minimap.render();
+  const fogDrawIndex = canvas.context.calls.findIndex((call) =>
+    call.op === "drawImage" && call.source === "static-1",
+  );
+  const iconDrawIndex = canvas.context.calls.findIndex((call) =>
+    call.op === "drawImage" && call.source === "artillery-icon",
+  );
+  assert(fogDrawIndex >= 0, "minimap draws cached fog before artillery markers");
+  assert(iconDrawIndex > fogDrawIndex, "artillery firing icon draws over fog for every player");
+  assert(
+    canvas.context.calls.some((call) => call.op === "rotate" && Math.abs(call.args[0] - 0.5) < 0.001),
+    "artillery firing icon uses the event facing",
   );
   minimap.destroy();
 }

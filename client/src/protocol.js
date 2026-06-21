@@ -165,6 +165,7 @@ export const EVENT = Object.freeze({
   MORTAR_IMPACT: "mortarImpact",
   ARTILLERY_TARGET: "artilleryTarget",
   ARTILLERY_IMPACT: "artilleryImpact",
+  ARTILLERY_FIRING: "artilleryFiring",
   OVERPENETRATION: "overpenetration",
 });
 
@@ -212,7 +213,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 22;
+export const COMPACT_SNAPSHOT_VERSION = 23;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -296,6 +297,7 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.ARTILLERY_IMPACT]: 8,
   [EVENT.MORTAR_LAUNCH]: 9,
   [EVENT.OVERPENETRATION]: 10,
+  [EVENT.ARTILLERY_FIRING]: 11,
 });
 
 export const ORDER_STAGE = Object.freeze({
@@ -1006,6 +1008,15 @@ function decodeCompactEvent(record, index) {
         delayTicks: readU32(fields[4], "event.artilleryTarget.delayTicks"),
       };
     }
+    case EVENT.ARTILLERY_FIRING:
+      requireLength(fields, 5, `artillery firing event ${index}`);
+      return {
+        e: EVENT.ARTILLERY_FIRING,
+        owner: readU32(fields[1], "event.artilleryFiring.owner"),
+        x: readNumber(fields[2], "event.artilleryFiring.x"),
+        y: readNumber(fields[3], "event.artilleryFiring.y"),
+        facing: readNumber(fields[4], "event.artilleryFiring.facing"),
+      };
     case EVENT.ARTILLERY_IMPACT:
       requireLength(fields, 4, `artillery impact event ${index}`);
       return {

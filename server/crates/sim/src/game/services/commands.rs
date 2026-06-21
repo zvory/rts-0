@@ -1466,6 +1466,17 @@ fn try_fire_artillery(
         setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
     });
     artillery_shells.schedule(player, unit, target_x, target_y, tick);
+    if let Some(reveal) = reveal.as_ref() {
+        let facing = reveal.weapon_facing.or(reveal.facing).unwrap_or(0.0);
+        for pid in events.keys().copied().collect::<Vec<_>>() {
+            events.entry(pid).or_default().push(Event::ArtilleryFiring {
+                owner: reveal.owner,
+                x: reveal.x,
+                y: reveal.y,
+                facing,
+            });
+        }
+    }
     for pid in events.keys().copied().collect::<Vec<_>>() {
         if teams.same_team_or_same_owner(pid, player) {
             events.entry(pid).or_default().push(Event::ArtilleryTarget {
@@ -4437,6 +4448,25 @@ mod tests {
         assert!(events.get(&1).is_some_and(|events| events.iter().any(
             |event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery)
         )));
+        assert!(events.get(&1).is_some_and(|events| events.iter().any(
+            |event| matches!(event, Event::ArtilleryFiring { owner: 1, x, y, .. }
+                if (*x - pos.0).abs() < 0.001 && (*y - pos.1).abs() < 0.001)
+        )));
+        assert!(
+            events.get(&2).is_some_and(|events| events.iter().any(
+                |event| matches!(event, Event::ArtilleryFiring { owner: 1, x, y, .. }
+                    if (*x - pos.0).abs() < 0.001 && (*y - pos.1).abs() < 0.001)
+            )),
+            "all players receive the firing-position minimap marker"
+        );
+        assert!(
+            events
+                .get(&2)
+                .map_or(true, |events| events
+                    .iter()
+                    .all(|event| !matches!(event, Event::ArtilleryTarget { .. }))),
+            "enemy players still do not receive artillery target data"
+        );
     }
 
     #[test]

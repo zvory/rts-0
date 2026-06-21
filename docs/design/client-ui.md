@@ -760,6 +760,7 @@ client-exposed descriptor against the Rust dump.
 export class Minimap {
   constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?, {clientIntent?, commandsEnabled?})
   render(frameViews?)                    // draw terrain + fog + entity blips + viewport rect
+  markArtilleryFiring(event)             // transient global artillery icon from artilleryFiring events
   inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)
 }
@@ -795,6 +796,8 @@ their projection remains spectator-shaped, but `LabControlPolicy.canUseCommandSu
 the selected-unit panel and real command card visible while prediction stays disabled and issue-as
 remains the command authority. Spectators still receive notice toasts and minimap alert pings, but
 `match.js` suppresses notice alert audio so observers do not hear player alert callouts.
+`artilleryFiring` events are forwarded directly to `Minimap.markArtilleryFiring`; the minimap draws
+the artillery rig icon above fog for every recipient without using it as entity visibility.
 
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
 
