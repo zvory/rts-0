@@ -5927,11 +5927,7 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert!(!results[0].ok);
         assert_eq!(results[0].request_id, 33);
-        assert!(results[0]
-            .error
-            .as_deref()
-            .unwrap()
-            .contains("lab rooms"));
+        assert!(results[0].error.as_deref().unwrap().contains("lab rooms"));
         let Phase::ReplayViewer(session) = &task.phase else {
             panic!("replay viewer should remain active");
         };
