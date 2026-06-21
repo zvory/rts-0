@@ -3,8 +3,9 @@
 
 import { MatchInputRouter } from "../client/src/input/router.js";
 import { ClientIntent } from "../client/src/client_intent.js";
+import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import { Minimap } from "../client/src/minimap.js";
-import { KIND, ORDER_STAGE, TERRAIN } from "../client/src/protocol.js";
+import { KIND, LAB_ROLE, ORDER_STAGE, TERRAIN } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -175,6 +176,7 @@ function minimapHarness({
   selected = [],
   commandTarget = null,
   commandsEnabled = true,
+  controlPolicy = null,
   legacySender = false,
   explicitClientIntent = true,
 } = {}) {
@@ -205,6 +207,7 @@ function minimapHarness({
     },
     players: [],
   };
+  if (controlPolicy) state.controlPolicy = controlPolicy;
   if (commandTarget && clientIntent) clientIntent.beginCommandTarget(commandTarget);
   const camera = {
     centerOn(x, y) {
@@ -307,6 +310,39 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(h.net.sent.length === 0, "replay minimap right-click sends no command");
   assert(h.router.pointerDown(lockedEvent(221, 321, 0)), "replay minimap left-click still recenters camera");
   assert(h.centers.length === 1, "replay minimap keeps local camera controls");
+  h.minimap.destroy();
+}
+
+// Lab operators can issue minimap commands through the lab command-surface predicate
+// even though lab starts keep normal gameplay command capabilities disabled.
+{
+  const selected = [{ id: 17, owner: 2, kind: KIND.RIFLEMAN }];
+  const labPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
+  const h = minimapHarness({
+    selected,
+    controlPolicy: labPolicy,
+    commandsEnabled: false,
+  });
+  assert(h.router.pointerDown(lockedEvent(180, 280, 2)), "lab operator minimap right-click is consumed");
+  assert(h.net.sent.length === 1, "lab operator minimap right-click sends one command through the lab command issuer");
+  assert(h.net.sent[0].c === "move", "lab operator minimap command routes selected units");
+  assert(h.net.sent[0].units.length === 1 && h.net.sent[0].units[0] === 17, "lab minimap command uses selected owner units");
+  h.minimap.destroy();
+}
+
+// Read-only lab starts keep minimap camera controls but do not issue commands.
+{
+  const selected = [{ id: 18, owner: 2, kind: KIND.RIFLEMAN }];
+  const readOnlyPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } });
+  const h = minimapHarness({
+    selected,
+    controlPolicy: readOnlyPolicy,
+    commandsEnabled: false,
+  });
+  assert(h.router.pointerDown(lockedEvent(180, 280, 2)), "read-only lab minimap right-click is consumed");
+  assert(h.net.sent.length === 0, "read-only lab minimap right-click sends no command");
+  assert(h.router.pointerDown(lockedEvent(221, 321, 0)), "read-only lab minimap left-click still recenters camera");
+  assert(h.centers.length === 1, "read-only lab keeps minimap camera controls");
   h.minimap.destroy();
 }
 

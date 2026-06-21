@@ -15,7 +15,7 @@ import {
   commandCardAbilitiesForFaction,
   workerBuildablesForFaction,
 } from "../client/src/config.js";
-import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
+import { ABILITY, KIND, LAB_ROLE, UPGRADE } from "../client/src/protocol.js";
 
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
 const ekatCommandId = (family, subject) => factionCommandId(EKAT_FACTION_ID, family, subject);
@@ -141,7 +141,7 @@ function buttonSlots(card) {
       return [labWorker];
     },
   };
-  const labPolicy = createLabControlPolicy({ metadata: { role: "operator" } });
+  const labPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
   const labCard = buildCommandCardDescriptors({
     spectator: true,
     commandSurfaceEnabled: labPolicy.canUseCommandSurface(labState),
@@ -162,7 +162,7 @@ function buttonSlots(card) {
     { commandId: "worker.buildMenu", slotIndex: 6, hotkey: "Z" },
   ], "lab operator command card treats the controlled selected owner as commandable");
 
-  const viewerPolicy = createLabControlPolicy({ metadata: { role: "viewer" } });
+  const viewerPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } });
   const viewerCard = buildCommandCardDescriptors({
     spectator: true,
     commandSurfaceEnabled: viewerPolicy.canUseCommandSurface(labState),
