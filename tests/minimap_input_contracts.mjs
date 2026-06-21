@@ -598,6 +598,15 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(fogDrawIndex >= 0, "minimap draws cached fog before artillery markers");
   assert(iconDrawIndex > fogDrawIndex, "artillery firing icon draws over fog for every player");
   assert(
+    canvas.context.calls[iconDrawIndex].args[2] === 30 &&
+      canvas.context.calls[iconDrawIndex].args[3] === 24,
+    "artillery firing icon uses the doubled minimap dimensions",
+  );
+  assert(
+    !canvas.context.calls.some((call) => call.op === "arc"),
+    "artillery firing icon image does not draw an extra surrounding circle",
+  );
+  assert(
     canvas.context.calls.some((call) => call.op === "rotate" && Math.abs(call.args[0] - 0.5) < 0.001),
     "artillery firing icon uses the event facing",
   );
