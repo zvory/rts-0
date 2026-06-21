@@ -39,10 +39,12 @@ import {
 import {
   LOBBY_BROWSER_POLL_MS,
   LobbyBrowserView,
+  LobbyCreateModal,
   formatLobbyAge,
   lobbyActionLabel,
   lobbyStatusLabel,
   sortLobbySummaries,
+  validateLobbyName,
 } from "../client/src/lobby_browser_view.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
 import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
@@ -289,16 +291,28 @@ function withFakeDocument(fn) {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
   };
+  const docListeners = {};
   globalThis.document = {
+    activeElement: null,
+    listeners: docListeners,
+    addEventListener(type, handler) {
+      docListeners[type] = handler;
+    },
+    removeEventListener(type, handler) {
+      if (docListeners[type] === handler) delete docListeners[type];
+    },
     createElement(tagName) {
       const el = {
         tagName: String(tagName).toUpperCase(),
         className: "",
         classList: fakeClassList(),
+        children: [],
         dataset: {},
         disabled: false,
+        hidden: false,
         title: "",
         type: "",
+        value: "",
         innerHTML: "",
         listeners: {},
         style: { setProperty() {} },
@@ -309,11 +323,9 @@ function withFakeDocument(fn) {
           if (this.listeners[type] === handler) delete this.listeners[type];
         },
         append(...children) {
-          this.children = this.children || [];
           this.children.push(...children);
         },
         appendChild(child) {
-          this.children = this.children || [];
           this.children.push(child);
           return child;
         },
@@ -325,6 +337,12 @@ function withFakeDocument(fn) {
         },
         remove() {
           this.removed = true;
+        },
+        focus() {
+          globalThis.document.activeElement = this;
+        },
+        click() {
+          this.listeners.click?.({ target: this, preventDefault() {}, stopPropagation() {} });
         },
         querySelectorAll() {
           return [];
@@ -4453,6 +4471,15 @@ function fakeAudioContext() {
   assert(lobbyStatusLabel("fullSpectatorOnly") === "Full", "full lobby rows get a distinct status label");
   assert(lobbyActionLabel("fullSpectatorOnly") === "Join as spectator",
     "full lobby rows advertise spectator joining");
+  assert(validateLobbyName(" Alpha ").ok, "lobby create accepts trimmed plain names");
+  assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
+  assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
+  assert(!validateLobbyName("x".repeat(65)).ok, "lobby create mirrors the server byte-length cap");
+  const indexHtml = fs.readFileSync(new URL("../client/index.html", import.meta.url), "utf8");
+  assert(indexHtml.includes('class="lobby-manual-room" hidden'),
+    "manual room-name join controls stay outside the normal pre-join product path");
+  assert(indexHtml.includes("#lobby-room and #lobby-join remain hidden compatibility controls"),
+    "DOM contract documents room-name controls as hidden compatibility only");
 
   const sorted = sortLobbySummaries([
     { room: "old-open", hostName: "A", createdAtUnixMs: 100, joinState: "open" },
@@ -4468,6 +4495,8 @@ function fakeAudioContext() {
   );
 
   withFakeDocument(() => {
+    const joins = [];
+    let createClicks = 0;
     const rowsRoot = {
       children: [],
       replaceChildren(...children) {
@@ -4484,29 +4513,100 @@ function fakeAudioContext() {
       },
     };
     const view = new LobbyBrowserView(root);
-    view.render({ rows: [], nowMs: now });
-    assert(textWithin(rowsRoot).includes("No lobbies"), "lobby browser renders compact empty state");
     view.render({
-      rows: [{
-        room: "Alpha Long Lobby",
-        hostName: "Host",
-        map: "No Terrain",
-        createdAtUnixMs: now - 60_000,
-        occupiedSlots: 4,
-        maxSlots: 4,
-        spectatorCount: 1,
-        joinState: "fullSpectatorOnly",
-      }],
+      rows: [],
+      nowMs: now,
+      onCreateLobby: () => { createClicks += 1; },
+      onJoinLobby: (row, options) => joins.push({ room: row.room, spectator: !!options?.spectator }),
+    });
+    assert(textWithin(rowsRoot).includes("No lobbies"), "lobby browser renders compact empty state");
+    findFakes(rowsRoot, (el) => el.tagName === "BUTTON" && el.textContent === "Create lobby")[0]?.click();
+    assert(createClicks === 1, "empty lobby browser create action opens the create flow");
+    view.render({
+      rows: [
+        {
+          room: "Open Lobby",
+          hostName: "Host A",
+          map: "Default",
+          createdAtUnixMs: now - 30_000,
+          occupiedSlots: 1,
+          maxSlots: 4,
+          spectatorCount: 0,
+          joinState: "open",
+        },
+        {
+          room: "Alpha Long Lobby",
+          hostName: "Host",
+          map: "No Terrain",
+          createdAtUnixMs: now - 60_000,
+          occupiedSlots: 4,
+          maxSlots: 4,
+          spectatorCount: 1,
+          joinState: "fullSpectatorOnly",
+        },
+        {
+          room: "Locked Match",
+          hostName: "Host C",
+          map: "Default",
+          createdAtUnixMs: now - 90_000,
+          occupiedSlots: 4,
+          maxSlots: 4,
+          spectatorCount: 0,
+          joinState: "inGame",
+        },
+      ],
       nowMs: now,
     });
     assert(textWithin(rowsRoot).includes("Alpha Long Lobby"), "lobby browser renders lobby names");
     assert(textWithin(rowsRoot).includes("No Terrain"), "lobby browser renders map names");
     assert(textWithin(rowsRoot).includes("4 / 4 +1 obs"), "lobby browser renders active slots and spectators");
     assert(textWithin(rowsRoot).includes("Join as spectator"), "lobby browser renders row action state");
-    const row = rowsRoot.children[0];
+    const row = rowsRoot.children.find((child) => child.dataset.joinState === "fullSpectatorOnly");
     assert(row.dataset.joinState === "fullSpectatorOnly", "lobby browser pins row join-state data");
-    const actionButton = findFakes(row, (el) => el.tagName === "BUTTON")[0];
-    assert(actionButton?.disabled, "phase 2 lobby browser row actions are read-only");
+    const buttons = findFakes(rowsRoot, (el) => el.tagName === "BUTTON");
+    const openButton = buttons.find((button) => button.textContent === "Join lobby");
+    const spectatorButton = buttons.find((button) => button.textContent === "Join as spectator");
+    const inGameButton = buttons.find((button) => button.textContent === "In match");
+    assert(!openButton?.disabled, "open lobby row action is enabled");
+    assert(!spectatorButton?.disabled, "full lobby row action joins as spectator");
+    assert(inGameButton?.disabled, "in-game lobby row action stays disabled");
+    openButton.click();
+    spectatorButton.click();
+    inGameButton.click();
+    assertDeepEqual(joins, [
+      { room: "Open Lobby", spectator: false },
+      { room: "Alpha Long Lobby", spectator: true },
+    ], "lobby browser row actions carry active vs spectator join intent");
+  });
+
+  await withFakeDocument(async () => {
+    const host = document.createElement("section");
+    const trigger = document.createElement("button");
+    let submitted = "";
+    const modal = new LobbyCreateModal(host, {
+      onSubmit: async (room) => {
+        submitted = room;
+        modal.setError("Lobby name is already in use.");
+        return false;
+      },
+    });
+    modal.open(trigger);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const input = findFakes(host, (el) => el.tagName === "INPUT")[0];
+    const submit = findFakes(host, (el) => el.tagName === "BUTTON" && el.textContent === "Create lobby")[0];
+    assert(document.activeElement === input, "create lobby modal moves focus to the name input");
+    assert(submit.disabled, "create lobby modal disables submit while the name is invalid");
+    input.value = "taken";
+    input.listeners.input?.({ target: input });
+    assert(!submit.disabled, "create lobby modal enables submit for a valid name");
+    submit.click();
+    await Promise.resolve();
+    assert(submitted === "taken", "create lobby modal submits the trimmed lobby name");
+    assert(textWithin(host).includes("Lobby name is already in use."),
+      "duplicate create failures are displayed inline");
+    modal.close();
+    assert(document.activeElement === trigger, "create lobby modal returns focus to the trigger");
+    modal.destroy();
   });
 }
 

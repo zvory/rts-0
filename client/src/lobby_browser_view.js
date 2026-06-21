@@ -25,6 +25,15 @@ const JOIN_STATE_ACTION = Object.freeze({
   stale: "Stale",
 });
 
+const PUBLIC_LOBBY_NAME_MAX_BYTES = 64;
+const RESERVED_LOBBY_PREFIXES = Object.freeze([
+  "__dev_scenario__:",
+  "__replay_artifact__:",
+  "__match_replay__",
+  "__replay_branch__",
+  "__lab__:",
+]);
+
 export const LOBBY_BROWSER_POLL_MS = 1500;
 
 export function normalizeLobbySummary(row = {}) {
@@ -77,12 +86,30 @@ export function formatLobbyAge(createdAtUnixMs, nowMs = Date.now()) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+export function validateLobbyName(rawName) {
+  const room = String(rawName ?? "").trim();
+  if (!room) return { ok: false, room, error: "Lobby name is required." };
+  if (utf8ByteLength(room) > PUBLIC_LOBBY_NAME_MAX_BYTES) {
+    return { ok: false, room, error: "Lobby name is too long." };
+  }
+  if (/[\u0000-\u001f\u007f]/u.test(room)) {
+    return { ok: false, room, error: "Lobby name contains unsupported characters." };
+  }
+  if (RESERVED_LOBBY_PREFIXES.some((prefix) => room.startsWith(prefix))) {
+    return { ok: false, room, error: "Lobby name is reserved." };
+  }
+  return { ok: true, room, error: "" };
+}
+
 export class LobbyBrowserView {
   constructor(rootEl) {
     this.root = rootEl;
     this.rowsRoot = rootEl?.querySelector("#lobby-browser-rows") || null;
     this.statusEl = rootEl?.querySelector("#lobby-browser-status") || null;
     this.rows = [];
+    this.onCreateLobby = null;
+    this.onJoinLobby = null;
+    this.actionsDisabled = false;
   }
 
   render({
@@ -91,9 +118,15 @@ export class LobbyBrowserView {
     connected = true,
     error = "",
     nowMs = Date.now(),
+    actionsDisabled = false,
+    onCreateLobby,
+    onJoinLobby,
   } = {}) {
     if (!this.root || !this.rowsRoot) return;
     if (Array.isArray(rows)) this.rows = sortLobbySummaries(rows);
+    if (onCreateLobby !== undefined) this.onCreateLobby = onCreateLobby;
+    if (onJoinLobby !== undefined) this.onJoinLobby = onJoinLobby;
+    this.actionsDisabled = !!actionsDisabled;
     this.root.classList.toggle("is-disconnected", !connected);
     this.root.classList.toggle("has-error", !!error);
     if (this.statusEl) {
@@ -104,7 +137,7 @@ export class LobbyBrowserView {
       return;
     }
     if (this.rows.length === 0) {
-      this.rowsRoot.replaceChildren(this._buildEmptyState(error));
+      this.rowsRoot.replaceChildren(this._buildEmptyState(error, { connected }));
       return;
     }
     this.rowsRoot.replaceChildren(
@@ -114,6 +147,8 @@ export class LobbyBrowserView {
 
   destroy() {
     this.rows = [];
+    this.onCreateLobby = null;
+    this.onJoinLobby = null;
     if (this.rowsRoot) this.rowsRoot.replaceChildren();
     this.root = null;
     this.rowsRoot = null;
@@ -128,7 +163,7 @@ export class LobbyBrowserView {
     return el;
   }
 
-  _buildEmptyState(error) {
+  _buildEmptyState(error, { connected }) {
     const el = document.createElement("div");
     el.className = "lobby-browser-empty";
     const title = document.createElement("strong");
@@ -136,15 +171,20 @@ export class LobbyBrowserView {
     const action = document.createElement("button");
     action.type = "button";
     action.className = "btn primary";
-    action.disabled = true;
+    action.disabled = !connected || this.actionsDisabled || !this.onCreateLobby;
     action.textContent = "Create lobby";
+    if (!action.disabled) {
+      action.addEventListener("click", () => this.onCreateLobby?.(action));
+    }
     el.append(title, action);
     return el;
   }
 
   _buildRow(row, { connected, nowMs }) {
-    const disabled = true;
     const state = normalizedJoinState(row.joinState);
+    const spectator = state === "fullSpectatorOnly";
+    const canJoin = connected && !this.actionsDisabled && (state === "open" || spectator);
+    const disabled = !canJoin || !this.onJoinLobby;
     const el = document.createElement("article");
     el.className = `lobby-browser-row is-${state}`;
     el.dataset.joinState = state;
@@ -174,6 +214,10 @@ export class LobbyBrowserView {
     button.className = "btn";
     button.disabled = disabled;
     button.textContent = lobbyActionLabel(state);
+    button.dataset.room = row.room;
+    if (!button.disabled) {
+      button.addEventListener("click", () => this.onJoinLobby?.(row, { spectator }));
+    }
     action.appendChild(button);
 
     el.append(lobby, host, map, made, slots, action);
@@ -191,6 +235,200 @@ export class LobbyBrowserView {
     value.title = valueText;
     el.append(label, value);
     return el;
+  }
+}
+
+export class LobbyCreateModal {
+  constructor(hostEl, { onSubmit } = {}) {
+    this.host = hostEl;
+    this.onSubmit = typeof onSubmit === "function" ? onSubmit : null;
+    this.root = null;
+    this.input = null;
+    this.errorEl = null;
+    this.cancelButton = null;
+    this.submitButton = null;
+    this.returnFocus = null;
+    this.pending = false;
+    this.dirty = false;
+    this._onKeydown = (ev) => this._handleKeydown(ev);
+  }
+
+  open(trigger = null) {
+    this._build();
+    if (!this.root || !this.input) return;
+    this.returnFocus = isHTMLElement(trigger) ? trigger : activeHTMLElement();
+    this.input.value = "";
+    this.dirty = false;
+    this.pending = false;
+    this.setError("");
+    this._syncSubmitState();
+    this.root.hidden = false;
+    document.addEventListener?.("keydown", this._onKeydown);
+    defer(() => this.input?.focus());
+  }
+
+  close({ restoreFocus = true } = {}) {
+    if (!this.root || this.root.hidden) return;
+    this.root.hidden = true;
+    this.pending = false;
+    document.removeEventListener?.("keydown", this._onKeydown);
+    const focusTarget = this.returnFocus;
+    this.returnFocus = null;
+    if (restoreFocus && isHTMLElement(focusTarget)) focusTarget.focus();
+  }
+
+  destroy() {
+    document.removeEventListener?.("keydown", this._onKeydown);
+    this.root?.remove();
+    this.root = null;
+    this.input = null;
+    this.errorEl = null;
+    this.cancelButton = null;
+    this.submitButton = null;
+    this.returnFocus = null;
+  }
+
+  setError(message) {
+    if (!this.errorEl) return;
+    this.errorEl.textContent = message || "";
+    this.errorEl.hidden = !message;
+  }
+
+  setPending(pending) {
+    this.pending = !!pending;
+    this._syncSubmitState({ showError: false });
+  }
+
+  _build() {
+    if (this.root || !this.host) return;
+
+    const root = document.createElement("div");
+    root.className = "lobby-alert lobby-create-modal";
+    root.hidden = true;
+    root.addEventListener("click", (ev) => {
+      if (ev.target === root && !this.pending) this.close();
+    });
+
+    const dialog = document.createElement("div");
+    dialog.className = "lobby-alert-box lobby-create-box";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "lobby-create-title");
+    dialog.setAttribute("aria-describedby", "lobby-create-error");
+
+    const eyebrow = document.createElement("div");
+    eyebrow.className = "lobby-alert-eyebrow";
+    eyebrow.textContent = "New lobby";
+
+    const title = document.createElement("h2");
+    title.id = "lobby-create-title";
+    title.textContent = "Create Lobby";
+
+    const label = document.createElement("label");
+    label.className = "lobby-create-field";
+    label.textContent = "Lobby name";
+
+    const input = document.createElement("input");
+    input.id = "lobby-create-name";
+    input.type = "text";
+    input.maxLength = PUBLIC_LOBBY_NAME_MAX_BYTES;
+    input.autocomplete = "off";
+    input.addEventListener("input", () => {
+      this.dirty = true;
+      this._syncSubmitState();
+    });
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        this._submit();
+      }
+    });
+    label.appendChild(input);
+
+    const error = document.createElement("p");
+    error.id = "lobby-create-error";
+    error.className = "lobby-create-error";
+    error.setAttribute("role", "alert");
+    error.hidden = true;
+
+    const actions = document.createElement("div");
+    actions.className = "lobby-alert-actions";
+
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => {
+      if (!this.pending) this.close();
+    });
+
+    const submit = document.createElement("button");
+    submit.type = "button";
+    submit.className = "btn primary";
+    submit.textContent = "Create lobby";
+    submit.addEventListener("click", () => this._submit());
+
+    actions.append(cancel, submit);
+    dialog.append(eyebrow, title, label, error, actions);
+    root.appendChild(dialog);
+    this.host.appendChild(root);
+
+    this.root = root;
+    this.input = input;
+    this.errorEl = error;
+    this.cancelButton = cancel;
+    this.submitButton = submit;
+  }
+
+  _syncSubmitState({ showError = this.dirty } = {}) {
+    if (!this.input || !this.submitButton) return;
+    const result = validateLobbyName(this.input.value);
+    this.submitButton.disabled = this.pending || !result.ok;
+    this.input.setAttribute("aria-invalid", result.ok ? "false" : "true");
+    if (showError && !result.ok) this.setError(result.error);
+    if (result.ok && !this.pending && showError) this.setError("");
+  }
+
+  async _submit() {
+    if (this.pending || !this.input) return;
+    this.dirty = true;
+    const result = validateLobbyName(this.input.value);
+    if (!result.ok) {
+      this._syncSubmitState({ showError: true });
+      this.input.focus();
+      return;
+    }
+    if (!this.onSubmit) return;
+    this.setPending(true);
+    this.setError("");
+    const shouldClose = await this.onSubmit(result.room);
+    if (shouldClose !== false) {
+      this.close({ restoreFocus: false });
+    } else {
+      this.setPending(false);
+      this.input?.focus();
+    }
+  }
+
+  _handleKeydown(ev) {
+    if (!this.root || this.root.hidden) return;
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      if (!this.pending) this.close();
+      return;
+    }
+    if (ev.key !== "Tab") return;
+
+    const focusables = [this.input, this.cancelButton, this.submitButton]
+      .filter((el) => el && !el.disabled);
+    if (focusables.length === 0) return;
+    const current = document.activeElement;
+    const currentIndex = focusables.indexOf(current);
+    const nextIndex = ev.shiftKey
+      ? (currentIndex <= 0 ? focusables.length : currentIndex) - 1
+      : (currentIndex + 1) % focusables.length;
+    ev.preventDefault();
+    focusables[nextIndex].focus();
   }
 }
 
@@ -223,4 +461,26 @@ function integerOr(value, fallback) {
 function boundedText(value, fallback) {
   const text = String(value ?? "").trim();
   return text || fallback;
+}
+
+function utf8ByteLength(value) {
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(value).length;
+  return encodeURIComponent(value).replace(/%[0-9a-f]{2}/gi, "x").length;
+}
+
+function activeHTMLElement() {
+  return isHTMLElement(document.activeElement) ? document.activeElement : null;
+}
+
+function defer(fn) {
+  const timer = typeof window !== "undefined" && typeof window.setTimeout === "function"
+    ? window.setTimeout.bind(window)
+    : setTimeout;
+  timer(fn, 0);
+}
+
+function isHTMLElement(value) {
+  return typeof HTMLElement !== "undefined"
+    ? value instanceof HTMLElement
+    : !!value && typeof value.focus === "function";
 }
