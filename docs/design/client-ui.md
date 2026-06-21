@@ -763,6 +763,9 @@ export class Minimap {
   // click/drag -> camera.centerOn or issue move command (right-click)
 }
 ```
+`commandsEnabled` may be a boolean or a zero-argument predicate. When `state.controlPolicy` is the
+lab policy, the minimap uses that policy so lab operators can issue minimap commands even though
+their start payload remains spectator-shaped.
 
 `lobby.js`
 ```js
