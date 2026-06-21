@@ -5224,7 +5224,7 @@ fn tank_trap_does_not_keep_player_alive() {
 }
 
 #[test]
-fn tank_trap_zero_sight_does_not_reveal_owner_fog() {
+fn tank_trap_grants_only_one_tile_local_sight() {
     let players = [
         PlayerInit {
             id: 1,
@@ -5257,8 +5257,19 @@ fn tank_trap_zero_sight_does_not_reveal_owner_fog() {
     game.fog.recompute(&[1, 2], &game.entities, &game.map);
 
     assert!(
-        !game.fog.is_visible_world(1, x, y),
-        "zero-sight Tank Traps must not reveal their own tile"
+        game.fog.is_visible_world(1, x, y),
+        "Tank Traps should reveal their own tile"
+    );
+    assert!(
+        game.fog
+            .is_visible_world(1, x - config::TILE_SIZE as f32, y),
+        "Tank Traps should reveal one local tile"
+    );
+    assert!(
+        !game
+            .fog
+            .is_visible_world(1, x - config::TILE_SIZE as f32 * 2.0, y),
+        "Tank Traps must not scout beyond one tile"
     );
 }
 
