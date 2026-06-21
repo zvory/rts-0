@@ -37,7 +37,7 @@ mod tests;
 use acquisition::{combat_mode, resolve_target, CombatMode};
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
-use projection::friendly_hard_blocker_between;
+use projection::{friendly_hard_blocker_between, shot_hits_intended_target};
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
@@ -207,9 +207,15 @@ pub(crate) fn combat_system(
         let dist = dist2(px, py, tx, ty).sqrt();
         let target_angle = (ty - py).atan2(tx - px);
         let terrain_clear = los.clear_between_world_points((px, py), (tx, ty));
-        let friendly_blocked = terrain_clear
-            && friendly_hard_blocker_between(map, entities, id, owner, (px, py), (tx, ty));
-        let clear_shot = is_mortar_team || (terrain_clear && !friendly_blocked);
+        let clear_shot = if is_mortar_team {
+            true
+        } else if !terrain_clear {
+            false
+        } else if mode == CombatMode::Ordered {
+            shot_hits_intended_target(map, entities, teams, id, owner, tid, (px, py))
+        } else {
+            !friendly_hard_blocker_between(map, entities, id, owner, (px, py), (tx, ty))
+        };
 
         if dist <= range_px && clear_shot {
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
@@ -292,10 +298,18 @@ pub(crate) fn combat_system(
                 }
             }
         } else if is_unit && mode != CombatMode::Opportunistic {
-            // Out of weapon range but within aggro: chase. Tanks route to a standoff point
-            // inside firing range; other units still route toward the target center.
-            let chase_goal =
-                chase_goal_for_target(map, entities, id, (px, py), (tx, ty), range_px, dist);
+            // Out of weapon range but within aggro: chase. Tanks route to a standoff point,
+            // and statically blocked targets route to a passable perimeter tile.
+            let chase_goal = chase_goal_for_target(
+                map,
+                entities,
+                id,
+                (px, py),
+                (tx, ty),
+                range_px,
+                dist,
+            );
+            let chase_goal = coordinator.attack_chase_goal(entities, id, tid, chase_goal, range_px);
             let want_repath = entities
                 .get(id)
                 .map(|e| chase_path_needs_refresh(e, chase_goal))

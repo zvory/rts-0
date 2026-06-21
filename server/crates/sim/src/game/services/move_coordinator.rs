@@ -358,6 +358,44 @@ impl<'a> MoveCoordinator<'a> {
         self.request_path(entities, id, node_pos, false)
     }
 
+    /// Return a chase goal that the movement system can actually path to.
+    ///
+    /// Direct attack orders preserve the intended target id, but a target building's center can
+    /// sit inside its own static footprint, and a unit can occasionally stand on a statically
+    /// blocked tile. In those cases, path to a passable perimeter tile until combat can hit the
+    /// intended target.
+    pub fn attack_chase_goal(
+        &self,
+        entities: &EntityStore,
+        attacker: u32,
+        target: u32,
+        proposed_goal: (f32, f32),
+        range_px: f32,
+    ) -> (f32, f32) {
+        let (Some(attacker), Some(target)) = (entities.get(attacker), entities.get(target)) else {
+            return proposed_goal;
+        };
+        let proposed_tile = self.map.tile_of(proposed_goal.0, proposed_goal.1);
+        if self.tile_passable_for_kind(proposed_tile, attacker.kind) {
+            return proposed_goal;
+        }
+
+        let target_pos = (target.pos_x, target.pos_y);
+        let blocked_tiles = if target.is_building() && target.kind != EntityKind::TankTrap {
+            building_footprint(self.map, target)
+        } else {
+            vec![self.map.tile_of(target.pos_x, target.pos_y)]
+        };
+        self.adjacent_attack_goal(
+            attacker.kind,
+            &blocked_tiles,
+            (attacker.pos_x, attacker.pos_y),
+            target_pos,
+            range_px,
+        )
+        .unwrap_or(proposed_goal)
+    }
+
     // -------------------------------------------------------------------
     // Spawn search
     // -------------------------------------------------------------------
@@ -473,6 +511,75 @@ impl<'a> MoveCoordinator<'a> {
                         .is_none_or(|existing| !unit_bodies_intersect(body, existing))
             })
             .then_some(facing)
+    }
+
+    fn adjacent_attack_goal(
+        &self,
+        attacker_kind: EntityKind,
+        blocked_tiles: &[(u32, u32)],
+        attacker_pos: (f32, f32),
+        target_pos: (f32, f32),
+        range_px: f32,
+    ) -> Option<(f32, f32)> {
+        if blocked_tiles.is_empty() {
+            return None;
+        }
+        let min_x = blocked_tiles.iter().map(|(x, _)| *x).min()? as i32;
+        let max_x = blocked_tiles.iter().map(|(x, _)| *x).max()? as i32;
+        let min_y = blocked_tiles.iter().map(|(_, y)| *y).min()? as i32;
+        let max_y = blocked_tiles.iter().map(|(_, y)| *y).max()? as i32;
+        let range2 = range_px * range_px;
+        let mut candidates = Vec::new();
+
+        for r in 1i32..=6 {
+            for ty in (min_y - r)..=(max_y + r) {
+                for tx in (min_x - r)..=(max_x + r) {
+                    if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
+                        continue;
+                    }
+                    if !self.map.in_bounds(tx, ty) {
+                        continue;
+                    }
+                    let tile = (tx as u32, ty as u32);
+                    if blocked_tiles.contains(&tile) || !self.tile_passable_for_kind(tile, attacker_kind)
+                    {
+                        continue;
+                    }
+                    let center = self.map.tile_center(tile.0, tile.1);
+                    let attacker_dist2 = {
+                        let dx = center.0 - attacker_pos.0;
+                        let dy = center.1 - attacker_pos.1;
+                        dx * dx + dy * dy
+                    };
+                    let target_dist2 = {
+                        let dx = center.0 - target_pos.0;
+                        let dy = center.1 - target_pos.1;
+                        dx * dx + dy * dy
+                    };
+                    let range_rank = u8::from(target_dist2 > range2);
+                    candidates.push((range_rank, r, attacker_dist2, tile, center));
+                }
+            }
+        }
+
+        candidates.sort_by(|left, right| {
+            left
+                .0
+                .cmp(&right.0)
+                .then_with(|| left.1.cmp(&right.1))
+                .then_with(|| left.2.total_cmp(&right.2))
+                .then_with(|| left.3.cmp(&right.3))
+        });
+        candidates
+            .into_iter()
+            .map(|(_, _, _, _, point)| point)
+            .next()
+    }
+
+    fn tile_passable_for_kind(&self, tile: (u32, u32), kind: EntityKind) -> bool {
+        let tx = tile.0 as i32;
+        let ty = tile.1 as i32;
+        self.map.is_passable(tx, ty) && self.occ.passable_for_kind(tx, ty, kind)
     }
 
     // -------------------------------------------------------------------
