@@ -1692,7 +1692,7 @@ fn ai_1_1_builds_second_factory_for_tank_production() {
             tx < width
                 && ty < height
                 && kind == EntityKind::Factory
-                && matches!((tx, ty), (6, 8) | (14, 14))
+                && matches!((tx, ty), (6, 8) | (28, 28))
         },
     );
 
@@ -1704,10 +1704,10 @@ fn ai_1_1_builds_second_factory_for_tank_production() {
             matches!(
                 command,
                 Command::Build { building: EntityKind::Factory, tile_x, tile_y, .. }
-                    if (*tile_x, *tile_y) == (14, 14)
+                    if (*tile_x, *tile_y) == (28, 28)
             )
         }),
-        "the second Factory should take the farther centerward site instead of the nearer rear site"
+        "the second Factory should take the expanded forward site instead of the nearer rear site"
     );
 }
 
