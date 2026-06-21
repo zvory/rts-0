@@ -138,6 +138,14 @@ pub(super) enum Phase {
     BranchStaging(Box<BranchStagingState>),
 }
 
+#[derive(Clone, Copy)]
+struct ReplayTickContext {
+    scheduler_lag: Duration,
+    tick_budget: Duration,
+    tick_start: StdInstant,
+    projection_policy: ProjectionPolicy,
+}
+
 #[derive(Clone)]
 pub(super) enum RoomMode {
     Normal,
@@ -2936,9 +2944,12 @@ impl RoomTask {
         self.broadcast(&msg);
     }
 
-    fn broadcast_observer_analysis_for(&self, session: &ReplaySession) {
-        if self.projection_policy().observer_analysis_audience()
-            != ObserverAnalysisAudience::ReplayViewers
+    fn broadcast_observer_analysis_for(
+        &self,
+        session: &ReplaySession,
+        projection_policy: ProjectionPolicy,
+    ) {
+        if projection_policy.observer_analysis_audience() != ObserverAnalysisAudience::ReplayViewers
         {
             return;
         }
@@ -2987,24 +2998,22 @@ impl RoomTask {
         &mut self,
         session: &ReplaySession,
         mut per_player_events: HashMap<u32, Vec<Event>>,
-        scheduler_lag: Duration,
-        tick_start: StdInstant,
+        context: ReplayTickContext,
         perf: Option<&mut rts_sim::perf::TickPerf>,
     ) {
-        let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
-        let projection_policy = self.projection_policy();
         SnapshotFanout::new(
             &self.room,
-            scheduler_lag,
-            tick_budget,
-            tick_start,
+            context.scheduler_lag,
+            context.tick_budget,
+            context.tick_start,
             &mut self.slow_tick_count,
             perf,
         )
         .send_to_recipients(&mut self.players, recipients, |id, _player| {
-            let projection =
-                projection_policy.replay_snapshot_for(session.vision_player_ids_for(id));
+            let projection = context
+                .projection_policy
+                .replay_snapshot_for(session.vision_player_ids_for(id));
             let snapshot =
                 projection.snapshot_with_events(session.game(), &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, true))
@@ -3176,6 +3185,12 @@ impl RoomTask {
     }
 
     fn on_tick_replay_viewer(&mut self, scheduled: TokioInstant) {
+        let context = ReplayTickContext {
+            scheduler_lag: scheduled.elapsed(),
+            tick_budget: self.current_tick_interval(),
+            tick_start: StdInstant::now(),
+            projection_policy: self.projection_policy_for_phase(SessionPhase::ReplayViewer),
+        };
         let mut session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::ReplayViewer(session) => session,
             other => {
@@ -3183,8 +3198,6 @@ impl RoomTask {
                 return;
             }
         };
-        let scheduler_lag = scheduled.elapsed();
-        let tick_start = StdInstant::now();
         let mut perf = rts_sim::perf::TickPerf::maybe_new();
 
         if session.has_remaining_ticks() {
@@ -3212,20 +3225,19 @@ impl RoomTask {
                 }
             };
             session.record_keyframe_if_due();
-            self.fanout_replay_snapshots(
-                &session,
-                per_player_events,
-                scheduler_lag,
-                tick_start,
-                perf.as_mut(),
-            );
-            self.broadcast_observer_analysis_for(&session);
+            self.fanout_replay_snapshots(&session, per_player_events, context, perf.as_mut());
+            self.broadcast_observer_analysis_for(&session, context.projection_policy);
         } else {
             self.broadcast_room_time_state_for(&session);
-            self.broadcast_observer_analysis_for(&session);
+            self.broadcast_observer_analysis_for(&session, context.projection_policy);
         }
 
-        self.finish_perf_tick(perf.as_ref(), session.game(), scheduler_lag, tick_start);
+        self.finish_perf_tick(
+            perf.as_ref(),
+            session.game(),
+            context.scheduler_lag,
+            context.tick_start,
+        );
         self.phase = Phase::ReplayViewer(session);
     }
 
@@ -6775,6 +6787,13 @@ mod tests {
         let expected = session.game.snapshot_for_spectator(&visible_players);
         assert_eq!(snapshot.tick, expected.tick);
         assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
+        let tick_messages: Vec<_> =
+            std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(tick_messages.iter().any(|msg| matches!(
+            msg,
+            ServerMessage::ObserverAnalysis(analysis)
+                if analysis.tick == expected.tick && analysis.players.len() == players.len()
+        )));
     }
 
     #[test]
