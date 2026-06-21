@@ -84,10 +84,6 @@ const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
 const LOBBY_SUMMARY_TIMEOUT: Duration = Duration::from_millis(75);
 const PUBLIC_LOBBY_NAME_MAX_BYTES: usize = 64;
-#[cfg(not(test))]
-const EMPTY_LOBBY_RESERVATION_TTL_MS: u64 = 10_000;
-#[cfg(test)]
-const EMPTY_LOBBY_RESERVATION_TTL_MS: u64 = 20;
 const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
 const REPLAY_ARTIFACT_ROOM_PREFIX: &str = "__replay_artifact__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
@@ -167,10 +163,6 @@ pub enum RoomEvent {
     /// Ask the room task to produce a browser-safe public summary. Internal rooms answer `None`.
     Summary {
         reply: tokio::sync::oneshot::Sender<Option<LobbySummary>>,
-    },
-    /// Try to claim an abandoned empty public lobby shell for a fresh create-lobby request.
-    ReserveEmptyPublicLobby {
-        reply: tokio::sync::oneshot::Sender<bool>,
     },
     /// A player joins this room. `msg_tx` is the connection's outbound sink. `ack` carries the
     /// accept/reject decision back to the connection: `true` once the player is actually in the
@@ -493,11 +485,7 @@ impl Lobby {
     pub async fn create_lobby(&self, room: &str) -> Result<String, CreateLobbyError> {
         let room = normalize_public_lobby_name(room)?;
         let mut rooms = self.rooms.lock().await;
-        if let Some(handle) = rooms.get(&room).cloned() {
-            drop(rooms);
-            if self.reserve_existing_empty_public_lobby(&handle).await {
-                return Ok(room);
-            }
+        if rooms.contains_key(&room) {
             return Err(CreateLobbyError::Duplicate);
         }
         if self.drain.is_draining() {
@@ -508,23 +496,8 @@ impl Lobby {
                 },
             )));
         }
-        self.create_reserved_public_lobby_locked(&room, &mut rooms);
+        self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Normal);
         Ok(room)
-    }
-
-    async fn reserve_existing_empty_public_lobby(&self, handle: &RoomHandle) -> bool {
-        let (reply, response) = tokio::sync::oneshot::channel();
-        if handle
-            .event_tx
-            .try_send(RoomEvent::ReserveEmptyPublicLobby { reply })
-            .is_err()
-        {
-            return false;
-        }
-        matches!(
-            tokio::time::timeout(LOBBY_SUMMARY_TIMEOUT, response).await,
-            Ok(Ok(true))
-        )
     }
 
     /// Collect browser rows from room tasks without inspecting room internals or waiting forever
@@ -577,24 +550,6 @@ impl Lobby {
         rooms: &mut HashMap<String, RoomHandle>,
         mode: RoomMode,
     ) -> RoomHandle {
-        self.create_room_locked_with_mode_and_reservation(room, rooms, mode, false)
-    }
-
-    fn create_reserved_public_lobby_locked(
-        &self,
-        room: &str,
-        rooms: &mut HashMap<String, RoomHandle>,
-    ) -> RoomHandle {
-        self.create_room_locked_with_mode_and_reservation(room, rooms, RoomMode::Normal, true)
-    }
-
-    fn create_room_locked_with_mode_and_reservation(
-        &self,
-        room: &str,
-        rooms: &mut HashMap<String, RoomHandle>,
-        mode: RoomMode,
-        reserve_empty_public_lobby: bool,
-    ) -> RoomHandle {
         let (event_tx, event_rx) = mpsc::channel(ROOM_EVENT_CHANNEL_CAP);
         let handle = RoomHandle { event_tx };
         rooms.insert(room.to_string(), handle.clone());
@@ -605,9 +560,6 @@ impl Lobby {
         let drain = self.drain.clone();
         tokio::spawn(async move {
             let mut task = RoomTask::new(name.clone(), mode, db, match_history_local_only, drain);
-            if reserve_empty_public_lobby {
-                task.reserve_empty_public_lobby_name();
-            }
             task.run(event_rx).await;
             crate::log_info!(room = %name, "room task exited");
         });
