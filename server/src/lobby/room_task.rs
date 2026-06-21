@@ -528,6 +528,8 @@ pub(super) struct RoomTask {
     mode: RoomMode,
     /// Connected players in join order (join order drives lobby display and host fallback).
     order: Vec<u32>,
+    /// Wall-clock creation/reset time for the public lobby browser age column.
+    created_at_unix_ms: u64,
     pub(super) players: HashMap<u32, RoomPlayer>,
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
     /// only when the room empties of humans.
@@ -600,6 +602,7 @@ impl RoomTask {
             room,
             mode,
             order: Vec::new(),
+            created_at_unix_ms: current_unix_ms(),
             players: HashMap::new(),
             ai_players: Vec::new(),
             human_team_assignments: HashMap::new(),
@@ -771,6 +774,9 @@ impl RoomTask {
 
     fn handle_event(&mut self, event: RoomEvent) {
         match event {
+            RoomEvent::Summary { reply } => {
+                let _ = reply.send(self.lobby_summary());
+            }
             RoomEvent::Join {
                 player_id,
                 name,
@@ -861,6 +867,61 @@ impl RoomTask {
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
             RoomEvent::DrainStarted(notice) => self.on_drain_started(notice),
         }
+    }
+
+    pub(super) fn lobby_summary(&self) -> Option<LobbySummary> {
+        let policy = self.session_policy();
+        if !policy.is_public_lobby_browser_room() {
+            return None;
+        }
+        let host_id = self.host_id?;
+        let host_name = self
+            .players
+            .get(&host_id)
+            .map(|player| player.name.clone())?;
+        let (phase, join_state, map) = if self.match_countdown_deadline.is_some() {
+            (
+                LobbySummaryPhase::Countdown,
+                LobbyJoinState::Starting,
+                self.selected_map.clone(),
+            )
+        } else {
+            match &self.phase {
+                Phase::Lobby => {
+                    let join_state = if self.total_player_count() >= MAX_PLAYERS {
+                        LobbyJoinState::FullSpectatorOnly
+                    } else {
+                        LobbyJoinState::Open
+                    };
+                    (
+                        LobbySummaryPhase::Lobby,
+                        join_state,
+                        self.selected_map.clone(),
+                    )
+                }
+                Phase::InGame(_) => (
+                    LobbySummaryPhase::InGame,
+                    LobbyJoinState::InGame,
+                    self.match_map_name.clone(),
+                ),
+                Phase::ReplayViewer(_) | Phase::BranchStaging(_) => return None,
+            }
+        };
+        Some(LobbySummary {
+            room: self.room.clone(),
+            host_name: Some(host_name),
+            map,
+            created_at_unix_ms: self.created_at_unix_ms,
+            occupied_slots: self.total_player_count(),
+            max_slots: MAX_PLAYERS,
+            spectator_count: self
+                .players
+                .values()
+                .filter(|player| player.spectator)
+                .count(),
+            phase,
+            join_state,
+        })
     }
 
     fn on_drain_started(&mut self, notice: DrainNotice) {
@@ -4047,6 +4108,7 @@ impl RoomTask {
 
     fn reset_empty_room_state(&mut self) {
         self.phase = Phase::Lobby;
+        self.created_at_unix_ms = current_unix_ms();
         self.match_countdown_deadline = None;
         self.match_player_count = 0;
         self.match_human_count = 0;
@@ -4276,6 +4338,135 @@ mod tests {
             map_name: "Default".to_string(),
             seed: Some(0x1A2B_3C4D),
         }
+    }
+
+    fn summary_task(room: &str) -> RoomTask {
+        let mut task = RoomTask::new(
+            room.to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        task.created_at_unix_ms = 123_456;
+        task.host_id = Some(1);
+        add_test_room_player(&mut task, 1, false);
+        task.assign_missing_team_for(1);
+        task.assign_missing_faction_for(1);
+        task
+    }
+
+    #[test]
+    fn lobby_summary_reports_open_waiting_room_state() {
+        let task = summary_task("open-summary");
+
+        let summary = task
+            .lobby_summary()
+            .expect("normal hosted lobby should be summarized");
+
+        assert_eq!(summary.room, "open-summary");
+        assert_eq!(summary.host_name.as_deref(), Some("Player 1"));
+        assert_eq!(summary.map, "Default");
+        assert_eq!(summary.created_at_unix_ms, 123_456);
+        assert_eq!(summary.occupied_slots, 1);
+        assert_eq!(summary.max_slots, MAX_PLAYERS);
+        assert_eq!(summary.spectator_count, 0);
+        assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
+        assert_eq!(summary.join_state, LobbyJoinState::Open);
+    }
+
+    #[test]
+    fn lobby_summary_marks_full_waiting_rooms_spectator_joinable() {
+        let mut task = summary_task("full-summary");
+        for id in 2..=4 {
+            add_test_room_player(&mut task, id, false);
+            task.assign_missing_team_for(id);
+            task.assign_missing_faction_for(id);
+        }
+        add_test_room_spectator(&mut task, 99);
+
+        let summary = task
+            .lobby_summary()
+            .expect("full waiting lobby should remain visible");
+
+        assert_eq!(summary.occupied_slots, MAX_PLAYERS);
+        assert_eq!(summary.spectator_count, 1);
+        assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
+        assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
+    }
+
+    #[test]
+    fn lobby_summary_marks_countdown_as_starting() {
+        let mut task = summary_task("countdown-summary");
+        add_test_room_player(&mut task, 2, true);
+        task.match_countdown_deadline = Some(TokioInstant::now() + Duration::from_secs(3));
+
+        let summary = task
+            .lobby_summary()
+            .expect("countdown lobby should remain visible");
+
+        assert_eq!(summary.phase, LobbySummaryPhase::Countdown);
+        assert_eq!(summary.join_state, LobbyJoinState::Starting);
+    }
+
+    #[test]
+    fn lobby_summary_includes_live_normal_rooms_as_non_joinable() {
+        let mut task = summary_task("ingame-summary");
+        let players = replay_test_players(2);
+        task.phase = Phase::InGame(Box::new(replay_test_game(&players, 0)));
+        task.match_map_name = "Default".to_string();
+
+        let summary = task
+            .lobby_summary()
+            .expect("normal live room should remain visible");
+
+        assert_eq!(summary.map, "Default");
+        assert_eq!(summary.phase, LobbySummaryPhase::InGame);
+        assert_eq!(summary.join_state, LobbyJoinState::InGame);
+    }
+
+    #[test]
+    fn lobby_summary_hides_internal_room_modes() {
+        let mut lab = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        lab.host_id = Some(1);
+        add_test_room_spectator(&mut lab, 1);
+        assert!(lab.lobby_summary().is_none());
+
+        let mut saved_replay = RoomTask::new(
+            "__replay_artifact__:demo".to_string(),
+            RoomMode::ReplayArtifact {
+                artifact: "demo".to_string(),
+            },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        saved_replay.host_id = Some(1);
+        add_test_room_spectator(&mut saved_replay, 1);
+        assert!(saved_replay.lobby_summary().is_none());
+
+        let mut dev = RoomTask::new(
+            "__dev_scenario__:demo".to_string(),
+            RoomMode::DevScenario(DevScenarioConfig {
+                id: DevScenarioId::DirectReverseOrder,
+                unit: EntityKind::Worker,
+                count: 1,
+                blocker: None,
+                case: None,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        dev.host_id = Some(1);
+        add_test_room_spectator(&mut dev, 1);
+        assert!(dev.lobby_summary().is_none());
     }
 
     #[test]

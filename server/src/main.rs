@@ -147,6 +147,10 @@ async fn main() {
         .route("/dev/scenarios", get(dev_scenario_handler))
         .route("/maps/catalog", get(map_catalog_handler))
         .route("/maps/save", post(map_save_handler))
+        .route(
+            "/api/lobbies",
+            get(lobbies_handler).post(create_lobby_handler),
+        )
         .route("/api/matches", get(matches_handler))
         .route(
             "/api/matches/{id}/replay",
@@ -266,6 +270,50 @@ async fn index_handler(State(state): State<AppState>) -> impl IntoResponse {
 /// Return the short git commit SHA that identifies this build.
 async fn version_handler(State(state): State<AppState>) -> String {
     state.version
+}
+
+#[derive(Deserialize)]
+struct CreateLobbyRequest {
+    room: String,
+}
+
+#[derive(Serialize)]
+struct CreateLobbyResponse {
+    room: String,
+}
+
+/// GET /api/lobbies — browser-safe summaries for public normal rooms.
+async fn lobbies_handler(State(state): State<AppState>) -> impl IntoResponse {
+    Json(state.lobby.summaries().await)
+}
+
+/// POST /api/lobbies — reserve a new normal lobby name without joining an existing room.
+async fn create_lobby_handler(
+    State(state): State<AppState>,
+    Json(request): Json<CreateLobbyRequest>,
+) -> impl IntoResponse {
+    match state.lobby.create_lobby(&request.room).await {
+        Ok(room) => (StatusCode::CREATED, Json(CreateLobbyResponse { room })).into_response(),
+        Err(err) => create_lobby_error_response(err),
+    }
+}
+
+fn create_lobby_error_response(err: lobby::CreateLobbyError) -> axum::response::Response {
+    let status = match &err {
+        lobby::CreateLobbyError::Duplicate => StatusCode::CONFLICT,
+        lobby::CreateLobbyError::Draining(_) => StatusCode::SERVICE_UNAVAILABLE,
+        lobby::CreateLobbyError::EmptyName
+        | lobby::CreateLobbyError::NameTooLong { .. }
+        | lobby::CreateLobbyError::InvalidCharacters
+        | lobby::CreateLobbyError::ReservedName => StatusCode::BAD_REQUEST,
+    };
+    (
+        status,
+        Json(ApiError {
+            error: err.message().to_string(),
+        }),
+    )
+        .into_response()
 }
 
 #[derive(Deserialize)]

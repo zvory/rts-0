@@ -26,6 +26,7 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use serde::Serialize;
 use tokio::sync::{mpsc, watch, Mutex, Notify};
 use tokio::time::{interval, MissedTickBehavior};
 
@@ -81,6 +82,8 @@ const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
 /// Bound on a room's inbound event queue. Commands/joins past this are dropped rather than
 /// allowed to grow without limit; in practice the room drains this every tick.
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
+const LOBBY_SUMMARY_TIMEOUT: Duration = Duration::from_millis(75);
+const PUBLIC_LOBBY_NAME_MAX_BYTES: usize = 64;
 const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
 const REPLAY_ARTIFACT_ROOM_PREFIX: &str = "__replay_artifact__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
@@ -95,6 +98,13 @@ static NEXT_MATCH_REPLAY_ROOM_ID: AtomicU32 = AtomicU32::new(1);
 /// Allocate a fresh, process-unique player id. Called once per connection.
 pub fn next_player_id() -> u32 {
     NEXT_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+fn current_unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or(0)
 }
 
 fn normalize_start_team_id(player_id: u32, team_id: TeamId) -> TeamId {
@@ -114,9 +124,46 @@ pub struct ReplayBranchSeed {
     pub seats: Vec<ReplayBranchSeat>,
 }
 
+/// Browser-safe room state for the first-screen lobby list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LobbySummary {
+    pub room: String,
+    pub host_name: Option<String>,
+    pub map: String,
+    pub created_at_unix_ms: u64,
+    pub occupied_slots: usize,
+    pub max_slots: usize,
+    pub spectator_count: usize,
+    pub phase: LobbySummaryPhase,
+    pub join_state: LobbyJoinState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LobbySummaryPhase {
+    Lobby,
+    Countdown,
+    InGame,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LobbyJoinState {
+    Open,
+    FullSpectatorOnly,
+    Starting,
+    InGame,
+    Stale,
+}
+
 /// Internal message from a connection (or the lobby) to a room task. The room task is the
 /// only consumer; see module docs.
 pub enum RoomEvent {
+    /// Ask the room task to produce a browser-safe public summary. Internal rooms answer `None`.
+    Summary {
+        reply: tokio::sync::oneshot::Sender<Option<LobbySummary>>,
+    },
     /// A player joins this room. `msg_tx` is the connection's outbound sink. `ack` carries the
     /// accept/reject decision back to the connection: `true` once the player is actually in the
     /// room, `false` if the join was rejected (duplicate, or mid-match). The connection must not
@@ -346,6 +393,31 @@ pub struct RoomHandle {
     pub event_tx: mpsc::Sender<RoomEvent>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CreateLobbyError {
+    EmptyName,
+    NameTooLong { max_bytes: usize },
+    InvalidCharacters,
+    ReservedName,
+    Duplicate,
+    Draining(DrainNotice),
+}
+
+impl CreateLobbyError {
+    pub fn message(&self) -> &'static str {
+        match self {
+            CreateLobbyError::EmptyName => "Lobby name is required.",
+            CreateLobbyError::NameTooLong { .. } => "Lobby name is too long.",
+            CreateLobbyError::InvalidCharacters => "Lobby name contains unsupported characters.",
+            CreateLobbyError::ReservedName => "Lobby name is reserved.",
+            CreateLobbyError::Duplicate => "Lobby name is already in use.",
+            CreateLobbyError::Draining(_) => {
+                "Server is draining for deploy; new lobbies are disabled."
+            }
+        }
+    }
+}
+
 /// Registry of rooms by name. Cheaply cloneable; share one instance across all connections.
 #[derive(Clone)]
 pub struct Lobby {
@@ -406,6 +478,61 @@ impl Lobby {
             }));
         }
         Ok(self.create_room_locked(room, &mut rooms))
+    }
+
+    /// Create a public normal lobby only when the normalized name is absent. This is intentionally
+    /// separate from join-by-room-name so duplicate create can fail instead of silently joining.
+    pub async fn create_lobby(&self, room: &str) -> Result<String, CreateLobbyError> {
+        let room = normalize_public_lobby_name(room)?;
+        let mut rooms = self.rooms.lock().await;
+        if rooms.contains_key(&room) {
+            return Err(CreateLobbyError::Duplicate);
+        }
+        if self.drain.is_draining() {
+            return Err(CreateLobbyError::Draining(self.drain.notice().unwrap_or(
+                DrainNotice {
+                    deadline_unix_ms: 0,
+                    seconds_remaining: 0,
+                },
+            )));
+        }
+        self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Normal);
+        Ok(room)
+    }
+
+    /// Collect browser rows from room tasks without inspecting room internals or waiting forever
+    /// on a stuck room. Dead, busy, timed-out, and internal rooms are omitted.
+    pub async fn summaries(&self) -> Vec<LobbySummary> {
+        let handles: Vec<RoomHandle> = {
+            let rooms = self.rooms.lock().await;
+            rooms.values().cloned().collect()
+        };
+        let requests = handles.into_iter().map(|handle| async move {
+            let (reply, response) = tokio::sync::oneshot::channel();
+            if handle
+                .event_tx
+                .try_send(RoomEvent::Summary { reply })
+                .is_err()
+            {
+                return None;
+            }
+            match tokio::time::timeout(LOBBY_SUMMARY_TIMEOUT, response).await {
+                Ok(Ok(summary)) => summary,
+                Ok(Err(_)) | Err(_) => None,
+            }
+        });
+        let mut summaries: Vec<LobbySummary> = futures_util::future::join_all(requests)
+            .await
+            .into_iter()
+            .flatten()
+            .collect();
+        summaries.sort_by(|a, b| {
+            lobby_join_sort_rank(a.join_state)
+                .cmp(&lobby_join_sort_rank(b.join_state))
+                .then_with(|| b.created_at_unix_ms.cmp(&a.created_at_unix_ms))
+                .then_with(|| a.room.cmp(&b.room))
+        });
+        summaries
     }
 
     fn create_room_locked(
@@ -512,6 +639,49 @@ impl Default for Lobby {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn lobby_join_sort_rank(state: LobbyJoinState) -> u8 {
+    match state {
+        LobbyJoinState::Open => 0,
+        LobbyJoinState::FullSpectatorOnly => 1,
+        LobbyJoinState::Starting => 2,
+        LobbyJoinState::InGame => 3,
+        LobbyJoinState::Stale => 4,
+    }
+}
+
+fn normalize_public_lobby_name(raw: &str) -> Result<String, CreateLobbyError> {
+    let room = raw.trim();
+    if room.is_empty() {
+        return Err(CreateLobbyError::EmptyName);
+    }
+    if room.len() > PUBLIC_LOBBY_NAME_MAX_BYTES {
+        return Err(CreateLobbyError::NameTooLong {
+            max_bytes: PUBLIC_LOBBY_NAME_MAX_BYTES,
+        });
+    }
+    if room.chars().any(char::is_control) {
+        return Err(CreateLobbyError::InvalidCharacters);
+    }
+    if is_reserved_lobby_name(room) {
+        return Err(CreateLobbyError::ReservedName);
+    }
+    Ok(room.to_string())
+}
+
+fn is_reserved_lobby_name(room: &str) -> bool {
+    const RESERVED_PREFIXES: [&str; 5] = [
+        DEV_SCENARIO_ROOM_PREFIX,
+        REPLAY_ARTIFACT_ROOM_PREFIX,
+        MATCH_REPLAY_ROOM_PREFIX,
+        REPLAY_BRANCH_ROOM_PREFIX,
+        LAB_ROOM_PREFIX,
+    ];
+    RESERVED_PREFIXES
+        .iter()
+        .any(|prefix| room.starts_with(prefix))
+        || !matches!(room_mode_for(room), RoomMode::Normal)
 }
 
 #[cfg(test)]

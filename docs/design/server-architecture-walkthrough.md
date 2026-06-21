@@ -56,8 +56,14 @@ flag: changes there should be smaller and tested closer to the behavior.
 The executable starts in `server/src/main.rs`.
 
 It creates the Axum router, serves the JS client, exposes utility routes like
-`/version`, `/wiki`, `/dev/scenarios`, `/dev/replay-artifact`, `/api/matches`, and upgrades `/ws` to a
-WebSocket. It also builds one shared `Lobby`.
+`/version`, `/wiki`, `/dev/scenarios`, `/dev/replay-artifact`, `/api/lobbies`, `/api/matches`, and
+upgrades `/ws` to a WebSocket. It also builds one shared `Lobby`.
+
+`GET /api/lobbies` returns browser-safe summaries for public normal rooms only: room name, current
+host name, map, creation time, occupied active slots, max slots, spectator count, phase, and
+server-authored join state. `POST /api/lobbies` reserves a new normal lobby name with create-only
+semantics; duplicate, invalid, reserved/internal, and deploy-drain attempts fail instead of routing
+through the normal join-or-create WebSocket path.
 
 `main.rs` does not own a `Game`. It is the edge of the server, not the
 simulation.

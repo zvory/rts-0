@@ -35,6 +35,30 @@ fn join_test_player_with_writer(task: &mut RoomTask, player_id: u32) -> Connecti
     writer
 }
 
+async fn join_room_handle(
+    handle: &RoomHandle,
+    player_id: u32,
+    name: &str,
+    spectator: bool,
+) -> ConnectionWriter {
+    let (msg_tx, writer) = ConnectionSink::new();
+    let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+    handle
+        .event_tx
+        .send(RoomEvent::Join {
+            player_id,
+            name: name.to_string(),
+            spectator,
+            replay_ok: false,
+            msg_tx,
+            ack: ack_tx,
+        })
+        .await
+        .expect("room task should accept join");
+    assert_eq!(ack_rx.await, Ok(true));
+    writer
+}
+
 fn test_drain() -> DrainHandle {
     DrainHandle::default()
 }
@@ -376,6 +400,107 @@ async fn draining_rejects_new_rooms_but_keeps_existing_rooms_joinable() {
             ..
         })
     ));
+}
+
+#[tokio::test]
+async fn create_lobby_rejects_duplicate_names() {
+    let lobby = Lobby::new();
+
+    let room = lobby
+        .create_lobby("  browser-one  ")
+        .await
+        .expect("first create should reserve normalized lobby name");
+    assert_eq!(room, "browser-one");
+
+    assert!(matches!(
+        lobby.create_lobby("browser-one").await,
+        Err(CreateLobbyError::Duplicate)
+    ));
+}
+
+#[tokio::test]
+async fn create_lobby_rejects_invalid_and_reserved_names() {
+    let lobby = Lobby::new();
+    let too_long = "x".repeat(PUBLIC_LOBBY_NAME_MAX_BYTES + 1);
+
+    assert!(matches!(
+        lobby.create_lobby("   ").await,
+        Err(CreateLobbyError::EmptyName)
+    ));
+    assert!(matches!(
+        lobby.create_lobby(&too_long).await,
+        Err(CreateLobbyError::NameTooLong { .. })
+    ));
+    assert!(matches!(
+        lobby.create_lobby("bad\nroom").await,
+        Err(CreateLobbyError::InvalidCharacters)
+    ));
+    for reserved in [
+        "__dev_scenario__:direct_reverse_order:worker:1",
+        "__replay_artifact__:demo",
+        "__match_replay__:00000001",
+        "__replay_branch__:00000001",
+        "__lab__:sandbox:map=Default",
+    ] {
+        assert!(
+            matches!(
+                lobby.create_lobby(reserved).await,
+                Err(CreateLobbyError::ReservedName)
+            ),
+            "{reserved} should be reserved"
+        );
+    }
+}
+
+#[tokio::test]
+async fn create_lobby_drain_rejects_new_names_but_existing_rooms_remain_joinable() {
+    let lobby = Lobby::new();
+    let existing = lobby
+        .create_lobby("existing-browser-room")
+        .await
+        .expect("pre-drain lobby should be created");
+
+    lobby.begin_draining(Duration::from_secs(295)).await;
+
+    assert!(matches!(
+        lobby.create_lobby("new-browser-room").await,
+        Err(CreateLobbyError::Draining(DrainNotice {
+            seconds_remaining: 295,
+            ..
+        }))
+    ));
+    assert!(lobby.get_or_create_join_target(&existing).await.is_ok());
+}
+
+#[tokio::test]
+async fn lobby_summaries_collect_browser_safe_rows_from_room_tasks() {
+    let lobby = Lobby::new();
+    let room = lobby
+        .create_lobby("summary-collection")
+        .await
+        .expect("lobby should be created");
+    let handle = lobby
+        .get_or_create_join_target(&room)
+        .await
+        .expect("created lobby should stay joinable");
+    let _writer = join_room_handle(&handle, 9001, "Browser Host", false).await;
+
+    let summaries = lobby.summaries().await;
+    let summary = summaries
+        .iter()
+        .find(|summary| summary.room == room)
+        .expect("joined normal lobby should be summarized");
+
+    assert_eq!(summary.host_name.as_deref(), Some("Browser Host"));
+    assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
+    assert_eq!(summary.join_state, LobbyJoinState::Open);
+    assert_eq!(summary.occupied_slots, 1);
+
+    handle
+        .event_tx
+        .send(RoomEvent::Leave { player_id: 9001 })
+        .await
+        .expect("cleanup leave should send");
 }
 
 #[tokio::test]
