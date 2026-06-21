@@ -25,8 +25,8 @@ The MVP is scenario setup and omnipotent control:
   research.
 - Select and inspect units for any player.
 - Issue real gameplay commands as the owning player, through normal command validation.
-- Switch the viewer's fog projection between full-world vision, one team's vision, and a union of
-  selected teams' vision.
+- Switch the room's lab fog projection between full-world vision, one team's vision, and a union
+  of selected teams' vision.
 - Save and load legible JSON scenarios.
 
 Visual rig iteration, scratch art hot reload, animation iteration, particle iteration, and balance
@@ -35,10 +35,14 @@ canvas preview or on a new visual asset pipeline.
 
 Normal game rules are the default. Privileged controls such as god mode, inert units, unlimited
 resources, disabled damage, and frozen cooldowns should be explicit lab toggles, not silent changes
-to the simulation. Debug mode should remain until the lab fully supersedes it.
+to the simulation. The normal lobby now points experimentation at the lab; the legacy quickstart
+debug preset remains only as a protocol/test compatibility path until explicit lab presets replace
+it.
 
-The initial operator model is one omnipotent operator per lab room. Additional connections can be
-read-only viewers or rejected until multi-operator semantics are worth designing.
+The landed collaborator model is intentionally small: every direct `/lab` URL joiner receives the
+omnipotent operator role for that room. `ReadOnly` remains in the protocol for future explicit
+viewer modes, and `operatorId` remains compatibility metadata naming the original joiner rather
+than the sole mutation authority.
 
 The lab is allowed in production. That means the privilege boundary is room-local, not auth-local:
 public users may create their own lab rooms, but lab operations must not affect normal rooms,
@@ -82,22 +86,22 @@ be ignored intentionally, never panic.
 
 ### Room And Lifecycle
 
-`server/src/lobby/room_task.rs` should own the lab room lifecycle, operator membership, room-local
+`server/src/lobby/room_task.rs` should own the lab room lifecycle, collaborator roles, room-local
 lab settings, scenario load/save requests, and snapshot fanout policy. It should call the public
 `Game` lab API for mutations and normal `Game::enqueue`-style command flow for gameplay orders.
 
 The room owns:
 
 - `RoomMode::Lab` and any lab-specific `Phase` state;
-- the operator connection id;
+- the original operator connection id plus per-connection lab roles;
 - lab scenario identity and dirty state;
-- lab vision mode per viewer;
+- the shared lab vision mode for current snapshot projection;
 - accepted lab operation log entries;
 - best-effort autosave or scenario export triggers;
 - translating team-based UI choices into current player ids for fog projection.
 
 The room should not know how to mutate an entity. It should know only how to validate that the
-request came from the operator, bound the payload, call `Game`, and send a result.
+request came from a lab operator role, bound the payload, call `Game`, and send a result.
 
 The landed room capability model makes persistence and export explicit room-policy choices.
 Normal matches are eligible for match-history rows and durable replay artifacts, replay branches
@@ -265,11 +269,13 @@ Hypothesis:
 
 ```rust
 struct LabSession {
-    operator: Option<u32>,
+    public_id: String,
+    operator_id: u32,
+    viewer_roles: HashMap<u32, LabStartRole>,
     scenario_id: Option<String>,
     dirty: bool,
     op_log: Vec<LabOpLogEntry>,
-    viewer_vision: HashMap<u32, LabVisionMode>,
+    vision_mode: LabVisionMode,
     flags: LabFlagState,
 }
 ```
@@ -520,19 +526,22 @@ The MVP slice validated these architecture choices:
    player template.
 2. Add `StartPayload.lab` metadata and a client `/lab` route that starts normal `Match` with lab
    mode enabled.
-3. Add lab vision controls: all vision, one team, and selected-team union. Keep this per viewer.
+3. Add lab vision controls: all vision, one team, and selected-team union. The current
+   collaborative room keeps this shared across operators; per-user vision is a follow-up.
 4. Add spawn/delete/move/set-owner operations for existing unit and building kinds.
 5. Add omnipotent selection and issue-command-as-owner for single-owner selections.
 6. Add JSON import/export for scenarios with map, players, teams, resources, upgrades, and
    entities.
+7. Promote later direct lab joiners to the same operator role as the first joiner, while preserving
+   `ReadOnly` as a future explicit viewer role.
 
 This slice replaces the most important debug-mode workflows: set up a map, stage two
 sides, issue real orders, observe with chosen fog, and save the setup.
 
 The MVP still deliberately excludes timeline pause/step/seek for labs, tick-perfect rewind,
-keyframes, persisted public scenario libraries, multi-operator editing, visual hot reload, lab
-simulation flags, and `/dev/scenario` migration. Those should each get a follow-up design rather
-than broadening the current lab operation envelope.
+keyframes, per-user lab vision, presence/permissions, persisted public scenario libraries, visual
+hot reload, lab simulation flags, and `/dev/scenario` migration. Those should each get a follow-up
+design rather than broadening the current lab operation envelope.
 
 ## Verification Strategy
 
@@ -542,8 +551,9 @@ The implementation phases should use focused checks before relying on the full P
 - `Game` unit tests for every accepted and rejected lab op.
 - Scenario round-trip tests proving load/export preserves map, players, teams, resources,
   upgrades, and entity placement.
-- Room-task tests proving only the operator can mutate the lab and that lab rooms do not affect
-  normal rooms.
+- Room-task tests proving only connections with the operator role can mutate the lab, collaborator
+  operators are attributed in the operation log, preserved read-only roles are rejected, and lab
+  requests do not affect normal or replay rooms.
 - Client architecture check for new lab modules and dependency injection boundaries.
 - Client contract tests for control policy, mixed-owner rejection, and lab protocol builders.
 - Manual browser smoke: create lab, select map, spawn opposing units, issue move/attack commands,

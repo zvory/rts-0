@@ -752,7 +752,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
             balance_unit_priorities: false,
         },
         attack: AttackPolicy {
-            first_attack_size: 6,
+            first_attack_size: 1,
             wave_growth: 2,
             regroup_reset_ticks: 480,
             reissue_cadence_ticks: 120,
@@ -823,6 +823,7 @@ mod tests {
         );
         assert_eq!(transition.attack.required_unit, Some(EntityKind::Tank));
         assert_eq!(transition.attack.unit_kinds, &[EntityKind::Tank]);
+        assert_eq!(transition.attack.first_attack_size, 1);
         assert_eq!(
             AI_1_1_TANK_MG.defensive_machine_gunners,
             Some(DefensiveMachineGunnerPolicy { target_count: 4 })
