@@ -48,7 +48,7 @@ runner prints the relevant tail on failure.
 Options:
   --plan NAME          Plan directory under plans/. Nested subplans such as lab/room are allowed. Required.
   --base BRANCH        Must be main. Kept for compatibility with existing calls.
-  --model MODEL        Optional model override for executor passes.
+  --model MODEL        Optional model override for executor passes. Defaults to the caller Codex model when available.
   --from PHASE         Discover phases after PHASE, up to --to. Example: --from 5.
   --to PHASE           Discover phases through PHASE. Requires --from.
   --pr                 Push the phase branch, open/update an owned PR, arm auto-merge, and stop pending merge.
@@ -59,6 +59,10 @@ Options:
 Environment:
   RTS_WORKTREE_ROOT=/tmp/rts-worktrees
   GH_BIN=gh
+  CODEX_MODEL          Optional caller model fallback when --model is not passed.
+  CODEX_REASONING_EFFORT
+                       Optional caller reasoning-effort fallback with CODEX_MODEL.
+  CODEX_THREAD_ID      Used to inherit the active Codex session model and reasoning effort when available.
 `;
 }
 
@@ -365,6 +369,119 @@ export function writeJson(file, data) {
   fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
 }
 
+function cleanString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function codexHomeForEnv(env) {
+  if (cleanString(env.CODEX_HOME)) {
+    return env.CODEX_HOME;
+  }
+  if (cleanString(env.HOME)) {
+    return path.join(env.HOME, ".codex");
+  }
+  return "";
+}
+
+function findCodexSessionFiles(root, threadId) {
+  const sessionsRoot = path.join(root, "sessions");
+  if (!cleanString(threadId) || !fs.existsSync(sessionsRoot)) {
+    return [];
+  }
+  const matches = [];
+  const visit = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(entryPath);
+      } else if (entry.isFile() && entry.name.includes(threadId) && entry.name.endsWith(".jsonl")) {
+        matches.push(entryPath);
+      }
+    }
+  };
+  visit(sessionsRoot);
+  return matches.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+}
+
+export function readCodexSessionExecutorConfig(sessionFile) {
+  let inherited = { model: "", reasoningEffort: "", source: "" };
+  for (const line of fs.readFileSync(sessionFile, "utf8").split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+    let item;
+    try {
+      item = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const payload = item?.payload;
+    const model = cleanString(payload?.model) || cleanString(payload?.collaboration_mode?.settings?.model);
+    const reasoningEffort = cleanString(payload?.collaboration_mode?.settings?.reasoning_effort) || cleanString(payload?.effort);
+    if (model || reasoningEffort) {
+      inherited = {
+        model: model || inherited.model,
+        reasoningEffort: reasoningEffort || inherited.reasoningEffort,
+        source: "codex-session",
+      };
+    }
+  }
+  return inherited;
+}
+
+export function resolveCodexExecutorConfig({ explicitModel = "", env = process.env } = {}) {
+  if (cleanString(explicitModel)) {
+    return { model: cleanString(explicitModel), reasoningEffort: "", source: "explicit" };
+  }
+
+  const envModel = cleanString(env.CODEX_MODEL);
+  if (envModel) {
+    return {
+      model: envModel,
+      reasoningEffort: cleanString(env.CODEX_REASONING_EFFORT) || cleanString(env.CODEX_MODEL_REASONING_EFFORT),
+      source: "env",
+    };
+  }
+
+  const codexHome = codexHomeForEnv(env);
+  for (const sessionFile of findCodexSessionFiles(codexHome, cleanString(env.CODEX_THREAD_ID))) {
+    const inherited = readCodexSessionExecutorConfig(sessionFile);
+    if (inherited.model) {
+      return inherited;
+    }
+  }
+
+  return { model: "", reasoningEffort: "", source: "codex-default" };
+}
+
+function tomlString(value) {
+  return JSON.stringify(value);
+}
+
+export function buildCodexExecArgs({ worktreePath, gitCommonDir, schemaFile, handoffFile, executorConfig, prompt }) {
+  const args = [
+    "exec",
+    "--cd",
+    worktreePath,
+    "--add-dir",
+    gitCommonDir,
+    "--sandbox",
+    "workspace-write",
+    "--output-schema",
+    schemaFile,
+    "--output-last-message",
+    handoffFile,
+  ];
+  if (executorConfig?.model) {
+    args.push("--model", executorConfig.model);
+  }
+  if (executorConfig?.reasoningEffort) {
+    args.push("--config", `model_reasoning_effort=${tomlString(executorConfig.reasoningEffort)}`);
+  }
+  args.push(prompt);
+  return args;
+}
+
 export class Runner {
   constructor({ env = process.env, stdout = process.stdout, stderr = process.stderr } = {}) {
     this.env = env;
@@ -482,24 +599,8 @@ export class Runner {
     );
   }
 
-  async runCodexCliExecutor({ worktreePath, gitCommonDir, schemaFile, handoffFile, model, prompt, codexLog }) {
-    const args = [
-      "exec",
-      "--cd",
-      worktreePath,
-      "--add-dir",
-      gitCommonDir,
-      "--sandbox",
-      "workspace-write",
-      "--output-schema",
-      schemaFile,
-      "--output-last-message",
-      handoffFile,
-    ];
-    if (model) {
-      args.push("--model", model);
-    }
-    args.push(prompt);
+  async runCodexCliExecutor({ worktreePath, gitCommonDir, schemaFile, handoffFile, executorConfig, prompt, codexLog }) {
+    const args = buildCodexExecArgs({ worktreePath, gitCommonDir, schemaFile, handoffFile, executorConfig, prompt });
     const logFd = fs.openSync(codexLog, "w");
     try {
       const result = spawnSync("codex", args, {
@@ -546,6 +647,15 @@ export class Runner {
     }
     if (!fs.existsSync(schemaFile)) {
       throw usageError(`missing result schema: ${schemaFile}`);
+    }
+    const executorConfig = resolveCodexExecutorConfig({ explicitModel: options.model, env: this.env });
+    if (executorConfig.source === "explicit") {
+      this.log(`phase-runner: using explicit Codex model ${executorConfig.model}`);
+    } else if (executorConfig.model) {
+      const reasoning = executorConfig.reasoningEffort ? ` (reasoning ${executorConfig.reasoningEffort})` : "";
+      this.log(`phase-runner: inheriting caller Codex model ${executorConfig.model}${reasoning}`);
+    } else {
+      this.log("phase-runner: using Codex CLI configured default model");
     }
 
     const worktreeRoot = this.env.RTS_WORKTREE_ROOT || DEFAULT_WORKTREE_ROOT;
@@ -630,7 +740,7 @@ export class Runner {
           gitCommonDir,
           schemaFile,
           handoffFile: layout.handoffFile,
-          model: options.model,
+          executorConfig,
           prompt,
           codexLog: layout.codexLog,
         });

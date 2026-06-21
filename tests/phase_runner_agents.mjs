@@ -7,13 +7,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  buildCodexExecArgs,
   discoverPhases,
   ensurePrReady,
   enrichHandoffWithPr,
   normalizePhase,
   parseArgs,
   phaseMarkedDoneText,
+  readCodexSessionExecutorConfig,
   renderPrompt,
+  resolveCodexExecutorConfig,
   validateOptions,
   verificationSummary,
   writePrBody,
@@ -65,6 +68,9 @@ const options = parseArgs(["--plan", "svg", "--from", "1", "--to", "2", "--pr", 
 validateOptions(options);
 assert.equal(options.planName, "svg");
 assert.equal(options.waitForPr, true);
+const modelOptions = parseArgs(["--plan", "svg", "phase-1", "--model", "gpt-5.4-mini", "--pr"]);
+validateOptions(modelOptions);
+assert.equal(modelOptions.model, "gpt-5.4-mini");
 const nestedOptions = parseArgs(["--plan", "lab/room", "phase-0", "--pr", "--wait"]);
 validateOptions(nestedOptions);
 assert.equal(nestedOptions.planName, "lab/room");
@@ -107,6 +113,94 @@ assert.deepEqual(enrichHandoffWithPr({ status: "completed" }, readyPr, "def", "m
 assert.equal(verificationSummary({ verification: ["node test", "", "git diff --check"] }), "node test; git diff --check");
 assert.equal(verificationSummary({ verification: [] }), "Focused verification not recorded by executor.");
 
+const sessionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-phase-runner-codex-home-"));
+try {
+  const threadId = "019efeed-1111-7222-8333-deadbeefcafe";
+  const sessionDir = path.join(sessionRoot, "sessions", "2026", "06", "21");
+  const sessionFile = path.join(sessionDir, `rollout-2026-06-21T12-00-00-${threadId}.jsonl`);
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(
+    sessionFile,
+    [
+      JSON.stringify({ type: "session_meta", payload: { id: threadId, model_provider: "openai" } }),
+      JSON.stringify({
+        type: "turn_context",
+        payload: {
+          model: "gpt-5.4-mini",
+          collaboration_mode: { settings: { model: "gpt-5.4-mini", reasoning_effort: "high" } },
+          effort: "high",
+        },
+      }),
+      JSON.stringify({
+        type: "turn_context",
+        payload: {
+          model: "gpt-5.5",
+          collaboration_mode: { settings: { model: "gpt-5.5", reasoning_effort: "xhigh" } },
+          effort: "xhigh",
+        },
+      }),
+      "",
+    ].join("\n"),
+  );
+
+  assert.deepEqual(readCodexSessionExecutorConfig(sessionFile), {
+    model: "gpt-5.5",
+    reasoningEffort: "xhigh",
+    source: "codex-session",
+  });
+  assert.deepEqual(resolveCodexExecutorConfig({ explicitModel: "gpt-5.4-mini", env: { CODEX_HOME: sessionRoot, CODEX_THREAD_ID: threadId } }), {
+    model: "gpt-5.4-mini",
+    reasoningEffort: "",
+    source: "explicit",
+  });
+  assert.deepEqual(resolveCodexExecutorConfig({ env: { CODEX_MODEL: "gpt-5.3-codex-spark", CODEX_REASONING_EFFORT: "low" } }), {
+    model: "gpt-5.3-codex-spark",
+    reasoningEffort: "low",
+    source: "env",
+  });
+  assert.deepEqual(resolveCodexExecutorConfig({ env: { CODEX_HOME: sessionRoot, CODEX_THREAD_ID: threadId } }), {
+    model: "gpt-5.5",
+    reasoningEffort: "xhigh",
+    source: "codex-session",
+  });
+  assert.deepEqual(resolveCodexExecutorConfig({ env: { CODEX_HOME: sessionRoot, CODEX_THREAD_ID: "missing" } }), {
+    model: "",
+    reasoningEffort: "",
+    source: "codex-default",
+  });
+} finally {
+  fs.rmSync(sessionRoot, { recursive: true, force: true });
+}
+
+assert.deepEqual(
+  buildCodexExecArgs({
+    worktreePath: "/tmp/worktree",
+    gitCommonDir: "/tmp/git-common",
+    schemaFile: "/tmp/schema.json",
+    handoffFile: "/tmp/handoff.json",
+    executorConfig: { model: "gpt-5.5", reasoningEffort: "xhigh" },
+    prompt: "Do the phase.",
+  }),
+  [
+    "exec",
+    "--cd",
+    "/tmp/worktree",
+    "--add-dir",
+    "/tmp/git-common",
+    "--sandbox",
+    "workspace-write",
+    "--output-schema",
+    "/tmp/schema.json",
+    "--output-last-message",
+    "/tmp/handoff.json",
+    "--model",
+    "gpt-5.5",
+    "--config",
+    'model_reasoning_effort="xhigh"',
+    "Do the phase.",
+  ],
+);
+
 const bodyPath = path.join(os.tmpdir(), `phase-runner-body-${process.pid}.md`);
 try {
   writePrBody(
@@ -131,8 +225,8 @@ try {
 
 const dryRunOutput = execFileSync(
   "node",
-  ["scripts/phase-runner-agents.mjs", "--plan", "svg", "phase-0", "phase-1", "--pr", "--dry-run"],
-  { cwd: repoRoot, encoding: "utf8" },
+  ["scripts/phase-runner-agents.mjs", "--plan", "archive/svg", "phase-0", "phase-1", "--pr", "--dry-run"],
+  { cwd: repoRoot, encoding: "utf8", env: { ...process.env, CODEX_THREAD_ID: "", CODEX_MODEL: "" } },
 );
 assert.match(dryRunOutput, /phase-runner: creating .*svg-phase-0/);
 assert.match(dryRunOutput, /phase-runner: would run Codex/);
@@ -141,18 +235,18 @@ assert.doesNotMatch(dryRunOutput, /svg-phase-1/);
 
 const waitDryRunOutput = execFileSync(
   "node",
-  ["scripts/phase-runner-agents.mjs", "--plan", "svg", "--from", "0", "--to", "1", "--pr", "--wait", "--dry-run"],
-  { cwd: repoRoot, encoding: "utf8" },
+  ["scripts/phase-runner-agents.mjs", "--plan", "archive/svg", "--from", "0", "--to", "1", "--pr", "--wait", "--dry-run"],
+  { cwd: repoRoot, encoding: "utf8", env: { ...process.env, CODEX_THREAD_ID: "", CODEX_MODEL: "" } },
 );
 assert.match(waitDryRunOutput, /phase-runner: discovered phases: phase-1/);
 assert.match(waitDryRunOutput, /would run scripts\/wait-pr.sh/);
 
 const nestedDryRunOutput = execFileSync(
   "node",
-  ["scripts/phase-runner-agents.mjs", "--plan", "lab/room", "phase-0", "--pr", "--dry-run"],
-  { cwd: repoRoot, encoding: "utf8" },
+  ["scripts/phase-runner-agents.mjs", "--plan", "archive/lab/room", "phase-0", "--pr", "--dry-run"],
+  { cwd: repoRoot, encoding: "utf8", env: { ...process.env, CODEX_THREAD_ID: "", CODEX_MODEL: "" } },
 );
-assert.match(nestedDryRunOutput, /phase-runner: creating .*lab-room-phase-0/);
-assert.match(nestedDryRunOutput, /would push zvorygin\/lab\/room-phase-0 to origin/);
+assert.match(nestedDryRunOutput, /phase-runner: creating .*archive-lab-room-phase-0/);
+assert.match(nestedDryRunOutput, /would push zvorygin\/archive\/lab\/room-phase-0 to origin/);
 
 console.log("phase runner agents tests passed");
