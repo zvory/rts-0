@@ -27,6 +27,10 @@ const EMPTY_COMMANDS = Object.freeze({
   gameplay: false,
 });
 
+const EMPTY_ACTIONS = Object.freeze({
+  replayBranch: false,
+});
+
 export function createRoomCapabilities({ startPayload } = {}) {
   const source = startPayload?.capabilities || {};
   const diagnostics = normalizeDiagnostics(startPayload?.diagnostics);
@@ -34,12 +38,14 @@ export function createRoomCapabilities({ startPayload } = {}) {
   const matchControls = normalizeMatchControls(source.matchControls);
   const visibility = normalizeVisibility(source.visibility);
   const commands = normalizeCommands(source.commands);
+  const actions = normalizeActions(source.actions);
   return Object.freeze({
     roomTime,
     matchControls: Object.freeze(matchControls),
     diagnostics,
     visibility: Object.freeze(visibility),
     commands: Object.freeze(commands),
+    actions: Object.freeze(actions),
   });
 }
 
@@ -75,6 +81,13 @@ function normalizeCommands(commands) {
   return Object.freeze({
     ...EMPTY_COMMANDS,
     gameplay: commands?.gameplay === true,
+  });
+}
+
+function normalizeActions(actions) {
+  return Object.freeze({
+    ...EMPTY_ACTIONS,
+    replayBranch: actions?.replayBranch === true,
   });
 }
 

@@ -321,7 +321,8 @@ Sent once when the match begins. Carries everything static for the whole match.
     },
     matchControls?: { pause?: bool },
     visibility?: { replayVision?: bool },
-    commands?: { gameplay?: bool }
+    commands?: { gameplay?: bool },
+    actions?: { replayBranch?: bool }
   },
   diagnostics?: {                // explicit recipient-scoped diagnostic affordances
     movementPaths?: "ownerOnly"|"all",
@@ -377,9 +378,11 @@ when room projection policy will send observer-analysis payloads to that recipie
 viewers, and lab viewers do not. Replay branch live players also receive pause capability only
 when their connection is mapped to an original active seat through the branch-live seat alias path.
 Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
-`visibility.replayVision: true`. Dev scenario watch rooms advertise speed/pause/step room-time
-controls without replay seek or replay-vision controls. Clients must not infer these shared
-affordances from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
+`visibility.replayVision: true`. Replay branch creation is advertised separately with
+`actions.replayBranch: true` only when the current replay can accept a branch request. Dev scenario
+watch rooms advertise speed/pause/step room-time controls without replay seek, replay-vision, or
+replay-branch controls. Clients must not infer these shared affordances from `replay`, `lab`,
+URL-local dev-watch state, or legacy debug flags.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`. Late live spectator joins receive the same live start
 payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata

@@ -3488,6 +3488,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
             timeline: true,
           },
           visibility: { replayVision: true },
+          actions: { replayBranch: true },
         },
       },
     }),
@@ -3558,7 +3559,36 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(!replayControls.querySelector(".replay-timeline"), "destroy removes generated timeline");
   assert(replayControls._listeners.size === 0, "destroy removes replay speed click listener");
 
+  const replayVisionOnlyControls = fakeEl("div");
+  dom.replaySpeed = replayVisionOnlyControls;
+  const replayVisionOnlyUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: true,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        replay: { durationTicks: 1_000 },
+        capabilities: {
+          roomTime: { available: true },
+          visibility: { replayVision: true },
+        },
+      },
+    }),
+  });
+  assert(
+    replayVisionOnlyControls.querySelector(".replay-vision-controls"),
+    "replay vision capability still builds replay fog controls",
+  );
+  assert(
+    !replayVisionOnlyControls.querySelector(".replay-branch-btn"),
+    "replay vision alone does not build a replay branch button",
+  );
+  replayVisionOnlyUi.destroy();
+
   const scenarioControls = fakeEl("div");
+  const scenarioSpeed2 = fakeEl("button");
+  scenarioSpeed2.className = "spd-btn";
+  scenarioSpeed2.dataset.speed = "2";
   const scenarioSpeed0 = fakeEl("button");
   scenarioSpeed0.className = "spd-btn dev-pause-btn";
   scenarioSpeed0.dataset.speed = "0";
@@ -3568,6 +3598,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   const scenarioSeek = fakeEl("button");
   scenarioSeek.className = "spd-btn seek-btn";
   scenarioSeek.dataset.seekBack = "30";
+  scenarioControls.appendChild(scenarioSpeed2);
   scenarioControls.appendChild(scenarioSpeed0);
   scenarioControls.appendChild(scenarioStep);
   scenarioControls.appendChild(scenarioSeek);
@@ -3590,13 +3621,67 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       },
     }),
   });
+  assert(!scenarioSpeed2.hidden, "scenario mode shows positive speed controls when setSpeed is advertised");
   assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
+  assert(!scenarioSpeed0.hidden, "scenario mode shows pause controls when pause is advertised");
   assert(!scenarioStep.hidden, "scenario mode shows step controls");
+  scenarioControls._listeners.get("click")({ target: scenarioSpeed2 });
+  assert(replayNet.speeds.at(-1) === 2, "scenario speed click sends net.setRoomTimeSpeed");
   scenarioControls._listeners.get("click")({ target: scenarioStep });
   assert(replayNet.steps === 1, "scenario step sends net.stepRoomTime");
   scenarioControls._listeners.get("click")({ target: scenarioSpeed0 });
   assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
   scenarioUi.destroy();
+
+  const stepOnlyControls = fakeEl("div");
+  const stepOnlySpeed = fakeEl("button");
+  stepOnlySpeed.className = "spd-btn";
+  stepOnlySpeed.dataset.speed = "2";
+  const stepOnlyPause = fakeEl("button");
+  stepOnlyPause.className = "spd-btn dev-pause-btn";
+  stepOnlyPause.dataset.speed = "0";
+  const stepOnlyStep = fakeEl("button");
+  stepOnlyStep.className = "spd-btn dev-step-btn";
+  stepOnlyStep.dataset.stepRoomTime = "";
+  const stepOnlySeek = fakeEl("button");
+  stepOnlySeek.className = "spd-btn seek-btn";
+  stepOnlySeek.dataset.seekBack = "30";
+  stepOnlyControls.appendChild(stepOnlySpeed);
+  stepOnlyControls.appendChild(stepOnlyPause);
+  stepOnlyControls.appendChild(stepOnlyStep);
+  stepOnlyControls.appendChild(stepOnlySeek);
+  dom.replaySpeed = stepOnlyControls;
+  const stepOnlyUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        spectator: true,
+        capabilities: {
+          roomTime: {
+            available: true,
+            step: true,
+          },
+        },
+      },
+    }),
+  });
+  assert(stepOnlySpeed.hidden, "positive speed controls hide without setSpeed capability");
+  assert(stepOnlyPause.hidden, "pause controls hide without pause capability");
+  assert(!stepOnlyStep.hidden, "step controls show with step capability");
+  assert(stepOnlySeek.hidden, "relative seek controls hide without seekRelative capability");
+  const speedsBeforeStepOnlyClicks = replayNet.speeds.length;
+  const seeksBeforeStepOnlyClicks = replayNet.seekBacks.length;
+  const stepsBeforeStepOnlyClicks = replayNet.steps;
+  stepOnlyControls._listeners.get("click")({ target: stepOnlySpeed });
+  stepOnlyControls._listeners.get("click")({ target: stepOnlyPause });
+  stepOnlyControls._listeners.get("click")({ target: stepOnlySeek });
+  assert(replayNet.speeds.length === speedsBeforeStepOnlyClicks, "hidden speed/pause controls are inert without capability");
+  assert(replayNet.seekBacks.length === seeksBeforeStepOnlyClicks, "hidden seek controls are inert without capability");
+  stepOnlyControls._listeners.get("click")({ target: stepOnlyStep });
+  assert(replayNet.steps === stepsBeforeStepOnlyClicks + 1, "step controls still send when step is advertised");
+  stepOnlyUi.destroy();
 
   const noCapabilityControls = fakeEl("div");
   dom.replaySpeed = noCapabilityControls;
@@ -4539,6 +4624,11 @@ function fakeAudioContext() {
     "normal lobby does not render the legacy quickstart control");
   assert(!indexHtml.includes("Debug mode"),
     "normal lobby copy no longer advertises Debug mode as the experimentation path");
+  const staticStepButton = indexHtml.match(/<button[^>]*class="[^"]*\bdev-step-btn\b[^"]*"[^>]*>/)?.[0] || "";
+  assert(staticStepButton.includes("data-step-room-time"),
+    "static dev scenario Step button uses the neutral room-time step contract");
+  assert(!staticStepButton.includes("data-step-dev-tick"),
+    "static dev scenario Step button does not use stale dev-specific step markup");
 
   const sorted = sortLobbySummaries([
     { room: "old-open", hostName: "A", createdAtUnixMs: 100, joinState: "open" },

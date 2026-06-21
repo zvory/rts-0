@@ -332,9 +332,10 @@ createRoomCapabilities({ startPayload })
 ```
 `Match` and app-shell controls consume this parsed `startPayload.capabilities` and
 `startPayload.diagnostics` record for room-time controls, diagnostic settings, observer analysis,
-vision controls, live pause controls, and read-only/gameplay command affordances. Product shells may
-still use product metadata for launch/routing and owned controls such as replay branch creation or
-lab scenario tools, but shared affordances must not be inferred from replay/dev/lab identity.
+vision controls, live pause controls, replay branch actions, and read-only/gameplay command
+affordances. Product shells may still use product metadata for launch/routing and owned controls
+such as lab scenario tools, but shared affordances must not be inferred from replay/dev/lab
+identity.
 
 `lab_client.js`
 ```js
