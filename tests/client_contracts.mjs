@@ -5090,6 +5090,12 @@ await withFakeDocument(async () => {
       !panel.fields.has("research-player"),
     "LabPanel does not render per-tool player selectors for spawn or player-state controls",
   );
+  assert(
+    !textWithin(root).includes("Advanced Spawn") &&
+      !panel.fields.has("advanced-spawn-kind") &&
+      !panel.fields.has("advanced-spawn-completed"),
+    "LabPanel does not expose the advanced spawn fallback",
+  );
   const teamButton = root.children[0].children
     .flatMap((child) => child.children || [])
     .find((child) => child.textContent === "Team 2");
@@ -5136,17 +5142,6 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").value = "ekat";
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
-  panel.fields.get("advanced-spawn-kind").value = KIND.CITY_CENTRE;
-  panel.fields.get("lab-player").value = "1";
-  panel.fields.get("advanced-spawn-completed").checked = true;
-  panel.armAdvancedSpawnTool();
-  assert(
-    armedTool?.kind === "spawnEntity" &&
-      armedTool.payload.kind === KIND.CITY_CENTRE &&
-      armedTool.payload.owner === 1 &&
-      armedTool.payload.completed === true,
-    "LabPanel advanced spawn preserves building spawn on the click-to-world tool path",
-  );
   assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
   assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
   assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");

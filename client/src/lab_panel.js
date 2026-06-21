@@ -30,10 +30,6 @@ export class LabPanel {
       kind: "",
       completed: true,
     };
-    this.advancedSpawn = {
-      kind: "",
-      completed: true,
-    };
     this.teamInputs = new Map();
     this.fields = new Map();
     this.listeners = [];
@@ -142,7 +138,6 @@ export class LabPanel {
     root.appendChild(this.renderActiveToolStatus());
     root.appendChild(this.renderTargetPlayer());
     root.appendChild(this.renderSpawnPalette());
-    root.appendChild(this.renderAdvancedSpawn());
 
     root.appendChild(this.fieldset("Selected", [
       this.readout(`${selectedIds.length} selected`),
@@ -417,26 +412,6 @@ export class LabPanel {
     return this.fieldset("Unit Spawn", controls);
   }
 
-  renderAdvancedSpawn() {
-    this.normalizeAdvancedSpawn();
-    return this.fieldset("Advanced Spawn", [
-      this.selectField("advanced-spawn-kind", "Kind", spawnKinds(), KIND_LABELS, {
-        value: this.advancedSpawn.kind,
-        onChange: (value) => {
-          this.advancedSpawn.kind = value;
-        },
-      }),
-      this.checkboxField("advanced-spawn-completed", "Complete", this.advancedSpawn.completed, {
-        onChange: (checked) => {
-          this.advancedSpawn.completed = checked;
-        },
-      }),
-      this.button("Arm spawn", () => this.armAdvancedSpawnTool(), {
-        dataset: { active: this.spawnToolActive(this.advancedSpawn.kind) ? "true" : "false" },
-      }),
-    ]);
-  }
-
   spawnPaletteGrid(unitKinds) {
     const grid = document.createElement("div");
     grid.className = "lab-spawn-palette";
@@ -474,16 +449,6 @@ export class LabPanel {
       completed: this.spawnPalette.completed,
     };
     return this.armSpawnTool(payload);
-  }
-
-  armAdvancedSpawnTool() {
-    this.captureAdvancedSpawnFields();
-    if (!this.advancedSpawn.kind) return null;
-    return this.armSpawnTool({
-      owner: this.targetPlayer(),
-      kind: this.advancedSpawn.kind,
-      completed: this.advancedSpawn.completed,
-    });
   }
 
   armSpawnTool(payload) {
@@ -527,15 +492,6 @@ export class LabPanel {
     this.spawnPalette.completed = !!this.spawnPalette.completed;
   }
 
-  normalizeAdvancedSpawn() {
-    this.targetPlayerId = this.validOwner(this.targetPlayerId);
-    const kinds = spawnKinds();
-    if (!kinds.includes(this.advancedSpawn.kind)) {
-      this.advancedSpawn.kind = kinds[0] || "";
-    }
-    this.advancedSpawn.completed = !!this.advancedSpawn.completed;
-  }
-
   validOwner(owner) {
     const numericOwner = Number(owner);
     const owners = this.players().map((player) => Number(player.id)).filter((id) => Number.isFinite(id));
@@ -546,12 +502,6 @@ export class LabPanel {
     this.captureTargetPlayerField();
     this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
     this.spawnPalette.completed = this.bool("spawn-completed");
-  }
-
-  captureAdvancedSpawnFields() {
-    this.captureTargetPlayerField();
-    this.advancedSpawn.kind = this.value("advanced-spawn-kind") || this.advancedSpawn.kind;
-    this.advancedSpawn.completed = this.bool("advanced-spawn-completed");
   }
 
   captureTargetPlayerField() {
@@ -861,10 +811,6 @@ export class LabPanel {
 const KIND_LABELS = Object.fromEntries(
   Object.entries(STATS).map(([kind, st]) => [kind, st.label || kind]),
 );
-
-function spawnKinds() {
-  return Object.keys(STATS).filter((kind) => STATS[kind]?.cost || STATS[kind]?.trains);
-}
 
 export function labSpawnFactionOptions() {
   return PLAYABLE_FACTIONS.filter((entry) => labSpawnUnitKindsForFaction(entry.id).length > 0);

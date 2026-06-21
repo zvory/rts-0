@@ -20,10 +20,8 @@ the clicked world position to the existing typed lab spawn operation.
 - On world click, send `spawnEntity` through `LabClient` with the selected owner, kind, completion
   flag, and exact clicked world coordinates.
 - Surface accepted and rejected spawn results through the existing lab result/status path.
-- Remove the primary reliance on manual `X` and `Y` spawn fields. Any temporary advanced spawn
-  fallback must be clearly secondary and should not be required for unit spawning.
-- Preserve or replace building spawn affordance only if it can follow the same click-to-world tool
-  model without expanding scope. Unit spawning is the required MVP2 path.
+- Remove the primary reliance on manual `X` and `Y` spawn fields. Do not keep a secondary advanced
+  spawn fallback; unit spawning is the required MVP2 path.
 
 ## Expected Touch Points
 
@@ -70,5 +68,5 @@ understandable.
 
 ## Handoff Expectations
 
-Describe the palette data source, any catalog helper extracted, and whether building spawn remains
-available. Call out any known palette-label or preview limitations for Phase 5 polish.
+Describe the palette data source and any catalog helper extracted. Call out any known palette-label
+or preview limitations for Phase 5 polish.
