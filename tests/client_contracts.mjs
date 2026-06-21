@@ -3105,6 +3105,18 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     assert(labToolWorldClick.x === 44.5 && labToolWorldClick.y === 88.25, "Match lab tool controller preserves exact world coordinates");
     assert(labToolMatch.clientIntent.activeLabTool === null, "Match lab tool controller clears consumed tools");
     assert(labToolChanges.at(-1)?.reason === "worldClick", "Match lab tool controller publishes world-click cancellation");
+    const persistent = labToolMatch.armLabTool(
+      { kind: "spawnEntity", keepArmedOnWorldClick: true },
+      { onWorldClick: () => {} },
+    );
+    labToolMatch.consumeLabToolWorldClick({
+      tool: persistent,
+      x: 12,
+      y: 16,
+      world: { x: 12, y: 16 },
+      screen: { x: 1, y: 2 },
+    });
+    assert(labToolMatch.clientIntent.activeLabTool?.id === persistent.id, "Match lab tool controller keeps persistent tools armed after world clicks");
   }
   {
     const priorWindowForReplayInput = globalThis.window;
@@ -4757,10 +4769,11 @@ await withFakeDocument(async () => {
     },
     armLabTool(tool, callbacks) {
       armedTool = this.clientIntent.beginLabTool({ id: "lab-tool-test", ...tool });
+      const toolAtArm = armedTool;
       armedCallbacks = {
         onWorldClick: (event) => {
           const result = callbacks.onWorldClick(event);
-          this.cancelLabTool("worldClick");
+          if (!toolAtArm.keepArmedOnWorldClick) this.cancelLabTool("worldClick");
           return result;
         },
       };
@@ -4822,6 +4835,7 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-completed").checked = false;
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
+  assert(armedTool?.keepArmedOnWorldClick === true, "LabPanel unit palette keeps the spawn tool armed across world clicks");
   assert(textWithin(root).includes("Armed: Spawn Rifleman"), "LabPanel shows the armed spawn tool state");
   assert(!buttonByText("Cancel tool").disabled, "LabPanel enables tool cancellation while a setup tool is armed");
   assert(
@@ -4832,6 +4846,7 @@ await withFakeDocument(async () => {
     "LabPanel unit palette captures owner, faction, kind, and completion in tool payload",
   );
   armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128.5, y: 160.25 });
+  assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel spawn tool stays armed after sending a spawn request");
   assert(
     sent.at(-1).op.op === "spawnEntity" &&
       sent.at(-1).op.owner === 2 &&
@@ -4849,6 +4864,8 @@ await withFakeDocument(async () => {
     error: "occupied placement",
   });
   assert(textWithin(root).includes("occupied placement"), "LabPanel surfaces rejected spawn results through the status path");
+  assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel spawn tool stays armed after rejected spawn results");
+  assert(!buttonByText("Cancel tool").disabled, "LabPanel keeps cancellation available after rejected spawn results");
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   match.cancelLabTool("escape");
   assert(textWithin(root).includes("Spawn Rifleman cancelled."), "LabPanel surfaces keyboard cancellation through the status path");
@@ -7396,9 +7413,14 @@ await withFakeDocument(async () => {
   const labToolInput = Object.create(Input.prototype);
   const labToolEvents = [];
   const labToolSelections = [];
+  const selectionBoxes = [];
   let labToolConsumedCancel = null;
   labToolInput.clientIntent = new ClientIntent();
-  labToolInput.clientIntent.beginLabTool({ kind: "fieldPoint", payload: { xField: "spawn-x" } });
+  labToolInput.clientIntent.beginLabTool({
+    kind: "spawnEntity",
+    payload: { xField: "spawn-x" },
+    keepArmedOnWorldClick: true,
+  });
   labToolInput.labToolController = {
     consumeWorldClick(event) {
       labToolEvents.push(event);
@@ -7408,15 +7430,63 @@ await withFakeDocument(async () => {
       return labToolInput.clientIntent.cancelLabTool(reason);
     },
   };
+  labToolInput.pointerLocked = false;
+  labToolInput.cameraNavigation = null;
+  labToolInput.renderer = { drawSelectionBox(box) { selectionBoxes.push(box); } };
   labToolInput._worldAt = (x, y) => ({ x: x + 100, y: y + 200 });
   labToolInput._commitClickSelection = (p) => labToolSelections.push(p);
+  labToolInput._eventScreenPos = () => ({ x: 12, y: 24 });
+  labToolInput._trackMouse = () => {};
+  labToolInput._routeLockedPointerUp = () => false;
+  labToolInput._finishTankTrapPlacementDrag = () => false;
   labToolInput._onLeftDown({ x: 12, y: 24 }, { shiftKey: true });
-  assert(labToolEvents.length === 1, "active lab tool consumes the next world click");
+  assert(labToolEvents.length === 0, "active lab spawn tool waits for a completed click before placing");
+  labToolInput._handleMouseUp({ button: 0, shiftKey: true });
+  assert(labToolEvents.length === 1, "active lab spawn tool consumes the completed world click");
   assert(labToolEvents[0].x === 112 && labToolEvents[0].y === 224, "lab tool click callback receives exact world coordinates");
   assert(labToolEvents[0].tool.payload.xField === "spawn-x", "lab tool click callback receives current tool payload");
-  assert(labToolInput.clientIntent.activeLabTool === null, "lab tool clears after consuming a world click");
-  assert(labToolConsumedCancel === "worldClick", "lab tool world-click cancellation flows through the controller");
+  assert(labToolInput.clientIntent.activeLabTool !== null, "persistent lab spawn tool stays armed after a world click");
+  assert(labToolConsumedCancel === null, "persistent lab spawn tool does not cancel on world click");
+  labToolInput._onLeftDown({ x: 20, y: 28 }, {});
+  labToolInput._eventScreenPos = () => ({ x: 20, y: 28 });
+  labToolInput._handleMouseUp({ button: 0, shiftKey: false });
+  assert(labToolEvents.length === 2, "persistent lab spawn tool places again on the next completed click");
   assert(labToolInput._drag == null && labToolSelections.length === 0, "lab tool click does not fall through to selection drag");
+
+  const labDragInput = Object.create(Input.prototype);
+  const labDragEvents = [];
+  const labDragSelections = [];
+  const labDragBoxes = [];
+  let labDragCancel = null;
+  labDragInput.clientIntent = new ClientIntent();
+  labDragInput.clientIntent.beginLabTool({ kind: "spawnEntity", keepArmedOnWorldClick: true });
+  labDragInput.labToolController = {
+    consumeWorldClick(event) {
+      labDragEvents.push(event);
+    },
+    cancel(reason) {
+      labDragCancel = reason;
+      return labDragInput.clientIntent.cancelLabTool(reason);
+    },
+  };
+  labDragInput.pointerLocked = false;
+  labDragInput.cameraNavigation = null;
+  labDragInput.renderer = { drawSelectionBox(box) { labDragBoxes.push(box); } };
+  labDragInput._screenPos = () => ({ x: 40, y: 42 });
+  labDragInput._eventScreenPos = () => ({ x: 40, y: 42 });
+  labDragInput._trackMouse = () => {};
+  labDragInput._routeLockedPointerMove = () => false;
+  labDragInput._routeLockedPointerUp = () => false;
+  labDragInput._finishTankTrapPlacementDrag = () => false;
+  labDragInput._commitBoxSelection = (drag) => labDragSelections.push(drag);
+  labDragInput._onLeftDown({ x: 12, y: 24 }, {});
+  labDragInput._handleMouseMove({});
+  labDragInput._handleMouseUp({ button: 0, shiftKey: false });
+  assert(labDragEvents.length === 0, "dragging with a lab spawn tool does not place a unit");
+  assert(labDragCancel === "boxSelect", "box selection cancels an active lab spawn tool");
+  assert(labDragInput.clientIntent.activeLabTool === null, "box selection clears the active lab spawn tool");
+  assert(labDragSelections.length === 1, "dragging with a lab spawn tool falls through to box selection");
+  assert(labDragBoxes.some(Boolean), "dragging with a lab spawn tool draws the selection box");
 
   const labRightClickInput = Object.create(Input.prototype);
   let labRightClickCancel = null;
@@ -7657,6 +7727,27 @@ await withFakeDocument(async () => {
   };
   placementBlurInput._handleBlur();
   assert(blurPlacementEnded === 1 && placementBlurInput.clientIntent.placement === null, "window blur clears build placement");
+
+  const labBlurInput = Object.create(Input.prototype);
+  let labBlurCancel = 0;
+  labBlurInput.pointerLocked = false;
+  labBlurInput.keys = { up: true, down: true, left: true, right: true };
+  labBlurInput.mouse = { x: 1, y: 2 };
+  labBlurInput._spacePan = true;
+  labBlurInput._panDrag = { x: 1, y: 2, button: 1 };
+  labBlurInput._drag = null;
+  labBlurInput.state = {};
+  labBlurInput.clientIntent = new ClientIntent();
+  const labBlurTool = labBlurInput.clientIntent.beginLabTool({ kind: "spawnEntity", keepArmedOnWorldClick: true });
+  labBlurInput.labToolController = {
+    cancel() {
+      labBlurCancel += 1;
+      return labBlurInput.clientIntent.cancelLabTool("blur");
+    },
+  };
+  labBlurInput._handleBlur();
+  assert(labBlurInput.clientIntent.activeLabTool?.id === labBlurTool.id, "window blur leaves active lab spawn tools armed");
+  assert(labBlurCancel === 0, "window blur does not route lab tool cancellation");
 
   const placementConfirmInput = Object.create(Input.prototype);
   const placementCommands = [];

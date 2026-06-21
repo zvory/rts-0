@@ -67,6 +67,13 @@ import {
   postQuickCastSelectionGuardActiveAt,
 } from "./quick_cast_selection_guard.js";
 import {
+  _beginLabToolClick,
+  _cancelActiveLabTool,
+  _cancelLabToolForBoxSelect,
+  _consumeLabToolWorldClick,
+  _finishLabToolClick,
+} from "./lab_tools.js";
+import {
   cursorLockSupported,
   installedAppRuntime,
   enterCursorLock,
@@ -268,29 +275,6 @@ export class Input {
 
   _labTool() {
     return this._intent()?.activeLabTool || null;
-  }
-
-  _consumeLabToolWorldClick(p, ev) {
-    const intent = this._intent();
-    const tool = intent?.activeLabTool || null;
-    if (!tool) return false;
-    const world = this._worldAt(p.x, p.y);
-    const event = {
-      tool,
-      x: world.x,
-      y: world.y,
-      world,
-      screen: { x: p.x, y: p.y },
-      originalEvent: ev,
-    };
-    try {
-      this.labToolController?.consumeWorldClick?.(event);
-    } finally {
-      if (intent.activeLabTool?.id === tool.id) {
-        this.labToolController?.cancel?.("worldClick") || intent.cancelLabTool?.("worldClick");
-      }
-    }
-    return true;
   }
 
   _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
@@ -828,6 +812,7 @@ export class Input {
       // Promote to a real box once the cursor has moved past a small threshold.
       if (!this._dragging && this._dragDistance() >= DRAG_THRESHOLD_PX) {
         this._dragging = true;
+        this._cancelLabToolForBoxSelect();
         if (this._drag.suppressPostQuickCastSelection) {
           this._drag.suppressPostQuickCastSelection = false;
           clearPostQuickCastSelectionGuard(this);
@@ -865,6 +850,8 @@ export class Input {
     if (wasDragging) {
       this._lastClick = null;
       this._commitBoxSelection(drag, ev.shiftKey);
+    } else if (drag.labToolId) {
+      this._finishLabToolClick(drag, p, ev);
     } else if (drag.suppressPostQuickCastSelection && consumePostQuickCastSelectionGuard(this, p)) {
       this._lastClick = null;
     } else {
@@ -901,9 +888,9 @@ export class Input {
   // --- Left-button logic --------------------------------------------------
 
   _onLeftDown(p, ev) {
-    if (this._labTool()) {
-      clearPostQuickCastSelectionGuard(this);
-      this._consumeLabToolWorldClick(p, ev);
+    const activeLabTool = this._labTool();
+    if (activeLabTool) {
+      this._beginLabToolClick(p, ev, activeLabTool);
       return;
     }
     // Build placement: a valid left-click confirms the build with a selected worker.
@@ -1084,6 +1071,11 @@ Object.assign(Input.prototype, {
   _beginTankTrapPlacementDrag,
   _finishTankTrapPlacementDrag,
   _cancelPlacementDrag,
+  _beginLabToolClick,
+  _cancelActiveLabTool,
+  _cancelLabToolForBoxSelect,
+  _consumeLabToolWorldClick,
+  _finishLabToolClick,
   _controlGroupSlotFromKey,
   _handleControlGroupHotkey,
   _jumpToControlGroupCluster,
