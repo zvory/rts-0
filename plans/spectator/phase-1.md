@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -68,19 +68,29 @@ fanout deliver union-fog spectator snapshots.
 
 ## Implementation Checklist
 
-- [ ] Browser in-game rows are joinable only as spectators.
-- [ ] Active late joins remain rejected and leave the socket able to join another room.
-- [ ] Late spectator joins are accepted for normal live matches.
-- [ ] Late spectators receive a read-only live start payload.
-- [ ] Late spectators receive union-fog snapshots and observer analysis when advertised.
-- [ ] Countdown rows remain non-joinable.
-- [ ] Protocol, server-sim, and client-ui docs are updated.
-- [ ] Focused Rust and JS coverage is added or updated.
-- [ ] Verification is run and recorded.
-- [ ] This phase file is marked done in the implementation commit.
+- [x] Browser in-game rows are joinable only as spectators.
+- [x] Active late joins remain rejected and leave the socket able to join another room.
+- [x] Late spectator joins are accepted for normal live matches.
+- [x] Late spectators receive a read-only live start payload.
+- [x] Late spectators receive union-fog snapshots and observer analysis when advertised.
+- [x] Countdown rows remain non-joinable.
+- [x] Protocol, server-sim, and client-ui docs are updated.
+- [x] Focused Rust and JS coverage is added or updated.
+- [x] Verification is run and recorded.
+- [x] This phase file is marked done in the implementation commit.
 
 ## Verification
 
+- Executor verification:
+  - `cargo test --manifest-path server/Cargo.toml -p rts-server late_spectator -- --nocapture`
+  - `cargo test --manifest-path server/Cargo.toml -p rts-server session_policy -- --nocapture`
+  - `node tests/client_contracts.mjs`
+  - `node --check tests/lobby_browser_integration.mjs`
+  - `node scripts/check-client-architecture.mjs`
+  - `node scripts/check-docs-health.mjs`
+  - `git diff --check`
+  - Local live `node tests/lobby_browser_integration.mjs` was not run because this executor sandbox
+    rejected binding a private server on `127.0.0.1:18081` with `Operation not permitted`.
 - `cargo test --manifest-path server/Cargo.toml -p rts-server late_spectator -- --nocapture`
 - `cargo test --manifest-path server/Cargo.toml -p rts-server session_policy -- --nocapture` if
   session-policy join naming changes

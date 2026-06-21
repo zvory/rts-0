@@ -46,7 +46,7 @@ lobby/config dump replaces the source scrape.
 
 | `t`        | Fields | Meaning |
 |------------|--------|---------|
-| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as a lobby observer. `room` defaults to `"main"`. Spectator joins and lobby role switches are observer-only and must happen before match start. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
+| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room as an active lobby player or, when `spectator` is true, as an observer. `room` defaults to `"main"`. Normal live matches accept `spectator: true` after match start and attach the connection as a read-only live spectator; active late joins and countdown joins are rejected. Lobby role switches are observer-only and must happen before match start. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). |
 | `setTeamPreset` | `preset: string` | Deprecated compatibility command. The server ignores it; lobby teams are host-managed slots. |
@@ -380,7 +380,9 @@ Replay playback advertises room-time speed/pause/relative seek/absolute seek/tim
 controls without replay seek or replay-vision controls. Clients must not infer these shared
 affordances from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
-list only active match players in `players`.
+list only active match players in `players`. Late live spectator joins receive the same live start
+payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
+omitted and live spectator capabilities/diagnostics applied for that recipient.
 
 Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
 metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and

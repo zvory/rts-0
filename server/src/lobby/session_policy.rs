@@ -38,7 +38,7 @@ pub(super) enum StateSource {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum JoinPolicy {
     NormalLobby,
-    RejectMidMatch,
+    LiveSpectatorAttach,
     ReplayPromptOrAttach,
     BranchStaging,
     BranchLiveAttach,
@@ -364,7 +364,7 @@ impl SessionPolicy {
                 mode,
                 phase,
                 state_source: StateSource::LiveGame,
-                join: JoinPolicy::RejectMidMatch,
+                join: JoinPolicy::LiveSpectatorAttach,
                 clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LivePlayers,
                 mutation: MutationPolicy::LiveGameplayCommands,
@@ -542,6 +542,10 @@ impl SessionPolicy {
 
     pub(super) fn uses_lab_room_join(self) -> bool {
         self.join == JoinPolicy::LabRoom
+    }
+
+    pub(super) fn allows_live_spectator_attach(self) -> bool {
+        self.join == JoinPolicy::LiveSpectatorAttach
     }
 
     pub(super) fn is_public_lobby_browser_room(self) -> bool {
@@ -736,7 +740,7 @@ mod tests {
                 mode: SessionMode::Normal,
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LiveGame,
-                join: JoinPolicy::RejectMidMatch,
+                join: JoinPolicy::LiveSpectatorAttach,
                 clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LivePlayers,
                 visibility: VisibilityPolicy::LiveFog,
@@ -753,7 +757,7 @@ mod tests {
                 mode: SessionMode::Normal,
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LiveGame,
-                join: JoinPolicy::RejectMidMatch,
+                join: JoinPolicy::LiveSpectatorAttach,
                 clock: ClockCapability::LIVE_MATCH,
                 authority: AuthorityPolicy::LivePlayers,
                 visibility: VisibilityPolicy::LiveFog,
@@ -986,7 +990,8 @@ mod tests {
 
         let live = SessionPolicy::new(SessionMode::Normal, SessionPhase::LiveMatch);
         assert_eq!(live.state_source, StateSource::LiveGame);
-        assert_eq!(live.join, JoinPolicy::RejectMidMatch);
+        assert_eq!(live.join, JoinPolicy::LiveSpectatorAttach);
+        assert!(live.allows_live_spectator_attach());
         assert_eq!(live.clock, ClockCapability::LIVE_MATCH);
         assert_eq!(live.authority, AuthorityPolicy::LivePlayers);
         assert_eq!(live.visibility, VisibilityPolicy::LiveFog);

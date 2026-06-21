@@ -167,7 +167,7 @@ async function main() {
   const inGameRow = await waitForLobbyRow(
     lifecycleRoom,
     (row) => row.joinState === "inGame" && row.map === "No Terrain",
-    "in-game row is disabled",
+    "in-game row is spectatable",
   );
   ok(inGameRow.occupiedSlots === 2, "in-game browser row keeps active human plus AI slots");
 
@@ -178,9 +178,40 @@ async function main() {
     3000,
     "stale in-game row join rejection",
   );
-  ok(!!rejected, "stale in-game browser join is rejected by server authority");
+  ok(!!rejected, "active stale in-game browser join is rejected by server authority");
+  const fallbackRoom = uniqueRoom("browser-after-reject");
+  StaleJoiner.send({ t: "join", name: "Stale", room: fallbackRoom });
+  await StaleJoiner.waitFor(
+    (msg) => msg.t === "lobby" && msg.room === fallbackRoom,
+    3000,
+    "active late join socket can still join another room",
+  );
 
-  closeClients(Host, StaleJoiner);
+  const SpectatorJoiner = await connectClient("browser-live-spectator");
+  SpectatorJoiner.send({ t: "join", name: "Spectator", room: lifecycleRoom, spectator: true });
+  const spectatorStart = await SpectatorJoiner.waitFor(
+    (msg) => msg.t === "start" && msg.spectator,
+    3000,
+    "late spectator receives live start",
+  );
+  ok(spectatorStart.playerId === SpectatorJoiner.playerId, "late spectator start is stamped with connection id");
+  ok(!spectatorStart.predictionBuildId && Number(spectatorStart.predictionVersion || 0) === 0,
+    "late spectator start disables prediction metadata");
+  const spectatorSnapshot = await SpectatorJoiner.waitFor(
+    (msg) => msg.t === "snapshot",
+    3000,
+    "late spectator receives live snapshot",
+  );
+  ok(spectatorSnapshot.playerResources?.length >= 2,
+    "late spectator snapshot uses spectator resource projection");
+  const liveSpectatorRow = await waitForLobbyRow(
+    lifecycleRoom,
+    (row) => row.joinState === "inGame" && row.spectatorCount >= 1,
+    "in-game spectator count refreshes",
+  );
+  ok(liveSpectatorRow.occupiedSlots === 2, "late spectator does not change active match slots");
+
+  closeClients(Host, StaleJoiner, SpectatorJoiner);
   await waitForLobbyGone(lifecycleRoom, "empty room cleanup hides browser row");
 
   if (assertions.failures > 0) console.log(`\n${assertions.failures} FAILURE(S)`);
