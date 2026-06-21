@@ -332,8 +332,12 @@ export const labVision                   // fullWorld(), team(teamId), teams(tea
 
 `lab_panel.js`
 ```js
+export function labSpawnFactionOptions()
+export function labSpawnUnitKindsForFaction(factionId)
 export class LabPanel {
   constructor({ root, labClient, launch, startPayload, match? })
+  armSpawnPaletteTool(kind?)             // arms a Match-owned spawnEntity world-click tool
+  armAdvancedSpawnTool()                 // same tool path for secondary building/setup spawns
   armPointFieldTool(xField, yField)      // arms a Match-owned lab world-click tool for coordinate fields
   destroy()
 }
@@ -363,7 +367,10 @@ next left world click before selection, command targeting, or placement. The cal
 active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears the tool for
 Esc, right-click, blur, teardown, or panel-driven cancellation. Starting ordinary placement,
 command targeting, or command-card build menus cancels the active lab tool so setup tools do not
-share state with gameplay command modes.
+share state with gameplay command modes. Unit spawning is a lab panel palette backed by the client
+faction catalog mirror and playable faction labels; the palette arms a `spawnEntity` lab tool and
+sends the clicked world coordinates through `LabClient`. Secondary building/setup spawns use the
+same click-to-world spawn tool path instead of primary manual coordinate entry.
 
 `hotkey_profiles.js`
 ```js

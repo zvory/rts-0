@@ -1,5 +1,6 @@
-import { LAB_ROLE, msg } from "./protocol.js";
-import { STATS, UPGRADES } from "./config.js";
+import { PLAYABLE_FACTIONS } from "./lobby_view.js";
+import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
+import { factionCatalog, STATS, UPGRADES } from "./config.js";
 
 const labVision = Object.freeze({
   fullWorld: () => msg.labVisionFullWorld(),
@@ -16,6 +17,17 @@ export class LabPanel {
     this.match = match;
     this.state = labClient?.state || startPayload?.lab || null;
     this.lastResult = labClient?.lastResult || null;
+    this.spawnPalette = {
+      owner: null,
+      factionId: DEFAULT_FACTION_ID,
+      kind: "",
+      completed: true,
+    };
+    this.advancedSpawn = {
+      owner: null,
+      kind: "",
+      completed: true,
+    };
     this.teamInputs = new Map();
     this.fields = new Map();
     this.listeners = [];
@@ -121,15 +133,8 @@ export class LabPanel {
     const issueOwner = singleOwner(selection);
     const point = this.defaultWorldPoint();
 
-    root.appendChild(this.fieldset("Spawn", [
-      this.selectField("spawn-kind", "Kind", spawnKinds(), KIND_LABELS),
-      this.playerSelectField("spawn-owner", "Owner"),
-      this.numberField("spawn-x", "X", point.x),
-      this.numberField("spawn-y", "Y", point.y),
-      this.button("Pick point", () => this.armPointFieldTool("spawn-x", "spawn-y")),
-      this.checkboxField("spawn-completed", "Complete", true),
-      this.button("Spawn", () => this.spawnEntity()),
-    ]));
+    root.appendChild(this.renderSpawnPalette());
+    root.appendChild(this.renderAdvancedSpawn());
 
     root.appendChild(this.fieldset("Selected", [
       this.readout(`${selectedIds.length} selected`),
@@ -182,13 +187,23 @@ export class LabPanel {
     root.appendChild(row);
   }
 
-  button(label, onClick) {
+  listen(target, type, handler) {
+    target.addEventListener(type, handler);
+    this.listeners.push([target, type, handler]);
+  }
+
+  button(label, onClick, options = {}) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "lab-btn";
+    button.className = options.className || "lab-btn";
     button.textContent = label;
-    button.addEventListener("click", onClick);
-    this.listeners.push([button, "click", onClick]);
+    if (options.title) button.title = options.title;
+    if (options.dataset) {
+      for (const [key, value] of Object.entries(options.dataset)) {
+        button.dataset[key] = String(value);
+      }
+    }
+    this.listen(button, "click", onClick);
     return button;
   }
 
@@ -216,21 +231,27 @@ export class LabPanel {
     return wrap;
   }
 
-  checkboxField(id, label, checked) {
+  checkboxField(id, label, checked, options = {}) {
     const wrap = this.fieldWrap(label);
     const input = document.createElement("input");
     input.type = "checkbox";
     input.checked = !!checked;
+    if (typeof options.onChange === "function") {
+      this.listen(input, "change", () => options.onChange(!!input.checked));
+    }
     this.fields.set(id, input);
     wrap.appendChild(input);
     return wrap;
   }
 
-  inputField(id, label, type, value) {
+  inputField(id, label, type, value, options = {}) {
     const wrap = this.fieldWrap(label);
     const input = document.createElement("input");
     input.type = type;
     input.value = String(value ?? "");
+    if (typeof options.onChange === "function") {
+      this.listen(input, "change", () => options.onChange(input.value));
+    }
     this.fields.set(id, input);
     wrap.appendChild(input);
     return wrap;
@@ -246,7 +267,7 @@ export class LabPanel {
     return wrap;
   }
 
-  selectField(id, label, values, labels = {}) {
+  selectField(id, label, values, labels = {}, options = {}) {
     const wrap = this.fieldWrap(label);
     const select = document.createElement("select");
     for (const value of values) {
@@ -255,18 +276,24 @@ export class LabPanel {
       option.textContent = labels[value] || String(value);
       select.appendChild(option);
     }
+    if (values.map(String).includes(String(options.value))) {
+      select.value = String(options.value);
+    }
+    if (typeof options.onChange === "function") {
+      this.listen(select, "change", () => options.onChange(select.value));
+    }
     this.fields.set(id, select);
     wrap.appendChild(select);
     return wrap;
   }
 
-  playerSelectField(id, label) {
+  playerSelectField(id, label, options = {}) {
     const labels = {};
     const values = this.players().map((player) => {
       labels[player.id] = player.name ? `P${player.id} ${player.name}` : `P${player.id}`;
       return player.id;
     });
-    return this.selectField(id, label, values, labels);
+    return this.selectField(id, label, values, labels, options);
   }
 
   fieldWrap(labelText) {
@@ -278,14 +305,180 @@ export class LabPanel {
     return label;
   }
 
-  spawnEntity() {
-    return this.labClient.spawnEntity({
-      kind: this.value("spawn-kind"),
-      owner: this.int("spawn-owner"),
-      x: this.num("spawn-x"),
-      y: this.num("spawn-y"),
-      completed: this.bool("spawn-completed"),
+  renderSpawnPalette() {
+    this.normalizeSpawnPalette();
+    const factionOptions = labSpawnFactionOptions();
+    const factionLabels = Object.fromEntries(factionOptions.map((entry) => [entry.id, entry.label]));
+    const unitKinds = labSpawnUnitKindsForFaction(this.spawnPalette.factionId);
+    const controls = [
+      this.playerSelectField("spawn-owner", "Owner", {
+        value: this.spawnPalette.owner,
+        onChange: (value) => {
+          this.spawnPalette.owner = toIntOrNull(value);
+        },
+      }),
+      this.selectField(
+        "spawn-faction",
+        "Faction",
+        factionOptions.map((entry) => entry.id),
+        factionLabels,
+        {
+          value: this.spawnPalette.factionId,
+          onChange: (value) => {
+            this.spawnPalette.factionId = value;
+            this.spawnPalette.kind = "";
+            this.render();
+          },
+        },
+      ),
+      this.checkboxField("spawn-completed", "Complete", this.spawnPalette.completed, {
+        onChange: (checked) => {
+          this.spawnPalette.completed = checked;
+        },
+      }),
+      this.spawnPaletteReadout(unitKinds),
+      this.spawnPaletteGrid(unitKinds),
+    ];
+    return this.fieldset("Unit Spawn", controls);
+  }
+
+  renderAdvancedSpawn() {
+    this.normalizeAdvancedSpawn();
+    return this.fieldset("Advanced Spawn", [
+      this.selectField("advanced-spawn-kind", "Kind", spawnKinds(), KIND_LABELS, {
+        value: this.advancedSpawn.kind,
+        onChange: (value) => {
+          this.advancedSpawn.kind = value;
+        },
+      }),
+      this.playerSelectField("advanced-spawn-owner", "Owner", {
+        value: this.advancedSpawn.owner,
+        onChange: (value) => {
+          this.advancedSpawn.owner = toIntOrNull(value);
+        },
+      }),
+      this.checkboxField("advanced-spawn-completed", "Complete", this.advancedSpawn.completed, {
+        onChange: (checked) => {
+          this.advancedSpawn.completed = checked;
+        },
+      }),
+      this.button("Arm spawn", () => this.armAdvancedSpawnTool()),
+    ]);
+  }
+
+  spawnPaletteGrid(unitKinds) {
+    const grid = document.createElement("div");
+    grid.className = "lab-spawn-palette";
+    for (const kind of unitKinds) {
+      const stats = STATS[kind] || {};
+      const button = this.button(stats.label || kind, () => this.armSpawnPaletteTool(kind), {
+        className: "lab-btn lab-spawn-option",
+        title: `Spawn ${stats.label || kind}`,
+        dataset: {
+          kind,
+          selected: kind === this.spawnPalette.kind ? "true" : "false",
+        },
+      });
+      grid.appendChild(button);
+    }
+    return grid;
+  }
+
+  spawnPaletteReadout(unitKinds) {
+    if (unitKinds.length > 0) {
+      return this.readout(`${factionLabel(this.spawnPalette.factionId)} units`);
+    }
+    return this.readout("No unit catalog entries");
+  }
+
+  armSpawnPaletteTool(kind = this.spawnPalette.kind) {
+    this.captureSpawnPaletteFields();
+    if (!kind) return null;
+    this.spawnPalette.kind = kind;
+    const payload = {
+      owner: this.spawnPalette.owner,
+      factionId: this.spawnPalette.factionId,
+      kind,
+      completed: this.spawnPalette.completed,
+    };
+    const armed = this.armSpawnTool(payload);
+    this.render();
+    return armed;
+  }
+
+  armAdvancedSpawnTool() {
+    this.captureAdvancedSpawnFields();
+    if (!this.advancedSpawn.kind) return null;
+    return this.armSpawnTool({
+      owner: this.advancedSpawn.owner,
+      kind: this.advancedSpawn.kind,
+      completed: this.advancedSpawn.completed,
     });
+  }
+
+  armSpawnTool(payload) {
+    if (typeof this.match?.armLabTool !== "function") return null;
+    const kind = payload?.kind || "";
+    return this.match.armLabTool(
+      {
+        kind: "spawnEntity",
+        payload: { ...payload },
+        label: `Spawn ${KIND_LABELS[kind] || kind}`,
+      },
+      { onWorldClick: (event) => this.spawnEntityAt(event) },
+    );
+  }
+
+  spawnEntityAt(event) {
+    const payload = event?.tool?.payload || {};
+    if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) return Promise.resolve(null);
+    return this.labClient.spawnEntity({
+      kind: payload.kind,
+      owner: Number(payload.owner),
+      x: event.x,
+      y: event.y,
+      completed: !!payload.completed,
+    });
+  }
+
+  normalizeSpawnPalette() {
+    this.spawnPalette.owner = this.validOwner(this.spawnPalette.owner);
+    const factions = labSpawnFactionOptions();
+    if (!factions.some((entry) => entry.id === this.spawnPalette.factionId)) {
+      this.spawnPalette.factionId = factions[0]?.id || DEFAULT_FACTION_ID;
+    }
+    const unitKinds = labSpawnUnitKindsForFaction(this.spawnPalette.factionId);
+    if (!unitKinds.includes(this.spawnPalette.kind)) {
+      this.spawnPalette.kind = unitKinds[0] || "";
+    }
+    this.spawnPalette.completed = !!this.spawnPalette.completed;
+  }
+
+  normalizeAdvancedSpawn() {
+    this.advancedSpawn.owner = this.validOwner(this.advancedSpawn.owner);
+    const kinds = spawnKinds();
+    if (!kinds.includes(this.advancedSpawn.kind)) {
+      this.advancedSpawn.kind = kinds[0] || "";
+    }
+    this.advancedSpawn.completed = !!this.advancedSpawn.completed;
+  }
+
+  validOwner(owner) {
+    const numericOwner = Number(owner);
+    const owners = this.players().map((player) => Number(player.id)).filter((id) => Number.isFinite(id));
+    return owners.includes(numericOwner) ? numericOwner : (owners[0] ?? 1);
+  }
+
+  captureSpawnPaletteFields() {
+    this.spawnPalette.owner = this.int("spawn-owner") || this.spawnPalette.owner;
+    this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
+    this.spawnPalette.completed = this.bool("spawn-completed");
+  }
+
+  captureAdvancedSpawnFields() {
+    this.advancedSpawn.owner = this.int("advanced-spawn-owner") || this.advancedSpawn.owner;
+    this.advancedSpawn.kind = this.value("advanced-spawn-kind") || this.advancedSpawn.kind;
+    this.advancedSpawn.completed = this.bool("advanced-spawn-completed");
   }
 
   armPointFieldTool(xField, yField) {
@@ -471,6 +664,23 @@ const KIND_LABELS = Object.fromEntries(
 
 function spawnKinds() {
   return Object.keys(STATS).filter((kind) => STATS[kind]?.cost || STATS[kind]?.trains);
+}
+
+export function labSpawnFactionOptions() {
+  return PLAYABLE_FACTIONS.filter((entry) => labSpawnUnitKindsForFaction(entry.id).length > 0);
+}
+
+export function labSpawnUnitKindsForFaction(factionId) {
+  return factionCatalog(factionId).units.filter((kind) => STATS[kind]);
+}
+
+function factionLabel(factionId) {
+  return labSpawnFactionOptions().find((entry) => entry.id === factionId)?.label || String(factionId || "");
+}
+
+function toIntOrNull(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.trunc(numeric) : null;
 }
 
 function upgradeLabels() {

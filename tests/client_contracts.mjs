@@ -131,7 +131,7 @@ import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { LabClient, labVision, labVisionLabel } from "../client/src/lab_client.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "../client/src/lab_control_policy.js";
-import { LabPanel } from "../client/src/lab_panel.js";
+import { LabPanel, labSpawnFactionOptions, labSpawnUnitKindsForFaction } from "../client/src/lab_panel.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
@@ -4687,6 +4687,27 @@ function fakeAudioContext() {
   assert(!createDefaultControlPolicy().canIssueAs(1), "default control policy does not issue-as");
 }
 
+{
+  assertDeepEqual(
+    labSpawnFactionOptions().map((entry) => entry.id),
+    ["kriegsia", "ekat"],
+    "LabPanel spawn palette exposes product-playable faction catalogs",
+  );
+  assert(
+    labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.RIFLEMAN),
+    "LabPanel spawn palette includes Kriegsia catalog units",
+  );
+  assert(
+    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.CITY_CENTRE),
+    "LabPanel spawn palette excludes buildings from primary unit options",
+  );
+  assertDeepEqual(
+    labSpawnUnitKindsForFaction("ekat"),
+    [KIND.EKAT],
+    "LabPanel spawn palette filters Ekat to Ekat units",
+  );
+}
+
 withFakeDocument(() => {
   const sent = [];
   const net = new Net("ws://example.test/ws");
@@ -4746,17 +4767,54 @@ withFakeDocument(() => {
     .find((child) => child.textContent === "Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
-  panel.fields.get("spawn-kind").value = KIND.RIFLEMAN;
   panel.fields.get("spawn-owner").value = "2";
-  panel.fields.get("spawn-x").value = "128";
-  panel.fields.get("spawn-y").value = "160";
-  panel.armPointFieldTool("spawn-x", "spawn-y");
+  panel.fields.get("spawn-completed").checked = false;
+  panel.armSpawnPaletteTool(KIND.RIFLEMAN);
+  assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
+  assert(
+    armedTool.payload.owner === 2 &&
+      armedTool.payload.kind === KIND.RIFLEMAN &&
+      armedTool.payload.factionId === DEFAULT_FACTION_ID &&
+      armedTool.payload.completed === false,
+    "LabPanel unit palette captures owner, faction, kind, and completion in tool payload",
+  );
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128.5, y: 160.25 });
+  assert(
+    sent.at(-1).op.op === "spawnEntity" &&
+      sent.at(-1).op.owner === 2 &&
+      sent.at(-1).op.kind === KIND.RIFLEMAN &&
+      sent.at(-1).op.x === 128.5 &&
+      sent.at(-1).op.y === 160.25 &&
+      sent.at(-1).op.completed === false,
+    "LabPanel spawn tool sends clicked world coordinates through LabClient",
+  );
+  net._emit("labResult", {
+    t: "labResult",
+    requestId: sent.at(-1).requestId,
+    ok: false,
+    op: "spawnEntity",
+    error: "occupied placement",
+  });
+  assert(textWithin(root).includes("occupied placement"), "LabPanel surfaces rejected spawn results through the status path");
+  panel.fields.get("spawn-faction").value = "ekat";
+  panel.fields.get("spawn-faction").listeners.change();
+  assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
+  panel.fields.get("advanced-spawn-kind").value = KIND.CITY_CENTRE;
+  panel.fields.get("advanced-spawn-owner").value = "1";
+  panel.fields.get("advanced-spawn-completed").checked = true;
+  panel.armAdvancedSpawnTool();
+  assert(
+    armedTool?.kind === "spawnEntity" &&
+      armedTool.payload.kind === KIND.CITY_CENTRE &&
+      armedTool.payload.owner === 1 &&
+      armedTool.payload.completed === true,
+    "LabPanel advanced spawn preserves building spawn on the click-to-world tool path",
+  );
+  panel.armPointFieldTool("move-x", "move-y");
   assert(armedTool?.kind === "fieldPoint", "LabPanel arms world-point lab tools through Match");
-  assert(armedTool.payload.xField === "spawn-x" && armedTool.payload.yField === "spawn-y", "LabPanel point tool payload names target fields");
+  assert(armedTool.payload.xField === "move-x" && armedTool.payload.yField === "move-y", "LabPanel point tool payload names target fields");
   armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 129.4, y: 160.6 });
-  assert(panel.fields.get("spawn-x").value === "129" && panel.fields.get("spawn-y").value === "161", "LabPanel point tool callback writes clicked world coordinates");
-  void panel.spawnEntity();
-  assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.owner === 2, "LabPanel spawn control sends setup mutation");
+  assert(panel.fields.get("move-x").value === "129" && panel.fields.get("move-y").value === "161", "LabPanel point tool callback writes clicked world coordinates");
   panel.fields.get("resource-player").value = "1";
   panel.fields.get("resource-steel").value = "900";
   panel.fields.get("resource-oil").value = "300";
