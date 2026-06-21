@@ -4,8 +4,8 @@
 const JOIN_STATE_RANK = Object.freeze({
   open: 0,
   fullSpectatorOnly: 1,
-  starting: 2,
-  inGame: 3,
+  inGame: 2,
+  starting: 3,
   stale: 4,
 });
 
@@ -21,7 +21,7 @@ const JOIN_STATE_ACTION = Object.freeze({
   open: "Join lobby",
   fullSpectatorOnly: "Join as spectator",
   starting: "Starting",
-  inGame: "In match",
+  inGame: "Spectate",
   stale: "Stale",
 });
 
@@ -79,6 +79,7 @@ export function lobbyJoinIntent(row = {}) {
   const state = normalizedJoinState(row?.joinState);
   if (state === "open") return { state, joinable: true, spectator: false };
   if (state === "fullSpectatorOnly") return { state, joinable: true, spectator: true };
+  if (state === "inGame") return { state, joinable: true, spectator: true };
   return { state, joinable: false, spectator: false };
 }
 
@@ -204,7 +205,7 @@ export class LobbyBrowserView {
     const el = document.createElement("article");
     el.className = `lobby-browser-row is-${state}`;
     el.dataset.joinState = state;
-    if (!connected || state === "inGame" || state === "starting" || state === "stale") {
+    if (!connected || state === "starting" || state === "stale") {
       el.classList.add("is-muted");
     }
 

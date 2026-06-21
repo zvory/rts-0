@@ -806,6 +806,9 @@ export class LobbyCreateModal {
   destroy()
 }
 ```
+The pre-join lobby browser keeps in-progress rows labeled `In match` and exposes a spectator
+action for `joinState: "inGame"`; clicks still preflight against `GET /api/lobbies` before sending
+`join` with `spectator: true`. Countdown, stale, and unknown rows remain disabled.
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
 `window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds

@@ -4500,13 +4500,16 @@ function fakeAudioContext() {
   assert(lobbyStatusLabel("fullSpectatorOnly") === "Full", "full lobby rows get a distinct status label");
   assert(lobbyActionLabel("fullSpectatorOnly") === "Join as spectator",
     "full lobby rows advertise spectator joining");
+  assert(lobbyActionLabel("inGame") === "Spectate",
+    "in-progress lobby rows advertise live spectating");
   assertDeepEqual(lobbyJoinIntent({ joinState: "open" }), { state: "open", joinable: true, spectator: false },
     "open lobby rows join as active players");
   assertDeepEqual(lobbyJoinIntent({ joinState: "fullSpectatorOnly" }),
     { state: "fullSpectatorOnly", joinable: true, spectator: true },
     "full waiting lobby rows join as spectators");
-  assert(!lobbyJoinIntent({ joinState: "inGame" }).joinable,
-    "in-progress lobby rows are not joinable");
+  assertDeepEqual(lobbyJoinIntent({ joinState: "inGame" }),
+    { state: "inGame", joinable: true, spectator: true },
+    "in-progress lobby rows join as spectators");
   assert(validateLobbyName(" Alpha ").ok, "lobby create accepts trimmed plain names");
   assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
   assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
@@ -4532,8 +4535,8 @@ function fakeAudioContext() {
   ]);
   assertDeepEqual(
     sorted.map((row) => row.room),
-    ["new-open", "old-open", "full", "starting", "in-game"],
-    "lobby browser sorts open, full, starting, and in-game rows by joinability then age",
+    ["new-open", "old-open", "full", "in-game", "starting"],
+    "lobby browser sorts open, full, in-game, and starting rows by joinability then age",
   );
 
   withFakeDocument(() => {
@@ -4628,12 +4631,12 @@ function fakeAudioContext() {
     const buttons = findFakes(rowsRoot, (el) => el.tagName === "BUTTON");
     const openButton = buttons.find((button) => button.textContent === "Join lobby");
     const spectatorButton = buttons.find((button) => button.textContent === "Join as spectator");
-    const inGameButton = buttons.find((button) => button.textContent === "In match");
+    const inGameButton = buttons.find((button) => button.textContent === "Spectate");
     const startingButton = buttons.find((button) => button.textContent === "Starting");
     const staleButton = buttons.find((button) => button.textContent === "Stale");
     assert(!openButton?.disabled, "open lobby row action is enabled");
     assert(!spectatorButton?.disabled, "full lobby row action joins as spectator");
-    assert(inGameButton?.disabled, "in-game lobby row action stays disabled");
+    assert(!inGameButton?.disabled, "in-game lobby row action joins as spectator");
     assert(startingButton?.disabled, "countdown lobby row action stays disabled");
     assert(staleButton?.disabled, "unknown lobby row action stays disabled as stale");
     openButton.click();
@@ -4642,6 +4645,7 @@ function fakeAudioContext() {
     assertDeepEqual(joins, [
       { room: "Open Lobby", spectator: false },
       { room: "Alpha Long Lobby", spectator: true },
+      { room: "Locked Match", spectator: true },
     ], "lobby browser row actions carry active vs spectator join intent");
     view.render({
       rows: [
