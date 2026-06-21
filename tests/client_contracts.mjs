@@ -5083,6 +5083,7 @@ await withFakeDocument(async () => {
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
   assert(panel.fields.has("lab-player"), "LabPanel exposes one shared player selector for lab setup tools");
+  assert(!textWithin(root).includes("Advanced Spawn"), "LabPanel omits the advanced spawn form");
   assert(
     !panel.fields.has("spawn-owner") &&
       !panel.fields.has("advanced-spawn-owner") &&
@@ -5093,8 +5094,10 @@ await withFakeDocument(async () => {
   assert(
     !textWithin(root).includes("Advanced Spawn") &&
       !panel.fields.has("advanced-spawn-kind") &&
-      !panel.fields.has("advanced-spawn-completed"),
-    "LabPanel does not expose the advanced spawn fallback",
+      !panel.fields.has("advanced-spawn-completed") &&
+      !panel.fields.has("spawn-completed") &&
+      !panel.fields.has("research-completed"),
+    "LabPanel does not expose advanced spawn or completion toggles",
   );
   const teamButton = root.children[0].children
     .flatMap((child) => child.children || [])
@@ -5102,7 +5105,6 @@ await withFakeDocument(async () => {
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
   panel.fields.get("lab-player").value = "2";
-  panel.fields.get("spawn-completed").checked = false;
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
   assert(armedTool?.keepArmedOnWorldClick === true, "LabPanel unit palette keeps the spawn tool armed across world clicks");
@@ -5112,8 +5114,8 @@ await withFakeDocument(async () => {
     armedTool.payload.owner === 2 &&
       armedTool.payload.kind === KIND.RIFLEMAN &&
       armedTool.payload.factionId === DEFAULT_FACTION_ID &&
-      armedTool.payload.completed === false,
-    "LabPanel unit palette captures owner, faction, kind, and completion in tool payload",
+      armedTool.payload.completed === true,
+    "LabPanel unit palette captures owner, faction, and kind with completed spawn payloads",
   );
   armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128.5, y: 160.25 });
   assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel spawn tool stays armed after sending a spawn request");
@@ -5123,8 +5125,8 @@ await withFakeDocument(async () => {
       sent.at(-1).op.kind === KIND.RIFLEMAN &&
       sent.at(-1).op.x === 128.5 &&
       sent.at(-1).op.y === 160.25 &&
-      sent.at(-1).op.completed === false,
-    "LabPanel spawn tool sends clicked world coordinates through LabClient",
+      sent.at(-1).op.completed === true,
+    "LabPanel spawn tool sends clicked world coordinates through LabClient with completed spawns",
   );
   net._emit("labResult", {
     t: "labResult",
@@ -5230,22 +5232,20 @@ await withFakeDocument(async () => {
   );
   panel.fields.get("lab-player").value = "2";
   panel.fields.get("research-upgrade").value = UPGRADE.TANK_UNLOCK;
-  panel.fields.get("research-completed").checked = false;
   buttonByText("Set research").listeners.click();
   assert(
     sent.at(-1).op.op === "setCompletedResearch" &&
       sent.at(-1).op.playerId === 2 &&
       sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK &&
-      sent.at(-1).op.completed === false,
-    "LabPanel research edits use the shared player selector",
+      sent.at(-1).op.completed === true,
+    "LabPanel research edits use the shared player selector and complete upgrades",
   );
-  resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: false } });
+  resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: true } });
   assert(
     panel.fields.get("lab-player").value === "2" &&
       panel.fields.get("resource-steel").value === "900" &&
       panel.fields.get("resource-oil").value === "300" &&
-      panel.fields.get("research-upgrade").value === UPGRADE.TANK_UNLOCK &&
-      panel.fields.get("research-completed").checked === false,
+      panel.fields.get("research-upgrade").value === UPGRADE.TANK_UNLOCK,
     "LabPanel preserves resource and research form values after set-research results re-render the panel",
   );
   panel.fields.get("scenario-name").value = "saved setup";
