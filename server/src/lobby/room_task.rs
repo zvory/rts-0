@@ -3115,6 +3115,7 @@ impl RoomTask {
         let mut payload = session.start_payload_for(watcher_id);
         payload.diagnostics = stamp.diagnostics;
         payload.capabilities = stamp.capabilities;
+        payload.capabilities.actions.replay_branch = session.can_create_replay_branch();
         payload
     }
 
@@ -5242,6 +5243,7 @@ mod tests {
             assert!(payload.capabilities.room_time.seek_absolute);
             assert!(payload.capabilities.room_time.timeline);
             assert!(payload.capabilities.visibility.replay_vision);
+            assert!(payload.capabilities.actions.replay_branch);
             assert!(!payload.capabilities.commands.gameplay);
             assert!(!payload.capabilities.match_controls.pause);
             assert!(payload.diagnostics.observer_analysis);
@@ -7015,15 +7017,20 @@ mod tests {
             false,
             DrainHandle::default(),
         );
-        let _writer = add_test_room_player(&mut task, 99, true);
+        let mut writer = add_test_room_player(&mut task, 99, true);
         task.phase = Phase::ReplayViewer(Box::new(replay));
+        task.send_replay_start_to(99);
 
         let err = match task.on_request_replay_branch(99) {
             Ok(_) => panic!("branch request with AI seats should fail"),
             Err(err) => err,
         };
+        let payload = start_payloads(&mut writer)
+            .pop()
+            .expect("AI replay viewer should receive a replay start payload");
 
         assert!(err.contains("AI seats"), "unexpected branch reject: {err}");
+        assert!(!payload.capabilities.actions.replay_branch);
         assert!(matches!(task.phase, Phase::ReplayViewer(_)));
     }
 

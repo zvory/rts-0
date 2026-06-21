@@ -291,12 +291,15 @@ assert(
     rustContract.includes("MatchControlCapabilities") &&
     rustContract.includes("VisibilityCapabilities") &&
     rustContract.includes("CommandCapabilities") &&
+    rustContract.includes("ActionCapabilities") &&
     protocolDoc.includes("capabilities?:") &&
     roomCapabilities.includes("startPayload?.capabilities") &&
     roomCapabilities.includes("roomTime") &&
     roomCapabilities.includes("matchControls") &&
     roomCapabilities.includes("replayVision") &&
-    roomCapabilities.includes("gameplay"),
+    roomCapabilities.includes("gameplay") &&
+    roomCapabilities.includes("replayBranch") &&
+    protocolDoc.includes("actions?: { replayBranch?: bool }"),
   "start payload room capabilities must be documented and mirrored by the client parser",
 );
 assert(

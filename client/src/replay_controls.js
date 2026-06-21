@@ -9,6 +9,7 @@ export class ReplayControls {
     this.capabilities = capabilities || {};
     this.roomTime = this.capabilities.roomTime || {};
     this.visibility = this.capabilities.visibility || {};
+    this.actions = this.capabilities.actions || {};
     this.replayVisionSelection = new Set();
     this.roomTimeState = null;
     this.replaySeekPending = false;
@@ -20,16 +21,27 @@ export class ReplayControls {
 
     dom.replaySpeed.hidden = false;
     dom.replaySpeed.classList.toggle("replay-viewer-controls", this.replayViewer);
+    for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn")) {
+      const speed = parseFloat(btn.dataset.speed);
+      if (Number.isFinite(speed) && speed > 0) btn.hidden = !this.roomTime.setSpeed;
+    }
     for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) {
       btn.hidden = !this.roomTime.seekRelative;
     }
-    for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
+    for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn")) {
+      btn.hidden = this.replayViewer || !this.roomTime.pause;
+    }
+    for (const btn of dom.replaySpeed.querySelectorAll(".dev-step-btn")) {
       btn.hidden = !this.roomTime.step;
     }
     this.replaySpeedHandler = (e) => this.onReplaySpeedClick(e);
     dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
     this.setRoomTimeSpeedActive(this.replayViewer ? 2 : null);
+    if (this.replayViewer && this.roomTime.pause) this.buildReplayPauseControl();
+    if (this.replayViewer && this.actions.replayBranch) this.buildReplayBranchControl();
     if (this.visibility.replayVision) this.buildReplayVisionControls();
+    if (this.replayViewer) this.buildReplayStatus();
+    if (this.replayViewer && this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildReplayTimeline();
   }
 
   onReplaySpeedClick(e) {
@@ -63,6 +75,7 @@ export class ReplayControls {
     const speed = parseFloat(btn.dataset.speed);
     if (!isFinite(speed)) return;
     if (speed === 0 && !this.roomTime.pause) return;
+    if (speed > 0 && !this.roomTime.setSpeed) return;
     if (speed > 0) this.lastReplaySpeed = speed;
     this.net.setRoomTimeSpeed(speed);
     this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
@@ -125,28 +138,30 @@ export class ReplayControls {
     btn.classList.toggle("active", paused);
   }
 
+  buildReplayPauseControl() {
+    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-pause-btn")) return;
+    const pause = document.createElement("button");
+    pause.type = "button";
+    pause.className = "spd-btn replay-pause-btn";
+    pause.dataset.replayPauseToggle = "1";
+    pause.textContent = "Pause";
+    pause.title = "Pause replay playback.";
+    dom.replaySpeed.appendChild(pause);
+  }
+
+  buildReplayBranchControl() {
+    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-branch-btn")) return;
+    const resume = document.createElement("button");
+    resume.type = "button";
+    resume.className = "spd-btn replay-branch-btn";
+    resume.textContent = "Resume play from here";
+    resume.title = "Create a practice branch from the current replay tick.";
+    resume.addEventListener("click", () => this.net.requestReplayBranch());
+    dom.replaySpeed.appendChild(resume);
+  }
+
   buildReplayVisionControls() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-vision-controls")) return;
-
-    if (!dom.replaySpeed.querySelector(".replay-pause-btn")) {
-      const pause = document.createElement("button");
-      pause.type = "button";
-      pause.className = "spd-btn replay-pause-btn";
-      pause.dataset.replayPauseToggle = "1";
-      pause.textContent = "Pause";
-      pause.title = "Pause replay playback.";
-      dom.replaySpeed.appendChild(pause);
-    }
-
-    if (!dom.replaySpeed.querySelector(".replay-branch-btn")) {
-      const resume = document.createElement("button");
-      resume.type = "button";
-      resume.className = "spd-btn replay-branch-btn";
-      resume.textContent = "Resume play from here";
-      resume.title = "Create a practice branch from the current replay tick.";
-      resume.addEventListener("click", () => this.net.requestReplayBranch());
-      dom.replaySpeed.appendChild(resume);
-    }
 
     const group = document.createElement("div");
     group.className = "replay-vision-controls";
@@ -174,17 +189,19 @@ export class ReplayControls {
 
     group.addEventListener("click", (ev) => this.onReplayVisionClick(ev));
     dom.replaySpeed.appendChild(group);
+  }
 
+  buildReplayStatus() {
+    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-tick-status")) return;
     const status = document.createElement("span");
     status.className = "replay-status replay-tick-status";
     status.textContent = "Replay 0 / 0";
     dom.replaySpeed.appendChild(status);
-
-    this.buildReplayTimeline();
   }
 
   buildReplayTimeline() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-timeline")) return;
+    if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
 
     const wrap = document.createElement("div");
     wrap.className = "replay-timeline";
@@ -210,7 +227,7 @@ export class ReplayControls {
   }
 
   onReplayTimelineClick(ev) {
-    if (!this.roomTime.seekAbsolute) return;
+    if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
     const track = ev.currentTarget;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
     if (!track || duration <= 0) return;
@@ -326,6 +343,10 @@ export class ReplayControls {
     }
     dom.replaySpeed.hidden = true;
     this.setReplayConcluded(false);
+    for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn")) {
+      const speed = parseFloat(btn.dataset.speed);
+      if (Number.isFinite(speed) && speed > 0) btn.hidden = false;
+    }
     for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) btn.hidden = false;
     for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
       btn.hidden = true;

@@ -1,7 +1,7 @@
 use super::room_task::RoomMode;
 use crate::protocol::{
-    CommandCapabilities, MatchControlCapabilities, RoomCapabilities, RoomTimeCapabilities,
-    VisibilityCapabilities,
+    ActionCapabilities, CommandCapabilities, MatchControlCapabilities, RoomCapabilities,
+    RoomTimeCapabilities, VisibilityCapabilities,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -639,6 +639,7 @@ impl SessionPolicy {
                             | MutationPolicy::BranchLiveSeatAliasGameplay
                     ),
             },
+            actions: ActionCapabilities::default(),
         }
     }
 

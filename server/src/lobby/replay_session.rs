@@ -282,8 +282,12 @@ impl ReplaySession {
         self.viewer_vision.remove(&viewer_id);
     }
 
+    pub(super) fn can_create_replay_branch(&self) -> bool {
+        !self.artifact.players.iter().any(|player| player.is_ai)
+    }
+
     pub(super) fn branch_seed(&self) -> Result<ReplayBranchSeed, String> {
-        if self.artifact.players.iter().any(|player| player.is_ai) {
+        if !self.can_create_replay_branch() {
             return Err("Replay branching does not support replays with AI seats yet.".to_string());
         }
         let source_tick = self.current_tick();

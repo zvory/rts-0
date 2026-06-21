@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -57,26 +57,26 @@ phase is client-focused and should run only after PR #257, PR #258, and roomfixe
 
 ## Implementation Checklist
 
-- [ ] Confirm PR #257 and PR #258 are merged before starting implementation.
-- [ ] Confirm Phases 1, 2, and 3 have merged and start from fresh `origin/main`.
-- [ ] Change the static dev scenario Step markup from `data-step-dev-tick` to
+- [x] Confirm PR #257 and PR #258 are merged before starting implementation.
+- [x] Confirm Phases 1, 2, and 3 have merged and start from fresh `origin/main`.
+- [x] Change the static dev scenario Step markup from `data-step-dev-tick` to
       `data-step-room-time`.
-- [ ] Add or update client contract coverage that constructs controls from the real static
+- [x] Add or update client contract coverage that constructs controls from the real static
       attribute names and proves Step sends `net.stepRoomTime()`.
-- [ ] Gate every rendered and clicked room-time action by the matching normalized capability bit,
+- [x] Gate every rendered and clicked room-time action by the matching normalized capability bit,
       especially positive speeds by `setSpeed` and timeline creation/use by `timeline` plus
       `seekAbsolute`.
-- [ ] Keep replay pause, replay status, replay timeline, and replay fog controls out of dev scenario
+- [x] Keep replay pause, replay status, replay timeline, and replay fog controls out of dev scenario
       mode unless their capabilities explicitly allow them.
-- [ ] Stop using `visibility.replayVision` as the branch-button eligibility signal.
-- [ ] Use an existing explicit branch/action eligibility signal if available; otherwise add the
+- [x] Stop using `visibility.replayVision` as the branch-button eligibility signal.
+- [x] Use an existing explicit branch/action eligibility signal if available; otherwise add the
       smallest mirrored capability bit and tests needed for the branch button.
-- [ ] Preserve cleanup on `ReplayControls.destroy()` across replay seek `Start` resends and match
+- [x] Preserve cleanup on `ReplayControls.destroy()` across replay seek `Start` resends and match
       teardown.
-- [ ] Avoid replay start payload builder, branch admission, lab drain, live pause, prediction, or
+- [x] Avoid replay start payload builder, branch admission, lab drain, live pause, prediction, or
       broader UI redesign work.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase file done in the implementation commit.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase file done in the implementation commit.
 
 ## Verification
 

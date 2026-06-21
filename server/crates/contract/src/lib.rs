@@ -52,6 +52,8 @@ pub struct RoomCapabilities {
     pub visibility: VisibilityCapabilities,
     #[serde(default, skip_serializing_if = "CommandCapabilities::is_empty")]
     pub commands: CommandCapabilities,
+    #[serde(default, skip_serializing_if = "ActionCapabilities::is_empty")]
+    pub actions: ActionCapabilities,
 }
 
 impl RoomCapabilities {
@@ -60,6 +62,7 @@ impl RoomCapabilities {
             && self.match_controls.is_empty()
             && self.visibility.is_empty()
             && self.commands.is_empty()
+            && self.actions.is_empty()
     }
 }
 
@@ -130,6 +133,19 @@ pub struct CommandCapabilities {
 impl CommandCapabilities {
     pub fn is_empty(&self) -> bool {
         !self.gameplay
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionCapabilities {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub replay_branch: bool,
+}
+
+impl ActionCapabilities {
+    pub fn is_empty(&self) -> bool {
+        !self.replay_branch
     }
 }
 
