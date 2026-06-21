@@ -363,15 +363,15 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 550       | trains worker; +8 supply; players start with one free |
-| zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekat start building; +8 supply; no trains/research in first playable slice |
-| depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
-| barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
-| training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
-| factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 300 | 6     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
-| tank_trap                  | Tank Trap          | 150 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no sight/fog reveal, not an elimination building; requires a completed Training Centre |
+| city_centre                | City Centre        | 600 | 1     | 200 | 3x3  | 550       | trains worker; +8 supply; players start with one free |
+| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +8 supply; no trains/research in first playable slice |
+| depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
+| barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
+| training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
+| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
+| factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
+| tank_trap                  | Tank Trap          | 150 | 1     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, one-tile local fog reveal, not an elimination building; requires a completed Training Centre |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends
