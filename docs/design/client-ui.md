@@ -8,8 +8,6 @@ index.html        # PINNED — CDN + #app + module entry + screens markup
 map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
 renderer_preview.html / renderer_preview.js
                   # standalone Renderer preview linked from the Dev links menu
-unit-lab.html / unit-lab.js
-                  # unit design lab UI; `/dev/unit-lab` redirects here and reads `/api/unit-designs`
 styles.css        # HUD, lobby, menus, command card
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
@@ -238,8 +236,8 @@ SVG unit art workflow:
   fixture SVGs in `tests/fixtures/svg/` when a fixture is useful for importer/runtime tests.
 - Verify new or changed rigs with `node tests/rig_schema.mjs`, `node tests/svg_rig_importer.mjs`,
   `node tests/rig_runtime.mjs`, and `node scripts/check-client-architecture.mjs`.
-- Use `/dev/unit-lab` only as a visual preview/design browser. Acceptance for runtime contract
-  changes comes from schema, importer, animation, renderer smoke, and architecture tests.
+- Runtime contract changes are accepted through schema, importer, animation, renderer smoke, and
+  architecture tests rather than static design previews.
 
 `renderer/feedback_view_model.js`
 ```js
