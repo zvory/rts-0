@@ -353,10 +353,13 @@ AI controllers, or Tokio coordination into `rts-sim`:
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
   per-viewer replay vision, branch-live active players use original-seat aliases, and dev-watch
   viewers get full-world scenario snapshots.
-- `launch.rs` owns common `StartPayload` stamping for live, replay-branch-live, and dev-watch
-  starts: player id, spectator flag, prediction build/version, recipient capability metadata,
-  pending snapshot clearing, and the send loop. Replay viewer payloads remain in
-  `replay_session.rs` because they also carry replay metadata.
+- `launch.rs` owns the lobby start-payload builder and send loop for live, replay-branch-live,
+  lab, dev-watch, and replay viewer starts. The builder consumes `SessionPolicy`, recipient role,
+  projection-derived diagnostics, prediction eligibility, pending snapshot behavior, and
+  source-specific metadata to stamp player id, spectator flag, prediction build/version,
+  recipient capabilities, diagnostics, replay metadata, and lab metadata. `Game::start_payload()`
+  remains the source of static simulation start data, while `replay_session.rs` keeps replay
+  playback state and exposes replay start metadata for the builder.
 - `live_tick.rs` runs one live simulation tick around the existing `Game` seam: AI command enqueue,
   `Game::tick`, recipient-specific room notice injection after projection, snapshot fanout,
   observer analysis, defeat/game-over checks, and panic replay capture.
