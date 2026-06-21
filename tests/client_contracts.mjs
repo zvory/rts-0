@@ -144,7 +144,13 @@ import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { LabClient, labVision, labVisionLabel } from "../client/src/lab_client.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "../client/src/lab_control_policy.js";
-import { LabPanel, labSpawnFactionOptions, labSpawnUnitKindsForFaction } from "../client/src/lab_panel.js";
+import {
+  LabPanel,
+  labBuildingSpawnFactionOptions,
+  labSpawnBuildingKindsForFaction,
+  labSpawnFactionOptions,
+  labSpawnUnitKindsForFaction,
+} from "../client/src/lab_panel.js";
 import { LabPanelWindowChrome } from "../client/src/lab_panel_window.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
@@ -5015,6 +5021,24 @@ function fakeAudioContext() {
     [KIND.EKAT],
     "LabPanel spawn palette filters Ekat to Ekat units",
   );
+  assertDeepEqual(
+    labBuildingSpawnFactionOptions().map((entry) => entry.id),
+    ["kriegsia", "ekat"],
+    "LabPanel building spawn palette exposes product-playable faction catalogs",
+  );
+  assert(
+    labSpawnBuildingKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.CITY_CENTRE),
+    "LabPanel building spawn palette includes Kriegsia catalog buildings",
+  );
+  assert(
+    !labSpawnBuildingKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.RIFLEMAN),
+    "LabPanel building spawn palette excludes units from building options",
+  );
+  assertDeepEqual(
+    labSpawnBuildingKindsForFaction("ekat"),
+    [KIND.ZAMOK],
+    "LabPanel building spawn palette filters Ekat to Ekat buildings",
+  );
 }
 
 await withFakeDocument(async () => {
@@ -5205,6 +5229,10 @@ await withFakeDocument(async () => {
   );
   assert(!textWithin(root).includes("Advanced Spawn"), "LabPanel omits the advanced spawn form");
   assert(
+    textWithin(root).includes("Unit Spawn") && textWithin(root).includes("Building Spawn"),
+    "LabPanel renders separate unit and building spawn sections",
+  );
+  assert(
     !panel.fields.has("spawn-owner") &&
       !panel.fields.has("advanced-spawn-owner") &&
       !panel.fields.has("resource-player") &&
@@ -5265,6 +5293,28 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").value = "ekat";
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
+  panel.armBuildingSpawnPaletteTool(KIND.CITY_CENTRE);
+  assert(armedTool?.kind === "spawnEntity", "LabPanel building palette arms the spawn lab tool through Match");
+  assert(
+    armedTool.payload.owner === 2 &&
+      armedTool.payload.kind === KIND.CITY_CENTRE &&
+      armedTool.payload.factionId === DEFAULT_FACTION_ID &&
+      armedTool.payload.completed === true,
+    "LabPanel building palette captures owner, faction, and kind with completed spawn payloads",
+  );
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 240, y: 288 });
+  assert(
+    sent.at(-1).op.op === "spawnEntity" &&
+      sent.at(-1).op.owner === 2 &&
+      sent.at(-1).op.kind === KIND.CITY_CENTRE &&
+      sent.at(-1).op.x === 240 &&
+      sent.at(-1).op.y === 288 &&
+      sent.at(-1).op.completed === true,
+    "LabPanel building spawn tool sends clicked world coordinates through LabClient",
+  );
+  panel.fields.get("building-spawn-faction").value = "ekat";
+  panel.fields.get("building-spawn-faction").listeners.change();
+  assert(panel.buildingSpawnPalette.kind === KIND.ZAMOK, "LabPanel faction selection updates the building palette deterministically");
   assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
   assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
   assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");
