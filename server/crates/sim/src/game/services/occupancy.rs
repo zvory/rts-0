@@ -11,6 +11,9 @@ use crate::game::teams::TeamRelations;
 
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+const TANK_TRAP_ROUTE_WINDOW_TILES: f32 = 6.0;
+const TANK_TRAP_ON_ROUTE_RADIUS_TILES: f32 = 0.65;
+const TANK_TRAP_PINCH_ROUTE_RADIUS_TILES: f32 = 0.45;
 
 /// A snapshot of which tiles are blocked by buildings this tick, layered over terrain. Units
 /// never block (soft overlap is allowed), so only static structures appear here.
@@ -60,9 +63,8 @@ impl<'a> Occupancy<'a> {
                 let idx = (ty * size + tx) as usize;
                 let terrain_blocked = !map.is_passable(tx as i32, ty as i32);
                 all_ground_static_blocked[idx] = all_ground_blocked[idx] || terrain_blocked;
-                vehicle_body_static_blocked[idx] = all_ground_blocked[idx]
-                    || vehicle_body_blocked[idx]
-                    || terrain_blocked;
+                vehicle_body_static_blocked[idx] =
+                    all_ground_blocked[idx] || vehicle_body_blocked[idx] || terrain_blocked;
             }
         }
         let all_ground_clearance_tiles = build_clearance_field(map, &all_ground_static_blocked);
@@ -208,6 +210,48 @@ impl<'a> Occupancy<'a> {
         self.all_ground_blocked[idx] || self.vehicle_body_blocked[idx]
     }
 
+    pub(super) fn tank_trap_obstructs_vehicle_route(
+        &self,
+        attacker: &Entity,
+        tank_trap: &Entity,
+        relation: &StaticPathingRelation,
+    ) -> bool {
+        if movement_body_class(attacker.kind) != MovementBodyClass::VehicleBody
+            || tank_trap.kind != EntityKind::TankTrap
+            || relation.blocks_tank_trap_owned_by(tank_trap.owner)
+        {
+            return false;
+        }
+
+        let Some(route_target) = attacker
+            .next_waypoint()
+            .or_else(|| attacker.path_goal())
+            .or_else(|| attacker.move_intent())
+        else {
+            return false;
+        };
+        let from = (attacker.pos_x, attacker.pos_y);
+        if !world_point_finite(from) || !world_point_finite(route_target) {
+            return false;
+        }
+
+        let segment = bounded_route_segment(from, route_target);
+        let trap_pos = (tank_trap.pos_x, tank_trap.pos_y);
+        if !world_point_finite(trap_pos) {
+            return false;
+        }
+
+        let tile = self.map.tile_of(tank_trap.pos_x, tank_trap.pos_y);
+        let on_route_radius = config::TILE_SIZE as f32 * TANK_TRAP_ON_ROUTE_RADIUS_TILES;
+        if distance_sq_to_segment(trap_pos, segment.0, segment.1)
+            <= on_route_radius * on_route_radius
+        {
+            return true;
+        }
+
+        self.tank_trap_pinches_route(tile, segment)
+    }
+
     pub(crate) fn passable_for_kind(&self, tx: i32, ty: i32, kind: EntityKind) -> bool {
         self.passable_for_movement_body(tx, ty, movement_body_class(kind))
     }
@@ -219,12 +263,7 @@ impl<'a> Occupancy<'a> {
         kind: EntityKind,
         relation: &StaticPathingRelation,
     ) -> bool {
-        self.passable_for_movement_body_and_relation(
-            tx,
-            ty,
-            movement_body_class(kind),
-            relation,
-        )
+        self.passable_for_movement_body_and_relation(tx, ty, movement_body_class(kind), relation)
     }
 
     pub(super) fn clearance_at_tile_for_kind_and_relation(
@@ -347,10 +386,7 @@ impl<'a> Occupancy<'a> {
         {
             return true;
         }
-        for ((ax, ay), (bx, by)) in [
-            ((tx - 1, ty), (tx + 1, ty)),
-            ((tx, ty - 1), (tx, ty + 1)),
-        ] {
+        for ((ax, ay), (bx, by)) in [((tx - 1, ty), (tx + 1, ty)), ((tx, ty - 1), (tx, ty + 1))] {
             let Some(owner_a) = self.tank_trap_owner_at(ax, ay) else {
                 continue;
             };
@@ -373,6 +409,77 @@ impl<'a> Occupancy<'a> {
         let idx = (ty as u32 * self.map.size + tx as u32) as usize;
         self.tank_trap_owner_by_tile[idx]
     }
+
+    fn tank_trap_pinches_route(
+        &self,
+        tank_trap_tile: (u32, u32),
+        segment: ((f32, f32), (f32, f32)),
+    ) -> bool {
+        let (tx, ty) = (tank_trap_tile.0 as i32, tank_trap_tile.1 as i32);
+        for (other_tile, midpoint_tile) in [
+            ((tx - 2, ty), (tx - 1, ty)),
+            ((tx + 2, ty), (tx + 1, ty)),
+            ((tx, ty - 2), (tx, ty - 1)),
+            ((tx, ty + 2), (tx, ty + 1)),
+        ] {
+            if self
+                .tank_trap_owner_at(other_tile.0, other_tile.1)
+                .is_none()
+            {
+                continue;
+            }
+            if !self.map.in_bounds(midpoint_tile.0, midpoint_tile.1) {
+                continue;
+            }
+            let midpoint = self
+                .map
+                .tile_center(midpoint_tile.0 as u32, midpoint_tile.1 as u32);
+            let pinch_radius = config::TILE_SIZE as f32 * TANK_TRAP_PINCH_ROUTE_RADIUS_TILES;
+            if distance_sq_to_segment(midpoint, segment.0, segment.1) <= pinch_radius * pinch_radius
+            {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+fn world_point_finite(point: (f32, f32)) -> bool {
+    point.0.is_finite() && point.1.is_finite()
+}
+
+fn bounded_route_segment(from: (f32, f32), to: (f32, f32)) -> ((f32, f32), (f32, f32)) {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let distance = (dx * dx + dy * dy).sqrt();
+    if !distance.is_finite() || distance <= f32::EPSILON {
+        return (from, from);
+    }
+
+    let max_distance = config::TILE_SIZE as f32 * TANK_TRAP_ROUTE_WINDOW_TILES;
+    if distance <= max_distance {
+        return (from, to);
+    }
+
+    let scale = max_distance / distance;
+    (from, (from.0 + dx * scale, from.1 + dy * scale))
+}
+
+fn distance_sq_to_segment(point: (f32, f32), from: (f32, f32), to: (f32, f32)) -> f32 {
+    let vx = to.0 - from.0;
+    let vy = to.1 - from.1;
+    let wx = point.0 - from.0;
+    let wy = point.1 - from.1;
+    let len_sq = vx * vx + vy * vy;
+    if len_sq <= f32::EPSILON {
+        return wx * wx + wy * wy;
+    }
+    let t = ((wx * vx + wy * vy) / len_sq).clamp(0.0, 1.0);
+    let closest_x = from.0 + t * vx;
+    let closest_y = from.1 + t * vy;
+    let dx = point.0 - closest_x;
+    let dy = point.1 - closest_y;
+    dx * dx + dy * dy
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -395,7 +502,11 @@ impl StaticPathingRelation {
 
     #[cfg(test)]
     pub(super) fn single_owner(player: u32) -> Self {
-        let owners = if player == 0 { Vec::new() } else { vec![player] };
+        let owners = if player == 0 {
+            Vec::new()
+        } else {
+            vec![player]
+        };
         Self {
             blocking_tank_trap_owners: owners,
         }
@@ -615,12 +726,7 @@ mod tests {
 
         assert!(!occ.passable_for_kind(5, 5, EntityKind::Tank));
         assert!(occ.passable_for_kind_and_relation(5, 5, EntityKind::Tank, &enemy_relation));
-        assert!(!occ.passable_for_kind_and_relation(
-            5,
-            5,
-            EntityKind::Tank,
-            &allied_relation
-        ));
+        assert!(!occ.passable_for_kind_and_relation(5, 5, EntityKind::Tank, &allied_relation));
     }
 
     #[test]
@@ -698,6 +804,72 @@ mod tests {
             5,
             EntityKind::ScoutCar,
             &player_one_relation
+        ));
+    }
+
+    #[test]
+    fn tank_trap_route_obstruction_distinguishes_forward_from_irrelevant_traps() {
+        let map = flat_test_map(12);
+        let relation = StaticPathingRelation::for_player(
+            1,
+            &TeamRelations::from_player_teams([(1, 1), (2, 2)]),
+        );
+        let mut entities = EntityStore::new();
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let forward = entities
+            .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
+            .expect("forward trap should spawn");
+        let side = entities
+            .spawn_building(2, EntityKind::TankTrap, 150.0, 160.0, true)
+            .expect("side trap should spawn");
+        entities
+            .get_mut(tank)
+            .expect("tank should exist")
+            .set_path_goal(Some((300.0, 100.0)));
+        let occ = Occupancy::build(&map, &entities);
+        let attacker = entities.get(tank).expect("tank should exist");
+
+        assert!(occ.tank_trap_obstructs_vehicle_route(
+            attacker,
+            entities.get(forward).expect("forward trap should exist"),
+            &relation
+        ));
+        assert!(!occ.tank_trap_obstructs_vehicle_route(
+            attacker,
+            entities.get(side).expect("side trap should exist"),
+            &relation
+        ));
+    }
+
+    #[test]
+    fn tank_trap_route_obstruction_marks_closed_gap_on_route() {
+        let map = flat_test_map(12);
+        let relation = StaticPathingRelation::for_player(
+            1,
+            &TeamRelations::from_player_teams([(1, 1), (2, 2)]),
+        );
+        let mut entities = EntityStore::new();
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let upper = entities
+            .spawn_building(2, EntityKind::TankTrap, 160.0, 68.0, true)
+            .expect("upper trap should spawn");
+        entities
+            .spawn_building(2, EntityKind::TankTrap, 160.0, 132.0, true)
+            .expect("lower trap should spawn");
+        entities
+            .get_mut(tank)
+            .expect("tank should exist")
+            .set_path_goal(Some((300.0, 100.0)));
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(occ.tank_trap_obstructs_vehicle_route(
+            entities.get(tank).expect("tank should exist"),
+            entities.get(upper).expect("upper trap should exist"),
+            &relation
         ));
     }
 

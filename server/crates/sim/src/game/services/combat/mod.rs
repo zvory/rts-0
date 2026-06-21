@@ -17,7 +17,7 @@ use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::occupancy::Occupancy;
+use crate::game::services::occupancy::{Occupancy, StaticPathingRelation};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
@@ -35,7 +35,7 @@ mod weapons;
 #[cfg(test)]
 mod tests;
 
-use acquisition::{combat_mode, resolve_target, CombatMode};
+use acquisition::{combat_mode, resolve_target as resolve_target_with_obstruction, CombatMode};
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
 use projection::{friendly_hard_blocker_between, shot_hits_intended_target};
@@ -46,6 +46,46 @@ use weapons::{
     rotate_anti_tank_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
     uses_stationary_weapon_aggro,
 };
+
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn resolve_target(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    spatial: &SpatialIndex,
+    los: &LineOfSight<'_>,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    acquire_px: f32,
+    mode: CombatMode,
+) -> Option<u32> {
+    let occ = Occupancy::build(map, entities);
+    let tank_trap_relation = StaticPathingRelation::for_player(owner, teams);
+    let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
+        occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
+    };
+    resolve_target_with_obstruction(
+        map,
+        entities,
+        teams,
+        spatial,
+        los,
+        fog,
+        smokes,
+        &tank_trap_obstructs_vehicle_route,
+        self_id,
+        owner,
+        px,
+        py,
+        acquire_px,
+        mode,
+    )
+}
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 pub(super) const RANGE_SLACK: f32 = 4.0;
@@ -65,7 +105,7 @@ pub(crate) fn combat_system(
     entities: &mut EntityStore,
     teams: &TeamRelations,
     mortar_autocast_researched: &dyn Fn(u32) -> bool,
-    _occ: &Occupancy,
+    occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
@@ -151,8 +191,25 @@ pub(crate) fn combat_system(
         }
 
         // Resolve / acquire a target id based on the current order semantics.
-        let target = resolve_target(
-            map, entities, teams, spatial, &los, fog, smokes, id, owner, px, py, acquire_px, mode,
+        let tank_trap_relation = StaticPathingRelation::for_player(owner, teams);
+        let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
+            occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
+        };
+        let target = resolve_target_with_obstruction(
+            map,
+            entities,
+            teams,
+            spatial,
+            &los,
+            fog,
+            smokes,
+            &tank_trap_obstructs_vehicle_route,
+            id,
+            owner,
+            px,
+            py,
+            acquire_px,
+            mode,
         );
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.

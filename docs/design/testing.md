@@ -131,6 +131,8 @@ The Tank Trap pathing matrix scenarios are harnesses for owner-aware pathing, in
 pass-through, explicit infantry attacks, and attack-move acquisition filtering. Enemy Tank Traps are
 breachable for vehicle path planning only; physical movement and standability still treat live Tank
 Trap footprints and closed one-tile gaps as vehicle-body blockers until combat removes enough traps.
+Combat acquisition should prioritize a Tank Trap only when that trap lies on the vehicle's bounded
+route window or closes a gap across it; irrelevant nearby traps should lose to combat targets.
 
 ## 11. Package-aware test selection policy
 

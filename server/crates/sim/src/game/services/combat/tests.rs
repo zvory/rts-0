@@ -17,6 +17,7 @@ use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
 
 mod retention;
+mod tank_traps;
 
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
     let mut entities = EntityStore::new();
