@@ -12,6 +12,8 @@ import {
   LOBBY_BROWSER_POLL_MS,
   LobbyBrowserView,
   LobbyCreateModal,
+  lobbyJoinIntent,
+  suggestLobbyName,
 } from "./lobby_browser_view.js";
 import {
   DEFAULT_AI_PROFILE_ID,
@@ -250,9 +252,48 @@ export class Lobby {
     this._reflectReadyButton();
   }
 
-  _joinBrowserLobby(row, { spectator = false } = {}) {
+  async _joinBrowserLobby(row, { preflight = true, spectator = false } = {}) {
     const room = String(row?.room || "").trim();
     if (!room || this._browserActionPending) return;
+    const intent = lobbyJoinIntent(row);
+    if (preflight && !intent.joinable) {
+      this.setStatus(`Lobby "${room}" is not joinable.`, true);
+      void this._refreshLobbyBrowser({ force: true });
+      return;
+    }
+    if (!preflight) {
+      this._beginBrowserJoin({ room }, { spectator: !!spectator });
+      return;
+    }
+    this._browserActionPending = true;
+    this._pendingBrowserJoinRoom = room;
+    this._renderLobbyBrowser();
+    this._reflectCreateButton();
+    const latestRows = await this._refreshLobbyBrowser({ force: true });
+    if (this._joined || this.root.hidden) return;
+    if (!Array.isArray(latestRows)) {
+      this._cancelPendingBrowserJoin("Lobby list unavailable.", {
+        rows: [],
+        listError: "Lobby list unavailable.",
+      });
+      return;
+    }
+    const latestRow = latestRows.find((candidate) => String(candidate?.room || "").trim() === room);
+    if (!latestRow) {
+      this._cancelPendingBrowserJoin(`Lobby "${room}" is no longer available.`, { rows: latestRows });
+      return;
+    }
+    const latestIntent = lobbyJoinIntent(latestRow);
+    if (!latestIntent.joinable) {
+      this._cancelPendingBrowserJoin(`Lobby "${room}" is no longer joinable.`, { rows: latestRows });
+      return;
+    }
+    this._beginBrowserJoin(latestRow, { spectator: latestIntent.spectator });
+  }
+
+  _beginBrowserJoin(row, { spectator = false } = {}) {
+    const room = String(row?.room || "").trim();
+    if (!room) return;
     const name = (this.elName && this.elName.value.trim()) || "Commander";
     this._browserActionPending = true;
     this._pendingBrowserJoinRoom = room;
@@ -265,6 +306,16 @@ export class Lobby {
     this._reflectCreateButton();
   }
 
+  _cancelPendingBrowserJoin(message, { rows, listError = "" } = {}) {
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
+    this._spectator = false;
+    this._renderLobbyBrowser({ rows: Array.isArray(rows) ? rows : undefined, error: listError });
+    this.setStatus(message, true);
+    this._reflectReadyButton();
+    this._reflectCreateButton();
+  }
+
   _sendJoin({ name, room, spectator }) {
     this._persistName(name);
     this.net.join(name, room, spectator);
@@ -272,7 +323,9 @@ export class Lobby {
 
   _openCreateLobby(trigger) {
     if (this._joined || this._browserActionPending || !this._browserConnected) return;
-    this.createModal?.open(trigger);
+    this.createModal?.open(trigger, {
+      initialValue: suggestLobbyName(this.elName?.value),
+    });
   }
 
   async _submitCreateLobby(room) {
@@ -297,7 +350,7 @@ export class Lobby {
       }
       const payload = await response.json().catch(() => ({}));
       const createdRoom = String(payload?.room || room).trim() || room;
-      this._joinBrowserLobby({ room: createdRoom }, { spectator: false });
+      this._beginBrowserJoin({ room: createdRoom }, { spectator: false });
       return true;
     } catch (_) {
       this.createModal?.setError("Network disconnected.");
@@ -549,26 +602,29 @@ export class Lobby {
         throw new Error(`Lobby browser request failed (${response?.status || "network"})`);
       }
       const rows = await response.json();
-      if (controller && this._browserAbort !== controller) return;
+      if (controller && this._browserAbort !== controller) return null;
       if (this._joined || this.root.hidden) {
         this._browserLoading = false;
-        return;
+        return null;
       }
       this._browserLoading = false;
       this._browserAbort = null;
+      const normalizedRows = Array.isArray(rows) ? rows : [];
       this._renderLobbyBrowser({
-        rows: Array.isArray(rows) ? rows : [],
+        rows: normalizedRows,
         error: "",
       });
+      return normalizedRows;
     } catch (err) {
       if (err?.name === "AbortError") {
-        if (controller && this._browserAbort !== controller) return;
+        if (controller && this._browserAbort !== controller) return null;
         this._browserLoading = false;
-        return;
+        return null;
       }
       this._browserLoading = false;
       this._browserAbort = null;
       this._renderLobbyBrowser({ error: "Lobby list unavailable." });
+      return null;
     }
   }
 

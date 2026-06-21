@@ -1,6 +1,6 @@
 # Phase 4 - Freshness, Hardening, and Docs
 
-Status: planned.
+Status: done.
 
 ## Goal
 

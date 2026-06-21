@@ -23,16 +23,10 @@ export class LabPanel {
       steel: null,
       oil: null,
       researchUpgrade: "",
-      researchCompleted: true,
     };
     this.spawnPalette = {
       factionId: DEFAULT_FACTION_ID,
       kind: "",
-      completed: true,
-    };
-    this.advancedSpawn = {
-      kind: "",
-      completed: true,
     };
     this.teamInputs = new Map();
     this.fields = new Map();
@@ -142,7 +136,6 @@ export class LabPanel {
     root.appendChild(this.renderActiveToolStatus());
     root.appendChild(this.renderTargetPlayer());
     root.appendChild(this.renderSpawnPalette());
-    root.appendChild(this.renderAdvancedSpawn());
 
     root.appendChild(this.fieldset("Selected", [
       this.readout(`${selectedIds.length} selected`),
@@ -183,11 +176,6 @@ export class LabPanel {
         value: this.playerState.researchUpgrade,
         onChange: (value) => {
           this.playerState.researchUpgrade = value;
-        },
-      }),
-      this.checkboxField("research-completed", "Complete", this.playerState.researchCompleted, {
-        onChange: (checked) => {
-          this.playerState.researchCompleted = checked;
         },
       }),
       this.button("Set research", () => this.setCompletedResearch()),
@@ -406,35 +394,10 @@ export class LabPanel {
           },
         },
       ),
-      this.checkboxField("spawn-completed", "Complete", this.spawnPalette.completed, {
-        onChange: (checked) => {
-          this.spawnPalette.completed = checked;
-        },
-      }),
       this.spawnPaletteReadout(unitKinds),
       this.spawnPaletteGrid(unitKinds),
     ];
     return this.fieldset("Unit Spawn", controls);
-  }
-
-  renderAdvancedSpawn() {
-    this.normalizeAdvancedSpawn();
-    return this.fieldset("Advanced Spawn", [
-      this.selectField("advanced-spawn-kind", "Kind", spawnKinds(), KIND_LABELS, {
-        value: this.advancedSpawn.kind,
-        onChange: (value) => {
-          this.advancedSpawn.kind = value;
-        },
-      }),
-      this.checkboxField("advanced-spawn-completed", "Complete", this.advancedSpawn.completed, {
-        onChange: (checked) => {
-          this.advancedSpawn.completed = checked;
-        },
-      }),
-      this.button("Arm spawn", () => this.armAdvancedSpawnTool(), {
-        dataset: { active: this.spawnToolActive(this.advancedSpawn.kind) ? "true" : "false" },
-      }),
-    ]);
   }
 
   spawnPaletteGrid(unitKinds) {
@@ -471,19 +434,9 @@ export class LabPanel {
       owner: this.targetPlayer(),
       factionId: this.spawnPalette.factionId,
       kind,
-      completed: this.spawnPalette.completed,
+      completed: true,
     };
     return this.armSpawnTool(payload);
-  }
-
-  armAdvancedSpawnTool() {
-    this.captureAdvancedSpawnFields();
-    if (!this.advancedSpawn.kind) return null;
-    return this.armSpawnTool({
-      owner: this.targetPlayer(),
-      kind: this.advancedSpawn.kind,
-      completed: this.advancedSpawn.completed,
-    });
   }
 
   armSpawnTool(payload) {
@@ -510,7 +463,7 @@ export class LabPanel {
       owner: Number(payload.owner),
       x: event.x,
       y: event.y,
-      completed: !!payload.completed,
+      completed: true,
     });
   }
 
@@ -524,16 +477,6 @@ export class LabPanel {
     if (!unitKinds.includes(this.spawnPalette.kind)) {
       this.spawnPalette.kind = unitKinds[0] || "";
     }
-    this.spawnPalette.completed = !!this.spawnPalette.completed;
-  }
-
-  normalizeAdvancedSpawn() {
-    this.targetPlayerId = this.validOwner(this.targetPlayerId);
-    const kinds = spawnKinds();
-    if (!kinds.includes(this.advancedSpawn.kind)) {
-      this.advancedSpawn.kind = kinds[0] || "";
-    }
-    this.advancedSpawn.completed = !!this.advancedSpawn.completed;
   }
 
   validOwner(owner) {
@@ -545,13 +488,6 @@ export class LabPanel {
   captureSpawnPaletteFields() {
     this.captureTargetPlayerField();
     this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
-    this.spawnPalette.completed = this.bool("spawn-completed");
-  }
-
-  captureAdvancedSpawnFields() {
-    this.captureTargetPlayerField();
-    this.advancedSpawn.kind = this.value("advanced-spawn-kind") || this.advancedSpawn.kind;
-    this.advancedSpawn.completed = this.bool("advanced-spawn-completed");
   }
 
   captureTargetPlayerField() {
@@ -573,7 +509,6 @@ export class LabPanel {
     if (!upgrades.includes(this.playerState.researchUpgrade)) {
       this.playerState.researchUpgrade = upgrades[0] || "";
     }
-    this.playerState.researchCompleted = !!this.playerState.researchCompleted;
   }
 
   capturePlayerStateFields() {
@@ -581,7 +516,6 @@ export class LabPanel {
     this.playerState.steel = this.uint("resource-steel");
     this.playerState.oil = this.uint("resource-oil");
     this.playerState.researchUpgrade = this.value("research-upgrade") || this.playerState.researchUpgrade;
-    this.playerState.researchCompleted = this.bool("research-completed");
   }
 
   setPlayerResources() {
@@ -598,7 +532,7 @@ export class LabPanel {
     return this.labClient.setCompletedResearch(
       this.targetPlayer(),
       this.playerState.researchUpgrade,
-      this.playerState.researchCompleted,
+      true,
     );
   }
 
@@ -861,10 +795,6 @@ export class LabPanel {
 const KIND_LABELS = Object.fromEntries(
   Object.entries(STATS).map(([kind, st]) => [kind, st.label || kind]),
 );
-
-function spawnKinds() {
-  return Object.keys(STATS).filter((kind) => STATS[kind]?.cost || STATS[kind]?.trains);
-}
 
 export function labSpawnFactionOptions() {
   return PLAYABLE_FACTIONS.filter((entry) => labSpawnUnitKindsForFaction(entry.id).length > 0);

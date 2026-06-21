@@ -4,7 +4,7 @@
 import { MatchInputRouter } from "../client/src/input/router.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { Minimap } from "../client/src/minimap.js";
-import { KIND, TERRAIN } from "../client/src/protocol.js";
+import { KIND, ORDER_STAGE, TERRAIN } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -322,6 +322,68 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   h.minimap.destroy();
 }
 
+// Setup targeting previews selected support weapons toward the hovered minimap point.
+{
+  const selected = [
+    { id: 30, owner: 1, kind: KIND.RIFLEMAN, x: 10, y: 20 },
+    { id: 31, owner: 1, kind: KIND.ANTI_TANK_GUN, x: 30, y: 40 },
+    { id: 32, owner: 1, kind: KIND.ARTILLERY, x: 50, y: 60 },
+  ];
+  const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
+  assert(h.router.pointerMove(lockedEvent(190, 290, 0)), "setup minimap hover is consumed");
+  const preview = h.clientIntent.antiTankGunSetupPreview;
+  assert(preview?.source === "minimap", "setup minimap hover records the minimap as preview source");
+  assertApprox(preview.mouseX, 90, 0.001, "setup minimap preview world x");
+  assertApprox(preview.mouseY, 90, 0.001, "setup minimap preview world y");
+  assert(preview.guns.length === 2, "setup minimap preview filters to support weapons");
+  assert(
+    preview.guns.some((e) => e.id === 31) && preview.guns.some((e) => e.id === 32),
+    "setup minimap preview includes anti-tank guns and artillery",
+  );
+  h.minimap.destroy();
+}
+
+// Queued minimap setup previews aim from the accepted movement endpoint, matching world-view setup.
+{
+  const selected = [
+    {
+      id: 32,
+      owner: 1,
+      kind: KIND.ARTILLERY,
+      x: 50,
+      y: 60,
+      orderPlan: [
+        { kind: ORDER_STAGE.ATTACK_MOVE, x: 150, y: 160 },
+      ],
+    },
+  ];
+  const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
+  assert(h.router.pointerMove(lockedEvent(190, 290, 0, { shiftKey: true })), "queued setup minimap hover is consumed");
+  const previewGun = h.clientIntent.antiTankGunSetupPreview?.guns[0];
+  assert(
+    previewGun?.x === 150 && previewGun?.y === 160 && selected[0].x === 50 && selected[0].y === 60,
+    "queued minimap setup preview uses movement endpoints without mutating selection",
+  );
+  h.minimap.destroy();
+}
+
+// Setup targeting left-click on minimap issues setupAntiTankGuns for artillery, not a move order.
+{
+  const selected = [
+    { id: 31, owner: 1, kind: KIND.ANTI_TANK_GUN, x: 30, y: 40 },
+    { id: 32, owner: 1, kind: KIND.ARTILLERY, x: 50, y: 60 },
+  ];
+  const h = minimapHarness({ selected, commandTarget: "setupAntiTankGuns" });
+  assert(h.router.pointerDown(lockedEvent(200, 300, 0)), "setup minimap click is consumed");
+  assert(h.net.sent.length === 1, "setup minimap click sends one command");
+  assert(h.net.sent[0].c === "setupAntiTankGuns", "setup minimap click sends setupAntiTankGuns");
+  assert(h.net.sent[0].units.includes(31) && h.net.sent[0].units.includes(32), "setup minimap click includes support weapons");
+  assertApprox(h.net.sent[0].x, 100, 0.001, "setup minimap command x");
+  assertApprox(h.net.sent[0].y, 100, 0.001, "setup minimap command y");
+  assert(h.clientIntent.commandTarget === null, "setup minimap click exits target mode");
+  h.minimap.destroy();
+}
+
 // Injected ClientIntent owns minimap target issuing without touching GameState shims.
 {
   const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
@@ -597,6 +659,15 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   );
   assert(fogDrawIndex >= 0, "minimap draws cached fog before artillery markers");
   assert(iconDrawIndex > fogDrawIndex, "artillery firing icon draws over fog for every player");
+  assert(
+    canvas.context.calls[iconDrawIndex].args[2] === 30 &&
+      canvas.context.calls[iconDrawIndex].args[3] === 24,
+    "artillery firing icon uses the doubled minimap dimensions",
+  );
+  assert(
+    !canvas.context.calls.some((call) => call.op === "arc"),
+    "artillery firing icon image does not draw an extra surrounding circle",
+  );
   assert(
     canvas.context.calls.some((call) => call.op === "rotate" && Math.abs(call.args[0] - 0.5) < 0.001),
     "artillery firing icon uses the event facing",

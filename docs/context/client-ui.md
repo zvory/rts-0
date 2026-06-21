@@ -21,7 +21,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, resource icons, scoreboard, status badge, minimap, branch
-  staging, lab panel, and settings.
+  staging, lab panel, and settings. The pre-join lobby browser polls `GET /api/lobbies` and
+  preflights row clicks against the latest list before sending `join`.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
 - `renderer`: `renderer/` Pixi facade, layers, terrain, entities, fog, feedback, art helpers,

@@ -8,8 +8,6 @@ index.html        # PINNED — CDN + #app + module entry + screens markup
 map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
 renderer_preview.html / renderer_preview.js
                   # standalone Renderer preview linked from the Dev links menu
-unit-lab.html / unit-lab.js
-                  # unit design lab UI; `/dev/unit-lab` redirects here and reads `/api/unit-designs`
 styles.css        # HUD, lobby, menus, command card
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
@@ -238,8 +236,8 @@ SVG unit art workflow:
   fixture SVGs in `tests/fixtures/svg/` when a fixture is useful for importer/runtime tests.
 - Verify new or changed rigs with `node tests/rig_schema.mjs`, `node tests/svg_rig_importer.mjs`,
   `node tests/rig_runtime.mjs`, and `node scripts/check-client-architecture.mjs`.
-- Use `/dev/unit-lab` only as a visual preview/design browser. Acceptance for runtime contract
-  changes comes from schema, importer, animation, renderer smoke, and architecture tests.
+- Runtime contract changes are accepted through schema, importer, animation, renderer smoke, and
+  architecture tests rather than static design previews.
 
 `renderer/feedback_view_model.js`
 ```js
@@ -360,8 +358,7 @@ export function labSpawnUnitKindsForFaction(factionId)
 export class LabPanel {
   constructor({ root, labClient, launch, startPayload, match? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
-  armSpawnPaletteTool(kind?)             // arms a Match-owned spawnEntity world-click tool
-  armAdvancedSpawnTool()                 // same tool path for secondary building/setup spawns
+  armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
   cancelActiveTool()
   setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
@@ -405,8 +402,8 @@ command targeting, or command-card build menus cancels the active lab tool so se
 share state with gameplay command modes. Unit spawning is a lab panel palette backed by the client
 faction catalog mirror and playable faction labels; the palette arms a persistent `spawnEntity` lab
 tool and every completed click sends the clicked world coordinates through `LabClient` until
-cancelled. Secondary building/setup spawns use the same click-to-world spawn tool path instead of
-primary manual coordinate entry. Selected-entity repositioning also uses
+cancelled. The lab does not expose a secondary advanced spawn fallback; the panel spawn affordance
+is limited to the playable faction unit palette. Selected-entity repositioning also uses
 the shared tool path: `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends
 `moveEntity` requests for each id at the clicked world point, and leaves stale-id or partial-failure
 reporting visible through the lab result status. Delete and owner reassignment stay contextual to
@@ -772,8 +769,9 @@ export class Minimap {
 export class Lobby {
   constructor(rootEl, net)
   show(), hide()
-  // owns lobby state, pre-join browser polling, joins, ready/start/spectator role, and delegates
-  // browser DOM to lobby_browser_view.js and joined-roster DOM to lobby_view.js.
+  // owns lobby state, pre-join browser polling, latest-row join preflight,
+  // ready/start/spectator role, and delegates browser DOM to lobby_browser_view.js and
+  // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
   // Teams are layout groups only; player colors come from each player record.
@@ -788,7 +786,9 @@ export function sortLobbySummaries(rows)
 export function formatLobbyAge(createdAtUnixMs, nowMs?)
 export function lobbyStatusLabel(joinState)
 export function lobbyActionLabel(joinState)
+export function lobbyJoinIntent(row)
 export function validateLobbyName(rawName)
+export function suggestLobbyName(playerName)
 export class LobbyBrowserView {
   constructor(rootEl)
   render({ rows?, loading?, connected?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
@@ -796,7 +796,7 @@ export class LobbyBrowserView {
 }
 export class LobbyCreateModal {
   constructor(hostEl, { onSubmit? })
-  open(trigger?)
+  open(trigger?, { initialValue? }?)
   close({ restoreFocus? }?)
   setError(message)
   setPending(pending)

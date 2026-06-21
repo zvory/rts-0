@@ -28,7 +28,6 @@ use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
 
-mod unit_design_lab;
 mod wiki;
 
 use rts_server::db::Db;
@@ -140,8 +139,6 @@ async fn main() {
         .route("/wiki/", get(wiki::wiki_index_handler))
         .route("/wiki/{*path}", get(wiki::wiki_page_handler))
         .route("/ws", get(ws_handler))
-        .route("/dev/unit-lab", get(unit_design_lab_handler))
-        .route("/api/unit-designs", get(unit_design_lab_list_handler))
         .route("/dev/replay-artifact", get(dev_replay_artifact_handler))
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
@@ -516,17 +513,6 @@ async fn dev_replay_artifact_handler(
             .into_response();
     };
     Redirect::temporary(&format!("/?replayArtifact={replay}")).into_response()
-}
-
-async fn unit_design_lab_handler() -> impl IntoResponse {
-    Redirect::temporary("/unit-lab.html")
-}
-
-async fn unit_design_lab_list_handler() -> impl IntoResponse {
-    match unit_design_lab::catalog().await {
-        Ok(payload) => Json(payload).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err).into_response(),
-    }
 }
 
 async fn dev_scenario_handler(

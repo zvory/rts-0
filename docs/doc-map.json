@@ -22,7 +22,6 @@
       "source": [
         "client/index.html",
         "client/map-editor.html",
-        "client/unit-lab.html",
         "client/src/app.js",
         "client/src/bootstrap.js",
         "client/src/main.js",
@@ -223,11 +222,9 @@
         "server/src/main.rs",
         "server/src/lib.rs",
         "server/src/dev_scenarios.rs",
-        "server/src/unit_design_lab.rs",
         "server/src/wiki.rs",
         "client/src/lab_*.js",
-        "client/src/replay_*.js",
-        "client/unit-lab.js"
+        "client/src/replay_*.js"
       ],
       "docs": [
         "docs/context/server-sim.md",
@@ -295,7 +292,6 @@
         "client/src/lab_client.js",
         "client/src/lab_control_policy.js",
         "client/src/lab_panel.js",
-        "client/unit-lab.*",
         "tests/tri_state/**"
       ],
       "docs": [

@@ -33,6 +33,8 @@ const RESERVED_LOBBY_PREFIXES = Object.freeze([
   "__replay_branch__",
   "__lab__:",
 ]);
+const DEFAULT_LOBBY_OWNER_NAME = "Commander";
+const SUGGESTED_LOBBY_SUFFIX = "'s lobby";
 
 export const LOBBY_BROWSER_POLL_MS = 1500;
 
@@ -73,6 +75,13 @@ export function lobbyActionLabel(joinState) {
   return JOIN_STATE_ACTION[normalizedJoinState(joinState)] || JOIN_STATE_ACTION.stale;
 }
 
+export function lobbyJoinIntent(row = {}) {
+  const state = normalizedJoinState(row?.joinState);
+  if (state === "open") return { state, joinable: true, spectator: false };
+  if (state === "fullSpectatorOnly") return { state, joinable: true, spectator: true };
+  return { state, joinable: false, spectator: false };
+}
+
 export function formatLobbyAge(createdAtUnixMs, nowMs = Date.now()) {
   const created = Number(createdAtUnixMs);
   const now = Number(nowMs);
@@ -101,6 +110,13 @@ export function validateLobbyName(rawName) {
   return { ok: true, room, error: "" };
 }
 
+export function suggestLobbyName(playerName) {
+  const ownerName = normalizeLobbyOwnerName(playerName) || DEFAULT_LOBBY_OWNER_NAME;
+  const suggested = fittedSuggestedLobbyName(ownerName);
+  if (validateLobbyName(suggested).ok) return suggested;
+  return fittedSuggestedLobbyName(`${DEFAULT_LOBBY_OWNER_NAME} ${ownerName}`);
+}
+
 export class LobbyBrowserView {
   constructor(rootEl) {
     this.root = rootEl;
@@ -126,7 +142,7 @@ export class LobbyBrowserView {
     if (Array.isArray(rows)) this.rows = sortLobbySummaries(rows);
     if (onCreateLobby !== undefined) this.onCreateLobby = onCreateLobby;
     if (onJoinLobby !== undefined) this.onJoinLobby = onJoinLobby;
-    this.actionsDisabled = !!actionsDisabled;
+    this.actionsDisabled = !!actionsDisabled || !!error;
     this.root.classList.toggle("is-disconnected", !connected);
     this.root.classList.toggle("has-error", !!error);
     if (this.statusEl) {
@@ -181,9 +197,9 @@ export class LobbyBrowserView {
   }
 
   _buildRow(row, { connected, nowMs }) {
-    const state = normalizedJoinState(row.joinState);
-    const spectator = state === "fullSpectatorOnly";
-    const canJoin = connected && !this.actionsDisabled && (state === "open" || spectator);
+    const intent = lobbyJoinIntent(row);
+    const state = intent.state;
+    const canJoin = connected && !this.actionsDisabled && intent.joinable;
     const disabled = !canJoin || !this.onJoinLobby;
     const el = document.createElement("article");
     el.className = `lobby-browser-row is-${state}`;
@@ -216,7 +232,7 @@ export class LobbyBrowserView {
     button.textContent = lobbyActionLabel(state);
     button.dataset.room = row.room;
     if (!button.disabled) {
-      button.addEventListener("click", () => this.onJoinLobby?.(row, { spectator }));
+      button.addEventListener("click", () => this.onJoinLobby?.(row, { spectator: intent.spectator }));
     }
     action.appendChild(button);
 
@@ -253,11 +269,11 @@ export class LobbyCreateModal {
     this._onKeydown = (ev) => this._handleKeydown(ev);
   }
 
-  open(trigger = null) {
+  open(trigger = null, { initialValue = "" } = {}) {
     this._build();
     if (!this.root || !this.input) return;
     this.returnFocus = isHTMLElement(trigger) ? trigger : activeHTMLElement();
-    this.input.value = "";
+    this.input.value = String(initialValue ?? "");
     this.dirty = false;
     this.pending = false;
     this.setError("");
@@ -461,6 +477,27 @@ function integerOr(value, fallback) {
 function boundedText(value, fallback) {
   const text = String(value ?? "").trim();
   return text || fallback;
+}
+
+function normalizeLobbyOwnerName(value) {
+  return String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fittedSuggestedLobbyName(ownerName) {
+  const suffixBytes = utf8ByteLength(SUGGESTED_LOBBY_SUFFIX);
+  const maxOwnerBytes = Math.max(0, PUBLIC_LOBBY_NAME_MAX_BYTES - suffixBytes);
+  let fittedOwner = "";
+  for (const char of ownerName) {
+    const next = `${fittedOwner}${char}`;
+    if (utf8ByteLength(next) > maxOwnerBytes) break;
+    fittedOwner = next;
+  }
+  const candidate = `${(fittedOwner.trim() || DEFAULT_LOBBY_OWNER_NAME)}${SUGGESTED_LOBBY_SUFFIX}`;
+  if (!RESERVED_LOBBY_PREFIXES.some((prefix) => candidate.startsWith(prefix))) return candidate;
+  return fittedSuggestedLobbyName(`Player ${ownerName}`);
 }
 
 function utf8ByteLength(value) {

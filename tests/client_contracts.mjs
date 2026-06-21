@@ -41,9 +41,11 @@ import {
   LobbyBrowserView,
   LobbyCreateModal,
   formatLobbyAge,
+  lobbyJoinIntent,
   lobbyActionLabel,
   lobbyStatusLabel,
   sortLobbySummaries,
+  suggestLobbyName,
   validateLobbyName,
 } from "../client/src/lobby_browser_view.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
@@ -4497,10 +4499,23 @@ function fakeAudioContext() {
   assert(lobbyStatusLabel("fullSpectatorOnly") === "Full", "full lobby rows get a distinct status label");
   assert(lobbyActionLabel("fullSpectatorOnly") === "Join as spectator",
     "full lobby rows advertise spectator joining");
+  assertDeepEqual(lobbyJoinIntent({ joinState: "open" }), { state: "open", joinable: true, spectator: false },
+    "open lobby rows join as active players");
+  assertDeepEqual(lobbyJoinIntent({ joinState: "fullSpectatorOnly" }),
+    { state: "fullSpectatorOnly", joinable: true, spectator: true },
+    "full waiting lobby rows join as spectators");
+  assert(!lobbyJoinIntent({ joinState: "inGame" }).joinable,
+    "in-progress lobby rows are not joinable");
   assert(validateLobbyName(" Alpha ").ok, "lobby create accepts trimmed plain names");
   assert(!validateLobbyName("   ").ok, "lobby create rejects empty names");
   assert(!validateLobbyName("__lab__:sandbox").ok, "lobby create rejects reserved internal prefixes");
   assert(!validateLobbyName("x".repeat(65)).ok, "lobby create mirrors the server byte-length cap");
+  assert(suggestLobbyName("Alex") === "Alex's lobby", "lobby create suggests a lobby from player name");
+  assert(suggestLobbyName("") === "Commander's lobby", "lobby create suggestion falls back when player name is blank");
+  assert(validateLobbyName(suggestLobbyName("x".repeat(120))).ok,
+    "lobby create suggestion stays within the public lobby name limit");
+  assert(validateLobbyName(suggestLobbyName("__lab__:sandbox")).ok,
+    "lobby create suggestion avoids reserved internal prefixes");
   const indexHtml = fs.readFileSync(new URL("../client/index.html", import.meta.url), "utf8");
   assert(indexHtml.includes('class="lobby-manual-room" hidden'),
     "manual room-name join controls stay outside the normal pre-join product path");
@@ -4580,6 +4595,26 @@ function fakeAudioContext() {
           spectatorCount: 0,
           joinState: "inGame",
         },
+        {
+          room: "Countdown Match",
+          hostName: "Host D",
+          map: "Default",
+          createdAtUnixMs: now - 10_000,
+          occupiedSlots: 2,
+          maxSlots: 4,
+          spectatorCount: 0,
+          joinState: "starting",
+        },
+        {
+          room: "Unknown State",
+          hostName: "Host E",
+          map: "Default",
+          createdAtUnixMs: now - 20_000,
+          occupiedSlots: 1,
+          maxSlots: 4,
+          spectatorCount: 0,
+          joinState: "mystery",
+        },
       ],
       nowMs: now,
     });
@@ -4593,9 +4628,13 @@ function fakeAudioContext() {
     const openButton = buttons.find((button) => button.textContent === "Join lobby");
     const spectatorButton = buttons.find((button) => button.textContent === "Join as spectator");
     const inGameButton = buttons.find((button) => button.textContent === "In match");
+    const startingButton = buttons.find((button) => button.textContent === "Starting");
+    const staleButton = buttons.find((button) => button.textContent === "Stale");
     assert(!openButton?.disabled, "open lobby row action is enabled");
     assert(!spectatorButton?.disabled, "full lobby row action joins as spectator");
     assert(inGameButton?.disabled, "in-game lobby row action stays disabled");
+    assert(startingButton?.disabled, "countdown lobby row action stays disabled");
+    assert(staleButton?.disabled, "unknown lobby row action stays disabled as stale");
     openButton.click();
     spectatorButton.click();
     inGameButton.click();
@@ -4603,6 +4642,24 @@ function fakeAudioContext() {
       { room: "Open Lobby", spectator: false },
       { room: "Alpha Long Lobby", spectator: true },
     ], "lobby browser row actions carry active vs spectator join intent");
+    view.render({
+      rows: [
+        {
+          room: "Refresh Failed",
+          hostName: "Host F",
+          map: "Default",
+          createdAtUnixMs: now,
+          occupiedSlots: 1,
+          maxSlots: 4,
+          spectatorCount: 0,
+          joinState: "open",
+        },
+      ],
+      error: "Lobby list unavailable.",
+    });
+    const disabledAfterError = findFakes(rowsRoot,
+      (el) => el.tagName === "BUTTON" && el.textContent === "Join lobby")[0];
+    assert(disabledAfterError?.disabled, "failed lobby-list refresh disables stale row actions");
   });
 
   await withFakeDocument(async () => {
@@ -4616,12 +4673,13 @@ function fakeAudioContext() {
         return false;
       },
     });
-    modal.open(trigger);
+    modal.open(trigger, { initialValue: "Alex's lobby" });
     await new Promise((resolve) => setTimeout(resolve, 0));
     const input = findFakes(host, (el) => el.tagName === "INPUT")[0];
     const submit = findFakes(host, (el) => el.tagName === "BUTTON" && el.textContent === "Create lobby")[0];
     assert(document.activeElement === input, "create lobby modal moves focus to the name input");
-    assert(submit.disabled, "create lobby modal disables submit while the name is invalid");
+    assert(input.value === "Alex's lobby", "create lobby modal prepopulates the suggested lobby name");
+    assert(!submit.disabled, "create lobby modal enables submit when the suggested lobby name is valid");
     input.value = "taken";
     input.listeners.input?.({ target: input });
     assert(!submit.disabled, "create lobby modal enables submit for a valid name");
@@ -5033,6 +5091,7 @@ await withFakeDocument(async () => {
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
   assert(panel.fields.has("lab-player"), "LabPanel exposes one shared player selector for lab setup tools");
+  assert(!textWithin(root).includes("Advanced Spawn"), "LabPanel omits the advanced spawn form");
   assert(
     !panel.fields.has("spawn-owner") &&
       !panel.fields.has("advanced-spawn-owner") &&
@@ -5040,13 +5099,20 @@ await withFakeDocument(async () => {
       !panel.fields.has("research-player"),
     "LabPanel does not render per-tool player selectors for spawn or player-state controls",
   );
+  assert(
+    !textWithin(root).includes("Advanced Spawn") &&
+      !panel.fields.has("advanced-spawn-kind") &&
+      !panel.fields.has("advanced-spawn-completed") &&
+      !panel.fields.has("spawn-completed") &&
+      !panel.fields.has("research-completed"),
+    "LabPanel does not expose advanced spawn or completion toggles",
+  );
   const teamButton = root.children[0].children
     .flatMap((child) => child.children || [])
     .find((child) => child.textContent === "Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
   panel.fields.get("lab-player").value = "2";
-  panel.fields.get("spawn-completed").checked = false;
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
   assert(armedTool?.keepArmedOnWorldClick === true, "LabPanel unit palette keeps the spawn tool armed across world clicks");
@@ -5056,8 +5122,8 @@ await withFakeDocument(async () => {
     armedTool.payload.owner === 2 &&
       armedTool.payload.kind === KIND.RIFLEMAN &&
       armedTool.payload.factionId === DEFAULT_FACTION_ID &&
-      armedTool.payload.completed === false,
-    "LabPanel unit palette captures owner, faction, kind, and completion in tool payload",
+      armedTool.payload.completed === true,
+    "LabPanel unit palette captures owner, faction, and kind with completed spawn payloads",
   );
   armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128.5, y: 160.25 });
   assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel spawn tool stays armed after sending a spawn request");
@@ -5067,8 +5133,8 @@ await withFakeDocument(async () => {
       sent.at(-1).op.kind === KIND.RIFLEMAN &&
       sent.at(-1).op.x === 128.5 &&
       sent.at(-1).op.y === 160.25 &&
-      sent.at(-1).op.completed === false,
-    "LabPanel spawn tool sends clicked world coordinates through LabClient",
+      sent.at(-1).op.completed === true,
+    "LabPanel spawn tool sends clicked world coordinates through LabClient with completed spawns",
   );
   net._emit("labResult", {
     t: "labResult",
@@ -5086,17 +5152,6 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").value = "ekat";
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
-  panel.fields.get("advanced-spawn-kind").value = KIND.CITY_CENTRE;
-  panel.fields.get("lab-player").value = "1";
-  panel.fields.get("advanced-spawn-completed").checked = true;
-  panel.armAdvancedSpawnTool();
-  assert(
-    armedTool?.kind === "spawnEntity" &&
-      armedTool.payload.kind === KIND.CITY_CENTRE &&
-      armedTool.payload.owner === 1 &&
-      armedTool.payload.completed === true,
-    "LabPanel advanced spawn preserves building spawn on the click-to-world tool path",
-  );
   assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
   assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
   assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");
@@ -5185,22 +5240,20 @@ await withFakeDocument(async () => {
   );
   panel.fields.get("lab-player").value = "2";
   panel.fields.get("research-upgrade").value = UPGRADE.TANK_UNLOCK;
-  panel.fields.get("research-completed").checked = false;
   buttonByText("Set research").listeners.click();
   assert(
     sent.at(-1).op.op === "setCompletedResearch" &&
       sent.at(-1).op.playerId === 2 &&
       sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK &&
-      sent.at(-1).op.completed === false,
-    "LabPanel research edits use the shared player selector",
+      sent.at(-1).op.completed === true,
+    "LabPanel research edits use the shared player selector and complete upgrades",
   );
-  resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: false } });
+  resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: true } });
   assert(
     panel.fields.get("lab-player").value === "2" &&
       panel.fields.get("resource-steel").value === "900" &&
       panel.fields.get("resource-oil").value === "300" &&
-      panel.fields.get("research-upgrade").value === UPGRADE.TANK_UNLOCK &&
-      panel.fields.get("research-completed").checked === false,
+      panel.fields.get("research-upgrade").value === UPGRADE.TANK_UNLOCK,
     "LabPanel preserves resource and research form values after set-research results re-render the panel",
   );
   panel.fields.get("scenario-name").value = "saved setup";
