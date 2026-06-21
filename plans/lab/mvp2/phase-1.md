@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Planned.
+- [x] Done.
 
 ## Objective
 
@@ -44,15 +44,15 @@ orders through lab issue-as while keeping read-only viewers and normal spectator
 
 ## Implementation Checklist
 
-- [ ] Identify and document the current spectator gates that affect lab command UI.
-- [ ] Add the smallest command-surface helper or option that lets lab operator command permission
+- [x] Identify and document the current spectator gates that affect lab command UI.
+- [x] Add the smallest command-surface helper or option that lets lab operator command permission
       be represented explicitly.
-- [ ] Route HUD command-card context through the new permission instead of raw spectator state.
-- [ ] Confirm `LabControlPolicy.canControlOwner` remains the owner authority for lab commandability.
-- [ ] Confirm command issuing still calls `issueCommandAs` for lab operators.
-- [ ] Keep read-only lab viewers, replay viewers, and normal spectators unable to command.
-- [ ] Add or update client tests for lab command-card visibility and issue-as behavior.
-- [ ] Run focused verification and record exact results in the handoff.
+- [x] Route HUD command-card context through the new permission instead of raw spectator state.
+- [x] Confirm `LabControlPolicy.canControlOwner` remains the owner authority for lab commandability.
+- [x] Confirm command issuing still calls `issueCommandAs` for lab operators.
+- [x] Keep read-only lab viewers, replay viewers, and normal spectators unable to command.
+- [x] Add or update client tests for lab command-card visibility and issue-as behavior.
+- [x] Run focused verification and record exact results in the handoff.
 
 ## Verification
 

@@ -234,18 +234,24 @@ function commandCardCtx({
   commandCardMode = null,
   commandTarget = null,
   spectator = false,
+  commandSurfaceEnabled = undefined,
   factionId = DEFAULT_FACTION_ID,
+  state = null,
+  controlPolicy = null,
 } = {}) {
   return {
     spectator,
+    ...(typeof commandSurfaceEnabled === "boolean" ? { commandSurfaceEnabled } : {}),
     playerId,
     factionId,
     selection,
+    state,
     resources,
     optimisticProduction,
     upgrades,
     commandCardMode,
     commandTarget,
+    controlPolicy,
     groupCooldownClocks,
     playerHasCompleteKind: (kind) => playerHasCompletedKind(entities, playerId, kind),
   };
@@ -1138,6 +1144,56 @@ function hotkeyService() {
   const spectatorCard = buildCommandCardDescriptors(commandCardCtx({ spectator: true }));
   assert(spectatorCard.kind === "spectator", "spectator command card should be hidden");
   assert(spectatorCard.slots.length === 0, "spectator command card should emit no slots");
+
+  const labWorker = { id: 14, owner: 2, kind: KIND.WORKER };
+  const labState = {
+    selectedEntities() {
+      return [labWorker];
+    },
+  };
+  const labPolicy = createLabControlPolicy({ metadata: { role: "operator" } });
+  const labOperatorCard = buildCommandCardDescriptors(commandCardCtx({
+    spectator: true,
+    commandSurfaceEnabled: labPolicy.canUseCommandSurface(labState),
+    playerId: 99,
+    selection: [labWorker],
+    entities: [labWorker],
+    state: labState,
+    controlPolicy: labPolicy,
+  }));
+  assert(buttonByAction(labOperatorCard, "move"), "lab operator spectator-shaped starts expose unit command buttons");
+  assert(
+    buttonByAction(labOperatorCard, "stop").intent.unitIds.join(",") === String(labWorker.id),
+    "lab operator command descriptors target the controllable selected owner",
+  );
+  const labViewerPolicy = createLabControlPolicy({ metadata: { role: "viewer" } });
+  const labViewerCard = buildCommandCardDescriptors(commandCardCtx({
+    spectator: true,
+    commandSurfaceEnabled: labViewerPolicy.canUseCommandSurface(labState),
+    selection: [labWorker],
+    state: labState,
+    controlPolicy: labViewerPolicy,
+  }));
+  assert(labViewerCard.kind === "spectator", "read-only lab viewers keep the command card hidden");
+  const mixedLabSelection = [
+    { id: 15, owner: 1, kind: KIND.RIFLEMAN },
+    { id: 16, owner: 2, kind: KIND.RIFLEMAN },
+  ];
+  const mixedLabState = {
+    selectedEntities() {
+      return mixedLabSelection;
+    },
+  };
+  const mixedLabCard = buildCommandCardDescriptors(commandCardCtx({
+    spectator: true,
+    commandSurfaceEnabled: labPolicy.canUseCommandSurface(mixedLabState),
+    playerId: 99,
+    selection: mixedLabSelection,
+    entities: mixedLabSelection,
+    state: mixedLabState,
+    controlPolicy: labPolicy,
+  }));
+  assert(commandButtons(mixedLabCard).length === 0, "mixed-owner lab selections stay non-commandable");
 
   const worker = { id: 10, owner: 1, kind: KIND.WORKER };
   const cityCentre = { id: 11, owner: 1, kind: KIND.CITY_CENTRE };
@@ -2964,6 +3020,30 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     liveMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "live player match restores the selected-unit HUD area");
     assert(!commandCard.hidden, "live player match restores the command card");
+
+    selectionArea.hidden = true;
+    commandCard.hidden = true;
+    const labOperatorMatch = Object.create(Match.prototype);
+    labOperatorMatch.replayViewer = false;
+    labOperatorMatch.state = {
+      spectator: true,
+      controlPolicy: createLabControlPolicy({ metadata: { role: "operator" } }),
+    };
+    labOperatorMatch.applySpectatorUi();
+    assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
+    assert(!commandCard.hidden, "lab operator keeps the command card visible");
+
+    selectionArea.hidden = false;
+    commandCard.hidden = false;
+    const labViewerMatch = Object.create(Match.prototype);
+    labViewerMatch.replayViewer = false;
+    labViewerMatch.state = {
+      spectator: true,
+      controlPolicy: createLabControlPolicy({ metadata: { role: "viewer" } }),
+    };
+    labViewerMatch.applySpectatorUi();
+    assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
+    assert(commandCard.hidden, "read-only lab viewer hides the command card");
   }
   {
     const priorWindowForReplayInput = globalThis.window;
@@ -4549,6 +4629,7 @@ function fakeAudioContext() {
   };
   assert(policy.canControlOwner(2, state), "lab control policy controls a single selected owner");
   assert(!policy.canControlOwner(1, state), "lab control policy rejects non-selected owners");
+  assert(policy.canUseCommandSurface(state), "lab operator can use the command surface");
   const issued = await policy.issueCommand(cmd.move([11], 20, 30), { state });
   assert(issued.sent && requests[0].playerId === 2, "lab control policy routes gameplay commands through issue-as");
   const mixedState = {
@@ -4557,6 +4638,11 @@ function fakeAudioContext() {
     },
   };
   assert(!policy.canIssueGameplayCommand(cmd.stop([11, 12]), mixedState).ok, "lab policy rejects mixed-owner gameplay commands");
+  assert(
+    !createLabControlPolicy({ metadata: { role: "viewer" } }).canUseCommandSurface(state),
+    "read-only lab viewers cannot use the command surface",
+  );
+  assert(!createDefaultControlPolicy().canUseCommandSurface({ spectator: true }), "default spectators cannot use the command surface");
   assert(!createDefaultControlPolicy().canIssueAs(1), "default control policy does not issue-as");
 }
 

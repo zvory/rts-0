@@ -7,6 +7,7 @@ import {
   duplicateCommandIdsForCard,
   factionCommandId,
 } from "../client/src/hud_command_card.js";
+import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import {
   EKAT_FACTION_ID,
   FIXTURE_FACTION_ID,
@@ -131,6 +132,70 @@ function buttonSlots(card) {
   assert.deepEqual(buildCard.slots[8].intent, {
     type: "closeCommandCardMenu",
   }, "worker return dispatch keeps submenu-close intent in the descriptor");
+}
+
+{
+  const labWorker = { id: 24, owner: 2, kind: KIND.WORKER };
+  const labState = {
+    selectedEntities() {
+      return [labWorker];
+    },
+  };
+  const labPolicy = createLabControlPolicy({ metadata: { role: "operator" } });
+  const labCard = buildCommandCardDescriptors({
+    spectator: true,
+    commandSurfaceEnabled: labPolicy.canUseCommandSurface(labState),
+    playerId: 99,
+    selection: [labWorker],
+    state: labState,
+    controlPolicy: labPolicy,
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.deepEqual(buttonSlots(labCard), [
+    { commandId: "unit.move", slotIndex: 0, hotkey: "Q" },
+    { commandId: "unit.holdPosition", slotIndex: 1, hotkey: "W" },
+    { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
+    { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
+    { commandId: "worker.buildMenu", slotIndex: 6, hotkey: "Z" },
+  ], "lab operator command card treats the controlled selected owner as commandable");
+
+  const viewerPolicy = createLabControlPolicy({ metadata: { role: "viewer" } });
+  const viewerCard = buildCommandCardDescriptors({
+    spectator: true,
+    commandSurfaceEnabled: viewerPolicy.canUseCommandSurface(labState),
+    selection: [labWorker],
+    state: labState,
+    controlPolicy: viewerPolicy,
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(viewerCard.kind, "spectator", "read-only lab viewer command card stays hidden");
+
+  const mixedSelection = [
+    { id: 25, owner: 1, kind: KIND.RIFLEMAN },
+    { id: 26, owner: 2, kind: KIND.RIFLEMAN },
+  ];
+  const mixedState = {
+    selectedEntities() {
+      return mixedSelection;
+    },
+  };
+  const mixedCard = buildCommandCardDescriptors({
+    spectator: true,
+    commandSurfaceEnabled: labPolicy.canUseCommandSurface(mixedState),
+    playerId: 99,
+    selection: mixedSelection,
+    state: mixedState,
+    controlPolicy: labPolicy,
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(buttonSlots(mixedCard).length, 0, "mixed-owner lab selections stay non-commandable");
 }
 
 {

@@ -152,7 +152,7 @@ export function buildCommandCardContextCatalog() {
 }
 
 export function buildCommandCardDescriptors(ctx) {
-  if (ctx?.spectator) return { kind: "spectator", signature: "spectator", slots: [] };
+  if (!commandSurfaceEnabled(ctx)) return { kind: "spectator", signature: "spectator", slots: [] };
 
   const selection = ctx?.selection || [];
   const primary = commandSubject(ctx, selection);
@@ -165,6 +165,11 @@ export function buildCommandCardDescriptors(ctx) {
     return buildUnitCard(ctx, selection);
   }
   return buildTrainCard(ctx, primary);
+}
+
+export function commandSurfaceEnabled(ctx) {
+  if (typeof ctx?.commandSurfaceEnabled === "boolean") return ctx.commandSurfaceEnabled;
+  return !ctx?.spectator;
 }
 
 export function commandSubject(ctx, selection) {
