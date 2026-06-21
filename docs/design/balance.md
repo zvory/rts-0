@@ -197,6 +197,11 @@ units still do not auto-acquire Tank Traps without a direct attack order. Anti-a
 prefer anti-armor threats and armored/hard targets over ordinary soft targets. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
+Moving-fire retention is sticky but not absolute: Tanks, Scout Cars, and charged Riflemen keep a
+current legal target across equal-rank comparisons so they do not flicker between similar enemies,
+but higher-rank default-weapon threats still steal focus. This ranking scope is limited to default
+attacks; future grenades, satchels, or demolition attacks need separate attack profiles and explicit
+activation/autocast policy instead of being folded into default targeting.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons).
