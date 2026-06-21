@@ -359,7 +359,6 @@ export class LabPanel {
   constructor({ root, labClient, launch, startPayload, match? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned spawnEntity world-click tool
-  armAdvancedSpawnTool()                 // same tool path for secondary building/setup spawns
   armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
   cancelActiveTool()
   setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
@@ -403,8 +402,8 @@ command targeting, or command-card build menus cancels the active lab tool so se
 share state with gameplay command modes. Unit spawning is a lab panel palette backed by the client
 faction catalog mirror and playable faction labels; the palette arms a persistent `spawnEntity` lab
 tool and every completed click sends the clicked world coordinates through `LabClient` until
-cancelled. Secondary building/setup spawns use the same click-to-world spawn tool path instead of
-primary manual coordinate entry. Selected-entity repositioning also uses
+cancelled. The lab does not expose a secondary advanced spawn fallback; the panel spawn affordance
+is limited to the playable faction unit palette. Selected-entity repositioning also uses
 the shared tool path: `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends
 `moveEntity` requests for each id at the clicked world point, and leaves stale-id or partial-failure
 reporting visible through the lab result status. Delete and owner reassignment stay contextual to
