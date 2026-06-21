@@ -124,7 +124,8 @@ or regime-specific iconography.
 
 MVP scope:
 - No air forces.
-- No late-game artillery yet; Mortar Teams provide the current early delayed-area fire tool.
+- Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
+  early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
   do have a simple hull-facing armor rule for anti-tank damage.
 
@@ -317,7 +318,7 @@ activation/autocast policy instead of being folded into default targeting.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 12 steel patches with 1,000 steel each + 3 oil
   patches with 3,333 oil each nearby.
-- Supply: City Centre gives `+8`, Depot gives `+8`, hard cap `200`.
+- Supply: City Centre, Zamok, and Depot each give `+8`; hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
@@ -352,7 +353,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 12 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 60 deployed / 45 packed | 14 deployed / 5 packed | 72 | 1.6 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and Anti-Tank Gun Crews (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 1.3 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
+| artillery       | 150 | 150 AP inner / 150-10 outer AOE | 15-60 point fire | 90 | 1.3 | 4 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), Anti-Tank Gun Crews (`anti_tank_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
@@ -363,7 +364,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
 | city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 550       | trains worker; +8 supply; players start with one free |
-| zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekat start building; inert in first playable slice |
+| zamok                      | Zamok              | 600 | 9     | 0   | 3x3  | 0         | Ekat start building; +8 supply; no trains/research in first playable slice |
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |

@@ -1,6 +1,6 @@
 # Phase 2 - Roster, Stats, and Balance Tables
 
-Status: pending.
+Status: done.
 
 ## Goal
 
