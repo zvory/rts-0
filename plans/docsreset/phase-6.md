@@ -1,6 +1,6 @@
 # Phase 6 - Lobby, Protocol, Replays, and Match History
 
-Status: pending.
+Status: done.
 
 ## Goal
 

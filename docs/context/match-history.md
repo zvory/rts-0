@@ -34,7 +34,9 @@ scope, or the lobby front-page table.
 - **Score-screen schema.** `score_screen` is JSONB holding `Vec<PlayerScore>` from
   `contract::PlayerScore`. Adding fields requires no migration.
 - **Replay storage.** `match_replays.artifact_json` stores `ReplayArtifactV1`; summaries and
-  launch check artifact schema, build SHA, map schema, and map hash before playback.
+  launch strictly check artifact schema, map schema, map hash, and faction/loadout validity.
+  Build-SHA mismatches stay launchable with a warning because replay playback is attempted across
+  build drift.
 - **TLS to Supabase.** `DATABASE_URL` must include `?sslmode=require`.
 
 ## Cross-capsule triggers
