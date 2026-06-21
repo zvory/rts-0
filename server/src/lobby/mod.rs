@@ -21,7 +21,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -267,6 +267,9 @@ pub enum RoomEvent {
     },
     /// Host selects a map by name (lobby phase only; honored only from the host).
     SelectMap { player_id: u32, map: String },
+    /// Internal lifecycle probe: when the room is empty, ask the registry to remove this exact
+    /// room instance. Future lifecycle policy decides when to send this.
+    ReportDisposableIfEmpty,
     /// Process shutdown has begun. Rooms stay alive, but lobby clients should see that starting
     /// another match is disabled while currently-running matches drain.
     DrainStarted(DrainNotice),
@@ -387,10 +390,51 @@ fn drain_notice_for(timeout: Duration) -> DrainNotice {
     }
 }
 
-/// Handle the lobby keeps for each live room: just the channel into its task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct RoomIdentity(u64);
+
+struct RoomDisposalRequest {
+    room: String,
+    identity: RoomIdentity,
+    ack: Option<tokio::sync::oneshot::Sender<bool>>,
+}
+
+#[derive(Clone)]
+pub(super) struct RoomLifecycle {
+    room: String,
+    identity: RoomIdentity,
+    disposal_tx: mpsc::UnboundedSender<RoomDisposalRequest>,
+}
+
+impl RoomLifecycle {
+    fn new(
+        room: String,
+        identity: RoomIdentity,
+        disposal_tx: mpsc::UnboundedSender<RoomDisposalRequest>,
+    ) -> Self {
+        Self {
+            room,
+            identity,
+            disposal_tx,
+        }
+    }
+
+    pub(super) fn request_disposal(&self) {
+        let _ = self.disposal_tx.send(RoomDisposalRequest {
+            room: self.room.clone(),
+            identity: self.identity,
+            ack: None,
+        });
+    }
+}
+
+/// Handle the lobby keeps for each live room: the channel into its task plus identity/lifecycle
+/// metadata used by registry-owned cleanup.
 #[derive(Clone)]
 pub struct RoomHandle {
     pub event_tx: mpsc::Sender<RoomEvent>,
+    identity: RoomIdentity,
+    shutdown_tx: watch::Sender<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -422,6 +466,8 @@ impl CreateLobbyError {
 #[derive(Clone)]
 pub struct Lobby {
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
+    disposal_tx: mpsc::UnboundedSender<RoomDisposalRequest>,
+    next_room_identity: Arc<AtomicU64>,
     db: Option<Arc<Db>>,
     match_history_local_only: bool,
     drain: DrainHandle,
@@ -429,8 +475,13 @@ pub struct Lobby {
 
 impl Lobby {
     pub fn new() -> Self {
+        let rooms = Arc::new(Mutex::new(HashMap::new()));
+        let (disposal_tx, disposal_rx) = mpsc::unbounded_channel();
+        spawn_room_disposal_task(rooms.clone(), disposal_rx);
         Lobby {
-            rooms: Arc::new(Mutex::new(HashMap::new())),
+            rooms,
+            disposal_tx,
+            next_room_identity: Arc::new(AtomicU64::new(1)),
             db: None,
             match_history_local_only: false,
             drain: DrainHandle::default(),
@@ -551,16 +602,30 @@ impl Lobby {
         mode: RoomMode,
     ) -> RoomHandle {
         let (event_tx, event_rx) = mpsc::channel(ROOM_EVENT_CHANNEL_CAP);
-        let handle = RoomHandle { event_tx };
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let identity = RoomIdentity(self.next_room_identity.fetch_add(1, Ordering::Relaxed));
+        let handle = RoomHandle {
+            event_tx,
+            identity,
+            shutdown_tx,
+        };
         rooms.insert(room.to_string(), handle.clone());
 
         let name = room.to_string();
         let db = self.db.clone();
         let match_history_local_only = self.match_history_local_only;
         let drain = self.drain.clone();
+        let lifecycle = RoomLifecycle::new(name.clone(), identity, self.disposal_tx.clone());
         tokio::spawn(async move {
-            let mut task = RoomTask::new(name.clone(), mode, db, match_history_local_only, drain);
-            task.run(event_rx).await;
+            let mut task = RoomTask::new_with_lifecycle(
+                name.clone(),
+                mode,
+                db,
+                match_history_local_only,
+                drain,
+                lifecycle,
+            );
+            task.run(event_rx, shutdown_rx).await;
             crate::log_info!(room = %name, "room task exited");
         });
         crate::log_info!(room = %room, "room created");
@@ -633,6 +698,21 @@ impl Lobby {
     pub fn subscribe_connection_shutdown(&self) -> watch::Receiver<bool> {
         self.drain.subscribe_connection_shutdown()
     }
+
+    #[cfg(test)]
+    async fn request_room_disposal_for_test(&self, room: &str, identity: RoomIdentity) -> bool {
+        let (ack, response) = tokio::sync::oneshot::channel();
+        self.disposal_tx
+            .send(RoomDisposalRequest {
+                room: room.to_string(),
+                identity,
+                ack: Some(ack),
+            })
+            .expect("lobby disposal task should be running");
+        response
+            .await
+            .expect("lobby disposal task should acknowledge request")
+    }
 }
 
 impl Default for Lobby {
@@ -649,6 +729,41 @@ fn lobby_join_sort_rank(state: LobbyJoinState) -> u8 {
         LobbyJoinState::InGame => 3,
         LobbyJoinState::Stale => 4,
     }
+}
+
+fn spawn_room_disposal_task(
+    rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
+    mut disposal_rx: mpsc::UnboundedReceiver<RoomDisposalRequest>,
+) {
+    tokio::spawn(async move {
+        while let Some(request) = disposal_rx.recv().await {
+            let removed = remove_room_if_matching(&rooms, &request.room, request.identity).await;
+            if let Some(ack) = request.ack {
+                let _ = ack.send(removed);
+            }
+        }
+    });
+}
+
+async fn remove_room_if_matching(
+    rooms: &Arc<Mutex<HashMap<String, RoomHandle>>>,
+    room: &str,
+    identity: RoomIdentity,
+) -> bool {
+    let mut rooms = rooms.lock().await;
+    let Some(handle) = rooms.get(room) else {
+        return false;
+    };
+    if handle.identity != identity {
+        return false;
+    }
+
+    if let Some(handle) = rooms.remove(room) {
+        handle.shutdown_tx.send_replace(true);
+        crate::log_info!(room = %room, "room disposed from registry");
+        return true;
+    }
+    false
 }
 
 fn normalize_public_lobby_name(raw: &str) -> Result<String, CreateLobbyError> {
