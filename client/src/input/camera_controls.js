@@ -5,6 +5,9 @@ import { isTextEntry } from "./placement.js";
 export function _handleKeyDown(ev) {
   // Never hijack typing in inputs (lobby name field, etc.).
   if (isTextEntry(ev.target)) return;
+  if (ev.code === "ShiftLeft" || ev.code === "ShiftRight") {
+    this._shiftKeyDown = true;
+  }
 
   if (ev.code === "Escape" && this.pointerLocked) {
     this.exitPointerLock();
@@ -77,6 +80,7 @@ export function _handleKeyUp(ev) {
       return;
     case "ShiftLeft":
     case "ShiftRight":
+      this._shiftKeyDown = false;
       if (typeof clientIntent(this)?.releaseCommandTargetShift === "function") {
         clientIntent(this).releaseCommandTargetShift();
       }
@@ -96,6 +100,7 @@ export function _handleKeyUp(ev) {
 
 export function _handleBlur() {
   if (this.pointerLocked) this.exitPointerLock();
+  this._shiftKeyDown = false;
   if (this.cameraNavigation) {
     this.cameraNavigation.release();
   } else {

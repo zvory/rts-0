@@ -514,7 +514,7 @@ export class HUD {
     if (!intent || typeof intent !== "object") return;
     switch (intent.type) {
       case "beginCommandTarget":
-        this._intent()?.beginCommandTarget?.(intent.target);
+        this._intent()?.beginCommandTarget?.(intent.target, { shiftKey: !!ev.shiftKey });
         return;
       case "openWorkerBuildMenu":
         this._intent()?.openWorkerBuildMenu?.();
@@ -569,7 +569,7 @@ export class HUD {
       return;
     }
     if (intent.targetMode === "worldPoint") {
-      this._intent()?.beginCommandTarget?.({ kind: "ability", ability: intent.ability });
+      this._intent()?.beginCommandTarget?.({ kind: "ability", ability: intent.ability }, { shiftKey: !!ev.shiftKey });
     } else {
       this._issueCommand(cmd.useAbility(
         intent.ability,

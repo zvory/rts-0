@@ -2441,6 +2441,8 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(explicitHudIntent.placement?.building === KIND.DEPOT, "HUD dispatch starts placement through injected ClientIntent");
   facadeHud._dispatchCommandIntent({ type: "beginCommandTarget", target: "attack" });
   assert(explicitHudIntent.commandTarget === "attack", "HUD dispatch arms command targets through injected ClientIntent");
+  facadeHud._dispatchCommandIntent({ type: "beginCommandTarget", target: "move" }, { shiftKey: true });
+  assert(explicitHudIntent.commandComposer.shiftPreserved === true, "HUD dispatch preserves Shift for command targeting");
 
   const explicitInputIntent = new ClientIntent();
   explicitInputIntent.beginPlacement(KIND.BARRACKS);
@@ -6195,6 +6197,65 @@ await withFakeDocument(async () => {
         setupCommands[0].units.includes(selectedArtillery.id) &&
         setupCommands[0].queued === true,
       "setupAntiTankGuns targeting includes selected artillery as setup-capable support weapons",
+    );
+
+    const movingAntiTankGun = {
+      ...selectedAntiTankGun,
+      x: 100,
+      y: 120,
+      orderPlan: [
+        { kind: ORDER_STAGE.MOVE, x: 320, y: 192 },
+        { kind: ORDER_STAGE.SETUP_ANTI_TANK_GUNS, x: 640, y: 192 },
+      ],
+    };
+    const movingArtillery = {
+      ...selectedArtillery,
+      x: 140,
+      y: 120,
+      orderPlan: [
+        { kind: ORDER_STAGE.ATTACK_MOVE, x: 352, y: 224 },
+      ],
+    };
+    const stationaryAntiTankGun = {
+      id: 90,
+      owner: playerId,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 180,
+      y: 120,
+    };
+    const previewInput = Object.create(Input.prototype);
+    previewInput.mouse = { x: 500, y: 300 };
+    previewInput.state = {
+      playerId,
+      selectedEntities: () => [movingAntiTankGun, movingArtillery, stationaryAntiTankGun],
+    };
+    previewInput.clientIntent = new ClientIntent();
+    previewInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
+    previewInput._worldAt = (x, y) => ({ x, y });
+    previewInput._refreshAntiTankGunSetupPreview();
+    const unqueuedPreviewGuns = previewInput.clientIntent.antiTankGunSetupPreview?.guns || [];
+    assert(
+      unqueuedPreviewGuns[0]?.x === 100 && unqueuedPreviewGuns[0]?.y === 120,
+      "unqueued support setup preview keeps the current gun position",
+    );
+
+    previewInput._shiftKeyDown = true;
+    previewInput._refreshAntiTankGunSetupPreview();
+    const previewGuns = previewInput.clientIntent.antiTankGunSetupPreview?.guns || [];
+    assert(
+      previewGuns[0]?.x === 320 &&
+        previewGuns[0]?.y === 192 &&
+        movingAntiTankGun.x === 100 &&
+        movingAntiTankGun.y === 120,
+      "queued anti-tank gun setup preview uses the accepted movement endpoint without mutating the selected entity",
+    );
+    assert(
+      previewGuns[1]?.x === 352 && previewGuns[1]?.y === 224,
+      "artillery setup preview uses attack-move formation endpoints as projected origins",
+    );
+    assert(
+      previewGuns[2]?.x === 180 && previewGuns[2]?.y === 120,
+      "support setup preview falls back to current position when no movement plan is accepted",
     );
   } finally {
     if (priorDocument === undefined) delete globalThis.document;

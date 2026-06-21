@@ -316,13 +316,40 @@ export function _refreshAntiTankGunSetupPreview() {
   }
   const guns = this.state
     .selectedEntities()
-    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY));
+    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY))
+    .map((e) => supportWeaponSetupPreviewEntity(e, setupPreviewQueued(this, intent)));
   if (guns.length === 0) {
     intent?.updateAntiTankGunSetupPreview?.(null);
     return;
   }
   const world = this._worldAt(this.mouse.x, this.mouse.y);
   intent?.updateAntiTankGunSetupPreview?.({ mouseX: world.x, mouseY: world.y, guns });
+}
+
+function setupPreviewQueued(input, intent) {
+  return intent?.commandComposer?.shiftPreserved === true || input?._shiftKeyDown === true;
+}
+
+function supportWeaponSetupPreviewEntity(entity, queued) {
+  if (!queued) return entity;
+  const origin = latestMovementOrderPlanPoint(entity);
+  if (!origin) return entity;
+  return { ...entity, x: origin.x, y: origin.y };
+}
+
+function latestMovementOrderPlanPoint(entity) {
+  if (!Array.isArray(entity?.orderPlan)) return null;
+  let origin = null;
+  for (const marker of entity.orderPlan) {
+    if (
+      (marker?.kind === ORDER_STAGE.MOVE || marker?.kind === ORDER_STAGE.ATTACK_MOVE) &&
+      Number.isFinite(marker.x) &&
+      Number.isFinite(marker.y)
+    ) {
+      origin = { x: marker.x, y: marker.y };
+    }
+  }
+  return origin;
 }
 
 export function _refreshResourceMiningPreview() {
