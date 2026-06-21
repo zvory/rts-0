@@ -36,6 +36,14 @@ import {
   shouldAcceptTeamDrop,
   teamSlotsForLobby,
 } from "../client/src/lobby.js";
+import {
+  LOBBY_BROWSER_POLL_MS,
+  LobbyBrowserView,
+  formatLobbyAge,
+  lobbyActionLabel,
+  lobbyStatusLabel,
+  sortLobbySummaries,
+} from "../client/src/lobby_browser_view.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
 import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
 import { GameState } from "../client/src/state.js";
@@ -286,6 +294,7 @@ function withFakeDocument(fn) {
       const el = {
         tagName: String(tagName).toUpperCase(),
         className: "",
+        classList: fakeClassList(),
         dataset: {},
         disabled: false,
         title: "",
@@ -4428,6 +4437,75 @@ function fakeAudioContext() {
     }),
     "team drop is host-only",
   );
+}
+
+// ---------------------------------------------------------------------------
+// Lobby browser UI helpers
+// ---------------------------------------------------------------------------
+{
+  const now = 200_000_000;
+  assert(LOBBY_BROWSER_POLL_MS === 1500, "lobby browser polls inside the 1-2 second contract");
+  assert(formatLobbyAge(now - 5_000, now) === "just now", "lobby browser formats fresh ages");
+  assert(formatLobbyAge(now - 3 * 60_000, now) === "3m ago", "lobby browser formats minute ages");
+  assert(formatLobbyAge(now - 2 * 60 * 60_000, now) === "2h ago", "lobby browser formats hour ages");
+  assert(lobbyStatusLabel("fullSpectatorOnly") === "Full", "full lobby rows get a distinct status label");
+  assert(lobbyActionLabel("fullSpectatorOnly") === "Join as spectator",
+    "full lobby rows advertise spectator joining");
+
+  const sorted = sortLobbySummaries([
+    { room: "old-open", hostName: "A", createdAtUnixMs: 100, joinState: "open" },
+    { room: "in-game", hostName: "B", createdAtUnixMs: 900, joinState: "inGame" },
+    { room: "full", hostName: "C", createdAtUnixMs: 800, joinState: "fullSpectatorOnly" },
+    { room: "new-open", hostName: "D", createdAtUnixMs: 700, joinState: "open" },
+    { room: "starting", hostName: "E", createdAtUnixMs: 950, joinState: "starting" },
+  ]);
+  assertDeepEqual(
+    sorted.map((row) => row.room),
+    ["new-open", "old-open", "full", "starting", "in-game"],
+    "lobby browser sorts open, full, starting, and in-game rows by joinability then age",
+  );
+
+  withFakeDocument(() => {
+    const rowsRoot = {
+      children: [],
+      replaceChildren(...children) {
+        this.children = children;
+      },
+    };
+    const statusEl = { textContent: "" };
+    const root = {
+      classList: fakeClassList(),
+      querySelector(selector) {
+        if (selector === "#lobby-browser-rows") return rowsRoot;
+        if (selector === "#lobby-browser-status") return statusEl;
+        return null;
+      },
+    };
+    const view = new LobbyBrowserView(root);
+    view.render({ rows: [], nowMs: now });
+    assert(textWithin(rowsRoot).includes("No lobbies"), "lobby browser renders compact empty state");
+    view.render({
+      rows: [{
+        room: "Alpha Long Lobby",
+        hostName: "Host",
+        map: "No Terrain",
+        createdAtUnixMs: now - 60_000,
+        occupiedSlots: 4,
+        maxSlots: 4,
+        spectatorCount: 1,
+        joinState: "fullSpectatorOnly",
+      }],
+      nowMs: now,
+    });
+    assert(textWithin(rowsRoot).includes("Alpha Long Lobby"), "lobby browser renders lobby names");
+    assert(textWithin(rowsRoot).includes("No Terrain"), "lobby browser renders map names");
+    assert(textWithin(rowsRoot).includes("4 / 4 +1 obs"), "lobby browser renders active slots and spectators");
+    assert(textWithin(rowsRoot).includes("Join as spectator"), "lobby browser renders row action state");
+    const row = rowsRoot.children[0];
+    assert(row.dataset.joinState === "fullSpectatorOnly", "lobby browser pins row join-state data");
+    const actionButton = findFakes(row, (el) => el.tagName === "BUTTON")[0];
+    assert(actionButton?.disabled, "phase 2 lobby browser row actions are read-only");
+  });
 }
 
 // ---------------------------------------------------------------------------

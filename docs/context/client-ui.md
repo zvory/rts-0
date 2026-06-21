@@ -20,7 +20,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
-  controller/view, match history, resource icons, scoreboard, status badge, minimap, branch
+  controller/browser/roster views, match history, resource icons, scoreboard, status badge, minimap, branch
   staging, lab panel, and settings.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.

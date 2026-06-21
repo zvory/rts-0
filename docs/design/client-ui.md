@@ -39,7 +39,8 @@ src/
   hotkey_editor.js # Settings Hotkeys tab editor
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
-  lobby.js        # Lobby screen controller: name/room, ready/start, host controls
+  lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
+  lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
   match_history.js # Lobby match-history table and replay launch affordance
   scoreboard.js   # Shared score/result formatting helpers
@@ -770,11 +771,26 @@ export class Minimap {
 export class Lobby {
   constructor(rootEl, net)
   show(), hide()
-  // owns lobby state, joins, ready/start/spectator role, and delegates roster DOM to lobby_view.js.
+  // owns lobby state, pre-join browser polling, joins, ready/start/spectator role, and delegates
+  // browser DOM to lobby_browser_view.js and joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
   // Teams are layout groups only; player colors come from each player record.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
+}
+```
+
+`lobby_browser_view.js`
+```js
+export const LOBBY_BROWSER_POLL_MS
+export function sortLobbySummaries(rows)
+export function formatLobbyAge(createdAtUnixMs, nowMs?)
+export function lobbyStatusLabel(joinState)
+export function lobbyActionLabel(joinState)
+export class LobbyBrowserView {
+  constructor(rootEl)
+  render({ rows?, loading?, connected?, error?, nowMs? })
+  destroy()
 }
 ```
 
@@ -953,7 +969,7 @@ Current areas:
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
-  controller/view, match history, minimap, resource icons, scoreboard, status badge, branch
+  controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
   staging, lab panel, settings. The in-match debug status badge displays live and rolling
   one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared

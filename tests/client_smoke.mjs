@@ -47,12 +47,16 @@ try {
   await page.waitForSelector("#lobby-screen", { visible: true, timeout: 5000 });
   ok(true, "lobby screen visible on load");
   ok(await page.evaluate(() => !!window.PIXI), `PixiJS loaded (v${await page.evaluate(() => window.PIXI?.VERSION)})`);
+  ok(await page.evaluate(() => !!document.querySelector("#lobby-browser")),
+    "pre-join lobby browser is visible on first paint");
 
   await page.click("#lobby-name", { clickCount: 3 });
   await page.type("#lobby-name", "Solo");
-  await page.click("#lobby-room", { clickCount: 3 });
-  await page.type("#lobby-room", "client-smoke-" + Date.now());
-  await page.click("#lobby-join");
+  await page.evaluate(() => {
+    const room = "client-smoke-" + Date.now();
+    window.__rts.lobby.elRoom.value = room;
+    window.__rts.lobby._join();
+  });
   await page.waitForFunction(() => document.querySelector("#lobby-players")?.children.length >= 1, { timeout: 5000 });
   ok(true, "joined room; lobby player list populated");
   const teamUi = await page.evaluate(() => {
