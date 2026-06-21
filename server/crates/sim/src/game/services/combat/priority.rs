@@ -8,7 +8,7 @@ use crate::rules::defs::{ArmorClass, WeaponClass};
 pub(super) struct AttackPriorityContext {
     pub attacker_kind: EntityKind,
     pub attacker_is_unit: bool,
-    pub prefers_armored: bool,
+    pub attacker_weapon_class: WeaponClass,
     pub can_retain_moving_target: bool,
 }
 
@@ -25,6 +25,7 @@ pub(super) struct TargetCandidate {
     pub is_building: bool,
     pub armor_class: Option<ArmorClass>,
     pub weapon_class: WeaponClass,
+    pub threat_role: combat_rules::TargetThreatRole,
     pub in_weapon_range: bool,
     pub tank_trap_auto_relevant: bool,
     pub retained_target: bool,
@@ -34,6 +35,7 @@ pub(super) struct TargetCandidate {
 struct TargetRank {
     priority_bucket: u8,
     policy_order: u8,
+    unit_order: u8,
     distance_sq: f32,
     id: u32,
 }
@@ -59,40 +61,81 @@ fn compare_candidates(
         .priority_bucket
         .cmp(&right_rank.priority_bucket)
         .then_with(|| left_rank.policy_order.cmp(&right_rank.policy_order))
+        .then_with(|| left_rank.unit_order.cmp(&right_rank.unit_order))
         .then_with(|| left_rank.distance_sq.total_cmp(&right_rank.distance_sq))
         .then_with(|| left_rank.id.cmp(&right_rank.id))
 }
 
 fn rank_candidate(context: &AttackPriorityContext, candidate: &TargetCandidate) -> TargetRank {
-    let (priority_bucket, policy_order) =
-        if let Some(order) = tank_priority_order(context, candidate) {
-            (0, order)
+    let (priority_bucket, policy_order, unit_order) =
+        if let Some(order) = tank_immediate_threat_order(context, candidate) {
+            (0, order, 0)
         } else if context.can_retain_moving_target && candidate.retained_target {
-            (1, 0)
-        } else if context.prefers_armored && candidate.kind == EntityKind::Tank {
-            (2, 0)
-        } else if context.attacker_is_unit && candidate.is_unit {
-            (3, 0)
+            (1, 0, 0)
         } else {
-            (4, 0)
+            (
+                2,
+                default_weapon_fit_order(context, candidate),
+                unit_preference_order(context, candidate),
+            )
         };
 
     TargetRank {
         priority_bucket,
         policy_order,
+        unit_order,
         distance_sq: candidate.distance_sq,
         id: candidate.id,
     }
 }
 
-fn tank_priority_order(context: &AttackPriorityContext, candidate: &TargetCandidate) -> Option<u8> {
+fn tank_immediate_threat_order(
+    context: &AttackPriorityContext,
+    candidate: &TargetCandidate,
+) -> Option<u8> {
     if context.attacker_kind != EntityKind::Tank || !candidate.in_weapon_range {
         return None;
     }
-    combat_rules::TANK_TARGET_PRIORITY_ORDER
-        .iter()
-        .position(|kind| *kind == candidate.kind)
-        .and_then(|index| u8::try_from(index).ok())
+    if candidate.kind == EntityKind::AntiTankGun {
+        Some(0)
+    } else {
+        match candidate.threat_role {
+            combat_rules::TargetThreatRole::AntiArmorThreat => Some(1),
+            combat_rules::TargetThreatRole::FieldObstacle => Some(2),
+            combat_rules::TargetThreatRole::SupportWeapon => Some(3),
+            combat_rules::TargetThreatRole::Ordinary => None,
+        }
+    }
+}
+
+fn default_weapon_fit_order(context: &AttackPriorityContext, candidate: &TargetCandidate) -> u8 {
+    if context.attacker_kind == EntityKind::Tank && !candidate.in_weapon_range {
+        return 3;
+    }
+    match combat_rules::default_weapon_target_fit(
+        context.attacker_weapon_class,
+        candidate.armor_class,
+        candidate.threat_role,
+    ) {
+        combat_rules::WeaponTargetFit::PreferredThreat => {
+            if candidate.kind == EntityKind::AntiTankGun {
+                0
+            } else {
+                1
+            }
+        }
+        combat_rules::WeaponTargetFit::PreferredArmor => 2,
+        combat_rules::WeaponTargetFit::PreferredSoft => 0,
+        combat_rules::WeaponTargetFit::Fallback => 3,
+    }
+}
+
+fn unit_preference_order(context: &AttackPriorityContext, candidate: &TargetCandidate) -> u8 {
+    if context.attacker_is_unit && candidate.is_unit {
+        0
+    } else {
+        1
+    }
 }
 
 #[cfg(test)]
@@ -103,7 +146,7 @@ mod tests {
         AttackPriorityContext {
             attacker_kind,
             attacker_is_unit: true,
-            prefers_armored: combat_rules::prefers_armored_targets(attacker_kind),
+            attacker_weapon_class: combat_rules::weapon_class(attacker_kind),
             can_retain_moving_target: matches!(
                 attacker_kind,
                 EntityKind::Tank | EntityKind::ScoutCar
@@ -128,6 +171,7 @@ mod tests {
             is_building: kind.is_building(),
             armor_class: combat_rules::armor_class(kind),
             weapon_class: combat_rules::weapon_class(kind),
+            threat_role: combat_rules::target_threat_role(kind),
             in_weapon_range: true,
             tank_trap_auto_relevant: kind == EntityKind::TankTrap,
             retained_target,
@@ -170,6 +214,62 @@ mod tests {
         assert_eq!(
             choose_target(&context(EntityKind::AntiTankGun), &candidates),
             Some(11)
+        );
+    }
+
+    #[test]
+    fn anti_armor_prefers_threat_over_generic_armored_target() {
+        let candidates = [
+            candidate(10, EntityKind::Barracks, 400.0, false),
+            candidate(11, EntityKind::Tank, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::AntiTankGun), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn small_arms_prefers_soft_target_over_nearer_armored_target() {
+        let candidates = [
+            candidate(10, EntityKind::Tank, 400.0, false),
+            candidate(11, EntityKind::MachineGunner, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::Rifleman), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn scout_car_prefers_soft_target_over_nearer_tank_trap() {
+        let candidates = [
+            candidate(10, EntityKind::TankTrap, 400.0, false),
+            candidate(11, EntityKind::Worker, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::ScoutCar), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn equal_rank_targets_use_distance_then_id_tie_breaks() {
+        let farther = candidate(10, EntityKind::Worker, 2_500.0, false);
+        let nearer = candidate(11, EntityKind::Worker, 400.0, false);
+        assert_eq!(
+            choose_target(&context(EntityKind::Rifleman), &[farther, nearer]),
+            Some(11)
+        );
+
+        let first = candidate(10, EntityKind::Worker, 900.0, false);
+        let second = candidate(11, EntityKind::Worker, 900.0, false);
+        assert_eq!(
+            choose_target(&context(EntityKind::Rifleman), &[first, second]),
+            Some(10)
         );
     }
 }

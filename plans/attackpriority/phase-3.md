@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -61,16 +61,26 @@ Tank/anti-armor priority requirements without adding alternate attacks or abilit
 
 ## Implementation Checklist
 
-- [ ] Add or expose pure combat classification helpers for target ranking.
-- [ ] Implement small-arms soft-target preference.
-- [ ] Implement anti-armor and anti-armor-threat preference.
-- [ ] Preserve Anti-Tank Gun as top Tank threat.
-- [ ] Remove or isolate obsolete narrow priority branches after tests cover the new policy.
-- [ ] Verify changed target choices come from rank terms, not new acquisition branches.
-- [ ] Add mixed-target acquisition tests.
-- [ ] Update design docs and patch-note bullets.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase as done in this file.
+- [x] Add or expose pure combat classification helpers for target ranking.
+- [x] Implement small-arms soft-target preference.
+- [x] Implement anti-armor and anti-armor-threat preference.
+- [x] Preserve Anti-Tank Gun as top Tank threat.
+- [x] Remove or isolate obsolete narrow priority branches after tests cover the new policy.
+- [x] Verify changed target choices come from rank terms, not new acquisition branches.
+- [x] Add mixed-target acquisition tests.
+- [x] Update design docs and patch-note bullets.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase as done in this file.
+
+## Patch Notes
+
+- Small-arms default attacks now prefer soft targets over armored or hard targets when both are
+  legal, while retaining armored/hard fallback targets when no soft target is available.
+- Anti-armor default attacks now prefer anti-armor threats and armored/hard targets over ordinary
+  soft targets.
+- Tanks still prioritize in-range Anti-Tank Guns first, then other anti-armor threats, armored
+  obstacles, support weapons, and ordinary soft targets.
+- Infantry-like units still do not auto-acquire Tank Traps without an explicit attack order.
 
 ## Verification
 
