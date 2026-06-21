@@ -53,6 +53,7 @@ src/
   branch_staging.js # replay branch staging panel
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
+  lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
@@ -368,6 +369,8 @@ export class LabPanel {
   destroy()
 }
 ```
+`lab_panel_window.js` owns the local drag, resize, reset, keyboard nudge, viewport-clamping, and
+localStorage geometry hint for the app-owned lab panel. It has no transport or match authority.
 
 `lab_control_policy.js`
 ```js

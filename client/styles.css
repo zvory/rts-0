@@ -1501,20 +1501,66 @@ input[type="text"]:focus {
   top: 58px;
   right: 12px;
   width: min(320px, calc(100vw - 24px));
-  max-height: calc(100vh - 82px);
+  min-width: min(260px, calc(100vw - 24px));
+  max-height: clamp(260px, calc(100vh - 368px), 560px);
   overflow: auto;
   pointer-events: auto;
-  padding: 10px;
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  padding: 10px 10px 16px;
   color: var(--ink);
 }
-.lab-panel header {
+.lab-panel[data-windowed="true"] {
+  min-height: min(220px, calc(100vh - 24px));
+}
+.lab-panel-titlebar {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 8px;
+  padding: 0 0 8px;
+  background: linear-gradient(rgba(39, 37, 31, 0.98), rgba(39, 37, 31, 0.9));
 }
-.lab-panel header span,
+.lab-panel-drag-handle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  cursor: grab;
+  border-radius: var(--radius-sm);
+  outline: none;
+  touch-action: none;
+  user-select: none;
+}
+.lab-panel[data-panel-interaction="move"] .lab-panel-drag-handle {
+  cursor: grabbing;
+}
+.lab-panel-drag-handle:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.lab-panel-grip {
+  width: 14px;
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1;
+  transform: rotate(90deg);
+  user-select: none;
+}
+.lab-panel-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.lab-panel-titlebar span,
 .lab-status-grid dt {
   color: var(--ink-dim);
   font-size: 11px;
@@ -1524,6 +1570,33 @@ input[type="text"]:focus {
   margin: 0;
   font-size: 17px;
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lab-panel-reset {
+  flex: 0 0 auto;
+}
+.lab-panel-resize-handle {
+  appearance: none;
+  position: sticky;
+  right: 0;
+  bottom: 0;
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 8px 0 -10px auto;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(135deg, transparent 0 55%, rgba(198, 203, 184, 0.26) 56% 60%, transparent 61%),
+    linear-gradient(135deg, transparent 0 70%, rgba(198, 203, 184, 0.44) 71% 76%, transparent 77%);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.lab-panel-resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .lab-status-grid {
   display: grid;
