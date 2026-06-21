@@ -103,9 +103,11 @@ resuming its normal profile once the threat has cleared.
 Developer self-play tooling also registers `ai_1_1_tank_mg` for direct comparison through
 `ai-matchup` and related profile-backed scripts. AI 1.1 is a close AI 1.0 fork that keeps the same
 expansion timing, Tank tech path, Methamphetamines-before-Tanks gate, and Tank-required
-frontal-wave posture, but removes Scout Car production and harassment, caps ordinary Barracks growth
-at one, trains a bounded defensive Machine Gunner group, pushes toward full two-base steel
-saturation, and can add a second Factory once Tank production is active. Its Tank-era production and
+frontal-wave posture, but launches its first Tank-era wave as soon as one Tank is ready. It removes
+Scout Car production and harassment, caps ordinary Barracks growth at one, trains a bounded
+defensive Machine Gunner group, pushes toward full two-base steel saturation, and can add a second
+Factory once Tank production is active. Factory placement is biased toward the center-facing front
+of the AI base so Tank production does not pile up behind the base. Its Tank-era production and
 frontal-wave composition are Tank-only, so Riflemen remain an opening/defensive Barracks output
 rather than a continuing mid-game spend. It reserves up to four ready Machine Gunners before
 frontal-wave readiness is calculated, so those MGs do not satisfy Tank wave sizes.
