@@ -19,8 +19,8 @@ const BORDER_PULSE_MS = 700;
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const IMPASSABLE_FOG_SCALE = 0.56;
 const ARTILLERY_MINIMAP_MARKER_MS = 2200;
-const ARTILLERY_MINIMAP_ICON_W = 15;
-const ARTILLERY_MINIMAP_ICON_H = 12;
+const ARTILLERY_MINIMAP_ICON_W = 30;
+const ARTILLERY_MINIMAP_ICON_H = 24;
 const TWO_PI = Math.PI * 2;
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
@@ -709,11 +709,6 @@ export class Minimap {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(0, 0, 7, 0, TWO_PI);
-    ctx.stroke();
     ctx.rotate(Number.isFinite(facing) ? facing : 0);
     if (this._artilleryIconReady && this._artilleryIconImage) {
       ctx.drawImage(
