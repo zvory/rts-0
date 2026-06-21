@@ -536,6 +536,11 @@ General rules:
   validity/visibility, finite points, ability carrier kind, ability readiness/cooldown/uses, and
   other command-specific facts before planning. It does not project future movement, future
   cooldown expiry, future tech, or future affordability.
+- Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
+  hard blocker would absorb the current shot; mobile attackers then use the existing chase path to
+  seek a fireable position. Building targets and statically blocked target tiles use a passable
+  perimeter chase goal instead of the blocked footprint center. Attack-move target acquisition
+  remains stricter and prefers targets that are currently fireable.
 - Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
   unaffordable later is skipped or rejected by the execution/promotion path.
 - Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear
