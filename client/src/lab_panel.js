@@ -201,7 +201,10 @@ export class LabPanel {
     section.appendChild(label);
 
     if (active) {
-      const detail = this.readout("Click the map to apply. Right-click or Esc cancels.");
+      const detailText = active.keepArmedOnWorldClick
+        ? "Click the map to apply repeatedly. Drag-select, right-click, or Esc cancels."
+        : "Click the map to apply. Drag-select, right-click, or Esc cancels.";
+      const detail = this.readout(detailText);
       detail.className = "lab-readout lab-active-tool-detail";
       section.appendChild(detail);
     }
@@ -476,6 +479,7 @@ export class LabPanel {
         kind: "spawnEntity",
         payload: { ...payload },
         label: `Spawn ${KIND_LABELS[kind] || kind}`,
+        keepArmedOnWorldClick: true,
       },
       { onWorldClick: (event) => this.spawnEntityAt(event) },
     );
@@ -870,7 +874,7 @@ function labToolLabel(tool) {
 }
 
 function shouldSurfaceToolCancellation(reason) {
-  return reason === "escape" || reason === "rightClick" || reason === "blur" || reason === "panelCancel";
+  return reason === "escape" || reason === "rightClick" || reason === "panelCancel";
 }
 
 function entityNoun(count) {

@@ -616,18 +616,18 @@ export class Match {
   }
 
   consumeLabToolWorldClick(event) {
-    const active = this.clientIntent?.activeLabTool || null;
-    if (!active || event?.tool?.id !== active.id) return;
-    const handler = this.labToolWorldClickHandler;
+    const tool = this.clientIntent?.activeLabTool || null;
+    if (!tool || event?.tool?.id !== tool.id) return;
+    const h = this.labToolWorldClickHandler;
     try {
-      const result = handler?.({ ...event, tool: active });
-      if (result && typeof result.catch === "function") {
-        result.catch((err) => this.handleLabToolActionError(err));
+      const r = h?.({ ...event, tool });
+      if (r && typeof r.catch === "function") {
+        r.catch((err) => this.handleLabToolActionError(err));
       }
     } catch (err) {
       this.handleLabToolActionError(err);
     } finally {
-      this.cancelLabTool("worldClick");
+      if (!tool.keepArmedOnWorldClick) this.cancelLabTool("worldClick");
     }
   }
 

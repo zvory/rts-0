@@ -391,18 +391,21 @@ passive. Operator gameplay commands still flow through `commandIssuer.issueComma
 owner.
 
 Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
-may ask `Match.armLabTool(tool, { onWorldClick })` to arm a tool, and normal `Input` consumes the
-next left world click before selection, command targeting, or placement. The callback receives the
-active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears the tool for
-Esc, right-click, blur, teardown, or panel-driven cancellation. `Input` routes those cancellations
-through the injected lab tool controller so `Match` can publish an active/cancelled change back to
-the app-owned `LabPanel`, keeping the panel status and cancel affordance synchronized with keyboard,
-pointer, blur, world-click, and teardown paths. Starting ordinary placement, command targeting, or
-command-card build menus cancels the active lab tool so setup tools do not share state with
-gameplay command modes. Unit spawning is a lab panel palette backed by the client faction catalog
-mirror and playable faction labels; the palette arms a `spawnEntity` lab tool and sends the clicked
-world coordinates through `LabClient`. Secondary building/setup spawns use the same click-to-world
-spawn tool path instead of primary manual coordinate entry. Selected-entity repositioning also uses
+may ask `Match.armLabTool(tool, { onWorldClick })` to arm a tool, and normal `Input` consumes a
+completed left world click before selection, command targeting, or placement. A left drag promotes
+to normal box selection and cancels the active lab tool instead of applying it. The callback
+receives the active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears
+the tool for Esc, right-click, teardown, box selection, or panel-driven cancellation. Window blur
+releases camera/input transient state but does not cancel the active lab tool. `Input` routes those
+cancellations through the injected lab tool controller so `Match` can publish an active/cancelled
+change back to the app-owned `LabPanel`, keeping the panel status and cancel affordance
+synchronized with keyboard, pointer, world-click, and teardown paths. Starting ordinary placement,
+command targeting, or command-card build menus cancels the active lab tool so setup tools do not
+share state with gameplay command modes. Unit spawning is a lab panel palette backed by the client
+faction catalog mirror and playable faction labels; the palette arms a persistent `spawnEntity` lab
+tool and every completed click sends the clicked world coordinates through `LabClient` until
+cancelled. Secondary building/setup spawns use the same click-to-world spawn tool path instead of
+primary manual coordinate entry. Selected-entity repositioning also uses
 the shared tool path: `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends
 `moveEntity` requests for each id at the clicked world point, and leaves stale-id or partial-failure
 reporting visible through the lab result status. Delete and owner reassignment stay contextual to
