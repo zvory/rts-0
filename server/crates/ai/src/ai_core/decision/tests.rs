@@ -1676,15 +1676,39 @@ fn ai_1_1_builds_second_factory_for_tank_production() {
     observation.upgrades.push(UpgradeKind::TankUnlock);
     observation.upgrades.push(UpgradeKind::Methamphetamines);
 
-    let decision = decide(
+    let width = observation.map.width;
+    let height = observation.map.height;
+    let decision = decide_profile(
         &observation,
         &AI_1_1_TANK_MG,
         &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+        ai_shared::BuildSearch {
+            min_radius: 2,
+            max_radius: 6,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |kind, tx, ty| {
+            tx < width
+                && ty < height
+                && kind == EntityKind::Factory
+                && matches!((tx, ty), (6, 8) | (14, 14))
+        },
     );
 
     assert!(decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Factory
     }));
+    assert!(
+        decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Build { building: EntityKind::Factory, tile_x, tile_y, .. }
+                    if (*tile_x, *tile_y) == (14, 14)
+            )
+        }),
+        "the second Factory should take the farther centerward site instead of the nearer rear site"
+    );
 }
 
 #[test]
@@ -3564,6 +3588,45 @@ fn far_tank_is_not_recalled_for_home_threat() {
             )
         }),
         "far tanks should keep their outbound attack behavior"
+    );
+}
+
+#[test]
+fn ai_1_1_attacks_with_its_first_ready_tank() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 30,
+            supply_cap: 60,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            building(13, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::Factory, Some(0)),
+            combat_at(30, EntityKind::Tank, 18.0 * ts, 18.0 * ts),
+        ],
+    );
+    observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(
+        decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::AttackMove { units, .. } if units.as_slice() == [30]
+            )
+        }),
+        "AI 1.1 should launch the first ready Tank instead of waiting for a larger Tank group"
     );
 }
 
