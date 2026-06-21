@@ -295,7 +295,9 @@ alive.
   id and appended after normal live projection in `LiveTickDriver`, then cleared for each recipient
   only after snapshot fanout accepts that recipient's next live snapshot. While live pause is active
   no snapshot fanout occurs, so queued late-spectator notices wait for the next emitted live
-  snapshot after unpause.
+  snapshot after unpause. Replay-branch live rooms use the same observer attach shape for late joins
+  to the private branch room; they do not return to branch staging or create another original-seat
+  mapping.
 - Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
   room-owned collaborator session record. Direct lab joiners currently receive the operator role;
   the original joiner remains in `operatorId` metadata for compatibility, not as the only mutation
@@ -319,7 +321,9 @@ AI controllers, or Tokio coordination into `rts-sim`:
 
 - `room_task.rs` remains the room lifecycle owner: membership, lobby/ingame/replay/branch phase
   transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
-  `Game`.
+  `Game`. Empty private replay-branch rooms reset their live/staging state but keep
+  `RoomMode::ReplayBranch`, so reserved `__replay_branch__` names never decay into public normal
+  lobbies.
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
   names the state source, join, clock, authority, mutation, visibility, diagnostics,
   persistence/export, start-payload, and UI-affordance choices used by the rest of the lobby

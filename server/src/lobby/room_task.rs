@@ -1036,8 +1036,12 @@ impl RoomTask {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
-        if policy.uses_branch_room_join() {
+        if policy.uses_branch_staging_join() {
             self.on_join_branch_staging(player_id, name, msg_tx, ack);
+            return;
+        }
+        if policy.uses_branch_live_attach() {
+            self.on_join_branch_live(player_id, name, msg_tx, ack);
             return;
         }
         if policy.uses_lab_room_join() {
@@ -2220,6 +2224,20 @@ impl RoomTask {
         let _ = ack.send(true);
         self.send_current_shutdown_warning_to(player_id);
         self.broadcast_branch_staging();
+    }
+
+    fn on_join_branch_live(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        self.on_join_live_spectator(player_id, name, true, msg_tx, ack);
     }
 
     fn on_join_lab(
@@ -4335,9 +4353,6 @@ impl RoomTask {
         self.ai_controllers.clear();
         self.pending_client_command_acks.clear();
         self.clear_finished_match_identity();
-        if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
-            self.mode = RoomMode::Normal;
-        }
     }
 
     fn reset_live_pause_state(&mut self) {
@@ -7258,6 +7273,71 @@ mod tests {
     }
 
     #[test]
+    fn branch_live_late_join_attaches_as_observer_without_resetting_staging() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-live-late-join-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer_a = add_branch_occupant(&mut task, 100);
+        let _writer_b = add_branch_occupant(&mut task, 101);
+        let mut staging = BranchStagingState::new(seed);
+        staging.claim(100, players[0].id).unwrap();
+        staging.claim(101, players[1].id).unwrap();
+        task.phase = Phase::BranchStaging(Box::new(staging));
+        task.start_branch_live();
+        let original_branch_live_seats = task.branch_live_seat_by_connection.clone();
+
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            103,
+            "Late Branch Viewer".to_string(),
+            false,
+            false,
+            msg_tx,
+            ack,
+        );
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert!(matches!(task.phase, Phase::InGame(_)));
+        assert_eq!(
+            task.branch_live_seat_by_connection,
+            original_branch_live_seats
+        );
+        assert!(!task.branch_live_seat_by_connection.contains_key(&103));
+        assert!(task.players.get(&103).unwrap().spectator);
+        assert_eq!(task.host_id, Some(100));
+
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(!messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::BranchStaging { .. })));
+        let start = messages
+            .iter()
+            .find_map(|msg| match msg {
+                ServerMessage::Start(payload) => Some(payload),
+                _ => None,
+            })
+            .expect("late branch observer should receive a live start payload");
+        assert_eq!(start.player_id, 103);
+        assert!(start.spectator);
+        assert_eq!(start.prediction_build_id, None);
+        assert_eq!(start.prediction_version, 0);
+        assert_eq!(
+            start.capabilities,
+            SessionPolicy::for_room(&task.mode, SessionPhase::LiveMatch).start_capabilities(false)
+        );
+        assert!(start.diagnostics.observer_analysis);
+        assert!(!start.capabilities.commands.gameplay);
+        assert!(!start.capabilities.match_controls.pause);
+    }
+
+    #[test]
     fn branch_live_give_up_resolves_by_original_seat_and_skips_public_history() {
         let players = replay_test_players(2);
         let seed = replay_branch_test_seed(&players, 0);
@@ -7356,11 +7436,11 @@ mod tests {
     }
 
     #[test]
-    fn empty_branch_room_drops_frozen_state_and_resets_room_name() {
+    fn empty_branch_room_preserves_private_branch_identity() {
         let players = replay_test_players(2);
         let seed = replay_branch_test_seed(&players, 1);
         let mut task = RoomTask::new(
-            "branch-empty-test".to_string(),
+            "__replay_branch__:empty-test".to_string(),
             RoomMode::ReplayBranch { seed },
             None,
             false,
@@ -7377,9 +7457,10 @@ mod tests {
         task.on_leave(100);
 
         assert!(matches!(task.phase, Phase::Lobby));
-        assert!(matches!(task.mode, RoomMode::Normal));
+        assert!(matches!(task.mode, RoomMode::ReplayBranch { .. }));
         assert!(task.players.is_empty());
         assert_eq!(task.host_id, None);
+        assert!(task.lobby_summary().is_none());
     }
 
     #[test]

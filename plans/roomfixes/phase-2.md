@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -58,24 +58,24 @@ spectator admission, spectator payload, or lobby-browser work from that plan.
 
 ## Implementation Checklist
 
-- [ ] Confirm PR #257 and PR #258 are merged before starting implementation.
-- [ ] Confirm Phase 1 has merged and start from fresh `origin/main`.
-- [ ] Inspect the merged spectator late-join path and reuse its live observer shape where branch
+- [x] Confirm PR #257 and PR #258 are merged before starting implementation.
+- [x] Confirm Phase 1 has merged and start from fresh `origin/main`.
+- [x] Inspect the merged spectator late-join path and reuse its live observer shape where branch
       live attach needs spectator admission.
-- [ ] Stop using one boolean helper that groups `BranchStaging` and `BranchLiveAttach` into the
+- [x] Stop using one boolean helper that groups `BranchStaging` and `BranchLiveAttach` into the
       same branch-staging handler.
-- [ ] Add or route to a branch-live attach handler that never rewrites `Phase::InGame` to
+- [x] Add or route to a branch-live attach handler that never rewrites `Phase::InGame` to
       `Phase::BranchStaging`.
-- [ ] Preserve branch-live command identity mappings in `branch_live_seat_by_connection`.
-- [ ] Preserve branch-staging join behavior for unlaunched replay branch rooms.
-- [ ] Fix empty internal branch room cleanup so `__replay_branch__` rooms cannot become public
+- [x] Preserve branch-live command identity mappings in `branch_live_seat_by_connection`.
+- [x] Preserve branch-staging join behavior for unlaunched replay branch rooms.
+- [x] Fix empty internal branch room cleanup so `__replay_branch__` rooms cannot become public
       normal lobbies.
-- [ ] Add regression tests for branch-live late join, branch-staging join, and empty branch-room
+- [x] Add regression tests for branch-live late join, branch-staging join, and empty branch-room
       identity cleanup.
-- [ ] Avoid replay start capability, lab collaboration, lab drain, room-time client, and
+- [x] Avoid replay start capability, lab collaboration, lab drain, room-time client, and
       start-payload builder refactors.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase file done in the implementation commit.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase file done in the implementation commit.
 
 ## Verification
 

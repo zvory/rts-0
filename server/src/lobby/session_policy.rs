@@ -533,11 +533,12 @@ impl SessionPolicy {
         self.join == JoinPolicy::ReplayPromptOrAttach
     }
 
-    pub(super) fn uses_branch_room_join(self) -> bool {
-        matches!(
-            self.join,
-            JoinPolicy::BranchStaging | JoinPolicy::BranchLiveAttach
-        )
+    pub(super) fn uses_branch_staging_join(self) -> bool {
+        self.join == JoinPolicy::BranchStaging
+    }
+
+    pub(super) fn uses_branch_live_attach(self) -> bool {
+        self.join == JoinPolicy::BranchLiveAttach
     }
 
     pub(super) fn uses_lab_room_join(self) -> bool {
