@@ -69,7 +69,7 @@ lobby/config dump replaces the source scrape.
 | `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted only in replay rooms. |
 | `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
-| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operators with `labResult`. Accepted setup mutations, issue-as commands, and vision changes are room-local and append to the lab operation log. |
+| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations, issue-as commands, and vision changes are room-local and append to the lab operation log with the requesting connection id. |
 | `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
@@ -384,8 +384,10 @@ list only active match players in `players`.
 
 Lab room start payloads set `lab` metadata and currently also set `spectator: true` with prediction
 metadata omitted. Labs use a hidden internal room id, a default two-team real `Game` template, and
-server-owned projection. `role` names the room-owned operator/read-only viewer classification; only
-the operator may send privileged lab operations in the MVP.
+server-owned projection. `role` names the room-owned operator/read-only viewer classification.
+Direct lab URL joiners currently receive `operator`; `readOnly` remains available for future
+explicit viewer modes. `operatorId` identifies the original lab joiner for compatibility metadata,
+not the sole authority for privileged lab operations.
 
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
@@ -878,8 +880,8 @@ Reliable lab server messages:
 
 Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timeline/keyframes,
 lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
-multi-operator conflict semantics, visual iteration hot reload, and `/dev/scenario` migration.
-Those require separate typed messages instead of overloading `LabClientOp`.
+fine-grained multi-operator permissions, visual iteration hot reload, and `/dev/scenario`
+migration. Those require separate typed messages instead of overloading `LabClientOp`.
 
 ### 2.7 Observer analysis state
 
