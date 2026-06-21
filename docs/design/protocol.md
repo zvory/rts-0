@@ -743,6 +743,14 @@ the fog overlay; `toPos` lets tracers draw even when the hit target is no longer
 Overpenetration events are sent for secondary entities damaged behind the primary target. They carry
 only the damaged entity id and do not imply a separate fired shot, muzzle flash, tracer, shooter
 reveal, weapon recoil, or attack sound.
+
+When a normal live match accepts a mid-match spectator attach, the server queues a position-free
+info notice for every already-connected active player and spectator: `<name> has joined the match as
+a spectator`. The joining spectator is excluded. The name comes from the server-sanitized join name
+with control-only/empty results displayed as `Commander`; the message is a normal `notice` event
+without an `alert:` prefix. Delivery is one-shot on each recipient's next live snapshot. If the match
+is live-paused, snapshot fanout is skipped and the notice remains queued until the next emitted live
+snapshot after unpause.
 Death events are sent to the dead entity's team and to enemy recipients whose team can currently see
 the death position; smoke-covered hidden death positions are withheld. Build completion events are
 sent to the completed building's team and to enemy recipients whose team currently sees the site.
@@ -816,7 +824,9 @@ when a request changes the room from unpaused to paused; any active player can u
 pause is active the room task skips the live simulation tick branch, so AI thinking, command-ack
 consumption, `Game::tick`, live snapshot fanout, and defeat checks do not advance, while reliable
 control-plane messages such as ping/pong, net reports, Give up, disconnect handling, and unpause
-still run.
+still run. Room-owned recipient notices queued during pause, such as late-spectator join notices,
+are delivered on the next emitted live snapshot after unpause rather than through a separate
+reliable message.
 
 `ReplayVisionRequest` selects fog/vision per viewer:
 ```

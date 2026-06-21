@@ -856,6 +856,11 @@ mod tests {
 
     const TEST_PLAYER_ID: u32 = 42;
 
+    #[test]
+    fn sanitize_name_uses_commander_for_blank_names() {
+        assert_eq!(sanitize_name(" \n\t ".to_string()), "Commander");
+    }
+
     async fn start_one_player_test_match(lobby: &Lobby, room: &str) -> lobby::RoomHandle {
         let handle = lobby.get_or_create(room).await;
         let (msg_tx, _writer) = lobby::ConnectionSink::new();
@@ -1980,7 +1985,7 @@ fn sanitize_name(name: String) -> String {
     let trimmed = name.trim();
     let cleaned: String = trimmed.chars().take(MAX_NAME_LEN).collect();
     if cleaned.is_empty() {
-        "Anonymous".to_string()
+        "Commander".to_string()
     } else {
         cleaned
     }
