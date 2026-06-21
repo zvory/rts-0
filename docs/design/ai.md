@@ -125,8 +125,8 @@ attack command count, damage events dealt, deduplicated deaths, first attack com
 Rifleman attack command, first Scout Car completion, first legacy Scout Car harassment-style `Move`
 command, first expansion City Centre planned/completed, and first Tank completion. Match-level results include
 winner or tick-cap status, first damage, attack events, death events, replay verification status,
-and optional replay artifact path. Compact baseline scenario metadata for opening pressure,
-mid-game expansion, tank tech, and blocked-goal pressure lives in
+and optional replay artifact path. Compact baseline scenario metadata for AI 1.0 early production,
+tech-blocked production, Scout Car unlock, and Tank unlock lives in
 `server/crates/ai/src/selfplay/scenarios.rs` so later AI changes can compare the same authored
 fixtures without rewriting the harness.
 Profile matchup JSON also includes a bounded `aiTraceTail` of compact trace entries for recent

@@ -31,13 +31,13 @@ depends on long matches.
 **Profile-backed coverage.** The long profile-backed tests spawn AI-profile players through the
 self-play adapter and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo nextest run
 --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default`. The
-profiles gather steel and oil, construct supply and tech structures, train Riflemen and Tanks, and launch
-attack-move waves at public enemy start tiles. The self-play adapter owns harness-only state such as
-pending build intents, failed build spots, and staging/attack guards needed to interpret
-fog-filtered snapshots without duplicating profile strategy logic. The harness checks per-tick
-invariants for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds
-positions, and non-finite progress values. It also enforces progress deadlines so a stuck
-economy/tech/combat loop fails as a deadlock instead of timing out silently.
+profiles gather steel and oil, construct supply and tech structures, train Riflemen, Scout Cars, and
+Tanks, and launch attack-move waves at public enemy start tiles. The self-play adapter owns
+harness-only state such as pending build intents, failed build spots, and staging/attack guards
+needed to interpret fog-filtered snapshots without duplicating profile strategy logic. The harness
+checks per-tick invariants for invalid resources, supply overflow, malformed entity snapshots,
+out-of-bounds positions, and non-finite progress values. It also enforces progress deadlines so a
+stuck economy/tech/combat loop fails as a deadlock instead of timing out silently.
 
 Special harness scripts remain where they cover behavior that is not a normal AI strategy profile:
 `WorkerRushScript` is an all-in worker-pull scenario, and `MineOnlyScript` is passive mining/fairness
@@ -68,8 +68,9 @@ write a replay artifact:
 
 ```bash
 cd server
-cargo run --bin ai-matchup -- rush tech
-cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
+cargo run --bin ai-matchup -- ai ai
+cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
+cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
@@ -91,14 +92,14 @@ open "http://localhost:<port>/dev/scenarios"
 The index lists every supported launch and links to the current URL shape:
 
 ```text
-/dev/scenarios?id=<scenario_id>&unit=<unit>&count=<count>[&blocker=<unit|none>]
+/dev/scenarios?id=<scenario_id>&unit=<unit>&count=<count>[&blocker=<unit|none>][&case=<case>]
 ```
 
 The handler redirects into the normal client with `watchScenario=1`; the client auto-joins a
 reserved spectator room named:
 
 ```text
-__dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>]
+__dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>][:case=<case>]
 ```
 
 Current scenario ids:

@@ -137,13 +137,13 @@ Runs inside the Rust test suite with no live server. Plain `cargo nextest run` r
 scripted self-play coverage. Long profile-backed matchups, long AI simulation checks, and the full
 real-AI match are gated behind `RTS_FULL_AI_TESTS=1` because they dominate wall-clock time.
 The tests create scripted API clients that drive `Game` through `enqueue`/`tick`/`snapshot_for`,
-exercising gathering, oil, Depot/Barracks/Vehicle Works construction, Rifleman/Tank training, rush
-pressure, and combat. Successful runs replay the authoritative tick-stamped command log through a
-fresh game and compare the replayed event stream and final snapshots against the live run. On
-failure it writes normal `ReplayArtifactV1` replay artifacts under the Cargo target dir's
-`selfplay-failures/` directory, plus self-play diagnostics beside them. To save a successful run too, set
-`RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an explicit safe
-artifact name; successful runs are then written under the target dir's
+exercising gathering, oil, Depot/Barracks/Vehicle Works construction, Rifleman/Scout Car/Tank
+training, rush pressure, and combat. Successful runs replay the authoritative tick-stamped command
+log through a fresh game and compare the replayed event stream and final snapshots against the live
+run. On failure it writes normal `ReplayArtifactV1` replay artifacts under the Cargo target dir's
+`selfplay-failures/` directory, plus self-play diagnostics beside them. To save a successful run
+too, set `RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an
+explicit safe artifact name; successful runs are then written under the target dir's
 `selfplay-artifacts/<name>/`.
 When you open a replay artifact in the browser, use the server instance that produced it, or
 start a fresh one on its own port before loading `/dev/replay-artifact?replay=<artifact_name>`.
@@ -163,9 +163,9 @@ first tanks, command counts, and final army/base counts.
 
 ```bash
 cd server
-cargo run --bin ai-matchup -- rush tech
-cargo run --bin ai-matchup -- expand tech
-cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
+cargo run --bin ai-matchup -- ai ai
+cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
+cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
