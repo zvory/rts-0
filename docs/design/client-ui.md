@@ -358,7 +358,7 @@ export function labSpawnUnitKindsForFaction(factionId)
 export class LabPanel {
   constructor({ root, labClient, launch, startPayload, match? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
-  armSpawnPaletteTool(kind?)             // arms a Match-owned spawnEntity world-click tool
+  armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
   cancelActiveTool()
   setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary

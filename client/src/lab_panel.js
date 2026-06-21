@@ -23,12 +23,10 @@ export class LabPanel {
       steel: null,
       oil: null,
       researchUpgrade: "",
-      researchCompleted: true,
     };
     this.spawnPalette = {
       factionId: DEFAULT_FACTION_ID,
       kind: "",
-      completed: true,
     };
     this.teamInputs = new Map();
     this.fields = new Map();
@@ -178,11 +176,6 @@ export class LabPanel {
         value: this.playerState.researchUpgrade,
         onChange: (value) => {
           this.playerState.researchUpgrade = value;
-        },
-      }),
-      this.checkboxField("research-completed", "Complete", this.playerState.researchCompleted, {
-        onChange: (checked) => {
-          this.playerState.researchCompleted = checked;
         },
       }),
       this.button("Set research", () => this.setCompletedResearch()),
@@ -401,11 +394,6 @@ export class LabPanel {
           },
         },
       ),
-      this.checkboxField("spawn-completed", "Complete", this.spawnPalette.completed, {
-        onChange: (checked) => {
-          this.spawnPalette.completed = checked;
-        },
-      }),
       this.spawnPaletteReadout(unitKinds),
       this.spawnPaletteGrid(unitKinds),
     ];
@@ -446,7 +434,7 @@ export class LabPanel {
       owner: this.targetPlayer(),
       factionId: this.spawnPalette.factionId,
       kind,
-      completed: this.spawnPalette.completed,
+      completed: true,
     };
     return this.armSpawnTool(payload);
   }
@@ -475,7 +463,7 @@ export class LabPanel {
       owner: Number(payload.owner),
       x: event.x,
       y: event.y,
-      completed: !!payload.completed,
+      completed: true,
     });
   }
 
@@ -489,7 +477,6 @@ export class LabPanel {
     if (!unitKinds.includes(this.spawnPalette.kind)) {
       this.spawnPalette.kind = unitKinds[0] || "";
     }
-    this.spawnPalette.completed = !!this.spawnPalette.completed;
   }
 
   validOwner(owner) {
@@ -501,7 +488,6 @@ export class LabPanel {
   captureSpawnPaletteFields() {
     this.captureTargetPlayerField();
     this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
-    this.spawnPalette.completed = this.bool("spawn-completed");
   }
 
   captureTargetPlayerField() {
@@ -523,7 +509,6 @@ export class LabPanel {
     if (!upgrades.includes(this.playerState.researchUpgrade)) {
       this.playerState.researchUpgrade = upgrades[0] || "";
     }
-    this.playerState.researchCompleted = !!this.playerState.researchCompleted;
   }
 
   capturePlayerStateFields() {
@@ -531,7 +516,6 @@ export class LabPanel {
     this.playerState.steel = this.uint("resource-steel");
     this.playerState.oil = this.uint("resource-oil");
     this.playerState.researchUpgrade = this.value("research-upgrade") || this.playerState.researchUpgrade;
-    this.playerState.researchCompleted = this.bool("research-completed");
   }
 
   setPlayerResources() {
@@ -548,7 +532,7 @@ export class LabPanel {
     return this.labClient.setCompletedResearch(
       this.targetPlayer(),
       this.playerState.researchUpgrade,
-      this.playerState.researchCompleted,
+      true,
     );
   }
 
