@@ -261,8 +261,14 @@ alive.
   `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
   `SeekRoomTime`, `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer
   of game state — no locks around `Game`.
-- The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
-  connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
+- Room-mode and phase-dependent lobby checks use a lobby-local `SessionPolicy` descriptor for the
+  current room mode and phase matrix, including dev-watch, replay-room, branch-staging, countdown,
+  speed-source, and match-history decisions.
+- The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
+  per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
+  `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay
+  per-viewer vision, dev full-world snapshots, and observer-analysis audiences; `SnapshotFanout`
+  owns compacting, net status, and perf accounting. Lobby phase: broadcast `lobby` on changes.
 - Live-match pause state belongs to `RoomTask`, not `Game` and not `tick_control.rs`. Normal live
   and branch-live active seats can spend up to three successful pause starts per match; spectators,
   replay viewers, dev-watch viewers, and lab viewers cannot spend pauses. While paused, the room
@@ -541,11 +547,19 @@ General rules:
   validity/visibility, finite points, ability carrier kind, ability readiness/cooldown/uses, and
   other command-specific facts before planning. It does not project future movement, future
   cooldown expiry, future tech, or future affordability.
+- Same-tile movement goals count as arrived rather than path-failed. Plain move orders clear back to
+  idle on arrival; attack-move orders keep their aggressive stance.
+- `HoldPosition` clears each selected unit's active order and queued intents, then marks the unit as
+  held. Held units do not voluntarily move or chase targets, but they keep normal collision behavior
+  and may fire at enemies already inside current weapon range.
 - Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
   hard blocker would absorb the current shot; mobile attackers then use the existing chase path to
-  seek a fireable position. Building targets and statically blocked target tiles use a passable
-  perimeter chase goal instead of the blocked footprint center. Tank Traps keep generic building
-  targeting and cleanup behavior but do not count for elimination survival. Attack-move target
+  seek a fireable position. Tank Traps are not combat shot blockers, so damage continues to the
+  target behind them; tanks and normal buildings still block shots. Building targets and statically
+  blocked target tiles use a passable perimeter chase goal instead of the blocked footprint center.
+  Tank Traps keep generic building targeting and cleanup behavior but do not count for elimination
+  survival. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
+  bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition remains stricter and prefers targets that are currently fireable.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
   `services::combat::acquisition`, then chooses between them through the sim-local

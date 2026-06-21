@@ -184,11 +184,13 @@ still hold position once a target is in weapon range. Scout cars also fire while
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
 Plain `Move` tanks and scout cars only fire at enemies already in
-weapon range, while `AttackMove` tanks and scout cars can chase acquired targets. When they chase an acquired
-target from outside weapon range, they path to a standoff point inside firing range instead of the
-target center. Forest-specific rules are future work. The unit, building, and resource-node tables
-below are the human-readable form of the
-authoritative `rules::defs` records.
+weapon range, while `AttackMove` tanks and scout cars can chase acquired targets. When they chase an
+acquired target from outside weapon range, they path to a standoff point inside firing range instead
+of the target center. Tank auto-targeting first checks in-range Anti-Tank Guns, Tanks, Tank Traps,
+and Mortar Teams, in that order, before generic acquisition; this priority can replace a retained
+lower-priority moving-fire target but does not chase out-of-range priority targets or override
+explicit player attack orders. Forest-specific rules are future work. The unit, building, and
+resource-node tables below are the human-readable form of the authoritative `rules::defs` records.
 
 Default auto-acquisition ranks already-legal targets by weapon fit before distance. Small-arms
 default weapons prefer soft targets (`ArmorClass::Small`) over armored or hard targets, but they
