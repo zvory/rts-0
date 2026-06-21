@@ -1,4 +1,4 @@
-use crate::game::entity::EntityStore;
+use crate::game::entity::{EntityStore, OrderIntent, RallyIntent, RallyKind};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::upgrade::UpgradeKind;
@@ -108,23 +108,36 @@ pub(crate) fn production_system(
                 if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                     player.record_entity_created(unit);
                 }
-                // Send the new unit through the building's rally plan.
+                // Send the new unit through the building's rally plan. Plain rally stages default
+                // to attack-move for combat units, but workers keep the old move rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
                     coordinator.order_group_move(
                         entities,
                         owner,
                         &[spawned],
                         (first.point.x, first.point.y),
-                        matches!(first.kind, crate::game::entity::RallyKind::AttackMove),
+                        rally_stage_attacks(unit, first),
                     );
                     if let Some(e) = entities.get_mut(spawned) {
                         for stage in rally_plan.iter().skip(1).copied() {
-                            e.append_queued_order(stage.to_order_intent());
+                            e.append_queued_order(rally_order_intent(unit, stage));
                         }
                     }
                 }
             }
         }
+    }
+}
+
+fn rally_stage_attacks(unit: EntityKind, rally: RallyIntent) -> bool {
+    matches!(rally.kind, RallyKind::AttackMove) || unit != EntityKind::Worker
+}
+
+fn rally_order_intent(unit: EntityKind, rally: RallyIntent) -> OrderIntent {
+    if rally_stage_attacks(unit, rally) {
+        OrderIntent::attack_move_to(rally.point.x, rally.point.y)
+    } else {
+        OrderIntent::move_to(rally.point.x, rally.point.y)
     }
 }
 
@@ -331,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn rally_point_moves_spawned_unit_and_prefers_near_exit() {
+    fn move_rally_attack_moves_spawned_non_worker_and_prefers_near_exit() {
         let map = flat_map(40);
         let mut entities = EntityStore::new();
         let factory = spawn_factory(&map, &mut entities, 10, 10);
@@ -362,8 +375,8 @@ mod tests {
             (rally.1 - spawned.pos_y).atan2(rally.0 - spawned.pos_x),
         );
         assert!(
-            matches!(spawned.order(), Order::Move(_)),
-            "spawned unit should receive a move order to the rally point"
+            matches!(spawned.order(), Order::AttackMove(_)),
+            "spawned non-worker should default to attack-moving to the rally point"
         );
         let goal = spawned.path_goal().expect("rally move should set a goal");
         let dist = ((goal.0 - rally.0).powi(2) + (goal.1 - rally.1).powi(2)).sqrt();
@@ -374,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    fn queued_attack_move_rally_plan_is_copied_to_spawned_unit() {
+    fn queued_rally_plan_defaults_non_worker_move_stages_to_attack_move() {
         let map = flat_map(40);
         let mut entities = EntityStore::new();
         let factory = spawn_factory(&map, &mut entities, 10, 10);
@@ -405,15 +418,46 @@ mod tests {
         );
         assert_eq!(
             spawned.queued_orders(),
-            &[crate::game::entity::OrderIntent::move_to(
+            &[crate::game::entity::OrderIntent::attack_move_to(
                 second.0, second.1
             )],
-            "later rally stages should be copied as queued orders"
+            "later move rally stages should default to queued attack-move for non-workers"
         );
     }
 
     #[test]
-    fn same_tile_machine_gunner_rally_resolves_after_path_request() {
+    fn move_rally_keeps_spawned_worker_on_move_order() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let city_centre = spawn_building_training(
+            &map,
+            &mut entities,
+            10,
+            10,
+            EntityKind::CityCentre,
+            EntityKind::Worker,
+        );
+        let rally = map.tile_center(18, 10);
+        entities
+            .get_mut(city_centre)
+            .expect("city centre")
+            .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        let worker = entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::Worker && e.hp > 0)
+            .expect("worker should spawn");
+        assert!(
+            matches!(worker.order(), Order::Move(_)),
+            "spawned workers should keep plain move rallies instead of attack-moving"
+        );
+    }
+
+    #[test]
+    fn same_tile_machine_gunner_default_attack_move_rally_survives_path_request() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let barracks = spawn_building_training(
@@ -450,8 +494,11 @@ mod tests {
             .iter()
             .find(|e| e.owner == 1 && e.kind == EntityKind::MachineGunner && e.hp > 0)
             .expect("machine gunner should spawn");
-        assert!(matches!(machine_gunner.order(), Order::Idle));
-        assert_eq!(machine_gunner.move_phase(), None);
+        assert!(matches!(machine_gunner.order(), Order::AttackMove(_)));
+        assert_eq!(
+            machine_gunner.move_phase(),
+            Some(crate::game::entity::MovePhase::Arrived)
+        );
         assert!(machine_gunner.path_is_empty());
     }
 
