@@ -48,6 +48,36 @@ fn visible_fog(map: &Map, entities: &EntityStore) -> Fog {
     fog
 }
 
+fn resolve_test_target(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    attacker_id: u32,
+    acquire_px: f32,
+) -> Option<u32> {
+    let los = LineOfSight::new(map);
+    let spatial = SpatialIndex::build(entities, map.size);
+    let fog = visible_fog(map, entities);
+    let smokes = SmokeCloudStore::new();
+    let attacker = entities.get(attacker_id).expect("attacker should exist");
+
+    resolve_target(
+        map,
+        entities,
+        teams,
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        attacker_id,
+        attacker.owner,
+        attacker.pos_x,
+        attacker.pos_y,
+        acquire_px,
+        combat_mode(attacker),
+    )
+}
+
 fn resolve_tank_test_target(
     map: &Map,
     entities: &EntityStore,
@@ -78,11 +108,7 @@ fn resolve_tank_test_target(
     )
 }
 
-fn spawn_tank_priority_target(
-    entities: &mut EntityStore,
-    kind: EntityKind,
-    x: f32,
-) -> Option<u32> {
+fn spawn_tank_priority_target(entities: &mut EntityStore, kind: EntityKind, x: f32) -> Option<u32> {
     if kind == EntityKind::TankTrap {
         entities.spawn_building(2, kind, x, 100.0, true)
     } else {
@@ -474,6 +500,81 @@ fn ordered_attackers_do_not_retain_allied_targets() {
 }
 
 #[test]
+fn explicit_attack_retains_visible_enemy_target_over_nearer_candidate() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let explicit_target = entities
+        .spawn_unit(2, EntityKind::Worker, 150.0, 100.0)
+        .expect("explicit target should spawn");
+    let closer_target = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("closer target should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(explicit_target));
+
+    let target = resolve_test_target(&map, &entities, &default_team_relations(), attacker, 192.0);
+
+    assert_eq!(target, Some(explicit_target));
+    assert_ne!(target, Some(closer_target));
+}
+
+#[test]
+fn explicit_attack_drops_dead_target_and_runs_normal_acquisition() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let dead_target = entities
+        .spawn_unit(2, EntityKind::Worker, 120.0, 100.0)
+        .expect("dead target should spawn");
+    let fallback_target = entities
+        .spawn_unit(2, EntityKind::Rifleman, 150.0, 100.0)
+        .expect("fallback target should spawn");
+    assert!(
+        entities
+            .get_mut(dead_target)
+            .expect("dead target should exist")
+            .apply_damage(u32::MAX, None),
+        "test setup should kill the explicit target",
+    );
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(dead_target));
+
+    let target = resolve_test_target(&map, &entities, &default_team_relations(), attacker, 192.0);
+
+    assert_eq!(target, Some(fallback_target));
+    assert_ne!(target, Some(dead_target));
+}
+
+#[test]
+fn infantry_explicit_attack_can_target_visible_enemy_tank_trap() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, 150.0, 100.0, true)
+        .expect("tank trap should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(trap));
+
+    let target = resolve_test_target(&map, &entities, &default_team_relations(), attacker, 192.0);
+
+    assert_eq!(target, Some(trap));
+}
+
+#[test]
 fn acquisition_against_buildings_ignores_allied_buildings() {
     let mut entities = EntityStore::new();
     let attacker = entities
@@ -558,12 +659,120 @@ fn anti_tank_gun_tank_preference_ignores_allied_tanks() {
 }
 
 #[test]
+fn anti_tank_gun_prefers_tank_over_nearer_soft_target() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let nearer_rifleman = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("nearer rifleman should spawn");
+    let tank = entities
+        .spawn_unit(2, EntityKind::Tank, 150.0, 100.0)
+        .expect("tank should spawn");
+
+    let target = resolve_test_target(
+        &map,
+        &entities,
+        &default_team_relations(),
+        anti_tank_gun,
+        192.0,
+    );
+
+    assert_eq!(target, Some(tank));
+    assert_ne!(target, Some(nearer_rifleman));
+}
+
+#[test]
+fn small_arms_prefers_unit_over_nearer_building() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let building = entities
+        .spawn_building(2, EntityKind::Barracks, 120.0, 100.0, true)
+        .expect("building should spawn");
+    let unit = entities
+        .spawn_unit(2, EntityKind::Worker, 150.0, 100.0)
+        .expect("unit should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(300.0, 100.0));
+
+    let target = resolve_test_target(&map, &entities, &default_team_relations(), attacker, 192.0);
+
+    assert_eq!(target, Some(unit));
+    assert_ne!(target, Some(building));
+}
+
+#[test]
+fn small_arms_falls_back_to_armored_or_hard_targets() {
+    for target_kind in [EntityKind::Tank, EntityKind::Barracks] {
+        let map = open_map(8);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let target = if target_kind.is_building() {
+            entities.spawn_building(2, target_kind, 150.0, 100.0, true)
+        } else {
+            entities.spawn_unit(2, target_kind, 150.0, 100.0)
+        }
+        .expect("fallback target should spawn");
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .set_order(Order::attack_move_to(300.0, 100.0));
+
+        assert_eq!(
+            resolve_test_target(&map, &entities, &default_team_relations(), attacker, 192.0),
+            Some(target),
+            "Rifleman should keep {target_kind:?} as a legal fallback target"
+        );
+    }
+}
+
+#[test]
+fn own_and_allied_tank_traps_are_not_hostile_targets() {
+    let cases = [
+        ("own", 1, team_relations(&[(1, 1), (2, 2)])),
+        ("allied", 2, team_relations(&[(1, 7), (2, 7)])),
+    ];
+
+    for (label, trap_owner, teams) in cases {
+        let map = open_map(8);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::ScoutCar, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let trap = entities
+            .spawn_building(trap_owner, EntityKind::TankTrap, 150.0, 100.0, true)
+            .expect("tank trap should spawn");
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .set_order(Order::attack_move_to(300.0, 100.0));
+
+        let target = resolve_test_target(&map, &entities, &teams, attacker, 192.0);
+
+        assert_eq!(target, None, "{label} Tank Trap should not be acquired");
+        assert_ne!(target, Some(trap));
+    }
+}
+
+#[test]
 fn tank_target_priority_uses_declared_order_for_targets_in_weapon_range() {
     use EntityKind::*;
 
     let map = open_map(12);
     let cases: &[(&[EntityKind], EntityKind)] = &[
-        (&[Rifleman, MortarTeam, TankTrap, Tank, AntiTankGun], AntiTankGun),
+        (
+            &[Rifleman, MortarTeam, TankTrap, Tank, AntiTankGun],
+            AntiTankGun,
+        ),
         (&[Rifleman, MortarTeam, TankTrap, Tank], Tank),
         (&[Rifleman, MortarTeam, TankTrap], TankTrap),
         (&[Rifleman, MortarTeam], MortarTeam),
@@ -577,8 +786,9 @@ fn tank_target_priority_uses_declared_order_for_targets_in_weapon_range() {
             .expect("tank should spawn");
         let mut expected_id = None;
         for (index, kind) in targets.iter().copied().enumerate() {
-            let target_id = spawn_tank_priority_target(&mut entities, kind, 120.0 + index as f32 * 10.0)
-                .expect("priority target should spawn");
+            let target_id =
+                spawn_tank_priority_target(&mut entities, kind, 120.0 + index as f32 * 10.0)
+                    .expect("priority target should spawn");
             if kind == expected_kind {
                 expected_id = Some(target_id);
             }
@@ -926,7 +1136,9 @@ fn visible_enemy_damage_alerts_victim_owner_only() {
             .get(&3)
             .expect("victim ally events should exist")
             .iter()
-            .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")),
+            .all(
+                |event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")
+            ),
         "victim ally should not receive the teammate's under-attack notice"
     );
     assert!(
@@ -1415,7 +1627,10 @@ fn ekat_has_no_default_attack() {
     run_combat_tick(&mut entities);
 
     let ekat = entities.get(ekat_id).expect("Ekat should exist");
-    assert!(!ekat.can_attack(), "Ekat should not expose a default weapon");
+    assert!(
+        !ekat.can_attack(),
+        "Ekat should not expose a default weapon"
+    );
     assert_eq!(
         entities.get(enemy_id).expect("enemy should exist").hp,
         enemy_hp,

@@ -290,16 +290,41 @@ mod tests {
     }
 
     #[test]
+    fn tank_target_priority_order_matches_current_contract() {
+        assert_eq!(
+            TANK_TARGET_PRIORITY_ORDER,
+            [
+                EntityKind::AntiTankGun,
+                EntityKind::Tank,
+                EntityKind::TankTrap,
+                EntityKind::MortarTeam,
+            ]
+        );
+    }
+
+    #[test]
     fn anti_tank_gun_miss_chance_applies_only_to_infantry_sized_targets() {
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Worker), 0.65);
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman), 0.65);
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Worker),
+            0.65
+        );
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman),
+            0.65
+        );
         assert_eq!(
             miss_chance(EntityKind::AntiTankGun, EntityKind::MachineGunner),
             0.65
         );
 
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar), 0.0);
-        assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun), 0.0);
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::ScoutCar),
+            0.0
+        );
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::AntiTankGun),
+            0.0
+        );
         assert_eq!(miss_chance(EntityKind::AntiTankGun, EntityKind::Tank), 0.0);
     }
 
