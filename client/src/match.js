@@ -110,6 +110,7 @@ export class Match {
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
+    this.onLabToolChange = options.onLabToolChange || null;
     this.labToolWorldClickHandler = null;
     this.replayViewer = !!options.replayViewer;
     this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
@@ -222,7 +223,10 @@ export class Match {
           this.inputRouter,
           this.hotkeyProfiles,
           this.clientIntent,
-          { consumeWorldClick: (event) => this.consumeLabToolWorldClick(event) },
+          {
+            consumeWorldClick: (event) => this.consumeLabToolWorldClick(event),
+            cancel: (reason) => this.cancelLabTool(reason),
+          },
         ),
     );
 
@@ -599,12 +603,16 @@ export class Match {
       ? callbacks
       : callbacks?.onWorldClick;
     this.labToolWorldClickHandler = typeof onWorldClick === "function" ? onWorldClick : null;
-    return this.clientIntent.beginLabTool(tool);
+    const active = this.clientIntent.beginLabTool(tool);
+    this.publishLabToolChange({ type: "armed", tool: active });
+    return active;
   }
 
   cancelLabTool(reason = "cancelled") {
     this.labToolWorldClickHandler = null;
-    return this.clientIntent?.cancelLabTool?.(reason) || null;
+    const cancelled = this.clientIntent?.cancelLabTool?.(reason) || null;
+    if (cancelled) this.publishLabToolChange({ type: "cancelled", reason, tool: cancelled });
+    return cancelled;
   }
 
   consumeLabToolWorldClick(event) {
@@ -612,13 +620,25 @@ export class Match {
     if (!active || event?.tool?.id !== active.id) return;
     const handler = this.labToolWorldClickHandler;
     try {
-      handler?.({ ...event, tool: active });
+      const result = handler?.({ ...event, tool: active });
+      if (result && typeof result.catch === "function") {
+        result.catch((err) => this.handleLabToolActionError(err));
+      }
     } catch (err) {
-      console.error("Lab tool world-click handler failed", err);
-      this.toast?.("Lab tool action failed.");
+      this.handleLabToolActionError(err);
     } finally {
       this.cancelLabTool("worldClick");
     }
+  }
+
+  handleLabToolActionError(err) {
+    console.error("Lab tool world-click handler failed", err);
+    this.toast?.("Lab tool action failed.");
+  }
+
+  publishLabToolChange(change) {
+    if (typeof this.onLabToolChange !== "function") return;
+    this.onLabToolChange(change);
   }
 
   handleMenuKeyDown(ev) {

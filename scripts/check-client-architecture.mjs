@@ -99,10 +99,10 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "hud.js": 44208,
   // Room2 Phase 4 adds recipient diagnostic affordance parsing to GameState.
   "state.js": 39267,
-  // Lab MVP2 Phase 2 keeps active lab setup tools on the main input routing path.
-  "input/index.js": 40818,
-  // Lab MVP2 Phase 2 adds the Match-owned lab setup tool controller seam.
-  "match.js": 46234,
+  // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
+  "input/index.js": 40927,
+  // Lab MVP2 Phase 5 publishes lab setup-tool state changes back to the app-owned panel.
+  "match.js": 46952,
   // Overpenetration event split adds a mirrored event tag, compact code, and decoder branch.
   "protocol.js": 44877,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.

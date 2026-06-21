@@ -1568,6 +1568,16 @@ input[type="text"]:focus {
 .lab-btn:focus-visible {
   border-color: var(--accent);
 }
+.lab-btn:disabled {
+  border-color: rgba(91, 83, 65, 0.55);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.lab-btn[data-active="true"] {
+  border-color: var(--accent);
+  background: rgba(64, 89, 76, 0.9);
+}
 .lab-team-union {
   display: flex;
   align-items: center;
@@ -1586,6 +1596,31 @@ input[type="text"]:focus {
   display: grid;
   gap: 8px;
   margin-top: 10px;
+}
+.lab-active-tool {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px;
+  background: rgba(15, 17, 18, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.lab-active-tool[data-active="true"] {
+  border-color: rgba(199, 208, 122, 0.62);
+  background: rgba(33, 47, 41, 0.78);
+}
+.lab-active-tool-label,
+.lab-active-tool-detail {
+  grid-column: 1;
+}
+.lab-active-tool-label {
+  color: var(--ink);
+}
+.lab-cancel-tool {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: stretch;
 }
 .lab-tool-group {
   display: grid;
@@ -1640,7 +1675,9 @@ input[type="text"]:focus {
 }
 .lab-spawn-option[data-selected="true"] {
   border-color: var(--accent);
-  background: rgba(64, 89, 76, 0.9);
+}
+.lab-spawn-option[data-active="true"] {
+  color: #f4f0d8;
 }
 .lab-result {
   margin: 10px 0 0;

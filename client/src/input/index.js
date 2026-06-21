@@ -114,7 +114,7 @@ export class Input {
    * @param {import("./router.js").MatchInputRouter} [inputRouter] optional UI input router
    * @param {import("../hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey profile service.
    * @param {import("../client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
-   * @param {{consumeWorldClick?: (event: object) => void}} [labToolController] active lab setup tool callback seam.
+   * @param {{consumeWorldClick?: (event: object) => void, cancel?: (reason:string) => object|null}} [labToolController] active lab setup tool callback seam.
    */
   constructor(
     domElement,
@@ -286,7 +286,9 @@ export class Input {
     try {
       this.labToolController?.consumeWorldClick?.(event);
     } finally {
-      if (intent.activeLabTool?.id === tool.id) intent.cancelLabTool?.("worldClick");
+      if (intent.activeLabTool?.id === tool.id) {
+        this.labToolController?.cancel?.("worldClick") || intent.cancelLabTool?.("worldClick");
+      }
     }
     return true;
   }
