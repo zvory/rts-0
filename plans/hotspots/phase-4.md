@@ -1,6 +1,6 @@
 # Phase 4 - Repeatable Hotspot Workflow
 
-Status: planned.
+Status: done.
 
 ## Goal
 
