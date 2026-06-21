@@ -1654,6 +1654,22 @@ input[type="text"]:focus {
   line-height: 1.45;
 }
 
+.lobby-create-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.lobby-create-error {
+  min-height: 20px;
+  color: var(--bad) !important;
+}
+
 .lobby-alert-actions {
   display: flex;
   gap: 10px;

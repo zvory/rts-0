@@ -787,9 +787,18 @@ export function sortLobbySummaries(rows)
 export function formatLobbyAge(createdAtUnixMs, nowMs?)
 export function lobbyStatusLabel(joinState)
 export function lobbyActionLabel(joinState)
+export function validateLobbyName(rawName)
 export class LobbyBrowserView {
   constructor(rootEl)
-  render({ rows?, loading?, connected?, error?, nowMs? })
+  render({ rows?, loading?, connected?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
+  destroy()
+}
+export class LobbyCreateModal {
+  constructor(hostEl, { onSubmit? })
+  open(trigger?)
+  close({ restoreFocus? }?)
+  setError(message)
+  setPending(pending)
   destroy()
 }
 ```

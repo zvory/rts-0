@@ -11,6 +11,7 @@ import { S } from "./protocol.js";
 import {
   LOBBY_BROWSER_POLL_MS,
   LobbyBrowserView,
+  LobbyCreateModal,
 } from "./lobby_browser_view.js";
 import {
   DEFAULT_AI_PROFILE_ID,
@@ -85,6 +86,9 @@ export class Lobby {
     this.selMap = rootEl.querySelector("#lobby-map");
     this.rosterView = new LobbyRosterView(this.elPlayers);
     this.browserView = new LobbyBrowserView(rootEl.querySelector("#lobby-browser"));
+    this.createModal = new LobbyCreateModal(rootEl, {
+      onSubmit: (room) => this._submitCreateLobby(room),
+    });
 
     // Local lobby state.
     this._joined = false;
@@ -114,7 +118,9 @@ export class Lobby {
     this._browserPollTimer = undefined;
     this._browserAbort = null;
     this._browserLoading = false;
-    this._browserConnected = true;
+    this._browserConnected = false;
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
     this._fetchImpl =
       typeof window !== "undefined" && typeof window.fetch === "function"
         ? window.fetch.bind(window)
@@ -125,16 +131,19 @@ export class Lobby {
     this._onMatchCountdown = (m) => this._renderMatchCountdown(m);
     this._onStart = () => this._handleStart();
     this._onJoinReplayPrompt = (m) => this._handleJoinReplayPrompt(m);
-    this._onError = (m) => this.setStatus((m && m.msg) || "Error", true);
+    this._onError = (m) => this._handleServerError((m && m.msg) || "Error");
     this._onOpen = () => {
       this._browserConnected = true;
       this._renderLobbyBrowser();
+      this._reflectCreateButton();
       this.setStatus("Connected.");
       this._refreshLobbyBrowser();
     };
     this._onClose = () => {
       this._browserConnected = false;
+      this._browserActionPending = false;
       this._renderLobbyBrowser({ error: "Disconnected." });
+      this._reflectCreateButton();
       this.setStatus("Disconnected from server.", true);
     };
     this._onReplayPromptKeydown = (ev) => this._handleReplayPromptKeydown(ev);
@@ -178,6 +187,7 @@ export class Lobby {
     // Join: send join, persist name, reveal the room block. The server confirms with a
     // `lobby` message which fills in the player list.
     this.btnJoin.addEventListener("click", () => this._join());
+    this.btnCreateLobby?.addEventListener("click", () => this._openCreateLobby(this.btnCreateLobby));
     // The hidden room field keeps legacy/dev joins available without exposing manual room entry.
     for (const el of [this.elRoom]) {
       if (!el) continue;
@@ -231,14 +241,69 @@ export class Lobby {
   _join() {
     const name = (this.elName && this.elName.value.trim()) || "Commander";
     const room = (this.elRoom && this.elRoom.value.trim()) || "main";
-    this._persistName(name);
-    this.net.join(name, room, false);
+    this._sendJoin({ name, room, spectator: false });
     this._joined = true;
     this._stopLobbyBrowserPolling();
     this._spectator = false;
     this._reflectJoinedState(false);
     this.setStatus(`Joining "${room}"…`);
     this._reflectReadyButton();
+  }
+
+  _joinBrowserLobby(row, { spectator = false } = {}) {
+    const room = String(row?.room || "").trim();
+    if (!room || this._browserActionPending) return;
+    const name = (this.elName && this.elName.value.trim()) || "Commander";
+    this._browserActionPending = true;
+    this._pendingBrowserJoinRoom = room;
+    this._spectator = !!spectator;
+    if (this.elRoom) this.elRoom.value = room;
+    this._sendJoin({ name, room, spectator: !!spectator });
+    this.setStatus(`Joining "${room}"${spectator ? " as spectator" : ""}...`);
+    this._renderLobbyBrowser();
+    this._reflectReadyButton();
+    this._reflectCreateButton();
+  }
+
+  _sendJoin({ name, room, spectator }) {
+    this._persistName(name);
+    this.net.join(name, room, spectator);
+  }
+
+  _openCreateLobby(trigger) {
+    if (this._joined || this._browserActionPending || !this._browserConnected) return;
+    this.createModal?.open(trigger);
+  }
+
+  async _submitCreateLobby(room) {
+    if (!this._fetchImpl) {
+      this.createModal?.setError("Network disconnected.");
+      return false;
+    }
+    if (!this._browserConnected) {
+      this.createModal?.setError("Network disconnected.");
+      return false;
+    }
+    try {
+      const response = await this._fetchImpl("/api/lobbies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room }),
+      });
+      if (!response?.ok) {
+        this.createModal?.setError(await readLobbyApiError(response));
+        await this._refreshLobbyBrowser({ force: true });
+        return false;
+      }
+      const payload = await response.json().catch(() => ({}));
+      const createdRoom = String(payload?.room || room).trim() || room;
+      this._joinBrowserLobby({ room: createdRoom }, { spectator: false });
+      return true;
+    } catch (_) {
+      this.createModal?.setError("Network disconnected.");
+      await this._refreshLobbyBrowser({ force: true });
+      return false;
+    }
   }
 
   // --- Net wiring ------------------------------------------------------------
@@ -264,6 +329,7 @@ export class Lobby {
     this.net.off("close", this._onClose);
     this._stopLobbyBrowserPolling();
     this.browserView?.destroy();
+    this.createModal?.destroy();
     this._clearCountdown();
     this._hideReplayPrompt(false);
     this._replayPrompt?.root.remove();
@@ -287,6 +353,8 @@ export class Lobby {
 
     // Once a lobby arrives we are definitively joined; make sure the room block shows.
     this._joined = true;
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
     this._stopLobbyBrowserPolling();
     this._reflectJoinedState(true);
 
@@ -421,6 +489,27 @@ export class Lobby {
     this.elStatus.classList.toggle("error", !!isError);
   }
 
+  _handleServerError(message) {
+    this.setStatus(message, true);
+    if (!this._browserActionPending) return;
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
+    this._joined = false;
+    this._spectator = false;
+    this._reflectJoinedState(false);
+    this._reflectReadyButton();
+    this._reflectCreateButton();
+    this._startLobbyBrowserPolling();
+    void this._refreshLobbyBrowser({ force: true });
+  }
+
+  _reflectCreateButton() {
+    if (!this.btnCreateLobby) return;
+    const busy = this._browserActionPending;
+    this.btnCreateLobby.hidden = this._joined;
+    this.btnCreateLobby.disabled = this._joined || busy || !this._browserConnected || !this._fetchImpl;
+  }
+
   _startLobbyBrowserPolling() {
     if (this._joined || this.root.hidden || !this.browserView || !this._fetchImpl) return;
     this._refreshLobbyBrowser({ loading: this.browserView.rows.length === 0 });
@@ -441,9 +530,12 @@ export class Lobby {
     this._browserLoading = false;
   }
 
-  async _refreshLobbyBrowser({ loading = false } = {}) {
+  async _refreshLobbyBrowser({ loading = false, force = false } = {}) {
     if (this._joined || this.root.hidden || !this.browserView || !this._fetchImpl) return;
-    if (this._browserLoading) return;
+    if (this._browserLoading) {
+      if (!force) return;
+      this._browserAbort?.abort();
+    }
     this._browserLoading = true;
     this._renderLobbyBrowser({ loading, error: "" });
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -470,6 +562,7 @@ export class Lobby {
       });
     } catch (err) {
       if (err?.name === "AbortError") {
+        if (controller && this._browserAbort !== controller) return;
         this._browserLoading = false;
         return;
       }
@@ -486,6 +579,9 @@ export class Lobby {
       connected: this._browserConnected,
       error,
       nowMs: Date.now(),
+      actionsDisabled: this._browserActionPending,
+      onCreateLobby: (trigger) => this._openCreateLobby(trigger),
+      onJoinLobby: (row, options) => this._joinBrowserLobby(row, options),
     });
   }
 
@@ -583,6 +679,8 @@ export class Lobby {
   _handleJoinReplayPrompt(m) {
     const room = (m?.room || "").trim() || ((this.elRoom && this.elRoom.value.trim()) || "main");
     this._joined = false;
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
     this._reflectJoinedState(false);
     this._startLobbyBrowserPolling();
     this.setStatus(`Room "${room}" is watching a replay.`, true);
@@ -725,6 +823,20 @@ export class Lobby {
     if (this.elSetupKicker) this.elSetupKicker.textContent = hasLobby ? "Host controls" : "Commander";
     if (this.elSetupTitle) this.elSetupTitle.textContent = hasLobby ? "Match setup" : "Lobby browser";
     if (this.btnJoin) this.btnJoin.textContent = hasLobby ? "Switch room" : "Join room";
+    this._reflectCreateButton();
     if (!hasLobby && !this._joined) this._startLobbyBrowserPolling();
   }
+}
+
+async function readLobbyApiError(response) {
+  try {
+    const payload = await response.json();
+    if (payload?.error) return String(payload.error);
+  } catch (_) {
+    // Fall through to status-based copy below.
+  }
+  if (response?.status === 409) return "Lobby name is already in use.";
+  if (response?.status === 503) return "Server is draining for deploy; new lobbies are disabled.";
+  if (response?.status === 400) return "Lobby name is invalid.";
+  return `Create lobby failed (${response?.status || "network"}).`;
 }
