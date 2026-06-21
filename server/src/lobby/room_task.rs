@@ -15,7 +15,7 @@ use super::tick_control::{RoomTimeClock, RoomTimeSpeed, ScheduledTickAction, Tic
 use super::*;
 use crate::protocol::{
     Command, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
-    LabState, LabVisionMode, LivePauseState, RoomTimeState, DEFAULT_FACTION_ID,
+    LabState, LabVisionMode, LivePauseState, NoticeSeverity, RoomTimeState, DEFAULT_FACTION_ID,
 };
 #[cfg(test)]
 use crate::protocol::{
@@ -108,6 +108,16 @@ pub(super) fn match_history_participants_are_automated(participants: &[String]) 
         has_bravo |= name == "Bravo";
     }
     has_alpha && has_bravo
+}
+
+fn late_spectator_notice_name(name: &str) -> String {
+    let cleaned: String = name.trim().chars().filter(|ch| !ch.is_control()).collect();
+    let cleaned = cleaned.trim();
+    if cleaned.is_empty() {
+        "Commander".to_string()
+    } else {
+        cleaned.to_string()
+    }
 }
 
 fn live_ai_controllers(
@@ -537,9 +547,6 @@ pub(super) struct RoomTask {
     order: Vec<u32>,
     /// Wall-clock creation/reset time for the public lobby browser age column.
     created_at_unix_ms: u64,
-    /// Empty lobbies created through POST /api/lobbies are briefly reserved for the creating
-    /// client's follow-up WebSocket join. If that join never arrives, the name can be reclaimed.
-    empty_lobby_reserved_until_unix_ms: Option<u64>,
     pub(super) players: HashMap<u32, RoomPlayer>,
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
     /// only when the room empties of humans.
@@ -581,6 +588,9 @@ pub(super) struct RoomTask {
     room_time_paused: bool,
     slow_tick_count: u32,
     pending_client_command_acks: Vec<PendingClientCommandAck>,
+    /// Recipient-specific room-owned notices appended to the next live snapshot for each
+    /// connection id. Used when the notice is about room membership rather than sim events.
+    pending_recipient_notices: HashMap<u32, Vec<Event>>,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
     db: Option<Arc<Db>>,
     /// When true, rows written by this room are hidden from non-localhost match-history reads.
@@ -613,7 +623,6 @@ impl RoomTask {
             mode,
             order: Vec::new(),
             created_at_unix_ms: current_unix_ms(),
-            empty_lobby_reserved_until_unix_ms: None,
             players: HashMap::new(),
             ai_players: Vec::new(),
             human_team_assignments: HashMap::new(),
@@ -637,6 +646,7 @@ impl RoomTask {
             room_time_paused: false,
             slow_tick_count: 0,
             pending_client_command_acks: Vec::new(),
+            pending_recipient_notices: HashMap::new(),
             db,
             match_history_local_only,
             match_started_at: None,
@@ -788,9 +798,6 @@ impl RoomTask {
             RoomEvent::Summary { reply } => {
                 let _ = reply.send(self.lobby_summary());
             }
-            RoomEvent::ReserveEmptyPublicLobby { reply } => {
-                let _ = reply.send(self.try_reserve_empty_public_lobby_name());
-            }
             RoomEvent::Join {
                 player_id,
                 name,
@@ -938,35 +945,6 @@ impl RoomTask {
         })
     }
 
-    pub(super) fn reserve_empty_public_lobby_name(&mut self) {
-        let now = current_unix_ms();
-        self.created_at_unix_ms = now;
-        self.empty_lobby_reserved_until_unix_ms =
-            Some(now.saturating_add(EMPTY_LOBBY_RESERVATION_TTL_MS));
-    }
-
-    fn try_reserve_empty_public_lobby_name(&mut self) -> bool {
-        if !self.empty_public_lobby_name_is_reusable() {
-            return false;
-        }
-        self.reserve_empty_public_lobby_name();
-        true
-    }
-
-    fn empty_public_lobby_name_is_reusable(&self) -> bool {
-        matches!(self.mode, RoomMode::Normal)
-            && matches!(self.phase, Phase::Lobby)
-            && self.players.is_empty()
-            && self.ai_players.is_empty()
-            && self.match_countdown_deadline.is_none()
-            && !self.empty_lobby_reservation_is_active(current_unix_ms())
-    }
-
-    fn empty_lobby_reservation_is_active(&self, now_unix_ms: u64) -> bool {
-        self.empty_lobby_reserved_until_unix_ms
-            .is_some_and(|reserved_until| reserved_until > now_unix_ms)
-    }
-
     fn on_drain_started(&mut self, notice: DrainNotice) {
         self.broadcast_shutdown_warning(notice);
         if matches!(self.phase, Phase::Lobby) {
@@ -1106,7 +1084,6 @@ impl RoomTask {
                 last_sim_consumed_client_tick: None,
             },
         );
-        self.empty_lobby_reserved_until_unix_ms = None;
         self.reassign_host_if_needed();
         if !spectator {
             self.assign_missing_team_for(player_id);
@@ -1163,10 +1140,14 @@ impl RoomTask {
         };
         payload.match_run_id = self.match_run_id.clone();
 
+        let notice_recipients = self.late_spectator_notice_recipient_ids();
+        let notice_name = late_spectator_notice_name(&name);
+
         self.insert_human_spectator(player_id, name, msg_tx);
         crate::log_debug!(room = %self.room, player_id, "joined live match as spectator");
         let _ = ack.send(true);
         self.send_current_shutdown_warning_to(player_id);
+        self.enqueue_late_spectator_join_notice(notice_recipients, notice_name);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
         let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
@@ -1213,6 +1194,32 @@ impl RoomTask {
         self.reassign_host_if_needed();
     }
 
+    fn late_spectator_notice_recipient_ids(&self) -> Vec<u32> {
+        self.order
+            .iter()
+            .copied()
+            .filter(|id| self.players.contains_key(id))
+            .collect()
+    }
+
+    fn enqueue_late_spectator_join_notice(&mut self, recipients: Vec<u32>, spectator_name: String) {
+        if recipients.is_empty() {
+            return;
+        }
+        let notice = Event::Notice {
+            msg: format!("{spectator_name} has joined the match as a spectator"),
+            severity: NoticeSeverity::Info,
+            x: None,
+            y: None,
+        };
+        for id in recipients {
+            self.pending_recipient_notices
+                .entry(id)
+                .or_default()
+                .push(notice.clone());
+        }
+    }
+
     fn prompt_for_replay_join(
         &self,
         player_id: u32,
@@ -1238,6 +1245,7 @@ impl RoomTask {
         self.order.retain(|&id| id != player_id);
         self.human_team_assignments.remove(&player_id);
         self.human_faction_assignments.remove(&player_id);
+        self.pending_recipient_notices.remove(&player_id);
         if let Some(session) = &mut self.lab_session {
             session.remove_viewer(player_id);
         }
@@ -3223,6 +3231,7 @@ impl RoomTask {
             branch_live_seat_by_connection: &self.branch_live_seat_by_connection,
             ai_controllers: &mut self.ai_controllers,
             pending_client_command_acks: &mut self.pending_client_command_acks,
+            pending_recipient_notices: &mut self.pending_recipient_notices,
             slow_tick_count: &mut self.slow_tick_count,
             spectator_visible_players,
             full_world_view_player_id,
@@ -4244,6 +4253,7 @@ impl RoomTask {
         self.match_human_count = 0;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
+        self.pending_recipient_notices.clear();
         self.reset_live_pause_state();
         for player in self.players.values_mut() {
             player.ready = false;
@@ -4261,12 +4271,12 @@ impl RoomTask {
     fn reset_empty_room_state(&mut self) {
         self.phase = Phase::Lobby;
         self.created_at_unix_ms = current_unix_ms();
-        self.empty_lobby_reserved_until_unix_ms = None;
         self.match_countdown_deadline = None;
         self.match_player_count = 0;
         self.match_human_count = 0;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
+        self.pending_recipient_notices.clear();
         self.reset_live_pause_state();
         self.lab_session = None;
         self.host_id = None;
@@ -4357,6 +4367,7 @@ impl RoomTask {
     fn reset_match_net_status(&mut self) {
         self.slow_tick_count = 0;
         self.pending_client_command_acks.clear();
+        self.pending_recipient_notices.clear();
         for player in self.players.values_mut() {
             player.head_of_line_count = 0;
             player.last_received_client_seq = 0;
@@ -4907,6 +4918,51 @@ mod tests {
         std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
             .filter(|msg| matches!(msg, ServerMessage::BranchStaging { .. }))
             .collect()
+    }
+
+    fn snapshot_notice_events(writer: &mut ConnectionWriter) -> Vec<Event> {
+        writer
+            .snapshots
+            .take()
+            .map(|snapshot| {
+                snapshot
+                    .events
+                    .into_iter()
+                    .filter(|event| matches!(event, Event::Notice { .. }))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn assert_single_late_spectator_notice(writer: &mut ConnectionWriter, expected_msg: &str) {
+        let notices = snapshot_notice_events(writer);
+        assert_eq!(
+            notices
+                .iter()
+                .filter(|event| matches!(event, Event::Notice { msg, .. } if msg == expected_msg))
+                .count(),
+            1,
+            "expected exactly one notice {expected_msg:?}, got {notices:?}"
+        );
+        assert!(notices.iter().any(|event| matches!(
+            event,
+            Event::Notice {
+                msg,
+                severity: NoticeSeverity::Info,
+                x: None,
+                y: None
+            } if msg == expected_msg
+        )));
+    }
+
+    fn assert_no_late_spectator_notice(writer: &mut ConnectionWriter, expected_msg: &str) {
+        let notices = snapshot_notice_events(writer);
+        assert!(
+            !notices
+                .iter()
+                .any(|event| matches!(event, Event::Notice { msg, .. } if msg == expected_msg)),
+            "unexpected notice {expected_msg:?}: {notices:?}"
+        );
     }
 
     fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
@@ -6128,6 +6184,214 @@ mod tests {
             ServerMessage::ObserverAnalysis(analysis)
                 if analysis.tick == expected.tick && !analysis.players.is_empty()
         )));
+    }
+
+    #[test]
+    fn late_spectator_notice_targets_existing_recipients_once() {
+        let mut task = RoomTask::new(
+            "late-spectator-notice-targeting-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_active_one = add_test_room_player(&mut task, 1, true);
+        let mut writer_active_two = add_test_room_player(&mut task, 2, true);
+        let mut writer_existing_spectator = add_test_room_spectator(&mut task, 50);
+
+        task.start_match();
+        let _ = start_payloads(&mut writer_active_one);
+        let _ = start_payloads(&mut writer_active_two);
+        let _ = start_payloads(&mut writer_existing_spectator);
+        task.on_tick(TokioInstant::now());
+        let _ = writer_active_one.snapshots.take();
+        let _ = writer_active_two.snapshots.take();
+        let _ = writer_existing_spectator.snapshots.take();
+
+        let (msg_tx, mut writer_new_spectator) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Late Scout".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert_eq!(task.match_player_count, 2);
+        assert_eq!(task.match_human_count, 2);
+        assert_eq!(
+            task.match_participants,
+            vec!["Player 1".to_string(), "Player 2".to_string()]
+        );
+        let summary = task
+            .lobby_summary()
+            .expect("live room should stay in the public browser");
+        assert_eq!(summary.spectator_count, 2);
+
+        task.on_tick(TokioInstant::now());
+        let expected = "Late Scout has joined the match as a spectator";
+        assert_single_late_spectator_notice(&mut writer_active_one, expected);
+        assert_single_late_spectator_notice(&mut writer_active_two, expected);
+        assert_single_late_spectator_notice(&mut writer_existing_spectator, expected);
+        assert_no_late_spectator_notice(&mut writer_new_spectator, expected);
+        assert!(task.pending_recipient_notices.is_empty());
+
+        task.on_tick(TokioInstant::now());
+        assert_no_late_spectator_notice(&mut writer_active_one, expected);
+        assert_no_late_spectator_notice(&mut writer_active_two, expected);
+        assert_no_late_spectator_notice(&mut writer_existing_spectator, expected);
+        assert_no_late_spectator_notice(&mut writer_new_spectator, expected);
+    }
+
+    #[test]
+    fn late_spectator_notice_uses_commander_for_blank_or_control_name() {
+        let mut task = RoomTask::new(
+            "late-spectator-notice-commander-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_active = add_test_room_player(&mut task, 1, true);
+        task.start_match();
+        let _ = start_payloads(&mut writer_active);
+        task.on_tick(TokioInstant::now());
+        let _ = writer_active.snapshots.take();
+
+        let (msg_tx, mut writer_new_spectator) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, " \n\u{0007}\t ".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        task.on_tick(TokioInstant::now());
+        let expected = "Commander has joined the match as a spectator";
+        assert_single_late_spectator_notice(&mut writer_active, expected);
+        assert_no_late_spectator_notice(&mut writer_new_spectator, expected);
+    }
+
+    #[test]
+    fn late_spectator_notice_is_not_emitted_for_rejected_active_join() {
+        let mut task = RoomTask::new(
+            "late-spectator-notice-active-reject-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_active = add_test_room_player(&mut task, 1, true);
+        task.start_match();
+        let _ = start_payloads(&mut writer_active);
+        task.on_tick(TokioInstant::now());
+        let _ = writer_active.snapshots.take();
+
+        let (msg_tx, mut writer_rejected) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Late Active".to_string(), false, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(false));
+        assert!(!task.players.contains_key(&99));
+        assert!(task.pending_recipient_notices.is_empty());
+        assert!(matches!(
+            writer_rejected.reliable_rx.try_recv().unwrap(),
+            ServerMessage::Error { msg } if msg.contains("join as a spectator")
+        ));
+
+        task.on_tick(TokioInstant::now());
+        assert_no_late_spectator_notice(
+            &mut writer_active,
+            "Late Active has joined the match as a spectator",
+        );
+    }
+
+    #[test]
+    fn late_spectator_notice_queues_while_live_paused() {
+        let mut task = RoomTask::new(
+            "late-spectator-notice-live-pause-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_active_one = add_test_room_player(&mut task, 1, true);
+        let mut writer_active_two = add_test_room_player(&mut task, 2, true);
+
+        task.start_match();
+        let _ = start_payloads(&mut writer_active_one);
+        let _ = start_payloads(&mut writer_active_two);
+        task.on_tick(TokioInstant::now());
+        let _ = writer_active_one.snapshots.take();
+        let _ = writer_active_two.snapshots.take();
+        task.on_pause_game(1);
+        assert!(task.live_paused);
+
+        let (msg_tx, mut writer_new_spectator) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Paused Scout".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert!(!task.pending_recipient_notices.is_empty());
+        task.on_tick(TokioInstant::now());
+        assert!(
+            writer_active_one.snapshots.take().is_none(),
+            "paused live ticks should not fan out snapshots"
+        );
+        assert!(
+            writer_active_two.snapshots.take().is_none(),
+            "paused live ticks should not fan out snapshots"
+        );
+
+        task.on_unpause_game(2);
+        task.on_tick(TokioInstant::now());
+        let expected = "Paused Scout has joined the match as a spectator";
+        assert_single_late_spectator_notice(&mut writer_active_one, expected);
+        assert_single_late_spectator_notice(&mut writer_active_two, expected);
+        assert_no_late_spectator_notice(&mut writer_new_spectator, expected);
+        assert!(task.pending_recipient_notices.is_empty());
+    }
+
+    #[test]
+    fn late_spectator_notice_lifecycle_keeps_active_match_counts() {
+        let mut task = RoomTask::new(
+            "late-spectator-notice-lifecycle-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_active_one = add_test_room_player(&mut task, 1, true);
+        let mut writer_active_two = add_test_room_player(&mut task, 2, true);
+        task.start_match();
+        let _ = start_payloads(&mut writer_active_one);
+        let _ = start_payloads(&mut writer_active_two);
+        task.on_tick(TokioInstant::now());
+        let _ = writer_active_one.snapshots.take();
+        let _ = writer_active_two.snapshots.take();
+
+        let (msg_tx, _writer_late_spectator) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Lifecycle Scout".to_string(), true, false, msg_tx, ack);
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert_eq!(task.match_player_count, 2);
+        assert_eq!(task.active_human_count(), 2);
+        assert_eq!(
+            task.match_participants,
+            vec!["Player 1".to_string(), "Player 2".to_string()]
+        );
+
+        let before_alive = match &task.phase {
+            Phase::InGame(game) => game.alive_players(),
+            _ => panic!("expected live match"),
+        };
+        assert_eq!(before_alive.len(), 2);
+
+        task.on_leave(99);
+        let summary = task
+            .lobby_summary()
+            .expect("live room should stay in the public browser after spectator leaves");
+        assert_eq!(summary.spectator_count, 0);
+        assert_eq!(task.match_player_count, 2);
+        assert_eq!(task.active_human_count(), 2);
+        let after_alive = match &task.phase {
+            Phase::InGame(game) => game.alive_players(),
+            _ => panic!("expected live match"),
+        };
+        assert_eq!(after_alive, before_alive);
     }
 
     #[test]

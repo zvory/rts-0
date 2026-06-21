@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -72,18 +72,18 @@ join name is blank or otherwise unavailable, and avoid adding any modal or extra
 
 ## Implementation Checklist
 
-- [ ] Mid-match spectator joins enqueue the exact info notice text.
-- [ ] Blank or unavailable names fall back to `Commander`.
-- [ ] Active players receive the notice.
-- [ ] Existing spectators receive the notice.
-- [ ] The newly joined spectator is excluded unless the implementation records an intentional
+- [x] Mid-match spectator joins enqueue the exact info notice text.
+- [x] Blank or unavailable names fall back to `Commander`.
+- [x] Active players receive the notice.
+- [x] Existing spectators receive the notice.
+- [x] The newly joined spectator is excluded unless the implementation records an intentional
       product change.
-- [ ] Notice delivery is one-shot.
-- [ ] Paused-match notice behavior is covered and documented.
-- [ ] Late spectator disconnects do not affect active armies or match outcomes.
-- [ ] Docs and tests are updated.
-- [ ] Verification is run and recorded.
-- [ ] This phase file is marked done in the implementation commit.
+- [x] Notice delivery is one-shot.
+- [x] Paused-match notice behavior is covered and documented.
+- [x] Late spectator disconnects do not affect active armies or match outcomes.
+- [x] Docs and tests are updated.
+- [x] Verification is run and recorded.
+- [x] This phase file is marked done in the implementation commit.
 
 ## Verification
 

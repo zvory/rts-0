@@ -71,6 +71,7 @@ try {
       hasLaunchCopy: /Launch|Ready check/.test(document.querySelector(".lobby-launch-panel")?.textContent || ""),
       mapSelectInSummary: !!document.querySelector(".lobby-status-grid #lobby-map:not([hidden])"),
       mapSelectInSidePanel: !!document.querySelector(".lobby-form #lobby-map"),
+      hasSidebarAddAi: !!document.querySelector("#lobby-add-ai"),
       statusText: document.querySelector("#lobby-status")?.textContent || "",
       seatDisplay: seat ? getComputedStyle(seat).display : "",
     };
@@ -86,6 +87,7 @@ try {
     "lobby omits mode summary, launch header copy, and room/player status text");
   ok(teamUi.mapSelectInSummary && !teamUi.mapSelectInSidePanel,
     "host map selector renders in the summary row instead of the setup panel");
+  ok(!teamUi.hasSidebarAddAi, "lobby keeps Add AI contextual to the team roster");
   ok(!teamUi.hasTeamMarks && teamUi.seatDisplay === "grid",
     `lobby teams have no color marks and player rows align with grid (${teamUi.seatDisplay})`);
 

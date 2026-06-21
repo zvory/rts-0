@@ -288,7 +288,14 @@ alive.
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
   read-only live spectator attach. Spectators receive `StartPayload.spectator = true` and live
   `game.snapshot_for_spectator(active_player_ids)` snapshots, but are not included in `PlayerInit`,
-  command routing, elimination, pause authority, or match-player counts.
+  command routing, elimination, pause authority, or match-player counts. `RoomTask` captures the
+  existing connected recipient ids before inserting a late spectator and queues a room-owned
+  position-free info notice for those recipients only: `<name> has joined the match as a
+  spectator`, with `Commander` used for empty/control-only names. The queue is keyed by connection
+  id and appended after normal live projection in `LiveTickDriver`, then cleared for each recipient
+  only after snapshot fanout accepts that recipient's next live snapshot. While live pause is active
+  no snapshot fanout occurs, so queued late-spectator notices wait for the next emitted live
+  snapshot after unpause.
 - Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
   room-owned collaborator session record. Direct lab joiners currently receive the operator role;
   the original joiner remains in `operatorId` metadata for compatibility, not as the only mutation
@@ -336,8 +343,8 @@ AI controllers, or Tokio coordination into `rts-sim`:
   pending snapshot clearing, and the send loop. Replay viewer payloads remain in
   `replay_session.rs` because they also carry replay metadata.
 - `live_tick.rs` runs one live simulation tick around the existing `Game` seam: AI command enqueue,
-  `Game::tick`, snapshot fanout, observer analysis, defeat/game-over checks, and panic replay
-  capture.
+  `Game::tick`, recipient-specific room notice injection after projection, snapshot fanout,
+  observer analysis, defeat/game-over checks, and panic replay capture.
 - `replay_session.rs` owns replay playback state, seek/keyframe policy, per-viewer replay vision,
   and post-match/dedicated replay start payloads.
 - `replay_branch.rs` owns branch staging state, original replay-seat claim/release policy, and

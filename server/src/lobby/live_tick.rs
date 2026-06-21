@@ -37,6 +37,7 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) branch_live_seat_by_connection: &'a HashMap<u32, u32>,
     pub(super) ai_controllers: &'a mut [AiController],
     pub(super) pending_client_command_acks: &'a mut Vec<PendingClientCommandAck>,
+    pub(super) pending_recipient_notices: &'a mut HashMap<u32, Vec<Event>>,
     pub(super) slow_tick_count: &'a mut u32,
     pub(super) spectator_visible_players: Vec<u32>,
     pub(super) full_world_view_player_id: Option<u32>,
@@ -177,8 +178,9 @@ impl LiveTickDriver<'_> {
         let spectator_visible_players = self.spectator_visible_players.clone();
         let full_world_view_player_id = self.full_world_view_player_id;
         let lab_visible_player_ids = self.lab_visible_player_ids.clone();
+        let pending_recipient_notices = &*self.pending_recipient_notices;
 
-        SnapshotFanout::new(
+        let delivered_recipients = SnapshotFanout::new(
             self.room,
             scheduler_lag,
             self.tick_budget,
@@ -207,8 +209,15 @@ impl LiveTickDriver<'_> {
             };
             let snapshot =
                 projection.snapshot_with_events(game, per_player_events, &full_vision_events);
+            let mut snapshot = snapshot;
+            if let Some(notices) = pending_recipient_notices.get(&id) {
+                snapshot.events.extend(notices.iter().cloned());
+            }
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
+        for id in delivered_recipients {
+            self.pending_recipient_notices.remove(&id);
+        }
     }
 
     fn broadcast_observer_analysis(&self, game: &Game) {

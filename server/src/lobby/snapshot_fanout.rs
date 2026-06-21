@@ -52,9 +52,10 @@ impl<'a> SnapshotFanout<'a> {
         players: &mut HashMap<u32, RoomPlayer>,
         recipients: impl IntoIterator<Item = u32>,
         mut snapshot_for: impl FnMut(u32, &RoomPlayer) -> Option<SnapshotFanoutPayload>,
-    ) {
+    ) -> Vec<u32> {
         let mut slow_tick_counted = false;
         let fanout_start = StdInstant::now();
+        let mut delivered_recipients = Vec::new();
 
         for id in recipients {
             let Some(player) = players.get(&id) else {
@@ -106,6 +107,12 @@ impl<'a> SnapshotFanout<'a> {
                 &player.msg_tx,
                 ServerMessage::Snapshot(snapshot),
             );
+            if matches!(
+                enqueue_status,
+                Some(SnapshotSendStatus::Stored | SnapshotSendStatus::Replaced)
+            ) {
+                delivered_recipients.push(id);
+            }
             if matches!(enqueue_status, Some(SnapshotSendStatus::Replaced)) {
                 if let Some(player) = players.get_mut(&id) {
                     player.head_of_line_count = player.head_of_line_count.saturating_add(1);
@@ -119,6 +126,7 @@ impl<'a> SnapshotFanout<'a> {
         if let Some(perf) = self.perf.as_mut() {
             perf.record_phase("snapshot_fanout", fanout_start.elapsed());
         }
+        delivered_recipients
     }
 }
 

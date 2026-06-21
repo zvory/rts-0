@@ -27,7 +27,7 @@
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
         Lobby:  #lobby-screen, #lobby-browser, #lobby-browser-rows, #lobby-name,
                 #lobby-create, #lobby-lab-open, #lobby-players, #lobby-ready,
-                #lobby-add-ai, #lobby-start, #lobby-status
+                #lobby-start, #lobby-status
                 #lobby-room and #lobby-join remain hidden compatibility controls, not visible
                 pre-join product controls.
                 Legacy quickstart remains a protocol/test compatibility command, not a visible
@@ -143,10 +143,6 @@
                   <input id="lobby-room" type="text" maxlength="24" value="main" autocomplete="off" />
                 </label>
                 <button id="lobby-join" class="btn primary" type="button">Join room</button>
-              </div>
-
-              <div class="lobby-host-tools lobby-joined-only">
-                <button id="lobby-add-ai" class="btn host-only" hidden>Add AI</button>
               </div>
             </div>
 

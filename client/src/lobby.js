@@ -80,7 +80,6 @@ export class Lobby {
     this.elSeatsSummary = rootEl.querySelector("#lobby-seats-summary");
     this.elObserversSummary = rootEl.querySelector("#lobby-observers-summary");
     this.btnReady = rootEl.querySelector("#lobby-ready");
-    this.btnAddAi = rootEl.querySelector("#lobby-add-ai");
     this.chkQuickstart = rootEl.querySelector("#lobby-quickstart");
     this.chkQuickstartInput = this.chkQuickstart?.querySelector("input[type='checkbox']") || null;
     this.btnStart = rootEl.querySelector("#lobby-start");
@@ -218,14 +217,6 @@ export class Lobby {
     if (this.chkQuickstartInput) {
       this.chkQuickstartInput.addEventListener("change", () => {
         this.net.setQuickstart(!!this.chkQuickstartInput.checked);
-      });
-    }
-
-    // Add AI: host-only. The server ignores it from non-hosts / when full, but we gate the UI too.
-    if (this.btnAddAi) {
-      this.btnAddAi.addEventListener("click", () => {
-        if (this.btnAddAi.disabled) return;
-        this.net.addAi(undefined, DEFAULT_AI_PROFILE_ID);
       });
     }
 
@@ -416,7 +407,6 @@ export class Lobby {
     this._reflectSummary(m.room, players);
     this._renderPlayers(players);
     this._reflectStartButton();
-    this._reflectAddAiButton();
     this._reflectQuickstart();
     this._reflectMap();
     this._reflectTeamPreset();
@@ -458,17 +448,6 @@ export class Lobby {
 
   _betaFactionSelectEnabled() {
     return betaFactionSelectEnabledForLocation(window.location);
-  }
-
-  /**
-   * Show the Add AI button only to the host, disabling it when the room is full
-   * ([`MAX_PLAYERS`]). The server enforces both rules regardless; this is just UI gating.
-   */
-  _reflectAddAiButton() {
-    if (!this.btnAddAi) return;
-    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
-    this.btnAddAi.hidden = !isHost;
-    this.btnAddAi.disabled = this._countdownActive || this._playerCount >= MAX_PLAYERS;
   }
 
   /** Keep an optional legacy quickstart control synced when an internal/test shell supplies one. */
@@ -677,7 +656,6 @@ export class Lobby {
     this._countdownActive = true;
     this._reflectReadyButton();
     this._reflectStartButton();
-    this._reflectAddAiButton();
     this._reflectQuickstart();
     this._reflectMap();
     this._reflectTeamPreset();
@@ -720,7 +698,6 @@ export class Lobby {
     }
     this._reflectReadyButton();
     this._reflectStartButton();
-    this._reflectAddAiButton();
     this._reflectQuickstart();
     this._reflectMap();
     this._reflectTeamPreset();
