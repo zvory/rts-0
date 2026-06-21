@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -58,26 +58,26 @@ input, minimap, or lab tool collaboration.
 
 ## Implementation Checklist
 
-- [ ] Confirm PR #257 and PR #258 are merged before starting implementation.
-- [ ] Confirm Phases 1 and 2 have merged and start from fresh `origin/main`.
-- [ ] Re-read the merged `plans/lab/debug-collab/phase-2.md` result and preserve later-joiner lab
+- [x] Confirm PR #257 and PR #258 are merged before starting implementation.
+- [x] Confirm Phases 1 and 2 have merged and start from fresh `origin/main`.
+- [x] Re-read the merged `plans/lab/debug-collab/phase-2.md` result and preserve later-joiner lab
       operator behavior.
-- [ ] Add an explicit policy/helper for whether a room mode may launch a new authoritative session
+- [x] Add an explicit policy/helper for whether a room mode may launch a new authoritative session
       during drain and whether that session is drain-tracked.
-- [ ] Apply the launch-during-drain gate before `on_join_lab()` creates a running lab from
+- [x] Apply the launch-during-drain gate before `on_join_lab()` creates a running lab from
       `Phase::Lobby`.
-- [ ] Keep already-running lab joins available so collaborators can attach during drain and receive
+- [x] Keep already-running lab joins available so collaborators can attach during drain and receive
       the shutdown warning.
-- [ ] Ensure lab start accounting happens only after a successful `start_lab_session()` launch.
-- [ ] Ensure failed lab starts and rejected lab joins during drain do not increment
+- [x] Ensure lab start accounting happens only after a successful `start_lab_session()` launch.
+- [x] Ensure failed lab starts and rejected lab joins during drain do not increment
       `active_match_count()`.
-- [ ] Ensure empty lab rooms still reset to lobby, clear `lab_session`, decrement drain accounting
+- [x] Ensure empty lab rooms still reset to lobby, clear `lab_session`, decrement drain accounting
       when tracked, and remain `RoomMode::Lab`.
-- [ ] Add regression tests for drain-blocked first lab join, already-running lab collaborator join
+- [x] Add regression tests for drain-blocked first lab join, already-running lab collaborator join
       during drain, lab empty-room reset/accounting, and policy classification.
-- [ ] Avoid client collaboration, replay, branch, room-time UI, and start-payload-builder changes.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase file done in the implementation commit.
+- [x] Avoid client collaboration, replay, branch, room-time UI, and start-payload-builder changes.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase file done in the implementation commit.
 
 ## Verification
 

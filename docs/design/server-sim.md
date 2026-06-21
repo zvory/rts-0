@@ -298,14 +298,16 @@ alive.
   snapshot after unpause. Replay-branch live rooms use the same observer attach shape for late joins
   to the private branch room; they do not return to branch staging or create another original-seat
   mapping.
-- Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
-  room-owned collaborator session record. Direct lab joiners currently receive the operator role;
-  the original joiner remains in `operatorId` metadata for compatibility, not as the only mutation
-  authority. They use the shared launch helper with `StartPayload.lab` metadata and prediction
-  disabled. Lab setup mutations call `Game::apply_lab_op`; issue-as commands call
-  `Game::issue_lab_command_as`, which rejects mixed-owner selections before queuing a normal
-  command. Lab state, dirty flags, viewer roles, selected vision, and append-only operation log
-  records stay in the room task rather than in `Game`.
+- Lab rooms are hidden `RoomMode::Lab` rooms that start a drain-tracked real `Game` on first join
+  with a room-owned collaborator session record. Existing lab rooms remain joinable during deploy
+  drain, but a lab that has not launched yet rejects the first join instead of creating a new
+  authoritative session. Direct lab joiners currently receive the operator role; the original
+  joiner remains in `operatorId` metadata for compatibility, not as the only mutation authority.
+  They use the shared launch helper with `StartPayload.lab` metadata and prediction disabled. Lab
+  setup mutations call `Game::apply_lab_op`; issue-as commands call `Game::issue_lab_command_as`,
+  which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,
+  viewer roles, selected vision, and append-only operation log records stay in the room task rather
+  than in `Game`.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -326,12 +328,12 @@ AI controllers, or Tokio coordination into `rts-sim`:
   lobbies.
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
   names the state source, join, clock, authority, mutation, visibility, diagnostics,
-  persistence/export, start-payload, and UI-affordance choices used by the rest of the lobby
-  helpers. Persistence is split into match-history eligibility, transient post-match replay
-  capture, match-history replay-artifact attachment, and room-local lab operation logging. Product
-  identity still selects real setup paths such as replay-artifact loading, dev scenario
-  construction, replay-branch seeding, and lab room initialization; lower-level helpers should
-  consume the explicit policy fields when the behavior is shared.
+  persistence/export, drain launch/accounting, start-payload, and UI-affordance choices used by the
+  rest of the lobby helpers. Persistence is split into match-history eligibility, transient
+  post-match replay capture, match-history replay-artifact attachment, and room-local lab operation
+  logging. Product identity still selects real setup paths such as replay-artifact loading, dev
+  scenario construction, replay-branch seeding, and lab room initialization; lower-level helpers
+  should consume the explicit policy fields when the behavior is shared.
 - `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
   human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
   aliases, and command issuer resolution.
