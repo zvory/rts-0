@@ -48,6 +48,11 @@ new code should prefer the owning crate directly when that does not make local c
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
 `game-core` implementer: provide exactly these. `server-shell` implementer: call only these.
+The server shell may also serve non-simulation HTTP routes such as `/wiki`, `/wiki/`, and
+`/wiki/{*path}`. Those routes generate the wiki index from the allowlisted packaged Markdown docs
+roots (`docs/context` and `docs/design`), route canonical `/wiki/docs/...` doc pages while
+preserving legacy short aliases, rewrite allowlisted relative Markdown doc links under `/wiki` with
+anchors preserved, render allowlisted docs Markdown as no-cache HTML, and do not call into `Game`.
 
 ```rust
 pub struct Game { /* private */ }
@@ -252,10 +257,10 @@ alive.
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
-  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`,
-  `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`, `SeekRoomTime`,
-  `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer of game state —
-  no locks around `Game`.
+  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
+  `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
+  `SeekRoomTime`, `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer
+  of game state — no locks around `Game`.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
   connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Live-match pause state belongs to `RoomTask`, not `Game` and not `tick_control.rs`. Normal live
@@ -280,9 +285,9 @@ alive.
   projection and fanout helpers to send watchers full-world snapshots for the configured view
   player. Saved self-play artifacts are normal `ReplayArtifactV1` files and load through
   `Phase::ReplayViewer` via the neutral replay-artifact room path.
-- Replay viewer rooms use `Phase::ReplayViewer`, which owns a `ReplaySession`:
-  the immutable `ReplayArtifactV1`, rebuilt `Game`, command cursor, shared playback speed, and
-  per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
+- Replay viewer rooms use `Phase::ReplayViewer`, which owns a lobby-local
+  `replay_session::ReplaySession`: the immutable `ReplayArtifactV1`, rebuilt `Game`, command
+  cursor, shared playback speed, and per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, never full-world state.
 
 Lobby-owned runtime boundaries stay in `server/src/lobby/`; none of these helpers move transport,
@@ -539,8 +544,9 @@ General rules:
 - Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
   hard blocker would absorb the current shot; mobile attackers then use the existing chase path to
   seek a fireable position. Building targets and statically blocked target tiles use a passable
-  perimeter chase goal instead of the blocked footprint center. Attack-move target acquisition
-  remains stricter and prefers targets that are currently fireable.
+  perimeter chase goal instead of the blocked footprint center. Tank Traps keep generic building
+  targeting and cleanup behavior but do not count for elimination survival. Attack-move target
+  acquisition remains stricter and prefers targets that are currently fireable.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
   `services::combat::acquisition`, then chooses between them through the sim-local
   `services::combat::priority` ranker. The ranker owns priority terms such as Tank threat order,
@@ -548,7 +554,11 @@ General rules:
   and nearest/id tie-breaks; it does not decide fog, smoke, line-of-sight, blocker, ownership, or
   acquisition-radius legality.
 - Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
-  unaffordable later is skipped or rejected by the execution/promotion path.
+  unaffordable later is skipped or rejected by the execution/promotion path. Tank Trap construction
+  is server-authoritative after Training Centre eligibility and uses vehicle-body-only placement
+  blocking. Constructed buildings spawn with their full max HP but only 10% current HP, then
+  linearly gain current HP with construction progress until completion restores them to full
+  health; prebuilt starting buildings are unchanged.
 - Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear
   future intents. `stop` always clears both active and queued unit orders.
 - Queueable commands append future unit-local intents. Unit queues are capped at 8 intents today;

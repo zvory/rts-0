@@ -473,10 +473,12 @@ queries only for direct module tests or event handlers outside the frame.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
-rather than relying on the full mutable `GameState`. HUD and input should exchange command intent
-through descriptor/facade methods, while gameplay command emission continues to flow through
-`commandIssuer.issueCommand`. `PredictionController` owns client sequence allocation and optimistic
-bookkeeping; `GameState` applies named display overlays but does not own prediction policy.
+rather than relying on the full mutable `GameState`. Tank Trap placement previews keep normal
+terrain, resource, building, and map-bounds checks, allow infantry overlap, and reject vehicle-body
+units. HUD and input should exchange command intent through descriptor/facade methods, while gameplay
+command emission continues to flow through `commandIssuer.issueCommand`. `PredictionController` owns
+client sequence allocation and optimistic bookkeeping; `GameState` applies named display overlays
+but does not own prediction policy.
 
 `camera.js`
 ```js
@@ -496,7 +498,7 @@ export class Renderer {
   constructor(canvasParent)              // creates PIXI.Application, layers
   resize(w,h)
   buildStaticMap(map)                    // draw terrain once into a cached layer
-  render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement
+  render(state, camera, fog, alpha, options?) // per-frame; draws entities, fog, selection, placement, Tank Traps
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // exposes screen->world hit info if helpful; selection box drawing lives here too:
   drawSelectionBox(rectOrNull)
@@ -800,9 +802,10 @@ and unit layer):
   visual intel only.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
-  small progress arc. Owned scaffolds may locally extrapolate `buildProgress` only while the
-  latest authoritative snapshot marks them `buildActive`; the display clamps below completion and
-  never unlocks supply, tech, production, pathing, or command behavior before the server snapshot.
+  small progress arc. Tank Traps render as neutral steel I-beam hedgehogs with deterministic per-id
+  rotation. Owned scaffolds may locally extrapolate `buildProgress` only while the latest
+  authoritative snapshot marks them `buildActive`; the display clamps below completion and never
+  unlocks supply, tech, production, pathing, or command behavior before the server snapshot.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre

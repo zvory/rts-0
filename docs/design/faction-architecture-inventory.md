@@ -58,7 +58,8 @@ The current production catalog is in `server/crates/rules/src/defs.rs`:
 - Units: Worker, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank,
   Command Car, and Ekat.
 - Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, Gun
-  Works, and Tank Trap.
+  Works, and Tank Trap. Tank Trap construction is server-authoritative after Training Centre
+  eligibility and is exposed through the mirrored worker build menu.
 - Resource nodes: Steel and Oil.
 
 Temporary compatibility shim policy: direct global kind checks are approved in the current rules
@@ -182,9 +183,11 @@ paths. Later phases must update this section whenever they touch one of those li
   code parity.
 - `tests/hud_command_card.mjs` locks representative current command-card descriptors.
 - `node scripts/check-faction-catalog-parity.mjs` compares every client-exposed catalog with the
-  Rust dump and verifies that all Rust catalogs are dumpable while fixture/future catalogs stay
-  deliberately bounded on the client surface. Every real-faction descriptor exposed in
-  `client/src/config.js` must be compared against the Rust dump by this gate.
+  Rust dump across catalog ids, loadout ids, train and research keys, builder/gatherer/production
+  anchors, ability command-card metadata, costs, and playable selector ids. It verifies that all
+  Rust catalogs are dumpable, that fixture catalogs stay mirrored for tests, and that
+  fixture/future catalogs are not exposed as playable lobby options. Every real-faction descriptor
+  exposed in `client/src/config.js` must be compared against the Rust dump by this gate.
 
 ## Guardrail Map For Future Faction Work
 
