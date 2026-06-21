@@ -147,13 +147,18 @@ suites.
   notes.
 - Faction guardrails: run `node scripts/check-faction-assumptions.mjs` for faction docs, lifecycle
   policy, lobby admission, protocol/config vocabulary, or checker changes. Run
-  `node scripts/check-faction-catalog-parity.mjs` when faction catalog facts or client mirrors can
-  change, including `server/crates/rules/src/faction.rs`, `client/src/config.js`,
+  `node scripts/check-faction-catalog-parity.mjs` when faction catalog facts, the Rust catalog dump,
+  or client mirrors can change, including `server/crates/rules/src/faction.rs`,
+  `server/crates/rules/src/bin/dump-faction-catalog.rs`, `client/src/config.js`,
   `client/src/lobby_view.js`, protocol/config mirror files, or the catalog parity checker itself.
   Docs-only faction policy edits should select these guardrails without requiring live-server
   suites.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
   changed behavior that crosses the room/network boundary.
+- SVG legacy unit renderer oracle: run `node tests/legacy_unit_visual_oracle.mjs` when legacy unit
+  rendering behavior or `tests/fixtures/svg/legacy-unit-oracle.baseline.json` changes. The oracle
+  uses a deterministic Node fixture, semantic measurements, and bounded pixel-diff thresholds across
+  current unit kinds and representative animation states.
 - Team-aware authored start assignment is covered by `cargo nextest run map` for deterministic
   FFA compatibility, current authored map proximity, 1v2/1v3 team layouts, synthetic larger layouts,
   start payload team ids, and replay reconstruction. Run `node tests/team_integration.mjs` for the
@@ -198,8 +203,11 @@ changed-file mapping selects the skipped behavior.
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
 It is an aggregate check over split coverage jobs for server binary build, Rust/architecture, live
 Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
-The split jobs run `tests/run-all.sh` sub-modes so the required aggregate gate preserves the same
-coverage as the portable repo-root command without serializing every suite in one runner.
+The split jobs run `tests/run-all.sh` sub-modes under CI so the required aggregate gate preserves
+client smoke plus tri-state browser coverage without serializing every suite in one runner. Local
+`tests/run-all.sh` runs keep client smoke in the default browser gate but skip the latency-sensitive
+tri-state browser scenarios unless `--with-tri-state-browser` or `RTS_RUN_TRI_STATE_BROWSER=1` is
+set.
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative
@@ -213,6 +221,9 @@ contract.
 `node scripts/check-docs-health.mjs` runs in the early changed-files CI lane before expensive split
 jobs. It validates `docs/doc-map.json`, enforces the 5 KiB `docs/context/*.md` capsule cap, and
 checks local Markdown links in `docs/` and `plans/`.
+
+The `PR ownership` workflow validates owned agent PR metadata for `zvorygin/*` branches with
+`scripts/check-pr-ownership.sh`.
 
 The old standalone `Rust` and `Integration` workflows are retired. Their package, architecture,
 live Node, and browser coverage is owned by the split `Main test gate` jobs under the required
