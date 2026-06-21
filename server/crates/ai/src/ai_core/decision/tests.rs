@@ -2736,6 +2736,52 @@ fn steel_expansion_tanks_keeps_main_workers_off_distant_expansion_steel() {
 }
 
 #[test]
+fn ai_1_1_sends_main_idle_worker_to_expansion_steel_when_main_is_saturated() {
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+        building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
+        building(12, EntityKind::Barracks, Some(0)),
+        building(13, EntityKind::TrainingCentre, None),
+        building(14, EntityKind::ResearchComplex, Some(0)),
+        building(15, EntityKind::Factory, Some(0)),
+        building(16, EntityKind::Factory, Some(0)),
+        building(17, EntityKind::Steelworks, Some(0)),
+    ];
+    owned.extend((0..18u32).map(|i| gathering_worker(40 + i, 100 + i)));
+    owned.push(worker_at(90, AiEntityState::Idle, 8.5 * ts, 8.5 * ts));
+    let mut observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 40,
+            supply_cap: 80,
+        },
+        owned,
+    ));
+    observation
+        .resources
+        .retain(|resource| resource.kind == EntityKind::Steel);
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(
+        decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Gather { units, node, .. }
+                    if units.as_slice() == [90] && (300..318).contains(node)
+            )
+        }),
+        "AI 1.1 should use expansion steel when the main steel line is fully saturated"
+    );
+}
+
+#[test]
 fn steel_expansion_tanks_sends_expansion_workers_to_expansion_steel() {
     let ts = config::TILE_SIZE as f32;
     let mut owned = vec![

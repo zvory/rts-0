@@ -585,6 +585,7 @@ where
                     economy_plan.desired_oil_workers - economy_plan.current_oil_workers,
                 ),
                 max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
+                remote_worker_assignment_fallback: economy_plan.remote_worker_assignment_fallback,
             },
         );
         if !assigned.is_empty() {
@@ -612,6 +613,7 @@ where
                     economy_plan.target_steel_workers - economy_plan.current_steel_workers,
                 ),
                 max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
+                remote_worker_assignment_fallback: economy_plan.remote_worker_assignment_fallback,
             },
         );
         if !assigned.is_empty() {

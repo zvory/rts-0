@@ -107,6 +107,7 @@ pub(crate) struct ExpansionPolicy {
     pub(crate) trigger_supply_used: u32,
     pub(crate) blocks_tech_path: bool,
     pub(crate) oil_before_steel_in_expansion: bool,
+    pub(crate) remote_worker_assignment_fallback: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -303,6 +304,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         trigger_supply_used: 70,
         blocks_tech_path: false,
         oil_before_steel_in_expansion: false,
+        remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
     recovery_transition: Some(RecoveryTransitionPolicy {
@@ -356,6 +358,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
             trigger_supply_used: 50,
             blocks_tech_path: false,
             oil_before_steel_in_expansion: false,
+            remote_worker_assignment_fallback: false,
         }),
     }),
     tech_transition: Some(TechTransitionPolicy {
@@ -439,6 +442,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         trigger_supply_used: 30,
         blocks_tech_path: false,
         oil_before_steel_in_expansion: true,
+        remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: None,
     recovery_transition: None,
@@ -523,6 +527,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         trigger_supply_used: 70,
         blocks_tech_path: false,
         oil_before_steel_in_expansion: false,
+        remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
     recovery_transition: None,
@@ -587,6 +592,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         trigger_supply_used: 0,
         blocks_tech_path: true,
         oil_before_steel_in_expansion: false,
+        remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
     recovery_transition: None,
@@ -669,6 +675,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         trigger_supply_used: 30,
         blocks_tech_path: false,
         oil_before_steel_in_expansion: true,
+        remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: None,
     recovery_transition: None,
@@ -731,6 +738,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
         trigger_supply_used: 30,
         blocks_tech_path: false,
         oil_before_steel_in_expansion: true,
+        remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 4 }),
     recovery_transition: None,
