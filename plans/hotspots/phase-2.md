@@ -1,6 +1,6 @@
 # Phase 2 - Responsibility Maps
 
-Status: planned.
+Status: done.
 
 ## Goal
 
