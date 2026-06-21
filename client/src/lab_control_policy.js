@@ -17,6 +17,9 @@ export function createLabControlPolicy({ labClient = null, metadata = null } = {
     canUseSetupTools() {
       return policy.isOperator();
     },
+    canUseCommandSurface() {
+      return policy.isOperator();
+    },
     canIssueAs(playerId) {
       return policy.isOperator() && Number(playerId) > 0;
     },
@@ -100,6 +103,9 @@ export function createDefaultControlPolicy() {
     },
     canUseSetupTools() {
       return false;
+    },
+    canUseCommandSurface(state = null) {
+      return state == null ? true : !state.spectator;
     },
     selectedOwners() {
       return [];

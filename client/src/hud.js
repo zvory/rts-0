@@ -110,6 +110,7 @@ export class HUD {
    * @param {import("./audio.js").Audio} [audio] optional audio engine for local UI notices.
    * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
    * @param {import("./client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
+   * @param {object} [controlPolicy] policy that decides command-surface and owner control.
    */
   constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null) {
     this.root = rootEl;
@@ -437,6 +438,7 @@ export class HUD {
     );
     return {
       spectator: this.state.spectator,
+      commandSurfaceEnabled: this._canUseCommandSurface(),
       state: this.state,
       playerId: this.state.playerId,
       factionId: this.state.localFactionId,
@@ -450,6 +452,13 @@ export class HUD {
       groupCooldownClocks,
       playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind, frameViews),
     };
+  }
+
+  _canUseCommandSurface() {
+    if (typeof this.controlPolicy?.canUseCommandSurface === "function") {
+      return !!this.controlPolicy.canUseCommandSurface(this.state);
+    }
+    return !this.state?.spectator;
   }
 
   _renderDescriptorCard(card, descriptorCard) {

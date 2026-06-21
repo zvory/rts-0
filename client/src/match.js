@@ -584,9 +584,10 @@ export class Match {
   }
 
   applySpectatorUi() {
-    const spectator = !!this.state?.spectator || this.replayViewer;
-    if (dom.selectionArea) dom.selectionArea.hidden = spectator;
-    if (dom.commandCard) dom.commandCard.hidden = spectator;
+    const hidden = this.replayViewer ||
+      !((this.state?.controlPolicy || this.labControlPolicy)?.canUseCommandSurface?.(this.state) ?? !this.state?.spectator);
+    if (dom.selectionArea) dom.selectionArea.hidden = hidden;
+    if (dom.commandCard) dom.commandCard.hidden = hidden;
     if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
   }
 

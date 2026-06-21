@@ -102,8 +102,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Quick-cast click suppression keeps guard math in input/quick_cast_selection_guard.js while
   // input/index.js owns the mouse down/move/up routing hooks.
   "input/index.js": 39869,
-  // Pause Phase 1 wires live-pause reliable state, settings action, and overlay lifecycle.
-  "match.js": 44950,
+  // Lab MVP2 Phase 1 lets spectator-shaped lab operators keep the command surface visible.
+  "match.js": 45041,
   // Overpenetration event split adds a mirrored event tag, compact code, and decoder branch.
   "protocol.js": 44877,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.

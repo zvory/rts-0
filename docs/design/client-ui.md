@@ -348,7 +348,13 @@ export function createDefaultControlPolicy()
 `lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
 constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
 MVP exposes room-local vision, setup mutations, issue-as commands, and scenario import/export
-through those collaborators while keeping the normal match screen authentic.
+through those collaborators while keeping the normal match screen authentic. Lab operator starts
+are still spectator-shaped for projection and prediction, but the injected control policy exposes
+`canUseCommandSurface(state)` so `Match` and HUD can keep selection plus the real command card
+available for operators while read-only lab viewers, replay viewers, and normal spectators remain
+passive. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
+`LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
+owner.
 
 `hotkey_profiles.js`
 ```js
@@ -638,7 +644,7 @@ export function noticeSoundId(msg)
 `hud.js`
 ```js
 export class HUD {
-  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?)
+  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?, clientIntent?, controlPolicy?)
   update(frameViews?)                    // refresh resources/supply, selected panel, command card
   // command card buttons call commandIssuer.issueCommand(...) or ClientIntent facade methods
 }
@@ -698,9 +704,12 @@ export class Lobby {
 audio exactly once; on `gameOver` show the victory/defeat overlay with the frozen score table. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
-For spectator starts, `match.js` hides the command card and give-up action, computes local fog from
-the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
-with `playerResources`. Spectators still receive notice toasts and minimap alert pings, but
+For spectator starts without command-surface permission, `match.js` hides the command card and
+give-up action, computes local fog from the server-filtered union snapshot, and keeps the ordinary
+renderer/minimap/HUD pointed at snapshots with `playerResources`. Lab operators are the exception:
+their projection remains spectator-shaped, but `LabControlPolicy.canUseCommandSurface(state)` keeps
+the selected-unit panel and real command card visible while prediction stays disabled and issue-as
+remains the command authority. Spectators still receive notice toasts and minimap alert pings, but
 `match.js` suppresses notice alert audio so observers do not hear player alert callouts.
 
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
