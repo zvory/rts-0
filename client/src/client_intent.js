@@ -25,7 +25,7 @@ export class ClientIntent {
     this.commandFeedback = [];
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
-    /** @type {null | {mouseX:number, mouseY:number, guns:Array<object>}} */
+    /** @type {null | {source?:string, mouseX:number, mouseY:number, guns:Array<object>}} */
     this.antiTankGunSetupPreview = null;
     /** @type {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
     this.abilityTargetPreview = null;
@@ -188,7 +188,7 @@ export class ClientIntent {
 
   /**
    * Set or clear the anti-tank gun manual setup cone preview.
-   * @param {null | {mouseX:number, mouseY:number, guns:Array<object>}} preview
+   * @param {null | {source?:string, mouseX:number, mouseY:number, guns:Array<object>}} preview
    */
   updateAntiTankGunSetupPreview(preview) {
     this.antiTankGunSetupPreview = preview;

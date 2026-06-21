@@ -8,7 +8,7 @@
 // non-square maps stay centered and undistorted.
 
 import { cmd } from "./protocol.js";
-import { ORDER_STAGE, TERRAIN, isResource, isUnit } from "./protocol.js";
+import { KIND, ORDER_STAGE, TERRAIN, isResource, isUnit } from "./protocol.js";
 import { ABILITIES, isProducerBuilding } from "./config.js";
 
 const isImpassableTerrainCode = (code) => code === TERRAIN.ROCK || code === TERRAIN.WATER;
@@ -142,6 +142,8 @@ export class Minimap {
     this.inputRouter = inputRouter;
     this.commandsEnabled = options.commandsEnabled !== false;
     this._unregisterInputZone = null;
+    this._hoverWorld = null;
+    this._hoverShiftKey = false;
 
     this.size = canvasEl.width; // assumed square (220 per index.html)
 
@@ -791,6 +793,7 @@ export class Minimap {
     c.removeEventListener("mousedown", this._onCanvasMouseDown);
     window.removeEventListener("mousemove", this._onWinMouseMove);
     window.removeEventListener("mouseup", this._onWinMouseUp);
+    this._clearMinimapSetupPreview();
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
     this._terrainLayerSignature = null;
@@ -812,6 +815,15 @@ export class Minimap {
 
   _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
     return this._intent()?.addCommandFeedback?.(kind, x, y, append, radiusTiles, performance.now());
+  }
+
+  updateCommandTargetPreview() {
+    if (this._intent()?.commandTarget !== "setupAntiTankGuns") {
+      this._clearMinimapSetupPreview();
+      return false;
+    }
+    if (!this._hoverWorld) return false;
+    return this._refreshSetupPreviewAt(this._hoverWorld.x, this._hoverWorld.y, this._hoverShiftKey);
   }
 
   inputZone() {
@@ -897,7 +909,8 @@ export class Minimap {
   }
 
   _handlePointerMove(ev) {
-    if (!this._dragging) return;
+    const hovering = this._updateHoverFromEvent(ev);
+    if (!this._dragging) return hovering;
     const cp = this._eventToCanvas(ev);
     const w = this._canvasToWorld(cp.x, cp.y);
     this.camera.centerOn(w.x, w.y);
@@ -918,10 +931,77 @@ export class Minimap {
     return true;
   }
 
+  _updateHoverFromEvent(ev) {
+    if (!this._ensureTransform()) return false;
+    if (!this._containsClientPoint(ev.clientX, ev.clientY)) {
+      this._hoverWorld = null;
+      this._clearMinimapSetupPreview();
+      return false;
+    }
+    const cp = this._eventToCanvas(ev);
+    const w = this._canvasToWorld(cp.x, cp.y);
+    this._hoverWorld = w;
+    this._hoverShiftKey = !!ev.shiftKey;
+    const handled = this._refreshSetupPreviewAt(w.x, w.y, this._hoverShiftKey);
+    if (handled) ev.originalEvent?.preventDefault();
+    return handled;
+  }
+
+  _refreshSetupPreviewAt(wx, wy, shiftKey = false) {
+    const intent = this._intent();
+    if (intent?.commandTarget !== "setupAntiTankGuns") {
+      this._clearMinimapSetupPreview();
+      return false;
+    }
+    const guns = this._setupPreviewEntities(this._setupPreviewQueued(shiftKey));
+    if (guns.length === 0) {
+      this._clearMinimapSetupPreview();
+      return false;
+    }
+    intent.updateAntiTankGunSetupPreview?.({
+      source: "minimap",
+      mouseX: wx,
+      mouseY: wy,
+      guns,
+    });
+    return true;
+  }
+
+  _clearMinimapSetupPreview() {
+    const intent = this._intent();
+    if (intent?.antiTankGunSetupPreview?.source === "minimap") {
+      intent.updateAntiTankGunSetupPreview?.(null);
+    }
+  }
+
+  _setupPreviewQueued(shiftKey = false) {
+    return !!shiftKey || this._intent()?.commandComposer?.shiftPreserved === true;
+  }
+
+  _setupPreviewEntities(queued = false) {
+    return this._selectedOwnSupportWeapons()
+      .map((e) => queued ? supportWeaponSetupPreviewEntity(e) : e);
+  }
+
+  _selectedOwnSupportWeapons() {
+    const sel = this.state.selectedEntities() || [];
+    return sel.filter((e) =>
+      ownOwner(this.state, e.owner) &&
+      (e.kind === KIND.ANTI_TANK_GUN || e.kind === KIND.ARTILLERY));
+  }
+
   /** Issue the minimap's current command to the world point for any selected own units. */
   _issueOrder(wx, wy, queued = false) {
     const commandTarget = this._intent()?.commandTarget;
     const sel = this.state.selectedEntities() || [];
+    if (commandTarget === "setupAntiTankGuns") {
+      const supportWeapons = this._selectedOwnSupportWeapons().map((e) => e.id);
+      if (supportWeapons.length > 0) {
+        this._issueCommand(cmd.setupAntiTankGuns(supportWeapons, wx, wy, queued));
+        this._addCommandFeedback("move", wx, wy, queued);
+      }
+      return;
+    }
     const unitIds = [];
     for (const e of sel) {
       // Only own, controllable units take move orders (skip buildings/resources/enemies).
@@ -963,6 +1043,26 @@ export class Minimap {
     this._issueCommand(cmd.move(unitIds, wx, wy, queued));
     this._addCommandFeedback("move", wx, wy, queued);
   }
+}
+
+function supportWeaponSetupPreviewEntity(entity) {
+  const origin = latestMovementOrderPlanPoint(entity);
+  return origin ? { ...entity, x: origin.x, y: origin.y } : entity;
+}
+
+function latestMovementOrderPlanPoint(entity) {
+  if (!Array.isArray(entity?.orderPlan)) return null;
+  let origin = null;
+  for (const marker of entity.orderPlan) {
+    if (
+      (marker?.kind === ORDER_STAGE.MOVE || marker?.kind === ORDER_STAGE.ATTACK_MOVE) &&
+      Number.isFinite(marker.x) &&
+      Number.isFinite(marker.y)
+    ) {
+      origin = { x: marker.x, y: marker.y };
+    }
+  }
+  return origin;
 }
 
 function ownOwner(state, owner) {

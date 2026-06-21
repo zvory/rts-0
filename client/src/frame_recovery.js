@@ -46,6 +46,7 @@ function runMatchFrame(match, now) {
       }
     });
     time("match.input", () => match.input.update(dt));
+    time("match.minimapIntent", () => match.minimap.updateCommandTargetPreview?.());
     time("match.predictionVisual", () => match.advancePredictionVisual());
     const frameViews = time(
       "match.frameEntityViews",
