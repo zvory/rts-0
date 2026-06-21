@@ -351,8 +351,8 @@ state-reading exception: it reads `Entity`, `Fog`, and smoke state so snapshot a
 policy is centralized instead of scattered through services.
 
 - `rules::defs` — immutable unit/building/node definition tables keyed by `EntityKind`. These
-  records are the source of truth for kind-specific stats, armor class, weapon class, target
-  priority, production chains, tech requirements, and resource-node amounts.
+  records are the source of truth for kind-specific stats, armor class, weapon class, production
+  chains, tech requirements, and resource-node amounts.
 - `rules::faction` — faction catalogs keyed by stable faction id. Catalogs reference global
   `EntityKind`, upgrade id, ability id, and Steel/Oil/Supply costs; reuse a global id across
   factions only when gameplay semantics are identical for every faction that can use it. Divergent
@@ -360,8 +360,8 @@ policy is centralized instead of scattered through services.
   catalog availability. The default catalog is `kriegsia`; `ekat` exposes the current Ekat hero
   and Zamok slice; `phase2_empty_fixture` exists only as a command-validation test fixture.
   Server-side lifecycle policy lives in `server/src/lobby/faction_validation.rs`.
-- `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
-  `attack_profile(kind) -> AttackProfile`, and
+- `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`), target-ranking classifiers
+  (`target_threat_role`, `default_weapon_target_fit`), `attack_profile(kind) -> AttackProfile`, and
   `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.
 - `rules::economy` — tech/production predicates (`trainable_units_for_faction`,
   `build_requirement_met_for_faction`, `train_requirement_met_for_faction`,
@@ -549,10 +549,12 @@ General rules:
   acquisition remains stricter and prefers targets that are currently fireable.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
   `services::combat::acquisition`, then chooses between them through the sim-local
-  `services::combat::priority` ranker. The ranker owns priority terms such as Tank threat order,
-  shoot-while-moving target retention, Anti-Tank Gun tank preference, unit-over-building preference,
+  `services::combat::priority` ranker. The ranker owns priority terms such as default-weapon fit,
+  Tank immediate-threat order, shoot-while-moving target retention, unit-over-building preference,
   and nearest/id tie-breaks; it does not decide fog, smoke, line-of-sight, blocker, ownership, or
-  acquisition-radius legality.
+  acquisition-radius legality. Default small-arms weapons prefer soft targets while keeping armored
+  or hard targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
+  armored/hard targets, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
 - Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
   unaffordable later is skipped or rejected by the execution/promotion path. Tank Trap construction
   is server-authoritative after Training Centre eligibility and uses vehicle-body-only placement

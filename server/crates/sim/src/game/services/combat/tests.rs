@@ -764,7 +764,7 @@ fn own_and_allied_tank_traps_are_not_hostile_targets() {
 }
 
 #[test]
-fn tank_target_priority_uses_declared_order_for_targets_in_weapon_range() {
+fn tank_target_priority_uses_threat_role_policy_for_targets_in_weapon_range() {
     use EntityKind::*;
 
     let map = open_map(12);

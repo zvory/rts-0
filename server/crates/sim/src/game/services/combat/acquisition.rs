@@ -88,7 +88,7 @@ pub(super) fn resolve_target(
     let context = AttackPriorityContext {
         attacker_kind: attacker.kind,
         attacker_is_unit: attacker.is_unit(),
-        prefers_armored: combat_rules::prefers_armored_targets(attacker.kind),
+        attacker_weapon_class: combat_rules::weapon_class(attacker.kind),
         can_retain_moving_target: can_fire_while_moving(attacker),
     };
     let weapon_range_px = weapon_range_px(attacker);
@@ -185,6 +185,7 @@ fn legal_target_candidates(
             is_building: target.is_building(),
             armor_class: combat_rules::armor_class(target.kind),
             weapon_class: combat_rules::weapon_class(target.kind),
+            threat_role: combat_rules::target_threat_role(target.kind),
             in_weapon_range,
             tank_trap_auto_relevant: target.kind == EntityKind::TankTrap,
             retained_target,
