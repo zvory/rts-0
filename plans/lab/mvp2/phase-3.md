@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Planned.
+- [x] Done.
 
 ## Objective
 
@@ -42,14 +42,14 @@ the clicked world position to the existing typed lab spawn operation.
 
 ## Implementation Checklist
 
-- [ ] Define the palette data source from existing faction catalogs and labels.
-- [ ] Add owner and faction controls that update the available unit palette deterministically.
-- [ ] Add palette item selection that arms the spawn lab tool.
-- [ ] Send spawn requests with clicked world coordinates, not camera-center or map-center defaults.
-- [ ] Surface server validation errors without leaving the UI in a misleading active state.
-- [ ] Remove or demote manual `X`/`Y` unit spawn fields from the primary workflow.
-- [ ] Add tests for faction filtering, tool arming, exact coordinate forwarding, and result display.
-- [ ] Run focused verification and record exact results in the handoff.
+- [x] Define the palette data source from existing faction catalogs and labels.
+- [x] Add owner and faction controls that update the available unit palette deterministically.
+- [x] Add palette item selection that arms the spawn lab tool.
+- [x] Send spawn requests with clicked world coordinates, not camera-center or map-center defaults.
+- [x] Surface server validation errors without leaving the UI in a misleading active state.
+- [x] Remove or demote manual `X`/`Y` unit spawn fields from the primary workflow.
+- [x] Add tests for faction filtering, tool arming, exact coordinate forwarding, and result display.
+- [x] Run focused verification and record exact results in the handoff.
 
 ## Verification
 
