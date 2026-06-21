@@ -28,8 +28,8 @@ Use when writing/debugging tests, changing CI/hooks, or choosing focused verific
 - `tests/run-all.sh --full-ai` — full orchestrator plus long AI self-play/simulation coverage.
 - `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files.
 - `node scripts/check-docs-health.mjs` — docs map, capsule size, and local Markdown link hygiene.
-- `node scripts/check-wiki.mjs` — wiki route hardening, local links, generated stats, and faction
-  catalog parity.
+- `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
+  parity.
 - Render perf: `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`; add `--stress-matrix`.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate dependency direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
