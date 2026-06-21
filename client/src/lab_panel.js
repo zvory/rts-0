@@ -126,6 +126,7 @@ export class LabPanel {
       this.playerSelectField("spawn-owner", "Owner"),
       this.numberField("spawn-x", "X", point.x),
       this.numberField("spawn-y", "Y", point.y),
+      this.button("Pick point", () => this.armPointFieldTool("spawn-x", "spawn-y")),
       this.checkboxField("spawn-completed", "Complete", true),
       this.button("Spawn", () => this.spawnEntity()),
     ]));
@@ -134,6 +135,7 @@ export class LabPanel {
       this.readout(`${selectedIds.length} selected`),
       this.numberField("move-x", "X", point.x),
       this.numberField("move-y", "Y", point.y),
+      this.button("Pick point", () => this.armPointFieldTool("move-x", "move-y")),
       this.button("Move", () => this.batchSelected((entity) => this.labClient.moveEntity(entity.id, this.num("move-x"), this.num("move-y")))),
       this.playerSelectField("set-owner", "Owner"),
       this.button("Set owner", () => this.batchSelected((entity) => this.labClient.setEntityOwner(entity.id, this.int("set-owner")))),
@@ -284,6 +286,24 @@ export class LabPanel {
       y: this.num("spawn-y"),
       completed: this.bool("spawn-completed"),
     });
+  }
+
+  armPointFieldTool(xField, yField) {
+    if (typeof this.match?.armLabTool !== "function") return null;
+    return this.match.armLabTool(
+      { kind: "fieldPoint", payload: { xField, yField }, label: "Pick point" },
+      { onWorldClick: (event) => this.applyPointFieldTool(event) },
+    );
+  }
+
+  applyPointFieldTool(event) {
+    const payload = event?.tool?.payload || {};
+    if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) return;
+    const xInput = this.fields.get(payload.xField);
+    const yInput = this.fields.get(payload.yField);
+    if (!xInput || !yInput) return;
+    xInput.value = String(Math.round(event.x));
+    yInput.value = String(Math.round(event.y));
   }
 
   async exportScenario() {
@@ -437,6 +457,7 @@ export class LabPanel {
   }
 
   destroy() {
+    this.match?.cancelLabTool?.("panelDestroy");
     this.unsubscribeState?.();
     this.unsubscribeResult?.();
     this.removeListeners();

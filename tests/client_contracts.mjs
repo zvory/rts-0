@@ -2382,6 +2382,18 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     inRange: true,
   });
   assert(intent.resourceMiningPreview?.resourceId === 200, "ClientIntent owns resource hover previews");
+  const armedLabTool = intent.beginLabTool({ kind: "fieldPoint", payload: { xField: "spawn-x", yField: "spawn-y" } });
+  assert(armedLabTool.id && armedLabTool.kind === "fieldPoint", "ClientIntent arms lab tools with stable ids");
+  assert(intent.commandTarget === null && intent.placement === null, "ClientIntent lab tools clear placement and command targeting");
+  assert(intent.resourceMiningPreview === null, "ClientIntent lab tools clear hover previews");
+  intent.beginPlacement(KIND.DEPOT);
+  assert(intent.activeLabTool === null, "ClientIntent placement cancels active lab tools");
+  intent.beginLabTool({ kind: "fieldPoint" });
+  intent.beginCommandTarget("move");
+  assert(intent.activeLabTool === null, "ClientIntent command targeting cancels active lab tools");
+  intent.beginLabTool({ kind: "fieldPoint" });
+  assert(intent.cancelLabTool("escape")?.reason === "escape", "ClientIntent reports lab tool cancellation reason");
+  assert(intent.activeLabTool === null, "ClientIntent clears lab tool cancellation state");
 
   const state = new GameState({
     playerId: 1,
@@ -2392,6 +2404,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(!("clientIntent" in state), "GameState no longer owns browser-local intent state");
   assert(!("placement" in state), "GameState no longer exposes placement intent shims");
   assert(!("commandTarget" in state), "GameState no longer exposes command-target intent shims");
+  assert(!("activeLabTool" in state), "GameState no longer exposes lab-tool intent shims");
 
   const explicitHudIntent = new ClientIntent();
   const facadeHud = Object.create(HUD.prototype);
@@ -2428,6 +2441,16 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   facadeInput._cancel();
   assert(explicitInputIntent.placement === null, "Input cancellation clears placement through injected ClientIntent");
   assert(facadeSelectionCleared === 0, "Input placement cancellation does not fall through to selection clear");
+
+  const labIntent = new ClientIntent();
+  labIntent.beginLabTool({ kind: "fieldPoint" });
+  const labCancelInput = Object.create(Input.prototype);
+  let labSelectionCleared = 0;
+  labCancelInput.state = { clearSelection() { labSelectionCleared += 1; } };
+  labCancelInput.clientIntent = labIntent;
+  labCancelInput._cancel();
+  assert(labIntent.activeLabTool === null, "Input cancellation clears active lab tools through ClientIntent");
+  assert(labSelectionCleared === 0, "Input lab tool cancellation does not fall through to selection clear");
 }
 
 {
@@ -3044,6 +3067,24 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     labViewerMatch.applySpectatorUi();
     assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
     assert(commandCard.hidden, "read-only lab viewer hides the command card");
+
+    const labToolMatch = Object.create(Match.prototype);
+    labToolMatch.clientIntent = new ClientIntent();
+    let labToolWorldClick = null;
+    const active = labToolMatch.armLabTool(
+      { kind: "fieldPoint", payload: { xField: "spawn-x" } },
+      { onWorldClick: (event) => { labToolWorldClick = event; } },
+    );
+    labToolMatch.consumeLabToolWorldClick({
+      tool: active,
+      x: 44.5,
+      y: 88.25,
+      world: { x: 44.5, y: 88.25 },
+      screen: { x: 10, y: 20 },
+    });
+    assert(labToolWorldClick?.tool.id === active.id, "Match lab tool controller routes world clicks with the active tool");
+    assert(labToolWorldClick.x === 44.5 && labToolWorldClick.y === 88.25, "Match lab tool controller preserves exact world coordinates");
+    assert(labToolMatch.clientIntent.activeLabTool === null, "Match lab tool controller clears consumed tools");
   }
   {
     const priorWindowForReplayInput = globalThis.window;
@@ -4658,6 +4699,28 @@ withFakeDocument(() => {
   };
   const root = document.createElement("div");
   const labClient = new LabClient(net);
+  let armedTool = null;
+  let armedCallbacks = null;
+  let cancelledToolReason = null;
+  const match = {
+    camera: { x: 320, y: 352 },
+    state: {
+      map: { width: 64, height: 64 },
+      playerResources: [{ steel: 500, oil: 200 }],
+      selectedEntities() {
+        return [];
+      },
+    },
+    armLabTool(tool, callbacks) {
+      armedTool = tool;
+      armedCallbacks = callbacks;
+      return { id: "lab-tool-test", ...tool };
+    },
+    cancelLabTool(reason) {
+      cancelledToolReason = reason;
+      return null;
+    },
+  };
   labClient.setInitialState({
     room: "__lab__:sandbox:map=Default",
     operatorId: 1,
@@ -4674,6 +4737,7 @@ withFakeDocument(() => {
       map: { name: "Default" },
       players: [{ id: 1, teamId: 1 }, { id: 2, teamId: 2 }],
     },
+    match,
   });
   assert(root.children.length === 1, "LabPanel mounts inside the app-owned root");
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
@@ -4686,6 +4750,11 @@ withFakeDocument(() => {
   panel.fields.get("spawn-owner").value = "2";
   panel.fields.get("spawn-x").value = "128";
   panel.fields.get("spawn-y").value = "160";
+  panel.armPointFieldTool("spawn-x", "spawn-y");
+  assert(armedTool?.kind === "fieldPoint", "LabPanel arms world-point lab tools through Match");
+  assert(armedTool.payload.xField === "spawn-x" && armedTool.payload.yField === "spawn-y", "LabPanel point tool payload names target fields");
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 129.4, y: 160.6 });
+  assert(panel.fields.get("spawn-x").value === "129" && panel.fields.get("spawn-y").value === "161", "LabPanel point tool callback writes clicked world coordinates");
   void panel.spawnEntity();
   assert(sent.at(-1).op.op === "spawnEntity" && sent.at(-1).op.owner === 2, "LabPanel spawn control sends setup mutation");
   panel.fields.get("resource-player").value = "1";
@@ -4706,6 +4775,7 @@ withFakeDocument(() => {
   assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted scenario JSON");
   panel.destroy();
   labClient.destroy();
+  assert(cancelledToolReason === "panelDestroy", "LabPanel cancels an active lab tool on teardown");
   assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");
 });
 
@@ -7080,6 +7150,34 @@ withFakeDocument(() => {
     metaKey: false,
   });
   assert(selectionClicks.length === 0, "attack targeting click should not also select on mouse-up");
+
+  const labToolInput = Object.create(Input.prototype);
+  const labToolEvents = [];
+  const labToolSelections = [];
+  labToolInput.clientIntent = new ClientIntent();
+  labToolInput.clientIntent.beginLabTool({ kind: "fieldPoint", payload: { xField: "spawn-x" } });
+  labToolInput.labToolController = {
+    consumeWorldClick(event) {
+      labToolEvents.push(event);
+    },
+  };
+  labToolInput._worldAt = (x, y) => ({ x: x + 100, y: y + 200 });
+  labToolInput._commitClickSelection = (p) => labToolSelections.push(p);
+  labToolInput._onLeftDown({ x: 12, y: 24 }, { shiftKey: true });
+  assert(labToolEvents.length === 1, "active lab tool consumes the next world click");
+  assert(labToolEvents[0].x === 112 && labToolEvents[0].y === 224, "lab tool click callback receives exact world coordinates");
+  assert(labToolEvents[0].tool.payload.xField === "spawn-x", "lab tool click callback receives current tool payload");
+  assert(labToolInput.clientIntent.activeLabTool === null, "lab tool clears after consuming a world click");
+  assert(labToolInput._drag == null && labToolSelections.length === 0, "lab tool click does not fall through to selection drag");
+
+  const labRightClickInput = Object.create(Input.prototype);
+  labRightClickInput.clientIntent = new ClientIntent();
+  labRightClickInput.clientIntent.beginLabTool({ kind: "fieldPoint" });
+  labRightClickInput._selectedOwnUnitIds = () => {
+    throw new Error("right-click lab tool cancellation must not issue normal commands");
+  };
+  labRightClickInput._onRightClick({ x: 5, y: 6 }, {});
+  assert(labRightClickInput.clientIntent.activeLabTool === null, "right-click cancels an active lab tool");
 
   targetedInput.clientIntent.endCommandTarget();
   targetedInput._drag = null;

@@ -16,6 +16,9 @@ export class ClientIntent {
     /** @type {null | "move" | "attack" | "setupAntiTankGuns" | {kind:"ability",ability:string}} */
     this.commandTarget = null;
     this.commandComposer = new CommandComposer();
+    /** @type {null | {id:string,kind:string,payload?:object,label?:string}} */
+    this.activeLabTool = null;
+    this._nextLabToolId = 1;
     /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
     this.lastCommandTargetArm = null;
     /** @type {Array<{kind:string,x:number,y:number,append:boolean,radiusTiles:number|null,createdAt:number}>} */
@@ -30,6 +33,7 @@ export class ClientIntent {
 
   /** Open the worker build command-card submenu. */
   openWorkerBuildMenu() {
+    this._clearActiveLabTool();
     this.placement = null;
     this.commandTarget = null;
     this.lastCommandTargetArm = null;
@@ -53,6 +57,7 @@ export class ClientIntent {
    * @param {string} buildingKind a building EntityKind.
    */
   beginPlacement(buildingKind) {
+    this._clearActiveLabTool();
     this.commandTarget = null;
     this.lastCommandTargetArm = null;
     this.closeCommandCardMenu();
@@ -88,6 +93,7 @@ export class ClientIntent {
    * @param {"move"|"attack"|"setupAntiTankGuns"|{kind:"ability",ability:string}} kind
    */
   beginCommandTarget(kind, options = {}) {
+    this._clearActiveLabTool();
     this.placement = null;
     this.closeCommandCardMenu();
     const armed = this.commandComposer.arm(kind, options);
@@ -194,6 +200,39 @@ export class ClientIntent {
    */
   updateAbilityTargetPreview(preview) {
     this.abilityTargetPreview = preview;
+  }
+
+  /**
+   * Arm a lab setup tool for the next world click.
+   * @param {{kind:string,payload?:object,label?:string,id?:string}} tool
+   */
+  beginLabTool(tool) {
+    const kind = typeof tool?.kind === "string" && tool.kind ? tool.kind : "unknown";
+    const id = typeof tool?.id === "string" && tool.id
+      ? tool.id
+      : `lab-tool-${this._nextLabToolId++}`;
+    this.placement = null;
+    this.commandComposer.cancel();
+    this.lastCommandTargetArm = null;
+    this._syncCommandTargetFromComposer();
+    this.commandCardMode = null;
+    this.resourceMiningPreview = null;
+    const active = { id, kind };
+    if (tool?.payload && typeof tool.payload === "object") active.payload = { ...tool.payload };
+    if (typeof tool?.label === "string" && tool.label) active.label = tool.label;
+    this.activeLabTool = active;
+    return active;
+  }
+
+  /** Clear the active lab setup tool, if any. */
+  cancelLabTool(reason = "cancelled") {
+    const active = this.activeLabTool;
+    this.activeLabTool = null;
+    return active ? { ...active, reason } : null;
+  }
+
+  _clearActiveLabTool() {
+    this.activeLabTool = null;
   }
 }
 

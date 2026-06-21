@@ -16,6 +16,10 @@ import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js"
 
 export function _onRightClick(p, ev = {}) {
   const intent = clientIntent(this);
+  if (intent?.activeLabTool) {
+    intent.cancelLabTool?.("rightClick");
+    return;
+  }
   // During placement, right-click cancels.
   if (intent?.placement) {
     this._cancelPlacementDrag?.();
@@ -438,6 +442,10 @@ export function _quickCastCommandTarget(ev = {}) {
 export function _cancel() {
   const intent = clientIntent(this);
   if (typeof intent?.closeCommandCardMenu === "function" && intent.closeCommandCardMenu()) {
+    return;
+  }
+  if (intent?.activeLabTool) {
+    intent.cancelLabTool?.("escape");
     return;
   }
   if (intent?.placement) {

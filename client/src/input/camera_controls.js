@@ -109,6 +109,9 @@ export function _handleBlur() {
     this._cancelPlacementDrag?.();
     clientIntent(this).endPlacement();
   }
+  if (clientIntent(this)?.activeLabTool && typeof clientIntent(this).cancelLabTool === "function") {
+    clientIntent(this).cancelLabTool("blur");
+  }
   if (this._drag) {
     this._drag = null;
     this._dragging = false;
