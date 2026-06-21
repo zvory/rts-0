@@ -108,13 +108,20 @@ reconstruction APIs.
 
 ## Current Tech Tree
 
-Workers build City Centre, Depot, Barracks, Training Centre, R&D Complex, Factory, and Gun Works.
-City Centre trains Workers. Barracks trains Riflemen and Machine Gunners. Factory trains Scout
-Cars, Tanks, and Command Cars. Gun Works trains Mortar Teams, Anti-Tank Guns, and Artillery.
+Workers can place City Centre and Supply Depot immediately. Barracks requires a completed City
+Centre; Training Centre requires a completed City Centre and Barracks; R&D Complex, Factory, and
+Gun Works require a completed City Centre and Training Centre; Tank Trap requires a completed
+Training Centre. City Centre trains Workers. Barracks trains Riflemen immediately and Machine
+Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately, Tanks
+after Tank Production research, and Command Cars after Command Car research. Gun Works trains
+Mortar Teams immediately, Anti-Tank Guns after Anti-Tank Gun Crews research, and Artillery after
+Unlock Artillery research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
-`client/src/config.js`: Methamphetamines, Anti-Tank Gun Unlock, Tank Unlock, Artillery Unlock,
-Command Car Unlock, and Mortar Autocast.
+`client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
+Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; Unlock
+Artillery requires completed Anti-Tank Gun Crews research, and Command Car requires completed Tank
+Production research.
 
 ## Current Ability Surface
 
