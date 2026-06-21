@@ -1178,6 +1178,7 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("artilleryTarget", 7),
     ("artilleryImpact", 8),
     ("mortarLaunch", 9),
+    ("overpenetration", 10),
 ];
 
 const ORDER_STAGE_CODES: &[(&str, u8)] = &[
@@ -1417,6 +1418,7 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("MORTAR_IMPACT", "mortarImpact"),
         ("ARTILLERY_TARGET", "artilleryTarget"),
         ("ARTILLERY_IMPACT", "artilleryImpact"),
+        ("OVERPENETRATION", "overpenetration"),
     ])
 }
 
@@ -1626,6 +1628,10 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(3, "y"),
                 code_field(4, "kind", "kind"),
             ],
+        ),
+        (
+            "overpenetration",
+            vec![code_field(0, "kind", "event"), field(1, "to")],
         ),
         (
             "build",
@@ -2403,6 +2409,12 @@ impl Serialize for CompactEvent<'_> {
                 }
                 seq.end()
             }
+            Event::Overpenetration { to } => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&event_code("overpenetration"))?;
+                seq.serialize_element(to)?;
+                seq.end()
+            }
             Event::Death { id, x, y, kind } => {
                 let mut seq = serializer.serialize_seq(Some(5))?;
                 seq.serialize_element(&event_code("death"))?;
@@ -3084,6 +3096,7 @@ mod tests {
                     }),
                     to_pos: Some([48.0, 96.0]),
                 },
+                Event::Overpenetration { to: 8 },
                 Event::Death {
                     id: 200,
                     x: 64.0,
@@ -3227,7 +3240,7 @@ mod tests {
             serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
         );
         assert_eq!(value["u"], serde_json::json!([4]));
-        assert_eq!(value["ev"].as_array().unwrap().len(), 7);
+        assert_eq!(value["ev"].as_array().unwrap().len(), 8);
         assert_eq!(
             value["n"],
             serde_json::json!([4, 17, 2, 2, 3, PREDICTION_PROTOCOL_VERSION, 8, 42])
@@ -3237,15 +3250,16 @@ mod tests {
             serde_json::json!([1, 4, 12.0, 24.0, 0.5, 0.75, 3])
         );
         assert_eq!(value["ev"][0][4], serde_json::json!([48.0, 96.0]));
+        assert_eq!(value["ev"][1], serde_json::json!([10, 8]));
         assert_eq!(
-            value["ev"][4],
+            value["ev"][5],
             serde_json::json!([9, 9, [256.0, 272.0], [320.0, 352.0], 1.5, 68])
         );
         assert_eq!(
-            value["ev"][5],
+            value["ev"][6],
             serde_json::json!([7, 10, [320.0, 352.0], 3.0, 120])
         );
-        assert_eq!(value["ev"][6], serde_json::json!([8, 336.0, 368.0, 3.0]));
+        assert_eq!(value["ev"][7], serde_json::json!([8, 336.0, 368.0, 3.0]));
     }
 
     #[test]

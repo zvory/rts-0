@@ -2916,11 +2916,31 @@ fn shots_overpenetrate_past_non_blocking_primary_target() {
     );
 
     assert_eq!(entities.get(primary).expect("primary should exist").hp, 35);
-    let secondary = entities.get(secondary).expect("secondary should exist");
+    let secondary_id = secondary;
+    let secondary = entities.get(secondary_id).expect("secondary should exist");
     assert_eq!(secondary.hp, 35);
     assert!(
         matches!(secondary.order(), Order::Idle),
         "overpenetration damage must not mutate worker orders"
+    );
+    let attacker_events = events.get(&1).expect("attacker owner events should exist");
+    assert!(
+        attacker_events
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == primary)),
+        "primary shot should still emit attack feedback"
+    );
+    assert!(
+        attacker_events
+            .iter()
+            .any(|event| matches!(event, Event::Overpenetration { to } if *to == secondary_id)),
+        "secondary hit should emit overpenetration feedback"
+    );
+    assert!(
+        attacker_events
+            .iter()
+            .all(|event| !matches!(event, Event::Attack { to, .. } if *to == secondary_id)),
+        "secondary overpenetration hit must not emit an attack event"
     );
 }
 

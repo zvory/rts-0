@@ -165,6 +165,7 @@ export const EVENT = Object.freeze({
   MORTAR_IMPACT: "mortarImpact",
   ARTILLERY_TARGET: "artilleryTarget",
   ARTILLERY_IMPACT: "artilleryImpact",
+  OVERPENETRATION: "overpenetration",
 });
 
 export const ABILITY_OBJECT_KIND = Object.freeze({
@@ -294,6 +295,7 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.ARTILLERY_TARGET]: 7,
   [EVENT.ARTILLERY_IMPACT]: 8,
   [EVENT.MORTAR_LAUNCH]: 9,
+  [EVENT.OVERPENETRATION]: 10,
 });
 
 export const ORDER_STAGE = Object.freeze({
@@ -917,6 +919,12 @@ function decodeCompactEvent(record, index) {
         }
         return ev;
       }
+    case EVENT.OVERPENETRATION:
+      requireLength(fields, 2, `overpenetration event ${index}`);
+      return {
+        e: EVENT.OVERPENETRATION,
+        to: readU32(fields[1], "event.overpenetration.to"),
+      };
     case EVENT.DEATH:
       requireLength(fields, 5, `death event ${index}`);
       return {

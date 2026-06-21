@@ -38,7 +38,6 @@ import {
 } from "../client/src/lobby.js";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
 import { formatTeamLabel, scoreRowIsWinner } from "../client/src/scoreboard.js";
-import { attackEventsForFiredShots } from "../client/src/attack_events.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
@@ -3874,6 +3873,7 @@ function fakeAudioContext() {
     fg: [1, 2, 3, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
+      [EVENT_CODE[EVENT.OVERPENETRATION], 22],
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
       [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.CITY_CENTRE]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
@@ -3971,30 +3971,34 @@ function fakeAudioContext() {
     "compact snapshot decodes server visibility grid",
   );
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
-  assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");
-  assert(decoded.events[3].msg === "Not enough steel", "notice event decodes");
-  assert(decoded.events[3].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
-  assert(decoded.events[4].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
-  assert(decoded.events[4].x === 512 && decoded.events[4].y === 768, "notice position decodes");
   assert(
-    decoded.events[5].e === EVENT.MORTAR_LAUNCH &&
-      decoded.events[5].from === 9 &&
-      decoded.events[5].fromX === 256 &&
-      decoded.events[5].toY === 352 &&
-      decoded.events[5].delayTicks === 68,
+    decoded.events[1].e === EVENT.OVERPENETRATION && decoded.events[1].to === 22,
+    "overpenetration event decodes",
+  );
+  assert(decoded.events[2].kind === KIND.STEEL, "death event kind decodes");
+  assert(decoded.events[4].msg === "Not enough steel", "notice event decodes");
+  assert(decoded.events[4].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
+  assert(decoded.events[5].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
+  assert(decoded.events[5].x === 512 && decoded.events[5].y === 768, "notice position decodes");
+  assert(
+    decoded.events[6].e === EVENT.MORTAR_LAUNCH &&
+      decoded.events[6].from === 9 &&
+      decoded.events[6].fromX === 256 &&
+      decoded.events[6].toY === 352 &&
+      decoded.events[6].delayTicks === 68,
     "mortar launch event decodes",
   );
   assert(
-    decoded.events[6].e === EVENT.ARTILLERY_TARGET &&
-      decoded.events[6].from === 10 &&
-      decoded.events[6].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
-      decoded.events[6].radiusTiles === 3,
+    decoded.events[7].e === EVENT.ARTILLERY_TARGET &&
+      decoded.events[7].from === 10 &&
+      decoded.events[7].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
+      decoded.events[7].radiusTiles === 3,
     "artillery target event decodes",
   );
   assert(
-    decoded.events[7].e === EVENT.ARTILLERY_IMPACT &&
-      decoded.events[7].x === 336 &&
-      decoded.events[7].y === 368,
+    decoded.events[8].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[8].x === 336 &&
+      decoded.events[8].y === 368,
     "artillery impact event decodes",
   );
 
@@ -4958,6 +4962,7 @@ withFakeDocument(() => {
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.OVERPENETRATION] === 10, "Overpenetration compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
   assert(
@@ -5889,42 +5894,18 @@ withFakeDocument(() => {
   assert(artilleryRevealState.liveMuzzleFlashes(performance.now()).length === 0, "artillery self-reveal does not draw a tracer");
   assert(artilleryRevealState.weaponRecoil(99, KIND.ARTILLERY, performance.now()) > 0, "artillery self-reveal still recoils the gun");
 
-  const overpenPrimaryAttack = { e: EVENT.ATTACK, from: 20, to: 21, toPos: [140, 100] };
-  const overpenFollowupAttack = { e: EVENT.ATTACK, from: 20, to: 22, toPos: [166, 108] };
-  const independentAttack = { e: EVENT.ATTACK, from: 23, to: 24, toPos: [220, 180] };
-  const firedShotEvents = attackEventsForFiredShots([
-    overpenPrimaryAttack,
-    overpenFollowupAttack,
-    independentAttack,
-  ]);
-  assert(
-    firedShotEvents.length === 2 &&
-      firedShotEvents[0] === overpenPrimaryAttack &&
-      firedShotEvents[1] === independentAttack,
-    "same-attacker overpenetration events collapse to one fired-shot event",
-  );
-
-  const overpenTracerState = new GameState({ ...start, map: { ...start.map, resources: [] } });
-  overpenTracerState.applySnapshot({
+  const overpenEventState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  overpenEventState.applySnapshot({
     tick: 12,
     steel: 0,
     oil: 0,
     supplyUsed: 0,
     supplyCap: 10,
-    entities: [
-      { id: 20, owner: 1, kind: KIND.RIFLEMAN, x: 100, y: 100, hp: 40, maxHp: 40, state: STATE.IDLE, facing: 0 },
-      { id: 21, owner: 2, kind: KIND.RIFLEMAN, x: 140, y: 100, hp: 30, maxHp: 40, state: STATE.IDLE },
-      { id: 22, owner: 2, kind: KIND.WORKER, x: 166, y: 108, hp: 30, maxHp: 40, state: STATE.IDLE },
-    ],
-    events: [overpenPrimaryAttack, overpenFollowupAttack],
+    entities: [{ id: 22, owner: 2, kind: KIND.WORKER, x: 166, y: 108, hp: 30, maxHp: 40, state: STATE.IDLE }],
+    events: [{ e: EVENT.OVERPENETRATION, to: 22 }],
   });
-  const overpenFlashes = overpenTracerState.liveMuzzleFlashes(performance.now());
-  assert(overpenFlashes.length === 1, "overpenetration draws one tracer for the fired shot");
-  assert(overpenFlashes[0].to === 21, "overpenetration tracer stays anchored to the primary hit");
-  assert(
-    overpenFlashes[0].targetPos?.x === 140 && overpenFlashes[0].targetPos?.y === 100,
-    "overpenetration tracer continues from the primary hit position",
-  );
+  assert(overpenEventState.liveMuzzleFlashes(performance.now()).length === 0, "overpenetration event does not draw a tracer");
+  assert(overpenEventState.weaponRecoil(22, KIND.WORKER, performance.now()) === 0, "overpenetration event does not trigger weapon recoil");
 
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);

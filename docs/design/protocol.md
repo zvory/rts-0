@@ -555,7 +555,7 @@ Compact numeric codes:
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage |
 
 #### 2.4.1 Boundary inventory
 
@@ -712,6 +712,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "attack", from: u32, to: u32,
   reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string },
   toPos?: [f32, f32] }                         // for muzzle flashes / tracers
+{ e: "overpenetration", to: u32 }               // secondary penetration damage; no tracer/audio
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
 { e: "smokeLaunch", fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
@@ -732,6 +733,9 @@ does not emit under-attack alerts. Unit attack events are sent to the attacker's
 recipients whose team can currently see the shooter or target point. They include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
+Overpenetration events are sent for secondary entities damaged behind the primary target. They carry
+only the damaged entity id and do not imply a separate fired shot, muzzle flash, tracer, shooter
+reveal, weapon recoil, or attack sound.
 Death events are sent to the dead entity's team and to enemy recipients whose team can currently see
 the death position; smoke-covered hidden death positions are withheld. Build completion events are
 sent to the completed building's team and to enemy recipients whose team currently sees the site.
