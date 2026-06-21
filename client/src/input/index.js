@@ -176,6 +176,8 @@ export class Input {
     this._lastClick = null;
     // One-shot selection suppression after an unqueued quick-cast at the cursor.
     this._postQuickCastSelectionGuard = null;
+    // Current Shift modifier state for hover previews that need queued-command semantics.
+    this._shiftKeyDown = false;
     // Last recalled control-group slot for number-key double-tap camera jumps.
     this._lastControlGroupTap = null;
     // Cursor-lock state. While locked, `this.mouse` is a viewport-local virtual
