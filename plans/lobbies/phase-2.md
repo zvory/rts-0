@@ -1,6 +1,6 @@
 # Phase 2 - First-Screen Browser UI
 
-Status: planned.
+Status: done.
 
 ## Goal
 
