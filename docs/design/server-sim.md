@@ -272,11 +272,14 @@ alive.
   the empty normal room asks the registry to dispose its exact room handle. After the last human
   leaves a normal public lobby, live match, one-player sandbox, or post-match replay, the room task
   clears its own lifecycle bookkeeping and asks the registry to remove the public name immediately;
-  there is no host reconnect grace. `GET /api/lobbies` collects those summaries with a short timeout
-  and returns browser-safe DTOs sorted by joinability then age; the client polls that route every 1.5
-  seconds and preflights a clicked row against the latest route response before sending `join`. No
-  WebSocket push message currently exists for the browser list; the HTTP poll cadence is the
-  accepted freshness target.
+  there is no host reconnect grace. Empty dev-scenario, replay, replay-artifact, and lab rooms also
+  dispose their private registry handles once their last viewer leaves; replay-branch rooms are the
+  retained private exception because their branch seed exists only inside the room handle until a
+  branch launches. `GET /api/lobbies` collects those summaries with a short timeout and returns
+  browser-safe DTOs sorted by joinability then age; the client polls that route every 1.5 seconds
+  and preflights a clicked row against the latest route response before sending `join`. No WebSocket
+  push message currently exists for the browser list; the HTTP poll cadence is the accepted
+  freshness target.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
   `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay
@@ -326,9 +329,10 @@ AI controllers, or Tokio coordination into `rts-sim`:
 
 - `room_task.rs` remains the room lifecycle owner: membership, lobby/ingame/replay/branch phase
   transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
-  `Game`. Empty private replay-branch rooms reset their live/staging state but keep
-  `RoomMode::ReplayBranch`, so reserved `__replay_branch__` names never decay into public normal
-  lobbies.
+  `Game`. Empty private dev, replay, replay-artifact, and lab rooms are disposable; empty private
+  replay-branch rooms reset their live/staging state but keep `RoomMode::ReplayBranch`, so reserved
+  `__replay_branch__` names never decay into public normal lobbies while preserving the in-memory
+  branch seed.
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
   names the state source, join, clock, authority, mutation, visibility, diagnostics,
   persistence/export, start-payload, and UI-affordance choices used by the rest of the lobby

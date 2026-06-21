@@ -55,6 +55,11 @@ async function waitForLobbyGone(room, label) {
   throw new Error(`timeout waiting for lobby row removal: ${label}`);
 }
 
+async function expectNoLobbyRow(room, label) {
+  const rows = await lobbyRows();
+  ok(!rows.some((entry) => entry.room === room), label);
+}
+
 async function waitForCreateAvailable(room, label) {
   for (let i = 0; i < 70; i++) {
     const response = await createLobby(room);
@@ -81,6 +86,15 @@ async function main() {
   );
   ok(recreatedAbandoned.status === 201,
     `abandoned pending create lease releases the name (${recreatedAbandoned.status})`);
+
+  const labRoom = `__lab__:${uniqueRoom("browser-lab")}:map=Default:seed=321`;
+  const LabViewer = await connectClient("browser-lab");
+  LabViewer.send({ t: "join", name: "Lab", room: labRoom, spectator: true });
+  await LabViewer.waitFor((msg) => msg.t === "start" && msg.lab, 3000, "internal lab start");
+  await expectNoLobbyRow(labRoom, "occupied internal lab room stays out of the public browser");
+  closeClients(LabViewer);
+  await sleep(200);
+  await expectNoLobbyRow(labRoom, "empty internal lab room does not leak into the public browser");
 
   const room = uniqueRoom("browser-flow");
 

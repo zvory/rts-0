@@ -1293,14 +1293,13 @@ impl RoomTask {
         self.reassign_host_if_needed();
         crate::log_debug!(room = %self.room, player_id, "left");
 
-        // If the room emptied out, fully reset it so teardown bookkeeping is complete before the
-        // registry drops the public normal room. Internal modes keep their existing mode-specific
-        // empty-room behavior.
+        // If the room emptied out, fully reset it so teardown bookkeeping is complete before any
+        // disposable registry handle is dropped.
         if self.players.is_empty() {
-            let dispose_public_room = self.should_dispose_when_empty();
+            let dispose_empty_room = self.should_dispose_when_empty();
             self.mark_match_finished_for_drain();
             self.reset_empty_room_state();
-            if dispose_public_room {
+            if dispose_empty_room {
                 self.report_disposable_if_empty();
             }
             crate::log_debug!(room = %self.room, "room emptied; reset to lobby");
@@ -4388,7 +4387,15 @@ impl RoomTask {
     }
 
     fn should_dispose_when_empty(&self) -> bool {
-        matches!(self.mode, RoomMode::Normal)
+        match self.mode {
+            RoomMode::Normal
+            | RoomMode::DevScenario(_)
+            | RoomMode::Replay { .. }
+            | RoomMode::ReplayArtifact { .. }
+            | RoomMode::Lab(_) => true,
+            // Branch seeds exist only inside the private branch room until the branch launches.
+            RoomMode::ReplayBranch { .. } => false,
+        }
     }
 
     // -- Sending helpers -----------------------------------------------------
@@ -7464,6 +7471,7 @@ mod tests {
 
         task.on_leave(100);
 
+        assert!(!task.should_dispose_when_empty());
         assert!(matches!(task.phase, Phase::Lobby));
         assert!(matches!(task.mode, RoomMode::ReplayBranch { .. }));
         assert!(task.players.is_empty());
