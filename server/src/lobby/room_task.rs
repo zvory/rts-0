@@ -4439,6 +4439,10 @@ mod tests {
 
     #[test]
     fn lobby_summary_hides_internal_room_modes() {
+        let replay_players = replay_test_players(2);
+        let (_live, replay_artifact) = replay_test_artifact(&replay_players, 0);
+        let branch_seed = replay_branch_test_seed(&replay_players, 0);
+
         let mut lab = RoomTask::new(
             "__lab__:sandbox:map=Default".to_string(),
             RoomMode::Lab(lab_config()),
@@ -4462,6 +4466,30 @@ mod tests {
         saved_replay.host_id = Some(1);
         add_test_room_spectator(&mut saved_replay, 1);
         assert!(saved_replay.lobby_summary().is_none());
+
+        let mut persisted_replay = RoomTask::new(
+            "__match_replay__:00000001".to_string(),
+            RoomMode::Replay {
+                artifact: replay_artifact,
+            },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        persisted_replay.host_id = Some(1);
+        add_test_room_spectator(&mut persisted_replay, 1);
+        assert!(persisted_replay.lobby_summary().is_none());
+
+        let mut branch = RoomTask::new(
+            "__replay_branch__:00000001".to_string(),
+            RoomMode::ReplayBranch { seed: branch_seed },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        branch.host_id = Some(1);
+        add_test_room_spectator(&mut branch, 1);
+        assert!(branch.lobby_summary().is_none());
 
         let mut dev = RoomTask::new(
             "__dev_scenario__:demo".to_string(),

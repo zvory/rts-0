@@ -73,6 +73,13 @@ export function lobbyActionLabel(joinState) {
   return JOIN_STATE_ACTION[normalizedJoinState(joinState)] || JOIN_STATE_ACTION.stale;
 }
 
+export function lobbyJoinIntent(row = {}) {
+  const state = normalizedJoinState(row?.joinState);
+  if (state === "open") return { state, joinable: true, spectator: false };
+  if (state === "fullSpectatorOnly") return { state, joinable: true, spectator: true };
+  return { state, joinable: false, spectator: false };
+}
+
 export function formatLobbyAge(createdAtUnixMs, nowMs = Date.now()) {
   const created = Number(createdAtUnixMs);
   const now = Number(nowMs);
@@ -126,7 +133,7 @@ export class LobbyBrowserView {
     if (Array.isArray(rows)) this.rows = sortLobbySummaries(rows);
     if (onCreateLobby !== undefined) this.onCreateLobby = onCreateLobby;
     if (onJoinLobby !== undefined) this.onJoinLobby = onJoinLobby;
-    this.actionsDisabled = !!actionsDisabled;
+    this.actionsDisabled = !!actionsDisabled || !!error;
     this.root.classList.toggle("is-disconnected", !connected);
     this.root.classList.toggle("has-error", !!error);
     if (this.statusEl) {
@@ -181,9 +188,9 @@ export class LobbyBrowserView {
   }
 
   _buildRow(row, { connected, nowMs }) {
-    const state = normalizedJoinState(row.joinState);
-    const spectator = state === "fullSpectatorOnly";
-    const canJoin = connected && !this.actionsDisabled && (state === "open" || spectator);
+    const intent = lobbyJoinIntent(row);
+    const state = intent.state;
+    const canJoin = connected && !this.actionsDisabled && intent.joinable;
     const disabled = !canJoin || !this.onJoinLobby;
     const el = document.createElement("article");
     el.className = `lobby-browser-row is-${state}`;
@@ -216,7 +223,7 @@ export class LobbyBrowserView {
     button.textContent = lobbyActionLabel(state);
     button.dataset.room = row.room;
     if (!button.disabled) {
-      button.addEventListener("click", () => this.onJoinLobby?.(row, { spectator }));
+      button.addEventListener("click", () => this.onJoinLobby?.(row, { spectator: intent.spectator }));
     }
     action.appendChild(button);
 

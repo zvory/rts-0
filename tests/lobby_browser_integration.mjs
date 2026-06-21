@@ -1,9 +1,12 @@
 // Focused lobby-browser HTTP + join-flow coverage. Expects a running server; use
 // `tests/run-all.sh` or start one with `cd server && cargo run` and set RTS_WS if needed.
 import {
+  addAi,
   closeClients,
   connectClient,
   createAssertions,
+  readyPlayers,
+  removeAi,
   sleep,
   uniqueRoom,
   URL as WS_URL,
@@ -35,12 +38,21 @@ async function lobbyRows() {
 }
 
 async function waitForLobbyRow(room, predicate, label) {
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 30; i++) {
     const row = (await lobbyRows()).find((entry) => entry.room === room);
     if (row && predicate(row)) return row;
     await sleep(100);
   }
   throw new Error(`timeout waiting for lobby row: ${label}`);
+}
+
+async function waitForLobbyGone(room, label) {
+  for (let i = 0; i < 50; i++) {
+    const row = (await lobbyRows()).find((entry) => entry.room === room);
+    if (!row) return true;
+    await sleep(100);
+  }
+  throw new Error(`timeout waiting for lobby row removal: ${label}`);
 }
 
 async function main() {
@@ -108,6 +120,69 @@ async function main() {
 
   closeClients(A, B, C, D, Observer);
   await sleep(200);
+
+  const lifecycleRoom = uniqueRoom("browser-state");
+  const Host = await connectClient("browser-host");
+  Host.send({ t: "join", name: "Host", room: lifecycleRoom });
+  await Host.waitFor((msg) => msg.t === "lobby" && msg.room === lifecycleRoom, 3000, "browser lifecycle host join");
+
+  const hostRow = await waitForLobbyRow(
+    lifecycleRoom,
+    (row) => row.joinState === "open" && row.hostName === "Host" && row.occupiedSlots === 1,
+    "host row after join",
+  );
+  ok(hostRow.spectatorCount === 0, "host-only row starts with no spectators");
+
+  Host.send({ t: "selectMap", map: "No Terrain" });
+  await Host.waitFor((msg) => msg.t === "lobby" && msg.map === "No Terrain", 3000, "browser map selection");
+  await waitForLobbyRow(
+    lifecycleRoom,
+    (row) => row.map === "No Terrain",
+    "map refresh after host selection",
+  );
+
+  const [firstAi] = await addAi(Host);
+  await waitForLobbyRow(
+    lifecycleRoom,
+    (row) => row.occupiedSlots === 2 && row.joinState === "open",
+    "AI add refreshes active slots",
+  );
+  await removeAi(Host, firstAi.id);
+  await waitForLobbyRow(
+    lifecycleRoom,
+    (row) => row.occupiedSlots === 1 && row.joinState === "open",
+    "AI remove refreshes active slots",
+  );
+
+  await addAi(Host);
+  await readyPlayers([Host]);
+  Host.send({ t: "start" });
+  await Host.waitFor((msg) => msg.t === "matchCountdown", 3000, "browser countdown start");
+  await waitForLobbyRow(
+    lifecycleRoom,
+    (row) => row.joinState === "starting" && row.occupiedSlots === 2,
+    "countdown row is starting",
+  );
+  await Host.waitFor((msg) => msg.t === "start", 6000, "browser lifecycle match start");
+  const inGameRow = await waitForLobbyRow(
+    lifecycleRoom,
+    (row) => row.joinState === "inGame" && row.map === "No Terrain",
+    "in-game row is disabled",
+  );
+  ok(inGameRow.occupiedSlots === 2, "in-game browser row keeps active human plus AI slots");
+
+  const StaleJoiner = await connectClient("browser-stale");
+  StaleJoiner.send({ t: "join", name: "Stale", room: lifecycleRoom });
+  const rejected = await StaleJoiner.waitFor(
+    (msg) => msg.t === "error" && /progress/.test(msg.msg || ""),
+    3000,
+    "stale in-game row join rejection",
+  );
+  ok(!!rejected, "stale in-game browser join is rejected by server authority");
+
+  closeClients(Host, StaleJoiner);
+  await waitForLobbyGone(lifecycleRoom, "empty room cleanup hides browser row");
+
   if (assertions.failures > 0) console.log(`\n${assertions.failures} FAILURE(S)`);
   process.exit(assertions.failures === 0 ? 0 : 1);
 }

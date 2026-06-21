@@ -772,8 +772,9 @@ export class Minimap {
 export class Lobby {
   constructor(rootEl, net)
   show(), hide()
-  // owns lobby state, pre-join browser polling, joins, ready/start/spectator role, and delegates
-  // browser DOM to lobby_browser_view.js and joined-roster DOM to lobby_view.js.
+  // owns lobby state, pre-join browser polling, latest-row join preflight,
+  // ready/start/spectator role, and delegates browser DOM to lobby_browser_view.js and
+  // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
   // Teams are layout groups only; player colors come from each player record.
@@ -788,6 +789,7 @@ export function sortLobbySummaries(rows)
 export function formatLobbyAge(createdAtUnixMs, nowMs?)
 export function lobbyStatusLabel(joinState)
 export function lobbyActionLabel(joinState)
+export function lobbyJoinIntent(row)
 export function validateLobbyName(rawName)
 export class LobbyBrowserView {
   constructor(rootEl)
