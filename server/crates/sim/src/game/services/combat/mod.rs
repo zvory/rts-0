@@ -28,6 +28,7 @@ mod acquisition;
 mod chase;
 mod damage;
 mod events;
+mod priority;
 mod projection;
 mod weapons;
 

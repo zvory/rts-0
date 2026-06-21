@@ -541,6 +541,12 @@ General rules:
   seek a fireable position. Building targets and statically blocked target tiles use a passable
   perimeter chase goal instead of the blocked footprint center. Attack-move target acquisition
   remains stricter and prefers targets that are currently fireable.
+- Normal combat auto-acquisition first filters already-legal hostile candidates in
+  `services::combat::acquisition`, then chooses between them through the sim-local
+  `services::combat::priority` ranker. The ranker owns priority terms such as Tank threat order,
+  shoot-while-moving target retention, Anti-Tank Gun tank preference, unit-over-building preference,
+  and nearest/id tie-breaks; it does not decide fog, smoke, line-of-sight, blocker, ownership, or
+  acquisition-radius legality.
 - Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
   unaffordable later is skipped or rejected by the execution/promotion path.
 - Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear

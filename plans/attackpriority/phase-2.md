@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -53,18 +53,18 @@ phase should make target selection easier to extend without yet changing what ta
 
 ## Implementation Checklist
 
-- [ ] Add the ranking/candidate module.
-- [ ] Keep legal target filtering separate from ranking.
-- [ ] Migrate current Tank priority into a named rank term or isolated policy function.
-- [ ] Migrate current Anti-Tank Gun preference into a named rank term or isolated policy function.
-- [ ] Migrate unit-over-building and nearest fallback behavior into ranking.
-- [ ] Preserve moving-fire retained-target semantics.
-- [ ] Confirm `resolve_target` now delegates priority choice to the ranker after explicit ordered
+- [x] Add the ranking/candidate module.
+- [x] Keep legal target filtering separate from ranking.
+- [x] Migrate current Tank priority into a named rank term or isolated policy function.
+- [x] Migrate current Anti-Tank Gun preference into a named rank term or isolated policy function.
+- [x] Migrate unit-over-building and nearest fallback behavior into ranking.
+- [x] Preserve moving-fire retained-target semantics.
+- [x] Confirm `resolve_target` now delegates priority choice to the ranker after explicit ordered
       target handling, or document a narrow temporary exception.
-- [ ] Add regression tests proving Phase 1 scenarios still pass.
-- [ ] Update design docs if the combat acquisition boundary changes.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase as done in this file.
+- [x] Add regression tests proving Phase 1 scenarios still pass.
+- [x] Update design docs if the combat acquisition boundary changes.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 

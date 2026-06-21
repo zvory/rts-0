@@ -55,15 +55,15 @@ pub fn attack_profile(kind: EntityKind) -> AttackProfile {
 
 /// Armored targets take 75% damage reduction from non-AP weapons.
 pub fn is_armored(kind: EntityKind) -> bool {
-    let armor_class = defs::unit_def(kind)
-        .map(|d| d.armor_class)
-        .or_else(|| defs::building_def(kind).map(|d| d.armor_class));
-    matches!(armor_class, Some(ArmorClass::Armored | ArmorClass::Hard))
+    matches!(
+        armor_class(kind),
+        Some(ArmorClass::Armored | ArmorClass::Hard)
+    )
 }
 
 /// AP weapons deal full damage to armored targets.
 pub fn is_ap(kind: EntityKind) -> bool {
-    weapon(kind) == WeaponClass::AntiTank
+    weapon_class(kind) == WeaponClass::AntiTank
 }
 
 /// Anti-Tank Guns prefer armored targets over all others.
@@ -71,6 +71,21 @@ pub fn prefers_armored_targets(kind: EntityKind) -> bool {
     defs::unit_def(kind)
         .map(|d| d.target_priority == TargetPriority::PrefersArmored)
         .unwrap_or(false)
+}
+
+/// Rules-owned armor classification for target ranking and damage policy.
+pub fn armor_class(kind: EntityKind) -> Option<ArmorClass> {
+    defs::unit_def(kind)
+        .map(|d| d.armor_class)
+        .or_else(|| defs::building_def(kind).map(|d| d.armor_class))
+}
+
+/// Rules-owned weapon classification for target ranking and threat policy.
+pub fn weapon_class(kind: EntityKind) -> WeaponClass {
+    defs::unit_def(kind)
+        .map(|d| d.weapon)
+        .or_else(|| defs::building_def(kind).map(|d| d.weapon))
+        .unwrap_or(WeaponClass::None)
 }
 
 /// Miss probability [0.0, 1.0) for an attack. anti-tank guns have a high miss rate against
@@ -98,9 +113,7 @@ pub fn effective_damage(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    let armor_class = defs::unit_def(victim_kind)
-        .map(|d| d.armor_class)
-        .or_else(|| defs::building_def(victim_kind).map(|d| d.armor_class));
+    let armor_class = armor_class(victim_kind);
     let armor_adjusted = match (is_ap(attacker_kind), armor_class) {
         (false, Some(ArmorClass::Armored)) => base_dmg / 4,
         (false, Some(ArmorClass::Hard)) => ((base_dmg as f32) * 0.75).round() as u32,
@@ -161,13 +174,6 @@ pub fn effective_damage_with_facing(
     let facing = classify_armor_facing(victim_facing, victim_pos, attacker_pos);
     let multiplier = facing_damage_multiplier(attacker_kind, victim_kind, facing);
     ((damage as f32) * multiplier).round().max(0.0) as u32
-}
-
-fn weapon(kind: EntityKind) -> WeaponClass {
-    defs::unit_def(kind)
-        .map(|d| d.weapon)
-        .or_else(|| defs::building_def(kind).map(|d| d.weapon))
-        .unwrap_or(WeaponClass::None)
 }
 
 fn normalized_angle_delta(from: f32, to: f32) -> f32 {
