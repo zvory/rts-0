@@ -289,11 +289,13 @@ alive.
   `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
 - Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
-  room-owned operator/read-only viewer session record. They use the shared launch helper with
-  `StartPayload.lab` metadata and prediction disabled. Lab setup mutations call `Game::apply_lab_op`;
-  issue-as commands call `Game::issue_lab_command_as`, which rejects mixed-owner selections before
-  queuing a normal command. Lab state, dirty flags, viewer roles, selected vision, and append-only
-  operation log records stay in the room task rather than in `Game`.
+  room-owned collaborator session record. Direct lab joiners currently receive the operator role;
+  the original joiner remains in `operatorId` metadata for compatibility, not as the only mutation
+  authority. They use the shared launch helper with `StartPayload.lab` metadata and prediction
+  disabled. Lab setup mutations call `Game::apply_lab_op`; issue-as commands call
+  `Game::issue_lab_command_as`, which rejects mixed-owner selections before queuing a normal
+  command. Lab state, dirty flags, viewer roles, selected vision, and append-only operation log
+  records stay in the room task rather than in `Game`.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -354,8 +356,8 @@ future lab work should consume the extracted primitives first and migrate scenar
 separate product-approved design. `scripts/check-lobby-architecture.mjs` guards the now-stable
 fanout boundary by failing new production lobby calls to `Game::snapshot_for*` outside
 `projection.rs`, except for the existing AI think context in `live_tick.rs`. The same guardrail
-keeps accepted lab mutation and issue-as calls centralized in `room_task.rs`, where operator
-authorization, result routing, dirty state, and the append-only operation log live.
+keeps accepted lab mutation and issue-as calls centralized in `room_task.rs`, where role-based
+operator authorization, result routing, dirty state, and the append-only operation log live.
 
 ### 3.3 Rules layer (`rules/`)
 
