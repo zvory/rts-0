@@ -25,8 +25,11 @@
   <body>
     <!--
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
-        Lobby:  #lobby-screen, #lobby-name, #lobby-room, #lobby-join, #lobby-players,
-                #lobby-ready, #lobby-add-ai, #lobby-quickstart, #lobby-start, #lobby-status
+        Lobby:  #lobby-screen, #lobby-browser, #lobby-browser-rows, #lobby-name,
+                #lobby-create, #lobby-players, #lobby-ready, #lobby-add-ai,
+                #lobby-quickstart, #lobby-start, #lobby-status
+                #lobby-room and #lobby-join remain hidden compatibility controls, not visible
+                pre-join product controls.
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selection-area, #control-group-tabs,
@@ -69,6 +72,27 @@
               </div>
             </header>
 
+            <section id="lobby-browser" class="lobby-browser" aria-label="Lobby Browser">
+              <header class="lobby-browser-header">
+                <div>
+                  <span class="lobby-kicker">Public rooms</span>
+                  <h2>Lobby Browser</h2>
+                </div>
+                <span id="lobby-browser-status" class="lobby-browser-refresh" aria-live="polite">Loading</span>
+              </header>
+              <div class="lobby-browser-table" role="table" aria-label="Available lobbies">
+                <div class="lobby-browser-grid lobby-browser-head" role="row">
+                  <span>Lobby</span>
+                  <span>Host</span>
+                  <span>Map</span>
+                  <span>Made</span>
+                  <span>Slots</span>
+                  <span>Action</span>
+                </div>
+                <div id="lobby-browser-rows" class="lobby-browser-rows"></div>
+              </div>
+            </section>
+
             <div class="lobby-room" hidden>
               <section class="lobby-status-grid" aria-label="Lobby status">
                 <div>
@@ -92,8 +116,8 @@
 
           <aside class="lobby-setup-panel" aria-label="Lobby setup">
             <header class="lobby-setup-header">
-              <span id="lobby-setup-kicker">Join lobby</span>
-              <h2 id="lobby-setup-title">Choose room</h2>
+              <span id="lobby-setup-kicker">Commander</span>
+              <h2 id="lobby-setup-title">Lobby browser</h2>
             </header>
 
             <div class="lobby-form">
@@ -101,11 +125,14 @@
                 Name
                 <input id="lobby-name" type="text" maxlength="16" placeholder="Commander" autocomplete="off" />
               </label>
-              <label>
-                Room
-                <input id="lobby-room" type="text" maxlength="24" value="main" autocomplete="off" />
-              </label>
-              <button id="lobby-join" class="btn primary">Join room</button>
+              <button id="lobby-create" class="btn primary" type="button" disabled>Create Lobby</button>
+              <div class="lobby-manual-room" hidden>
+                <label>
+                  Room
+                  <input id="lobby-room" type="text" maxlength="24" value="main" autocomplete="off" />
+                </label>
+                <button id="lobby-join" class="btn primary" type="button">Join room</button>
+              </div>
 
               <div class="lobby-host-tools lobby-joined-only">
                 <button id="lobby-add-ai" class="btn host-only" hidden>Add AI</button>

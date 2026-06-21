@@ -544,6 +544,11 @@ impl SessionPolicy {
         self.join == JoinPolicy::LabRoom
     }
 
+    pub(super) fn is_public_lobby_browser_room(self) -> bool {
+        self.mode == SessionMode::Normal
+            && matches!(self.phase, SessionPhase::Lobby | SessionPhase::LiveMatch)
+    }
+
     pub(super) fn allows_match_history(self) -> bool {
         self.persistence.match_history == MatchHistoryPolicy::Eligible
     }

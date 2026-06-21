@@ -18,6 +18,10 @@ const PING_MS = 900;
 const BORDER_PULSE_MS = 700;
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const IMPASSABLE_FOG_SCALE = 0.56;
+const ARTILLERY_MINIMAP_MARKER_MS = 2200;
+const ARTILLERY_MINIMAP_ICON_W = 15;
+const ARTILLERY_MINIMAP_ICON_H = 12;
+const TWO_PI = Math.PI * 2;
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
@@ -42,6 +46,31 @@ const resourceLayoutSignature = (resources) => {
     signature += `|${node.id}:${node.kind}:${node.x}:${node.y}:${node.remaining ?? ""}`;
   }
   return signature;
+};
+
+const minimapArtillerySvg = (svgText) => {
+  if (typeof svgText !== "string") return "";
+  const style = [
+    "<style>",
+    "[id$='.packed'],[id^='part.art.flash'],[id^='anchor.'],[id^='bounds.']{display:none}",
+    "</style>",
+  ].join("");
+  return svgText.replace(/<svg\b([^>]*)>/, `<svg$1>${style}`);
+};
+
+const createSvgImage = (svgText, canvas, onReady) => {
+  const svg = minimapArtillerySvg(svgText);
+  if (!svg) return null;
+  const doc = canvas?.ownerDocument || globalThis.document || null;
+  const image = doc?.createElement
+    ? doc.createElement("img")
+    : typeof globalThis.Image === "function"
+      ? new globalThis.Image()
+      : null;
+  if (!image) return null;
+  image.onload = () => onReady?.();
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return image;
 };
 
 const staticSignatureChanged = (prev, next) => {
@@ -139,7 +168,15 @@ export class Minimap {
 
     this._dragging = false;
     this._pings = [];
+    this._artilleryMarkers = [];
     this._borderPulseUntil = 0;
+    this._artilleryIconImage = options.artilleryIconImage || null;
+    this._artilleryIconReady = !!this._artilleryIconImage;
+    if (!this._artilleryIconImage && options.artilleryIconSvg) {
+      this._artilleryIconImage = createSvgImage(options.artilleryIconSvg, canvasEl, () => {
+        this._artilleryIconReady = true;
+      });
+    }
 
     // Bound handlers retained so destroy() can remove the exact references.
     this._onContextMenu = (ev) => {
@@ -239,8 +276,10 @@ export class Minimap {
     this._drawEntities(frameViews);
     this._drawFog();
     this._drawResourceLayer();
+    const now = performance.now();
+    this._drawArtilleryFiringMarkers(now);
     this._drawViewport();
-    this._drawPings(performance.now());
+    this._drawPings(now);
   }
 
   /**
@@ -255,6 +294,19 @@ export class Minimap {
       return;
     }
     this._pings.push({ x, y, severity, startedAt: performance.now() });
+  }
+
+  /** Add a globally visible short-lived artillery firing marker. */
+  markArtilleryFiring(ev) {
+    const x = Number(ev?.x);
+    const y = Number(ev?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const owner = Number.isInteger(ev?.owner) ? ev.owner : 0;
+    const facing = Number.isFinite(ev?.facing) ? ev.facing : 0;
+    this._artilleryMarkers.push({ owner, x, y, facing, startedAt: performance.now() });
+    if (this._artilleryMarkers.length > 48) {
+      this._artilleryMarkers.splice(0, this._artilleryMarkers.length - 48);
+    }
   }
 
   /** Pulse the minimap border when an alert has no resolvable world position. */
@@ -581,6 +633,14 @@ export class Minimap {
     return (player && player.color) || hex(COLORS.selectEnemy);
   }
 
+  _markerOwnerColor(owner) {
+    if (owner === 0) return hex(COLORS.selectNeutral);
+    if (ownOwner(this.state, owner)) return hex(COLORS.selectOwn);
+    if (allyOwner(this.state, owner)) return hex(COLORS.selectAlly);
+    const player = this._playerById(owner);
+    return (player && player.color) || hex(COLORS.selectEnemy);
+  }
+
   _playerById(id) {
     const players = this.state.players || [];
     return players.find((p) => p.id === id) || null;
@@ -627,6 +687,68 @@ export class Minimap {
       ctx.strokeRect(1.5, 1.5, this.size - 3, this.size - 3);
       ctx.restore();
     }
+  }
+
+  _drawArtilleryFiringMarkers(now) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    this._artilleryMarkers = this._artilleryMarkers.filter(
+      (marker) => now - marker.startedAt < ARTILLERY_MINIMAP_MARKER_MS,
+    );
+    for (const marker of this._artilleryMarkers) {
+      const p = this._worldToCanvas(marker.x, marker.y);
+      const age = Math.max(0, now - marker.startedAt);
+      const progress = Math.min(1, age / ARTILLERY_MINIMAP_MARKER_MS);
+      this._drawArtilleryMarker(p.x, p.y, marker.facing, this._markerOwnerColor(marker.owner), progress);
+    }
+  }
+
+  _drawArtilleryMarker(cx, cy, facing, color, progress) {
+    const ctx = this.ctx;
+    const alpha = 1 - progress * 0.35;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 7, 0, TWO_PI);
+    ctx.stroke();
+    ctx.rotate(Number.isFinite(facing) ? facing : 0);
+    if (this._artilleryIconReady && this._artilleryIconImage) {
+      ctx.drawImage(
+        this._artilleryIconImage,
+        -ARTILLERY_MINIMAP_ICON_W / 2,
+        -ARTILLERY_MINIMAP_ICON_H / 2,
+        ARTILLERY_MINIMAP_ICON_W,
+        ARTILLERY_MINIMAP_ICON_H,
+      );
+    } else {
+      this._drawFallbackArtilleryIcon(ctx, color);
+    }
+    ctx.restore();
+  }
+
+  _drawFallbackArtilleryIcon(ctx, color) {
+    ctx.fillStyle = "rgba(17,13,10,0.88)";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(-5, -3);
+    ctx.lineTo(1, -3);
+    ctx.lineTo(2.5, 3);
+    ctx.lineTo(-5, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(7, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-2.5, -3.4, 1.2, 0, TWO_PI);
+    ctx.arc(-2.5, 3.4, 1.2, 0, TWO_PI);
+    ctx.fill();
   }
 
   /**

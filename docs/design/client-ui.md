@@ -39,7 +39,8 @@ src/
   hotkey_editor.js # Settings Hotkeys tab editor
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
-  lobby.js        # Lobby screen controller: name/room, ready/start, host controls
+  lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
+  lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
   match_history.js # Lobby match-history table and replay launch affordance
   scoreboard.js   # Shared score/result formatting helpers
@@ -391,18 +392,21 @@ passive. Operator gameplay commands still flow through `commandIssuer.issueComma
 owner.
 
 Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
-may ask `Match.armLabTool(tool, { onWorldClick })` to arm a tool, and normal `Input` consumes the
-next left world click before selection, command targeting, or placement. The callback receives the
-active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears the tool for
-Esc, right-click, blur, teardown, or panel-driven cancellation. `Input` routes those cancellations
-through the injected lab tool controller so `Match` can publish an active/cancelled change back to
-the app-owned `LabPanel`, keeping the panel status and cancel affordance synchronized with keyboard,
-pointer, blur, world-click, and teardown paths. Starting ordinary placement, command targeting, or
-command-card build menus cancels the active lab tool so setup tools do not share state with
-gameplay command modes. Unit spawning is a lab panel palette backed by the client faction catalog
-mirror and playable faction labels; the palette arms a `spawnEntity` lab tool and sends the clicked
-world coordinates through `LabClient`. Secondary building/setup spawns use the same click-to-world
-spawn tool path instead of primary manual coordinate entry. Selected-entity repositioning also uses
+may ask `Match.armLabTool(tool, { onWorldClick })` to arm a tool, and normal `Input` consumes a
+completed left world click before selection, command targeting, or placement. A left drag promotes
+to normal box selection and cancels the active lab tool instead of applying it. The callback
+receives the active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears
+the tool for Esc, right-click, teardown, box selection, or panel-driven cancellation. Window blur
+releases camera/input transient state but does not cancel the active lab tool. `Input` routes those
+cancellations through the injected lab tool controller so `Match` can publish an active/cancelled
+change back to the app-owned `LabPanel`, keeping the panel status and cancel affordance
+synchronized with keyboard, pointer, world-click, and teardown paths. Starting ordinary placement,
+command targeting, or command-card build menus cancels the active lab tool so setup tools do not
+share state with gameplay command modes. Unit spawning is a lab panel palette backed by the client
+faction catalog mirror and playable faction labels; the palette arms a persistent `spawnEntity` lab
+tool and every completed click sends the clicked world coordinates through `LabClient` until
+cancelled. Secondary building/setup spawns use the same click-to-world spawn tool path instead of
+primary manual coordinate entry. Selected-entity repositioning also uses
 the shared tool path: `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends
 `moveEntity` requests for each id at the clicked world point, and leaves stale-id or partial-failure
 reporting visible through the lab result status. Delete and owner reassignment stay contextual to
@@ -757,6 +761,7 @@ client-exposed descriptor against the Rust dump.
 export class Minimap {
   constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?, {clientIntent?, commandsEnabled?})
   render(frameViews?)                    // draw terrain + fog + entity blips + viewport rect
+  markArtilleryFiring(event)             // transient global artillery icon from artilleryFiring events
   inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)
 }
@@ -767,11 +772,35 @@ export class Minimap {
 export class Lobby {
   constructor(rootEl, net)
   show(), hide()
-  // owns lobby state, joins, ready/start/spectator role, and delegates roster DOM to lobby_view.js.
+  // owns lobby state, pre-join browser polling, joins, ready/start/spectator role, and delegates
+  // browser DOM to lobby_browser_view.js and joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
   // Teams are layout groups only; player colors come from each player record.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
+}
+```
+
+`lobby_browser_view.js`
+```js
+export const LOBBY_BROWSER_POLL_MS
+export function sortLobbySummaries(rows)
+export function formatLobbyAge(createdAtUnixMs, nowMs?)
+export function lobbyStatusLabel(joinState)
+export function lobbyActionLabel(joinState)
+export function validateLobbyName(rawName)
+export class LobbyBrowserView {
+  constructor(rootEl)
+  render({ rows?, loading?, connected?, error?, nowMs?, actionsDisabled?, onCreateLobby?, onJoinLobby? })
+  destroy()
+}
+export class LobbyCreateModal {
+  constructor(hostEl, { onSubmit? })
+  open(trigger?)
+  close({ restoreFocus? }?)
+  setError(message)
+  setPending(pending)
+  destroy()
 }
 ```
 
@@ -792,6 +821,8 @@ their projection remains spectator-shaped, but `LabControlPolicy.canUseCommandSu
 the selected-unit panel and real command card visible while prediction stays disabled and issue-as
 remains the command authority. Spectators still receive notice toasts and minimap alert pings, but
 `match.js` suppresses notice alert audio so observers do not hear player alert callouts.
+`artilleryFiring` events are forwarded directly to `Minimap.markArtilleryFiring`; the minimap draws
+the artillery rig icon above fog for every recipient without using it as entity visibility.
 
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
 
@@ -950,7 +981,7 @@ Current areas:
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
-  controller/view, match history, minimap, resource icons, scoreboard, status badge, branch
+  controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
   staging, lab panel, settings. The in-match debug status badge displays live and rolling
   one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared

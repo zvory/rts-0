@@ -481,7 +481,8 @@ pub enum Command {
     HoldPosition {
         units: Vec<u32>,
     },
-    /// Set or append a unit-producing building rally stage. `kind` defaults to a plain move stage.
+    /// Set or append a unit-producing building rally stage. `kind` defaults to a plain move stage
+    /// on the wire; production applies plain rally stages as attack-move for non-workers.
     SetRally {
         building: u32,
         x: f32,
@@ -867,7 +868,7 @@ pub struct LobbyPlayer {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 22;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 23;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -1179,6 +1180,7 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("artilleryImpact", 8),
     ("mortarLaunch", 9),
     ("overpenetration", 10),
+    ("artilleryFiring", 11),
 ];
 
 const ORDER_STAGE_CODES: &[(&str, u8)] = &[
@@ -1419,6 +1421,7 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("ARTILLERY_TARGET", "artilleryTarget"),
         ("ARTILLERY_IMPACT", "artilleryImpact"),
         ("OVERPENETRATION", "overpenetration"),
+        ("ARTILLERY_FIRING", "artilleryFiring"),
     ])
 }
 
@@ -1699,6 +1702,16 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(1, "x"),
                 field(2, "y"),
                 field(3, "radiusTiles"),
+            ],
+        ),
+        (
+            "artilleryFiring",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "owner"),
+                field(2, "x"),
+                field(3, "y"),
+                field(4, "facing"),
             ],
         ),
     ]
@@ -2505,6 +2518,20 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(delay_ticks)?;
                 seq.end()
             }
+            Event::ArtilleryFiring {
+                owner,
+                x,
+                y,
+                facing,
+            } => {
+                let mut seq = serializer.serialize_seq(Some(5))?;
+                seq.serialize_element(&event_code("artilleryFiring"))?;
+                seq.serialize_element(owner)?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.serialize_element(facing)?;
+                seq.end()
+            }
             Event::ArtilleryImpact { x, y, radius_tiles } => {
                 let mut seq = serializer.serialize_seq(Some(4))?;
                 seq.serialize_element(&event_code("artilleryImpact"))?;
@@ -3129,6 +3156,12 @@ mod tests {
                     radius_tiles: 3.0,
                     delay_ticks: 120,
                 },
+                Event::ArtilleryFiring {
+                    owner: 1,
+                    x: 288.0,
+                    y: 304.0,
+                    facing: 0.25,
+                },
                 Event::ArtilleryImpact {
                     x: 336.0,
                     y: 368.0,
@@ -3240,7 +3273,7 @@ mod tests {
             serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
         );
         assert_eq!(value["u"], serde_json::json!([4]));
-        assert_eq!(value["ev"].as_array().unwrap().len(), 8);
+        assert_eq!(value["ev"].as_array().unwrap().len(), 9);
         assert_eq!(
             value["n"],
             serde_json::json!([4, 17, 2, 2, 3, PREDICTION_PROTOCOL_VERSION, 8, 42])
@@ -3259,7 +3292,8 @@ mod tests {
             value["ev"][6],
             serde_json::json!([7, 10, [320.0, 352.0], 3.0, 120])
         );
-        assert_eq!(value["ev"][7], serde_json::json!([8, 336.0, 368.0, 3.0]));
+        assert_eq!(value["ev"][7], serde_json::json!([11, 1, 288.0, 304.0, 0.25]));
+        assert_eq!(value["ev"][8], serde_json::json!([8, 336.0, 368.0, 3.0]));
     }
 
     #[test]

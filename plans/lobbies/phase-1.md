@@ -1,6 +1,6 @@
 # Phase 1 - Server Lobby Summary Contract
 
-Status: planned.
+Status: done.
 
 ## Goal
 

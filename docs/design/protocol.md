@@ -104,7 +104,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
 | `holdPosition` | `units: u32[]` | Clear active and queued unit orders, then stand ground. Held units do not chase or path to auto-acquire enemies; they still fire at enemies already in weapon range and can still be pushed by collision resolution. |
-| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre, research_complex), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
+| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"` on the wire. Freshly produced units receive the building's rally plan as active + queued orders; plain move rally stages become attack-move orders for non-workers, while workers keep plain move orders. The building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre, research_complex), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
 illegal placements, or unaffordable actions (fail silently or emit a `notice` event).
@@ -497,7 +497,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 22. `client/src/net.js` parses the
+`messagepack-compact`, codec version 1, compact snapshot version 23. `client/src/net.js` parses the
 binary frame into the raw compact snapshot object, then `decodeCompactSnapshot` expands it back into
 the semantic object above before dispatching `S.SNAPSHOT`.
 
@@ -522,7 +522,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 22,
+  "v": 23,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -557,7 +557,7 @@ Compact numeric codes:
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 5 `mortar_autocast`, 6 `command_car_unlock` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker |
 
 #### 2.4.1 Boundary inventory
 
@@ -722,6 +722,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "mortarImpact", from?: u32, x: f32, y: f32, radiusTiles: f32,
   reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string } }
 { e: "artilleryTarget", from: u32, x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
+{ e: "artilleryFiring", owner: u32, x: f32, y: f32, facing: f32 }
 { e: "artilleryImpact", x: f32, y: f32, radiusTiles: f32 }
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
@@ -757,8 +758,11 @@ hidden mortar launch data or hidden mortar impact markers unless their entities 
 team sees the relevant point.
 Artillery target events are sent to the firing team so enemies never receive pre-impact markers,
 even if they have vision of the gun. The `from` id lets allied clients recoil the specific gun and
-draw launch dust. Enemy players receive a visual-only `attack` event with a shooter `reveal` when
-their team currently sees the firing gun, so the gun can be shown briefly without revealing terrain,
+draw launch dust. Every player receives a visual-only `artilleryFiring` event with the firing
+owner, shooter position, and facing so the minimap can show a small global artillery firing marker;
+it does not carry the shooter entity id, target point, terrain, exploration, or entity visibility.
+Enemy players also receive a visual-only `attack` event with a shooter `reveal` when their team
+currently sees the firing gun, so the gun can be shown briefly without revealing terrain,
 exploration, or the target point. Artillery impact events are sent to the firing team and to enemy
 recipients whose team currently sees the impact point; they do not reveal terrain, update
 exploration, or carry entity visibility. Artillery impact damage follows the same support-fire
