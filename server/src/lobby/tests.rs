@@ -6,7 +6,9 @@ use super::room_task::{
 };
 use super::snapshots::compact_snapshot_for_wire;
 use super::*;
-use crate::protocol::{kinds, EntityView, Event, ResourceDelta};
+use crate::protocol::{kinds, EntityView, Event, ResourceDelta, DEFAULT_FACTION_ID};
+use rts_sim::game::replay::ReplayArtifactV1;
+use rts_sim::game::{Game, PlayerInit};
 
 fn join_test_player(task: &mut RoomTask, player_id: u32) {
     let (msg_tx, _writer) = ConnectionSink::new();
@@ -41,6 +43,16 @@ async fn join_room_handle(
     name: &str,
     spectator: bool,
 ) -> ConnectionWriter {
+    join_room_handle_with_replay_ok(handle, player_id, name, spectator, false).await
+}
+
+async fn join_room_handle_with_replay_ok(
+    handle: &RoomHandle,
+    player_id: u32,
+    name: &str,
+    spectator: bool,
+    replay_ok: bool,
+) -> ConnectionWriter {
     let (msg_tx, writer) = ConnectionSink::new();
     let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
     handle
@@ -49,7 +61,7 @@ async fn join_room_handle(
             player_id,
             name: name.to_string(),
             spectator,
-            replay_ok: false,
+            replay_ok,
             msg_tx,
             ack: ack_tx,
         })
@@ -74,6 +86,19 @@ async fn wait_for_lobby_room_count(lobby: &Lobby, expected: usize) {
 
 fn test_drain() -> DrainHandle {
     DrainHandle::default()
+}
+
+fn registry_test_replay_artifact() -> ReplayArtifactV1 {
+    let players = vec![PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        name: "Replay Player".to_string(),
+        color: PLAYER_PALETTE[0].to_string(),
+        is_ai: false,
+    }];
+    let game = Game::new(&players, 0x5150_3003);
+    ReplayArtifactV1::capture_from_game(&game, crate::build_info::build_id(), None, game.scores())
 }
 
 fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
@@ -645,6 +670,79 @@ async fn empty_public_lobby_has_no_reconnect_grace_and_releases_name() {
             .expect("empty public lobby name should be available immediately"),
         room
     );
+}
+
+#[tokio::test]
+async fn empty_recreatable_internal_rooms_are_disposed_and_hidden_from_browser() {
+    let lobby = Lobby::new();
+    for (idx, (room, replay_ok)) in [
+        (
+            "__dev_scenario__:direct_reverse_order:unit=tank:count=1".to_string(),
+            false,
+        ),
+        ("__lab__:phase3-lab:map=Default:seed=123".to_string(), false),
+        (
+            "__replay_artifact__:phase3-missing-artifact".to_string(),
+            true,
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let handle = lobby.get_or_create(&room).await;
+        let _writer = join_room_handle_with_replay_ok(
+            &handle,
+            7000 + idx as u32,
+            "Internal Viewer",
+            true,
+            replay_ok,
+        )
+        .await;
+
+        assert!(
+            lobby
+                .summaries()
+                .await
+                .iter()
+                .all(|summary| summary.room != room),
+            "{room} should stay out of the public lobby browser while occupied"
+        );
+
+        handle
+            .event_tx
+            .send(RoomEvent::Leave {
+                player_id: 7000 + idx as u32,
+            })
+            .await
+            .expect("internal room leave should send");
+        wait_for_lobby_room_count(&lobby, 0).await;
+    }
+}
+
+#[tokio::test]
+async fn empty_persisted_replay_room_is_disposed_and_hidden_from_browser() {
+    let lobby = Lobby::new();
+    let room = lobby
+        .create_replay_room(registry_test_replay_artifact())
+        .await;
+    let handle = lobby
+        .get_or_create_join_target(&room)
+        .await
+        .expect("created replay room should be joinable");
+    let _writer = join_room_handle_with_replay_ok(&handle, 7100, "Replay Viewer", true, true).await;
+
+    assert!(lobby
+        .summaries()
+        .await
+        .iter()
+        .all(|summary| summary.room != room));
+
+    handle
+        .event_tx
+        .send(RoomEvent::Leave { player_id: 7100 })
+        .await
+        .expect("replay room leave should send");
+    wait_for_lobby_room_count(&lobby, 0).await;
 }
 
 #[tokio::test]
