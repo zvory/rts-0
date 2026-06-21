@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -50,17 +50,17 @@ spectator behavior, lab collaboration, or unrelated lobby-browser work.
 
 ## Implementation Checklist
 
-- [ ] Confirm PR #257 and PR #258 are merged before starting implementation.
-- [ ] Identify every replay `ServerMessage::Start` send and resend path.
-- [ ] Add or reuse one room-task helper that stamps replay start payload diagnostics and
+- [x] Confirm PR #257 and PR #258 are merged before starting implementation.
+- [x] Identify every replay `ServerMessage::Start` send and resend path.
+- [x] Add or reuse one room-task helper that stamps replay start payload diagnostics and
       capabilities together.
-- [ ] Ensure absolute seek and relative seek resend paths use that helper.
-- [ ] Ensure initial replay joins and replay-room transitions keep using the same stamping logic.
-- [ ] Preserve `replay: Some(...)`, `spectator: true`, viewer `player_id`, and authoritative tick.
-- [ ] Add focused Rust regression coverage for initial replay start and seek-triggered resends.
-- [ ] Avoid spectator admission, lab-collab, lobby-browser, or unrelated room-policy changes.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase file done in the implementation commit.
+- [x] Ensure absolute seek and relative seek resend paths use that helper.
+- [x] Ensure initial replay joins and replay-room transitions keep using the same stamping logic.
+- [x] Preserve `replay: Some(...)`, `spectator: true`, viewer `player_id`, and authoritative tick.
+- [x] Add focused Rust regression coverage for initial replay start and seek-triggered resends.
+- [x] Avoid spectator admission, lab-collab, lobby-browser, or unrelated room-policy changes.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase file done in the implementation commit.
 
 ## Verification
 

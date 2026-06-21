@@ -14,12 +14,13 @@ use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::tick_control::{RoomTimeClock, RoomTimeSpeed, ScheduledTickAction, TickControl};
 use super::*;
 use crate::protocol::{
-    Command, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
-    LabState, LabVisionMode, LivePauseState, NoticeSeverity, RoomTimeState, DEFAULT_FACTION_ID,
+    Command, DiagnosticCapabilities, LabClientOp, LabResult, LabScenarioLabMetadata,
+    LabStartMetadata, LabStartRole, LabState, LabVisionMode, LivePauseState, NoticeSeverity,
+    RoomCapabilities, RoomTimeState, StartPayload, DEFAULT_FACTION_ID,
 };
 #[cfg(test)]
 use crate::protocol::{
-    MovementPathDiagnosticScope, SnapshotNetStatus, StartPayload, PREDICTION_PROTOCOL_VERSION,
+    MovementPathDiagnosticScope, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION,
 };
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
@@ -154,6 +155,12 @@ struct ReplayTickContext {
     tick_budget: Duration,
     tick_start: StdInstant,
     projection_policy: ProjectionPolicy,
+}
+
+#[derive(Clone, Copy)]
+struct ReplayStartPayloadStamp {
+    diagnostics: DiagnosticCapabilities,
+    capabilities: RoomCapabilities,
 }
 
 #[derive(Clone)]
@@ -3010,6 +3017,26 @@ impl RoomTask {
             .map(|session| session.metadata_for(player_id))
     }
 
+    fn replay_start_payload_stamp(&self) -> ReplayStartPayloadStamp {
+        ReplayStartPayloadStamp {
+            diagnostics: self
+                .projection_policy()
+                .diagnostic_capabilities_for(RecipientRole::Spectator),
+            capabilities: self.session_policy().start_capabilities(false),
+        }
+    }
+
+    fn replay_start_payload_for(
+        session: &ReplaySession,
+        watcher_id: u32,
+        stamp: ReplayStartPayloadStamp,
+    ) -> StartPayload {
+        let mut payload = session.start_payload_for(watcher_id);
+        payload.diagnostics = stamp.diagnostics;
+        payload.capabilities = stamp.capabilities;
+        payload
+    }
+
     fn lab_snapshot_projection_inputs(&self, game: &Game) -> (Option<u32>, Option<Vec<u32>>) {
         let Some(session) = &self.lab_session else {
             return (None, None);
@@ -3033,11 +3060,8 @@ impl RoomTask {
         let Some(player) = self.players.get(&watcher_id) else {
             return;
         };
-        let mut payload = session.start_payload_for(watcher_id);
-        payload.diagnostics = self
-            .projection_policy()
-            .diagnostic_capabilities_for(RecipientRole::Spectator);
-        payload.capabilities = self.session_policy().start_capabilities(false);
+        let payload =
+            Self::replay_start_payload_for(session, watcher_id, self.replay_start_payload_stamp());
         send_or_log(
             &self.room,
             watcher_id,
@@ -3885,10 +3909,7 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
-        let start_diagnostics = self
-            .projection_policy()
-            .diagnostic_capabilities_for(RecipientRole::Spectator);
-        let start_capabilities = self.session_policy().start_capabilities(false);
+        let start_stamp = self.replay_start_payload_stamp();
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
             let seek_result = session.seek_back(&self.room, viewer_count, player_id, ticks_back);
@@ -3897,9 +3918,8 @@ impl RoomTask {
                     .iter()
                     .filter_map(|viewer_id| {
                         self.players.get(viewer_id).map(|player| {
-                            let mut start = session.start_payload_for(*viewer_id);
-                            start.diagnostics = start_diagnostics;
-                            start.capabilities = start_capabilities;
+                            let start =
+                                Self::replay_start_payload_for(session, *viewer_id, start_stamp);
                             (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
@@ -3944,10 +3964,7 @@ impl RoomTask {
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
-        let start_diagnostics = self
-            .projection_policy()
-            .diagnostic_capabilities_for(RecipientRole::Spectator);
-        let start_capabilities = self.session_policy().start_capabilities(false);
+        let start_stamp = self.replay_start_payload_stamp();
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
             let seek_result = session.seek_to(&self.room, viewer_count, player_id, tick);
@@ -3956,9 +3973,8 @@ impl RoomTask {
                     .iter()
                     .filter_map(|viewer_id| {
                         self.players.get(viewer_id).map(|player| {
-                            let mut start = session.start_payload_for(*viewer_id);
-                            start.diagnostics = start_diagnostics;
-                            start.capabilities = start_capabilities;
+                            let start =
+                                Self::replay_start_payload_for(session, *viewer_id, start_stamp);
                             (*viewer_id, player.msg_tx.clone(), start)
                         })
                     })
@@ -4994,6 +5010,35 @@ mod tests {
         }
     }
 
+    fn replay_start_payload_after(room: &str, action: impl FnOnce(&mut RoomTask)) -> StartPayload {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        for _ in 0..3 {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+        let mut task = RoomTask::new(
+            room.to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer = add_test_room_player(&mut task, 99, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        action(&mut task);
+
+        let mut payloads = start_payloads(&mut writer);
+        assert_eq!(
+            payloads.len(),
+            1,
+            "expected exactly one replay start payload"
+        );
+        payloads.remove(0)
+    }
+
     #[test]
     fn paused_replay_viewer_does_not_advance_on_scheduled_tick() {
         let players = replay_test_players(2);
@@ -5083,6 +5128,44 @@ mod tests {
         branch.room_time_speed = 4.0;
         branch.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
         assert_eq!(branch.current_tick_interval(), base);
+    }
+
+    #[test]
+    fn replay_start_capabilities_survive_initial_and_seek_resends() {
+        let initial = replay_start_payload_after("replay-start-caps-initial", |task| {
+            task.send_replay_start_to(99)
+        });
+        let relative = replay_start_payload_after("replay-start-caps-relative", |task| {
+            task.on_seek_room_time(99, 1)
+        });
+        let absolute = replay_start_payload_after("replay-start-caps-absolute", |task| {
+            task.on_seek_room_time_to(99, 1)
+        });
+
+        for payload in [&initial, &relative, &absolute] {
+            assert_eq!(payload.player_id, 99);
+            assert!(payload.spectator);
+            assert!(payload.replay.is_some());
+            assert!(payload.capabilities.room_time.available);
+            assert!(payload.capabilities.room_time.set_speed);
+            assert!(payload.capabilities.room_time.pause);
+            assert!(payload.capabilities.room_time.seek_relative);
+            assert!(payload.capabilities.room_time.seek_absolute);
+            assert!(payload.capabilities.room_time.timeline);
+            assert!(payload.capabilities.visibility.replay_vision);
+            assert!(!payload.capabilities.commands.gameplay);
+            assert!(!payload.capabilities.match_controls.pause);
+            assert!(payload.diagnostics.observer_analysis);
+            assert_eq!(
+                payload.diagnostics.movement_paths,
+                MovementPathDiagnosticScope::None
+            );
+        }
+
+        assert_eq!(relative.capabilities, initial.capabilities);
+        assert_eq!(absolute.capabilities, initial.capabilities);
+        assert_eq!(relative.diagnostics, initial.diagnostics);
+        assert_eq!(absolute.diagnostics, initial.diagnostics);
     }
 
     #[test]
