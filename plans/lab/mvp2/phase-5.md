@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Planned.
+- [x] Done.
 
 ## Objective
 
@@ -44,14 +44,26 @@ operator workflow before closing the plan.
 
 ## Implementation Checklist
 
-- [ ] Polish active-tool state and cancellation affordances.
-- [ ] Verify lab teardown does not leak panel, input, or intent state across rematches.
-- [ ] Add or update focused automated coverage for the MVP2 workflows.
-- [ ] Run the relevant focused verification commands.
-- [ ] Perform a manual browser smoke of lab command-card ordering and palette click-to-spawn.
-- [ ] Update design docs and context capsule pointers for changed contracts.
-- [ ] Mark completed phase documents done as appropriate.
-- [ ] Record remaining non-MVP2 gaps without expanding this plan's scope.
+- [x] Polish active-tool state and cancellation affordances.
+- [x] Verify lab teardown does not leak panel, input, or intent state across rematches.
+- [x] Add or update focused automated coverage for the MVP2 workflows.
+- [x] Run the relevant focused verification commands.
+- [x] Perform a manual browser smoke of lab command-card ordering and palette click-to-spawn.
+- [x] Update design docs and context capsule pointers for changed contracts.
+- [x] Mark completed phase documents done as appropriate.
+- [x] Record remaining non-MVP2 gaps without expanding this plan's scope.
+
+## Completion Notes
+
+- Lab setup tools now publish active and cancelled state from `Match` back to the app-owned
+  `LabPanel`, so the panel stays synchronized when tools are armed, consumed by a world click, or
+  cancelled by Escape, right-click, blur, or the explicit cancel button.
+- The manual browser smoke used a real local `/lab` page and server. It verified palette
+  click-to-spawn, selected-unit command-card move routing through `issueCommandAs`, Escape
+  cancellation status, vision switching, scenario export/import, and that the normal lobby path does
+  not expose lab tools.
+- Remaining gaps are intentionally outside MVP2: timeline controls, multi-operator collaboration,
+  persistent scenario libraries, lab flags, sharing/auth, and `/dev/scenario` migration.
 
 ## Verification
 

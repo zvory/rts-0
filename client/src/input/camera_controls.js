@@ -110,7 +110,7 @@ export function _handleBlur() {
     clientIntent(this).endPlacement();
   }
   if (clientIntent(this)?.activeLabTool && typeof clientIntent(this).cancelLabTool === "function") {
-    clientIntent(this).cancelLabTool("blur");
+    this.labToolController?.cancel?.("blur") || clientIntent(this).cancelLabTool("blur");
   }
   if (this._drag) {
     this._drag = null;

@@ -133,6 +133,7 @@ export class LabPanel {
     const selectedActionDisabled = !hasSelection;
     const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
 
+    root.appendChild(this.renderActiveToolStatus());
     root.appendChild(this.renderSpawnPalette());
     root.appendChild(this.renderAdvancedSpawn());
 
@@ -141,6 +142,7 @@ export class LabPanel {
       this.button("Move to point", () => this.armMoveSelectedTool(), {
         disabled: selectedActionDisabled,
         title: selectedActionTitle,
+        dataset: { active: this.activeLabTool()?.kind === "moveSelected" ? "true" : "false" },
       }),
       this.playerSelectField("set-owner", "Owner", {
         value: issueOwner ?? undefined,
@@ -184,6 +186,31 @@ export class LabPanel {
     ]));
 
     return root;
+  }
+
+  renderActiveToolStatus() {
+    const active = this.activeLabTool();
+    const section = document.createElement("section");
+    section.className = "lab-active-tool";
+    section.dataset.active = active ? "true" : "false";
+    section.setAttribute("aria-live", "polite");
+
+    const label = this.readout(active ? `Armed: ${labToolLabel(active)}` : "No setup tool armed");
+    label.className = "lab-readout lab-active-tool-label";
+    section.appendChild(label);
+
+    if (active) {
+      const detail = this.readout("Click the map to apply. Right-click or Esc cancels.");
+      detail.className = "lab-readout lab-active-tool-detail";
+      section.appendChild(detail);
+    }
+
+    section.appendChild(this.button("Cancel tool", () => this.cancelActiveTool(), {
+      disabled: !active,
+      title: active ? `Cancel ${labToolLabel(active)}` : "No active setup tool",
+      className: "lab-btn lab-cancel-tool",
+    }));
+    return section;
   }
 
   addStatus(root, label, value) {
@@ -385,7 +412,9 @@ export class LabPanel {
           this.advancedSpawn.completed = checked;
         },
       }),
-      this.button("Arm spawn", () => this.armAdvancedSpawnTool()),
+      this.button("Arm spawn", () => this.armAdvancedSpawnTool(), {
+        dataset: { active: this.spawnToolActive(this.advancedSpawn.kind) ? "true" : "false" },
+      }),
     ]);
   }
 
@@ -400,6 +429,7 @@ export class LabPanel {
         dataset: {
           kind,
           selected: kind === this.spawnPalette.kind ? "true" : "false",
+          active: this.spawnToolActive(kind) ? "true" : "false",
         },
       });
       grid.appendChild(button);
@@ -424,9 +454,7 @@ export class LabPanel {
       kind,
       completed: this.spawnPalette.completed,
     };
-    const armed = this.armSpawnTool(payload);
-    this.render();
-    return armed;
+    return this.armSpawnTool(payload);
   }
 
   armAdvancedSpawnTool() {
@@ -442,7 +470,7 @@ export class LabPanel {
   armSpawnTool(payload) {
     if (typeof this.match?.armLabTool !== "function") return null;
     const kind = payload?.kind || "";
-    return this.match.armLabTool(
+    const armed = this.match.armLabTool(
       {
         kind: "spawnEntity",
         payload: { ...payload },
@@ -450,6 +478,8 @@ export class LabPanel {
       },
       { onWorldClick: (event) => this.spawnEntityAt(event) },
     );
+    this.render();
+    return armed;
   }
 
   spawnEntityAt(event) {
@@ -510,7 +540,7 @@ export class LabPanel {
     if (entityIds.length === 0) {
       return this.publishLocalResult("moveEntity", false, "Select an entity first.");
     }
-    return this.match.armLabTool(
+    const armed = this.match.armLabTool(
       {
         kind: "moveSelected",
         payload: { entityIds },
@@ -518,6 +548,26 @@ export class LabPanel {
       },
       { onWorldClick: (event) => this.moveSelectedTo(event) },
     );
+    this.render();
+    return armed;
+  }
+
+  cancelActiveTool() {
+    return this.match?.cancelLabTool?.("panelCancel") || null;
+  }
+
+  applyLabToolChange(change) {
+    if (change?.type === "cancelled" && shouldSurfaceToolCancellation(change.reason)) {
+      const summary = `${labToolLabel(change.tool)} cancelled.`;
+      this.lastResult = {
+        requestId: 0,
+        ok: true,
+        op: "labTool",
+        error: "",
+        outcome: { summary },
+      };
+    }
+    this.render();
   }
 
   moveSelectedTo(event) {
@@ -621,6 +671,15 @@ export class LabPanel {
     return typeof this.match?.state?.selectedEntities === "function"
       ? this.match.state.selectedEntities()
       : [];
+  }
+
+  activeLabTool() {
+    return this.match?.clientIntent?.activeLabTool || null;
+  }
+
+  spawnToolActive(kind) {
+    const active = this.activeLabTool();
+    return active?.kind === "spawnEntity" && active?.payload?.kind === kind;
   }
 
   resourcesForFirstPlayer() {
@@ -796,6 +855,20 @@ function batchOperationLabel(op) {
   if (op === "setEntityOwner") return { success: "Updated owner for", failure: "Owner change" };
   if (op === "deleteEntity") return { success: "Deleted", failure: "Delete" };
   return { success: `${op} accepted for`, failure: op };
+}
+
+function labToolLabel(tool) {
+  if (typeof tool?.label === "string" && tool.label) return tool.label;
+  if (tool?.kind === "spawnEntity") {
+    const kind = tool?.payload?.kind || "";
+    return kind ? `Spawn ${KIND_LABELS[kind] || kind}` : "Spawn";
+  }
+  if (tool?.kind === "moveSelected") return "Move selected";
+  return "Setup tool";
+}
+
+function shouldSurfaceToolCancellation(reason) {
+  return reason === "escape" || reason === "rightClick" || reason === "blur" || reason === "panelCancel";
 }
 
 function entityNoun(count) {

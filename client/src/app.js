@@ -310,6 +310,7 @@ export class App {
         labMetadata,
         labClient: this.labClient,
         labControlPolicy: this.labControlPolicy,
+        onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
       },
     );
     if (labMetadata) {
