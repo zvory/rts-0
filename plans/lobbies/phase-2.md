@@ -59,6 +59,12 @@ States:
 - Compute relative age in client code from server `createdAtUnixMs`; refresh displayed ages on poll
   and optionally on a lightweight local timer.
 - Use dependency injection for fetch/clock in pure helpers where tests need deterministic behavior.
+- Preserve `LobbyRosterView` as the joined-lobby renderer. The browser helper owns only the
+  pre-join list/empty/error states and should hand successful joins back to the existing joined
+  lobby flow.
+- The current first screen also hosts match history below the lobby shell. Keep it stable unless
+  the implementation intentionally moves it, and verify the browser does not push joined-lobby
+  controls or match history into overlapping layouts.
 
 ## Touch Points
 

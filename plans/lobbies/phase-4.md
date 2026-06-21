@@ -19,6 +19,9 @@ and updating design/protocol documentation.
   server state marks in-game or gone.
 - Add or update tests for server summary state transitions, client browser rendering, create/join
   behavior, and responsive smoke coverage.
+- Add a guardrail or focused assertion that the public browser only exposes normal-room summaries.
+  This can live in lobby Rust tests, `scripts/check-lobby-architecture.mjs`, or both if the final
+  implementation creates a stable helper worth enforcing.
 - Update the relevant design docs and context capsules.
 - Run focused verification and let the final phase commit hook provide broad coverage before merge.
 
@@ -41,6 +44,8 @@ accepted freshness target is the configured 1-2 second interval.
 - Names are validated consistently in client preflight and server authority, with server authority
   winning.
 - Internal room prefixes remain hidden and uncreatable through the browser.
+- Lab, replay artifact, persisted replay, replay branch, and dev scenario rooms remain hidden even
+  though they are now all room-hosted sessions under the same policy shell.
 - Summary collection cannot wedge on a slow room task.
 - Browser polling stops on teardown and does not leak intervals across app lifecycle changes.
 - Relative-age timers do not keep running after `Lobby.destroy()`.
@@ -55,12 +60,15 @@ accepted freshness target is the configured 1-2 second interval.
 - Update the relevant server/client design docs for `GET /api/lobbies` if the summary list is HTTP.
 - Update `docs/context/protocol.md` if protocol section lists or lobby fields change.
 - Update `docs/context/client-ui.md` if a new lobby browser module becomes a stable UI seam.
+- Update `docs/context/server-sim.md` if the summary/create helper becomes a stable lobby seam or
+  adds a new `RoomEvent`.
 - Update testing docs only if a new dedicated lobby-browser suite is added.
 
 ## Touch Points
 
 - `server/src/lobby/mod.rs`
 - `server/src/lobby/room_task.rs`
+- `server/src/lobby/session_policy.rs`
 - `server/src/main.rs`
 - `server/crates/protocol/src/lib.rs` if push/list messages are WebSocket
 - `server/src/protocol.rs` if protocol adapters are affected
@@ -77,6 +85,8 @@ accepted freshness target is the configured 1-2 second interval.
 ## Verification
 
 - Run focused Rust tests for lobby summary state transitions.
+- Run `node scripts/check-lobby-architecture.mjs` if lobby policy guardrails or helper boundaries
+  change.
 - Run `node tests/protocol_parity.mjs` if protocol changed.
 - Run `node tests/client_contracts.mjs`.
 - Run `node scripts/check-client-architecture.mjs`.
