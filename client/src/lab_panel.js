@@ -1,6 +1,6 @@
 import { PLAYABLE_FACTIONS } from "./lobby_view.js";
 import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
-import { factionCatalog, STATS, UPGRADES } from "./config.js";
+import { factionCatalog, PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 
 const labVision = Object.freeze({
@@ -30,6 +30,7 @@ export class LabPanel {
       kind: "",
     };
     this.teamInputs = new Map();
+    this.playerButtons = new Map();
     this.fields = new Map();
     this.listeners = [];
     this.unsubscribeState = null;
@@ -55,6 +56,7 @@ export class LabPanel {
     this.removeListeners();
     this.windowChrome.clearRenderListeners();
     this.teamInputs.clear();
+    this.playerButtons.clear();
     this.fields.clear();
     this.el.replaceChildren();
 
@@ -369,13 +371,62 @@ export class LabPanel {
 
   renderTargetPlayer() {
     return this.fieldset("Target Player", [
-      this.playerSelectField("lab-player", "Player", {
-        value: this.targetPlayer(),
-        onChange: (value) => {
-          this.targetPlayerId = this.validOwner(value);
-        },
-      }),
+      this.playerButtonField("lab-player", "Player"),
     ]);
+  }
+
+  playerButtonField(id, labelText) {
+    const wrap = document.createElement("div");
+    wrap.className = "lab-player-field";
+    const label = document.createElement("span");
+    label.className = "lab-player-label";
+    label.textContent = labelText;
+    const group = document.createElement("div");
+    group.className = "lab-player-buttons";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", labelText);
+    const selected = this.targetPlayer();
+    this.fields.set(id, { value: String(selected) });
+    this.players().forEach((player, index) => {
+      const playerId = Number(player.id);
+      if (!Number.isFinite(playerId)) return;
+      const color = playerColor(player, index);
+      const button = this.button(playerButtonLabel(player), () => this.selectTargetPlayer(playerId), {
+        className: "lab-btn lab-player-btn",
+        title: playerButtonTitle(player),
+        dataset: {
+          playerId,
+          selected: playerId === selected ? "true" : "false",
+          color,
+        },
+      });
+      button.setAttribute("aria-pressed", playerId === selected ? "true" : "false");
+      button.style.setProperty("--lab-player-color", color);
+      button.style.setProperty("--lab-player-bg", hexToRgba(color, 0.18));
+      button.style.setProperty("--lab-player-bg-active", hexToRgba(color, 0.42));
+      button.style.setProperty("--lab-player-ring", hexToRgba(color, 0.72));
+      this.playerButtons.set(playerId, button);
+      group.appendChild(button);
+    });
+    wrap.append(label, group);
+    return wrap;
+  }
+
+  selectTargetPlayer(owner) {
+    this.captureVisibleSetupFields();
+    this.targetPlayerId = this.validOwner(owner);
+    this.syncTargetPlayerButtons();
+  }
+
+  syncTargetPlayerButtons() {
+    const selected = this.targetPlayer();
+    const field = this.fields.get("lab-player");
+    if (field) field.value = String(selected);
+    for (const [playerId, button] of this.playerButtons.entries()) {
+      const isSelected = playerId === selected;
+      button.dataset.selected = isSelected ? "true" : "false";
+      button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    }
   }
 
   renderSpawnPalette() {
@@ -497,6 +548,15 @@ export class LabPanel {
   captureTargetPlayerField() {
     this.targetPlayerId = this.validOwner(this.int("lab-player") || this.targetPlayerId);
     return this.targetPlayerId;
+  }
+
+  captureVisibleSetupFields() {
+    if (this.fields.has("resource-steel")) this.playerState.steel = this.uint("resource-steel");
+    if (this.fields.has("resource-oil")) this.playerState.oil = this.uint("resource-oil");
+    if (this.fields.has("research-upgrade")) {
+      this.playerState.researchUpgrade = this.value("research-upgrade") || this.playerState.researchUpgrade;
+    }
+    if (this.fields.has("spawn-faction")) this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
   }
 
   targetPlayer() {
@@ -849,6 +909,33 @@ export function labSpawnUnitKindsForFaction(factionId) {
 
 function factionLabel(factionId) {
   return labSpawnFactionOptions().find((entry) => entry.id === factionId)?.label || String(factionId || "");
+}
+
+function playerButtonLabel(player) {
+  const id = Number(player?.id);
+  return Number.isFinite(id) ? `P${id}` : "P?";
+}
+
+function playerButtonTitle(player) {
+  const id = Number(player?.id);
+  const name = String(player?.name || "").trim();
+  return name ? `Player ${id}: ${name}` : `Player ${id}`;
+}
+
+function playerColor(player, index) {
+  const color = String(player?.color || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+  return PLAYER_PALETTE[index % PLAYER_PALETTE.length] || "#9aa0a8";
+}
+
+function hexToRgba(hex, alpha) {
+  const match = /^#([0-9a-f]{6})$/i.exec(String(hex || ""));
+  if (!match) return `rgba(154, 160, 168, ${alpha})`;
+  const value = Number.parseInt(match[1], 16);
+  const r = (value >> 16) & 0xff;
+  const g = (value >> 8) & 0xff;
+  const b = value & 0xff;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function toIntOrNull(value) {

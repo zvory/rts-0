@@ -149,9 +149,9 @@ pub(crate) fn find_build_spot_near_start_with(
     let (sx, sy) = (start.0 as i32, start.1 as i32);
     let mut fallback = None;
 
-    for radius in search.min_radius..=search.max_radius {
-        if search.prefer_toward_center {
-            let mut best_in_ring: Option<(u32, u32, f32, f32)> = None;
+    if search.prefer_toward_center {
+        let mut best: Option<(u32, u32, f32, f32)> = None;
+        for radius in search.min_radius..=search.max_radius {
             for dy in -radius..=radius {
                 for dx in -radius..=radius {
                     if dx.abs().max(dy.abs()) != radius {
@@ -177,7 +177,7 @@ pub(crate) fn find_build_spot_near_start_with(
                     if fallback.is_none() {
                         fallback = Some((tx, ty));
                     }
-                    let better = best_in_ring
+                    let better = best
                         .map(|(_, _, best_map_distance, best_start_distance)| {
                             map_distance < best_map_distance
                                 || (map_distance == best_map_distance
@@ -185,15 +185,15 @@ pub(crate) fn find_build_spot_near_start_with(
                         })
                         .unwrap_or(true);
                     if better {
-                        best_in_ring = Some((tx, ty, map_distance, start_distance));
+                        best = Some((tx, ty, map_distance, start_distance));
                     }
                 }
             }
-            if let Some((tx, ty, _, _)) = best_in_ring {
-                return Some((tx, ty));
-            }
-            continue;
         }
+        return best.map(|(tx, ty, _, _)| (tx, ty)).or(fallback);
+    }
+
+    for radius in search.min_radius..=search.max_radius {
 
         if !search.prefer_away_from_center {
             for dy in -radius..=radius {
@@ -330,6 +330,26 @@ mod tests {
         );
 
         assert_eq!(spot, Some((6, 15)));
+    }
+
+    #[test]
+    fn toward_center_mode_prefers_farther_front_tile_over_nearer_back_tile() {
+        let spot = find_build_spot_near_start_with(
+            30,
+            30,
+            (4, 15),
+            EntityKind::Factory,
+            BuildSearch {
+                min_radius: 2,
+                max_radius: 6,
+                prefer_away_from_center: false,
+                prefer_toward_center: true,
+            },
+            &BTreeSet::new(),
+            |tx, ty| matches!((tx, ty), (2, 15) | (10, 15)),
+        );
+
+        assert_eq!(spot, Some((10, 15)));
     }
 
     #[test]

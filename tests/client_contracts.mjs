@@ -5053,7 +5053,10 @@ await withFakeDocument(async () => {
   });
   const startPayload = {
     map: { name: "Default" },
-    players: [{ id: 1, teamId: 1 }, { id: 2, teamId: 2 }],
+    players: [
+      { id: 1, teamId: 1, color: "#2255aa" },
+      { id: 2, teamId: 2, color: "#bb4422" },
+    ],
   };
 
   const rootA = document.createElement("div");
@@ -5068,7 +5071,7 @@ await withFakeDocument(async () => {
   refB.panel = new LabPanel({ root: rootB, labClient: operatorB, startPayload, match: matchB });
 
   assert(textWithin(rootB).includes("Operator"), "later lab joiner operator role renders as Operator");
-  assert(refB.panel.fields.has("lab-player"), "later lab joiner operator receives setup tools");
+  assert(refB.panel.fields.has("lab-player"), "later lab joiner operator receives target player controls");
   refA.panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(textWithin(rootA).includes("Armed: Spawn Rifleman"), "one lab tab can arm a setup tool locally");
   assert(textWithin(rootB).includes("No setup tool armed"), "another lab tab keeps its own setup tool state");
@@ -5083,7 +5086,7 @@ await withFakeDocument(async () => {
     match: buildMatch(readOnlyRef),
   });
   assert(textWithin(readOnlyRoot).includes("Read-only"), "read-only lab role renders read-only status");
-  assert(!readOnlyRef.panel.fields.has("lab-player"), "read-only lab role does not expose setup tools");
+  assert(!readOnlyRef.panel.fields.has("lab-player"), "read-only lab role does not expose target player controls");
 
   refA.panel.destroy();
   refB.panel.destroy();
@@ -5154,11 +5157,20 @@ await withFakeDocument(async () => {
     launch: { publicRoom: "sandbox", map: "Default" },
     startPayload: {
       map: { name: "Default" },
-      players: [{ id: 1, teamId: 1 }, { id: 2, teamId: 2 }],
+      players: [
+        { id: 1, teamId: 1, color: "#2255aa" },
+        { id: 2, teamId: 2, color: "#bb4422" },
+      ],
     },
     match,
   });
   const buttonByText = (label) => findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === label)[0];
+  const playerButtonById = (id) => findFakes(root, (el) => (
+    el.tagName === "BUTTON" && el.dataset?.playerId === String(id)
+  ))[0];
+  const playerButtons = () => findFakes(root, (el) => (
+    el.tagName === "BUTTON" && String(el.className).includes("lab-player-btn")
+  ));
   const resolveLastLabResult = (options = {}) => {
     const envelope = sent.at(-1);
     net._emit("labResult", {
@@ -5179,7 +5191,18 @@ await withFakeDocument(async () => {
   );
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
-  assert(panel.fields.has("lab-player"), "LabPanel exposes one shared player selector for lab setup tools");
+  assert(panel.fields.has("lab-player"), "LabPanel tracks one shared target player for lab setup tools");
+  assert(
+    playerButtons().length === 2 &&
+      playerButtonById(1)?.dataset.color === "#2255aa" &&
+      playerButtonById(2)?.dataset.color === "#bb4422",
+    "LabPanel renders one team-colored target button per player",
+  );
+  assert(
+    playerButtonById(1)?.dataset.selected === "true" &&
+      playerButtonById(2)?.dataset.selected === "false",
+    "LabPanel marks the selected target player button",
+  );
   assert(!textWithin(root).includes("Advanced Spawn"), "LabPanel omits the advanced spawn form");
   assert(
     !panel.fields.has("spawn-owner") &&
@@ -5201,7 +5224,8 @@ await withFakeDocument(async () => {
     .find((child) => child.textContent === "Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
-  panel.fields.get("lab-player").value = "2";
+  playerButtonById(2).listeners.click();
+  assert(panel.fields.get("lab-player").value === "2", "LabPanel target player buttons update shared target state");
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
   assert(armedTool?.keepArmedOnWorldClick === true, "LabPanel unit palette keeps the spawn tool armed across world clicks");
@@ -5309,7 +5333,7 @@ await withFakeDocument(async () => {
   resolveLastLabResult({ outcome: { entityId: 32 } });
   await deletePromise;
   assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes accepted deletes");
-  panel.fields.get("lab-player").value = "1";
+  playerButtonById(1).listeners.click();
   panel.fields.get("resource-steel").value = "900";
   panel.fields.get("resource-oil").value = "300";
   buttonByText("Set resources").listeners.click();
@@ -5318,11 +5342,12 @@ await withFakeDocument(async () => {
       sent.at(-1).op.playerId === 1 &&
       sent.at(-1).op.steel === 900 &&
       sent.at(-1).op.oil === 300,
-    "LabPanel resource fields normalize player state edits through the shared player selector",
+    "LabPanel resource fields normalize player state edits through the shared target player",
   );
   resolveLastLabResult({ outcome: { playerId: 1, steel: 900, oil: 300 } });
   assert(
     panel.fields.get("lab-player").value === "1" &&
+      playerButtonById(1)?.dataset.selected === "true" &&
       panel.fields.get("resource-steel").value === "900" &&
       panel.fields.get("resource-oil").value === "300",
     "LabPanel preserves resource form values after set-resources results re-render the panel",
@@ -5350,7 +5375,7 @@ await withFakeDocument(async () => {
     textWithin(root).includes("Gave 2 players 99999 steel and 99999 oil."),
     "LabPanel Give All summarizes the all-player resource grant",
   );
-  panel.fields.get("lab-player").value = "2";
+  playerButtonById(2).listeners.click();
   panel.fields.get("research-upgrade").value = UPGRADE.TANK_UNLOCK;
   buttonByText("Set research").listeners.click();
   assert(
@@ -5358,11 +5383,12 @@ await withFakeDocument(async () => {
       sent.at(-1).op.playerId === 2 &&
       sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK &&
       sent.at(-1).op.completed === true,
-    "LabPanel research edits use the shared player selector and complete upgrades",
+    "LabPanel research edits use the shared target player and complete upgrades",
   );
   resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: true } });
   assert(
     panel.fields.get("lab-player").value === "2" &&
+      playerButtonById(2)?.dataset.selected === "true" &&
       panel.fields.get("resource-steel").value === "900" &&
       panel.fields.get("resource-oil").value === "300" &&
       panel.fields.get("research-upgrade").value === UPGRADE.TANK_UNLOCK,
