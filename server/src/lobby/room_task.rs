@@ -537,6 +537,9 @@ pub(super) struct RoomTask {
     order: Vec<u32>,
     /// Wall-clock creation/reset time for the public lobby browser age column.
     created_at_unix_ms: u64,
+    /// Empty lobbies created through POST /api/lobbies are briefly reserved for the creating
+    /// client's follow-up WebSocket join. If that join never arrives, the name can be reclaimed.
+    empty_lobby_reserved_until_unix_ms: Option<u64>,
     pub(super) players: HashMap<u32, RoomPlayer>,
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
     /// only when the room empties of humans.
@@ -610,6 +613,7 @@ impl RoomTask {
             mode,
             order: Vec::new(),
             created_at_unix_ms: current_unix_ms(),
+            empty_lobby_reserved_until_unix_ms: None,
             players: HashMap::new(),
             ai_players: Vec::new(),
             human_team_assignments: HashMap::new(),
@@ -784,6 +788,9 @@ impl RoomTask {
             RoomEvent::Summary { reply } => {
                 let _ = reply.send(self.lobby_summary());
             }
+            RoomEvent::ReserveEmptyPublicLobby { reply } => {
+                let _ = reply.send(self.try_reserve_empty_public_lobby_name());
+            }
             RoomEvent::Join {
                 player_id,
                 name,
@@ -931,6 +938,35 @@ impl RoomTask {
         })
     }
 
+    pub(super) fn reserve_empty_public_lobby_name(&mut self) {
+        let now = current_unix_ms();
+        self.created_at_unix_ms = now;
+        self.empty_lobby_reserved_until_unix_ms =
+            Some(now.saturating_add(EMPTY_LOBBY_RESERVATION_TTL_MS));
+    }
+
+    fn try_reserve_empty_public_lobby_name(&mut self) -> bool {
+        if !self.empty_public_lobby_name_is_reusable() {
+            return false;
+        }
+        self.reserve_empty_public_lobby_name();
+        true
+    }
+
+    fn empty_public_lobby_name_is_reusable(&self) -> bool {
+        matches!(self.mode, RoomMode::Normal)
+            && matches!(self.phase, Phase::Lobby)
+            && self.players.is_empty()
+            && self.ai_players.is_empty()
+            && self.match_countdown_deadline.is_none()
+            && !self.empty_lobby_reservation_is_active(current_unix_ms())
+    }
+
+    fn empty_lobby_reservation_is_active(&self, now_unix_ms: u64) -> bool {
+        self.empty_lobby_reserved_until_unix_ms
+            .is_some_and(|reserved_until| reserved_until > now_unix_ms)
+    }
+
     fn on_drain_started(&mut self, notice: DrainNotice) {
         self.broadcast_shutdown_warning(notice);
         if matches!(self.phase, Phase::Lobby) {
@@ -1070,6 +1106,7 @@ impl RoomTask {
                 last_sim_consumed_client_tick: None,
             },
         );
+        self.empty_lobby_reserved_until_unix_ms = None;
         self.reassign_host_if_needed();
         if !spectator {
             self.assign_missing_team_for(player_id);
@@ -4224,6 +4261,7 @@ impl RoomTask {
     fn reset_empty_room_state(&mut self) {
         self.phase = Phase::Lobby;
         self.created_at_unix_ms = current_unix_ms();
+        self.empty_lobby_reserved_until_unix_ms = None;
         self.match_countdown_deadline = None;
         self.match_player_count = 0;
         self.match_human_count = 0;
