@@ -71,7 +71,7 @@ const SPOKEN_CATEGORIES = new Set(["alert", "ui", "unit_voice"]);
 /** Multiple of `refDist` beyond which a spatial sound is dropped entirely. */
 const MAX_DIST_MULT = 3;
 /** Extra distance beyond `refDist` is scaled by this before attenuation/muffling. */
-const FAR_DISTANCE_EFFECT_MULT = 2;
+const FAR_DISTANCE_EFFECT_MULT = 4;
 /** Lowpass cutoff at the listener (Hz). */
 const LP_NEAR_HZ = 20000;
 /** Lowpass cutoff at `maxDist` (Hz). Muffled-far cue. */
