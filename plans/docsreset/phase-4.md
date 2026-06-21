@@ -1,6 +1,6 @@
 # Phase 4 - Combat, Abilities, Fog, and Orders
 
-Status: pending.
+Status: done.
 
 ## Goal
 
