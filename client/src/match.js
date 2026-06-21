@@ -110,6 +110,7 @@ export class Match {
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
     this.labControlPolicy = options.labControlPolicy || null;
+    this.labToolWorldClickHandler = null;
     this.replayViewer = !!options.replayViewer;
     this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
@@ -221,6 +222,7 @@ export class Match {
           this.inputRouter,
           this.hotkeyProfiles,
           this.clientIntent,
+          { consumeWorldClick: (event) => this.consumeLabToolWorldClick(event) },
         ),
     );
 
@@ -589,6 +591,34 @@ export class Match {
     if (dom.selectionArea) dom.selectionArea.hidden = hidden;
     if (dom.commandCard) dom.commandCard.hidden = hidden;
     if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
+  }
+
+  armLabTool(tool, callbacks = {}) {
+    if (!this.clientIntent || typeof this.clientIntent.beginLabTool !== "function") return null;
+    const onWorldClick = typeof callbacks === "function"
+      ? callbacks
+      : callbacks?.onWorldClick;
+    this.labToolWorldClickHandler = typeof onWorldClick === "function" ? onWorldClick : null;
+    return this.clientIntent.beginLabTool(tool);
+  }
+
+  cancelLabTool(reason = "cancelled") {
+    this.labToolWorldClickHandler = null;
+    return this.clientIntent?.cancelLabTool?.(reason) || null;
+  }
+
+  consumeLabToolWorldClick(event) {
+    const active = this.clientIntent?.activeLabTool || null;
+    if (!active || event?.tool?.id !== active.id) return;
+    const handler = this.labToolWorldClickHandler;
+    try {
+      handler?.({ ...event, tool: active });
+    } catch (err) {
+      console.error("Lab tool world-click handler failed", err);
+      this.toast?.("Lab tool action failed.");
+    } finally {
+      this.cancelLabTool("worldClick");
+    }
   }
 
   handleMenuKeyDown(ev) {
@@ -1108,6 +1138,7 @@ export class Match {
     this.replayControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
     this.livePauseOverlay?.destroy();
+    this.cancelLabTool("freeze");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     if (typeof window !== "undefined" && window.__rtsPerf === this.frameProfilerSurface) {
@@ -1151,6 +1182,7 @@ export class Match {
     this.replayControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
     this.livePauseOverlay?.destroy();
+    this.cancelLabTool("destroy");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;

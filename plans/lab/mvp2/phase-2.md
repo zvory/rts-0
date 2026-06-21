@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Planned.
+- [x] Done.
 
 ## Objective
 
@@ -43,15 +43,15 @@ shims.
 
 ## Implementation Checklist
 
-- [ ] Define the active lab tool state shape and cancellation semantics in `ClientIntent`.
-- [ ] Add a narrow arm/cancel API between `LabPanel` and `Match`.
-- [ ] Ensure active lab tools clear or block conflicting placement and command-target modes.
-- [ ] Add input routing that passes exact clicked world coordinates to the lab tool callback.
-- [ ] Verify normal selection, drag selection, camera controls, and command-targeting behavior are
+- [x] Define the active lab tool state shape and cancellation semantics in `ClientIntent`.
+- [x] Add a narrow arm/cancel API between `LabPanel` and `Match`.
+- [x] Ensure active lab tools clear or block conflicting placement and command-target modes.
+- [x] Add input routing that passes exact clicked world coordinates to the lab tool callback.
+- [x] Verify normal selection, drag selection, camera controls, and command-targeting behavior are
       unchanged when no lab tool is active.
-- [ ] Add tests for arm, cancel, click-consume, and priority behavior.
-- [ ] Update client design docs if this becomes a stable interaction contract.
-- [ ] Run focused verification and record exact results in the handoff.
+- [x] Add tests for arm, cancel, click-consume, and priority behavior.
+- [x] Update client design docs if this becomes a stable interaction contract.
+- [x] Run focused verification and record exact results in the handoff.
 
 ## Verification
 

@@ -99,11 +99,10 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "hud.js": 44208,
   // Room2 Phase 4 adds recipient diagnostic affordance parsing to GameState.
   "state.js": 39267,
-  // Quick-cast click suppression keeps guard math in input/quick_cast_selection_guard.js while
-  // input/index.js owns the mouse down/move/up routing hooks.
-  "input/index.js": 39869,
-  // Lab MVP2 Phase 1 lets spectator-shaped lab operators keep the command surface visible.
-  "match.js": 45041,
+  // Lab MVP2 Phase 2 keeps active lab setup tools on the main input routing path.
+  "input/index.js": 40818,
+  // Lab MVP2 Phase 2 adds the Match-owned lab setup tool controller seam.
+  "match.js": 46234,
   // Overpenetration event split adds a mirrored event tag, compact code, and decoder branch.
   "protocol.js": 44877,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
@@ -122,6 +121,7 @@ const FORBIDDEN_GAMESTATE_INTENT_SHIMS = [
   "antiTankGunSetupPreview",
   "abilityTargetPreview",
   "liveCommandFeedback",
+  "activeLabTool",
   "openWorkerBuildMenu",
   "closeCommandCardMenu",
   "beginPlacement",
@@ -133,6 +133,8 @@ const FORBIDDEN_GAMESTATE_INTENT_SHIMS = [
   "issueCommandTarget",
   "releaseCommandTargetKey",
   "releaseCommandTargetShift",
+  "beginLabTool",
+  "cancelLabTool",
   "updateResourceMiningPreview",
   "updateAntiTankGunSetupPreview",
   "updateAbilityTargetPreview",

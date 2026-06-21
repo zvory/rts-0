@@ -42,7 +42,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   and `startPayload.diagnostics`; shared controls must not be inferred from replay/dev/lab identity.
 - **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,
   minimap, and renderer feedback. Do not read or write placement, command targeting, command-card
-  mode, previews, or command feedback through `GameState` shims.
+  mode, active lab tools, previews, or command feedback through `GameState` shims. Lab setup tools
+  are armed through `Match` and consumed by input world clicks, not by panel-owned viewport
+  listeners.
 - **Teardown.** Any module that holds DOM/window listeners or GPU resources must implement
   `destroy()`. `Match.destroy()` calls it on every module between matches.
 - **Coordinates.** World pixels on the wire and in client code, except fields ending in `Tile`.

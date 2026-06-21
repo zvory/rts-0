@@ -16,7 +16,7 @@ src/
   prediction_settings.js # localStorage-backed prediction toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
-  client_intent.js # ClientIntent: browser-local placement, command targeting, previews, feedback
+  client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
@@ -333,7 +333,8 @@ export const labVision                   // fullWorld(), team(teamId), teams(tea
 `lab_panel.js`
 ```js
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload })
+  constructor({ root, labClient, launch, startPayload, match? })
+  armPointFieldTool(xField, yField)      // arms a Match-owned lab world-click tool for coordinate fields
   destroy()
 }
 ```
@@ -355,6 +356,14 @@ available for operators while read-only lab viewers, replay viewers, and normal 
 passive. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
 `LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
 owner.
+
+Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
+may ask `Match.armLabTool(tool, { onWorldClick })` to arm a tool, and normal `Input` consumes the
+next left world click before selection, command targeting, or placement. The callback receives the
+active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears the tool for
+Esc, right-click, blur, teardown, or panel-driven cancellation. Starting ordinary placement,
+command targeting, or command-card build menus cancels the active lab tool so setup tools do not
+share state with gameplay command modes.
 
 `hotkey_profiles.js`
 ```js
