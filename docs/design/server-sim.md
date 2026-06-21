@@ -268,10 +268,15 @@ alive.
   of reading room internals. Only normal lobby/countdown/live-match rooms are summarized; dev,
   replay, replay-artifact, replay-branch, and lab modes stay hidden, and create-only lobby
   reservation rejects duplicate or reserved/internal names before the later WebSocket join path.
-  `GET /api/lobbies` collects those summaries with a short timeout and returns browser-safe DTOs
-  sorted by joinability then age; the client polls that route every 1.5 seconds and preflights a
-  clicked row against the latest route response before sending `join`. No WebSocket push message
-  currently exists for the browser list; the HTTP poll cadence is the accepted freshness target.
+  That reservation is only a short pending-create lease: if no human joins before the lease probe,
+  the empty normal room asks the registry to dispose its exact room handle. After the last human
+  leaves a normal public lobby, live match, one-player sandbox, or post-match replay, the room task
+  clears its own lifecycle bookkeeping and asks the registry to remove the public name immediately;
+  there is no host reconnect grace. `GET /api/lobbies` collects those summaries with a short timeout
+  and returns browser-safe DTOs sorted by joinability then age; the client polls that route every 1.5
+  seconds and preflights a clicked row against the latest route response before sending `join`. No
+  WebSocket push message currently exists for the browser list; the HTTP poll cadence is the
+  accepted freshness target.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
   `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay

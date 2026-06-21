@@ -55,7 +55,33 @@ async function waitForLobbyGone(room, label) {
   throw new Error(`timeout waiting for lobby row removal: ${label}`);
 }
 
+async function waitForCreateAvailable(room, label) {
+  for (let i = 0; i < 70; i++) {
+    const response = await createLobby(room);
+    if (response.status === 201) return response;
+    if (response.status !== 409) {
+      throw new Error(`unexpected create status ${response.status} while waiting for ${label}`);
+    }
+    await sleep(100);
+  }
+  throw new Error(`timeout waiting for lobby create availability: ${label}`);
+}
+
 async function main() {
+  const abandonedRoom = uniqueRoom("browser-abandoned");
+  const abandonedName = `alex's ${abandonedRoom}`;
+  const abandoned = await createLobby(abandonedName);
+  ok(abandoned.status === 201, `POST /api/lobbies accepts apostrophe names (${abandoned.status})`);
+  const abandonedDuplicate = await createLobby(abandonedName);
+  ok(abandonedDuplicate.status === 409,
+    `pending create lease keeps duplicate protection (${abandonedDuplicate.status})`);
+  const recreatedAbandoned = await waitForCreateAvailable(
+    abandonedName,
+    "abandoned pending create lease",
+  );
+  ok(recreatedAbandoned.status === 201,
+    `abandoned pending create lease releases the name (${recreatedAbandoned.status})`);
+
   const room = uniqueRoom("browser-flow");
 
   const created = await createLobby(`  ${room}  `);
@@ -213,6 +239,9 @@ async function main() {
 
   closeClients(Host, StaleJoiner, SpectatorJoiner);
   await waitForLobbyGone(lifecycleRoom, "empty room cleanup hides browser row");
+  const recreatedLifecycle = await createLobby(lifecycleRoom);
+  ok(recreatedLifecycle.status === 201,
+    `empty public room has no reconnect grace and releases the name (${recreatedLifecycle.status})`);
 
   if (assertions.failures > 0) console.log(`\n${assertions.failures} FAILURE(S)`);
   process.exit(assertions.failures === 0 ? 0 : 1);

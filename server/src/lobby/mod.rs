@@ -95,6 +95,17 @@ const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 static NEXT_PLAYER_ID: AtomicU32 = AtomicU32::new(1);
 static NEXT_MATCH_REPLAY_ROOM_ID: AtomicU32 = AtomicU32::new(1);
 
+fn pending_create_lease_duration() -> Duration {
+    #[cfg(test)]
+    {
+        Duration::from_millis(25)
+    }
+    #[cfg(not(test))]
+    {
+        Duration::from_secs(5)
+    }
+}
+
 /// Allocate a fresh, process-unique player id. Called once per connection.
 pub fn next_player_id() -> u32 {
     NEXT_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
@@ -547,7 +558,8 @@ impl Lobby {
                 },
             )));
         }
-        self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Normal);
+        let handle = self.create_room_locked_with_mode(&room, &mut rooms, RoomMode::Normal);
+        schedule_pending_create_disposal_probe(handle.event_tx.clone());
         Ok(room)
     }
 
@@ -742,6 +754,13 @@ fn spawn_room_disposal_task(
                 let _ = ack.send(removed);
             }
         }
+    });
+}
+
+fn schedule_pending_create_disposal_probe(event_tx: mpsc::Sender<RoomEvent>) {
+    tokio::spawn(async move {
+        tokio::time::sleep(pending_create_lease_duration()).await;
+        let _ = event_tx.send(RoomEvent::ReportDisposableIfEmpty).await;
     });
 }
 

@@ -438,7 +438,8 @@ pending latest-only live snapshots for connected humans, and then sends a replay
 at tick 0 plus `roomTimeState`. Post-match replay defaults every viewer to all active players'
 combined authoritative vision and starts at `2.0x` speed. `returnToLobby` detaches only the
 requesting replay viewer; the shared replay session remains alive for everyone else. The room drops
-the replay simulation and resets to a clean lobby only after the last viewer leaves. Dedicated
+the replay simulation after the last viewer leaves; for normal public rooms, that empty room then
+asks the lobby registry to dispose the public name rather than holding it for reconnect. Dedicated
 replay rooms created for match-history or dev replay viewing follow the same per-viewer detach rule;
 they keep the shared replay session alive until the room empties.
 

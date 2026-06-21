@@ -1,6 +1,6 @@
 # Phase 2 - Public Lobby Deletion Semantics
 
-Status: not started
+Status: done
 
 ## Goal
 
