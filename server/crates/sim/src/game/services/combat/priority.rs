@@ -15,6 +15,7 @@ pub(super) struct AttackPriorityContext {
     /// Moving-fire units may keep a still-legal target inside the same material
     /// rank, but higher-rank default-weapon threats are allowed to steal focus.
     pub can_retain_moving_target: bool,
+    pub attacker_is_vehicle_body: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -32,7 +33,7 @@ pub(super) struct TargetCandidate {
     pub weapon_class: WeaponClass,
     pub threat_role: combat_rules::TargetThreatRole,
     pub in_weapon_range: bool,
-    pub tank_trap_auto_relevant: bool,
+    pub tank_trap_obstructs_vehicle_route: bool,
     pub retained_target: bool,
 }
 
@@ -77,6 +78,8 @@ fn rank_candidate(context: &AttackPriorityContext, candidate: &TargetCandidate) 
     let (priority_bucket, policy_order, unit_order) =
         if let Some(order) = tank_immediate_threat_order(context, candidate) {
             (0, order, 0)
+        } else if let Some(order) = vehicle_route_obstruction_order(context, candidate) {
+            (0, order, 0)
         } else {
             (
                 1,
@@ -115,10 +118,34 @@ fn tank_immediate_threat_order(
     } else {
         match candidate.threat_role {
             combat_rules::TargetThreatRole::AntiArmorThreat => Some(1),
-            combat_rules::TargetThreatRole::FieldObstacle => Some(2),
+            combat_rules::TargetThreatRole::FieldObstacle
+                if candidate.kind == EntityKind::TankTrap
+                    && candidate.tank_trap_obstructs_vehicle_route =>
+            {
+                Some(2)
+            }
             combat_rules::TargetThreatRole::SupportWeapon => Some(3),
-            combat_rules::TargetThreatRole::Ordinary => None,
+            combat_rules::TargetThreatRole::FieldObstacle
+            | combat_rules::TargetThreatRole::Ordinary => None,
         }
+    }
+}
+
+fn vehicle_route_obstruction_order(
+    context: &AttackPriorityContext,
+    candidate: &TargetCandidate,
+) -> Option<u8> {
+    if !context.attacker_is_vehicle_body
+        || candidate.kind != EntityKind::TankTrap
+        || !candidate.tank_trap_obstructs_vehicle_route
+    {
+        return None;
+    }
+
+    if context.attacker_kind == EntityKind::Tank {
+        None
+    } else {
+        Some(0)
     }
 }
 
@@ -160,6 +187,15 @@ mod tests {
         AttackPriorityContext {
             attacker_kind,
             attacker_is_unit: true,
+            attacker_is_vehicle_body: matches!(
+                attacker_kind,
+                EntityKind::Tank
+                    | EntityKind::ScoutCar
+                    | EntityKind::AntiTankGun
+                    | EntityKind::Artillery
+                    | EntityKind::CommandCar
+                    | EntityKind::MortarTeam
+            ),
             attacker_weapon_class: combat_rules::weapon_class(attacker_kind),
             can_retain_moving_target: matches!(
                 attacker_kind,
@@ -187,8 +223,15 @@ mod tests {
             weapon_class: combat_rules::weapon_class(kind),
             threat_role: combat_rules::target_threat_role(kind),
             in_weapon_range: true,
-            tank_trap_auto_relevant: kind == EntityKind::TankTrap,
+            tank_trap_obstructs_vehicle_route: false,
             retained_target,
+        }
+    }
+
+    fn obstructing_tank_trap(id: u32, distance_sq: f32) -> TargetCandidate {
+        TargetCandidate {
+            tank_trap_obstructs_vehicle_route: true,
+            ..candidate(id, EntityKind::TankTrap, distance_sq, false)
         }
     }
 
@@ -282,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn scout_car_prefers_soft_target_over_nearer_tank_trap() {
+    fn scout_car_prefers_soft_target_over_nearer_irrelevant_tank_trap() {
         let candidates = [
             candidate(10, EntityKind::TankTrap, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
@@ -290,6 +333,32 @@ mod tests {
 
         assert_eq!(
             choose_target(&context(EntityKind::ScoutCar), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn vehicle_body_prefers_obstructing_tank_trap_over_soft_target() {
+        let candidates = [
+            obstructing_tank_trap(10, 900.0),
+            candidate(11, EntityKind::Worker, 400.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::ScoutCar), &candidates),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn tank_keeps_anti_tank_gun_above_obstructing_tank_trap() {
+        let candidates = [
+            obstructing_tank_trap(10, 400.0),
+            candidate(11, EntityKind::AntiTankGun, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::Tank), &candidates),
             Some(11)
         );
     }

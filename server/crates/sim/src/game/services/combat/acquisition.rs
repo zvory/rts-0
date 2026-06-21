@@ -51,6 +51,7 @@ pub(super) fn resolve_target(
     los: &LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
+    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -90,6 +91,8 @@ pub(super) fn resolve_target(
     let context = AttackPriorityContext {
         attacker_kind: attacker.kind,
         attacker_is_unit: attacker.is_unit(),
+        attacker_is_vehicle_body: movement_body_class(attacker.kind)
+            == MovementBodyClass::VehicleBody,
         attacker_weapon_class: combat_rules::weapon_class(attacker.kind),
         can_retain_moving_target: can_fire_while_moving(attacker),
     };
@@ -109,6 +112,7 @@ pub(super) fn resolve_target(
         acquire_px,
         weapon_range_px,
         &context,
+        tank_trap_obstructs_vehicle_route,
         attacker.target_id(),
     );
     priority::choose_target(&context, &candidates)
@@ -140,9 +144,11 @@ fn legal_target_candidates(
     acquire_px: f32,
     weapon_range_px: f32,
     context: &AttackPriorityContext,
+    tank_trap_obstructs_vehicle_route: &dyn Fn(&Entity, &Entity) -> bool,
     retained_target_id: Option<u32>,
 ) -> Vec<TargetCandidate> {
     let mut candidates = Vec::new();
+    let attacker = entities.get(self_id);
     for id in spatial.ids_in_circle_bbox(px, py, acquire_px) {
         let Some(target) = entities.get(id) else {
             continue;
@@ -179,6 +185,14 @@ fn legal_target_candidates(
         ) {
             continue;
         }
+        let tank_trap_obstructs_vehicle_route =
+            if target.kind == EntityKind::TankTrap && context.attacker_is_vehicle_body {
+                attacker
+                    .map(|attacker| tank_trap_obstructs_vehicle_route(attacker, target))
+                    .unwrap_or(false)
+            } else {
+                false
+            };
         candidates.push(TargetCandidate {
             id,
             kind: target.kind,
@@ -192,7 +206,7 @@ fn legal_target_candidates(
             weapon_class: combat_rules::weapon_class(target.kind),
             threat_role: combat_rules::target_threat_role(target.kind),
             in_weapon_range,
-            tank_trap_auto_relevant: target.kind == EntityKind::TankTrap,
+            tank_trap_obstructs_vehicle_route,
             retained_target,
         });
     }

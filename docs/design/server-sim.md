@@ -555,6 +555,11 @@ General rules:
   acquisition-radius legality. Default small-arms weapons prefer soft targets while keeping armored
   or hard targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
   armored/hard targets, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
+  Vehicle-body units rank enemy Tank Traps as high-priority breach targets only when
+  `services::occupancy` reports that the trap is on the current bounded route segment or forms a
+  closed-gap pinch across that route; irrelevant nearby traps remain legal fallback targets but lose
+  to real combat targets. The obstruction query is read-only, uses the current waypoint, `path_goal`,
+  or movement intent, and does not run pathfinding during target ranking.
   Retention is intentionally a stickiness term inside the ranker rather than a separate branch:
   Tanks, Scout Cars, and charged Riflemen keep a still-legal current target when competing targets
   have the same material rank, but they switch when a higher-rank default-weapon threat appears.

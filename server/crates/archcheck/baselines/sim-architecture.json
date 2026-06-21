@@ -1,5 +1,5 @@
 {
-  "reason": "Tank Trap deconstruction adds a worker command, order state, and progression service",
+  "reason": "Phase 5 adds bounded Tank Trap route obstruction query in occupancy for combat ranking",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -135,7 +135,7 @@
     },
     {
       "path": "services/combat/acquisition.rs",
-      "lines": 303
+      "lines": 259
     },
     {
       "path": "services/combat/chase.rs",
@@ -143,7 +143,7 @@
     },
     {
       "path": "services/combat/damage.rs",
-      "lines": 293
+      "lines": 290
     },
     {
       "path": "services/combat/events.rs",
@@ -151,15 +151,27 @@
     },
     {
       "path": "services/combat/mod.rs",
-      "lines": 415
+      "lines": 461
+    },
+    {
+      "path": "services/combat/priority.rs",
+      "lines": 382
     },
     {
       "path": "services/combat/projection.rs",
-      "lines": 81
+      "lines": 110
     },
     {
       "path": "services/combat/tests.rs",
-      "lines": 3376
+      "lines": 3713
+    },
+    {
+      "path": "services/combat/tests/retention.rs",
+      "lines": 140
+    },
+    {
+      "path": "services/combat/tests/tank_traps.rs",
+      "lines": 93
     },
     {
       "path": "services/combat/weapons.rs",
@@ -203,7 +215,7 @@
     },
     {
       "path": "services/move_coordinator.rs",
-      "lines": 1969
+      "lines": 2076
     },
     {
       "path": "services/movement/collision.rs",
@@ -239,7 +251,7 @@
     },
     {
       "path": "services/occupancy.rs",
-      "lines": 786
+      "lines": 958
     },
     {
       "path": "services/order_execution.rs",
@@ -275,7 +287,7 @@
     },
     {
       "path": "services/world_query.rs",
-      "lines": 503
+      "lines": 392
     },
     {
       "path": "setup.rs",
@@ -885,32 +897,32 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 94,
+      "line": 123,
       "code": "PlayerState {"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 93,
+      "line": 122,
       "code": "fn player_state(id: u32, is_ai: bool) -> PlayerState {"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 127,
+      "line": 156,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 135,
+      "line": 164,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 143,
+      "line": 172,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 153,
+      "line": 182,
       "code": "players: &[PlayerState],"
     },
     {
@@ -1219,7 +1231,7 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 1175,
+      "line": 1393,
       "field": "hp",
       "code": "dead_target.hp = 0;"
     },
@@ -1489,7 +1501,7 @@
     },
     {
       "path": "services/move_coordinator.rs",
-      "count": 15
+      "count": 16
     },
     {
       "path": "services/movement/collision.rs",
@@ -1545,7 +1557,7 @@
     },
     {
       "path": "services/world_query.rs",
-      "count": 17
+      "count": 13
     },
     {
       "path": "setup.rs",

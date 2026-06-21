@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -65,16 +65,16 @@ obstructing their movement, while irrelevant nearby traps should not outrank rea
 
 ## Implementation Checklist
 
-- [ ] Add a bounded obstruction-context helper.
-- [ ] Prove the helper is bounded and does not run per-candidate A* or mutate movement state.
-- [ ] Feed obstruction context into target ranking for vehicle-body attackers.
-- [ ] Keep infantry Tank Trap auto-acquisition filtering intact.
-- [ ] Preserve explicit Tank Trap attack commands.
-- [ ] Add obstructing versus irrelevant Tank Trap priority tests.
-- [ ] Add or update dev scenarios if useful for manual inspection.
-- [ ] Update design docs for the movement/combat contract.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase as done in this file.
+- [x] Add a bounded obstruction-context helper.
+- [x] Prove the helper is bounded and does not run per-candidate A* or mutate movement state.
+- [x] Feed obstruction context into target ranking for vehicle-body attackers.
+- [x] Keep infantry Tank Trap auto-acquisition filtering intact.
+- [x] Preserve explicit Tank Trap attack commands.
+- [x] Add obstructing versus irrelevant Tank Trap priority tests.
+- [x] Add or update dev scenarios if useful for manual inspection.
+- [x] Update design docs for the movement/combat contract.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
