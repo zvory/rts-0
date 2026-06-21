@@ -8245,11 +8245,11 @@ await withFakeDocument(async () => {
 
   const mid = audio._computeSpatial(900, 100);
   assert(mid !== null, "Audio spatial off-viewport emitter should play");
-  assertApprox(mid.gain, 1 / 3, 0.001, "Audio spatial gain doubles far-distance attenuation");
+  assertApprox(mid.gain, 1 / 5, 0.001, "Audio spatial gain quadruples far-distance attenuation");
 
   const far = audio._computeSpatial(1300, 100);
   assert(far !== null, "Audio spatial max-distance edge should play");
-  assertApprox(far.gain, 1 / 5, 0.001, "Audio spatial gain attenuates harder at maxDist");
+  assertApprox(far.gain, 1 / 9, 0.001, "Audio spatial gain attenuates harder at maxDist");
   assertApprox(far.lpHz, 1200, 0.001, "Audio spatial lowpass reaches far cutoff");
   assert(audio._computeSpatial(1301, 100) === null, "Audio drops sounds beyond maxDist");
 
