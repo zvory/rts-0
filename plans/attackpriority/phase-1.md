@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -46,13 +46,13 @@ move acquisition into a ranking boundary without accidental gameplay changes.
 
 ## Implementation Checklist
 
-- [ ] Add explicit-attack preservation tests.
-- [ ] Add Tank priority and retained-target override tests.
-- [ ] Add Anti-Tank Gun armored-preference tests.
-- [ ] Add small-arms unit/building and armored-fallback baseline tests.
-- [ ] Add Tank Trap acquisition and shot-transparency baseline tests if gaps remain.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase as done in this file.
+- [x] Add explicit-attack preservation tests.
+- [x] Add Tank priority and retained-target override tests.
+- [x] Add Anti-Tank Gun armored-preference tests.
+- [x] Add small-arms unit/building and armored-fallback baseline tests.
+- [x] Add Tank Trap acquisition and shot-transparency baseline tests if gaps remain.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
