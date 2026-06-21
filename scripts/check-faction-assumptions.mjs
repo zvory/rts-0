@@ -240,6 +240,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/combat/damage.rs",
   "server/crates/sim/src/game/services/combat/events.rs",
   "server/crates/sim/src/game/services/combat/mod.rs",
+  // Default combat target policy is still current-roster based until catalog combat roles exist.
+  "server/crates/sim/src/game/services/combat/priority.rs",
   "server/crates/sim/src/game/services/combat/projection.rs",
   "server/crates/sim/src/game/services/combat/weapons.rs",
   "server/crates/sim/src/game/services/commands.rs",
