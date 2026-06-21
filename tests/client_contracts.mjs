@@ -5327,6 +5327,29 @@ await withFakeDocument(async () => {
       panel.fields.get("resource-oil").value === "300",
     "LabPanel preserves resource form values after set-resources results re-render the panel",
   );
+  const giveAllPromise = buttonByText("Give All").listeners.click();
+  assert(
+    sent.at(-1).op.op === "setPlayerResources" &&
+      sent.at(-1).op.playerId === 1 &&
+      sent.at(-1).op.steel === 99999 &&
+      sent.at(-1).op.oil === 99999,
+    "LabPanel Give All starts by giving player one maximum lab resources",
+  );
+  resolveLastLabResult({ outcome: { playerId: 1, steel: 99999, oil: 99999 } });
+  await Promise.resolve();
+  assert(
+    sent.at(-1).op.op === "setPlayerResources" &&
+      sent.at(-1).op.playerId === 2 &&
+      sent.at(-1).op.steel === 99999 &&
+      sent.at(-1).op.oil === 99999,
+    "LabPanel Give All sends maximum lab resources to every player",
+  );
+  resolveLastLabResult({ outcome: { playerId: 2, steel: 99999, oil: 99999 } });
+  await giveAllPromise;
+  assert(
+    textWithin(root).includes("Gave 2 players 99999 steel and 99999 oil."),
+    "LabPanel Give All summarizes the all-player resource grant",
+  );
   panel.fields.get("lab-player").value = "2";
   panel.fields.get("research-upgrade").value = UPGRADE.TANK_UNLOCK;
   buttonByText("Set research").listeners.click();
