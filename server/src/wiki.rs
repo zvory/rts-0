@@ -436,17 +436,30 @@ fn render_stats_tables(tables: &[StatsTable]) -> String {
 }
 
 fn kind_label(kind: EntityKind) -> String {
-    kind.stable_id()
-        .split('_')
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
-                None => String::new(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+    match kind {
+        EntityKind::Worker => "Engineer",
+        EntityKind::Rifleman => "Rifleman",
+        EntityKind::MachineGunner => "Machine Gunner",
+        EntityKind::AntiTankGun => "Anti-Tank Gun",
+        EntityKind::MortarTeam => "Mortar Team",
+        EntityKind::Artillery => "Artillery",
+        EntityKind::ScoutCar => "Scout Car",
+        EntityKind::Tank => "Tank",
+        EntityKind::CommandCar => "Command Car",
+        EntityKind::Ekat => "Ekat",
+        EntityKind::CityCentre => "City Centre",
+        EntityKind::Zamok => "Zamok",
+        EntityKind::Depot => "Supply Depot",
+        EntityKind::Barracks => "Barracks",
+        EntityKind::TrainingCentre => "Training Centre",
+        EntityKind::ResearchComplex => "R&D Complex",
+        EntityKind::Factory => "Vehicle Works",
+        EntityKind::Steelworks => "Gun Works",
+        EntityKind::TankTrap => "Tank Trap",
+        EntityKind::Steel => "Steel",
+        EntityKind::Oil => "Oil",
+    }
+    .to_string()
 }
 
 fn kind_list(kinds: &[EntityKind]) -> String {
@@ -845,7 +858,7 @@ mod tests {
         assert_eq!(buildings.rows.len(), defs::BUILDINGS.len());
         let depot = defs::building_def(EntityKind::Depot).expect("depot def");
         assert!(buildings.rows.contains(&vec![
-            "Depot".to_string(),
+            "Supply Depot".to_string(),
             EntityKind::Depot.stable_id().to_string(),
             depot.stats.hp.to_string(),
             depot.stats.sight_tiles.to_string(),
@@ -872,6 +885,34 @@ mod tests {
                 .amount
                 .to_string(),
         ]));
+
+        let gun_works = defs::building_def(EntityKind::Steelworks).expect("gun works def");
+        assert!(buildings.rows.contains(&vec![
+            "Gun Works".to_string(),
+            EntityKind::Steelworks.stable_id().to_string(),
+            gun_works.stats.hp.to_string(),
+            gun_works.stats.sight_tiles.to_string(),
+            gun_works.stats.cost_steel.to_string(),
+            gun_works.stats.cost_oil.to_string(),
+            format!("{}x{}", gun_works.stats.foot_w, gun_works.stats.foot_h),
+            gun_works.stats.build_ticks.to_string(),
+            gun_works.stats.provides_supply.to_string(),
+            gun_works.stats.dmg.to_string(),
+            gun_works.stats.range_tiles.to_string(),
+            gun_works.stats.cooldown.to_string(),
+            format!("{:?}", gun_works.armor_class),
+            format!("{:?}", gun_works.weapon),
+            kind_list(gun_works.trains),
+            kind_list(gun_works.build_requires),
+        ]));
+
+        let anti_tank_gun = units
+            .rows
+            .iter()
+            .find(|row| row[1] == EntityKind::AntiTankGun.stable_id())
+            .expect("anti-tank gun stats row");
+        assert_eq!(anti_tank_gun[15], "Gun Works");
+        assert_eq!(anti_tank_gun[16], "Gun Works");
 
         assert_eq!(factions.rows.len(), faction::CATALOGS.len());
         assert!(factions
