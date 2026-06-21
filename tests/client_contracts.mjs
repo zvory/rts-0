@@ -4522,6 +4522,14 @@ function fakeAudioContext() {
     "manual room-name join controls stay outside the normal pre-join product path");
   assert(indexHtml.includes("#lobby-room and #lobby-join remain hidden compatibility controls"),
     "DOM contract documents room-name controls as hidden compatibility only");
+  assert(indexHtml.includes('id="lobby-lab-open"'),
+    "normal lobby exposes a direct lab entry affordance");
+  assert(indexHtml.includes('href="/lab?room=default&map=Default"'),
+    "normal lobby lab entry uses the direct shared lab URL contract");
+  assert(!indexHtml.includes('id="lobby-quickstart"'),
+    "normal lobby does not render the legacy quickstart control");
+  assert(!indexHtml.includes("Debug mode"),
+    "normal lobby copy no longer advertises Debug mode as the experimentation path");
 
   const sorted = sortLobbySummaries([
     { room: "old-open", hostName: "A", createdAtUnixMs: 100, joinState: "open" },

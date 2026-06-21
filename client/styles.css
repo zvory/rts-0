@@ -462,6 +462,29 @@ input[type="text"]:focus {
   width: 100%;
 }
 
+.lobby-lab-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.lobby-lab-entry span {
+  min-width: 0;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.lobby-lab-entry .btn {
+  min-width: 116px;
+  width: auto;
+  text-align: center;
+}
+
 .lobby-manual-room[hidden] {
   display: none !important;
 }

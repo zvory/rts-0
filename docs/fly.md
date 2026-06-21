@@ -129,7 +129,7 @@ finished deployed match logs `match recorded` with map, outcome, replay status, 
 scope.
 
 If public reads return `[]` after a match: check `RTS_RECORD_MATCHES` is set and not `0`/`false`,
-and that the match involved at least one human player with lobby Debug mode off. See
+and that the match involved at least one human player with legacy quickstart/debug mode off. See
 [docs/design/match-history.md](design/match-history.md) for the full scope table.
 
 ## Agent log access
