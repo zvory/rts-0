@@ -61,7 +61,9 @@ pub(super) fn resolve_target(
     if smokes.point_inside(px, py) {
         return None;
     }
-    // Ordered attackers keep their explicit target if it still exists.
+    // Ordered attackers keep command intent outside the ranker. If the target is
+    // still hostile and visible, the combat system may chase for a fireable shot
+    // instead of letting auto-acquisition steal focus.
     if mode == CombatMode::Ordered {
         if let Some(e) = entities.get(self_id) {
             if let Some(target) = e.order().attack_target() {
@@ -145,6 +147,9 @@ fn legal_target_candidates(
         let Some(target) = entities.get(id) else {
             continue;
         };
+        // Retained target status is only a ranker fact. It must still pass the
+        // same hostile, visible, smoke, LOS, and blocker checks as any other
+        // auto-acquired candidate.
         let retained_target = retained_target_id == Some(id);
         let retained_moving_fire_target = context.can_retain_moving_target && retained_target;
         if !world_query::is_enemy_targetable(target, teams, owner, self_id) {

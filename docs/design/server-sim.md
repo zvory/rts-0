@@ -555,6 +555,16 @@ General rules:
   acquisition-radius legality. Default small-arms weapons prefer soft targets while keeping armored
   or hard targets as fallbacks. Default anti-armor weapons prefer anti-armor threats and
   armored/hard targets, with Tanks treating in-range Anti-Tank Guns as the top immediate threat.
+  Retention is intentionally a stickiness term inside the ranker rather than a separate branch:
+  Tanks, Scout Cars, and charged Riflemen keep a still-legal current target when competing targets
+  have the same material rank, but they switch when a higher-rank default-weapon threat appears.
+  Dead, friendly, hidden, smoke-covered, or non-fireable retained targets are filtered out before
+  ranking and cannot bypass legality.
+- The auto-acquisition ranker chooses only for the current default attack profile. Future grenades,
+  satchels, sticky bombs, melee demolition, or other special attacks must be represented as separate
+  profiles with explicit activation policy; explicit-only special attacks can be added without
+  changing default auto-acquisition, and autocast special attacks need their own conservative plan
+  and tests.
 - Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
   unaffordable later is skipped or rejected by the execution/promotion path. Tank Trap construction
   is server-authoritative after Training Centre eligibility and uses vehicle-body-only placement

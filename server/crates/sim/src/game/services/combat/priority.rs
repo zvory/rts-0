@@ -8,7 +8,12 @@ use crate::rules::defs::{ArmorClass, WeaponClass};
 pub(super) struct AttackPriorityContext {
     pub attacker_kind: EntityKind,
     pub attacker_is_unit: bool,
+    /// The ranking policy applies to the current default attack only. Future
+    /// grenades, satchels, or melee demolition profiles should build their own
+    /// activation/ranking context instead of changing this default profile.
     pub attacker_weapon_class: WeaponClass,
+    /// Moving-fire units may keep a still-legal target inside the same material
+    /// rank, but higher-rank default-weapon threats are allowed to steal focus.
     pub can_retain_moving_target: bool,
 }
 
@@ -36,6 +41,7 @@ struct TargetRank {
     priority_bucket: u8,
     policy_order: u8,
     unit_order: u8,
+    retention_order: u8,
     distance_sq: f32,
     id: u32,
 }
@@ -62,6 +68,7 @@ fn compare_candidates(
         .cmp(&right_rank.priority_bucket)
         .then_with(|| left_rank.policy_order.cmp(&right_rank.policy_order))
         .then_with(|| left_rank.unit_order.cmp(&right_rank.unit_order))
+        .then_with(|| left_rank.retention_order.cmp(&right_rank.retention_order))
         .then_with(|| left_rank.distance_sq.total_cmp(&right_rank.distance_sq))
         .then_with(|| left_rank.id.cmp(&right_rank.id))
 }
@@ -70,11 +77,9 @@ fn rank_candidate(context: &AttackPriorityContext, candidate: &TargetCandidate) 
     let (priority_bucket, policy_order, unit_order) =
         if let Some(order) = tank_immediate_threat_order(context, candidate) {
             (0, order, 0)
-        } else if context.can_retain_moving_target && candidate.retained_target {
-            (1, 0, 0)
         } else {
             (
-                2,
+                1,
                 default_weapon_fit_order(context, candidate),
                 unit_preference_order(context, candidate),
             )
@@ -84,8 +89,17 @@ fn rank_candidate(context: &AttackPriorityContext, candidate: &TargetCandidate) 
         priority_bucket,
         policy_order,
         unit_order,
+        retention_order: retention_order(context, candidate),
         distance_sq: candidate.distance_sq,
         id: candidate.id,
+    }
+}
+
+fn retention_order(context: &AttackPriorityContext, candidate: &TargetCandidate) -> u8 {
+    if context.can_retain_moving_target && candidate.retained_target {
+        0
+    } else {
+        1
     }
 }
 
@@ -192,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn retained_moving_target_beats_nearer_fallback_target() {
+    fn retained_moving_target_beats_nearer_equal_rank_target() {
         let candidates = [
             candidate(10, EntityKind::Worker, 2_500.0, true),
             candidate(11, EntityKind::Worker, 900.0, false),
@@ -200,6 +214,30 @@ mod tests {
 
         assert_eq!(
             choose_target(&context(EntityKind::ScoutCar), &candidates),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn materially_better_default_target_beats_retained_lower_rank_target() {
+        let candidates = [
+            candidate(10, EntityKind::TankTrap, 400.0, true),
+            candidate(11, EntityKind::Worker, 2_500.0, false),
+        ];
+
+        assert_eq!(
+            choose_target(&context(EntityKind::ScoutCar), &candidates),
+            Some(11)
+        );
+    }
+
+    #[test]
+    fn retained_moving_target_does_not_affect_first_acquisition_tie_breaks() {
+        let first = candidate(10, EntityKind::Worker, 900.0, false);
+        let second = candidate(11, EntityKind::Worker, 900.0, false);
+
+        assert_eq!(
+            choose_target(&context(EntityKind::ScoutCar), &[second, first]),
             Some(10)
         );
     }

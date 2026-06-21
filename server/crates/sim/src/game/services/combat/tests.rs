@@ -16,6 +16,8 @@ use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
 
+mod retention;
+
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
     let mut entities = EntityStore::new();
     let self_id = entities
@@ -1321,7 +1323,7 @@ fn tank_move_order_does_not_chase_targets_outside_weapon_range() {
 
 #[test]
 fn shoot_while_moving_units_keep_existing_valid_target() {
-    for kind in [EntityKind::Tank, EntityKind::ScoutCar] {
+    for kind in [EntityKind::Tank, EntityKind::ScoutCar, EntityKind::Rifleman] {
         let mut entities = EntityStore::new();
         let attacker_id = entities
             .spawn_unit(1, kind, 100.0, 100.0)
@@ -1335,6 +1337,9 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
         if let Some(attacker) = entities.get_mut(attacker_id) {
             attacker.set_order(Order::move_to(300.0, 100.0));
             attacker.set_target_id(Some(retained_target_id));
+            if kind == EntityKind::Rifleman {
+                attacker.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+            }
         }
 
         let map = open_map(8);

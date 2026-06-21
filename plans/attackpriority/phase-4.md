@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -47,15 +47,15 @@ accidentally becoming an ability planner when grenades and satchels are added la
 
 ## Implementation Checklist
 
-- [ ] Add a documented retargeting/stickiness rule.
-- [ ] Preserve explicit ordered attack semantics outside rank-based retention.
-- [ ] Verify retained-target behavior is expressed through rank/stickiness terms, not a bypass path.
-- [ ] Add equal-rank stability tests.
-- [ ] Add high-rank threat override tests.
-- [ ] Add invalid-retained-target clearing tests.
-- [ ] Document the default-profile versus future special-attack boundary.
-- [ ] Run focused verification and record exact commands.
-- [ ] Mark this phase as done in this file.
+- [x] Add a documented retargeting/stickiness rule.
+- [x] Preserve explicit ordered attack semantics outside rank-based retention.
+- [x] Verify retained-target behavior is expressed through rank/stickiness terms, not a bypass path.
+- [x] Add equal-rank stability tests.
+- [x] Add high-rank threat override tests.
+- [x] Add invalid-retained-target clearing tests.
+- [x] Document the default-profile versus future special-attack boundary.
+- [x] Run focused verification and record exact commands.
+- [x] Mark this phase as done in this file.
 
 ## Verification
 
