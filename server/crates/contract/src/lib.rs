@@ -604,6 +604,9 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         to_pos: Option<[f32; 2]>,
     },
+    Overpenetration {
+        to: u32,
+    },
     Death {
         id: u32,
         x: f32,

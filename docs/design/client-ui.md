@@ -16,7 +16,6 @@ src/
   prediction_settings.js # localStorage-backed prediction toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
-  attack_events.js # fired-shot event helpers for attack visuals
   client_intent.js # ClientIntent: browser-local placement, command targeting, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
@@ -846,7 +845,7 @@ Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `observer_analysis_overlay.js`, `observer_analysis_signatures.js`,
   `replay_controls.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
-- `model`: `state.js`, `attack_events.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
+- `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
   `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.

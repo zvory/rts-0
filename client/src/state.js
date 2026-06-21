@@ -6,7 +6,6 @@
 // client-only concept; the server never sees it directly.
 
 import { RESOURCE_AMOUNTS } from "./config.js";
-import { muzzleFlashesForFiredShots } from "./attack_events.js";
 import { admitSelectionIds } from "./command_budget.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import {
@@ -138,7 +137,7 @@ export class GameState {
     /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
     this.visibleTiles = [];
 
-    /** @type {Array<{from:number,to:number,targetPos?:{x:number,y:number}|null,createdAt:number}>} */
+    /** @type {Array<{from:number,to:number,createdAt:number}>} */
     this.muzzleFlashes = [];
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
     this.mortarLaunches = [];
@@ -296,9 +295,14 @@ export class GameState {
     this._pruneSelection();
     this._pruneControlGroups();
 
-    this.muzzleFlashes.push(...muzzleFlashesForFiredShots(this.events, now));
     for (const ev of this.events) {
       if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
+        const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
+          ? { x: ev.toPos[0], y: ev.toPos[1] }
+          : null;
+        if (ev.from !== ev.to) {
+          this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
+        }
         this.weaponRecoilById.set(ev.from, now);
       } else if (ev && ev.e === "smokeLaunch") {
         this.addSmokeCanister(ev, now);
@@ -560,7 +564,7 @@ export class GameState {
   /**
    * Return live muzzle-flash records, pruning expired ones.
    * @param {number} now
-   * @returns {Array<{from:number,to:number,targetPos?:{x:number,y:number}|null,createdAt:number}>}
+   * @returns {Array<{from:number,to:number,createdAt:number}>}
    */
   liveMuzzleFlashes(now) {
     const ttlMs = 240;

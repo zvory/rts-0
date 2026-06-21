@@ -25,7 +25,6 @@ const AREA_BY_FILE = new Map(Object.entries({
   "room_capabilities.js": "app-shell",
 
   "state.js": "model",
-  "attack_events.js": "model",
   "client_intent.js": "model",
   "command_budget.js": "model",
   "command_composer.js": "model",
@@ -105,8 +104,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "input/index.js": 39869,
   // Pause Phase 1 wires live-pause reliable state, settings action, and overlay lifecycle.
   "match.js": 44950,
-  // Tank Trap deconstruction adds a mirrored command tag, order stage, and builder.
-  "protocol.js": 44592,
+  // Overpenetration event split adds a mirrored event tag, compact code, and decoder branch.
+  "protocol.js": 44877,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,

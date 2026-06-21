@@ -264,7 +264,6 @@ fn apply_overpenetration(
         if let Some(v) = entities.get_mut(id) {
             v.apply_damage(effective_dmg, Some((attacker_owner, (ax, ay), tick)));
         }
-        let reveal = attack_reveal_for(entities.get(attacker));
         for pid in &player_ids {
             if !projection_rules::attack_event_visible_to_team(
                 *pid,
@@ -278,12 +277,10 @@ fn apply_overpenetration(
             ) {
                 continue;
             }
-            events.entry(*pid).or_default().push(Event::Attack {
-                from: attacker,
-                to: id,
-                reveal: reveal.clone(),
-                to_pos: Some([tx, ty]),
-            });
+            events
+                .entry(*pid)
+                .or_default()
+                .push(Event::Overpenetration { to: id });
             push_under_attack_notice(events, teams, *pid, victim_owner, attacker_owner, tx, ty);
         }
         if shot_blocked {
