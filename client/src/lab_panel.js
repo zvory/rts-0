@@ -112,9 +112,7 @@ export class LabPanel {
     const result = document.createElement("p");
     result.className = "lab-result";
     if (this.lastResult) {
-      result.textContent = this.lastResult.ok
-        ? `${this.lastResult.op || "request"} accepted`
-        : this.lastResult.error || `${this.lastResult.op || "request"} rejected`;
+      result.textContent = this.resultText(this.lastResult);
       result.dataset.state = this.lastResult.ok ? "ok" : "error";
     } else {
       result.textContent = "Ready";
@@ -129,22 +127,33 @@ export class LabPanel {
     root.setAttribute("aria-label", "Lab setup tools");
 
     const selection = this.selectedEntities();
-    const selectedIds = selection.map((entity) => entity.id);
+    const selectedIds = selectedEntityIds(selection);
     const issueOwner = singleOwner(selection);
-    const point = this.defaultWorldPoint();
+    const hasSelection = selectedIds.length > 0;
+    const selectedActionDisabled = !hasSelection;
+    const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
 
     root.appendChild(this.renderSpawnPalette());
     root.appendChild(this.renderAdvancedSpawn());
 
     root.appendChild(this.fieldset("Selected", [
       this.readout(`${selectedIds.length} selected`),
-      this.numberField("move-x", "X", point.x),
-      this.numberField("move-y", "Y", point.y),
-      this.button("Pick point", () => this.armPointFieldTool("move-x", "move-y")),
-      this.button("Move", () => this.batchSelected((entity) => this.labClient.moveEntity(entity.id, this.num("move-x"), this.num("move-y")))),
-      this.playerSelectField("set-owner", "Owner"),
-      this.button("Set owner", () => this.batchSelected((entity) => this.labClient.setEntityOwner(entity.id, this.int("set-owner")))),
-      this.button("Delete", () => this.batchSelected((entity) => this.labClient.deleteEntity(entity.id))),
+      this.button("Move to point", () => this.armMoveSelectedTool(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+      }),
+      this.playerSelectField("set-owner", "Owner", {
+        value: issueOwner ?? undefined,
+        disabled: selectedActionDisabled,
+      }),
+      this.button("Set owner", () => this.setSelectedOwner(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+      }),
+      this.button("Delete", () => this.deleteSelected(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+      }),
       this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
     ]));
 
@@ -187,6 +196,13 @@ export class LabPanel {
     root.appendChild(row);
   }
 
+  resultText(result) {
+    const summary = result?.outcome?.summary;
+    if (typeof summary === "string" && summary) return summary;
+    if (result?.ok) return `${result.op || "request"} accepted`;
+    return result?.error || `${result?.op || "request"} rejected`;
+  }
+
   listen(target, type, handler) {
     target.addEventListener(type, handler);
     this.listeners.push([target, type, handler]);
@@ -198,6 +214,10 @@ export class LabPanel {
     button.className = options.className || "lab-btn";
     button.textContent = label;
     if (options.title) button.title = options.title;
+    if (options.disabled) {
+      button.disabled = true;
+      button.setAttribute("aria-disabled", "true");
+    }
     if (options.dataset) {
       for (const [key, value] of Object.entries(options.dataset)) {
         button.dataset[key] = String(value);
@@ -236,6 +256,7 @@ export class LabPanel {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.checked = !!checked;
+    if (options.disabled) input.disabled = true;
     if (typeof options.onChange === "function") {
       this.listen(input, "change", () => options.onChange(!!input.checked));
     }
@@ -249,6 +270,7 @@ export class LabPanel {
     const input = document.createElement("input");
     input.type = type;
     input.value = String(value ?? "");
+    if (options.disabled) input.disabled = true;
     if (typeof options.onChange === "function") {
       this.listen(input, "change", () => options.onChange(input.value));
     }
@@ -279,6 +301,7 @@ export class LabPanel {
     if (values.map(String).includes(String(options.value))) {
       select.value = String(options.value);
     }
+    if (options.disabled) select.disabled = true;
     if (typeof options.onChange === "function") {
       this.listen(select, "change", () => options.onChange(select.value));
     }
@@ -481,22 +504,88 @@ export class LabPanel {
     this.advancedSpawn.completed = this.bool("advanced-spawn-completed");
   }
 
-  armPointFieldTool(xField, yField) {
+  armMoveSelectedTool() {
     if (typeof this.match?.armLabTool !== "function") return null;
+    const entityIds = selectedEntityIds(this.selectedEntities());
+    if (entityIds.length === 0) {
+      return this.publishLocalResult("moveEntity", false, "Select an entity first.");
+    }
     return this.match.armLabTool(
-      { kind: "fieldPoint", payload: { xField, yField }, label: "Pick point" },
-      { onWorldClick: (event) => this.applyPointFieldTool(event) },
+      {
+        kind: "moveSelected",
+        payload: { entityIds },
+        label: `Move ${entityIds.length} selected`,
+      },
+      { onWorldClick: (event) => this.moveSelectedTo(event) },
     );
   }
 
-  applyPointFieldTool(event) {
-    const payload = event?.tool?.payload || {};
-    if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) return;
-    const xInput = this.fields.get(payload.xField);
-    const yInput = this.fields.get(payload.yField);
-    if (!xInput || !yInput) return;
-    xInput.value = String(Math.round(event.x));
-    yInput.value = String(Math.round(event.y));
+  moveSelectedTo(event) {
+    const entityIds = selectedEntityIdsFromPayload(event?.tool?.payload?.entityIds);
+    if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) {
+      return this.publishLocalResult("moveEntity", false, "Pick a valid world point.");
+    }
+    return this.batchEntityMutation("moveEntity", entityIds, (entityId) => (
+      this.labClient.moveEntity(entityId, event.x, event.y)
+    ));
+  }
+
+  setSelectedOwner() {
+    const owner = this.validOwner(this.int("set-owner"));
+    return this.batchEntityMutation("setEntityOwner", selectedEntityIds(this.selectedEntities()), (entityId) => (
+      this.labClient.setEntityOwner(entityId, owner)
+    ));
+  }
+
+  deleteSelected() {
+    return this.batchEntityMutation("deleteEntity", selectedEntityIds(this.selectedEntities()), (entityId) => (
+      this.labClient.deleteEntity(entityId)
+    ));
+  }
+
+  async batchEntityMutation(op, entityIds, request) {
+    const ids = selectedEntityIdsFromPayload(entityIds);
+    if (ids.length === 0) {
+      return this.publishLocalResult(op, false, "Select an entity first.");
+    }
+    const results = [];
+    for (const entityId of ids) {
+      const result = await request(entityId);
+      results.push({ entityId, result });
+    }
+    return this.publishBatchResult(op, results);
+  }
+
+  publishBatchResult(op, results) {
+    const failures = results
+      .filter(({ result }) => !result?.ok)
+      .map(({ entityId, result }) => ({
+        entityId,
+        error: result?.error || `${op} rejected`,
+      }));
+    const accepted = results.length - failures.length;
+    const summary = batchResultSummary(op, accepted, failures);
+    return this.publishLocalResult(op, failures.length === 0, summary, {
+      requestId: results.at(-1)?.result?.requestId,
+      outcome: {
+        summary,
+        accepted,
+        rejected: failures.length,
+        failures,
+      },
+    });
+  }
+
+  publishLocalResult(op, ok, message, options = {}) {
+    this.lastResult = {
+      requestId: Number.isFinite(options.requestId) ? options.requestId : 0,
+      ok: !!ok,
+      op,
+      error: ok ? "" : message,
+      outcome: options.outcome || (ok ? { summary: message } : null),
+    };
+    this.render();
+    return Promise.resolve(this.lastResult);
   }
 
   async exportScenario() {
@@ -528,31 +617,10 @@ export class LabPanel {
     return this.labClient.importScenario(scenario);
   }
 
-  batchSelected(request) {
-    const selected = this.selectedEntities();
-    if (selected.length === 0) return Promise.resolve(null);
-    return selected.reduce(
-      (chain, entity) => chain.then(() => request(entity)),
-      Promise.resolve(null),
-    );
-  }
-
   selectedEntities() {
     return typeof this.match?.state?.selectedEntities === "function"
       ? this.match.state.selectedEntities()
       : [];
-  }
-
-  defaultWorldPoint() {
-    const camera = this.match?.camera;
-    const map = this.match?.state?.map;
-    if (camera && Number.isFinite(camera.x) && Number.isFinite(camera.y)) {
-      return { x: Math.round(camera.x), y: Math.round(camera.y) };
-    }
-    return {
-      x: Math.round((map?.width || 1024) / 2),
-      y: Math.round((map?.height || 1024) / 2),
-    };
   }
 
   resourcesForFirstPlayer() {
@@ -692,6 +760,53 @@ function upgradeLabels() {
 function singleOwner(selection) {
   const owners = new Set((selection || []).map((entity) => Number(entity.owner)).filter((owner) => owner > 0));
   return owners.size === 1 ? Array.from(owners)[0] : null;
+}
+
+function selectedEntityIds(selection) {
+  return selectedEntityIdsFromPayload((selection || []).map((entity) => entity?.id));
+}
+
+function selectedEntityIdsFromPayload(entityIds) {
+  if (!Array.isArray(entityIds)) return [];
+  const seen = new Set();
+  const ids = [];
+  for (const value of entityIds) {
+    const id = Number(value);
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function batchResultSummary(op, accepted, failures) {
+  const label = batchOperationLabel(op);
+  const rejected = failures.length;
+  const acceptedText = accepted > 0 ? `${label.success} ${accepted} ${entityNoun(accepted)}` : "";
+  const rejectedText = rejected > 0
+    ? `${rejected} rejected${failureDetails(failures)}`
+    : "";
+  if (acceptedText && rejectedText) return `${acceptedText}; ${rejectedText}`;
+  if (acceptedText) return `${acceptedText}.`;
+  return `${label.failure} rejected for ${rejected} ${entityNoun(rejected)}${failureDetails(failures)}`;
+}
+
+function batchOperationLabel(op) {
+  if (op === "moveEntity") return { success: "Moved", failure: "Move" };
+  if (op === "setEntityOwner") return { success: "Updated owner for", failure: "Owner change" };
+  if (op === "deleteEntity") return { success: "Deleted", failure: "Delete" };
+  return { success: `${op} accepted for`, failure: op };
+}
+
+function entityNoun(count) {
+  return count === 1 ? "entity" : "entities";
+}
+
+function failureDetails(failures) {
+  if (!failures.length) return "";
+  const shown = failures.slice(0, 3).map((failure) => `#${failure.entityId}: ${failure.error}`);
+  const suffix = failures.length > shown.length ? `; +${failures.length - shown.length} more` : "";
+  return `: ${shown.join("; ")}${suffix}.`;
 }
 
 function roleLabel(role) {

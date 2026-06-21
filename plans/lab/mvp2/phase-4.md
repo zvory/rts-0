@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Planned.
+- [x] Done.
 
 ## Objective
 
@@ -39,14 +39,14 @@ pattern where that improves precision, consistency, or maintainability.
 
 ## Implementation Checklist
 
-- [ ] Inventory setup controls that still rely on manual coordinates or hidden panel state.
-- [ ] Move selected-entity repositioning to the shared lab tool click path.
-- [ ] Tighten selected-entity delete and owner reassignment enabled/disabled states.
-- [ ] Ensure lab result/status display handles stale ids and rejected operations clearly.
-- [ ] Preserve resource, research, vision, import, and export behavior.
-- [ ] Add tests for selected-entity tool state, click coordinates, disabled states, and rejected
+- [x] Inventory setup controls that still rely on manual coordinates or hidden panel state.
+- [x] Move selected-entity repositioning to the shared lab tool click path.
+- [x] Tighten selected-entity delete and owner reassignment enabled/disabled states.
+- [x] Ensure lab result/status display handles stale ids and rejected operations clearly.
+- [x] Preserve resource, research, vision, import, and export behavior.
+- [x] Add tests for selected-entity tool state, click coordinates, disabled states, and rejected
       result display.
-- [ ] Run focused verification and record exact results in the handoff.
+- [x] Run focused verification and record exact results in the handoff.
 
 ## Verification
 

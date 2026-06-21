@@ -276,6 +276,10 @@ function buttonByLabel(card, label) {
 function withFakeDocument(fn) {
   const priorDocument = globalThis.document;
   const created = [];
+  const restore = () => {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  };
   globalThis.document = {
     createElement(tagName) {
       const el = {
@@ -324,10 +328,13 @@ function withFakeDocument(fn) {
     },
   };
   try {
-    return fn(created);
-  } finally {
-    if (priorDocument === undefined) delete globalThis.document;
-    else globalThis.document = priorDocument;
+    const result = fn(created);
+    if (result && typeof result.finally === "function") return result.finally(restore);
+    restore();
+    return result;
+  } catch (err) {
+    restore();
+    throw err;
   }
 }
 
@@ -4708,7 +4715,7 @@ function fakeAudioContext() {
   );
 }
 
-withFakeDocument(() => {
+await withFakeDocument(async () => {
   const sent = [];
   const net = new Net("ws://example.test/ws");
   net.ws = {
@@ -4723,13 +4730,14 @@ withFakeDocument(() => {
   let armedTool = null;
   let armedCallbacks = null;
   let cancelledToolReason = null;
+  let selectedEntities = [];
   const match = {
     camera: { x: 320, y: 352 },
     state: {
       map: { width: 64, height: 64 },
       playerResources: [{ steel: 500, oil: 200 }],
       selectedEntities() {
-        return [];
+        return selectedEntities;
       },
     },
     armLabTool(tool, callbacks) {
@@ -4760,6 +4768,19 @@ withFakeDocument(() => {
     },
     match,
   });
+  const buttonByText = (label) => findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === label)[0];
+  const resolveLastLabResult = (options = {}) => {
+    const envelope = sent.at(-1);
+    net._emit("labResult", {
+      t: "labResult",
+      requestId: envelope.requestId,
+      ok: options.ok !== false,
+      op: envelope.op.op,
+      error: options.error || "",
+      outcome: options.outcome || null,
+    });
+  };
+
   assert(root.children.length === 1, "LabPanel mounts inside the app-owned root");
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   const teamButton = root.children[0].children
@@ -4810,11 +4831,70 @@ withFakeDocument(() => {
       armedTool.payload.completed === true,
     "LabPanel advanced spawn preserves building spawn on the click-to-world tool path",
   );
-  panel.armPointFieldTool("move-x", "move-y");
-  assert(armedTool?.kind === "fieldPoint", "LabPanel arms world-point lab tools through Match");
-  assert(armedTool.payload.xField === "move-x" && armedTool.payload.yField === "move-y", "LabPanel point tool payload names target fields");
-  armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 129.4, y: 160.6 });
-  assert(panel.fields.get("move-x").value === "129" && panel.fields.get("move-y").value === "161", "LabPanel point tool callback writes clicked world coordinates");
+  assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
+  assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
+  assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");
+  selectedEntities = [
+    { id: 31, owner: 1, kind: KIND.RIFLEMAN },
+    { id: 32, owner: 2, kind: KIND.RIFLEMAN },
+  ];
+  panel.render();
+  assert(!buttonByText("Move to point").disabled, "LabPanel enables selected move for selected entities");
+  buttonByText("Move to point").listeners.click();
+  assert(
+    armedTool?.kind === "moveSelected" && armedTool.payload.entityIds.join(",") === "31,32",
+    "LabPanel move-selected tool captures the selected entity ids in the tool payload",
+  );
+  const movePromise = armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 129.4, y: 160.6 });
+  assert(
+    sent.at(-1).op.op === "moveEntity" &&
+      sent.at(-1).op.entityId === 31 &&
+      sent.at(-1).op.x === 129.4 &&
+      sent.at(-1).op.y === 160.6,
+    "LabPanel selected move sends the clicked world coordinates for the first selected entity",
+  );
+  resolveLastLabResult({ outcome: { entityId: 31, x: 129.4, y: 160.6 } });
+  await Promise.resolve();
+  assert(
+    sent.at(-1).op.op === "moveEntity" &&
+      sent.at(-1).op.entityId === 32 &&
+      sent.at(-1).op.x === 129.4 &&
+      sent.at(-1).op.y === 160.6,
+    "LabPanel selected move reuses the clicked world coordinates for each selected entity",
+  );
+  resolveLastLabResult({ ok: false, error: "entity 32 not found" });
+  await movePromise;
+  assert(
+    textWithin(root).includes("Moved 1 entity; 1 rejected: #32: entity 32 not found."),
+    "LabPanel summarizes partial selected-move rejections",
+  );
+  panel.fields.get("set-owner").value = "1";
+  const setOwnerPromise = buttonByText("Set owner").listeners.click();
+  assert(
+    sent.at(-1).op.op === "setEntityOwner" &&
+      sent.at(-1).op.entityId === 31 &&
+      sent.at(-1).op.owner === 1,
+    "LabPanel selected owner change sends the requested owner for the first selected entity",
+  );
+  resolveLastLabResult({ outcome: { entityId: 31, owner: 1 } });
+  await Promise.resolve();
+  assert(
+    sent.at(-1).op.op === "setEntityOwner" &&
+      sent.at(-1).op.entityId === 32 &&
+      sent.at(-1).op.owner === 1,
+    "LabPanel selected owner change sends all selected entity ids",
+  );
+  resolveLastLabResult({ outcome: { entityId: 32, owner: 1 } });
+  await setOwnerPromise;
+  assert(textWithin(root).includes("Updated owner for 2 entities."), "LabPanel summarizes accepted owner changes");
+  const deletePromise = buttonByText("Delete").listeners.click();
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 31, "LabPanel selected delete sends the first selected entity id");
+  resolveLastLabResult({ outcome: { entityId: 31 } });
+  await Promise.resolve();
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 32, "LabPanel selected delete sends all selected entity ids");
+  resolveLastLabResult({ outcome: { entityId: 32 } });
+  await deletePromise;
+  assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes accepted deletes");
   panel.fields.get("resource-player").value = "1";
   panel.fields.get("resource-steel").value = "900";
   panel.fields.get("resource-oil").value = "300";
