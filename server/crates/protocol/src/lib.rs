@@ -481,7 +481,8 @@ pub enum Command {
     HoldPosition {
         units: Vec<u32>,
     },
-    /// Set or append a unit-producing building rally stage. `kind` defaults to a plain move stage.
+    /// Set or append a unit-producing building rally stage. `kind` defaults to a plain move stage
+    /// on the wire; production applies plain rally stages as attack-move for non-workers.
     SetRally {
         building: u32,
         x: f32,
