@@ -234,12 +234,7 @@ impl LabSession {
     }
 
     fn add_viewer(&mut self, player_id: u32) {
-        let role = if player_id == self.operator_id {
-            LabStartRole::Operator
-        } else {
-            LabStartRole::ReadOnly
-        };
-        self.viewer_roles.insert(player_id, role);
+        self.viewer_roles.insert(player_id, LabStartRole::Operator);
     }
 
     fn remove_viewer(&mut self, player_id: u32) {
@@ -251,6 +246,10 @@ impl LabSession {
             .get(&player_id)
             .copied()
             .unwrap_or(LabStartRole::ReadOnly)
+    }
+
+    fn can_operate(&self, player_id: u32) -> bool {
+        matches!(self.role_for(player_id), LabStartRole::Operator)
     }
 
     fn metadata_for(&self, player_id: u32) -> LabStartMetadata {
@@ -3370,11 +3369,11 @@ impl RoomTask {
             );
             return;
         }
-        if self
+        if !self
             .lab_session
             .as_ref()
-            .map(|session| session.operator_id != player_id)
-            .unwrap_or(true)
+            .map(|session| session.can_operate(player_id))
+            .unwrap_or(false)
         {
             self.send_lab_result_to(
                 player_id,
@@ -3382,7 +3381,7 @@ impl RoomTask {
                     request_id,
                     ok: false,
                     op: op_kind,
-                    error: Some("only the lab operator can send lab requests".to_string()),
+                    error: Some("only lab operators can send lab requests".to_string()),
                     outcome: None,
                 },
             );
@@ -3394,10 +3393,11 @@ impl RoomTask {
                 self.apply_lab_vision(player_id, request_id, vision)
             }
             LabClientOp::ExportScenario { name } => self.export_lab_scenario(request_id, name),
-            LabClientOp::IssueCommandAs { player_id, cmd } => {
-                self.apply_lab_issue_command(request_id, player_id, cmd)
-            }
-            op => self.apply_lab_mutation(request_id, op),
+            LabClientOp::IssueCommandAs {
+                player_id: command_player_id,
+                cmd,
+            } => self.apply_lab_issue_command(request_id, player_id, command_player_id, cmd),
+            op => self.apply_lab_mutation(player_id, request_id, op),
         };
         self.send_lab_result_to(player_id, result);
     }
@@ -3442,6 +3442,7 @@ impl RoomTask {
     fn apply_lab_issue_command(
         &mut self,
         request_id: u32,
+        operator_id: u32,
         command_player_id: u32,
         cmd: Command,
     ) -> LabResult {
@@ -3462,7 +3463,7 @@ impl RoomTask {
                 session.operation_log.push(LabOperationLogEntry {
                     tick,
                     request_id,
-                    operator_id: session.operator_id,
+                    operator_id,
                     op: op.clone(),
                     result: format!("playerId={command_player_id}"),
                 });
@@ -3527,7 +3528,12 @@ impl RoomTask {
         }
     }
 
-    fn apply_lab_mutation(&mut self, request_id: u32, op: LabClientOp) -> LabResult {
+    fn apply_lab_mutation(
+        &mut self,
+        operator_id: u32,
+        request_id: u32,
+        op: LabClientOp,
+    ) -> LabResult {
         let op_kind = lab_op_kind(&op).to_string();
         let imported_vision = match &op {
             LabClientOp::ImportScenario { scenario } => Some(scenario.metadata.lab.vision.clone()),
@@ -3557,7 +3563,7 @@ impl RoomTask {
                 session.operation_log.push(LabOperationLogEntry {
                     tick,
                     request_id,
-                    operator_id: session.operator_id,
+                    operator_id,
                     op: op_kind.clone(),
                     result: outcome_json.to_string(),
                 });
@@ -5411,7 +5417,7 @@ mod tests {
     }
 
     #[test]
-    fn lab_room_additional_joiner_gets_read_only_lab_start() {
+    fn lab_room_additional_joiner_gets_operator_lab_start() {
         let mut task = RoomTask::new(
             "__lab__:sandbox:map=Default".to_string(),
             RoomMode::Lab(lab_config()),
@@ -5446,7 +5452,7 @@ mod tests {
         assert_eq!(starts.len(), 1);
         let lab = starts[0].lab.as_ref().expect("lab metadata");
         assert_eq!(lab.operator_id, 99);
-        assert_eq!(lab.role, LabStartRole::ReadOnly);
+        assert_eq!(lab.role, LabStartRole::Operator);
         assert_eq!(lab.vision, LabVisionMode::FullWorld);
     }
 
@@ -5532,6 +5538,86 @@ mod tests {
         assert_eq!(session.operation_log[0].tick, 0);
         assert_eq!(session.operation_log[0].op, "setPlayerResources");
         assert!(session.operation_log[0].result.contains("playerId"));
+    }
+
+    #[test]
+    fn lab_collaborators_can_mutate_issue_commands_and_log_requester() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        let (collab_tx, mut collab_writer) = ConnectionSink::new();
+        let (collab_ack, _collab_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Collaborator".to_string(),
+            true,
+            false,
+            collab_tx,
+            collab_ack,
+        );
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        while collab_writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_lab_request(
+            99,
+            30,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 456,
+                oil: 78,
+            },
+        );
+        assert!(lab_results(&mut operator_writer)[0].ok);
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should be running");
+        };
+        let worker = game
+            .snapshot_full_for(LAB_PLAYER_ONE_ID)
+            .entities
+            .iter()
+            .find(|entity| {
+                entity.owner == LAB_PLAYER_ONE_ID && entity.kind == crate::protocol::kinds::WORKER
+            })
+            .unwrap()
+            .id;
+
+        task.on_lab_request(
+            100,
+            31,
+            LabClientOp::IssueCommandAs {
+                player_id: LAB_PLAYER_ONE_ID,
+                cmd: Command::Stop {
+                    units: vec![worker],
+                },
+            },
+        );
+        assert!(lab_results(&mut collab_writer)[0].ok);
+
+        let session = task.lab_session.as_ref().unwrap();
+        assert_eq!(session.role_for(99), LabStartRole::Operator);
+        assert_eq!(session.role_for(100), LabStartRole::Operator);
+        assert_eq!(session.operation_log.len(), 2);
+        assert_eq!(session.operation_log[0].request_id, 30);
+        assert_eq!(session.operation_log[0].operator_id, 99);
+        assert_eq!(session.operation_log[0].op, "setPlayerResources");
+        assert_eq!(session.operation_log[1].request_id, 31);
+        assert_eq!(session.operation_log[1].operator_id, 100);
+        assert_eq!(session.operation_log[1].op, "issueCommandAs");
     }
 
     #[test]
@@ -5625,59 +5711,7 @@ mod tests {
     }
 
     #[test]
-    fn lab_viewer_cannot_mutate_and_normal_room_rejects_lab_request() {
-        let mut lab_task = RoomTask::new(
-            "__lab__:sandbox:map=Default".to_string(),
-            RoomMode::Lab(lab_config()),
-            None,
-            false,
-            DrainHandle::default(),
-        );
-        let (operator_tx, _operator_writer) = ConnectionSink::new();
-        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
-        lab_task.on_join(
-            99,
-            "Operator".to_string(),
-            true,
-            false,
-            operator_tx,
-            operator_ack,
-        );
-        let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
-        let (viewer_ack, _viewer_ack_rx) = tokio::sync::oneshot::channel();
-        lab_task.on_join(
-            100,
-            "Viewer".to_string(),
-            true,
-            false,
-            viewer_tx,
-            viewer_ack,
-        );
-        while viewer_writer.reliable_rx.try_recv().is_ok() {}
-
-        lab_task.on_lab_request(
-            100,
-            8,
-            LabClientOp::SetPlayerResources {
-                player_id: LAB_PLAYER_ONE_ID,
-                steel: 1,
-                oil: 1,
-            },
-        );
-
-        let rejected = lab_results(&mut viewer_writer);
-        assert_eq!(rejected.len(), 1);
-        assert!(!rejected[0].ok);
-        assert!(rejected[0]
-            .error
-            .as_deref()
-            .unwrap()
-            .contains("only the lab operator"));
-        assert_eq!(
-            lab_task.lab_session.as_ref().unwrap().operation_log.len(),
-            0
-        );
-
+    fn normal_room_rejects_lab_request() {
         let mut normal = RoomTask::new(
             "normal-lab-reject-test".to_string(),
             RoomMode::Normal,
