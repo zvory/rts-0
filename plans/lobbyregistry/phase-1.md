@@ -1,6 +1,6 @@
 # Phase 1 - Registry Disposal Primitive
 
-Status: not started
+Status: done
 
 ## Goal
 

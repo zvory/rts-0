@@ -615,6 +615,7 @@ pub(super) struct RoomTask {
     match_countdown_deadline: Option<TokioInstant>,
     drain: DrainHandle,
     match_tracked_for_drain: bool,
+    lifecycle: Option<RoomLifecycle>,
 }
 
 impl RoomTask {
@@ -663,22 +664,49 @@ impl RoomTask {
             match_countdown_deadline: None,
             drain,
             match_tracked_for_drain: false,
+            lifecycle: None,
         }
     }
 
+    pub(super) fn new_with_lifecycle(
+        room: String,
+        mode: RoomMode,
+        db: Option<Arc<Db>>,
+        match_history_local_only: bool,
+        drain: DrainHandle,
+        lifecycle: RoomLifecycle,
+    ) -> Self {
+        let mut task = Self::new(room, mode, db, match_history_local_only, drain);
+        task.lifecycle = Some(lifecycle);
+        task
+    }
+
     /// Main loop: multiplex the fixed-rate tick against the inbound event stream. Returns (and
-    /// the task ends) only when the event channel closes, which happens when the `Lobby`
-    /// registry — and therefore the process — is gone.
-    pub(super) async fn run(&mut self, mut event_rx: mpsc::Receiver<RoomEvent>) {
+    /// the task ends) when the event channel closes or the registry explicitly disposes this room.
+    pub(super) async fn run(
+        &mut self,
+        mut event_rx: mpsc::Receiver<RoomEvent>,
+        mut shutdown_rx: watch::Receiver<bool>,
+    ) {
         let mut ticker = self.make_ticker();
 
         loop {
+            if *shutdown_rx.borrow_and_update() {
+                return;
+            }
             let mut speed_changed = false;
             tokio::select! {
                 // Bias is irrelevant for correctness: events are timestamped only by arrival
                 // order, and a tick handles whatever has been applied so far.
                 scheduled = ticker.tick() => {
                     self.on_tick(scheduled);
+                }
+                changed = shutdown_rx.changed() => {
+                    match changed {
+                        Ok(()) if *shutdown_rx.borrow_and_update() => return,
+                        Ok(()) => {}
+                        Err(_) => return,
+                    }
                 }
                 maybe_event = event_rx.recv() => {
                     match maybe_event {
@@ -893,6 +921,7 @@ impl RoomTask {
                 seats,
             } => self.on_announce_replay_branch(branch_room, source_tick, seats),
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
+            RoomEvent::ReportDisposableIfEmpty => self.report_disposable_if_empty(),
             RoomEvent::DrainStarted(notice) => self.on_drain_started(notice),
         }
     }
@@ -4328,6 +4357,14 @@ impl RoomTask {
         if self.match_tracked_for_drain {
             self.match_tracked_for_drain = false;
             self.drain.match_finished();
+        }
+    }
+
+    fn report_disposable_if_empty(&self) {
+        if self.players.is_empty() {
+            if let Some(lifecycle) = &self.lifecycle {
+                lifecycle.request_disposal();
+            }
         }
     }
 

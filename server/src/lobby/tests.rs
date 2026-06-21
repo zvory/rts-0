@@ -59,6 +59,19 @@ async fn join_room_handle(
     writer
 }
 
+async fn wait_for_lobby_room_count(lobby: &Lobby, expected: usize) {
+    tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if lobby.rooms.lock().await.len() == expected {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("lobby room count did not settle");
+}
+
 fn test_drain() -> DrainHandle {
     DrainHandle::default()
 }
@@ -470,6 +483,68 @@ async fn create_lobby_drain_rejects_new_names_but_existing_rooms_remain_joinable
         }))
     ));
     assert!(lobby.get_or_create_join_target(&existing).await.is_ok());
+}
+
+#[tokio::test]
+async fn registry_disposal_removes_matching_room() {
+    let lobby = Lobby::new();
+    let handle = lobby.get_or_create("disposable-room").await;
+
+    handle
+        .event_tx
+        .send(RoomEvent::ReportDisposableIfEmpty)
+        .await
+        .expect("room task should accept disposal probe");
+
+    wait_for_lobby_room_count(&lobby, 0).await;
+}
+
+#[tokio::test]
+async fn registry_disposal_ignores_stale_room_identity() {
+    let lobby = Lobby::new();
+    let old = lobby.get_or_create("reused-name").await;
+    let old_identity = old.identity;
+
+    assert!(
+        lobby
+            .request_room_disposal_for_test("reused-name", old_identity)
+            .await,
+        "old room should be removable before the name is reused"
+    );
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    let newer = lobby.get_or_create("reused-name").await;
+    assert_ne!(newer.identity, old_identity);
+    assert!(
+        !lobby
+            .request_room_disposal_for_test("reused-name", old_identity)
+            .await,
+        "stale disposal must not remove a newer room under the same name"
+    );
+
+    let rooms = lobby.rooms.lock().await;
+    let current = rooms
+        .get("reused-name")
+        .expect("newer room should remain registered");
+    assert_eq!(current.identity, newer.identity);
+}
+
+#[tokio::test]
+async fn registry_disposal_stops_room_task() {
+    let lobby = Lobby::new();
+    let handle = lobby.get_or_create("shutdown-room").await;
+    let event_tx = handle.event_tx.clone();
+
+    handle
+        .event_tx
+        .send(RoomEvent::ReportDisposableIfEmpty)
+        .await
+        .expect("room task should accept disposal probe");
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    tokio::time::timeout(Duration::from_secs(1), event_tx.closed())
+        .await
+        .expect("disposed room task should close its event receiver");
 }
 
 #[tokio::test]
