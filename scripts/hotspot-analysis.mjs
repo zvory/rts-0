@@ -120,6 +120,8 @@ const GROUP_RULES = [
     group: "client-state-model",
     exact: [
       "client/src/state.js",
+      "client/src/state_queries.js",
+      "client/src/state_visual_effects.js",
       "client/src/client_intent.js",
       "client/src/command_budget.js",
       "client/src/command_composer.js",
