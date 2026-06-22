@@ -35,6 +35,7 @@ export class LabPanel {
     };
     this.teamInputs = new Map();
     this.playerButtons = new Map();
+    this.spawnPanels = new Map();
     this.fields = new Map();
     this.listeners = [];
     this.unsubscribeState = null;
@@ -61,6 +62,7 @@ export class LabPanel {
     this.windowChrome.clearRenderListeners();
     this.teamInputs.clear();
     this.playerButtons.clear();
+    this.spawnPanels.clear();
     this.fields.clear();
     this.el.replaceChildren();
 
@@ -275,9 +277,19 @@ export class LabPanel {
     return button;
   }
 
-  fieldset(title, children) {
+  fieldset(title, children, options = {}) {
     const section = document.createElement("section");
-    section.className = "lab-tool-group";
+    section.className = options.className || "lab-tool-group";
+    if (options.dataset) {
+      for (const [key, value] of Object.entries(options.dataset)) {
+        section.dataset[key] = String(value);
+      }
+    }
+    if (options.styles) {
+      for (const [key, value] of Object.entries(options.styles)) {
+        section.style.setProperty(key, String(value));
+      }
+    }
     const h = document.createElement("h3");
     h.textContent = title;
     section.appendChild(h);
@@ -425,6 +437,7 @@ export class LabPanel {
     this.captureVisibleSetupFields();
     this.targetPlayerId = this.validOwner(owner);
     this.syncTargetPlayerButtons();
+    this.syncSpawnPanelTargetColors();
   }
 
   syncTargetPlayerButtons() {
@@ -435,6 +448,12 @@ export class LabPanel {
       const isSelected = playerId === selected;
       button.dataset.selected = isSelected ? "true" : "false";
       button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    }
+  }
+
+  syncSpawnPanelTargetColors() {
+    for (const [kind, section] of this.spawnPanels.entries()) {
+      this.applySpawnTargetFieldsetOptions(section, kind);
     }
   }
 
@@ -461,7 +480,9 @@ export class LabPanel {
       this.spawnPaletteReadout(unitKinds),
       this.spawnPaletteGrid(unitKinds),
     ];
-    return this.fieldset("Unit Spawn", controls);
+    const section = this.fieldset("Unit Spawn", controls, this.spawnTargetFieldsetOptions("units"));
+    this.spawnPanels.set("units", section);
+    return section;
   }
 
   renderBuildingSpawnPalette() {
@@ -487,7 +508,36 @@ export class LabPanel {
       this.buildingSpawnPaletteReadout(buildingKinds),
       this.buildingSpawnPaletteGrid(buildingKinds),
     ];
-    return this.fieldset("Building Spawn", controls);
+    const section = this.fieldset("Building Spawn", controls, this.spawnTargetFieldsetOptions("buildings"));
+    this.spawnPanels.set("buildings", section);
+    return section;
+  }
+
+  spawnTargetFieldsetOptions(kind) {
+    const target = this.targetPlayerInfo();
+    return {
+      dataset: {
+        spawnPanel: kind,
+        targetPlayerId: target.id,
+        targetColor: target.color,
+      },
+      styles: {
+        "--lab-spawn-player-color": target.color,
+        "--lab-spawn-player-bg": hexToRgba(target.color, 0.16),
+        "--lab-spawn-player-bg-strong": hexToRgba(target.color, 0.3),
+        "--lab-spawn-player-ring": hexToRgba(target.color, 0.72),
+      },
+    };
+  }
+
+  applySpawnTargetFieldsetOptions(section, kind) {
+    const options = this.spawnTargetFieldsetOptions(kind);
+    for (const [key, value] of Object.entries(options.dataset)) {
+      section.dataset[key] = String(value);
+    }
+    for (const [key, value] of Object.entries(options.styles)) {
+      section.style.setProperty(key, String(value));
+    }
   }
 
   spawnPaletteGrid(unitKinds) {
@@ -656,6 +706,17 @@ export class LabPanel {
   targetPlayer() {
     this.targetPlayerId = this.validOwner(this.targetPlayerId);
     return this.targetPlayerId;
+  }
+
+  targetPlayerInfo() {
+    const selected = this.targetPlayer();
+    const players = this.players();
+    const index = players.findIndex((player) => Number(player.id) === selected);
+    const player = index >= 0 ? players[index] : null;
+    return {
+      id: selected,
+      color: playerColor(player, Math.max(index, 0)),
+    };
   }
 
   normalizePlayerState() {

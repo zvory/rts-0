@@ -318,6 +318,9 @@ await withFakeDocument(async () => {
   const playerButtons = () => findFakes(root, (el) => (
     el.tagName === "BUTTON" && String(el.className).includes("lab-player-btn")
   ));
+  const spawnPanel = (kind) => findFakes(root, (el) => (
+    el.tagName === "SECTION" && el.dataset?.spawnPanel === kind
+  ))[0];
   const resolveLastLabResult = (options = {}) => {
     const envelope = sent.at(-1);
     net._emit("labResult", {
@@ -356,6 +359,13 @@ await withFakeDocument(async () => {
     "LabPanel renders separate unit and building spawn sections",
   );
   assert(
+    spawnPanel("units")?.dataset.targetPlayerId === "1" &&
+      spawnPanel("units")?.dataset.targetColor === "#2255aa" &&
+      spawnPanel("buildings")?.dataset.targetPlayerId === "1" &&
+      spawnPanel("buildings")?.dataset.targetColor === "#2255aa",
+    "LabPanel tints spawn panels with the selected target player's color",
+  );
+  assert(
     !panel.fields.has("spawn-owner") &&
       !panel.fields.has("advanced-spawn-owner") &&
       !panel.fields.has("resource-player") &&
@@ -377,6 +387,13 @@ await withFakeDocument(async () => {
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
   playerButtonById(2).listeners.click();
   assert(panel.fields.get("lab-player").value === "2", "LabPanel target player buttons update shared target state");
+  assert(
+    spawnPanel("units")?.dataset.targetPlayerId === "2" &&
+      spawnPanel("units")?.dataset.targetColor === "#bb4422" &&
+      spawnPanel("buildings")?.dataset.targetPlayerId === "2" &&
+      spawnPanel("buildings")?.dataset.targetColor === "#bb4422",
+    "LabPanel retints spawn panels when the target player changes",
+  );
   panel.armSpawnPaletteTool(KIND.RIFLEMAN);
   assert(armedTool?.kind === "spawnEntity", "LabPanel unit palette arms the spawn lab tool through Match");
   assert(armedTool?.keepArmedOnWorldClick === true, "LabPanel unit palette keeps the spawn tool armed across world clicks");
