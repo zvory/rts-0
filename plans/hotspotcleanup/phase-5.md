@@ -1,6 +1,6 @@
 # Phase 5 - HUD Helper Extraction
 
-Status: planned.
+Status: done.
 
 ## Goal
 

@@ -1,0 +1,347 @@
+use super::fixtures::*;
+use super::*;
+
+#[test]
+fn scores_count_starting_entities() {
+    let players = human_vs_ai_players();
+    let game = Game::new(&players, 0x515C_0DE);
+    let scores = game.scores();
+    let human = scores
+        .iter()
+        .find(|score| score.id == 1)
+        .expect("human score should exist");
+
+    assert_eq!(
+        human.unit_score,
+        config::STARTING_WORKERS * entity_score_value(EntityKind::Worker)
+    );
+    assert_eq!(
+        human.structure_score,
+        entity_score_value(EntityKind::CityCentre)
+    );
+    assert_eq!(human.units_killed, 0);
+    assert_eq!(human.units_lost, 0);
+    assert_eq!(human.buildings_killed, 0);
+    assert_eq!(human.buildings_lost, 0);
+}
+
+#[test]
+fn scores_record_kills_and_losses_on_death() {
+    let players = human_vs_ai_players();
+    let mut game = Game::new(&players, 0x515C_0DE);
+    let victim_unit = game
+        .entities
+        .iter()
+        .find(|e| e.owner == 2 && e.kind == EntityKind::Worker)
+        .map(|e| e.id)
+        .expect("victim unit should exist");
+    let victim_building = game
+        .entities
+        .iter()
+        .find(|e| e.owner == 2 && e.kind == EntityKind::CityCentre)
+        .map(|e| e.id)
+        .expect("victim building should exist");
+    for id in [victim_unit, victim_building] {
+        let entity = game.entities.get_mut(id).expect("victim should exist");
+        entity.hp = 0;
+        entity.set_last_damage_owner(Some(1));
+    }
+
+    let mut events: HashMap<u32, Vec<Event>> =
+        game.players.iter().map(|p| (p.id, Vec::new())).collect();
+    let mut lingering_sight = Vec::new();
+    let tick = game.tick_count();
+    let teams = game.team_relations();
+    services::death::death_system(
+        &mut game.entities,
+        &game.fog,
+        &game.smokes,
+        &teams,
+        &mut game.players,
+        &mut lingering_sight,
+        &mut events,
+        tick,
+    );
+
+    let scores = game.scores();
+    let attacker = scores
+        .iter()
+        .find(|score| score.id == 1)
+        .expect("attacker score should exist");
+    let victim = scores
+        .iter()
+        .find(|score| score.id == 2)
+        .expect("victim score should exist");
+
+    assert_eq!(attacker.units_killed, 1);
+    assert_eq!(attacker.buildings_killed, 1);
+    assert_eq!(victim.units_lost, 1);
+    assert_eq!(victim.buildings_lost, 1);
+}
+
+#[test]
+fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
+    let players = human_vs_ai_players();
+    let mut game =
+        Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0xA11A_0001);
+    let city_centre = game
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
+        .map(|e| e.id)
+        .expect("player city centre should exist");
+    game.enqueue(
+        1,
+        Command::Train {
+            building: city_centre,
+            unit: EntityKind::Worker,
+        },
+    );
+    game.tick();
+
+    let victim_unit = game
+        .entities
+        .iter()
+        .find(|e| e.owner == 2 && e.kind == EntityKind::Worker)
+        .map(|e| e.id)
+        .expect("victim unit should exist");
+    let entity = game
+        .entities
+        .get_mut(victim_unit)
+        .expect("victim unit should still exist");
+    entity.hp = 0;
+    entity.set_last_damage_owner(Some(1));
+    let mut events: HashMap<u32, Vec<Event>> =
+        game.players.iter().map(|p| (p.id, Vec::new())).collect();
+    let mut lingering_sight = Vec::new();
+    let tick = game.tick_count();
+    let teams = game.team_relations();
+    services::death::death_system(
+        &mut game.entities,
+        &game.fog,
+        &game.smokes,
+        &teams,
+        &mut game.players,
+        &mut lingering_sight,
+        &mut events,
+        tick,
+    );
+
+    let analysis = game.observer_analysis();
+    assert_eq!(analysis.tick, game.tick_count());
+    let player_one = analysis
+        .players
+        .iter()
+        .find(|player| player.id == 1)
+        .expect("player one analysis should exist");
+    assert!(player_one
+        .units
+        .iter()
+        .any(|row| row.kind == "worker" && row.count == config::STARTING_WORKERS));
+    assert!(player_one.production.iter().any(|row| {
+        row.building_id == city_centre
+            && row.building_kind == "city_centre"
+            && row.item_kind == "worker"
+            && row.item_type == "unit"
+            && row.queue_depth == 1
+            && row.progress > 0.0
+    }));
+    let player_two = analysis
+        .players
+        .iter()
+        .find(|player| player.id == 2)
+        .expect("player two analysis should exist");
+    assert!(player_two
+        .units_lost
+        .iter()
+        .any(|row| row.kind == "worker" && row.count == 1 && row.steel_value > 0));
+    assert_eq!(
+        player_two.resources_lost.steel,
+        player_two.units_lost[0].steel_value
+    );
+    assert_eq!(
+        player_two.resources_lost.oil,
+        player_two.units_lost[0].oil_value
+    );
+}
+
+#[test]
+fn phase4_projection_matches_legacy_snapshot_entities() {
+    let players = human_vs_ai_players();
+    let mut game = Game::new(&players, 0xCAFE_BABE);
+    let (sx, sy) = game
+        .map
+        .tile_center(game.players[0].start_tile.0, game.players[0].start_tile.1);
+    let attacker = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, sx + 64.0, sy)
+        .expect("attacker should spawn");
+    let target = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, sx + 96.0, sy)
+        .expect("target should spawn");
+    if let Some(e) = game.entities.get_mut(attacker) {
+        e.set_order(Order::attack(target));
+        e.set_target_id(Some(target));
+    }
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    assert_eq!(
+        game.snapshot_for(1).entities,
+        legacy_snapshot_entities(&game, 1, true)
+    );
+    assert_eq!(
+        game.snapshot_full_for(1).entities,
+        legacy_snapshot_entities(&game, 1, false)
+    );
+}
+
+#[test]
+fn spectator_snapshot_uses_union_fog_not_full_world() {
+    let players = human_vs_ai_players();
+    let mut game = Game::new(&players, 0xCAFE_BABE);
+    let active_players = [1, 2];
+    game.fog
+        .recompute(&active_players, &game.entities, &game.map);
+
+    let hidden_pos = (0..game.map.size)
+        .flat_map(|ty| (0..game.map.size).map(move |tx| (tx, ty)))
+        .find_map(|(tx, ty)| {
+            let (x, y) = game.map.tile_center(tx, ty);
+            let hidden_from_all = active_players
+                .iter()
+                .all(|player| !game.fog.is_visible_world(*player, x, y));
+            hidden_from_all.then_some((x, y))
+        })
+        .expect("map should contain a tile outside both players' opening fog");
+    let hidden = game
+        .entities
+        .spawn_unit(99, EntityKind::Rifleman, hidden_pos.0, hidden_pos.1)
+        .expect("hidden unit should spawn");
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.fog
+        .recompute(&active_players, &game.entities, &game.map);
+
+    let snapshot = game.snapshot_for_spectator(&active_players);
+
+    assert!(snapshot.entities.iter().any(|e| e.owner == 1));
+    assert!(snapshot.entities.iter().any(|e| e.owner == 2));
+    assert!(!snapshot.entities.iter().any(|e| e.id == hidden));
+    assert_eq!(snapshot.player_resources.len(), 2);
+}
+
+#[test]
+fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new_for_replay(&players, 0xD3AD_5151);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let rifle_pos = game.map.tile_center(2, 2);
+    let rifle = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
+        .expect("rifleman should spawn");
+    let spotter_pos = game.map.tile_center(20, 20);
+    let spotter = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("spotter should spawn");
+    let enemy_pos = game.map.tile_center(22, 20);
+    let enemy = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    assert!(game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));
+
+    game.entities
+        .get_mut(spotter)
+        .expect("spotter should exist")
+        .hp = 0;
+    game.tick();
+
+    assert!(!game.entities.contains(spotter));
+    assert!(
+        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        "live fog should no longer see through the dead spotter"
+    );
+    let first_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|e| e.id == enemy)
+        .expect("enemy should remain visible through lingering death vision");
+    assert!(first_linger.vision_only);
+
+    let enemy_goal = game.map.tile_center(24, 20);
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![rifle],
+            target: enemy,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        2,
+        Command::Move {
+            units: vec![enemy],
+            x: enemy_goal.0,
+            y: enemy_goal.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let rifle_entity = game.entities.get(rifle).expect("rifle should remain alive");
+    assert_eq!(
+        rifle_entity.order().attack_target(),
+        None,
+        "vision-only enemies should not be accepted as direct attack targets"
+    );
+    let moved_enemy = game.entities.get(enemy).expect("enemy should remain alive");
+    let moving_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|e| e.id == enemy)
+        .expect("moving enemy should still be visible during lingering death vision");
+    assert!(moving_linger.vision_only);
+    assert!((moving_linger.x - moved_enemy.pos_x).abs() < 0.001);
+    assert!((moving_linger.y - moved_enemy.pos_y).abs() < 0.001);
+
+    while game.tick_count() <= config::TICK_HZ * 5 {
+        game.tick();
+    }
+    assert!(
+        game.snapshot_for(1).entities.iter().all(|e| e.id != enemy),
+        "lingering death vision should expire after five seconds"
+    );
+}

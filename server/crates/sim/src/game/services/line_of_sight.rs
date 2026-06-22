@@ -1,7 +1,8 @@
-//! Line-of-sight queries over static map terrain.
+//! Line-of-sight queries over map terrain plus optional dynamic blockers.
 //!
-//! Stone blocks both vision and ranged attacks. This service owns the tile raycast so fog,
-//! combat, and future terrain features share one interpretation of "can see/shoot through".
+//! Stone blocks both vision and ranged attacks. Fog can also supply current building-footprint
+//! blockers, while smoke supplies dynamic cloud blockers. This service owns the tile raycast so
+//! fog, combat, and future terrain features share one interpretation of "can see/shoot through".
 
 use crate::config;
 use crate::game::map::Map;
@@ -12,17 +13,43 @@ use crate::rules::terrain;
 pub(crate) struct LineOfSight<'a> {
     map: &'a Map,
     smokes: Option<&'a SmokeCloudStore>,
+    building_blockers: Option<&'a [bool]>,
 }
 
 impl<'a> LineOfSight<'a> {
     pub(crate) fn new(map: &'a Map) -> Self {
-        LineOfSight { map, smokes: None }
+        LineOfSight {
+            map,
+            smokes: None,
+            building_blockers: None,
+        }
     }
 
     pub(crate) fn with_smoke(map: &'a Map, smokes: &'a SmokeCloudStore) -> Self {
         LineOfSight {
             map,
             smokes: Some(smokes),
+            building_blockers: None,
+        }
+    }
+
+    pub(crate) fn with_building_blockers(map: &'a Map, building_blockers: &'a [bool]) -> Self {
+        LineOfSight {
+            map,
+            smokes: None,
+            building_blockers: Some(building_blockers),
+        }
+    }
+
+    pub(crate) fn with_smoke_and_building_blockers(
+        map: &'a Map,
+        smokes: &'a SmokeCloudStore,
+        building_blockers: &'a [bool],
+    ) -> Self {
+        LineOfSight {
+            map,
+            smokes: Some(smokes),
+            building_blockers: Some(building_blockers),
         }
     }
 
@@ -153,7 +180,14 @@ impl<'a> LineOfSight<'a> {
     }
 
     fn tile_blocks(&self, tile: (u32, u32)) -> bool {
-        terrain::blocks_line_of_sight(self.map.terrain_at(tile.0, tile.1))
+        if terrain::blocks_line_of_sight(self.map.terrain_at(tile.0, tile.1)) {
+            return true;
+        }
+        let Some(blockers) = self.building_blockers else {
+            return false;
+        };
+        let idx = (tile.1 * self.map.size + tile.0) as usize;
+        blockers.get(idx).copied().unwrap_or(false)
     }
 }
 

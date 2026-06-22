@@ -1,6 +1,6 @@
 # Phase 3 - Command Service Guards and Tests
 
-Status: planned.
+Status: done.
 
 ## Goal
 

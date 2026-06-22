@@ -1,0 +1,259 @@
+// tests/client_contracts/match_shell_contracts.mjs
+// Match shell collaborator contracts imported by ../client_contracts.mjs.
+
+import { assert } from "./assertions.mjs";
+import { withFakeSettingsDocument } from "./fakes.mjs";
+import { MatchCombatAudio } from "../../client/src/match_combat_audio.js";
+import { MatchNetReporter, predictionReportFields } from "../../client/src/match_net_reporter.js";
+import { buildMatchSettingsContext } from "../../client/src/match_settings_context.js";
+import {
+  EVENT,
+  KIND,
+  MOVEMENT_PATH_DIAGNOSTICS,
+} from "../../client/src/protocol.js";
+
+// Match net-report/ping collaborator
+// ---------------------------------------------------------------------------
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const priorPerformance = globalThis.performance;
+  const priorClearInterval = globalThis.clearInterval;
+  const intervals = [];
+  const cleared = [];
+  let now = 1200;
+  globalThis.window = {
+    setInterval(handler, ms) {
+      const id = intervals.length + 1;
+      intervals.push({ id, handler, ms });
+      return id;
+    },
+  };
+  globalThis.clearInterval = (id) => cleared.push(id);
+  globalThis.document = {
+    hidden: true,
+    hasFocus() { return false; },
+  };
+  globalThis.performance = { now: () => now };
+  try {
+    const pings = [];
+    const reports = [];
+    const diagnostics = [];
+    let resetStats = 0;
+    let resetFrame = 0;
+    let resetSnapshot = 0;
+    const net = {
+      bufferedAmount: 456,
+      ping() { pings.push("ping"); },
+      netReport(report) { reports.push(report); },
+      consumeSnapshotReportStats() {
+        return {
+          snapshotBytesTotal: 1024,
+          snapshotBytesMax: 768,
+          snapshotMessageCount: 2,
+        };
+      },
+    };
+    const health = {
+      reportStartedAt: 1000,
+      reportStats: {
+        rttMaxMs: 31,
+        badRttSamples: 1,
+        snapshotGapMaxMs: 44,
+        jitterSamples: 2,
+        snapshots: 3,
+        frameGapMaxMs: 25,
+        frameCount: 2,
+        frameTotalMs: 40,
+      },
+      metrics() {
+        return {
+          latencyMs: 28,
+          jitterMs: 9,
+          serverTickMs: 33,
+          serverLagMs: 4,
+          issues: {
+            slowTick: { count: 5 },
+            headOfLine: { count: 6 },
+          },
+        };
+      },
+      resetReportStats() { resetStats += 1; },
+    };
+    const reporter = new MatchNetReporter({
+      net,
+      health,
+      frameProfiler: {
+        reportSummary: () => ({ frameWorkMaxMs: 12, rendererMaxMs: 8, context: {} }),
+        resetReportWindow: () => { resetFrame += 1; },
+      },
+      snapshotProcessingReport: {
+        snapshotApplySummary: () => ({ max: 3 }),
+        predictionApplySummary: () => ({ max: 2 }),
+        reset: () => { resetSnapshot += 1; },
+      },
+      diagnostics: {
+        count(name, payload) { diagnostics.push({ name, payload }); },
+      },
+      matchRunId: "match-run-7",
+      getLastSnapshotTick: () => 77,
+      getPredictionReportFields: () => ({ predictionMode: "predicting", pendingCommandCount: 4 }),
+    });
+
+    reporter.startMatchPings();
+    assert(pings.length === 1, "match net reporter sends an immediate ping when started");
+    assert(intervals[0].ms === 2000, "match net reporter preserves ping cadence");
+    intervals[0].handler();
+    assert(pings.length === 2, "match net reporter ping interval uses the injected Net");
+    reporter.stopMatchPings();
+    assert(cleared.includes(1), "match net reporter clears the ping timer");
+
+    reporter.startNetReports();
+    assert(intervals[1].ms === 10000, "match net reporter preserves net-report cadence");
+    now = 1250;
+    reporter.sendNetReport();
+    assert(reports[0].schemaVersion === 1, "match net reporter sends schema-versioned reports");
+    assert(reports[0].matchRunId === "match-run-7", "match net reporter preserves match run id");
+    assert(reports[0].matchTick === 77, "match net reporter reads the latest snapshot tick lazily");
+    assert(reports[0].fpsEstimate === 50, "match net reporter derives fps estimate from frame stats");
+    assert(reports[0].predictionMode === "predicting", "match net reporter merges prediction fields");
+    assert(reports[0].hidden === true && reports[0].focused === false, "match net reporter includes document state");
+    assert(resetStats === 1 && resetFrame === 1 && resetSnapshot === 1, "match net reporter resets report windows after upload");
+    assert(
+      diagnostics[0]?.name === "client.send.netReport" && diagnostics[0].payload.pendingCommandCount === 4,
+      "match net reporter preserves diagnostics counters",
+    );
+    reporter.stopNetReports();
+    assert(cleared.includes(2), "match net reporter clears the net-report timer");
+  } finally {
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorPerformance === undefined) delete globalThis.performance;
+    else globalThis.performance = priorPerformance;
+    if (priorClearInterval === undefined) delete globalThis.clearInterval;
+    else globalThis.clearInterval = priorClearInterval;
+  }
+}
+
+{
+  const fields = predictionReportFields({
+    prediction: {
+      debugSummary: () => ({
+        mode: "predicting",
+        pendingCommandCount: 7,
+        ackLatencyMs: 13,
+        maxCorrectionDistance: 22,
+        correctionCount: 3,
+        disableCount: 1,
+      }),
+      consumeCommandReportStats: () => ({
+        commandsIssued: 9,
+        commandIssueToServerReceiptMaxMs: 40,
+      }),
+    },
+    predictionAdapter: {
+      diagnostics: () => ({
+        lastTickMs: 2,
+        memoryBytes: 4096,
+        lastReplayTicks: 5,
+      }),
+    },
+  });
+  assert(fields.predictionMode === "predicting", "prediction net-report fields preserve controller mode");
+  assert(fields.pendingCommandCount === 7, "prediction net-report fields include pending command count");
+  assert(fields.commandsIssued === 9, "prediction net-report fields include command report counters");
+  assert(fields.wasmMemoryBytes === 4096, "prediction net-report fields include WASM diagnostics");
+}
+
+// Match combat-audio collaborator
+// ---------------------------------------------------------------------------
+{
+  const entities = new Map([
+    [1, { id: 1, kind: KIND.MACHINE_GUNNER, owner: 1, x: 100, y: 140, targetId: 9 }],
+  ]);
+  const plays = [];
+  const stopped = [];
+  const combatAudio = new MatchCombatAudio({
+    state: {
+      playerId: 1,
+      entityById: (id) => entities.get(id) || null,
+    },
+    audio: {
+      pickVariant: (ids) => ids[0],
+      play(id, opts) {
+        plays.push({ id, opts });
+        return true;
+      },
+      stopByKey(key) {
+        stopped.push(key);
+      },
+    },
+  });
+
+  combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 1 });
+  assert(plays[0].id === "combat_mg_burst_02", "match combat audio picks machine-gun combat sound");
+  assert(plays[0].opts.category === "combat_self", "match combat audio classifies own fire as combat_self");
+  assert(plays[0].opts.key === "combat:machine_gunner:1", "match combat audio keys looping machine-gunner bursts");
+  combatAudio.stopInactiveMachineGunSounds();
+  assert(stopped.length === 0, "match combat audio keeps active machine-gunner target audio");
+  entities.set(1, { id: 1, kind: KIND.MACHINE_GUNNER, owner: 1, x: 100, y: 140 });
+  combatAudio.stopInactiveMachineGunSounds();
+  assert(stopped[0] === "combat:machine_gunner:1", "match combat audio stops stale machine-gunner target audio");
+  combatAudio.playPointFireSound({ e: EVENT.MORTAR_LAUNCH, fromX: 12, fromY: 24 });
+  assert(plays.at(-1).id === "combat_mortar_launch_04", "match combat audio routes mortar launches");
+  assert(plays.at(-1).opts.x === 12 && plays.at(-1).opts.y === 24, "match combat audio preserves point-fire source position");
+}
+
+// Match settings context collaborator
+// ---------------------------------------------------------------------------
+withFakeSettingsDocument(() => {
+  let pauseSent = 0;
+  let giveUpOpened = 0;
+  let predictionToggled = false;
+  let pointerLockToggled = 0;
+  let debugToggled = 0;
+  const context = buildMatchSettingsContext({
+    replayViewer: false,
+    state: { spectator: false, debugPathOverlaysEnabled: true },
+    capabilities: {
+      matchControls: { pause: true },
+      diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
+    },
+    livePauseState: { paused: false, canPause: true, pausesRemaining: 2 },
+    giveUpSent: false,
+    audio: {},
+    hotkeyProfiles: null,
+    prediction: { enabled: true },
+    predictionAdapter: { ready: true, loading: false },
+    input: { pointerLocked: false, pointerLockSupported: () => true },
+    onPauseGame: () => { pauseSent += 1; },
+    onGiveUpOpen: () => { giveUpOpened += 1; },
+    onPredictionEnabledChange: (enabled) => { predictionToggled = enabled; },
+    onPointerLockToggle: () => { pointerLockToggled += 1; },
+    onDebugPathToggle: () => { debugToggled += 1; },
+    livePauseActionLabel: () => "Pause (2)",
+    livePauseActionTitle: () => "2 pauses remaining.",
+  });
+  assert(context.kind === "match" && !context.spectator && !context.replay, "match settings context identifies live player matches");
+  const [pauseAction, giveUpAction] = context.actions;
+  const pauseButton = pauseAction.render();
+  const giveUpButton = giveUpAction.render();
+  assert(pauseButton.id === "live-pause-open" && pauseButton.textContent === "Pause (2)", "match settings context wires pause action label");
+  pauseButton.listeners.click();
+  giveUpButton.listeners.click();
+  assert(pauseSent === 1 && giveUpOpened === 1, "match settings context preserves pause and give-up callbacks");
+
+  const gameTab = context.tabs.find((tab) => tab.id === "game");
+  const debugTab = context.tabs.find((tab) => tab.id === "debug");
+  const root = document.createElement("div");
+  gameTab.render(root, context);
+  root.children.find((child) => child.id === "prediction-toggle").listeners.click();
+  root.children.find((child) => child.id === "pointer-lock-toggle").listeners.click();
+  debugTab.render(root, context);
+  root.children.find((child) => child.id === "debug-path-toggle").listeners.click();
+  assert(predictionToggled === false, "match settings context toggles prediction through the injected callback");
+  assert(pointerLockToggled === 1, "match settings context toggles pointer lock through the injected callback");
+  assert(debugToggled === 1, "match settings context toggles debug paths through the injected callback");
+});

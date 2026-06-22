@@ -59,6 +59,9 @@ src/
   main.js         # Entry point: starts App
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
+  match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
+  match_net_reporter.js # Match ping cadence and client net-report upload collaborator
+  match_settings_context.js # Match settings action/tab context builder
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
@@ -984,7 +987,8 @@ removed `GameState` intent shims such as `state.commandTarget`, `state.placement
 update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, `client_perf_report.js`, `match_health.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_combat_audio.js`,
+  `match_net_reporter.js`, `match_settings_context.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
   `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
