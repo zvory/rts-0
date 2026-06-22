@@ -14,6 +14,7 @@ import { Net } from "../../client/src/net.js";
 import {
   DEFAULT_FACTION_ID,
   KIND,
+  LAB_SCENARIO,
   LAB_ROLE,
   UPGRADE,
   cmd,
@@ -83,8 +84,17 @@ import { textWithin } from "./dom_text.mjs";
   assert(sent.at(-1).op.op === "setCompletedResearch" && sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK, "LabClient sends research operations");
   void labClient.exportScenario("saved setup");
   assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabClient sends scenario export requests");
-  void labClient.importScenario({ schemaVersion: 1, kind: "labScenario" });
-  assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.kind === "labScenario", "LabClient sends scenario import requests");
+  void labClient.importScenario({
+    schemaVersion: LAB_SCENARIO.SCHEMA_VERSION,
+    kind: LAB_SCENARIO.KIND,
+    entities: [{ id: 7, setUp: true, setupTarget: { x: 128, y: 160 } }],
+  });
+  assert(
+    sent.at(-1).op.op === "importScenario" &&
+      sent.at(-1).op.scenario.kind === LAB_SCENARIO.KIND &&
+      sent.at(-1).op.scenario.entities[0].setupTarget.x === 128,
+    "LabClient sends scenario import requests with setup fields",
+  );
   assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
   labClient.destroy();
 }

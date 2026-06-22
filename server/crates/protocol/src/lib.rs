@@ -602,6 +602,16 @@ pub struct LabScenarioEntity {
     pub construction_progress: Option<u32>,
     pub construction_total: Option<u32>,
     pub resource_remaining: Option<u32>,
+    #[serde(default)]
+    pub set_up: bool,
+    pub setup_target: Option<LabScenarioPoint>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioPoint {
+    pub x: f32,
+    pub y: f32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]

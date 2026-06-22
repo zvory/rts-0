@@ -2752,7 +2752,11 @@
       "teamId": 1,
       "upgrades": [
         "methamphetamines",
-        "anti_tank_gun_unlock"
+        "anti_tank_gun_unlock",
+        "tank_unlock",
+        "artillery_unlock",
+        "command_car_unlock",
+        "mortar_autocast"
       ]
     },
     {
@@ -2764,7 +2768,14 @@
       "oil": 0,
       "steel": 75,
       "teamId": 2,
-      "upgrades": []
+      "upgrades": [
+        "methamphetamines",
+        "anti_tank_gun_unlock",
+        "tank_unlock",
+        "artillery_unlock",
+        "command_car_unlock",
+        "mortar_autocast"
+      ]
     }
   ],
   "schemaVersion": 1,

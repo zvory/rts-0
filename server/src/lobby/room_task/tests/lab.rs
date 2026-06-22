@@ -89,9 +89,23 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
     assert_eq!(scenario.seed, 3_566_641_871);
     assert_eq!(scenario.players.len(), 2);
     assert_eq!(scenario.entities.len(), 227);
-    assert!(scenario.players[0]
-        .upgrades
-        .contains(&"anti_tank_gun_unlock".to_string()));
+    let all_research = [
+        "methamphetamines",
+        "anti_tank_gun_unlock",
+        "tank_unlock",
+        "artillery_unlock",
+        "command_car_unlock",
+        "mortar_autocast",
+    ];
+    for player in &scenario.players {
+        for upgrade in all_research {
+            assert!(
+                player.upgrades.iter().any(|completed| completed == upgrade),
+                "player {} should have {upgrade}",
+                player.id
+            );
+        }
+    }
     assert_eq!(
         task.lab_timeline
             .as_ref()
