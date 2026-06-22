@@ -18,7 +18,7 @@ import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { ObserverAnalysisOverlay, shouldMountObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
-import { ReplayControls } from "./replay_controls.js";
+import { RoomTimeControls } from "./replay_controls.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
 import { predictionBlockedReason, predictionCompatibility } from "./prediction_compatibility.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
@@ -271,7 +271,7 @@ export class Match {
     if (this.prediction.enabled) this.initPredictionAdapter();
 
     if (this.capabilities.roomTime.available && dom.replaySpeed) {
-      this.replayControls = new ReplayControls({
+      this.replayControls = new RoomTimeControls({
         net: this.net,
         state: this.state,
         replayViewer: this.replayViewer,

@@ -1,8 +1,8 @@
 import { dom } from "./bootstrap.js";
 import { REPLAY_VISION } from "./protocol.js";
 
-export class ReplayControls {
-  constructor({ net, state, replayViewer = false, capabilities = null }) {
+export class RoomTimeControls {
+  constructor({ net, state, replayViewer = false, capabilities = null, label = null }) {
     this.net = net;
     this.state = state;
     this.replayViewer = !!replayViewer;
@@ -10,17 +10,20 @@ export class ReplayControls {
     this.roomTime = this.capabilities.roomTime || {};
     this.visibility = this.capabilities.visibility || {};
     this.actions = this.capabilities.actions || {};
+    this.label = label || (this.replayViewer ? "Replay" : "Room time");
     this.replayVisionSelection = new Set();
     this.roomTimeState = null;
-    this.replaySeekPending = false;
-    this.replaySeekTargetTick = null;
-    this.replaySpeedHandler = null;
-    this.lastReplaySpeed = 2;
+    this.roomTimeSeekPending = false;
+    this.roomTimeSeekTargetTick = null;
+    this.roomTimeHandler = null;
+    this.lastRoomTimeSpeed = 2;
 
     if (!dom.replaySpeed || !this.roomTime.available) return;
 
     dom.replaySpeed.hidden = false;
     dom.replaySpeed.classList.toggle("replay-viewer-controls", this.replayViewer);
+    dom.replaySpeed.classList.add("room-time-controls");
+    dom.replaySpeed.setAttribute("aria-label", `${this.label} controls`);
     for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn")) {
       const speed = parseFloat(btn.dataset.speed);
       if (Number.isFinite(speed) && speed > 0) btn.hidden = !this.roomTime.setSpeed;
@@ -34,19 +37,20 @@ export class ReplayControls {
     for (const btn of dom.replaySpeed.querySelectorAll(".dev-step-btn")) {
       btn.hidden = !this.roomTime.step;
     }
-    this.replaySpeedHandler = (e) => this.onReplaySpeedClick(e);
-    dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
+    this.roomTimeHandler = (e) => this.onRoomTimeControlClick(e);
+    dom.replaySpeed.addEventListener("click", this.roomTimeHandler);
     this.setRoomTimeSpeedActive(this.replayViewer ? 2 : null);
     if (this.replayViewer && this.roomTime.pause) this.buildReplayPauseControl();
     if (this.replayViewer && this.actions.replayBranch) this.buildReplayBranchControl();
     if (this.visibility.replayVision) this.buildReplayVisionControls();
-    if (this.replayViewer) this.buildReplayStatus();
-    if (this.replayViewer && this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildReplayTimeline();
+    this.buildRoomTimeStatus();
+    if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
+    this.updateRoomTimePauseButton();
   }
 
-  onReplaySpeedClick(e) {
+  onRoomTimeControlClick(e) {
     const btn = e.target.closest(".spd-btn");
-    if (!btn) return;
+    if (!btn || btn.hidden || btn.disabled) return;
     if (btn.dataset.stepRoomTime !== undefined) {
       if (!this.roomTime.step) return;
       this.net.stepRoomTime();
@@ -56,61 +60,63 @@ export class ReplayControls {
       if (!this.roomTime.seekRelative) return;
       const ticksBack = parseInt(btn.dataset.seekBack, 10);
       if (!isFinite(ticksBack) || ticksBack <= 0) return;
-      this.setReplayConcluded(false);
+      this.setRoomTimeConcluded(false);
       const currentTick = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
-      this.setReplaySeekPending(Math.max(0, currentTick - ticksBack));
+      this.setRoomTimeSeekPending(Math.max(0, currentTick - ticksBack));
       this.net.seekRoomTime(ticksBack);
       return;
     }
-    if (btn.dataset.replayPauseToggle !== undefined) {
+    if (btn.dataset.replayPauseToggle !== undefined || btn.classList.contains("dev-pause-btn")) {
       if (!this.roomTime.pause) return;
-      const speed = this.isReplayPaused() ? this.lastReplaySpeed : 0;
+      const speed = this.isRoomTimePaused() ? this.lastRoomTimeSpeed : 0;
       this.net.setRoomTimeSpeed(speed);
       this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
       this.setRoomTimeSpeedActive(speed);
-      this.updateReplayPauseButton();
-      this.updateReplayStatus();
+      this.updateRoomTimePauseButton();
+      this.updateRoomTimeStatus();
       return;
     }
     const speed = parseFloat(btn.dataset.speed);
     if (!isFinite(speed)) return;
     if (speed === 0 && !this.roomTime.pause) return;
     if (speed > 0 && !this.roomTime.setSpeed) return;
-    if (speed > 0) this.lastReplaySpeed = speed;
+    if (speed > 0) this.lastRoomTimeSpeed = speed;
     this.net.setRoomTimeSpeed(speed);
     this.roomTimeState = { ...(this.roomTimeState || {}), speed, paused: speed === 0 };
     this.setRoomTimeSpeedActive(speed);
-    this.updateReplayPauseButton();
-    this.updateReplayStatus();
+    this.updateRoomTimePauseButton();
+    this.updateRoomTimeStatus();
   }
 
   applyRoomTimeState(state) {
     this.roomTimeState = state || null;
-    this.setReplaySeekPending(null, false);
-    if (Number.isFinite(state?.speed) && state.speed > 0) this.lastReplaySpeed = state.speed;
+    this.setRoomTimeSeekPending(null, false);
+    if (Number.isFinite(state?.speed) && state.speed > 0) this.lastRoomTimeSpeed = state.speed;
     const ended =
       state?.ended === true ||
       (Number.isFinite(state?.currentTick) &&
         Number.isFinite(state?.durationTicks) &&
         state.durationTicks > 0 &&
         state.currentTick >= state.durationTicks);
-    this.setReplayConcluded(ended);
+    this.setRoomTimeConcluded(ended);
     if (Number.isFinite(state?.speed)) this.setRoomTimeSpeedActive(state.speed);
-    this.updateReplayPauseButton();
-    this.updateReplayStatus();
-    this.updateReplayTimeline();
+    this.updateRoomTimePauseButton();
+    this.updateRoomTimeStatus();
+    this.updateRoomTimeTimeline();
   }
 
   noteSnapshotTick(tick) {
-    if (!this.replayViewer || !Number.isFinite(tick)) return;
+    if (!this.roomTime.available || !Number.isFinite(tick)) return;
     this.roomTimeState = { ...(this.roomTimeState || {}), currentTick: tick };
-    this.updateReplayStatus();
-    this.updateReplayTimeline();
+    this.updateRoomTimeStatus();
+    this.updateRoomTimeTimeline();
   }
 
-  setReplayConcluded(concluded) {
+  setRoomTimeConcluded(concluded) {
     const status = dom.replaySpeed?.querySelector("#replay-concluded");
-    if (status) status.hidden = !concluded;
+    if (!status) return;
+    status.textContent = this.replayViewer ? "Replay Concluded" : "Room Time Ended";
+    status.hidden = !concluded;
   }
 
   setRoomTimeSpeedActive(speed) {
@@ -125,17 +131,18 @@ export class ReplayControls {
     }
   }
 
-  isReplayPaused() {
+  isRoomTimePaused() {
     return this.roomTimeState?.paused === true || this.roomTimeState?.speed === 0;
   }
 
-  updateReplayPauseButton() {
-    const btn = dom.replaySpeed?.querySelector(".replay-pause-btn");
-    if (!btn) return;
-    const paused = this.isReplayPaused();
-    btn.textContent = paused ? "Resume" : "Pause";
-    btn.title = paused ? "Resume replay playback." : "Pause replay playback.";
-    btn.classList.toggle("active", paused);
+  updateRoomTimePauseButton() {
+    if (!dom.replaySpeed) return;
+    const paused = this.isRoomTimePaused();
+    for (const btn of dom.replaySpeed.querySelectorAll(".replay-pause-btn, .dev-pause-btn")) {
+      btn.textContent = paused ? "Resume" : "Pause";
+      btn.title = paused ? `Resume ${this.label.toLowerCase()} at ${this.lastRoomTimeSpeed}x.` : `Pause ${this.label.toLowerCase()}.`;
+      btn.classList.toggle("active", paused);
+    }
   }
 
   buildReplayPauseControl() {
@@ -191,42 +198,42 @@ export class ReplayControls {
     dom.replaySpeed.appendChild(group);
   }
 
-  buildReplayStatus() {
+  buildRoomTimeStatus() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-tick-status")) return;
     const status = document.createElement("span");
-    status.className = "replay-status replay-tick-status";
-    status.textContent = "Replay 0 / 0";
+    status.className = "replay-status replay-tick-status room-time-tick-status";
+    status.textContent = `${this.label} 0 / 0`;
     dom.replaySpeed.appendChild(status);
   }
 
-  buildReplayTimeline() {
+  buildRoomTimeTimeline() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-timeline")) return;
     if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
 
     const wrap = document.createElement("div");
-    wrap.className = "replay-timeline";
+    wrap.className = "replay-timeline room-time-timeline";
 
     const track = document.createElement("button");
     track.type = "button";
-    track.className = "replay-timeline-track";
-    track.setAttribute("aria-label", "Seek replay timeline");
-    track.title = "Click to seek replay";
-    track.addEventListener("click", (ev) => this.onReplayTimelineClick(ev));
+    track.className = "replay-timeline-track room-time-timeline-track";
+    track.setAttribute("aria-label", `Seek ${this.label.toLowerCase()} timeline`);
+    track.title = `Click to seek ${this.label.toLowerCase()}`;
+    track.addEventListener("click", (ev) => this.onRoomTimeTimelineClick(ev));
 
     const progress = document.createElement("span");
-    progress.className = "replay-timeline-progress";
+    progress.className = "replay-timeline-progress room-time-timeline-progress";
     track.appendChild(progress);
 
     const marks = document.createElement("span");
-    marks.className = "replay-timeline-marks";
+    marks.className = "replay-timeline-marks room-time-timeline-marks";
     track.appendChild(marks);
 
     wrap.appendChild(track);
     dom.replaySpeed.appendChild(wrap);
-    this.updateReplayTimeline();
+    this.updateRoomTimeTimeline();
   }
 
-  onReplayTimelineClick(ev) {
+  onRoomTimeTimelineClick(ev) {
     if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
     const track = ev.currentTarget;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
@@ -235,25 +242,27 @@ export class ReplayControls {
     if (!rect.width) return;
     const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
     const tick = Math.round(ratio * duration);
-    this.setReplayConcluded(false);
-    this.setReplaySeekPending(tick);
+    this.setRoomTimeConcluded(false);
+    this.setRoomTimeSeekPending(tick);
     this.net.seekRoomTimeTo(tick);
   }
 
-  setReplaySeekPending(targetTick, pending = true) {
-    this.replaySeekPending = !!pending;
-    this.replaySeekTargetTick = this.replaySeekPending && Number.isFinite(targetTick) ? targetTick : null;
-    this.updateReplayStatus();
-    this.updateReplayTimeline();
+  setRoomTimeSeekPending(targetTick, pending = true) {
+    this.roomTimeSeekPending = !!pending;
+    this.roomTimeSeekTargetTick = this.roomTimeSeekPending && Number.isFinite(targetTick) ? targetTick : null;
+    this.updateRoomTimeStatus();
+    this.updateRoomTimeTimeline();
   }
 
-  updateReplayTimeline() {
+  updateRoomTimeTimeline() {
     const timeline = dom.replaySpeed?.querySelector(".replay-timeline");
     if (!timeline) return;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
     const current = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
     const ratio = duration > 0 ? Math.max(0, Math.min(1, current / duration)) : 0;
-    timeline.querySelector(".replay-timeline-progress")?.style.setProperty("--replay-progress", `${ratio * 100}%`);
+    const progress = timeline.querySelector(".replay-timeline-progress");
+    progress?.style.setProperty("--replay-progress", `${ratio * 100}%`);
+    progress?.style.setProperty("--room-time-progress", `${ratio * 100}%`);
 
     const marks = timeline.querySelector(".replay-timeline-marks");
     if (!marks) return;
@@ -267,7 +276,7 @@ export class ReplayControls {
     marks.replaceChildren();
     for (const tick of normalized) {
       const mark = document.createElement("span");
-      mark.className = "replay-timeline-mark";
+      mark.className = "replay-timeline-mark room-time-timeline-mark";
       const left = duration > 0 ? (tick / duration) * 100 : 0;
       mark.style.left = `${Math.max(0, Math.min(100, left))}%`;
       mark.title = `Keyframe ${tick}`;
@@ -323,26 +332,66 @@ export class ReplayControls {
     }
   }
 
-  updateReplayStatus() {
+  updateRoomTimeStatus() {
     const status = dom.replaySpeed?.querySelector(".replay-tick-status");
     if (!status) return;
     const current = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
-    const speed = Number.isFinite(this.roomTimeState?.speed) ? this.roomTimeState.speed : 2;
-    const seeking = this.replaySeekPending
-      ? ` · Seeking${Number.isFinite(this.replaySeekTargetTick) ? ` ${this.replaySeekTargetTick}` : ""}...`
+    const speed = Number.isFinite(this.roomTimeState?.speed) ? this.roomTimeState.speed : this.lastRoomTimeSpeed;
+    const seeking = this.roomTimeSeekPending
+      ? ` · Seeking${Number.isFinite(this.roomTimeSeekTargetTick) ? ` ${this.roomTimeSeekTargetTick}` : ""}...`
       : "";
-    status.textContent = `Replay ${current} / ${duration} @ ${speed}x${seeking}`;
+    status.textContent = `${this.label} ${current} / ${duration} @ ${speed}x${seeking}`;
+  }
+
+  onReplaySpeedClick(e) {
+    return this.onRoomTimeControlClick(e);
+  }
+
+  setReplayConcluded(concluded) {
+    return this.setRoomTimeConcluded(concluded);
+  }
+
+  isReplayPaused() {
+    return this.isRoomTimePaused();
+  }
+
+  updateReplayPauseButton() {
+    return this.updateRoomTimePauseButton();
+  }
+
+  buildReplayStatus() {
+    return this.buildRoomTimeStatus();
+  }
+
+  buildReplayTimeline() {
+    return this.buildRoomTimeTimeline();
+  }
+
+  onReplayTimelineClick(ev) {
+    return this.onRoomTimeTimelineClick(ev);
+  }
+
+  setReplaySeekPending(targetTick, pending = true) {
+    return this.setRoomTimeSeekPending(targetTick, pending);
+  }
+
+  updateReplayTimeline() {
+    return this.updateRoomTimeTimeline();
+  }
+
+  updateReplayStatus() {
+    return this.updateRoomTimeStatus();
   }
 
   destroy() {
     if (!dom.replaySpeed) return;
-    if (this.replaySpeedHandler) {
-      dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
-      this.replaySpeedHandler = null;
+    if (this.roomTimeHandler) {
+      dom.replaySpeed.removeEventListener("click", this.roomTimeHandler);
+      this.roomTimeHandler = null;
     }
     dom.replaySpeed.hidden = true;
-    this.setReplayConcluded(false);
+    this.setRoomTimeConcluded(false);
     for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn")) {
       const speed = parseFloat(btn.dataset.speed);
       if (Number.isFinite(speed) && speed > 0) btn.hidden = false;
@@ -350,8 +399,15 @@ export class ReplayControls {
     for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) btn.hidden = false;
     for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
       btn.hidden = true;
+      if (btn.classList.contains("dev-pause-btn")) {
+        btn.textContent = "Pause";
+        btn.title = "Pause room time";
+        btn.classList.remove("active");
+      }
     }
     dom.replaySpeed.classList.remove("replay-viewer-controls");
+    dom.replaySpeed.classList.remove("room-time-controls");
+    dom.replaySpeed.removeAttribute?.("aria-label");
     dom.replaySpeed.querySelector(".replay-pause-btn")?.remove();
     dom.replaySpeed.querySelector(".replay-branch-btn")?.remove();
     dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
@@ -359,3 +415,5 @@ export class ReplayControls {
     dom.replaySpeed.querySelector(".replay-timeline")?.remove();
   }
 }
+
+export class ReplayControls extends RoomTimeControls {}
