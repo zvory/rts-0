@@ -1,5 +1,5 @@
 {
-  "reason": "track command-service test split",
+  "reason": "Phase 4 moved existing game tests into split modules",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -71,7 +71,11 @@
     },
     {
       "path": "fog.rs",
-      "lines": 345
+      "lines": 386
+    },
+    {
+      "path": "fog/tests.rs",
+      "lines": 190
     },
     {
       "path": "hero_abilities.rs",
@@ -151,7 +155,7 @@
     },
     {
       "path": "services/combat/mod.rs",
-      "lines": 461
+      "lines": 468
     },
     {
       "path": "services/combat/priority.rs",
@@ -163,7 +167,7 @@
     },
     {
       "path": "services/combat/tests.rs",
-      "lines": 3713
+      "lines": 3721
     },
     {
       "path": "services/combat/tests/retention.rs",
@@ -247,7 +251,7 @@
     },
     {
       "path": "services/line_of_sight.rs",
-      "lines": 230
+      "lines": 264
     },
     {
       "path": "services/mod.rs",
@@ -311,7 +315,7 @@
     },
     {
       "path": "services/production.rs",
-      "lines": 706
+      "lines": 753
     },
     {
       "path": "services/spatial.rs",
@@ -359,7 +363,7 @@
     },
     {
       "path": "snapshot.rs",
-      "lines": 294
+      "lines": 299
     },
     {
       "path": "snapshot_memory_tests.rs",
@@ -375,7 +379,55 @@
     },
     {
       "path": "tests.rs",
-      "lines": 5485
+      "lines": 21
+    },
+    {
+      "path": "tests/ability_runtime_tests.rs",
+      "lines": 227
+    },
+    {
+      "path": "tests/ai_identity_tests.rs",
+      "lines": 42
+    },
+    {
+      "path": "tests/artillery_tests.rs",
+      "lines": 386
+    },
+    {
+      "path": "tests/determinism_tests.rs",
+      "lines": 46
+    },
+    {
+      "path": "tests/ekat_tests.rs",
+      "lines": 1102
+    },
+    {
+      "path": "tests/faction_ability_tests.rs",
+      "lines": 308
+    },
+    {
+      "path": "tests/fixtures.rs",
+      "lines": 249
+    },
+    {
+      "path": "tests/movement_replay_tests.rs",
+      "lines": 1043
+    },
+    {
+      "path": "tests/resources_mining_tests.rs",
+      "lines": 396
+    },
+    {
+      "path": "tests/scoring_projection_tests.rs",
+      "lines": 347
+    },
+    {
+      "path": "tests/smoke_mortar_tests.rs",
+      "lines": 1203
+    },
+    {
+      "path": "tests/tank_trap_tests.rs",
+      "lines": 167
     },
     {
       "path": "upgrade.rs",
@@ -805,32 +857,32 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 63,
+      "line": 70,
       "name": "apply_commands"
     },
     {
       "path": "services/commands.rs",
-      "line": 1521,
+      "line": 1495,
       "name": "artillery_point_fire_system"
     },
     {
       "path": "services/commands.rs",
-      "line": 1354,
+      "line": 1317,
       "name": "order_artillery_point_fire"
     },
     {
       "path": "services/commands.rs",
-      "line": 1886,
+      "line": 1851,
       "name": "order_cancel"
     },
     {
       "path": "services/commands.rs",
-      "line": 1771,
+      "line": 1736,
       "name": "order_train"
     },
     {
       "path": "services/commands.rs",
-      "line": 1401,
+      "line": 1364,
       "name": "try_fire_artillery"
     },
     {
@@ -982,52 +1034,52 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 1125,
+      "line": 1088,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1694,
+      "line": 1659,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 66,
+      "line": 73,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 743,
+      "line": 706,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1214,
+      "line": 1177,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1357,
+      "line": 1320,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1403,
+      "line": 1366,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1524,
+      "line": 1498,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1773,
+      "line": 1738,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1888,
+      "line": 1853,
       "code": "players: &mut [PlayerState],"
     },
     {
@@ -1037,8 +1089,8 @@
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 32,
-      "code": "players: &mut [PlayerState],"
+      "line": 88,
+      "code": "PlayerState {"
     },
     {
       "path": "services/commands/tests.rs",
@@ -1047,8 +1099,13 @@
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 88,
-      "code": "PlayerState {"
+      "line": 32,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands/tests.rs",
+      "line": 42,
+      "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/construction.rs",
@@ -1217,7 +1274,7 @@
     },
     {
       "path": "snapshot.rs",
-      "line": 234,
+      "line": 239,
       "code": "fn player(&self, id: u32) -> Option<&PlayerState> {"
     },
     {
@@ -1263,14 +1320,14 @@
       "code": "players[0].oil = 1;"
     },
     {
-      "path": "tests.rs",
-      "line": 3068,
+      "path": "tests/smoke_mortar_tests.rs",
+      "line": 1151,
       "field": "oil",
       "code": "game.players[0].oil = 0;"
     },
     {
-      "path": "tests.rs",
-      "line": 3067,
+      "path": "tests/smoke_mortar_tests.rs",
+      "line": 1150,
       "field": "steel",
       "code": "game.players[0].steel = 0;"
     }
@@ -1355,76 +1412,76 @@
       "code": "e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);"
     },
     {
-      "path": "tests.rs",
-      "line": 4793,
-      "field": "hp",
-      "code": ".hp = 0;"
-    },
-    {
-      "path": "tests.rs",
-      "line": 3029,
-      "field": "hp",
-      "code": "e.hp = 0;"
-    },
-    {
-      "path": "tests.rs",
-      "line": 4552,
-      "field": "hp",
-      "code": "entity.hp = 0;"
-    },
-    {
-      "path": "tests.rs",
-      "line": 4618,
-      "field": "hp",
-      "code": "entity.hp = 0;"
-    },
-    {
-      "path": "tests.rs",
-      "line": 4985,
+      "path": "tests/resources_mining_tests.rs",
+      "line": 92,
       "field": "pos_x",
       "code": "holder_entity.pos_x = node_x;"
     },
     {
-      "path": "tests.rs",
-      "line": 4993,
+      "path": "tests/resources_mining_tests.rs",
+      "line": 100,
       "field": "pos_x",
       "code": "ordered_entity.pos_x = node_x + 4.0;"
     },
     {
-      "path": "tests.rs",
-      "line": 2978,
-      "field": "pos_x",
-      "code": "unit.pos_x = smoke_pos.0;"
-    },
-    {
-      "path": "tests.rs",
-      "line": 5052,
+      "path": "tests/resources_mining_tests.rs",
+      "line": 159,
       "field": "pos_x",
       "code": "worker_entity.pos_x = node_x + worker_radius + node_radius - 1.0;"
     },
     {
-      "path": "tests.rs",
-      "line": 4986,
+      "path": "tests/resources_mining_tests.rs",
+      "line": 93,
       "field": "pos_y",
       "code": "holder_entity.pos_y = node_y;"
     },
     {
-      "path": "tests.rs",
-      "line": 4994,
+      "path": "tests/resources_mining_tests.rs",
+      "line": 101,
       "field": "pos_y",
       "code": "ordered_entity.pos_y = node_y;"
     },
     {
-      "path": "tests.rs",
-      "line": 2979,
-      "field": "pos_y",
-      "code": "unit.pos_y = smoke_pos.1;"
-    },
-    {
-      "path": "tests.rs",
-      "line": 5053,
+      "path": "tests/resources_mining_tests.rs",
+      "line": 160,
       "field": "pos_y",
       "code": "worker_entity.pos_y = node_y;"
+    },
+    {
+      "path": "tests/scoring_projection_tests.rs",
+      "line": 287,
+      "field": "hp",
+      "code": ".hp = 0;"
+    },
+    {
+      "path": "tests/scoring_projection_tests.rs",
+      "line": 46,
+      "field": "hp",
+      "code": "entity.hp = 0;"
+    },
+    {
+      "path": "tests/scoring_projection_tests.rs",
+      "line": 112,
+      "field": "hp",
+      "code": "entity.hp = 0;"
+    },
+    {
+      "path": "tests/smoke_mortar_tests.rs",
+      "line": 1112,
+      "field": "hp",
+      "code": "e.hp = 0;"
+    },
+    {
+      "path": "tests/smoke_mortar_tests.rs",
+      "line": 1061,
+      "field": "pos_x",
+      "code": "unit.pos_x = smoke_pos.0;"
+    },
+    {
+      "path": "tests/smoke_mortar_tests.rs",
+      "line": 1062,
+      "field": "pos_y",
+      "code": "unit.pos_y = smoke_pos.1;"
     }
   ],
   "public_export_counts": [
@@ -1558,7 +1615,7 @@
     },
     {
       "path": "services/line_of_sight.rs",
-      "count": 5
+      "count": 7
     },
     {
       "path": "services/mod.rs",
