@@ -17,7 +17,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   injection, frame health, observer analysis, room-time controls, and
   replay/spectator/lab shell wiring.
 - `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`, `command_budget.js`,
-  `command_composer.js`, `progress_extrapolator.js`, prediction adapters, and local display state.
+  `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
@@ -26,10 +26,10 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   row clicks against the latest list before sending `join`.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
-- `renderer`: `renderer/` Pixi facade, layers, terrain, ground decals,
+- `renderer`: `renderer/` facade, layers, terrain, ground decals,
   SVG decal atlas helpers, entities, fog, feedback, art helpers, rigs, and palette helpers.
-- `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`,
-  `prediction_settings.js`, and `report_window_aggregate.js`.
+- `platform`: `bootstrap.js`, `audio.js`, `sound_manifest.js`, `combat_audio.js`, `alerts.js`,
+  `fog.js`, `camera.js`, `prediction_settings.js`, `report_window_aggregate.js`.
 
 ## Invariants
 - **No framework, no JS build step.** Plain ES2020 modules. PixiJS v7 is the global `PIXI`; do not
