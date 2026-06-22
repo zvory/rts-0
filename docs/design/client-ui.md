@@ -64,7 +64,7 @@ src/
   match_settings_context.js # Match settings action/tab context builder
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
-  replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
+  replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
@@ -101,7 +101,7 @@ export class Net {
   noteSnapshotFrame({bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind})
   setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario/lab time
   stepRoomTime()                         // paused dev-scenario/lab room time
-  seekRoomTime(ticksBack)                // room-controlled replay time; pass huge N for full reset
+  seekRoomTime(ticksBack)                // room-controlled replay/lab time; pass huge N for full reset
   seekRoomTimeTo(tick)
   setReplayVision(vision)
   lab(requestId, op)                     // lab rooms only; request id allocated by LabClient
@@ -327,6 +327,21 @@ export class LivePauseOverlay {
   destroy()
 }
 ```
+
+`replay_controls.js`
+```js
+export class RoomTimeControls {
+  constructor({ net, state, replayViewer?, capabilities, label? })
+  applyRoomTimeState(state)
+  noteSnapshotTick(tick)
+  destroy()
+}
+export class ReplayControls extends RoomTimeControls
+```
+`RoomTimeControls` renders pause/resume, speed, step, relative seek, absolute timeline seek, tick
+status, and keyframe marks only from `capabilities.roomTime`. Replay fog-perspective controls and
+the replay-branch button remain gated by replay-specific visibility/action capabilities, not by lab
+or URL identity.
 
 `room_capabilities.js`
 ```js

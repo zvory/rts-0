@@ -38,9 +38,10 @@ canvas preview or on a new visual asset pipeline.
 
 Normal game rules are the default. Privileged controls such as god mode, inert units, unlimited
 resources, disabled damage, and frozen cooldowns should be explicit lab toggles, not silent changes
-to the simulation. The normal lobby now points experimentation at the lab; the legacy quickstart
-debug preset remains only as a protocol/test compatibility path until explicit lab presets replace
-it.
+to the simulation. The normal lobby now points experimentation at the lab, and the legacy
+quickstart/debug preset path has been retired from active protocol, client, tests, and
+source-of-truth docs. Debug-style prebuilt setups should return only as explicit, hand-authored lab
+scenarios or presets.
 
 The landed collaborator model is intentionally small: every direct `/lab` URL joiner receives the
 omnipotent operator role for that room. `ReadOnly` remains in the protocol for future explicit
@@ -98,8 +99,9 @@ The room owns:
 - `RoomMode::Lab` and any lab-specific `Phase` state;
 - the original operator connection id plus per-connection lab roles;
 - lab scenario identity and dirty state;
-- the shared lab vision mode for current snapshot projection;
+- per-connection lab vision choices plus the default vision for future joins/imports;
 - accepted lab operation log entries;
+- room-local lab timeline keyframes and accepted operation/issue-as replay entries;
 - best-effort autosave or scenario export triggers;
 - translating team-based UI choices into current player ids for fog projection.
 
@@ -230,14 +232,17 @@ should not read arbitrary paths supplied by the browser.
 
 ### Replay And Timeline
 
-Pause, step, speed control, seek, rewind, replay branch, and true timeline editing are later
-features. The architecture should still record lab operations in an append-only room-local log from
-the MVP, because future rewind has to include privileged mutations such as god mode changes,
-spawns, deletes, and owner changes.
+Lab room-time controls now use the neutral room-time message family for shared pause, resume,
+speed, one-tick step, relative seek, and absolute timeline seek. Timeline history is room-local and
+in-memory: labs record a baseline keyframe, periodic cloned `Game` keyframes, accepted lab
+operations, and issue-as commands in authoritative tick order, then rebuild seeks from the nearest
+retained keyframe. If an operator seeks into the past and accepts a new lab operation or issue-as
+command, future entries are truncated instead of creating branch UI.
 
-Normal gameplay commands already have a command log in `Game`. Lab operations need their own log
-or a shared replay event stream so future keyframe rebuilds can replay both normal commands and
-privileged lab mutations in tick order.
+Normal gameplay commands already have a command log in `Game`. Lab operations keep their own room
+timeline stream so keyframe rebuilds can replay both normal commands and privileged lab mutations
+in tick order. Replay branch-from-lab, durable rewind artifacts, and true timeline editing remain
+future work.
 
 ## Durable Primitives
 
@@ -275,10 +280,12 @@ struct LabSession {
     public_id: String,
     operator_id: u32,
     viewer_roles: HashMap<u32, LabStartRole>,
+    viewer_vision_modes: HashMap<u32, LabVisionMode>,
     scenario_id: Option<String>,
     dirty: bool,
     op_log: Vec<LabOpLogEntry>,
-    vision_mode: LabVisionMode,
+    default_vision_mode: LabVisionMode,
+    timeline: LabTimeline,
     flags: LabFlagState,
 }
 ```
@@ -529,22 +536,24 @@ The MVP slice validated these architecture choices:
    player template.
 2. Add `StartPayload.lab` metadata and a client `/lab` route that starts normal `Match` with lab
    mode enabled.
-3. Add lab vision controls: all vision, one team, and selected-team union. The current
-   collaborative room keeps this shared across operators; per-user vision is a follow-up.
+3. Add per-operator lab vision controls: all vision, one team, and selected-team union. One
+   operator changing vision does not change another operator's projection.
 4. Add spawn/delete/move/set-owner operations for existing unit and building kinds.
 5. Add omnipotent selection and issue-command-as-owner for single-owner selections.
 6. Add JSON import/export for scenarios with map, players, teams, resources, upgrades, and
    entities.
 7. Promote later direct lab joiners to the same operator role as the first joiner, while preserving
    `ReadOnly` as a future explicit viewer role.
+8. Add shared lab room-time controls for pause/resume, speed, one-tick step, relative seek, and
+   absolute timeline seek using room-local keyframes and recorded lab entries.
 
 This slice replaces the most important debug-mode workflows: set up a map, stage two
 sides, issue real orders, observe with chosen fog, and save the setup.
 
-The MVP still deliberately excludes timeline pause/step/seek for labs, tick-perfect rewind,
-keyframes, per-user lab vision, presence/permissions, persisted public scenario libraries, visual
-hot reload, lab simulation flags, and `/dev/scenario` migration. Those should each get a follow-up
-design rather than broadening the current lab operation envelope.
+The current lab still deliberately excludes hand-authored preset libraries, optional lab flags,
+presence/permissions beyond the all-operators model, durable public scenario libraries,
+branch-from-lab, visual hot reload, and `/dev/scenario` migration. Those should each get a
+follow-up design rather than broadening the current lab operation envelope.
 
 ## Verification Strategy
 
@@ -560,7 +569,8 @@ The implementation phases should use focused checks before relying on the full P
 - Client architecture check for new lab modules and dependency injection boundaries.
 - Client contract tests for control policy, mixed-owner rejection, and lab protocol builders.
 - Manual browser smoke: create lab, select map, spawn opposing units, issue move/attack commands,
-  switch vision modes, save JSON, reload JSON.
+  switch each operator to a different vision mode, pause/step/resume shared time, seek the lab
+  timeline, save JSON, and reload JSON.
 
 ## Restart And Recovery Hypothesis
 
@@ -570,12 +580,14 @@ behavior is:
 - accepted setup operations can dirty an autosave/export scenario;
 - the operator can save the current setup to JSON at any point;
 - after a server restart, the scenario can be loaded and restaged quickly;
+- room-local timeline/keyframes support rewind while the room is alive, but are not durable restart
+  artifacts;
 - live mid-fight state, exact cooldowns, projectile state, and command queues are not guaranteed
-  until timeline/keyframe work exists.
+  across a server restart.
 
-If true rewind and replay controls become a near-term target, the lab op log should be persisted
-beside periodic `Game::clone_for_replay_keyframe()` keyframes or a serializable lab checkpoint.
-That is later work.
+If durable rewind or branch-from-lab becomes a near-term target, the lab timeline should be
+persisted beside periodic `Game::clone_for_replay_keyframe()` keyframes or a serializable lab
+checkpoint. That is later work.
 
 ## Risks And Open Hypotheses
 
@@ -591,7 +603,7 @@ That is later work.
   validity unless an explicit later flag allows impossible setups.
 - Lab flags can quickly leak into normal sim behavior if they are scattered. They should be typed,
   room-scoped, and absent from normal rooms by construction.
-- Replay rewind will be much easier if lab ops are logged from day one, even before replay controls
-  are exposed.
+- Branch-from-lab needs an explicit product model for what becomes durable, who can share it, and
+  how future-history truncation maps to public replay artifacts.
 - The old unit design lab can stay alive as a separate visual scratchpad until visual iteration is
   redesigned as v2+ on top of the real lab.

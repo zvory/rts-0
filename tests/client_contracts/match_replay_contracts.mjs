@@ -51,10 +51,11 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   };
   const { Match } = await import("../../client/src/match.js");
   const { ReplayViewer } = await import("../../client/src/replay_viewer.js");
-  const { ReplayControls } = await import("../../client/src/replay_controls.js");
+  const { ReplayControls, RoomTimeControls } = await import("../../client/src/replay_controls.js");
   const { shouldWarnBeforeUnload } = await import("../../client/src/app.js");
   const { dom } = await import("../../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
+  assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
   {
     const selectionArea = { hidden: false };
@@ -603,7 +604,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   scenarioControls.appendChild(scenarioStep);
   scenarioControls.appendChild(scenarioSeek);
   dom.replaySpeed = scenarioControls;
-  const scenarioUi = new ReplayControls({
+  const scenarioUi = new RoomTimeControls({
     net: replayNet,
     state: roomTimeState,
     replayViewer: false,
@@ -651,7 +652,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   labControls.appendChild(labStep);
   labControls.appendChild(labSeek);
   dom.replaySpeed = labControls;
-  const labUi = new ReplayControls({
+  const labUi = new RoomTimeControls({
     net: replayNet,
     state: roomTimeState,
     replayViewer: false,
@@ -665,6 +666,9 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
             setSpeed: true,
             pause: true,
             step: true,
+            seekRelative: true,
+            seekAbsolute: true,
+            timeline: true,
           },
         },
       },
@@ -673,11 +677,36 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(!labSpeed2.hidden, "lab mode shows positive speed controls when setSpeed is advertised");
   assert(!labPause.hidden, "lab mode shows pause controls when pause is advertised");
   assert(!labStep.hidden, "lab mode shows step controls when step is advertised");
-  assert(labSeek.hidden, "lab mode hides replay seek controls without seek capability");
+  assert(!labSeek.hidden, "lab mode shows relative seek controls when seekRelative is advertised");
+  assert(!labControls.querySelector(".replay-vision-controls"), "lab room-time controls do not create replay vision controls");
+  assert(!labControls.querySelector(".replay-branch-btn"), "lab room-time controls do not create replay branch controls");
   labControls._listeners.get("click")({ target: labStep });
   assert(replayNet.steps === 2, "lab step sends net.stepRoomTime through neutral controls");
+  labUi.applyRoomTimeState({
+    currentTick: 120,
+    durationTicks: 600,
+    keyframeTicks: [0, 200, 400],
+    speed: 1,
+    paused: false,
+  });
+  assert(
+    labControls.querySelectorAll(".replay-timeline-mark").length === 3,
+    "lab timeline renders server keyframe marks through neutral room-time controls",
+  );
+  assert(
+    labControls.querySelector(".replay-tick-status").textContent.startsWith("Room time"),
+    "lab room-time status uses neutral copy instead of replay copy",
+  );
+  labControls._listeners.get("click")({ target: labSeek });
+  assert(replayNet.seekBacks.at(-1) === 30, "lab relative seek sends net.seekRoomTime through neutral controls");
+  const labTimelineTrack = labControls.querySelector(".replay-timeline-track");
+  labUi.onRoomTimeTimelineClick({ currentTarget: labTimelineTrack, clientX: 100 });
+  assert(replayNet.seekTargets.at(-1) === 300, "lab timeline click sends an absolute room-time seek");
   labControls._listeners.get("click")({ target: labPause });
   assert(replayNet.speeds.at(-1) === 0, "lab pause sends net.setRoomTimeSpeed");
+  assert(labPause.textContent === "Resume", "paused lab room-time control switches to resume");
+  labControls._listeners.get("click")({ target: labPause });
+  assert(replayNet.speeds.at(-1) === 1, "lab resume restores the last positive room-time speed");
   labUi.destroy();
 
   const stepOnlyControls = fakeEl("div");
@@ -698,7 +727,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   stepOnlyControls.appendChild(stepOnlyStep);
   stepOnlyControls.appendChild(stepOnlySeek);
   dom.replaySpeed = stepOnlyControls;
-  const stepOnlyUi = new ReplayControls({
+  const stepOnlyUi = new RoomTimeControls({
     net: replayNet,
     state: roomTimeState,
     replayViewer: false,

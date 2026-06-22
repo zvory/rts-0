@@ -22,9 +22,10 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/crates/rules/src/` and `server/crates/sim/src/rules/projection.rs` — declarative rules
   and fog-gated projection policy.
 - `server/crates/ai/src/` — AI opponents and self-play harnesses.
-- `server/src/lobby/room_task.rs`, `session_policy.rs`, `participants.rs`, and `tick_control.rs` —
+- `server/src/lobby/room_task.rs`, `session_policy.rs`, `participants.rs`, `tick_control.rs`, and
+  `lab_timeline.rs` —
   room ownership, lifecycle policy, public lobby-browser summaries, persistence/export policy,
-  seat/issuer resolution, and clocking.
+  seat/issuer resolution, clocking, and room-local lab rewind recording/rebuild.
 - `server/src/lobby/projection.rs`, `snapshot_fanout.rs`, and `snapshots.rs` — per-recipient
   visibility, fanout, compacting, and diagnostic snapshot options such as movement-path inclusion.
 - `server/src/lobby/launch.rs`, `live_tick.rs`, `replay_session.rs`, `replay_branch.rs`,

@@ -375,6 +375,8 @@ watch rooms advertise speed/pause/step room-time controls without seek. Lab room
 speed/pause/step/relative seek/absolute seek/timeline controls, but still do not advertise
 replay-vision or replay-branch controls. Clients must not infer these shared affordances
 from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
+The browser's shared room-time controls render lab seek and keyframe metadata from these
+capabilities and `roomTimeState`; per-operator lab vision remains a separate lab-control state.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`. Late live spectator joins receive the same live start
 payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
