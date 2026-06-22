@@ -111,6 +111,7 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_last_tick: Option<u32>,
     defensive_panic_response: DefensivePanicResponse,
     pending_upgrades: BTreeSet<UpgradeKind>,
+    launched_frontal_units: BTreeMap<u32, u32>,
 }
 
 impl AiDecisionMemory {
@@ -127,6 +128,7 @@ impl AiDecisionMemory {
             defensive_panic_last_tick: None,
             defensive_panic_response: DefensivePanicResponse::Riflemen,
             pending_upgrades: BTreeSet::new(),
+            launched_frontal_units: BTreeMap::new(),
         }
     }
 
@@ -151,10 +153,21 @@ impl AiDecisionMemory {
         self.next_attack_size
     }
 
-    fn note_attack_for(&mut self, profile: &AiProfile, attack: AttackPolicy, tick: u32) {
+    fn note_attack_for(
+        &mut self,
+        profile: &AiProfile,
+        attack: AttackPolicy,
+        tick: u32,
+        units: &[u32],
+    ) {
         self.ensure_attack_policy(profile, attack);
         self.last_attack_tick = Some(tick);
         self.next_attack_size = self.next_attack_size.saturating_add(attack.wave_growth);
+        if profile.frontal_wave.exclude_launched_ticks.is_some() {
+            for unit in units {
+                self.launched_frontal_units.insert(*unit, tick);
+            }
+        }
     }
 
     fn attack_due_for(&mut self, profile: &AiProfile, attack: AttackPolicy, tick: u32) -> bool {
@@ -179,6 +192,7 @@ impl AiDecisionMemory {
         self.defensive_panic_last_tick = None;
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
         self.pending_upgrades.clear();
+        self.launched_frontal_units.clear();
     }
 
     fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
@@ -189,6 +203,23 @@ impl AiDecisionMemory {
         self.attack_first_size = Some(attack.first_attack_size);
         self.next_attack_size = attack.first_attack_size;
         self.last_attack_tick = None;
+        self.launched_frontal_units.clear();
+    }
+
+    fn launched_frontal_unit_exclusions(
+        &mut self,
+        profile: &AiProfile,
+        tick: u32,
+        owned_units: &BTreeSet<u32>,
+    ) -> BTreeSet<u32> {
+        let Some(exclude_ticks) = profile.frontal_wave.exclude_launched_ticks else {
+            self.launched_frontal_units.clear();
+            return BTreeSet::new();
+        };
+        self.launched_frontal_units.retain(|unit, launched_tick| {
+            owned_units.contains(unit) && tick.saturating_sub(*launched_tick) < exclude_ticks
+        });
+        self.launched_frontal_units.keys().copied().collect()
     }
 
     fn defensive_panic(
@@ -737,7 +768,7 @@ where
                         actions::move_units(&mut actions, frontal_wave.ready_units.clone(), x, y)
                     };
                     if let Some(units) = attack_units {
-                        memory.note_attack_for(profile, attack_policy, observation.tick);
+                        memory.note_attack_for(profile, attack_policy, observation.tick, &units);
                         intents.push(AiIntent::Attack { units });
                     }
                 } else if !rifle_raid_policy {
@@ -749,8 +780,13 @@ where
                         &frontal_wave,
                         enemy_base,
                     ) {
-                        if matches!(intent, AiIntent::Attack { .. }) {
-                            memory.note_attack_for(profile, attack_policy, observation.tick);
+                        if let AiIntent::Attack { units } = &intent {
+                            memory.note_attack_for(
+                                profile,
+                                attack_policy,
+                                observation.tick,
+                                units,
+                            );
                         }
                         intents.push(intent);
                     }

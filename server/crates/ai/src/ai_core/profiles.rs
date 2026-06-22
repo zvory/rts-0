@@ -8,6 +8,9 @@ pub(crate) const TECH_TO_TANKS_ID: &str = "tech_to_tanks";
 pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
 pub(crate) const AI_1_0_TECH_ID: &str = "ai_1_0_tech";
 pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
+pub(crate) const AI_1_2_WAVE_COHORTS_ID: &str = "ai_1_2_wave_cohorts";
+
+const AI_1_2_FRONTAL_COHORT_TICKS: u32 = 3_600;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
@@ -20,6 +23,7 @@ pub(crate) struct AiProfile {
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
+    pub(crate) frontal_wave: FrontalWavePolicy,
     pub(crate) recovery_transition: Option<RecoveryTransitionPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
 }
@@ -173,6 +177,19 @@ pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct FrontalWavePolicy {
+    pub(crate) exclude_launched_ticks: Option<u32>,
+    pub(crate) line_staging: bool,
+}
+
+impl FrontalWavePolicy {
+    pub(crate) const DEFAULT: Self = Self {
+        exclude_launched_ticks: None,
+        line_staging: false,
+    };
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TechTransitionPolicy {
     pub(crate) supply_used_threshold: u32,
@@ -307,6 +324,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
+    frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: Some(RecoveryTransitionPolicy {
         completed_building: EntityKind::Barracks,
         delay_unit: EntityKind::Rifleman,
@@ -445,6 +463,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: None,
+    frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         // Once the rifle flood has put real bodies on the field, pivot to tanks so a stalemated
@@ -530,6 +549,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
+    frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: None,
 };
@@ -595,6 +615,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         remote_worker_assignment_fallback: false,
     }),
     defensive_machine_gunners: None,
+    frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         supply_used_threshold: 50,
@@ -678,6 +699,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: None,
+    frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         supply_used_threshold: 30,
@@ -741,6 +763,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
         remote_worker_assignment_fallback: true,
     }),
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy { target_count: 4 }),
+    frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         supply_used_threshold: 30,
@@ -763,8 +786,26 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 2] {
-    [&AI_1_0_TECH, &AI_1_1_TANK_MG]
+pub(crate) static AI_1_2_WAVE_COHORTS: AiProfile = AiProfile {
+    id: AI_1_2_WAVE_COHORTS_ID,
+    workers: AI_1_1_TANK_MG.workers,
+    supply: AI_1_1_TANK_MG.supply,
+    buildings: AI_1_1_TANK_MG.buildings,
+    production: AI_1_1_TANK_MG.production,
+    attack: AI_1_1_TANK_MG.attack,
+    resources: AI_1_1_TANK_MG.resources,
+    expansion: AI_1_1_TANK_MG.expansion,
+    defensive_machine_gunners: AI_1_1_TANK_MG.defensive_machine_gunners,
+    frontal_wave: FrontalWavePolicy {
+        exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
+        line_staging: true,
+    },
+    recovery_transition: AI_1_1_TANK_MG.recovery_transition,
+    tech_transition: AI_1_1_TANK_MG.tech_transition,
+};
+
+pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
+    [&AI_1_0_TECH, &AI_1_1_TANK_MG, &AI_1_2_WAVE_COHORTS]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
@@ -783,12 +824,20 @@ mod tests {
 
         assert_eq!(
             profiles.map(|profile| profile.id),
-            [AI_1_0_TECH_ID, AI_1_1_TANK_MG_ID]
+            [
+                AI_1_0_TECH_ID,
+                AI_1_1_TANK_MG_ID,
+                AI_1_2_WAVE_COHORTS_ID
+            ]
         );
         assert_eq!(profile_by_id(AI_1_0_TECH_ID).unwrap().id, AI_1_0_TECH_ID);
         assert_eq!(
             profile_by_id(AI_1_1_TANK_MG_ID).unwrap().id,
             AI_1_1_TANK_MG_ID
+        );
+        assert_eq!(
+            profile_by_id(AI_1_2_WAVE_COHORTS_ID).unwrap().id,
+            AI_1_2_WAVE_COHORTS_ID
         );
         assert!(profile_by_id("tech_tree").is_none());
     }
@@ -827,6 +876,32 @@ mod tests {
         assert_eq!(
             AI_1_1_TANK_MG.defensive_machine_gunners,
             Some(DefensiveMachineGunnerPolicy { target_count: 4 })
+        );
+    }
+
+    #[test]
+    fn ai_1_2_forks_ai_1_1_with_frontal_wave_cohorts() {
+        assert_eq!(AI_1_2_WAVE_COHORTS.workers, AI_1_1_TANK_MG.workers);
+        assert_eq!(AI_1_2_WAVE_COHORTS.supply, AI_1_1_TANK_MG.supply);
+        assert_eq!(AI_1_2_WAVE_COHORTS.buildings, AI_1_1_TANK_MG.buildings);
+        assert_eq!(AI_1_2_WAVE_COHORTS.production, AI_1_1_TANK_MG.production);
+        assert_eq!(AI_1_2_WAVE_COHORTS.attack, AI_1_1_TANK_MG.attack);
+        assert_eq!(AI_1_2_WAVE_COHORTS.resources, AI_1_1_TANK_MG.resources);
+        assert_eq!(AI_1_2_WAVE_COHORTS.expansion, AI_1_1_TANK_MG.expansion);
+        assert_eq!(
+            AI_1_2_WAVE_COHORTS.defensive_machine_gunners,
+            AI_1_1_TANK_MG.defensive_machine_gunners
+        );
+        assert_eq!(
+            AI_1_2_WAVE_COHORTS.tech_transition,
+            AI_1_1_TANK_MG.tech_transition
+        );
+        assert_eq!(
+            AI_1_2_WAVE_COHORTS.frontal_wave,
+            FrontalWavePolicy {
+                exclude_launched_ticks: Some(AI_1_2_FRONTAL_COHORT_TICKS),
+                line_staging: true,
+            }
         );
     }
 

@@ -34,8 +34,9 @@ instead of reaching into entity stores from the server layer.
 **Strategy.** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs use the promoted
-`ai_1_1_tank_mg` profile by default and keep that profile for the whole match. Hosts can select
-`ai_1_0_tech` or `ai_1_1_tank_mg` per AI seat from the lobby before countdown/start; unsupported
+`ai_1_2_wave_cohorts` profile by default and keep that profile for the whole match. Hosts can select
+`ai_1_0_tech`, `ai_1_1_tank_mg`, or `ai_1_2_wave_cohorts` per AI seat from the lobby before
+countdown/start; unsupported
 profile ids are ignored or defaulted to the highest supported live AI version. Team relationships are observation-only safety
 inputs: player summaries carry `teamId`, visible allied entities are classified separately from
 `visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
@@ -100,8 +101,9 @@ the relevant support tech is absent, production falls back to Riflemen and panic
 create tech buildings.
 If the pressure persists through the panic window, the AI asks for an additional Barracks before
 resuming its normal profile once the threat has cleared.
-Developer self-play tooling also registers `ai_1_1_tank_mg` for direct comparison through
-`ai-matchup` and related profile-backed scripts. AI 1.1 is a close AI 1.0 fork that keeps the same
+Developer self-play tooling also registers `ai_1_1_tank_mg` and `ai_1_2_wave_cohorts` for direct
+comparison through `ai-matchup` and related profile-backed scripts. AI 1.1 is a close AI 1.0 fork
+that keeps the same
 expansion timing, Tank tech path, Methamphetamines-before-Tanks gate, and Tank-required
 frontal-wave posture, but launches its first Tank-era wave as soon as one Tank is ready. It removes
 Scout Car production and harassment, caps ordinary Barracks growth at one, trains a bounded
@@ -117,13 +119,22 @@ stage orders roughly 20 tiles past the main steel line toward the nearest living
 using public resource geometry rather than hidden enemy positions. This pushes the defensive group
 out far enough to contest approaches before attackers reach the expansion. Visible threats near the
 base, home resource line, or workers still take priority over passive perimeter staging.
-The aliases `ai_1_1` and `ai11` resolve to `ai_1_1_tank_mg`; `ai_1_0`, `ai_1_0_tech`, and `ai1`
-resolve to `ai_1_0_tech`; `ai` and `default` resolve to the live default.
+AI 1.2 (`ai_1_2_wave_cohorts`) is an AI 1.1 fork with explicit frontal-wave cohorting and
+MG-style line staging for forming frontal waves. Once a frontal wave launches, its unit ids are
+excluded from future frontal-wave readiness for a bounded window while they remain alive, so newly
+trained Riflemen or Tanks must form the next outbound wave instead of being counted together with
+the already-launched group. Forming waves receive deterministic individual attack-move staging slots
+along the same enemy-facing main-steel line shape used by the defensive Machine Gunner perimeter,
+avoiding a single rally point. Local defense still selects any eligible local combat unit, including
+units that are excluded from outbound wave formation.
+The aliases `ai_1_2` and `ai12` resolve to `ai_1_2_wave_cohorts`; `ai_1_1` and
+`ai11` resolve to `ai_1_1_tank_mg`; `ai_1_0`, `ai_1_0_tech`, and `ai1` resolve to
+`ai_1_0_tech`; `ai` and `default` resolve to the live default.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Unknown live profile ids resolve to the
-highest supported live AI version, currently `ai_1_1_tank_mg`. The ordinary lobby exposes only
-AI 1.0 and AI 1.1; older experimental profile ids are no longer listed or accepted by developer
-tooling. AI 1.1 is the live lobby default.
+highest supported live AI version, currently `ai_1_2_wave_cohorts`. The ordinary lobby exposes
+AI 1.0, AI 1.1, and AI 1.2; older experimental profile ids are no longer listed or accepted by
+developer tooling. AI 1.2 is the live lobby default.
 
 **Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
 profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player

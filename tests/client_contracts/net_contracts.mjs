@@ -197,7 +197,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
-  assert(DEFAULT_AI_PROFILE_ID === "ai_1_1_tank_mg", "lobby defaults to the highest AI profile version");
+  assert(DEFAULT_AI_PROFILE_ID === "ai_1_2_wave_cohorts", "lobby defaults to the highest AI profile version");
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(
     msg.addAi(2, DEFAULT_AI_PROFILE_ID).aiProfileId === DEFAULT_AI_PROFILE_ID,
