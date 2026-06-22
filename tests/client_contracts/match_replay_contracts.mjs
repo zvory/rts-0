@@ -1,0 +1,976 @@
+// tests/client_contracts/match_replay_contracts.mjs
+// Domain contract assertions imported by ../client_contracts.mjs.
+
+import {
+  assert,
+  assertApprox,
+} from "./assertions.mjs";
+import { withFakeOverlayDocument } from "./fakes.mjs";
+import { HUD } from "../../client/src/hud.js";
+import {
+  EVENT,
+  LAB_ROLE,
+  MOVEMENT_PATH_DIAGNOSTICS,
+  NOTICE_SEVERITY,
+  msg,
+} from "../../client/src/protocol.js";
+import { CameraNavigationInput } from "../../client/src/input/camera_navigation.js";
+import { ClientIntent } from "../../client/src/client_intent.js";
+import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
+import { ReplayCameraInput } from "../../client/src/replay_camera_input.js";
+import { LivePauseOverlay } from "../../client/src/live_pause_overlay.js";
+import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
+
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const fallbackElement = {
+    contains() { return true; },
+    addEventListener() {},
+    removeEventListener() {},
+    setAttribute() {},
+    querySelectorAll() { return []; },
+    hidden: false,
+    disabled: false,
+    textContent: "",
+    title: "",
+  };
+  globalThis.window = {
+    location: { protocol: "http:", host: "localhost", search: "" },
+    localStorage: { getItem() { return null; } },
+    setTimeout(fn) {
+      fn();
+      return 1;
+    },
+  };
+  globalThis.document = {
+    hidden: false,
+    hasFocus() { return true; },
+    getElementById() { return fallbackElement; },
+    createElement() { return { classList: { add() {} }, appendChild() {}, style: {} }; },
+  };
+  const { Match } = await import("../../client/src/match.js");
+  const { ReplayViewer } = await import("../../client/src/replay_viewer.js");
+  const { ReplayControls } = await import("../../client/src/replay_controls.js");
+  const { shouldWarnBeforeUnload } = await import("../../client/src/app.js");
+  const { dom } = await import("../../client/src/bootstrap.js");
+  assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
+  assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
+  {
+    const selectionArea = { hidden: false };
+    const commandCard = { hidden: false };
+    const giveUpConfirm = { hidden: false };
+    dom.selectionArea = selectionArea;
+    dom.commandCard = commandCard;
+    dom.giveUpConfirm = giveUpConfirm;
+
+    const replayMatch = Object.create(Match.prototype);
+    replayMatch.replayViewer = true;
+    replayMatch.state = { spectator: false };
+    replayMatch.applySpectatorUi();
+    assert(selectionArea.hidden, "replay viewer hides the selected-unit HUD area");
+    assert(commandCard.hidden, "replay viewer keeps command card hidden");
+    assert(giveUpConfirm.hidden, "replay viewer hides give-up confirmation");
+
+    selectionArea.hidden = true;
+    commandCard.hidden = true;
+    const liveMatch = Object.create(Match.prototype);
+    liveMatch.replayViewer = false;
+    liveMatch.state = { spectator: false };
+    liveMatch.applySpectatorUi();
+    assert(!selectionArea.hidden, "live player match restores the selected-unit HUD area");
+    assert(!commandCard.hidden, "live player match restores the command card");
+
+    selectionArea.hidden = true;
+    commandCard.hidden = true;
+    const labOperatorMatch = Object.create(Match.prototype);
+    labOperatorMatch.replayViewer = false;
+    labOperatorMatch.state = {
+      spectator: true,
+      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+    };
+    labOperatorMatch.applySpectatorUi();
+    assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
+    assert(!commandCard.hidden, "lab operator keeps the command card visible");
+
+    selectionArea.hidden = false;
+    commandCard.hidden = false;
+    const labViewerMatch = Object.create(Match.prototype);
+    labViewerMatch.replayViewer = false;
+    labViewerMatch.state = {
+      spectator: true,
+      controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }),
+    };
+    labViewerMatch.applySpectatorUi();
+    assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
+    assert(commandCard.hidden, "read-only lab viewer hides the command card");
+
+    const labToolMatch = Object.create(Match.prototype);
+    labToolMatch.clientIntent = new ClientIntent();
+    const labToolChanges = [];
+    labToolMatch.publishLabToolChange = (change) => labToolChanges.push(change);
+    let labToolWorldClick = null;
+    const active = labToolMatch.armLabTool(
+      { kind: "fieldPoint", payload: { xField: "spawn-x" } },
+      { onWorldClick: (event) => { labToolWorldClick = event; } },
+    );
+    assert(labToolChanges.at(-1)?.type === "armed", "Match lab tool controller publishes armed state");
+    labToolMatch.consumeLabToolWorldClick({
+      tool: active,
+      x: 44.5,
+      y: 88.25,
+      world: { x: 44.5, y: 88.25 },
+      screen: { x: 10, y: 20 },
+    });
+    assert(labToolWorldClick?.tool.id === active.id, "Match lab tool controller routes world clicks with the active tool");
+    assert(labToolWorldClick.x === 44.5 && labToolWorldClick.y === 88.25, "Match lab tool controller preserves exact world coordinates");
+    assert(labToolMatch.clientIntent.activeLabTool === null, "Match lab tool controller clears consumed tools");
+    assert(labToolChanges.at(-1)?.reason === "worldClick", "Match lab tool controller publishes world-click cancellation");
+    const persistent = labToolMatch.armLabTool(
+      { kind: "spawnEntity", keepArmedOnWorldClick: true },
+      { onWorldClick: () => {} },
+    );
+    labToolMatch.consumeLabToolWorldClick({
+      tool: persistent,
+      x: 12,
+      y: 16,
+      world: { x: 12, y: 16 },
+      screen: { x: 1, y: 2 },
+    });
+    assert(labToolMatch.clientIntent.activeLabTool?.id === persistent.id, "Match lab tool controller keeps persistent tools armed after world clicks");
+  }
+  {
+    const priorWindowForReplayInput = globalThis.window;
+    const listeners = new Map();
+    const options = new Map();
+    const viewport = {
+      addEventListener(type, handler, opts) {
+        listeners.set(type, handler);
+        options.set(type, opts);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(type) === handler) listeners.delete(type);
+      },
+      getBoundingClientRect() {
+        return { left: 20, top: 30, width: 640, height: 480 };
+      },
+    };
+    const camera = {
+      zoom: 1,
+      calls: [],
+      pans: [],
+      setZoom(zoom, x, y) {
+        this.calls.push({ zoom, x, y });
+        this.zoom = zoom;
+      },
+      panByScreenDelta(dx, dy) {
+        this.pans.push({ dx, dy });
+      },
+    };
+    globalThis.window = {
+      addEventListener(type, handler) {
+        listeners.set(`window:${type}`, handler);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(`window:${type}`) === handler) listeners.delete(`window:${type}`);
+      },
+    };
+    try {
+      const replayInput = new ReplayCameraInput(viewport, camera);
+      assert(options.get("wheel")?.passive === false, "Replay camera wheel listener is non-passive");
+      let prevented = 0;
+      listeners.get("wheel")({
+        deltaY: -100,
+        clientX: 220,
+        clientY: 180,
+        preventDefault() {
+          prevented += 1;
+        },
+      });
+      assertApprox(camera.zoom, 1.12, 0.000001, "Replay mouse wheel zooms in");
+      assert(camera.calls[0].x === 200 && camera.calls[0].y === 150, "Replay wheel zoom anchors on cursor");
+      listeners.get("wheel")({
+        deltaY: 100,
+        clientX: 220,
+        clientY: 180,
+        preventDefault() {
+          prevented += 1;
+        },
+      });
+      assertApprox(camera.zoom, 1, 0.000001, "Replay mouse wheel zooms out");
+      assert(prevented === 2, "Replay wheel zoom prevents page scroll");
+      let dragPrevented = 0;
+      listeners.get("mousedown")({
+        button: 1,
+        clientX: 120,
+        clientY: 130,
+        preventDefault() {
+          dragPrevented += 1;
+        },
+      });
+      listeners.get("window:mousemove")({
+        clientX: 150,
+        clientY: 160,
+        preventDefault() {
+          dragPrevented += 1;
+        },
+      });
+      listeners.get("window:mouseup")({
+        button: 1,
+        preventDefault() {
+          dragPrevented += 1;
+        },
+      });
+      assert(camera.pans.length === 1, "Replay middle-drag pans through shared camera navigation");
+      assert(camera.pans[0].dx === 30 && camera.pans[0].dy === 30, "Replay middle-drag uses screen delta");
+      assert(dragPrevented === 3, "Replay middle-drag suppresses browser drag defaults");
+      listeners.get("window:keydown")({
+        code: "Space",
+        preventDefault() {},
+      });
+      listeners.get("mousedown")({
+        button: 0,
+        clientX: 170,
+        clientY: 175,
+        preventDefault() {},
+      });
+      listeners.get("window:mousemove")({
+        clientX: 160,
+        clientY: 165,
+        preventDefault() {},
+      });
+      listeners.get("window:mouseup")({
+        button: 0,
+        preventDefault() {},
+      });
+      listeners.get("window:keyup")({
+        code: "Space",
+        preventDefault() {},
+      });
+      assert(camera.pans.length === 2, "Replay Space+left-drag pans through shared camera navigation");
+      assert(camera.pans[1].dx === -10 && camera.pans[1].dy === -10, "Replay Space+left-drag uses screen delta");
+      replayInput.destroy();
+      assert(!listeners.has("wheel"), "Replay camera input removes wheel listener on destroy");
+    } finally {
+      if (priorWindowForReplayInput === undefined) delete globalThis.window;
+      else globalThis.window = priorWindowForReplayInput;
+    }
+  }
+  {
+    const listeners = new Map();
+    const viewport = {
+      addEventListener(type, handler) {
+        listeners.set(type, handler);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(type) === handler) listeners.delete(type);
+      },
+      getBoundingClientRect() {
+        return { left: 0, top: 0, width: 800, height: 600 };
+      },
+    };
+    const windowRef = {
+      addEventListener(type, handler) {
+        listeners.set(`window:${type}`, handler);
+      },
+      removeEventListener(type, handler) {
+        if (listeners.get(`window:${type}`) === handler) listeners.delete(`window:${type}`);
+      },
+    };
+    const helper = new CameraNavigationInput(viewport, { zoom: 1 }, {
+      installListeners: true,
+      windowRef,
+      panKeyCodes: CameraNavigationInput.replayPanKeyCodes(),
+    });
+    let prevented = 0;
+    listeners.get("window:keydown")({
+      code: "KeyW",
+      preventDefault() {
+        prevented += 1;
+      },
+    });
+    assert(helper.keys.up, "Shared camera navigation maps configured pan keys");
+    listeners.get("window:keyup")({
+      code: "KeyW",
+      preventDefault() {
+        prevented += 1;
+      },
+    });
+    assert(!helper.keys.up && prevented === 2, "Shared camera navigation releases configured pan keys");
+    helper.destroy();
+    assert(!listeners.has("window:keydown"), "Shared camera navigation removes key listeners on destroy");
+  }
+  assert(!shouldWarnBeforeUnload(), "lobby state does not warn before unload");
+  assert(shouldWarnBeforeUnload({ match: {} }), "live match warns before unload");
+  assert(shouldWarnBeforeUnload({ inReplayPlayback: true }), "replay playback warns before unload");
+  assert(
+    !shouldWarnBeforeUnload({ match: {}, allowUnloadWithoutWarning: true }),
+    "intentional app navigation bypasses unload warning",
+  );
+
+  function fakeEl(tag = "div") {
+    const el = {
+      tagName: tag.toUpperCase(),
+      children: [],
+      dataset: {},
+      style: { setProperty(name, value) { this[name] = value; } },
+      hidden: false,
+      textContent: "",
+      className: "",
+      _listeners: new Map(),
+      classList: {
+        add(cls) {
+          if (!el.className.split(/\s+/).includes(cls)) el.className = `${el.className} ${cls}`.trim();
+        },
+        remove(cls) {
+          el.className = el.className.split(/\s+/).filter((c) => c && c !== cls).join(" ");
+        },
+        toggle(cls, force) {
+          const active = force === undefined ? !this.contains(cls) : !!force;
+          if (active) this.add(cls);
+          else this.remove(cls);
+          return active;
+        },
+        contains(cls) {
+          return el.className.split(/\s+/).includes(cls);
+        },
+      },
+      setAttribute(name, value) {
+        this[name] = value;
+      },
+      appendChild(child) {
+        child.parentNode = this;
+        this.children.push(child);
+        return child;
+      },
+      replaceChildren(...children) {
+        this.children = [];
+        for (const child of children) this.appendChild(child);
+      },
+      addEventListener(type, handler) {
+        this._listeners.set(type, handler);
+      },
+      removeEventListener(type, handler) {
+        if (this._listeners.get(type) === handler) this._listeners.delete(type);
+      },
+      dispatchEvent(ev) {
+        this._listeners.get(ev.type)?.(ev);
+      },
+      remove() {
+        if (!this.parentNode) return;
+        this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
+        this.parentNode = null;
+      },
+      closest(selector) {
+        if (selector.startsWith(".") && this.classList.contains(selector.slice(1))) return this;
+        return this.parentNode?.closest?.(selector) || null;
+      },
+      getBoundingClientRect() {
+        return { left: 0, width: 200 };
+      },
+      querySelector(selector) {
+        return this.querySelectorAll(selector)[0] || null;
+      },
+      querySelectorAll(selector) {
+        const out = [];
+        const matches = (node) => {
+          if (selector.includes(",")) {
+            return selector.split(",").some((part) => {
+              const trimmed = part.trim();
+              return trimmed.startsWith(".") && node.classList?.contains(trimmed.slice(1));
+            });
+          }
+          if (selector === ".spd-btn:not(.seek-btn)") {
+            return node.classList?.contains("spd-btn") && !node.classList?.contains("seek-btn");
+          }
+          if (selector.startsWith("#")) return node.id === selector.slice(1);
+          if (selector.startsWith(".")) return node.classList?.contains(selector.slice(1));
+          return false;
+        };
+        const walk = (node) => {
+          for (const child of node.children || []) {
+            if (matches(child)) out.push(child);
+            walk(child);
+          }
+        };
+        walk(this);
+        return out;
+      },
+    };
+    return el;
+  }
+
+  globalThis.document.createElement = fakeEl;
+  const replayControls = fakeEl("div");
+  const speed2 = fakeEl("button");
+  speed2.className = "spd-btn";
+  speed2.dataset.speed = "2";
+  const speed0 = fakeEl("button");
+  speed0.className = "spd-btn dev-pause-btn";
+  speed0.dataset.speed = "0";
+  const seekBack = fakeEl("button");
+  seekBack.className = "spd-btn seek-btn";
+  seekBack.dataset.seekBack = "90";
+  const stepDev = fakeEl("button");
+  stepDev.className = "spd-btn dev-step-btn";
+  stepDev.dataset.stepRoomTime = "";
+  const concluded = fakeEl("span");
+  concluded.id = "replay-concluded";
+  replayControls.appendChild(speed2);
+  replayControls.appendChild(speed0);
+  replayControls.appendChild(seekBack);
+  replayControls.appendChild(stepDev);
+  replayControls.appendChild(concluded);
+  dom.replaySpeed = replayControls;
+  const replayNet = {
+    speeds: [],
+    seekBacks: [],
+    seekTargets: [],
+    visions: [],
+    branches: 0,
+    steps: 0,
+    setRoomTimeSpeed(speed) {
+      this.speeds.push(speed);
+    },
+    seekRoomTime(ticksBack) {
+      this.seekBacks.push(ticksBack);
+    },
+    seekRoomTimeTo(tick) {
+      this.seekTargets.push(tick);
+    },
+    setReplayVision(vision) {
+      this.visions.push(vision);
+    },
+    requestReplayBranch() {
+      this.branches += 1;
+    },
+    stepRoomTime() {
+      this.steps += 1;
+    },
+  };
+  const roomTimeState = {
+    players: [
+      { id: 1, name: "Alpha", color: "#f00" },
+      { id: 2, name: "Bravo", color: "#0f0" },
+    ],
+  };
+  const replayUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: true,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        replay: { durationTicks: 1_000 },
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+            seekRelative: true,
+            seekAbsolute: true,
+            timeline: true,
+          },
+          visibility: { replayVision: true },
+          actions: { replayBranch: true },
+        },
+      },
+    }),
+  });
+  assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
+  assert(replayControls.classList.contains("replay-viewer-controls"), "replay viewer controls keep wrapper class");
+  assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
+  assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
+  const pauseReplay = replayControls.querySelector(".replay-pause-btn");
+  assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause button");
+  const branchReplay = replayControls.querySelector(".replay-branch-btn");
+  assert(branchReplay?.textContent === "Resume play from here", "replay branch button describes resuming from the current tick");
+  replayControls._listeners.get("click")({ target: speed2 });
+  assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setRoomTimeSpeed");
+  replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2 });
+  replayControls._listeners.get("click")({ target: pauseReplay });
+  assert(replayNet.speeds.at(-1) === 0, "replay pause button sends zero playback speed");
+  assert(pauseReplay.textContent === "Resume", "paused replay button switches to resume");
+  replayControls._listeners.get("click")({ target: pauseReplay });
+  assert(replayNet.speeds.at(-1) === 2, "replay resume button restores the last non-zero speed");
+  assert(pauseReplay.textContent === "Pause", "resumed replay button switches back to pause");
+  replayControls._listeners.get("click")({ target: seekBack });
+  assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekRoomTime");
+  const visionButtons = replayControls.querySelectorAll(".vision-btn");
+  assert(visionButtons.length === 3, "replay viewer builds all-player and per-player fog controls");
+  replayUi.onReplayVisionClick({ target: visionButtons[1], shiftKey: false });
+  assert(
+    replayNet.visions.at(-1).mode === "player" &&
+      replayNet.visions.at(-1).playerId === 1,
+    "single replay fog click sends a per-viewer player vision request",
+  );
+  replayUi.onReplayVisionClick({ target: visionButtons[2], shiftKey: true });
+  assert(
+    replayNet.visions.at(-1).mode === "players" &&
+      replayNet.visions.at(-1).playerIds.join(",") === "1,2",
+    "shift-click replay fog controls send a selected-players request",
+  );
+  replayUi.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
+  assert(replayNet.visions.at(-1).mode === "all", "all replay fog control restores union vision");
+  replayUi.applyRoomTimeState({
+    currentTick: 100,
+    durationTicks: 1_000,
+    keyframeTicks: [0, 400, 800],
+    speed: 2,
+    paused: false,
+    ended: false,
+  });
+  assert(
+    replayControls.querySelectorAll(".replay-timeline-mark").length === 3,
+    "replay timeline renders server keyframe marks",
+  );
+  const timelineTrack = replayControls.querySelector(".replay-timeline-track");
+  replayUi.onReplayTimelineClick({ currentTarget: timelineTrack, clientX: 100 });
+  assert(replayNet.seekTargets.at(-1) === 500, "replay timeline click seeks to the clicked tick");
+  assert(
+    replayControls.querySelector(".replay-tick-status").textContent.includes("Seeking 500"),
+    "replay timeline shows a pending seek indicator",
+  );
+  replayUi.destroy();
+  assert(replayControls.hidden, "destroy hides replay controls");
+  assert(!replayControls.classList.contains("replay-viewer-controls"), "destroy clears replay wrapper class");
+  assert(!seekBack.hidden, "destroy restores seek controls visible");
+  assert(stepDev.hidden, "destroy restores scenario step controls hidden");
+  assert(!replayControls.querySelector(".replay-pause-btn"), "destroy removes generated replay pause button");
+  assert(!replayControls.querySelector(".replay-branch-btn"), "destroy removes generated replay branch button");
+  assert(!replayControls.querySelector(".replay-vision-controls"), "destroy removes generated vision controls");
+  assert(!replayControls.querySelector(".replay-tick-status"), "destroy removes generated status");
+  assert(!replayControls.querySelector(".replay-timeline"), "destroy removes generated timeline");
+  assert(replayControls._listeners.size === 0, "destroy removes replay speed click listener");
+
+  const replayVisionOnlyControls = fakeEl("div");
+  dom.replaySpeed = replayVisionOnlyControls;
+  const replayVisionOnlyUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: true,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        replay: { durationTicks: 1_000 },
+        capabilities: {
+          roomTime: { available: true },
+          visibility: { replayVision: true },
+        },
+      },
+    }),
+  });
+  assert(
+    replayVisionOnlyControls.querySelector(".replay-vision-controls"),
+    "replay vision capability still builds replay fog controls",
+  );
+  assert(
+    !replayVisionOnlyControls.querySelector(".replay-branch-btn"),
+    "replay vision alone does not build a replay branch button",
+  );
+  replayVisionOnlyUi.destroy();
+
+  const scenarioControls = fakeEl("div");
+  const scenarioSpeed2 = fakeEl("button");
+  scenarioSpeed2.className = "spd-btn";
+  scenarioSpeed2.dataset.speed = "2";
+  const scenarioSpeed0 = fakeEl("button");
+  scenarioSpeed0.className = "spd-btn dev-pause-btn";
+  scenarioSpeed0.dataset.speed = "0";
+  const scenarioStep = fakeEl("button");
+  scenarioStep.className = "spd-btn dev-step-btn";
+  scenarioStep.dataset.stepRoomTime = "";
+  const scenarioSeek = fakeEl("button");
+  scenarioSeek.className = "spd-btn seek-btn";
+  scenarioSeek.dataset.seekBack = "30";
+  scenarioControls.appendChild(scenarioSpeed2);
+  scenarioControls.appendChild(scenarioSpeed0);
+  scenarioControls.appendChild(scenarioStep);
+  scenarioControls.appendChild(scenarioSeek);
+  dom.replaySpeed = scenarioControls;
+  const scenarioUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        spectator: true,
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+            step: true,
+          },
+        },
+      },
+    }),
+  });
+  assert(!scenarioSpeed2.hidden, "scenario mode shows positive speed controls when setSpeed is advertised");
+  assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
+  assert(!scenarioSpeed0.hidden, "scenario mode shows pause controls when pause is advertised");
+  assert(!scenarioStep.hidden, "scenario mode shows step controls");
+  scenarioControls._listeners.get("click")({ target: scenarioSpeed2 });
+  assert(replayNet.speeds.at(-1) === 2, "scenario speed click sends net.setRoomTimeSpeed");
+  scenarioControls._listeners.get("click")({ target: scenarioStep });
+  assert(replayNet.steps === 1, "scenario step sends net.stepRoomTime");
+  scenarioControls._listeners.get("click")({ target: scenarioSpeed0 });
+  assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
+  scenarioUi.destroy();
+
+  const stepOnlyControls = fakeEl("div");
+  const stepOnlySpeed = fakeEl("button");
+  stepOnlySpeed.className = "spd-btn";
+  stepOnlySpeed.dataset.speed = "2";
+  const stepOnlyPause = fakeEl("button");
+  stepOnlyPause.className = "spd-btn dev-pause-btn";
+  stepOnlyPause.dataset.speed = "0";
+  const stepOnlyStep = fakeEl("button");
+  stepOnlyStep.className = "spd-btn dev-step-btn";
+  stepOnlyStep.dataset.stepRoomTime = "";
+  const stepOnlySeek = fakeEl("button");
+  stepOnlySeek.className = "spd-btn seek-btn";
+  stepOnlySeek.dataset.seekBack = "30";
+  stepOnlyControls.appendChild(stepOnlySpeed);
+  stepOnlyControls.appendChild(stepOnlyPause);
+  stepOnlyControls.appendChild(stepOnlyStep);
+  stepOnlyControls.appendChild(stepOnlySeek);
+  dom.replaySpeed = stepOnlyControls;
+  const stepOnlyUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        spectator: true,
+        capabilities: {
+          roomTime: {
+            available: true,
+            step: true,
+          },
+        },
+      },
+    }),
+  });
+  assert(stepOnlySpeed.hidden, "positive speed controls hide without setSpeed capability");
+  assert(stepOnlyPause.hidden, "pause controls hide without pause capability");
+  assert(!stepOnlyStep.hidden, "step controls show with step capability");
+  assert(stepOnlySeek.hidden, "relative seek controls hide without seekRelative capability");
+  const speedsBeforeStepOnlyClicks = replayNet.speeds.length;
+  const seeksBeforeStepOnlyClicks = replayNet.seekBacks.length;
+  const stepsBeforeStepOnlyClicks = replayNet.steps;
+  stepOnlyControls._listeners.get("click")({ target: stepOnlySpeed });
+  stepOnlyControls._listeners.get("click")({ target: stepOnlyPause });
+  stepOnlyControls._listeners.get("click")({ target: stepOnlySeek });
+  assert(replayNet.speeds.length === speedsBeforeStepOnlyClicks, "hidden speed/pause controls are inert without capability");
+  assert(replayNet.seekBacks.length === seeksBeforeStepOnlyClicks, "hidden seek controls are inert without capability");
+  stepOnlyControls._listeners.get("click")({ target: stepOnlyStep });
+  assert(replayNet.steps === stepsBeforeStepOnlyClicks + 1, "step controls still send when step is advertised");
+  stepOnlyUi.destroy();
+
+  const noCapabilityControls = fakeEl("div");
+  dom.replaySpeed = noCapabilityControls;
+  const noCapabilityUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: true,
+    capabilities: createRoomCapabilities({ startPayload: { spectator: true, replay: {} } }),
+  });
+  assert(!noCapabilityControls._listeners.has("click"), "room-time controls need an advertised capability");
+  assert(
+    !noCapabilityControls.querySelector(".replay-vision-controls"),
+    "replay identity alone does not build replay vision controls",
+  );
+  noCapabilityUi.destroy();
+
+  const normalCapabilities = createRoomCapabilities({
+    startPayload: { spectator: false, capabilities: { commands: { gameplay: true }, matchControls: { pause: true } } },
+  });
+  assert(!normalCapabilities.roomTime.available, "normal matches do not mount room-time controls");
+  assert(normalCapabilities.commands.gameplay, "active players keep gameplay command affordances");
+  assert(normalCapabilities.matchControls.pause, "active live players keep live pause affordances");
+
+  const spectatorCapabilities = createRoomCapabilities({
+    startPayload: {
+      spectator: true,
+      diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
+      capabilities: { commands: { gameplay: false } },
+    },
+  });
+  assert(!spectatorCapabilities.commands.gameplay, "spectators get read-only command affordances");
+  assert(
+    spectatorCapabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.ALL,
+    "capability parser keeps diagnostic affordances from the start payload",
+  );
+  assert(!spectatorCapabilities.matchControls.pause, "spectators do not get live pause controls by default");
+
+  withFakeOverlayDocument(({ FakeElement }) => {
+    const root = new FakeElement("section");
+    let unpaused = false;
+    const overlay = new LivePauseOverlay({ root, onUnpause: () => { unpaused = true; } });
+    overlay.applyLivePauseState({ paused: true, pausedBy: 2, pauseLimit: 3, canUnpause: true });
+    assert(root.children.length === 1, "live pause overlay mounts generated DOM");
+    assert(!root.children[0].hidden, "live pause overlay shows when paused");
+    const button = root.querySelector("#live-pause-unpause");
+    assert(button && !button.hidden && !button.disabled, "live pause overlay enables unpause for active players");
+    button.listeners.click();
+    assert(unpaused, "live pause overlay calls injected unpause action");
+    overlay.applyLivePauseState({ paused: true, canUnpause: false });
+    assert(button.hidden && button.disabled, "live pause overlay hides spectator unpause control");
+    overlay.applyLivePauseState({ paused: false });
+    assert(root.children[0].hidden, "live pause overlay hides when running");
+    overlay.destroy();
+    assert(root.children.length === 0, "live pause overlay tears down DOM");
+  });
+
+  const noticeAudioMatch = Object.create(Match.prototype);
+  const playedNotices = [];
+  let minimapPings = 0;
+  noticeAudioMatch.toast = () => {};
+  noticeAudioMatch.audio = {
+    play(id, opts) {
+      playedNotices.push({ id, opts });
+    },
+  };
+  noticeAudioMatch.minimap = {
+    ping() {
+      minimapPings += 1;
+    },
+    pulseBorder() {},
+  };
+  noticeAudioMatch.camera = { x: 0, y: 0, viewW: 100, viewH: 100, zoom: 1 };
+  noticeAudioMatch.state = { spectator: false };
+  noticeAudioMatch.replayViewer = true;
+  noticeAudioMatch.handleNotice({
+    e: EVENT.NOTICE,
+    msg: "alert:under_attack",
+    severity: NOTICE_SEVERITY.ALERT,
+    x: 512,
+    y: 768,
+  });
+  assert(playedNotices.length === 0, "replay notice alerts do not play audio");
+  assert(minimapPings === 1, "replay notice alerts still ping the minimap");
+  noticeAudioMatch.replayViewer = false;
+  noticeAudioMatch.state = { spectator: true };
+  noticeAudioMatch.handleNotice({
+    e: EVENT.NOTICE,
+    msg: "alert:under_attack",
+    severity: NOTICE_SEVERITY.ALERT,
+    x: 512,
+    y: 768,
+  });
+  assert(playedNotices.length === 0, "live spectator notice alerts do not play audio");
+  assert(minimapPings === 2, "live spectator notice alerts still ping the minimap");
+  noticeAudioMatch.state = { spectator: false };
+  noticeAudioMatch.handleNotice({
+    e: EVENT.NOTICE,
+    msg: "alert:under_attack",
+    severity: NOTICE_SEVERITY.ALERT,
+    x: 512,
+    y: 768,
+  });
+  assert(
+    playedNotices[0]?.id === "notice_under_attack",
+    "live notice alerts still play audio outside the current viewport",
+  );
+
+  const artilleryMarkerMatch = Object.create(Match.prototype);
+  const artilleryMarkers = [];
+  artilleryMarkerMatch.audio = null;
+  artilleryMarkerMatch.minimap = {
+    markArtilleryFiring(ev) {
+      artilleryMarkers.push(ev);
+    },
+  };
+  artilleryMarkerMatch.handleSnapshotEvents([
+    { e: EVENT.ARTILLERY_FIRING, owner: 2, x: 288, y: 304, facing: 0.25 },
+  ]);
+  assert(
+    artilleryMarkers.length === 1 &&
+      artilleryMarkers[0].owner === 2 &&
+      artilleryMarkers[0].x === 288,
+    "artillery firing events are forwarded to the minimap marker layer",
+  );
+
+  const predictionPolicyMatch = Object.create(Match.prototype);
+  predictionPolicyMatch.replayViewer = false;
+  predictionPolicyMatch.state = {
+    spectator: false,
+    applyPredictionDisplayOverlay(overlay) {
+      if (Object.prototype.hasOwnProperty.call(overlay || {}, "predictedSnapshot")) {
+        this.predictedSnapshot = overlay.predictedSnapshot;
+      }
+      if (Object.prototype.hasOwnProperty.call(overlay || {}, "optimisticCommands")) {
+        this.optimisticCommands = overlay.optimisticCommands;
+      }
+    },
+  };
+  predictionPolicyMatch.prediction = {
+    enabled: true,
+    predictor: null,
+    reset({ enabled }) {
+      this.enabled = enabled;
+    },
+  };
+  predictionPolicyMatch.predictionInitToken = 0;
+  let predictionAdapterInit = 0;
+  let predictionAdapterDestroy = 0;
+  let predictionAdapterId = 0;
+  const makePredictionAdapter = () => {
+    const adapter = {
+      id: ++predictionAdapterId,
+      ready: false,
+      loading: false,
+      destroyed: false,
+      diagnostics: () => ({ ready: adapter.ready, loading: adapter.loading }),
+      init: async () => {
+        predictionAdapterInit += 1;
+        adapter.loading = true;
+        await Promise.resolve();
+        adapter.loading = false;
+        adapter.ready = true;
+        return true;
+      },
+      destroy: () => {
+        predictionAdapterDestroy += 1;
+        adapter.destroyed = true;
+        adapter.ready = false;
+        adapter.loading = false;
+      },
+    };
+    return adapter;
+  };
+  predictionPolicyMatch.createPredictionAdapter = makePredictionAdapter;
+  predictionPolicyMatch.predictionAdapter = {
+    ready: false,
+    loading: false,
+    diagnostics: () => ({ ready: false }),
+    init: async () => true,
+    destroy: () => { predictionAdapterDestroy += 1; },
+  };
+  predictionPolicyMatch.prediction.predictor = predictionPolicyMatch.predictionAdapter;
+  predictionPolicyMatch.publishPredictionDebug = () => {};
+  predictionPolicyMatch.mountSettings = () => {};
+  predictionPolicyMatch.logPredictionStatus = () => {};
+  predictionPolicyMatch.setPredictionEnabled(false);
+  assert(!predictionPolicyMatch.prediction.enabled, "prediction setting can disable live prediction");
+  assert(predictionPolicyMatch.state.predictedSnapshot === null, "disabling prediction clears local predicted overlay");
+  assert(predictionPolicyMatch.state.optimisticCommands === null, "disabling prediction clears optimistic command UI");
+  assert(predictionPolicyMatch.prediction.predictor === predictionPolicyMatch.predictionAdapter,
+    "disabling prediction replaces the controller predictor with a fresh inactive adapter");
+  assert(predictionAdapterDestroy === 1, "disabling prediction destroys the active WASM adapter");
+  predictionPolicyMatch.setPredictionEnabled(true);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert(predictionPolicyMatch.prediction.enabled, "prediction setting can re-enable live prediction");
+  assert(predictionAdapterInit === 1, "re-enabling prediction initializes the WASM adapter");
+  assert(predictionPolicyMatch.predictionAdapter.ready, "re-enabled prediction owns a ready fresh adapter");
+
+  const staleInitMatch = Object.create(Match.prototype);
+  staleInitMatch.replayViewer = false;
+  staleInitMatch.state = { spectator: false };
+  staleInitMatch.predictionInitToken = 0;
+  staleInitMatch.prediction = {
+    enabled: true,
+    predictor: null,
+    reset({ enabled }) {
+      this.enabled = enabled;
+    },
+  };
+  let resolveStaleInit = null;
+  const staleAdapter = {
+    destroyed: false,
+    ready: false,
+    loading: true,
+    diagnostics: () => ({ ready: staleAdapter.ready, loading: staleAdapter.loading }),
+    init: () => new Promise((resolve) => {
+      resolveStaleInit = () => {
+        staleAdapter.loading = false;
+        staleAdapter.ready = true;
+        resolve(true);
+      };
+    }),
+    destroy: () => {
+      staleAdapter.destroyed = true;
+      staleAdapter.ready = false;
+      staleAdapter.loading = false;
+    },
+  };
+  let freshAdapter = null;
+  staleInitMatch.createPredictionAdapter = () => {
+    freshAdapter = {
+      destroyed: false,
+      ready: false,
+      loading: false,
+      diagnostics: () => ({ ready: freshAdapter.ready, loading: freshAdapter.loading }),
+      init: async () => {
+        freshAdapter.ready = true;
+        return true;
+      },
+      destroy: () => {
+        freshAdapter.destroyed = true;
+        freshAdapter.ready = false;
+      },
+    };
+    return freshAdapter;
+  };
+  staleInitMatch.predictionAdapter = staleAdapter;
+  staleInitMatch.prediction.predictor = staleAdapter;
+  staleInitMatch.publishPredictionDebug = () => {};
+  staleInitMatch.mountSettings = () => {};
+  staleInitMatch.logPredictionStatus = () => {};
+  staleInitMatch.initPredictionAdapter();
+  staleInitMatch.setPredictionEnabled(false);
+  staleInitMatch.setPredictionEnabled(true);
+  await Promise.resolve();
+  resolveStaleInit();
+  await Promise.resolve();
+  assert(staleAdapter.destroyed, "stale in-flight prediction init is destroyed after the toggle-off token changes");
+  assert(freshAdapter.ready && !freshAdapter.destroyed, "stale init completion does not destroy the re-enabled adapter");
+
+  const mismatchMatch = Object.create(Match.prototype);
+  mismatchMatch.prediction = {
+    enabled: true,
+    reset({ enabled }) {
+      this.enabled = enabled;
+    },
+  };
+  mismatchMatch.predictionStateMismatchLogged = false;
+  let mismatchStatus = null;
+  mismatchMatch.logPredictionStatus = (status) => { mismatchStatus = status; };
+  mismatchMatch.state = {};
+  mismatchMatch.advancePredictionVisual();
+  assert(!mismatchMatch.prediction.enabled, "stale cached state module disables prediction instead of crashing");
+  assert(mismatchStatus === "disabled-state-mismatch", "state mismatch is logged for diagnostics");
+
+  const manualPointerLockMatch = Object.create(Match.prototype);
+  let toggledPointerLock = 0;
+  let closedSettings = 0;
+  manualPointerLockMatch.input = {
+    pointerLocked: false,
+    pointerLockSupported: () => true,
+    togglePointerLock() {
+      toggledPointerLock += 1;
+    },
+  };
+  manualPointerLockMatch.closeSettingsMenu = () => {
+    closedSettings += 1;
+  };
+  manualPointerLockMatch.syncPointerLockUi = () => {};
+  manualPointerLockMatch.togglePointerLock();
+  assert(toggledPointerLock === 1, "manual cursor-lock action is the only Pointer Lock request path");
+  assert(closedSettings === 1, "manual cursor-lock request closes settings before requesting lock");
+
+  let unsupportedToast = null;
+  manualPointerLockMatch.input.pointerLockSupported = () => false;
+  manualPointerLockMatch.toast = (msg) => {
+    unsupportedToast = msg;
+  };
+  manualPointerLockMatch.togglePointerLock();
+  assert(toggledPointerLock === 1, "unsupported cursor-lock action does not request Pointer Lock");
+  assert(unsupportedToast === "Cursor lock is not supported by this browser.",
+    "unsupported cursor lock surfaces the existing support message");
+
+  if (priorWindow === undefined) delete globalThis.window;
+  else globalThis.window = priorWindow;
+  if (priorDocument === undefined) delete globalThis.document;
+  else globalThis.document = priorDocument;
+}

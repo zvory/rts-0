@@ -1,0 +1,222 @@
+// tests/client_contracts/net_contracts.mjs
+// Domain contract assertions imported by ../client_contracts.mjs.
+
+import { CLIENT_NET_REPORT_FIELDS } from "../client_net_report_fields.mjs";
+import {
+  assert,
+  assertHasGetter,
+  assertHasMethod,
+  assertThrows,
+} from "./assertions.mjs";
+import {
+  Net,
+  SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES,
+} from "../../client/src/net.js";
+import { DEFAULT_AI_PROFILE_ID } from "../../client/src/lobby.js";
+import {
+  COMPACT_SNAPSHOT_VERSION,
+  SNAPSHOT_CODEC,
+  SNAPSHOT_CODEC_VERSION,
+  SNAPSHOT_FRAME_KIND,
+  PREDICTION_PROTOCOL_VERSION,
+  cmd,
+  msg,
+} from "../../client/src/protocol.js";
+
+import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
+
+// Net
+// ---------------------------------------------------------------------------
+{
+  const net = new Net("ws://example.test/ws");
+  assert(net instanceof Net, "Net constructor should return an instance");
+  assertHasMethod(net, "connect", "Net");
+  assertHasMethod(net, "on", "Net");
+  assertHasMethod(net, "off", "Net");
+  assertHasMethod(net, "join", "Net");
+  assertHasMethod(net, "ready", "Net");
+  assertHasMethod(net, "start", "Net");
+  assertHasMethod(net, "giveUp", "Net");
+  assertHasMethod(net, "pauseGame", "Net");
+  assertHasMethod(net, "unpauseGame", "Net");
+  assertHasMethod(net, "returnToLobby", "Net");
+  assertHasMethod(net, "command", "Net");
+  assertHasMethod(net, "ping", "Net");
+  assertHasMethod(net, "netReport", "Net");
+  assertHasGetter(net, "playerId", "Net");
+  assert(net.playerId === null, "Net.playerId should be null before welcome");
+  assertHasMethod(net, "addAi", "Net");
+  assertHasMethod(net, "removeAi", "Net");
+  assertHasMethod(net, "setTeamPreset", "Net");
+  assertHasMethod(net, "setTeam", "Net");
+  assertHasMethod(net, "setFaction", "Net");
+  assertHasMethod(net, "setQuickstart", "Net");
+  assertHasMethod(net, "setRoomTimeSpeed", "Net");
+  assertHasMethod(net, "stepRoomTime", "Net");
+  assertHasMethod(net, "seekRoomTime", "Net");
+  assertHasMethod(net, "seekRoomTimeTo", "Net");
+  assertHasMethod(net, "setReplayVision", "Net");
+  assertHasMethod(net, "lab", "Net");
+  assertHasMethod(net, "requestReplayBranch", "Net");
+  assertHasMethod(net, "claimBranchSeat", "Net");
+  assertHasMethod(net, "releaseBranchSeat", "Net");
+  assertHasMethod(net, "startBranch", "Net");
+  const sent = [];
+  net.ws = {
+    readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
+    send(json) {
+      sent.push(JSON.parse(json));
+    },
+  };
+  assertThrows(() => net.command(cmd.stop([1])), "Net.command requires controller-provided clientSeq");
+  net.command(cmd.stop([1]), 7);
+  assert(sent[0].clientSeq === 7, "Net.command sends the provided clientSeq");
+  net.pauseGame();
+  net.unpauseGame();
+  assert(sent[1].t === "pauseGame" && sent[2].t === "unpauseGame", "Net live pause helpers send exact tags");
+  net.lab(12, { op: "setVision", vision: msg.labVisionFullWorld() });
+  assert(sent[3].t === "lab" && sent[3].requestId === 12, "Net.lab sends lab request envelopes");
+  assert(
+    msg.labExportScenario(13, "saved").op.name === "saved",
+    "lab export builder includes a scenario name",
+  );
+  assert(
+    msg.labImportScenario(14, { schemaVersion: 1 }).op.scenario.schemaVersion === 1,
+    "lab import builder includes a scenario payload",
+  );
+  assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
+  assert(
+    msg.join("A", "main", false, true).replayOk === true,
+    "join builder can confirm replay joins",
+  );
+  const priorPerformance = globalThis.performance;
+  let nowSamples = [0, 2, 2, 5, 10, 13, 13, 17];
+  globalThis.performance = { now: () => nowSamples.shift() ?? 17 };
+  try {
+    const reportNet = new Net("ws://example.invalid");
+    reportNet.ws = { extensions: "permessage-deflate; client_max_window_bits" };
+    reportNet._onMessage({
+      data: messagePackSnapshotFrame({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [1, 0, 0, 0, 0],
+        e: [],
+        n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 0, null],
+      }),
+    });
+    reportNet._onMessage({
+      data: messagePackSnapshotFrame({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [2, 0, 0, 0, 0],
+        e: [],
+        n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 0, null],
+      }),
+    });
+    const stats = reportNet.consumeSnapshotReportStats();
+    assert(stats.snapshotMessageCount === 2, "Net reports snapshot message count");
+    assert(stats.snapshotBytesTotal > stats.snapshotBytesMax, "Net reports bounded snapshot byte totals");
+    assert(
+      stats.snapshotByteSource === "messagepack-application-payload",
+      "Net labels MessagePack payload byte measurement source",
+    );
+    assert(stats.snapshotCodec === SNAPSHOT_CODEC.MESSAGEPACK_COMPACT, "Net reports snapshot codec");
+    assert(stats.snapshotCodecVersion === SNAPSHOT_CODEC_VERSION, "Net reports snapshot codec version");
+    assert(stats.snapshotFrameKind === SNAPSHOT_FRAME_KIND.BINARY, "Net reports binary snapshot frame kind");
+    assert(
+      stats.websocketExtensions.includes("permessage-deflate"),
+      "Net reports browser WebSocket extension string",
+    );
+    assert(
+      stats.websocketCompression === "permessage-deflate",
+      "Net reports negotiated permessage-deflate state",
+    );
+    assert(stats.snapshotSegmentBudgetBytes === SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES, "Net reports snapshot packet budget");
+    assert(stats.snapshotBytesP95 >= stats.snapshotBytesAvg, "Net reports snapshot byte p95");
+    assert(stats.snapshotOverSegmentBudgetCount === 0, "small snapshots stay within packet budget");
+    assert(stats.snapshotParseMaxMs === 3, "Net reports snapshot frame parse max");
+    assert(stats.snapshotDecodeMaxMs === 4, "Net reports compact decode max");
+    const resetStats = reportNet.consumeSnapshotReportStats();
+    assert(resetStats.snapshotMessageCount === 0, "Net snapshot report stats reset");
+    assert(resetStats.websocketCompression === "permessage-deflate", "Net keeps compression state after stats reset");
+    assert(resetStats.snapshotOverSegmentBudgetCount === 0, "Net snapshot packet-budget stats reset");
+    assert(resetStats.snapshotCodec === SNAPSHOT_CODEC.MESSAGEPACK_COMPACT, "Net snapshot codec default resets");
+    assert(resetStats.snapshotFrameKind === SNAPSHOT_FRAME_KIND.BINARY, "Net snapshot frame kind default resets");
+
+    reportNet.noteSnapshotFrame({
+      bytes: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1,
+      parseMs: 0,
+      decodeMs: 0,
+      snapshotCodec: SNAPSHOT_CODEC.MESSAGEPACK_COMPACT,
+      snapshotCodecVersion: SNAPSHOT_CODEC_VERSION,
+      frameKind: SNAPSHOT_FRAME_KIND.BINARY,
+    });
+    const overBudget = reportNet.consumeSnapshotReportStats();
+    assert(overBudget.snapshotBytesP95 > SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES, "Net reports over-budget byte p95");
+    assert(overBudget.snapshotOverSegmentBudgetCount === 1, "Net counts over-budget snapshot frames");
+    assert(overBudget.snapshotOverSegmentBudgetPctX100 === 10000, "Net reports over-budget snapshot percentage");
+  } finally {
+    globalThis.performance = priorPerformance;
+  }
+  for (const field of [
+    "snapshotBytesTotal",
+    "snapshotByteSource",
+    "snapshotCodec",
+    "snapshotCodecVersion",
+    "snapshotFrameKind",
+    "snapshotBytesP95",
+    "snapshotSegmentBudgetBytes",
+    "snapshotOverSegmentBudgetCount",
+    "snapshotOverSegmentBudgetPctX100",
+    "snapshotParseMaxMs",
+    "snapshotDecodeP95Ms",
+    "websocketExtensions",
+    "websocketCompression",
+    "snapshotApplyMaxMs",
+    "predictionApplyP95Ms",
+    "snapshotTickGapMax",
+    "snapshotBurstMax",
+    "frameWorkMaxMs",
+    "frameWorkP95Ms",
+    "slowFrameCount",
+    "worstFramePhase",
+    "rendererMaxMs",
+    "entityCount",
+    "devicePixelRatioX100",
+  ]) {
+    assert(CLIENT_NET_REPORT_FIELDS.includes(field), `client net-report field list includes ${field}`);
+  }
+  assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
+  assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
+  assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
+  assert(msg.setRoomTimeSpeed(2).t === "setRoomTimeSpeed", "room-time speed builder tag");
+  assert(msg.stepRoomTime().t === "stepRoomTime", "room-time step builder tag");
+  assert(msg.seekRoomTime(90).ticksBack === 90, "room-time relative seek builder payload");
+  assert(msg.seekRoomTimeTo(450).tick === 450, "room-time absolute seek builder payload");
+  assert(msg.setTeamPreset("1v2").preset === "1v2", "team preset builder payload");
+  assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
+  assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
+  assert(DEFAULT_AI_PROFILE_ID === "ai_1_1_tank_mg", "lobby defaults to the highest AI profile version");
+  assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
+  assert(
+    msg.addAi(2, DEFAULT_AI_PROFILE_ID).aiProfileId === DEFAULT_AI_PROFILE_ID,
+    "addAi builder can include default aiProfileId",
+  );
+  assert(msg.requestReplayBranch().t === "requestReplayBranch", "replay branch builder tag");
+  assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");
+  assert(msg.releaseBranchSeat(7).t === "releaseBranchSeat", "branch seat release builder tag");
+  assert(msg.startBranch().t === "startBranch", "branch start builder tag");
+  assert(msg.replayVisionAll().t === "setReplayVision", "replay all-vision builder tag");
+  assert(msg.replayVisionAll().vision.mode === "all", "replay all-vision builder payload");
+  assert(
+    msg.replayVisionPlayer(7).vision.playerId === 7,
+    "replay single-player vision builder payload",
+  );
+  assert(
+    msg.replayVisionPlayers([1, 2]).vision.playerIds.join(",") === "1,2",
+    "replay subset vision builder payload",
+  );
+}
+
+// ---------------------------------------------------------------------------
