@@ -255,7 +255,7 @@ and a defeated player does not receive an individual loss screen while any teamm
 alive.
 
 ### 3.2 Concurrency model
-- One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
+- One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
@@ -267,20 +267,11 @@ alive.
   speed-source, and match-history decisions.
 - The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead
   of reading room internals. Only normal lobby/countdown/live-match rooms are summarized; dev,
-  replay, replay-artifact, replay-branch, and lab modes stay hidden, and create-only lobby
-  reservation rejects duplicate or reserved/internal names before the later WebSocket join path.
-  That reservation is only a short pending-create lease: if no human joins before the lease probe,
-  the empty normal room asks the registry to dispose its exact room handle. After the last human
-  leaves a normal public lobby, live match, one-player sandbox, or post-match replay, the room task
-  clears its own lifecycle bookkeeping and asks the registry to remove the public name immediately;
-  there is no host reconnect grace. Empty dev-scenario, replay, replay-artifact, and lab rooms also
-  dispose their private registry handles once their last viewer leaves; replay-branch rooms are the
-  retained private exception because their branch seed exists only inside the room handle until a
-  branch launches. `GET /api/lobbies` collects those summaries with a short timeout and returns
-  browser-safe DTOs sorted by joinability then age; the client polls that route every 1.5 seconds
-  and preflights a clicked row against the latest route response before sending `join`. No WebSocket
-  push message currently exists for the browser list; the HTTP poll cadence is the accepted
-  freshness target.
+  replay, replay-artifact, replay-branch, and lab modes stay hidden. `GET /api/lobbies` collects
+  those summaries with a short timeout and returns browser-safe DTOs sorted by joinability then age;
+  the client polls that route every 1.5 seconds and preflights a clicked row against the latest
+  route response before sending `join`. No WebSocket push message currently exists for the browser
+  list; the HTTP poll cadence is the accepted freshness target.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
   `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay
@@ -599,7 +590,9 @@ General rules:
   and may fire at enemies already inside current weapon range.
 - Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
   hard blocker would absorb the current shot; mobile attackers then use the existing chase path to
-  seek a fireable position. Tank Traps are not combat shot blockers, so damage continues to the
+  seek a fireable position. Shared line-of-sight raycasts stop as reached when a grid-corner side
+  step enters the target tile, while preserving opaque-target handling and the two-stone corner
+  blocker behavior. Tank Traps are not combat shot blockers, so damage continues to the
   target behind them; tanks and normal buildings still block shots. Building targets and statically
   blocked target tiles use a passable perimeter chase goal instead of the blocked footprint center.
   Tank Traps keep generic building targeting and cleanup behavior but do not count for elimination
