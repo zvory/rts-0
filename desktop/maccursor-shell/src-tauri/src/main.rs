@@ -9,6 +9,12 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod native_cursor;
+
+use native_cursor::{
+    maccursor_configure, maccursor_diagnostics, maccursor_start, maccursor_stop,
+    NativeCursorBackend,
+};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const SERVER_READY_TIMEOUT: Duration = Duration::from_secs(120);
@@ -53,28 +59,46 @@ fn run() -> ShellResult<()> {
     #[cfg(target_os = "macos")]
     {
         tauri::Builder::default()
+            .invoke_handler(tauri::generate_handler![
+                maccursor_start,
+                maccursor_configure,
+                maccursor_stop,
+                maccursor_diagnostics
+            ])
             .setup(|app| {
                 let server = launch_server(app.handle())?;
                 let url: tauri::Url = server.url.parse().map_err(|err| {
                     shell_error(format!("invalid server URL {}: {err}", server.url))
                 })?;
+                let native_cursor = NativeCursorBackend::default();
+                app.manage(native_cursor.clone());
                 let runtime_script = desktop_runtime_script(&server);
-                WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::External(url))
-                    .title("Bewegungskrieg")
-                    .inner_size(1280.0, 820.0)
-                    .min_inner_size(960.0, 640.0)
-                    .initialization_script(runtime_script)
-                    .on_navigation(|url| {
-                        matches!(url.host_str(), Some("127.0.0.1") | Some("localhost"))
-                    })
-                    .build()?;
+                let window =
+                    WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::External(url))
+                        .title("Bewegungskrieg")
+                        .inner_size(1280.0, 820.0)
+                        .min_inner_size(960.0, 640.0)
+                        .initialization_script(runtime_script)
+                        .on_navigation(|url| {
+                            matches!(url.host_str(), Some("127.0.0.1") | Some("localhost"))
+                        })
+                        .build()?;
+                native_cursor.install(&window);
                 Ok(())
             })
             .on_window_event(|window, event| {
-                if window.label() == WINDOW_LABEL
-                    && matches!(event, WindowEvent::CloseRequested { .. })
-                {
-                    window.app_handle().exit(0);
+                if window.label() != WINDOW_LABEL {
+                    return;
+                }
+                match event {
+                    WindowEvent::Focused(false) => {
+                        let _ = window.state::<NativeCursorBackend>().stop("window blur");
+                    }
+                    WindowEvent::CloseRequested { .. } => {
+                        let _ = window.state::<NativeCursorBackend>().stop("window closed");
+                        window.app_handle().exit(0);
+                    }
+                    _ => {}
                 }
             })
             .run(tauri::generate_context!())?;
@@ -228,8 +252,8 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
   const runtime = Object.freeze({{
     shell: "tauri",
     platform: "macos",
-    nativeCursorBackend: false,
-    nativeCursorCapture: false,
+    nativeCursorBackend: true,
+    nativeCursorCapture: true,
     pointerLockDisabled: true,
     serverMode: "{mode}",
     serverUrl: "{url}"
@@ -254,6 +278,97 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
       }});
     }} catch {{}}
   }};
+
+  const invoke = (cmd, payload = {{}}) => {{
+    const tauriInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+    if (typeof tauriInvoke !== "function") {{
+      return Promise.reject(new Error("Tauri invoke bridge is unavailable."));
+    }}
+    return tauriInvoke(cmd, payload);
+  }};
+  const listeners = new Set();
+  const diagnostics = {{
+    supported: true,
+    backend: "native-macos",
+    active: false,
+    visual: "dom-event-time",
+    movementBatched: false,
+    nativeEventsReceived: 0,
+    jsEventsProcessed: 0,
+    droppedEvents: 0,
+    backloggedEvents: 0,
+    lastSequence: 0,
+    lastDeliveryLatencyMs: null,
+    lastReason: "ready",
+    lastError: null
+  }};
+  const mergeDiagnostics = (snapshot) => {{
+    if (!snapshot || typeof snapshot !== "object") return snapshot;
+    diagnostics.active = !!snapshot.active;
+    diagnostics.nativeEventsReceived = Number(snapshot.nativeEventsReceived || diagnostics.nativeEventsReceived);
+    diagnostics.droppedEvents = Number(snapshot.droppedEvents || diagnostics.droppedEvents);
+    diagnostics.lastReason = snapshot.lastReason || diagnostics.lastReason;
+    diagnostics.lastError = snapshot.lastError || null;
+    return snapshot;
+  }};
+  const dispatchNativeEvent = (detail) => {{
+    if (!detail || typeof detail !== "object") return;
+    diagnostics.nativeEventsReceived = Number(detail.nativeEventsReceived || diagnostics.nativeEventsReceived + 1);
+    diagnostics.jsEventsProcessed += 1;
+    if (Number.isFinite(detail.sequence)) {{
+      if (diagnostics.lastSequence && detail.sequence > diagnostics.lastSequence + 1) {{
+        diagnostics.droppedEvents += detail.sequence - diagnostics.lastSequence - 1;
+      }}
+      diagnostics.lastSequence = detail.sequence;
+    }}
+    if (Number.isFinite(detail.sentAtMs)) {{
+      diagnostics.lastDeliveryLatencyMs = Math.max(0, Date.now() - detail.sentAtMs);
+    }}
+    if (detail.type === "capture") diagnostics.active = false;
+    for (const listener of Array.from(listeners)) {{
+      try {{
+        listener(detail);
+      }} catch (err) {{
+        diagnostics.lastError = err && err.message ? err.message : String(err);
+      }}
+    }}
+  }};
+  Object.defineProperty(window, "__RTS_NATIVE_CURSOR", {{
+    value: Object.freeze({{
+      supported: () => true,
+      backend: "native-macos",
+      visual: "dom-event-time",
+      start: (bounds = {{}}) => invoke("maccursor_start", {{
+        x: Number(bounds.x || 0),
+        y: Number(bounds.y || 0),
+        width: Number(bounds.width || 0),
+        height: Number(bounds.height || 0)
+      }}).then((snapshot) => {{
+        mergeDiagnostics(snapshot);
+        diagnostics.active = !!snapshot?.active;
+        return snapshot;
+      }}),
+      configure: (bounds = {{}}) => invoke("maccursor_configure", {{
+        width: Number(bounds.width || 0),
+        height: Number(bounds.height || 0)
+      }}).then(mergeDiagnostics),
+      stop: (reason = "js-stop") => invoke("maccursor_stop", {{ reason }}).then((snapshot) => {{
+        mergeDiagnostics(snapshot);
+        diagnostics.active = false;
+        return snapshot;
+      }}),
+      diagnostics: () => Object.freeze({{ ...diagnostics }}),
+      nativeDiagnostics: () => invoke("maccursor_diagnostics").then(mergeDiagnostics),
+      onEvent: (listener) => {{
+        if (typeof listener !== "function") return () => {{}};
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }},
+      __dispatchNativeEvent: dispatchNativeEvent
+    }}),
+    configurable: false,
+    writable: false
+  }});
 
   const elementProto = typeof Element !== "undefined" ? Element.prototype : null;
   const htmlElementProto = typeof HTMLElement !== "undefined" ? HTMLElement.prototype : null;
@@ -309,7 +424,9 @@ mod tests {
             mode: "spawned",
         });
         assert!(script.contains("__RTS_DESKTOP_RUNTIME"));
-        assert!(script.contains("nativeCursorBackend: false"));
+        assert!(script.contains("nativeCursorBackend: true"));
+        assert!(script.contains("__RTS_NATIVE_CURSOR"));
+        assert!(script.contains("maccursor_start"));
         assert!(script.contains("pointerLockDisabled: true"));
         assert!(script.contains("requestPointerLock"));
     }

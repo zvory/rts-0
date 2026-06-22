@@ -30,6 +30,26 @@
 import { DRAG_THRESHOLD_PX } from "./constants.js";
 import { isBuilding, isUnit } from "../protocol.js";
 import {
+  _browserExitPointerLockFn,
+  _browserPointerLockElement,
+  _browserPointerLockSupported,
+  _browserRequestPointerLock,
+  _elementDebugSummary,
+  _exitBrowserPointerLock,
+  _finishPointerLockRequest,
+  _focusDebugState,
+  _focusPointerLockTarget,
+  _handlePointerLockChange,
+  _handlePointerLockError,
+  _pointerLockErrorSummary,
+  _pointerLockTarget,
+  _requestBrowserPointerLock,
+  _requestBrowserPointerLockWithOptions,
+  _waitForBrowserPointerLockResult,
+  _waitForPointerLockPromise,
+  pointerLockDebugSnapshot,
+} from "./browser_pointer_lock.js";
+import {
   _activateCommandHotkey,
   _cancel,
   _issueTargetedCommand,
@@ -75,10 +95,19 @@ import {
   _finishLabToolClick,
 } from "./lab_tools.js";
 import {
+  _handleNativeCursorEvent,
+  _installNativeCursorBridge,
+  _nativeCursorBounds,
+  _nativePointerEvent,
+  _setNativeCursorPoint,
+  configureNativeCursorBounds,
+} from "./native_cursor.js";
+import {
   cursorLockSupported,
   installedAppRuntime,
   enterCursorLock,
   exitCursorLock,
+  nativeDesktopCursorBridge,
 } from "./cursor_lock.js";
 import {
   _closestIdsToPoint,
@@ -94,8 +123,6 @@ import {
 
 export { footprintValidAgainstEntities };
 
-const POINTER_LOCK_RESULT_TIMEOUT_MS = 700;
-const POINTER_LOCK_RAW_INPUT_OPTIONS = Object.freeze({ unadjustedMovement: true });
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const CONTEXT_MENU_SUPPRESS_MS = 500;
 
@@ -123,6 +150,7 @@ export class Input {
    * @param {import("../hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey profile service.
    * @param {import("../client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
    * @param {object} [labToolController] active lab setup tool callback seam.
+   * @param {object} [desktopCursor] optional native desktop cursor bridge injected by the shell.
    */
   constructor(
     domElement,
@@ -136,6 +164,7 @@ export class Input {
     hotkeyProfiles = null,
     clientIntent = null,
     labToolController = null,
+    desktopCursor = null,
   ) {
     this.dom = domElement;
     this.camera = camera;
@@ -148,6 +177,7 @@ export class Input {
     this.hotkeyProfiles = hotkeyProfiles;
     this.clientIntent = clientIntent;
     this.labToolController = labToolController;
+    this.desktopCursor = desktopCursor || nativeDesktopCursorBridge();
 
     this.cameraNavigation = new CameraNavigationInput(domElement, camera);
     this.keys = this.cameraNavigation.keys;
@@ -206,9 +236,12 @@ export class Input {
     this._onBlur = this._handleBlur.bind(this);
     this._onPointerLockChange = this._handlePointerLockChange.bind(this);
     this._onPointerLockError = this._handlePointerLockError.bind(this);
+    this._onNativeCursorEvent = this._handleNativeCursorEvent.bind(this);
+    this._removeNativeCursorListener = null;
 
     this._install();
     this._installPointerLockCursor();
+    this._installNativeCursorBridge();
   }
 
   // --- Lifecycle ----------------------------------------------------------
@@ -253,6 +286,10 @@ export class Input {
     document.removeEventListener("pointerlockerror", this._onPointerLockError);
     document.removeEventListener("webkitpointerlockchange", this._onPointerLockChange);
     document.removeEventListener("webkitpointerlockerror", this._onPointerLockError);
+    if (this._removeNativeCursorListener) {
+      this._removeNativeCursorListener();
+      this._removeNativeCursorListener = null;
+    }
     this.cameraNavigation.destroy();
     if (this._pointerLockCursor) {
       this._pointerLockCursor.remove();
@@ -369,15 +406,25 @@ export class Input {
     this._pointerLockCursor = cursor;
   }
 
-  _setPointerLockCursor(p) {
+  _setPointerLockCursor(p, { immediate = false } = {}) {
     if (!this._pointerLockCursor) return;
+    if (immediate) {
+      this._paintPointerLockCursor(p);
+      this._pendingPointerLockCursor = null;
+      return;
+    }
     this._pendingPointerLockCursor = { x: p.x, y: p.y };
+  }
+
+  _paintPointerLockCursor(p) {
+    if (!this._pointerLockCursor) return;
+    this._pointerLockCursor.style.transform = `translate(${p.x}px, ${p.y}px)`;
   }
 
   _flushPointerLockCursor() {
     if (!this._pointerLockCursor || !this._pendingPointerLockCursor) return;
     const p = this._pendingPointerLockCursor;
-    this._pointerLockCursor.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    this._paintPointerLockCursor(p);
     this._pendingPointerLockCursor = null;
   }
 
@@ -432,78 +479,11 @@ export class Input {
   }
 
   pointerLockSupported() {
-    return cursorLockSupported(this._browserPointerLockSupported());
+    return cursorLockSupported(this._browserPointerLockSupported(), this.desktopCursor);
   }
 
   installedAppRuntime() {
     return installedAppRuntime();
-  }
-
-  _browserPointerLockSupported() {
-    return this._browserRequestPointerLock() !== null && this._browserExitPointerLockFn() !== null;
-  }
-
-  _pointerLockTarget() {
-    const view = this.renderer?.app?.view;
-    return view && typeof view.requestPointerLock === "function" ? view : this.dom;
-  }
-
-  _browserRequestPointerLock() {
-    const target = this._pointerLockTarget();
-    const fn = target.requestPointerLock || target.webkitRequestPointerLock;
-    return typeof fn === "function" ? fn.bind(target) : null;
-  }
-
-  _browserExitPointerLockFn() {
-    const fn = document.exitPointerLock || document.webkitExitPointerLock;
-    return typeof fn === "function" ? fn.bind(document) : null;
-  }
-
-  _browserPointerLockElement() {
-    return document.pointerLockElement || document.webkitPointerLockElement || null;
-  }
-
-  _elementDebugSummary(el) {
-    if (!el) return null;
-    return {
-      tag: el.tagName,
-      id: el.id || null,
-      className: el.className || null,
-      requestPointerLock: typeof el.requestPointerLock,
-      webkitRequestPointerLock: typeof el.webkitRequestPointerLock,
-    };
-  }
-
-  pointerLockDebugSnapshot() {
-    const target = this._pointerLockTarget();
-    return {
-      installedAppRuntime: this.installedAppRuntime(),
-      pointerLocked: this.pointerLocked,
-      pointerLockElementMatches: this._browserPointerLockElement() === target,
-      pointerLockElementIsViewport: this._browserPointerLockElement() === this.dom,
-      pointerLockElementIsTarget: this._browserPointerLockElement() === target,
-      viewport: this._elementDebugSummary(this.dom),
-      lockTarget: this._elementDebugSummary(target),
-      requestPointerLock: typeof target.requestPointerLock,
-      webkitRequestPointerLock: typeof target.webkitRequestPointerLock,
-      exitPointerLock: typeof document.exitPointerLock,
-      webkitExitPointerLock: typeof document.webkitExitPointerLock,
-      hasPointerLockElement: "pointerLockElement" in document,
-      hasWebkitPointerLockElement: "webkitPointerLockElement" in document,
-      documentHasFocus: typeof document.hasFocus === "function" ? document.hasFocus() : null,
-      activeElement: document.activeElement
-        ? {
-            tag: document.activeElement.tagName,
-            id: document.activeElement.id || null,
-            className: document.activeElement.className || null,
-          }
-        : null,
-      attempts: this._pointerLockAttempt,
-      lastFocusAttempt: this._lastPointerLockFocusAttempt,
-      lastRequest: this._lastPointerLockRequest,
-      location: globalThis.location?.href || null,
-      userAgent: navigator.userAgent,
-    };
   }
 
   _prepareCursorLock() {
@@ -511,44 +491,6 @@ export class Input {
     const p = this.mouse || this._viewportCenter();
     this.mouse = this._clampViewportPoint(p);
     this._setPointerLockCursor(this.mouse);
-  }
-
-  _focusPointerLockTarget() {
-    const before = this._focusDebugState();
-    const target = this._pointerLockTarget();
-    if (typeof target.hasAttribute === "function" && !target.hasAttribute("tabindex")) target.tabIndex = -1;
-    if (typeof globalThis.window?.focus === "function") {
-      try {
-        globalThis.window.focus();
-      } catch {
-        // Some embedded webviews expose focus but reject it; the element focus below is still useful.
-      }
-    }
-    if (typeof target.focus !== "function") {
-      this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled: false };
-      return;
-    }
-    const elementFocusCalled = true;
-    try {
-      target.focus({ preventScroll: true });
-    } catch {
-      target.focus();
-    }
-    this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled };
-  }
-
-  _focusDebugState() {
-    const doc = globalThis.document;
-    return {
-      documentHasFocus: typeof doc?.hasFocus === "function" ? doc.hasFocus() : null,
-      activeElement: doc?.activeElement
-        ? {
-            tag: doc.activeElement.tagName,
-            id: doc.activeElement.id || null,
-            className: doc.activeElement.className || null,
-          }
-        : null,
-    };
   }
 
   requestPointerLock() {
@@ -559,10 +501,16 @@ export class Input {
       return Promise.resolve(false);
     }
     this._prepareCursorLock();
-    return enterCursorLock(() => this._requestBrowserPointerLock(), this.mouse).then((mode) => {
+    return enterCursorLock(
+      () => this._requestBrowserPointerLock(),
+      this.mouse,
+      this.desktopCursor,
+      this._nativeCursorBounds(),
+    ).then((mode) => {
       if (!mode && this.onPointerLockError) {
         this.onPointerLockError(new Error("Pointer Lock request finished without locking the viewport."));
       }
+      if (mode && mode !== "browser") this._setCursorLockState(true, mode);
       return !!mode;
     }).catch((err) => {
       if (this.onPointerLockError) this.onPointerLockError(err);
@@ -570,149 +518,19 @@ export class Input {
     });
   }
 
-  async _requestBrowserPointerLock() {
-    if (!this._browserPointerLockSupported()) {
-      if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
-      return false;
-    }
-    try {
-      const requestPointerLock = this._browserRequestPointerLock();
-      if (!requestPointerLock) {
-        if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
-        return false;
-      }
-      const rawLocked = await this._requestBrowserPointerLockWithOptions(
-        requestPointerLock,
-        POINTER_LOCK_RAW_INPUT_OPTIONS,
-        true,
-      );
-      return rawLocked || this._browserPointerLockElement() === this._pointerLockTarget();
-    } catch (err) {
-      this._finishPointerLockRequest("exception", err);
-      if (this.onPointerLockError) this.onPointerLockError(err);
-      return false;
-    }
-  }
-
-  async _requestBrowserPointerLockWithOptions(requestPointerLock, options, rawInputRequested) {
-    let result;
-    try {
-      result = options === undefined ? requestPointerLock() : requestPointerLock(options);
-    } catch (err) {
-      this._lastPointerLockRequest = {
-        attempt: this._pointerLockAttempt,
-        at: new Date().toISOString(),
-        rawInputRequested,
-        returnedPromise: false,
-        before: this._focusDebugState(),
-        outcome: "pending",
-      };
-      this._finishPointerLockRequest("exception", err);
-      return false;
-    }
-    this._lastPointerLockRequest = {
-      attempt: this._pointerLockAttempt,
-      at: new Date().toISOString(),
-      rawInputRequested,
-      returnedPromise: !!(result && typeof result.then === "function"),
-      before: this._focusDebugState(),
-      outcome: "pending",
-    };
-    if (result && typeof result.then === "function") {
-      return await this._waitForPointerLockPromise(result);
-    }
-    return await this._waitForBrowserPointerLockResult();
-  }
-
-  _waitForPointerLockPromise(pointerLockPromise) {
-    return new Promise((resolve) => {
-      let done = false;
-      const finish = (outcome, locked, err = null) => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        this._finishPointerLockRequest(outcome, err);
-        resolve(locked);
-      };
-      const timer = window.setTimeout(() => {
-        finish("timeout", this._browserPointerLockElement() === this._pointerLockTarget(), null);
-      }, POINTER_LOCK_RESULT_TIMEOUT_MS);
-      pointerLockPromise.then(
-        () => finish("resolved", this._browserPointerLockElement() === this._pointerLockTarget(), null),
-        (err) => finish("rejected", false, err),
-      );
-    });
-  }
-
-  _finishPointerLockRequest(outcome, err = null) {
-    if (!this._lastPointerLockRequest) return;
-    this._lastPointerLockRequest = {
-      ...this._lastPointerLockRequest,
-      outcome,
-      after: this._focusDebugState(),
-      pointerLockElementMatches: this._browserPointerLockElement() === this._pointerLockTarget(),
-      error: err ? this._pointerLockErrorSummary(err) : null,
-    };
-  }
-
-  _pointerLockErrorSummary(err) {
-    if (err instanceof Error) return { name: err.name, message: err.message };
-    if (err && typeof err === "object") {
-      return {
-        type: err.type || null,
-        name: err.name || null,
-        message: err.message || null,
-      };
-    }
-    return err == null ? null : { message: String(err) };
-  }
-
-  _waitForBrowserPointerLockResult() {
-    if (this._browserPointerLockElement() === this._pointerLockTarget()) return Promise.resolve(true);
-    return new Promise((resolve) => {
-      let done = false;
-      const finish = (locked) => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        document.removeEventListener("pointerlockchange", onChange);
-        document.removeEventListener("pointerlockerror", onError);
-        document.removeEventListener("webkitpointerlockchange", onChange);
-        document.removeEventListener("webkitpointerlockerror", onError);
-        resolve(locked);
-      };
-      const onChange = () => finish(this._browserPointerLockElement() === this._pointerLockTarget());
-      const onError = () => finish(false);
-      const timer = window.setTimeout(() => finish(this._browserPointerLockElement() === this._pointerLockTarget()), 350);
-      document.addEventListener("pointerlockchange", onChange);
-      document.addEventListener("pointerlockerror", onError);
-      document.addEventListener("webkitpointerlockchange", onChange);
-      document.addEventListener("webkitpointerlockerror", onError);
-    });
-  }
-
   exitPointerLock() {
     const mode = this._cursorLockMode;
-    return exitCursorLock(mode, () => this._exitBrowserPointerLock()).catch((err) => {
+    return exitCursorLock(mode, () => this._exitBrowserPointerLock(), this.desktopCursor, "input-exit").then(() => {
+      if (mode && mode !== "browser") this._setCursorLockState(false, null);
+      return true;
+    }).catch((err) => {
       if (this.onPointerLockError) this.onPointerLockError(err);
       return false;
     });
-  }
-
-  _exitBrowserPointerLock() {
-    if (this._browserPointerLockElement() === this._pointerLockTarget()) {
-      const exitPointerLock = this._browserExitPointerLockFn();
-      if (exitPointerLock) exitPointerLock();
-    }
   }
 
   togglePointerLock() {
     return this.pointerLocked ? (this.exitPointerLock(), Promise.resolve(false)) : this.requestPointerLock();
-  }
-
-  _handlePointerLockChange() {
-    const locked = this._browserPointerLockElement() === this._pointerLockTarget();
-    this._setCursorLockState(locked, locked ? "browser" : null);
   }
 
   _setCursorLockState(locked, mode) {
@@ -734,10 +552,6 @@ export class Input {
       this._placementDrag = null;
     }
     if (this.onPointerLockChange) this.onPointerLockChange(locked);
-  }
-
-  _handlePointerLockError(ev) {
-    if (this.onPointerLockError) this.onPointerLockError(ev);
   }
 
   /** World point under the current screen cursor, clamped to map bounds. */
@@ -800,6 +614,10 @@ export class Input {
       p = this._screenPos(ev);
       this._trackMouse(p);
     }
+    this._handlePointerMoveAt(ev, p);
+  }
+
+  _handlePointerMoveAt(ev, p) {
     if (this._routeLockedPointerMove(ev, p)) {
       ev.preventDefault();
       return;
@@ -1081,12 +899,36 @@ Object.assign(Input.prototype, {
   _consumeLabToolWorldClick,
   _finishLabToolBoxSelection,
   _finishLabToolClick,
+  _installNativeCursorBridge,
+  _nativeCursorBounds,
+  configureNativeCursorBounds,
+  _setNativeCursorPoint,
+  _handleNativeCursorEvent,
+  _nativePointerEvent,
   _controlGroupSlotFromKey,
   _handleControlGroupHotkey,
   _jumpToControlGroupCluster,
   _handleKeyDown,
   _handleKeyUp,
   _handleBlur,
+  _browserPointerLockSupported,
+  _pointerLockTarget,
+  _browserRequestPointerLock,
+  _browserExitPointerLockFn,
+  _browserPointerLockElement,
+  _elementDebugSummary,
+  pointerLockDebugSnapshot,
+  _focusPointerLockTarget,
+  _focusDebugState,
+  _requestBrowserPointerLock,
+  _requestBrowserPointerLockWithOptions,
+  _waitForPointerLockPromise,
+  _finishPointerLockRequest,
+  _pointerLockErrorSummary,
+  _waitForBrowserPointerLockResult,
+  _exitBrowserPointerLock,
+  _handlePointerLockChange,
+  _handlePointerLockError,
   _activateCommandHotkey,
   _cancel,
   _handleWheel,
