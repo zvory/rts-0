@@ -437,7 +437,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         kind: EntityKind::TankTrap,
         stats: balance::BuildingStats {
             hp: 150,
-            sight_tiles: 1,
+            sight_tiles: 0,
             cost_steel: 15,
             cost_oil: 0,
             foot_w: 1,
@@ -630,8 +630,11 @@ mod tests {
     }
 
     #[test]
-    fn all_buildings_grant_only_local_sight() {
+    fn non_obstacle_buildings_grant_only_local_sight() {
         for building in BUILDINGS {
+            if building.kind == EntityKind::TankTrap {
+                continue;
+            }
             assert_eq!(
                 building.stats.sight_tiles, 1,
                 "{:?} should grant one-tile local sight",
@@ -645,7 +648,7 @@ mod tests {
         let def = building_def(EntityKind::TankTrap).expect("tank trap def");
 
         assert_eq!(def.stats.hp, 150);
-        assert_eq!(def.stats.sight_tiles, 1);
+        assert_eq!(def.stats.sight_tiles, 0);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (15, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
         assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);

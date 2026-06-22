@@ -469,8 +469,9 @@ faction unit and building palettes. Selected-entity repositioning also uses the 
 `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends `moveEntity` requests
 for each id at the clicked world point, and leaves stale-id or partial-failure reporting visible
 through the lab result status. The remove tool arms a persistent `removeSelectableUnits` setup
-tool; clicking deletes the selectable unit under the cursor, and dragging deletes selectable units
-in the box without changing the current selection. Owner reassignment stays contextual to the
+tool; clicking deletes the selectable unit or building under the cursor, and dragging deletes
+selectable units and buildings in the box without changing the current selection. Owner
+reassignment stays contextual to the
 current selection, disables itself when no selected entity ids are available, and summarizes
 accepted plus rejected per-entity mutations after the individual server replies return.
 
@@ -957,8 +958,9 @@ Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `d
 terrain and resources):
 - Decals are client-only, best-effort visual state derived only from received fog-filtered `death`
   events. They are not persisted in the protocol, replay artifacts, match history, or server sim.
-- Infantry deaths stamp player-tinted SVG paint masks. Vehicle and support-weapon deaths stamp
-  blackened scorch masks with smaller player-colored paint fragments.
+- Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
+  deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
+  fragments.
 - `GameState` queues only unpainted death ids and `Renderer` consumes the pending queue once per
   frame. A skipped snapshot or reconnect may miss older decals; the client must not infer them.
 - The renderer stamps each new-death batch into one downsampled texture, updates that texture once

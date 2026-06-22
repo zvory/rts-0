@@ -16,7 +16,9 @@ export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
 const DECAL_CLASS_INFANTRY = "infantry";
 const DECAL_CLASS_SCORCH = "scorch";
 const SCORCH_DARK = 0x070706;
-const SCORCH_WARM = 0x241a12;
+const SCORCH_ASH = 0x181816;
+const VEHICLE_SCORCH_MASK_LENGTH = 62;
+const VEHICLE_SCORCH_MASK_WIDTH = 38;
 
 export class GroundDecalLayer {
   constructor({
@@ -285,21 +287,21 @@ function stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch) {
   const bodyScale = vehicleBodyScale(decal.kind);
   drawTintedMask(ctx, tintScratch, scorch, SCORCH_DARK, x, y, downsample, {
     rotation: plan.rotation,
-    scaleX: plan.scale * bodyScale * plan.flipX,
-    scaleY: plan.scale * bodyScale * plan.flipY,
+    scaleX: plan.scale * bodyScale.x * plan.flipX,
+    scaleY: plan.scale * bodyScale.y * plan.flipY,
     opacity: plan.scorchOpacity,
   });
-  drawTintedMask(ctx, tintScratch, scorch, SCORCH_WARM, x, y, downsample, {
+  drawTintedMask(ctx, tintScratch, scorch, SCORCH_ASH, x, y, downsample, {
     rotation: plan.rotation,
-    scaleX: plan.scale * bodyScale * 0.72 * plan.flipX,
-    scaleY: plan.scale * bodyScale * 0.72 * plan.flipY,
-    opacity: plan.emberOpacity,
+    scaleX: plan.scale * bodyScale.x * 0.66 * plan.flipX,
+    scaleY: plan.scale * bodyScale.y * 0.66 * plan.flipY,
+    opacity: plan.ashOpacity,
   });
   if (paint) {
     drawTintedMask(ctx, tintScratch, paint, plan.color, x, y, downsample, {
       rotation: plan.rotation,
-      scaleX: plan.scale * bodyScale * plan.flipX,
-      scaleY: plan.scale * bodyScale * plan.flipY,
+      scaleX: plan.scale * bodyScale.x * plan.flipX,
+      scaleY: plan.scale * bodyScale.y * plan.flipY,
       opacity: plan.paintOpacity,
     });
   }
@@ -379,7 +381,11 @@ function vehicleBodyScale(kind) {
   const stat = STATS[kind] || {};
   const body = stat.body || {};
   const length = Math.max(22, body.length || (stat.size || 16) * 2.4);
-  return clamp(length / 50, 0.72, 1.35);
+  const width = Math.max(12, body.width || (stat.size || 16) * 1.25);
+  return {
+    x: clamp(length / VEHICLE_SCORCH_MASK_LENGTH, 0.56, 1.08),
+    y: clamp(width / VEHICLE_SCORCH_MASK_WIDTH, 0.48, 0.98),
+  };
 }
 
 function stampInfantry(ctx, decal, rng, downsample) {
@@ -404,15 +410,15 @@ function stampScorch(ctx, decal, rng, downsample) {
   const length = Math.max(22, body.length || (stat.size || 16) * 2.4) / downsample;
   const width = Math.max(12, body.width || (stat.size || 16) * 1.25) / downsample;
   const char = 0.8 + rng() * 0.16;
-  ctx.fillStyle = rgba(0x070706, 0.45);
+  ctx.fillStyle = rgba(0x070706, 0.36);
   irregularHullPath(ctx, length * char, width * (0.9 + rng() * 0.18), rng);
   ctx.fill();
-  ctx.fillStyle = rgba(0x201812, 0.36);
+  ctx.fillStyle = rgba(0x181816, 0.14);
   irregularHullPath(ctx, length * 0.76, width * 0.7, rng);
   ctx.fill();
 
   const chips = 2 + (decal.variant % 3);
-  ctx.fillStyle = rgba(color, 0.34);
+  ctx.fillStyle = rgba(color, 0.22);
   for (let i = 0; i < chips; i += 1) {
     const px = (-length * 0.35) + rng() * length * 0.7;
     const py = (-width * 0.32) + rng() * width * 0.64;

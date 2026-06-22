@@ -33,8 +33,8 @@ use tokio::time::{interval, MissedTickBehavior};
 use crate::config;
 use crate::db::Db;
 use crate::protocol::{
-    BranchStagingOccupant, Event, LabClientOp, LobbyPlayer, PlayerScore, ReplayBranchSeat,
-    ReplayStartMetadata, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, TeamId,
+    BranchStagingOccupant, Event, LabClientOp, PlayerScore, ReplayBranchSeat, ReplayStartMetadata,
+    ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, TeamId,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;

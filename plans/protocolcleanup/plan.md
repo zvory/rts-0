@@ -3,7 +3,7 @@
 ## Purpose
 
 Reduce the review and merge risk around the protocol mirror without changing wire behavior. This
-plan exists because `plans/hotspotcleanup/phase-9.md` found a safe cleanup path only if Rust
+plan exists because `plans/archive/hotspotcleanup/phase-9.md` found a safe cleanup path only if Rust
 protocol code, browser protocol code, parity tests, and protocol design notes move as one mirrored
 surface. Every phase is behavior-preserving: no gameplay, fog, balance, protocol tag, field, compact
 code, compact slot, version, enum vocabulary, optional slot, or exported API change is allowed.

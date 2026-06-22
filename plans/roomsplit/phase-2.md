@@ -1,6 +1,6 @@
 # Phase 2 - Module Skeleton And Shared Types
 
-Status: not started.
+Status: done.
 
 ## Goal
 
