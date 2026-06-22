@@ -312,7 +312,11 @@ closed PRs, stale branches, dirty sweep worktrees, and Codex failures leave the 
 
 Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including
 `docdrift-full.{md,json}` and any classify/generate reports. Use
-`scripts/docdrift-daily.sh` as the launchd-friendly daily 8 p.m. command; pass normal
+`scripts/docdrift-daily.sh` as the launchd-friendly daily command; pass normal
 `docdrift-sweep.mjs` options after it, for example `--dry-run` for a lifecycle preview or
-`--run-id <id>` for predictable report paths. The wrapper only runs the command; it does not install
-or require a launchd job for other developers.
+`--run-id <id>` for predictable report paths. The wrapper defaults scheduled runs to
+`--max-commits 300` so ordinary daily backlog does not trip the interactive classifier guard; set
+`DOC_DRIFT_MAX_COMMITS` to override that limit. When the daily command exits non-zero, it writes an
+ignored `.docdrift/last-failure.md` marker with the command, UTC timestamps, exit code, and stdout
+and stderr tails, and it clears that marker after the next successful run. The wrapper only runs the
+command; it does not install or require a launchd job for other developers.

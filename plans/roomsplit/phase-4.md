@@ -1,6 +1,6 @@
 # Phase 4 - Lab And Dev Mode Split
 
-Status: not started.
+Status: done.
 
 ## Goal
 

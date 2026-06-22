@@ -34,10 +34,10 @@ for (const file of listRustFiles(lobbySrc)) {
     );
   }
 
-  if (file !== "room_task.rs") {
+  if (file !== "room_task.rs" && file !== "room_task/lab.rs") {
     for (const match of stripped.matchAll(labMutationCallRe)) {
       failures.push(
-        `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${match[1]} must stay centralized in room_task.rs lab request handling`,
+        `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${match[1]} must stay centralized in room_task/lab.rs lab request handling`,
       );
     }
   }
@@ -64,6 +64,7 @@ function listRustFiles(dir) {
       const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
       const abs = path.join(absDir, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name === "tests") continue;
         walk(abs, rel);
       } else if (entry.isFile() && entry.name.endsWith(".rs")) {
         out.push(rel.replaceAll(path.sep, "/"));

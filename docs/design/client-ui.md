@@ -957,8 +957,9 @@ Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `d
 terrain and resources):
 - Decals are client-only, best-effort visual state derived only from received fog-filtered `death`
   events. They are not persisted in the protocol, replay artifacts, match history, or server sim.
-- Infantry deaths stamp player-tinted SVG paint masks. Vehicle and support-weapon deaths stamp
-  blackened scorch masks with smaller player-colored paint fragments.
+- Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
+  deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
+  fragments.
 - `GameState` queues only unpainted death ids and `Renderer` consumes the pending queue once per
   frame. A skipped snapshot or reconnect may miss older decals; the client must not infer them.
 - The renderer stamps each new-death batch into one downsampled texture, updates that texture once

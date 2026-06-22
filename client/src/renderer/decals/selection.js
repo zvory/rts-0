@@ -29,8 +29,8 @@ export function createGroundDecalStampPlan(decal, {
       scale: 0.86 + rng() * 0.28,
       flipX: rng() < 0.5 ? -1 : 1,
       flipY: rng() < 0.18 ? -1 : 1,
-      opacity: 0.62 + rng() * 0.18,
-      shadowOpacity: 0.18 + rng() * 0.08,
+      opacity: 0.54 + rng() * 0.16,
+      shadowOpacity: 0.14 + rng() * 0.06,
       offsetWorldX: (rng() - 0.5) * 5,
       offsetWorldY: (rng() - 0.5) * 5,
     };
@@ -43,14 +43,14 @@ export function createGroundDecalStampPlan(decal, {
     variantIndex: pickIndex(seed, assetCounts.vehicleScorch),
     paintVariantIndex: pickIndex(seed >>> 7, assetCounts.vehiclePaint),
     rotation: normalizeAngle(facing + (rng() - 0.5) * 0.24),
-    scale: 0.96 + rng() * 0.18,
-    flipX: rng() < 0.5 ? -1 : 1,
+    scale: 0.94 + rng() * 0.14,
+    flipX: 1,
     flipY: rng() < 0.5 ? -1 : 1,
-    scorchOpacity: 0.62 + rng() * 0.16,
-    emberOpacity: 0.16 + rng() * 0.08,
-    paintOpacity: 0.24 + rng() * 0.14,
-    offsetWorldX: (rng() - 0.5) * 4,
-    offsetWorldY: (rng() - 0.5) * 4,
+    scorchOpacity: 0.48 + rng() * 0.12,
+    ashOpacity: 0.06 + rng() * 0.05,
+    paintOpacity: 0.13 + rng() * 0.07,
+    offsetWorldX: (rng() - 0.5) * 3,
+    offsetWorldY: (rng() - 0.5) * 3,
   };
 }
 

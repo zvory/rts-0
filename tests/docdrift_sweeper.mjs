@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const script = path.join(repoRoot, "scripts", "docdrift-sweep.mjs");
+const dailyScript = path.join(repoRoot, "scripts", "docdrift-daily.sh");
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-docdrift-sweeper-"));
 const repo = path.join(fixtureRoot, "repo");
 
@@ -84,6 +85,24 @@ function writeExecutable(name, text) {
   const absPath = path.join(fixtureRoot, name);
   fs.writeFileSync(absPath, text, { mode: 0o755 });
   return absPath;
+}
+
+function runDailyWrapper(fakeBin, args, options = {}) {
+  return execFileSync("bash", [dailyScript, ...args], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      PATH: `${fakeBin}${path.delimiter}${process.env.PATH}`,
+      DOC_DRIFT_OBSERVABILITY_DIR: options.observabilityDir,
+      DOC_DRIFT_MAX_COMMITS: options.maxCommits ?? "300",
+      FAKE_NODE_ARGS_FILE: options.argsFile,
+      FAKE_NODE_EXIT: String(options.exitCode ?? 0),
+      FAKE_NODE_STDOUT: options.stdout ?? "",
+      FAKE_NODE_STDERR: options.stderr ?? "",
+    },
+    encoding: "utf8",
+    stdio: options.stdio ?? "pipe",
+  });
 }
 
 fs.mkdirSync(repo, { recursive: true });
@@ -638,6 +657,56 @@ try {
   assert.equal(fullNoop.checkpoint.after.sha, docsOnlyHead);
   assert.match(fs.readFileSync(path.join(repo, ".docdrift/checkpoint.txt"), "utf8"), new RegExp(docsOnlyHead));
   assert.ok(fs.existsSync(path.join(fullNoopOutDir, "docdrift-full.json")));
+
+  const fakeNodeBin = path.join(fixtureRoot, "fake-node-bin");
+  fs.mkdirSync(fakeNodeBin, { recursive: true });
+  writeExecutable(
+    path.join("fake-node-bin", "node"),
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "printf '%s\\n' \"$@\" > \"$FAKE_NODE_ARGS_FILE\"",
+      "if [ -n \"${FAKE_NODE_STDOUT:-}\" ]; then printf '%s\\n' \"$FAKE_NODE_STDOUT\"; fi",
+      "if [ -n \"${FAKE_NODE_STDERR:-}\" ]; then printf '%s\\n' \"$FAKE_NODE_STDERR\" >&2; fi",
+      "exit \"${FAKE_NODE_EXIT:-0}\"",
+      "",
+    ].join("\n"),
+  );
+  const dailyObservabilityDir = path.join(fixtureRoot, "daily-observability");
+  const dailyArgsFile = path.join(fixtureRoot, "daily-args.txt");
+  runDailyWrapper(fakeNodeBin, ["--checkpoint-ref", "docdrift-checkpoint"], {
+    observabilityDir: dailyObservabilityDir,
+    argsFile: dailyArgsFile,
+    stdout: "daily ok",
+  });
+  assert.deepEqual(fs.readFileSync(dailyArgsFile, "utf8").trim().split("\n"), [
+    "scripts/docdrift-sweep.mjs",
+    "--full",
+    "--head",
+    "origin/main",
+    "--max-commits",
+    "300",
+    "--checkpoint-ref",
+    "docdrift-checkpoint",
+  ]);
+  assert.equal(fs.existsSync(path.join(dailyObservabilityDir, "last-failure.md")), false);
+
+  try {
+    runDailyWrapper(fakeNodeBin, ["--checkpoint-ref", "docdrift-checkpoint"], {
+      observabilityDir: dailyObservabilityDir,
+      argsFile: dailyArgsFile,
+      exitCode: 42,
+      stderr: "classify budget exceeded: 75 considered commits exceeds --max-commits 25",
+    });
+    assert.fail("expected daily wrapper failure");
+  } catch (error) {
+    assert.equal(error.status, 42);
+  }
+  const failureReport = fs.readFileSync(path.join(dailyObservabilityDir, "last-failure.md"), "utf8");
+  assert.match(failureReport, /# Documentation Drift Daily Failure/);
+  assert.match(failureReport, /Exit code: `42`/);
+  assert.match(failureReport, /--max-commits 300/);
+  assert.match(failureReport, /classify budget exceeded/);
 } finally {
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }

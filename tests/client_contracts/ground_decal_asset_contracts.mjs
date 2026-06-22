@@ -59,8 +59,8 @@ for (const asset of allAssets) {
     "infantry decal variant comes from the deterministic seed",
   );
   assert(plan.scale > 0.8 && plan.scale < 1.17, "infantry decal scale stays within the authored variation range");
-  assert(plan.opacity >= 0.62 && plan.opacity <= 0.8, "infantry decal tint opacity stays intentionally readable");
-  assert(plan.shadowOpacity >= 0.18 && plan.shadowOpacity <= 0.26, "infantry decal shadow keeps paint grounded");
+  assert(plan.opacity >= 0.54 && plan.opacity <= 0.7, "infantry decal tint opacity stays intentionally readable");
+  assert(plan.shadowOpacity >= 0.14 && plan.shadowOpacity <= 0.2, "infantry decal shadow keeps paint grounded");
 }
 
 {
@@ -82,6 +82,9 @@ for (const asset of allAssets) {
   );
   assertApprox(plan.rotation, decal.facing, 0.121, "vehicle scorch orientation stays anchored to recovered facing");
   assert(plan.paintVariantIndex >= 0, "vehicle decals include a deterministic player-color paint mask");
+  assert(plan.flipX === 1, "vehicle decals keep the authored hull nose aligned with recovered facing");
   assert(plan.scorchOpacity > plan.paintOpacity, "vehicle decals stay blackened before team-color fragments");
-  assert(plan.paintOpacity >= 0.24 && plan.paintOpacity <= 0.38, "vehicle paint opacity stays subordinate to scorch");
+  assert(plan.scorchOpacity >= 0.48 && plan.scorchOpacity <= 0.6, "vehicle scorch opacity is subdued");
+  assert(plan.ashOpacity >= 0.06 && plan.ashOpacity <= 0.11, "vehicle inner ash stays neutral and subtle");
+  assert(plan.paintOpacity >= 0.13 && plan.paintOpacity <= 0.2, "vehicle paint opacity stays subordinate to scorch");
 }
