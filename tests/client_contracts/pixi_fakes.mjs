@@ -8,6 +8,7 @@ class FakeGraphics {
   endFill() {}
   drawPolygon() {}
   drawCircle() {}
+  drawEllipse() {}
   drawRect() {}
   drawRoundedRect() {}
   moveTo() {}
@@ -37,6 +38,9 @@ export class RecordingGraphics extends FakeGraphics {
   }
   drawCircle(x, y, radius) {
     this.calls.push(["drawCircle", x, y, radius]);
+  }
+  drawEllipse(x, y, rx, ry) {
+    this.calls.push(["drawEllipse", x, y, rx, ry]);
   }
   arc(x, y, radius, start, end, anticlockwise) {
     this.calls.push(["arc", x, y, radius, start, end, anticlockwise]);
@@ -71,6 +75,12 @@ export function installFakePixi() {
     removeChild(child) {
       this.children = this.children.filter((item) => item !== child);
       child.parent = null;
+    }
+    removeChildren() {
+      const removed = this.children;
+      for (const child of removed) child.parent = null;
+      this.children = [];
+      return removed;
     }
     destroy() {}
   }
@@ -119,6 +129,49 @@ export function installFakePixi() {
     }
   }
 
+  class FakeTexture {
+    constructor(resource, options = {}) {
+      this.resource = resource;
+      this.options = options;
+      this.updateCount = 0;
+      this.destroyed = false;
+      this.baseTexture = {
+        update: () => {
+          this.updateCount += 1;
+        },
+        destroy: () => {
+          this.baseTextureDestroyed = true;
+        },
+      };
+    }
+    update() {
+      this.updateCount += 1;
+    }
+    destroy(options) {
+      this.destroyed = true;
+      this.destroyOptions = options;
+    }
+    static from(resource, options = {}) {
+      return new FakeTexture(resource, options);
+    }
+  }
+
+  class FakeSprite {
+    constructor(texture) {
+      this.texture = texture;
+      this.visible = true;
+      this.scale = { set: (value = 1) => { this.scaleValue = value; } };
+      this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
+    }
+    destroy(options) {
+      this.destroyed = true;
+      this.destroyOptions = options;
+      if (options === true || options?.texture) {
+        this.texture?.destroy?.(options);
+      }
+    }
+  }
+
   globalThis.window = {
     ...(priorWindow || {}),
     devicePixelRatio: 1,
@@ -130,6 +183,8 @@ export function installFakePixi() {
     Container: FakeContainer,
     Graphics: PixiGraphics,
     Text: FakeText,
+    Texture: FakeTexture,
+    Sprite: FakeSprite,
     SCALE_MODES: { NEAREST: "nearest" },
     settings: {},
   };

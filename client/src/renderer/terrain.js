@@ -77,4 +77,5 @@ export function buildStaticMap(map) {
   const scale = ts / textureTileSize;
   this._terrainSprite.scale.set(scale);
   layer.addChild(this._terrainSprite);
+  this._initGroundDecalsForMap?.(map);
 }

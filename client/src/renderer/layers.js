@@ -3,6 +3,7 @@ import { SWEEP_EVICT_FRAMES } from "./palette.js";
 // Layer names in back-to-front draw order. Index in this array == child index in `world`.
 export const LAYERS = [
   "terrain",
+  "decals",
   "resources",
   "buildingShadows",
   "buildings",
