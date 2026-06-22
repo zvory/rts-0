@@ -17,7 +17,7 @@ use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::tick_control::{RoomTimeClock, RoomTimeSpeed, ScheduledTickAction, TickControl};
 use super::*;
 use crate::protocol::{
-    Command, DiagnosticCapabilities, LabClientOp, LabResult, LabScenarioLabMetadata,
+    Command, DiagnosticCapabilities, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioV1,
     LabStartMetadata, LabStartRole, LabState, LabVisionMode, LivePauseState, NoticeSeverity,
     RoomTimeState, StartPayload, DEFAULT_FACTION_ID,
 };
@@ -168,6 +168,15 @@ enum LabSeekTarget {
     Absolute(u32),
 }
 
+struct LabLaunch {
+    game: Game,
+    seed: u32,
+    map_name: String,
+    player_count: usize,
+    participants: Vec<String>,
+    default_vision: Option<LabVisionMode>,
+}
+
 #[derive(Clone, Copy)]
 struct ReplayStartPayloadStamp {
     policy: SessionPolicy,
@@ -189,6 +198,36 @@ pub(super) struct LabRoomConfig {
     pub(super) public_id: String,
     pub(super) map_name: String,
     pub(super) seed: Option<u32>,
+    pub(super) scenario: Option<LabScenarioPreset>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LabScenarioPreset {
+    Lategame,
+}
+
+impl LabScenarioPreset {
+    pub(super) fn from_id(id: &str) -> Option<Self> {
+        match id {
+            "lategame" => Some(Self::Lategame),
+            _ => None,
+        }
+    }
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::Lategame => "lategame",
+        }
+    }
+
+    fn json(self) -> &'static str {
+        match self {
+            Self::Lategame => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/lab-scenarios/lategame.json"
+            )),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -416,6 +455,20 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
         | LabClientOp::SetVision { .. }
         | LabClientOp::IssueCommandAs { .. } => Err("not a lab mutation".to_string()),
     }
+}
+
+fn load_lab_scenario_preset(
+    preset: LabScenarioPreset,
+) -> Result<(LabScenarioV1, SimLabScenarioV1), String> {
+    let scenario: LabScenarioV1 = serde_json::from_str(preset.json())
+        .map_err(|err| format!("invalid bundled lab scenario JSON: {err}"))?;
+    validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
+    let sim_scenario: SimLabScenarioV1 = serde_json::from_value(
+        serde_json::to_value(&scenario)
+            .map_err(|err| format!("invalid bundled lab scenario payload: {err}"))?,
+    )
+    .map_err(|err| format!("invalid bundled lab scenario payload: {err}"))?;
+    Ok((scenario, sim_scenario))
 }
 
 fn validate_lab_vision(game: &Game, vision: &LabVisionMode) -> Result<(), String> {
@@ -2724,44 +2777,24 @@ impl RoomTask {
                 self.lab_session = Some(LabSession::new(&config, operator_id));
             }
         }
-        let seed = config.seed.unwrap_or_else(match_seed);
-        let inits = self.default_lab_player_template();
-        let start_players: Vec<_> = inits
-            .iter()
-            .map(|player| {
-                (
-                    player.id,
-                    normalize_start_team_id(player.id, player.team_id),
-                )
-            })
-            .collect();
-        let map_metadata = match Map::metadata_for_name(&config.map_name) {
-            Ok(metadata) => metadata,
+        let launch = match self.build_lab_launch(&config) {
+            Ok(launch) => launch,
             Err(err) => {
-                self.send_lab_error(format!(
-                    "Cannot load lab map \"{}\": {err}",
-                    config.map_name
-                ));
+                self.send_lab_error(err);
                 return;
             }
         };
-        let map = match Map::load_for_players(&config.map_name, &start_players, seed) {
-            Ok(map) => map,
-            Err(err) => {
-                self.send_lab_error(format!(
-                    "Cannot load lab map \"{}\": {err}",
-                    config.map_name
-                ));
-                return;
+        if let Some(vision) = launch.default_vision.clone() {
+            if let Some(session) = &mut self.lab_session {
+                session.import_vision_for(session.operator_id, vision);
             }
-        };
-        let game =
-            Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata);
+        }
+        let game = launch.game;
         self.record_live_match_started(
-            inits.len(),
+            launch.player_count,
             0,
-            config.map_name.clone(),
-            inits.iter().map(|player| player.name.clone()).collect(),
+            launch.map_name.clone(),
+            launch.participants,
         );
         let mut payload = game.start_payload();
         payload.match_run_id = self.match_run_id.clone();
@@ -2800,7 +2833,7 @@ impl RoomTask {
             match_run_id: self.match_run_id.as_deref().unwrap_or(""),
             mode: "lab",
             map: &self.match_map_name,
-            seed,
+            seed: launch.seed,
             players: self.match_player_count,
             humans: self.match_human_count,
             ai: 0,
@@ -2810,6 +2843,95 @@ impl RoomTask {
         self.lab_timeline = Some(LabTimeline::new(&game));
         self.phase = Phase::InGame(Box::new(game));
         self.broadcast_lab_room_time_state();
+    }
+
+    fn build_lab_launch(&self, config: &LabRoomConfig) -> Result<LabLaunch, String> {
+        match config.scenario {
+            Some(preset) => self.build_lab_launch_from_scenario(preset),
+            None => self.build_blank_lab_launch(config),
+        }
+    }
+
+    fn build_lab_launch_from_scenario(
+        &self,
+        preset: LabScenarioPreset,
+    ) -> Result<LabLaunch, String> {
+        let (scenario, sim_scenario) = load_lab_scenario_preset(preset)
+            .map_err(|err| format!("Cannot load lab scenario \"{}\": {err}", preset.id()))?;
+        let inits: Vec<_> = scenario
+            .players
+            .iter()
+            .map(|player| PlayerInit {
+                id: player.id,
+                team_id: player.team_id,
+                faction_id: player.faction_id.clone(),
+                name: player.name.clone(),
+                color: player.color.clone(),
+                is_ai: player.is_ai,
+            })
+            .collect();
+        let start_players: Vec<_> = inits
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    normalize_start_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map_metadata = Map::metadata_for_name(&scenario.map.name)
+            .map_err(|err| format!("Cannot load lab scenario \"{}\": {err}", preset.id()))?;
+        let map = Map::load_for_players(&scenario.map.name, &start_players, scenario.seed)
+            .map_err(|err| format!("Cannot load lab scenario \"{}\": {err}", preset.id()))?;
+        let mut game = Game::new_lab(&inits, scenario.seed, map, map_metadata);
+        game.apply_lab_op(LabOp::RestoreScenario(Box::new(sim_scenario)))
+            .map_err(|err| {
+                format!(
+                    "Cannot load lab scenario \"{}\": {}",
+                    preset.id(),
+                    lab_error_text(&err)
+                )
+            })?;
+        Ok(LabLaunch {
+            game,
+            seed: scenario.seed,
+            map_name: scenario.map.name,
+            player_count: scenario.players.len(),
+            participants: scenario
+                .players
+                .iter()
+                .map(|player| player.name.clone())
+                .collect(),
+            default_vision: Some(scenario.metadata.lab.vision),
+        })
+    }
+
+    fn build_blank_lab_launch(&self, config: &LabRoomConfig) -> Result<LabLaunch, String> {
+        let seed = config.seed.unwrap_or_else(match_seed);
+        let inits = self.default_lab_player_template();
+        let start_players: Vec<_> = inits
+            .iter()
+            .map(|player| {
+                (
+                    player.id,
+                    normalize_start_team_id(player.id, player.team_id),
+                )
+            })
+            .collect();
+        let map_metadata = Map::metadata_for_name(&config.map_name)
+            .map_err(|err| format!("Cannot load lab map \"{}\": {err}", config.map_name))?;
+        let map = Map::load_for_players(&config.map_name, &start_players, seed)
+            .map_err(|err| format!("Cannot load lab map \"{}\": {err}", config.map_name))?;
+        let game =
+            Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata);
+        Ok(LabLaunch {
+            game,
+            seed,
+            map_name: config.map_name.clone(),
+            player_count: inits.len(),
+            participants: inits.iter().map(|player| player.name.clone()).collect(),
+            default_vision: None,
+        })
     }
 
     fn default_lab_player_template(&self) -> Vec<PlayerInit> {
@@ -4945,7 +5067,14 @@ mod tests {
             public_id: "sandbox".to_string(),
             map_name: "Default".to_string(),
             seed: Some(0x1A2B_3C4D),
+            scenario: None,
         }
+    }
+
+    fn lategame_lab_config() -> LabRoomConfig {
+        let mut config = lab_config();
+        config.scenario = Some(LabScenarioPreset::Lategame);
+        config
     }
 
     fn summary_task(room: &str) -> RoomTask {
@@ -6183,6 +6312,49 @@ mod tests {
         assert_eq!(lab.vision, LabVisionMode::FullWorld);
         assert!(!lab.dirty);
         assert_eq!(lab.operation_count, 0);
+    }
+
+    #[test]
+    fn lab_start_payload_can_use_bundled_lategame_scenario() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default:scenario=lategame".to_string(),
+            RoomMode::Lab(lategame_lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        let starts = start_payloads(&mut writer);
+        assert_eq!(starts.len(), 1);
+        assert_eq!(starts[0].players.len(), 2);
+        assert_eq!(starts[0].players[0].name, "Lab Alpha");
+        assert_eq!(starts[0].players[1].name, "Lab Bravo");
+        let lab = starts[0].lab.as_ref().expect("lab metadata");
+        assert_eq!(lab.vision, LabVisionMode::FullWorld);
+        assert!(!lab.dirty);
+        assert_eq!(lab.operation_count, 0);
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lategame lab should start immediately");
+        };
+        let scenario = game.export_lab_scenario();
+        assert_eq!(scenario.seed, 3_566_641_871);
+        assert_eq!(scenario.players.len(), 2);
+        assert_eq!(scenario.entities.len(), 227);
+        assert!(scenario.players[0]
+            .upgrades
+            .contains(&"anti_tank_gun_unlock".to_string()));
+        assert_eq!(
+            task.lab_timeline
+                .as_ref()
+                .expect("lab timeline")
+                .keyframe_ticks(),
+            vec![0]
+        );
     }
 
     #[test]

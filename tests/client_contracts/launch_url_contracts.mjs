@@ -115,7 +115,21 @@ async function testLabLaunchConfig() {
     config = labLaunchConfig();
     assert(
       config.room === "__lab__:default:map=Default",
-      "lab launch falls back for unsafe room and map tokens",
+      "lab launch falls back for unsafe room and map tokens without adding the default scenario to custom map URLs",
+    );
+
+    globalThis.window.location = new URL("http://localhost/lab");
+    config = labLaunchConfig();
+    assert(
+      config.room === "__lab__:default:map=Default:scenario=lategame",
+      "plain lab launch should request the default lategame scenario",
+    );
+
+    globalThis.window.location = new URL("http://localhost/lab?scenario=blank");
+    config = labLaunchConfig();
+    assert(
+      config.room === "__lab__:default:map=Default:scenario=blank",
+      "explicit lab scenario override should be preserved",
     );
 
     globalThis.window.location = new URL("http://localhost/?room=sandbox");
