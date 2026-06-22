@@ -66,6 +66,19 @@ function generateDocs(args) {
   });
 }
 
+function generateDocsFailure(args) {
+  try {
+    generateDocs(args);
+    assert.fail("expected generate-docs command to fail");
+  } catch (error) {
+    return {
+      stdout: error.stdout.toString(),
+      stderr: error.stderr.toString(),
+      status: error.status,
+    };
+  }
+}
+
 function fullSweep(args) {
   return run("node", [script, "--full", "--repo", repo, ...args], {
     cwd: repoRoot,
@@ -504,6 +517,143 @@ try {
   const sequentialDoc = fs.readFileSync(path.join(sequentialRepo, "docs/design/server-sim.md"), "utf8");
   assert.match(sequentialDoc, /First generated detail/);
   assert.match(sequentialDoc, /Second generated detail/);
+
+  const partialRepo = path.join(fixtureRoot, "partial-repo");
+  fs.mkdirSync(partialRepo, { recursive: true });
+  const partialGit = (args, options = {}) => run("git", args, { cwd: partialRepo, ...options }).trim();
+  const partialWrite = (name, text) => {
+    const absPath = path.join(partialRepo, name);
+    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    fs.writeFileSync(absPath, text);
+  };
+  const partialCommit = (name, text, subject, options = {}) => {
+    partialWrite(name, text);
+    partialGit(["add", name]);
+    partialGit(["commit", "-m", subject], options);
+    return partialGit(["rev-parse", "HEAD"]);
+  };
+  run("git", ["init", "--initial-branch=main"], { cwd: partialRepo });
+  partialGit(["config", "user.email", "agent@example.invalid"]);
+  partialGit(["config", "user.name", "Agent"]);
+  partialWrite(
+    "docs/doc-map.json",
+    JSON.stringify(
+      {
+        version: 1,
+        routes: [
+          {
+            source: ["client/src/**"],
+            docs: ["docs/design/client-ui.md"],
+          },
+        ],
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  partialWrite("docs/design/client-ui.md", "client ui design\n");
+  partialGit(["add", "."]);
+  partialGit(["commit", "-m", "Initial docs"]);
+  const partialBase = partialGit(["rev-parse", "HEAD"]);
+  partialCommit("client/src/view.js", "export const first = true;\n", "Add first UI behavior", {
+    date: "2026-06-20T12:20:00Z",
+  });
+  const partialSecondCommit = partialCommit(
+    "client/src/view.js",
+    "export const first = true;\nexport const second = true;\n",
+    "Add second UI behavior",
+    { date: "2026-06-20T12:21:00Z" },
+  );
+  const partialHead = partialGit(["rev-parse", "HEAD"]);
+  const partialFixture = path.join(fixtureRoot, "classifier-partial.json");
+  fs.writeFileSync(
+    partialFixture,
+    JSON.stringify(
+      {
+        decisions: [
+          {
+            subjectIncludes: "Add first UI behavior",
+            decision: "update_docs",
+            likelyDocs: ["docs/design/client-ui.md"],
+            evidenceNote: "First UI behavior needs client docs.",
+          },
+          {
+            subjectIncludes: "Add second UI behavior",
+            decision: "update_docs",
+            likelyDocs: ["docs/design/client-ui.md"],
+            evidenceNote: "Second UI behavior needs client docs.",
+          },
+        ],
+        docPatches: [
+          {
+            subjectIncludes: "Add first UI behavior",
+            summary: "Add first UI behavior.",
+            patches: [
+              {
+                path: "docs/design/client-ui.md",
+                find: "client ui design\n",
+                replace: "client ui design\n\nFirst UI behavior detail.\n",
+                rationale: "The first UI behavior changed.",
+              },
+            ],
+          },
+          {
+            subjectIncludes: "Add second UI behavior",
+            summary: "Add second UI behavior.",
+            patches: [
+              {
+                path: "docs/design/client-ui.md",
+                find: "missing generated context\n",
+                replace: "missing generated context\nSecond UI behavior detail.\n",
+                rationale: "The second UI behavior changed.",
+              },
+            ],
+          },
+        ],
+        default: {
+          decision: "move_on",
+          likelyDocs: [],
+          evidenceNote: "No docs update needed.",
+        },
+        defaultDocPatch: {
+          summary: "No patch.",
+          patches: [],
+        },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  const partialFailure = generateDocsFailure([
+    "--repo",
+    partialRepo,
+    "--base",
+    partialBase,
+    "--head",
+    partialHead,
+    "--no-codex",
+    "--fixture",
+    partialFixture,
+    "--classifier-cache",
+    ".docdrift/partial-classifier-cache",
+    "--doc-patch-cache",
+    ".docdrift/partial-doc-patch-cache",
+    "--format",
+    "json",
+  ]);
+  assert.equal(partialFailure.status, 1);
+  assert.equal(partialFailure.stderr, "");
+  const partialGenerate = JSON.parse(partialFailure.stdout);
+  assert.equal(partialGenerate.docPatch.partial, true);
+  assert.equal(partialGenerate.docPatch.summary.failed, true);
+  assert.equal(partialGenerate.docPatch.summary.patchRecords, 1);
+  assert.equal(partialGenerate.docPatch.summary.applied, 1);
+  assert.equal(partialGenerate.docPatch.failure.index, 2);
+  assert.equal(partialGenerate.docPatch.failure.commitSha, partialSecondCommit);
+  assert.match(partialGenerate.docPatch.failure.message, /doc patch find text not found/);
+  const partialDoc = fs.readFileSync(path.join(partialRepo, "docs/design/client-ui.md"), "utf8");
+  assert.match(partialDoc, /First UI behavior detail/);
+  assert.doesNotMatch(partialDoc, /Second UI behavior detail/);
 
   const fakeCodexArgsPath = path.join(fixtureRoot, "fake-codex-args.json");
   const fakeCodex = writeExecutable(

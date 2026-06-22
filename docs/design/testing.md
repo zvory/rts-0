@@ -303,7 +303,10 @@ patches to the working tree and writes `docdrift-generate.{md,json}` with `--out
 inspect the resulting docs diff before any PR lifecycle step. Fixture runs use the same
 `--no-codex --fixture <name>` path and must remain idempotent. If a retry sees that a cached patch's
 replacement text is already present, it reports the patch as already applied without spending
-another Codex generation call.
+another Codex generation call. Patch application is atomic per commit: all patches for one
+`update_docs` decision are validated against the current working tree before any file is written.
+If doc generation or application fails after earlier decisions succeeded, the report is marked
+partial, keeps the successful prefix, and records the failed decision and error.
 
 `scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
 uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed
@@ -313,6 +316,11 @@ pushes the sweep branch, opens or updates the owned PR through `scripts/agent-pr
 `scripts/wait-pr.sh`. The checkpoint advances atomically only after a no-PR range is fully processed
 or after `wait-pr.sh` confirms the sweep PR head is reachable from `origin/main`; failed checks,
 closed PRs, stale branches, dirty sweep worktrees, and Codex failures leave the checkpoint unchanged.
+If a full run hits a partial doc-patch failure after applying a successful prefix, it commits and
+opens a PR for that prefix, then advances the checkpoint only to the last source commit before the
+failed commit after the PR merges. If there is no successful prefix to commit, the checkpoint stays
+unchanged. Partial runs still exit non-zero after writing reports so the daily wrapper preserves the
+local failure marker for operator follow-up.
 
 Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including
 `docdrift-full.{md,json}` and any classify/generate reports. Use
