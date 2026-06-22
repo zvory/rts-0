@@ -245,6 +245,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/combat/projection.rs",
   "server/crates/sim/src/game/services/combat/weapons.rs",
   "server/crates/sim/src/game/services/commands.rs",
+  // Command-budget guard extraction keeps the existing Command Car cap special case.
+  "server/crates/sim/src/game/services/commands/guards.rs",
   "server/crates/sim/src/game/services/construction.rs",
   "server/crates/sim/src/game/services/economy.rs",
   "server/crates/sim/src/game/services/geometry.rs",
