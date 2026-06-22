@@ -25,6 +25,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "room_capabilities.js": "app-shell",
 
   "state.js": "model",
+  "state_queries.js": "model",
+  "state_visual_effects.js": "model",
   "client_intent.js": "model",
   "command_budget.js": "model",
   "command_composer.js": "model",
@@ -102,8 +104,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "renderer/feedback.js": 46315,
   // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
   "hud.js": 44208,
-  // Room2 Phase 4 adds recipient diagnostic affordance parsing to GameState.
-  "state.js": 39267,
+  // Hotspot Cleanup Phase 6 extracted GameState query and visual-effect helpers.
+  "state.js": 29754,
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   "input/index.js": 40927,
   // Artillery minimap markers forward the visual-only firing event and inject the rig icon.

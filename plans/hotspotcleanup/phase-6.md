@@ -1,6 +1,6 @@
 # Phase 6 - GameState Helper Extraction
 
-Status: planned.
+Status: done.
 
 ## Goal
 

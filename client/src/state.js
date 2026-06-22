@@ -5,33 +5,28 @@
 // latest resources/events, and the local selection set. Selection is a
 // client-only concept; the server never sees it directly.
 
-import { RESOURCE_AMOUNTS } from "./config.js";
 import { admitSelectionIds } from "./command_budget.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
+import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
 import {
-  DEFAULT_FACTION_ID,
-  KIND,
-  MOVEMENT_PATH_DIAGNOSTICS,
-  PASSABLE,
-  STATE,
-  isBuilding,
-  isResource,
-  isUnit,
-} from "./protocol.js";
+  isAllyOwner as queryIsAllyOwner,
+  isEnemyOwner as queryIsEnemyOwner,
+  isNeutralOwner as queryIsNeutralOwner,
+  isOwnOwner as queryIsOwnOwner,
+  isPassable as queryIsPassable,
+  normalizeDiagnostics,
+  normalizePlayer,
+  normalizeResource,
+  playerById as queryPlayerById,
+  teamIdForPlayer as queryTeamIdForPlayer,
+  terrainAt as queryTerrainAt,
+  worldInBounds as queryWorldInBounds,
+} from "./state_queries.js";
+import { VisualEffectBuffers } from "./state_visual_effects.js";
 
 const TWO_PI = Math.PI * 2;
-const SHOT_REVEAL_MS = 1500;
 const PREDICTION_SMOOTH_MS = 120;
 const PREDICTION_SMOOTH_MAX_PX = 96;
-const WEAPON_RECOIL_MS = Object.freeze({
-  [KIND.RIFLEMAN]: 420,
-  [KIND.MACHINE_GUNNER]: 160,
-  [KIND.ANTI_TANK_GUN]: 820,
-  [KIND.MORTAR_TEAM]: 520,
-  [KIND.ARTILLERY]: 980,
-  [KIND.SCOUT_CAR]: 160,
-  [KIND.TANK]: 650,
-});
 
 function normalizeAngle(a) {
   let out = (a + Math.PI) % TWO_PI;
@@ -45,18 +40,6 @@ function shortestAngleDelta(from, to) {
 
 function lerpAngle(from, to, t) {
   return normalizeAngle(from + shortestAngleDelta(from, to) * t);
-}
-
-function normalizeDiagnostics(diagnostics) {
-  const movementPaths = Object.values(MOVEMENT_PATH_DIAGNOSTICS).includes(
-    diagnostics?.movementPaths,
-  )
-    ? diagnostics.movementPaths
-    : MOVEMENT_PATH_DIAGNOSTICS.NONE;
-  return {
-    movementPaths,
-    observerAnalysis: diagnostics?.observerAnalysis === true,
-  };
 }
 
 export class GameState {
@@ -74,14 +57,14 @@ export class GameState {
     this.map = {
       ...startInfo.map,
       resources: (startInfo.map?.resources || []).map((node, index) =>
-        this._normalizeResource(node, index),
+        normalizeResource(node, index),
       ),
     };
     /** @type {Map<number, object>} id -> resource node state. */
     this.resourceById = new Map();
     for (const node of this.map.resources) this.resourceById.set(node.id, node);
     /** @type {Array<{id:number,teamId:number,factionId:string,name:string,color:string,startTileX:number,startTileY:number}>} */
-    this.players = (startInfo.players || []).map((player) => this._normalizePlayer(player));
+    this.players = (startInfo.players || []).map((player) => normalizePlayer(player));
 
     // --- snapshot buffering for interpolation ---
     /** @type {object|null} previous snapshot (older of the two we keep). */
@@ -132,33 +115,10 @@ export class GameState {
     this.abilityObjects = [];
     /** @type {Array<{id:number,owner:number,kind:string,x:number,y:number,footprint:Array<[number,number]>,observedTick:number}>} */
     this.rememberedBuildings = [];
-    /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>} */
-    this.smokeCanisters = [];
     /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
     this.visibleTiles = [];
 
-    /** @type {Array<{from:number,to:number,createdAt:number}>} */
-    this.muzzleFlashes = [];
-    /** @type {Array<{x:number,y:number,createdAt:number}>} */
-    this.mortarLaunches = [];
-    /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>} */
-    this.mortarShells = [];
-    /** @type {Array<{fromX:number,fromY:number,x:number,y:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>} */
-    this.mortarTargets = [];
-    /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
-    this.mortarImpacts = [];
-    /** @type {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>} */
-    this.artilleryTargets = [];
-    /** @type {Array<{x:number,y:number,facing:number,seed:number,createdAt:number}>} */
-    this.artilleryLaunches = [];
-    /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
-    this.artilleryImpacts = [];
-    /** @type {Map<number, number>} attacker id -> latest shot receive time. */
-    this.weaponRecoilById = new Map();
-    /** @type {Array<{x:number,y:number,createdAt:number}>} */
-    this.pendingMortarTargets = [];
-    /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
-    this.shotRevealsById = new Map();
+    this.visualEffects = new VisualEffectBuffers();
     /** @type {Map<number, object>} owned predicted entity id -> predicted entity view. */
     this.predictedById = new Map();
     this.predictionCorrectionById = new Map();
@@ -175,8 +135,7 @@ export class GameState {
   }
 
   playerById(id) {
-    const playerId = Number(id);
-    return this.players.find((player) => player.id === playerId) || null;
+    return queryPlayerById(this.players, id);
   }
 
   get localPlayer() {
@@ -188,32 +147,23 @@ export class GameState {
   }
 
   teamIdForPlayer(id) {
-    const player = this.playerById(id);
-    return player ? player.teamId : null;
+    return queryTeamIdForPlayer(this.players, id);
   }
 
   isOwnOwner(owner) {
-    return Number(owner) === this.playerId;
+    return queryIsOwnOwner(this.playerId, owner);
   }
 
   isAllyOwner(owner) {
-    const ownerId = Number(owner);
-    if (!Number.isInteger(ownerId) || ownerId === 0 || ownerId === this.playerId) return false;
-    const ownTeam = this.teamIdForPlayer(this.playerId);
-    const ownerTeam = this.teamIdForPlayer(ownerId);
-    return ownTeam != null && ownerTeam != null && ownTeam !== 0 && ownTeam === ownerTeam;
+    return queryIsAllyOwner(this.players, this.playerId, owner);
   }
 
   isEnemyOwner(owner) {
-    const ownerId = Number(owner);
-    if (!Number.isInteger(ownerId) || ownerId === 0 || ownerId === this.playerId) return false;
-    const ownTeam = this.teamIdForPlayer(this.playerId);
-    const ownerTeam = this.teamIdForPlayer(ownerId);
-    return ownTeam != null && ownerTeam != null && ownTeam !== ownerTeam;
+    return queryIsEnemyOwner(this.players, this.playerId, owner);
   }
 
   isNeutralOwner(owner) {
-    return Number(owner) === 0;
+    return queryIsNeutralOwner(owner);
   }
 
   /**
@@ -231,6 +181,102 @@ export class GameState {
    */
   get currRecvTime() {
     return this._cur ? this._curRecvTime : null;
+  }
+
+  get smokeCanisters() {
+    return this.visualEffects.smokeCanisters;
+  }
+
+  set smokeCanisters(value) {
+    this.visualEffects.smokeCanisters = Array.isArray(value) ? value : [];
+  }
+
+  get muzzleFlashes() {
+    return this.visualEffects.muzzleFlashes;
+  }
+
+  set muzzleFlashes(value) {
+    this.visualEffects.muzzleFlashes = Array.isArray(value) ? value : [];
+  }
+
+  get mortarLaunches() {
+    return this.visualEffects.mortarLaunches;
+  }
+
+  set mortarLaunches(value) {
+    this.visualEffects.mortarLaunches = Array.isArray(value) ? value : [];
+  }
+
+  get mortarShells() {
+    return this.visualEffects.mortarShells;
+  }
+
+  set mortarShells(value) {
+    this.visualEffects.mortarShells = Array.isArray(value) ? value : [];
+  }
+
+  get mortarTargets() {
+    return this.visualEffects.mortarTargets;
+  }
+
+  set mortarTargets(value) {
+    this.visualEffects.mortarTargets = Array.isArray(value) ? value : [];
+  }
+
+  get mortarImpacts() {
+    return this.visualEffects.mortarImpacts;
+  }
+
+  set mortarImpacts(value) {
+    this.visualEffects.mortarImpacts = Array.isArray(value) ? value : [];
+  }
+
+  get artilleryTargets() {
+    return this.visualEffects.artilleryTargets;
+  }
+
+  set artilleryTargets(value) {
+    this.visualEffects.artilleryTargets = Array.isArray(value) ? value : [];
+  }
+
+  get artilleryLaunches() {
+    return this.visualEffects.artilleryLaunches;
+  }
+
+  set artilleryLaunches(value) {
+    this.visualEffects.artilleryLaunches = Array.isArray(value) ? value : [];
+  }
+
+  get artilleryImpacts() {
+    return this.visualEffects.artilleryImpacts;
+  }
+
+  set artilleryImpacts(value) {
+    this.visualEffects.artilleryImpacts = Array.isArray(value) ? value : [];
+  }
+
+  get weaponRecoilById() {
+    return this.visualEffects.weaponRecoilById;
+  }
+
+  set weaponRecoilById(value) {
+    this.visualEffects.weaponRecoilById = value instanceof Map ? value : new Map();
+  }
+
+  get pendingMortarTargets() {
+    return this.visualEffects.pendingMortarTargets;
+  }
+
+  set pendingMortarTargets(value) {
+    this.visualEffects.pendingMortarTargets = Array.isArray(value) ? value : [];
+  }
+
+  get shotRevealsById() {
+    return this.visualEffects.shotRevealsById;
+  }
+
+  set shotRevealsById(value) {
+    this.visualEffects.shotRevealsById = value instanceof Map ? value : new Map();
   }
 
   // --- snapshots ----------------------------------------------------------
@@ -260,20 +306,18 @@ export class GameState {
     this._applyResourceDeltas(msg.resourceDeltas || []);
     this._applyResourceDeaths(events);
     const wireEntities = (msg.entities || []).filter((e) => !isResource(e.kind));
-    this._applyAttackReveals(events, now);
+    this.visualEffects.applyAttackReveals(events, now);
     const visibleIds = new Set(wireEntities.map((e) => e.id));
     const entities = wireEntities
       .concat(this._resourceEntityViews())
-      .concat(this._shotRevealEntityViews(now, visibleIds));
+      .concat(this.visualEffects.shotRevealEntityViews(now, visibleIds));
     this.progressExtrapolator.updateFromSnapshot(entities, now);
 
     this._cur = { ...msg, entities };
     this._curRecvTime = now;
     this._curById = new Map();
     for (const e of entities) this._curById.set(e.id, e);
-    for (const id of this.weaponRecoilById.keys()) {
-      if (!this._curById.has(id)) this.weaponRecoilById.delete(id);
-    }
+    this.visualEffects.pruneRecoilForSnapshot(this._curById);
 
     this.resources = {
       steel: msg.steel | 0,
@@ -295,183 +339,27 @@ export class GameState {
     this._pruneSelection();
     this._pruneControlGroups();
 
-    for (const ev of this.events) {
-      if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
-        const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
-          ? { x: ev.toPos[0], y: ev.toPos[1] }
-          : null;
-        if (ev.from !== ev.to) {
-          this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
-        }
-        this.weaponRecoilById.set(ev.from, now);
-      } else if (ev && ev.e === "smokeLaunch") {
-        this.addSmokeCanister(ev, now);
-      } else if (ev && ev.e === "mortarLaunch") {
-        this.addMortarLaunch(ev, now);
-      } else if (ev && ev.e === "mortarImpact") {
-        this.addMortarImpact(ev, now);
-      } else if (ev && ev.e === "artilleryTarget") {
-        this.addArtilleryTarget(ev, now);
-      } else if (ev && ev.e === "artilleryImpact") {
-        this.addArtilleryImpact(ev, now);
-      }
-    }
-    if (this.muzzleFlashes.length > 256) {
-      this.muzzleFlashes.splice(0, this.muzzleFlashes.length - 256);
-    }
-    if (this.smokeCanisters.length > 64) {
-      this.smokeCanisters.splice(0, this.smokeCanisters.length - 64);
-    }
-    if (this.mortarLaunches.length > 32) {
-      this.mortarLaunches.splice(0, this.mortarLaunches.length - 32);
-    }
-    if (this.mortarShells.length > 32) {
-      this.mortarShells.splice(0, this.mortarShells.length - 32);
-    }
-    if (this.mortarTargets.length > 32) {
-      this.mortarTargets.splice(0, this.mortarTargets.length - 32);
-    }
-    if (this.mortarImpacts.length > 32) {
-      this.mortarImpacts.splice(0, this.mortarImpacts.length - 32);
-    }
-    if (this.artilleryTargets.length > 48) {
-      this.artilleryTargets.splice(0, this.artilleryTargets.length - 48);
-    }
-    if (this.artilleryLaunches.length > 32) {
-      this.artilleryLaunches.splice(0, this.artilleryLaunches.length - 32);
-    }
-    if (this.artilleryImpacts.length > 32) {
-      this.artilleryImpacts.splice(0, this.artilleryImpacts.length - 32);
-    }
+    this.visualEffects.applySnapshotEvents(this.events, now, (id) => this.entityById(id));
   }
 
   addMortarLaunch(ev, now = performance.now()) {
-    if (
-      !Number.isFinite(ev.fromX) ||
-      !Number.isFinite(ev.fromY) ||
-      !Number.isFinite(ev.toX) ||
-      !Number.isFinite(ev.toY)
-    ) {
-      return;
-    }
-    const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0;
-    const durationMs = Math.max(1, (delayTicks / 30) * 1000);
-    const radiusTiles = Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5;
-    const seed = Math.floor(ev.toX * 13 + ev.toY * 7 + now) >>> 0;
-    if (typeof ev.from === "number") {
-      this.weaponRecoilById.set(ev.from, now);
-    }
-    this.pendingMortarTargets = this.pendingMortarTargets.filter(
-      (p) => Math.hypot(p.x - ev.toX, p.y - ev.toY) > 2,
-    );
-    this.mortarLaunches.push({
-      x: ev.fromX,
-      y: ev.fromY,
-      toX: ev.toX,
-      toY: ev.toY,
-      seed,
-      createdAt: now,
-    });
-    this.mortarShells.push({
-      fromX: ev.fromX,
-      fromY: ev.fromY,
-      toX: ev.toX,
-      toY: ev.toY,
-      radiusTiles,
-      durationMs,
-      seed,
-      createdAt: now,
-    });
-    this.mortarTargets.push({
-      fromX: ev.fromX,
-      fromY: ev.fromY,
-      x: ev.toX,
-      y: ev.toY,
-      radiusTiles,
-      durationMs,
-      seed,
-      createdAt: now,
-    });
+    this.visualEffects.addMortarLaunch(ev, now);
   }
 
   addMortarImpact(ev, now = performance.now()) {
-    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
-    this.mortarTargets = this.mortarTargets.filter(
-      (target) => Math.hypot(target.x - ev.x, target.y - ev.y) > 2,
-    );
-    this.mortarShells = this.mortarShells.filter(
-      (shell) => Math.hypot(shell.toX - ev.x, shell.toY - ev.y) > 2,
-    );
-    this.mortarImpacts.push({
-      x: ev.x,
-      y: ev.y,
-      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5,
-      seed: Math.floor(ev.x * 13 + ev.y * 7 + now) >>> 0,
-      createdAt: now,
-    });
+    this.visualEffects.addMortarImpact(ev, now);
   }
 
   addArtilleryTarget(ev, now = performance.now()) {
-    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
-    if (typeof ev.from === "number") {
-      this.weaponRecoilById.set(ev.from, now);
-      const shooter = this.entityById(ev.from);
-      if (shooter && Number.isFinite(shooter.x) && Number.isFinite(shooter.y)) {
-        const facing = Number.isFinite(shooter.weaponFacing)
-          ? shooter.weaponFacing
-          : Number.isFinite(shooter.facing)
-            ? shooter.facing
-            : 0;
-        this.artilleryLaunches.push({
-          x: shooter.x,
-          y: shooter.y,
-          facing,
-          seed: Math.floor(shooter.x * 23 + shooter.y * 29 + now) >>> 0,
-          createdAt: now,
-        });
-      }
-    }
-    this.artilleryTargets.push({
-      x: ev.x,
-      y: ev.y,
-      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 3,
-      delayTicks: Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0,
-      seed: Math.floor(ev.x * 17 + ev.y * 11 + now) >>> 0,
-      createdAt: now,
-    });
+    this.visualEffects.addArtilleryTarget(ev, now, (id) => this.entityById(id));
   }
 
   addArtilleryImpact(ev, now = performance.now()) {
-    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
-    this.artilleryImpacts.push({
-      x: ev.x,
-      y: ev.y,
-      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 3,
-      seed: Math.floor(ev.x * 19 + ev.y * 23 + now) >>> 0,
-      createdAt: now,
-    });
+    this.visualEffects.addArtilleryImpact(ev, now);
   }
 
   addSmokeCanister(ev, now = performance.now()) {
-    if (
-      !Number.isFinite(ev.fromX) ||
-      !Number.isFinite(ev.fromY) ||
-      !Number.isFinite(ev.toX) ||
-      !Number.isFinite(ev.toY)
-    ) {
-      return;
-    }
-    const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0;
-    const durationMs = (delayTicks / 30) * 1000;
-    if (durationMs <= 0) return;
-    this.smokeCanisters.push({
-      fromX: ev.fromX,
-      fromY: ev.fromY,
-      toX: ev.toX,
-      toY: ev.toY,
-      durationMs,
-      createdAt: now,
-    });
+    this.visualEffects.addSmokeCanister(ev, now);
   }
 
   /**
@@ -480,8 +368,7 @@ export class GameState {
    * @returns {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>}
    */
   liveSmokeCanisters(now) {
-    this.smokeCanisters = this.smokeCanisters.filter((f) => now - f.createdAt <= f.durationMs);
-    return this.smokeCanisters;
+    return this.visualEffects.liveSmokeCanisters(now);
   }
 
   /**
@@ -490,9 +377,7 @@ export class GameState {
    * @returns {Array<{x:number,y:number,createdAt:number}>}
    */
   liveMortarLaunches(now) {
-    const ttlMs = 360;
-    this.mortarLaunches = this.mortarLaunches.filter((f) => now - f.createdAt <= ttlMs);
-    return this.mortarLaunches;
+    return this.visualEffects.liveMortarLaunches(now);
   }
 
   /**
@@ -501,8 +386,7 @@ export class GameState {
    * @returns {Array<{fromX:number,fromY:number,toX:number,toY:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>}
    */
   liveMortarShells(now) {
-    this.mortarShells = this.mortarShells.filter((f) => now - f.createdAt <= f.durationMs + 120);
-    return this.mortarShells;
+    return this.visualEffects.liveMortarShells(now);
   }
 
   /**
@@ -511,8 +395,7 @@ export class GameState {
    * @returns {Array<{fromX:number,fromY:number,x:number,y:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>}
    */
   liveMortarTargets(now) {
-    this.mortarTargets = this.mortarTargets.filter((f) => now - f.createdAt <= f.durationMs + 120);
-    return this.mortarTargets;
+    return this.visualEffects.liveMortarTargets(now);
   }
 
   /**
@@ -521,9 +404,7 @@ export class GameState {
    * @returns {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>}
    */
   liveMortarImpacts(now) {
-    const ttlMs = 1000;
-    this.mortarImpacts = this.mortarImpacts.filter((f) => now - f.createdAt <= ttlMs);
-    return this.mortarImpacts;
+    return this.visualEffects.liveMortarImpacts(now);
   }
 
   /**
@@ -532,11 +413,7 @@ export class GameState {
    * @returns {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>}
    */
   liveArtilleryTargets(now) {
-    this.artilleryTargets = this.artilleryTargets.filter((f) => {
-      const ttlMs = Math.max(900, ((f.delayTicks || 0) / 30) * 1000 + 350);
-      return now - f.createdAt <= ttlMs;
-    });
-    return this.artilleryTargets;
+    return this.visualEffects.liveArtilleryTargets(now);
   }
 
   /**
@@ -545,9 +422,7 @@ export class GameState {
    * @returns {Array<{x:number,y:number,facing:number,seed:number,createdAt:number}>}
    */
   liveArtilleryLaunches(now) {
-    const ttlMs = 820;
-    this.artilleryLaunches = this.artilleryLaunches.filter((f) => now - f.createdAt <= ttlMs);
-    return this.artilleryLaunches;
+    return this.visualEffects.liveArtilleryLaunches(now);
   }
 
   /**
@@ -556,9 +431,7 @@ export class GameState {
    * @returns {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>}
    */
   liveArtilleryImpacts(now) {
-    const ttlMs = 850;
-    this.artilleryImpacts = this.artilleryImpacts.filter((f) => now - f.createdAt <= ttlMs);
-    return this.artilleryImpacts;
+    return this.visualEffects.liveArtilleryImpacts(now);
   }
 
   /**
@@ -567,9 +440,7 @@ export class GameState {
    * @returns {Array<{from:number,to:number,createdAt:number}>}
    */
   liveMuzzleFlashes(now) {
-    const ttlMs = 240;
-    this.muzzleFlashes = this.muzzleFlashes.filter((f) => now - f.createdAt <= ttlMs);
-    return this.muzzleFlashes;
+    return this.visualEffects.liveMuzzleFlashes(now);
   }
 
   /**
@@ -580,21 +451,7 @@ export class GameState {
    * @returns {number}
    */
   weaponRecoil(id, kind, now) {
-    if (typeof now !== "number") {
-      now = kind;
-      kind = undefined;
-    }
-    const startedAt = this.weaponRecoilById.get(id);
-    if (typeof startedAt !== "number") return 0;
-    const ttlMs = WEAPON_RECOIL_MS[kind] || 300;
-    const age = now - startedAt;
-    if (age < 0) return 1;
-    if (age > ttlMs) {
-      this.weaponRecoilById.delete(id);
-      return 0;
-    }
-    const t = age / ttlMs;
-    return recoilCurve(t);
+    return this.visualEffects.weaponRecoil(id, kind, now);
   }
 
   /**
@@ -779,21 +636,6 @@ export class GameState {
     return out;
   }
 
-  _normalizeResource(node, index) {
-    const kind = node.kind === KIND.OIL ? KIND.OIL : KIND.STEEL;
-    return {
-      id: typeof node.id === "number" ? node.id : -(index + 1),
-      owner: 0,
-      kind,
-      x: node.x,
-      y: node.y,
-      hp: 1,
-      maxHp: 1,
-      state: "idle",
-      remaining: node.remaining ?? RESOURCE_AMOUNTS[kind] ?? 0,
-    };
-  }
-
   _applyResourceDeltas(deltas) {
     for (const delta of deltas) {
       if (!delta || typeof delta.id !== "number") continue;
@@ -809,65 +651,6 @@ export class GameState {
       const node = this.resourceById.get(ev.id);
       if (node) node.remaining = 0;
     }
-  }
-
-  _applyAttackReveals(events, now) {
-    for (const ev of events) {
-      if (
-        !ev ||
-        (ev.e !== "attack" && ev.e !== "mortarImpact") ||
-        typeof ev.from !== "number"
-      ) {
-        continue;
-      }
-      const reveal = this._normalizeAttackReveal(ev, now);
-      if (!reveal) continue;
-      this.shotRevealsById.set(ev.from, reveal);
-    }
-  }
-
-  _normalizeAttackReveal(ev, now) {
-    const r = ev.reveal;
-    if (!r || !isUnit(r.kind)) return null;
-    if (!Number.isFinite(r.x) || !Number.isFinite(r.y)) return null;
-    const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
-      ? { x: ev.toPos[0], y: ev.toPos[1] }
-      : Number.isFinite(ev.x) && Number.isFinite(ev.y)
-        ? { x: ev.x, y: ev.y }
-      : null;
-    const targetAngle = targetPos && Number.isFinite(targetPos.x) && Number.isFinite(targetPos.y)
-      ? Math.atan2(targetPos.y - r.y, targetPos.x - r.x)
-      : null;
-    const facing = Number.isFinite(r.facing) ? r.facing : (targetAngle ?? 0);
-    const weaponFacing = Number.isFinite(r.weaponFacing) ? r.weaponFacing : facing;
-    return {
-      id: ev.from,
-      owner: typeof r.owner === "number" ? r.owner : 0,
-      kind: r.kind,
-      x: r.x,
-      y: r.y,
-      hp: 1,
-      maxHp: 1,
-      state: STATE.ATTACK,
-      facing,
-      weaponFacing,
-      setupState: r.setupState,
-      shotReveal: true,
-      shotRevealCreatedAt: now,
-      shotRevealExpiresAt: now + SHOT_REVEAL_MS,
-    };
-  }
-
-  _shotRevealEntityViews(now, visibleIds) {
-    const out = [];
-    for (const [id, reveal] of this.shotRevealsById) {
-      if (visibleIds.has(id) || now > reveal.shotRevealExpiresAt) {
-        this.shotRevealsById.delete(id);
-        continue;
-      }
-      out.push({ ...reveal });
-    }
-    return out;
   }
 
   _resourceEntityViews() {
@@ -1059,12 +842,7 @@ export class GameState {
    * @returns {boolean}
    */
   worldInBounds(wx, wy) {
-    return (
-      wx >= 0 &&
-      wy >= 0 &&
-      wx < this.map.width * this.map.tileSize &&
-      wy < this.map.height * this.map.tileSize
-    );
+    return queryWorldInBounds(this.map, wx, wy);
   }
 
   /**
@@ -1074,10 +852,7 @@ export class GameState {
    * @returns {number|null} a TERRAIN code, or null.
    */
   terrainAt(tileX, tileY) {
-    if (tileX < 0 || tileY < 0 || tileX >= this.map.width || tileY >= this.map.height) {
-      return null;
-    }
-    return this.map.terrain[tileY * this.map.width + tileX];
+    return queryTerrainAt(this.map, tileX, tileY);
   }
 
   /**
@@ -1088,31 +863,6 @@ export class GameState {
    * @returns {boolean}
    */
   isPassable(tileX, tileY) {
-    const terrain = this.terrainAt(tileX, tileY);
-    if (terrain == null) return false;
-    return !!PASSABLE[terrain];
+    return queryIsPassable(this.map, tileX, tileY);
   }
-
-  _normalizePlayer(player) {
-    const id = Number(player?.id) >>> 0;
-    const rawTeamId = Number(player?.teamId);
-    return {
-      ...player,
-      id,
-      teamId: Number.isInteger(rawTeamId) && rawTeamId > 0 ? rawTeamId >>> 0 : id,
-      factionId:
-        typeof player?.factionId === "string" && player.factionId.length > 0
-          ? player.factionId
-          : DEFAULT_FACTION_ID,
-    };
-  }
-}
-
-function recoilCurve(t) {
-  const progress = t < 0 ? 0 : t > 1 ? 1 : t;
-  if (progress < 0.18) {
-    return 1 - progress * 0.12;
-  }
-  const settle = (progress - 0.18) / 0.82;
-  return Math.cos(settle * Math.PI * 0.5) * 0.88;
 }
