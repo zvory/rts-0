@@ -34,10 +34,10 @@ for (const file of listRustFiles(lobbySrc)) {
     );
   }
 
-  if (file !== "room_task.rs") {
+  if (file !== "room_task.rs" && file !== "room_task/lab.rs") {
     for (const match of stripped.matchAll(labMutationCallRe)) {
       failures.push(
-        `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${match[1]} must stay centralized in room_task.rs lab request handling`,
+        `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${match[1]} must stay centralized in room_task/lab.rs lab request handling`,
       );
     }
   }
