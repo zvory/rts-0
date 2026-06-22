@@ -3316,18 +3316,15 @@ impl RoomTask {
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
         match self.tick_control().scheduled_action() {
-            ScheduledTickAction::Noop => return,
+            ScheduledTickAction::Noop => {}
             ScheduledTickAction::Countdown => {
                 self.finish_match_countdown_if_due();
-                return;
             }
             ScheduledTickAction::RoomControlled(RoomTimeSource::ReplayPlayback) => {
                 self.on_tick_replay_viewer(scheduled);
-                return;
             }
             ScheduledTickAction::RoomControlled(RoomTimeSource::DevScenario) => {
                 self.on_tick_dev_watch(scheduled);
-                return;
             }
             ScheduledTickAction::RoomControlled(RoomTimeSource::Lab)
             | ScheduledTickAction::LiveMatch => {
