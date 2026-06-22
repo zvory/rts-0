@@ -57,6 +57,7 @@ pub(super) enum ClockTickSource {
 pub(super) enum RoomTimeSource {
     ReplayPlayback,
     DevScenario,
+    Lab,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +98,13 @@ impl RoomTimeOperations {
         seek_absolute: false,
     };
 
+    pub(super) const LAB: Self = Self {
+        set_speed: true,
+        step: true,
+        seek_relative: false,
+        seek_absolute: false,
+    };
+
     pub(super) fn allows(self, operation: RoomTimeOperation) -> bool {
         match operation {
             RoomTimeOperation::SetSpeed => self.set_speed,
@@ -130,6 +138,10 @@ impl ClockCapability {
     pub(super) const DEV_SCENARIO: Self = Self::RoomControlled(RoomTimeCapability {
         source: RoomTimeSource::DevScenario,
         operations: RoomTimeOperations::DEV_SCENARIO,
+    });
+    pub(super) const LAB: Self = Self::RoomControlled(RoomTimeCapability {
+        source: RoomTimeSource::Lab,
+        operations: RoomTimeOperations::LAB,
     });
 
     pub(super) fn room_time_source(self) -> Option<RoomTimeSource> {
@@ -523,7 +535,7 @@ impl SessionPolicy {
             SessionMode::Lab => {
                 policy.state_source = StateSource::LabGame;
                 policy.join = JoinPolicy::LabRoom;
-                policy.clock = ClockCapability::LIVE_MATCH;
+                policy.clock = ClockCapability::LAB;
                 policy.authority = AuthorityPolicy::LabOperator;
                 policy.mutation = MutationPolicy::LabPrivilegedOps;
                 policy.visibility = VisibilityPolicy::LabFullWorld;
@@ -906,7 +918,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LabGame,
                 join: JoinPolicy::LabRoom,
-                clock: ClockCapability::LIVE_MATCH,
+                clock: ClockCapability::LAB,
                 authority: AuthorityPolicy::LabOperator,
                 visibility: VisibilityPolicy::LabFullWorld,
                 mutation: MutationPolicy::LabPrivilegedOps,
@@ -923,7 +935,7 @@ mod tests {
                 phase: SessionPhase::LiveMatch,
                 state_source: StateSource::LabGame,
                 join: JoinPolicy::LabRoom,
-                clock: ClockCapability::LIVE_MATCH,
+                clock: ClockCapability::LAB,
                 authority: AuthorityPolicy::LabOperator,
                 visibility: VisibilityPolicy::LabFullWorld,
                 mutation: MutationPolicy::LabPrivilegedOps,
@@ -974,6 +986,18 @@ mod tests {
         let branch = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);
         assert!(branch.start_capabilities(true).match_controls.pause);
         assert!(!branch.start_capabilities(false).match_controls.pause);
+
+        let lab = SessionPolicy::new(SessionMode::Lab, SessionPhase::LiveMatch);
+        let lab_caps = lab.start_capabilities(false);
+        assert!(lab_caps.room_time.available);
+        assert!(lab_caps.room_time.set_speed);
+        assert!(lab_caps.room_time.pause);
+        assert!(lab_caps.room_time.step);
+        assert!(!lab_caps.room_time.seek_relative);
+        assert!(!lab_caps.room_time.seek_absolute);
+        assert!(!lab_caps.room_time.timeline);
+        assert!(!lab_caps.commands.gameplay);
+        assert!(!lab_caps.match_controls.pause);
     }
 
     #[test]
@@ -1157,7 +1181,7 @@ mod tests {
         let lab_lobby = SessionPolicy::new(SessionMode::Lab, SessionPhase::Lobby);
         assert_eq!(lab_lobby.state_source, StateSource::LabGame);
         assert_eq!(lab_lobby.join, JoinPolicy::LabRoom);
-        assert_eq!(lab_lobby.clock, ClockCapability::LIVE_MATCH);
+        assert_eq!(lab_lobby.clock, ClockCapability::LAB);
         assert_eq!(lab_lobby.authority, AuthorityPolicy::LabOperator);
         assert_eq!(lab_lobby.visibility, VisibilityPolicy::LabFullWorld);
         assert_eq!(lab_lobby.mutation, MutationPolicy::LabPrivilegedOps);

@@ -619,6 +619,7 @@ pub(super) struct RoomTask {
     /// Room-time pause flag. Kept separate from room_time_speed so interval creation never divides
     /// by zero and resume can restore the previous non-zero multiplier.
     room_time_paused: bool,
+    lab_room_time_controller_id: Option<u32>,
     slow_tick_count: u32,
     pending_client_command_acks: Vec<PendingClientCommandAck>,
     /// Recipient-specific room-owned notices appended to the next live snapshot for each
@@ -677,6 +678,7 @@ impl RoomTask {
             ai_controllers: Vec::new(),
             room_time_speed: 1.0,
             room_time_paused: false,
+            lab_room_time_controller_id: None,
             slow_tick_count: 0,
             pending_client_command_acks: Vec::new(),
             pending_recipient_notices: HashMap::new(),
@@ -779,6 +781,10 @@ impl RoomTask {
                 })
             }
             (_, Some(RoomTimeSource::DevScenario)) => Some(RoomTimeClock {
+                speed: self.room_time_speed,
+                paused: self.room_time_paused,
+            }),
+            (_, Some(RoomTimeSource::Lab)) => Some(RoomTimeClock {
                 speed: self.room_time_speed,
                 paused: self.room_time_paused,
             }),
@@ -2312,6 +2318,7 @@ impl RoomTask {
             self.start_lab_session();
         } else {
             self.send_lab_start_to(player_id);
+            self.send_lab_room_time_state_to(player_id);
         }
     }
 
@@ -2792,6 +2799,7 @@ impl RoomTask {
         });
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
+        self.broadcast_lab_room_time_state();
     }
 
     fn default_lab_player_template(&self) -> Vec<PlayerInit> {
@@ -3200,14 +3208,12 @@ impl RoomTask {
         }
     }
 
-    fn broadcast_dev_watch_state(&self) {
-        if !self.session_policy().is_dev_watch() {
-            return;
-        }
-        let Phase::InGame(game) = &self.phase else {
-            return;
-        };
-        self.broadcast(&ServerMessage::RoomTimeState(RoomTimeState {
+    fn room_time_state_for_live_game(
+        &self,
+        game: &Game,
+        controller_id: Option<u32>,
+    ) -> RoomTimeState {
+        RoomTimeState {
             current_tick: game.tick_count(),
             duration_ticks: 0,
             keyframe_ticks: Vec::new(),
@@ -3218,8 +3224,52 @@ impl RoomTask {
             },
             paused: self.room_time_paused,
             ended: false,
-            controller_id: None,
-        }));
+            controller_id,
+        }
+    }
+
+    fn broadcast_dev_watch_state(&self) {
+        if !self.session_policy().is_dev_watch() {
+            return;
+        }
+        let Phase::InGame(game) = &self.phase else {
+            return;
+        };
+        self.broadcast(&ServerMessage::RoomTimeState(
+            self.room_time_state_for_live_game(game, None),
+        ));
+    }
+
+    fn lab_room_time_state(&self) -> Option<RoomTimeState> {
+        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::Lab) {
+            return None;
+        }
+        let Phase::InGame(game) = &self.phase else {
+            return None;
+        };
+        Some(self.room_time_state_for_live_game(game, self.lab_room_time_controller_id))
+    }
+
+    fn send_lab_room_time_state_to(&self, player_id: u32) {
+        let Some(state) = self.lab_room_time_state() else {
+            return;
+        };
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            player_id,
+            &player.msg_tx,
+            ServerMessage::RoomTimeState(state),
+        );
+    }
+
+    fn broadcast_lab_room_time_state(&self) {
+        let Some(state) = self.lab_room_time_state() else {
+            return;
+        };
+        self.broadcast(&ServerMessage::RoomTimeState(state));
     }
 
     fn fanout_replay_snapshots(
@@ -3279,8 +3329,14 @@ impl RoomTask {
                 self.on_tick_dev_watch(scheduled);
                 return;
             }
-            ScheduledTickAction::LiveMatch => {}
+            ScheduledTickAction::RoomControlled(RoomTimeSource::Lab)
+            | ScheduledTickAction::LiveMatch => {
+                self.on_tick_live_game(scheduled);
+            }
         }
+    }
+
+    fn on_tick_live_game(&mut self, scheduled: TokioInstant) {
         if self.live_paused && self.live_pause_controls_available() {
             return;
         }
@@ -3479,16 +3535,17 @@ impl RoomTask {
         match self.session_policy().clock.room_time_source() {
             Some(RoomTimeSource::ReplayPlayback) => {}
             Some(RoomTimeSource::DevScenario) => {
-                match TickControl::room_time_speed(speed) {
-                    RoomTimeSpeed::Paused => {
-                        self.room_time_paused = true;
-                    }
-                    RoomTimeSpeed::Running(speed) => {
-                        self.room_time_paused = false;
-                        self.room_time_speed = speed;
-                    }
-                }
+                self.apply_room_time_speed(speed);
                 self.broadcast_dev_watch_state();
+                return;
+            }
+            Some(RoomTimeSource::Lab) => {
+                if !self.lab_room_time_control_allowed(player_id) {
+                    return;
+                }
+                self.apply_room_time_speed(speed);
+                self.lab_room_time_controller_id = Some(player_id);
+                self.broadcast_lab_room_time_state();
                 return;
             }
             None => return,
@@ -3508,11 +3565,40 @@ impl RoomTask {
         {
             return;
         }
-        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::DevScenario) {
-            return;
+        match self.session_policy().clock.room_time_source() {
+            Some(RoomTimeSource::DevScenario) => {
+                self.on_tick_dev_watch(TokioInstant::now());
+                self.broadcast_dev_watch_state();
+            }
+            Some(RoomTimeSource::Lab) => {
+                if !self.lab_room_time_control_allowed(player_id) {
+                    return;
+                }
+                self.lab_room_time_controller_id = Some(player_id);
+                self.on_tick_live_game(TokioInstant::now());
+                self.broadcast_lab_room_time_state();
+            }
+            Some(RoomTimeSource::ReplayPlayback) | None => {}
         }
-        self.on_tick_dev_watch(TokioInstant::now());
-        self.broadcast_dev_watch_state();
+    }
+
+    fn apply_room_time_speed(&mut self, speed: f32) {
+        match TickControl::room_time_speed(speed) {
+            RoomTimeSpeed::Paused => {
+                self.room_time_paused = true;
+            }
+            RoomTimeSpeed::Running(speed) => {
+                self.room_time_paused = false;
+                self.room_time_speed = speed;
+            }
+        }
+    }
+
+    fn lab_room_time_control_allowed(&self, player_id: u32) -> bool {
+        self.lab_session
+            .as_ref()
+            .map(|session| session.can_operate(player_id))
+            .unwrap_or(false)
     }
 
     fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
@@ -4315,6 +4401,7 @@ impl RoomTask {
         self.match_countdown_deadline = None;
         self.reset_match_net_status();
         self.reset_live_pause_state();
+        self.reset_room_time_state();
     }
 
     fn record_live_match_started(
@@ -4340,6 +4427,7 @@ impl RoomTask {
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();
         self.reset_live_pause_state();
+        self.reset_room_time_state();
         for player in self.players.values_mut() {
             player.ready = false;
             player.msg_tx.clear_pending_snapshot();
@@ -4374,6 +4462,7 @@ impl RoomTask {
         self.dev_view_player_id = None;
         self.ai_controllers.clear();
         self.pending_client_command_acks.clear();
+        self.reset_room_time_state();
         self.clear_finished_match_identity();
     }
 
@@ -4381,6 +4470,12 @@ impl RoomTask {
         self.live_paused = false;
         self.live_paused_by = None;
         self.live_pause_counts.clear();
+    }
+
+    fn reset_room_time_state(&mut self) {
+        self.room_time_speed = 1.0;
+        self.room_time_paused = false;
+        self.lab_room_time_controller_id = None;
     }
 
     fn mark_match_started_for_drain(&mut self) {
@@ -5013,6 +5108,15 @@ mod tests {
         std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
             .filter_map(|msg| match msg {
                 ServerMessage::LabResult(result) => Some(result),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn room_time_states(writer: &mut ConnectionWriter) -> Vec<RoomTimeState> {
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .filter_map(|msg| match msg {
+                ServerMessage::RoomTimeState(state) => Some(state),
                 _ => None,
             })
             .collect()
@@ -5763,7 +5867,13 @@ mod tests {
         assert_eq!(payload.prediction_version, 0);
         assert!(!payload.capabilities.commands.gameplay);
         assert!(!payload.capabilities.match_controls.pause);
-        assert!(!payload.capabilities.room_time.available);
+        assert!(payload.capabilities.room_time.available);
+        assert!(payload.capabilities.room_time.set_speed);
+        assert!(payload.capabilities.room_time.pause);
+        assert!(payload.capabilities.room_time.step);
+        assert!(!payload.capabilities.room_time.seek_relative);
+        assert!(!payload.capabilities.room_time.seek_absolute);
+        assert!(!payload.capabilities.room_time.timeline);
         assert!(!payload.capabilities.visibility.replay_vision);
         assert!(!payload.capabilities.actions.replay_branch);
         assert!(payload.diagnostics.is_empty());
@@ -5987,6 +6097,140 @@ mod tests {
         assert_eq!(snapshot.entities.len(), expected.entities.len());
         assert_eq!(snapshot.player_resources, expected.player_resources);
         assert_eq!(snapshot.net_status.prediction_version, 0);
+    }
+
+    #[test]
+    fn lab_start_payload_advertises_room_time_controls() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        let starts: Vec<_> = messages
+            .iter()
+            .filter_map(|msg| match msg {
+                ServerMessage::Start(payload) => Some(payload),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(starts.len(), 1);
+        let payload = starts[0];
+        assert!(payload.lab.is_some());
+        assert!(payload.capabilities.room_time.available);
+        assert!(payload.capabilities.room_time.set_speed);
+        assert!(payload.capabilities.room_time.pause);
+        assert!(payload.capabilities.room_time.step);
+        assert!(!payload.capabilities.room_time.seek_relative);
+        assert!(!payload.capabilities.room_time.seek_absolute);
+        assert!(!payload.capabilities.room_time.timeline);
+        assert!(!payload.capabilities.commands.gameplay);
+        assert!(!payload.capabilities.match_controls.pause);
+
+        let states: Vec<_> = messages
+            .iter()
+            .filter_map(|msg| match msg {
+                ServerMessage::RoomTimeState(state) => Some(state),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(states.len(), 1);
+        assert_eq!(states[0].current_tick, 0);
+        assert_eq!(states[0].speed, 1.0);
+        assert!(!states[0].paused);
+        assert!(!states[0].ended);
+        assert_eq!(states[0].controller_id, None);
+    }
+
+    #[test]
+    fn paused_lab_room_steps_one_live_tick_and_shares_room_time_state() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        let (collab_tx, mut collab_writer) = ConnectionSink::new();
+        let (collab_ack, _collab_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Collaborator".to_string(),
+            true,
+            false,
+            collab_tx,
+            collab_ack,
+        );
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        while collab_writer.reliable_rx.try_recv().is_ok() {}
+
+        assert_eq!(in_game_tick(&task), 0);
+        task.on_set_room_time_speed(99, 0.0);
+
+        let operator_pause = room_time_states(&mut operator_writer);
+        let collab_pause = room_time_states(&mut collab_writer);
+        assert_eq!(operator_pause.len(), 1);
+        assert_eq!(collab_pause.len(), 1);
+        for state in [&operator_pause[0], &collab_pause[0]] {
+            assert_eq!(state.current_tick, 0);
+            assert_eq!(state.speed, 0.0);
+            assert!(state.paused);
+            assert_eq!(state.controller_id, Some(99));
+        }
+
+        task.on_tick(TokioInstant::now());
+        assert_eq!(
+            in_game_tick(&task),
+            0,
+            "scheduled lab ticks should not advance while paused"
+        );
+
+        task.on_step_room_time(100);
+        assert_eq!(in_game_tick(&task), 1);
+        assert!(operator_writer.snapshots.take().is_some());
+        assert!(collab_writer.snapshots.take().is_some());
+        let operator_step = room_time_states(&mut operator_writer);
+        let collab_step = room_time_states(&mut collab_writer);
+        assert_eq!(operator_step.len(), 1);
+        assert_eq!(collab_step.len(), 1);
+        for state in [&operator_step[0], &collab_step[0]] {
+            assert_eq!(state.current_tick, 1);
+            assert_eq!(state.speed, 0.0);
+            assert!(state.paused);
+            assert_eq!(state.controller_id, Some(100));
+        }
+
+        task.on_set_room_time_speed(100, 2.0);
+        let operator_resume = room_time_states(&mut operator_writer);
+        assert_eq!(operator_resume.len(), 1);
+        assert_eq!(operator_resume[0].current_tick, 1);
+        assert_eq!(operator_resume[0].speed, 2.0);
+        assert!(!operator_resume[0].paused);
+        assert_eq!(operator_resume[0].controller_id, Some(100));
+
+        task.on_tick(TokioInstant::now());
+        assert_eq!(
+            in_game_tick(&task),
+            2,
+            "scheduled lab ticks should resume after selecting a non-zero speed"
+        );
     }
 
     #[test]

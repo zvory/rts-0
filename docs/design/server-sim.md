@@ -315,8 +315,10 @@ alive.
   They use the shared launch helper with `StartPayload.lab` metadata and prediction disabled. Lab
   setup mutations call `Game::apply_lab_op`; issue-as commands call `Game::issue_lab_command_as`,
   which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,
-  viewer roles, per-operator selected vision, the future-join vision default, and append-only
-  operation log records stay in the room task rather than in `Game`.
+  viewer roles, per-operator selected vision, the future-join vision default, shared room-time
+  speed/pause/controller state, and append-only operation log records stay in the room task rather
+  than in `Game`. Paused lab room-time suppresses scheduled ticks; one-tick lab steps and running
+  lab ticks use the same `LiveTickDriver` path as ordinary live simulation.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -347,9 +349,9 @@ AI controllers, or Tokio coordination into `rts-sim`:
 - `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
   human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
   aliases, and command issuer resolution.
-- `tick_control.rs` maps the session clock policy, replay pause/speed, dev-watch pause state, and
-  countdown state to the room ticker interval and scheduled action. `RoomTask` still owns the Tokio
-  interval and remains the only task that advances a room.
+- `tick_control.rs` maps the session clock policy, replay pause/speed, dev-watch and lab pause
+  state, and countdown state to the room ticker interval and scheduled action. `RoomTask` still
+  owns the Tokio interval and remains the only task that advances a room.
 - `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
   per-viewer replay vision, lab viewers get their room-owned per-operator lab vision, branch-live

@@ -99,8 +99,8 @@ export class Net {
   createSnapshotReportStats()
   consumeSnapshotReportStats()
   noteSnapshotFrame({bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind})
-  setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario time
-  stepRoomTime()                         // paused dev-scenario room time
+  setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario/lab time
+  stepRoomTime()                         // paused dev-scenario/lab room time
   seekRoomTime(ticksBack)                // room-controlled replay time; pass huge N for full reset
   seekRoomTimeTo(tick)
   setReplayVision(vision)
