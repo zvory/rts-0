@@ -605,7 +605,8 @@ control groups, relationship helpers, fog-facing visibility data, and display ov
 authoritative snapshots. `ClientIntent` owns placement intent, command-card submenu state,
 command-target arming, hover previews, command feedback, and ability previews. `GameState` must not
 grow compatibility accessors for those intent fields; HUD, input, minimap, and renderer feedback
-use the injected facade or a narrow read model.
+use the injected facade or a narrow read model. Lab Unit Spawn and Building Spawn panels expose the
+target player's color through DOM data/style hooks before map placement.
 
 Frame-local entity views belong to the app-shell frame loop, not to `GameState`. Rendering, local
 fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
@@ -616,7 +617,9 @@ artillery firing indicators render as 30x24 SVG rig images without an extra surr
 Frame-local entity views may carry bounded render diagnostics for local profiling consumers without
 changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
 into deduped, browser-local pending ground decal stamps and rendered below resources and fog as
-visual-only decals; they do not change server protocol, simulation, or balance.
+visual-only decals. Death decals use SVG-authored mask assets from the client asset path when they
+load, queue stamps while the atlas is loading, and fall back to procedural masks when SVG loading is
+unavailable or fails; they do not change server protocol, simulation, or balance.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
@@ -1098,8 +1101,8 @@ Current areas:
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, audio, combat audio, alerts, fog, camera, prediction settings,
-  `report_window_aggregate.js`.
+- `platform`: bootstrap, including `/lab` launch URL mode/scenario defaults, audio, combat audio,
+  alerts, fog, camera, prediction settings, `report_window_aggregate.js`.
 
 Import rules:
 - `protocol.js` and `config.js` are shared mirrors and may be imported where needed.
