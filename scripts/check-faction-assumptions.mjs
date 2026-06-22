@@ -142,7 +142,6 @@ assertNotIncludes(clientUiDoc, "Phase 10 may keep this checked mirror", "docs/de
 
 for (const pathName of [
   "Normal lobby start",
-  "Quickstart/debug start",
   "AI add/remove/start",
   "Fixture/dev faction start",
   "Replay playback",
@@ -188,7 +187,7 @@ assert(
   `compact snapshot version mismatch: Rust ${rustCompactVersion}, client ${clientCompactVersion}`,
 );
 
-const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|CityCentre|Depot|Barracks|TrainingCentre|ResearchComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS|QUICKSTART_STEEL|QUICKSTART_OIL)\b/;
+const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|CityCentre|Depot|Barracks|TrainingCentre|ResearchComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS)\b/;
 const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/actions.rs",
   "server/crates/ai/src/ai_core/decision/defense.rs",

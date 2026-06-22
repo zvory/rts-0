@@ -205,11 +205,6 @@ export class Net {
     this._send(msg.removeAi(id));
   }
 
-  /** Toggle the lobby's start-with-more-money mode (host-only; ignored otherwise). */
-  setQuickstart(enabled) {
-    this._send(msg.setQuickstart(enabled));
-  }
-
   /**
    * Switch a player between player and spectator role while still in the lobby.
    * @param {boolean} spectator

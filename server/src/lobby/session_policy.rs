@@ -183,7 +183,6 @@ pub(super) enum ObserverAnalysisPolicy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum MovementPathDiagnosticPolicy {
     None,
-    OwnerOnly,
     AllProjected,
 }
 
@@ -213,13 +212,6 @@ impl DiagnosticPolicy {
         observer_analysis: ObserverAnalysisPolicy::None,
         movement_paths: MovementPathDiagnosticPolicy::AllProjected,
     };
-
-    pub(super) fn with_owner_movement_paths(self) -> Self {
-        Self {
-            movement_paths: MovementPathDiagnosticPolicy::OwnerOnly,
-            ..self
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

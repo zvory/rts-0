@@ -1,5 +1,4 @@
 use super::*;
-use crate::game::entity::WeaponSetup;
 use crate::rules::faction::{catalog_for_or_default_empty, FactionLoadout, StartingFormation};
 use std::str::FromStr;
 
@@ -18,7 +17,7 @@ impl Game {
         Self::new_inner(players, None, seed, StartingLoadout::Standard, None)
     }
 
-    /// Compatibility helper for tests/debug starts with one global resource override.
+    /// Compatibility helper for tests with one global resource override.
     #[allow(dead_code)]
     pub fn new_with_starting_resources(
         players: &[PlayerInit],
@@ -35,7 +34,7 @@ impl Game {
         )
     }
 
-    /// Compatibility helper for tests/debug starts with one global resource override.
+    /// Compatibility helper for tests with one global resource override.
     #[allow(dead_code)]
     pub fn new_with_starting_resources_and_random_ai_profiles(
         players: &[PlayerInit],
@@ -48,23 +47,6 @@ impl Game {
             Some((steel, oil)),
             seed,
             StartingLoadout::Standard,
-            None,
-        )
-    }
-
-    /// Create a debug lobby match with boosted resources and a prebuilt human-only loadout.
-    #[allow(dead_code)]
-    pub fn new_with_debug_starting_loadout_and_random_ai_profiles(
-        players: &[PlayerInit],
-        steel: u32,
-        oil: u32,
-        seed: u32,
-    ) -> Game {
-        Self::new_inner(
-            players,
-            Some((steel, oil)),
-            seed,
-            StartingLoadout::DebugHuman,
             None,
         )
     }
@@ -95,44 +77,6 @@ impl Game {
             None,
             seed,
             StartingLoadout::Standard,
-            None,
-            Some(map),
-            map_metadata,
-        )
-    }
-
-    /// Like [`Game::new_with_debug_starting_loadout_and_random_ai_profiles`] but uses a
-    /// pre-loaded [`Map`].
-    pub fn new_with_debug_starting_loadout_and_random_ai_profiles_and_map(
-        players: &[PlayerInit],
-        steel: u32,
-        oil: u32,
-        seed: u32,
-        map: Map,
-    ) -> Game {
-        Self::new_with_debug_starting_loadout_and_random_ai_profiles_and_map_metadata(
-            players,
-            steel,
-            oil,
-            seed,
-            map,
-            default_map_metadata(),
-        )
-    }
-
-    pub fn new_with_debug_starting_loadout_and_random_ai_profiles_and_map_metadata(
-        players: &[PlayerInit],
-        steel: u32,
-        oil: u32,
-        seed: u32,
-        map: Map,
-        map_metadata: MapMetadata,
-    ) -> Game {
-        Self::new_inner_with_map(
-            players,
-            Some((steel, oil)),
-            seed,
-            StartingLoadout::DebugHuman,
             None,
             Some(map),
             map_metadata,
@@ -306,9 +250,6 @@ impl Game {
             if let Some(loadout) = loadout {
                 spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
             }
-            if catalog.is_some() && starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
-                spawn_debug_human_start(&mut entities, &map, &mut ps, start);
-            }
             if let Some(loadout) = loadout {
                 for &upgrade in loadout.opening_upgrades {
                     if let Ok(kind) = upgrade::UpgradeKind::from_str(upgrade) {
@@ -316,17 +257,11 @@ impl Game {
                     }
                 }
             }
-            let loadout_id = if starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
-                catalog
-                    .map(|catalog| format!("{}.debug_human", catalog.id))
-                    .unwrap_or_else(|| format!("{faction_id}.invalid"))
-            } else {
-                override_record
-                    .filter(|_| catalog.is_some())
-                    .map(|record| record.loadout_id.clone())
-                    .or_else(|| loadout.map(|loadout| loadout.id.to_string()))
-                    .unwrap_or_else(|| format!("{faction_id}.invalid"))
-            };
+            let loadout_id = override_record
+                .filter(|_| catalog.is_some())
+                .map(|record| record.loadout_id.clone())
+                .or_else(|| loadout.map(|loadout| loadout.id.to_string()))
+                .unwrap_or_else(|| format!("{faction_id}.invalid"));
             resolved_starting_loadouts.push(PlayerStartingLoadout {
                 player_id: p.id,
                 faction_id,
@@ -335,10 +270,6 @@ impl Game {
                 starting_oil: initial_oil,
             });
             player_states.push(ps);
-        }
-
-        if starting_loadout == StartingLoadout::DebugHuman {
-            spawn_debug_inert_enemy_mortar_corner(&mut entities, &map, &mut player_states, players);
         }
 
         // Always spawn resources on the neutral expansion sites. Claimed sites get a full start;
@@ -553,252 +484,6 @@ fn spawn_player_start(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StartingLoadout {
     Standard,
-    DebugHuman,
-}
-
-/// Spawn the debug-mode extras for a human player. Default starts already include four workers,
-/// so this adds one more worker plus five of every combat unit for a final five of each unit kind.
-/// It also seeds a side-corner stash of extra depots for fast supply-cap testing.
-fn spawn_debug_human_start(
-    entities: &mut EntityStore,
-    map: &Map,
-    player: &mut PlayerState,
-    start: (u32, u32),
-) {
-    const DEBUG_BUILDINGS: &[(EntityKind, f32, f32)] = &[
-        (EntityKind::Depot, -8.0, 7.0),
-        (EntityKind::Depot, -4.0, 7.0),
-        (EntityKind::Depot, 0.0, 7.0),
-        (EntityKind::Depot, 4.0, 7.0),
-        (EntityKind::Depot, 8.0, 7.0),
-        (EntityKind::TrainingCentre, -7.0, 12.0),
-        (EntityKind::Barracks, -1.5, 12.0),
-        (EntityKind::Barracks, 4.0, 12.0),
-        (EntityKind::Steelworks, 9.0, 12.0),
-        (EntityKind::ResearchComplex, 9.0, 15.0),
-        (EntityKind::Factory, -4.0, 17.0),
-        (EntityKind::Factory, 4.0, 17.0),
-    ];
-    const DEBUG_CORNER_DEPOT_COLUMNS: u32 = 5;
-    const DEBUG_CORNER_DEPOT_ROWS: u32 = 2;
-    const DEBUG_UNITS: &[(EntityKind, u32)] = &[
-        (EntityKind::Worker, 1),
-        (EntityKind::Rifleman, 5),
-        (EntityKind::MachineGunner, 5),
-        (EntityKind::MortarTeam, 5),
-        (EntityKind::AntiTankGun, 5),
-        (EntityKind::Artillery, 5),
-        (EntityKind::ScoutCar, 5),
-        (EntityKind::Tank, 5),
-        (EntityKind::CommandCar, 5),
-    ];
-
-    for &(kind, side_tiles, back_tiles) in DEBUG_BUILDINGS {
-        let (x, y) = debug_offset_world(map, start, side_tiles, back_tiles);
-        if entities
-            .spawn_building(player.id, kind, x, y, true)
-            .is_some()
-        {
-            player.record_entity_created(kind);
-        }
-    }
-
-    for row in 0..DEBUG_CORNER_DEPOT_ROWS {
-        for col in 0..DEBUG_CORNER_DEPOT_COLUMNS {
-            let (x, y) = debug_side_corner_world(map, start, col, row);
-            if entities
-                .spawn_building(player.id, EntityKind::Depot, x, y, true)
-                .is_some()
-            {
-                player.record_entity_created(EntityKind::Depot);
-            }
-        }
-    }
-
-    let mut slot = 0u32;
-    for &(kind, count) in DEBUG_UNITS {
-        for _ in 0..count {
-            let row = slot / 6;
-            let col = slot % 6;
-            let side_tiles = if col < 3 {
-                -8.0 + col as f32 * 3.0
-            } else {
-                2.0 + (col - 3) as f32 * 3.0
-            };
-            let back_tiles = -3.0 + row as f32;
-            let (x, y) = debug_offset_world(map, start, side_tiles, back_tiles);
-            if entities.spawn_unit(player.id, kind, x, y).is_some() {
-                player.record_entity_created(kind);
-            }
-            slot += 1;
-        }
-    }
-}
-
-const DEBUG_INERT_ENEMY_ID: u32 = 900_001;
-const DEBUG_INERT_MORTAR_COUNT: usize = 5;
-const DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES: f32 = 2.0;
-const DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES: f32 = 5.0;
-
-/// Add a static enemy mortar/scout-car clump to debug starts without creating an AI
-/// controller/profile.
-fn spawn_debug_inert_enemy_mortar_corner(
-    entities: &mut EntityStore,
-    map: &Map,
-    players: &mut Vec<PlayerState>,
-    inits: &[PlayerInit],
-) {
-    if inits.iter().any(|p| p.id == DEBUG_INERT_ENEMY_ID) || inits.iter().all(|p| p.is_ai) {
-        return;
-    }
-
-    let Some((human_index, _)) = inits.iter().enumerate().find(|(_, p)| !p.is_ai) else {
-        return;
-    };
-    let Some(&human_start) = map.starts.get(human_index) else {
-        return;
-    };
-
-    let clump_tile = debug_clockwise_adjacent_corner_tile(map, human_start);
-    let clump_center = map.tile_center(clump_tile.0, clump_tile.1);
-    let map_center = map.world_size_px() * 0.5;
-    let to_center = (map_center - clump_center.0, map_center - clump_center.1);
-    let center_facing = to_center.1.atan2(to_center.0);
-    if !center_facing.is_finite() {
-        return;
-    }
-
-    let ts = config::TILE_SIZE as f32;
-    const MORTAR_OFFSETS: [(f32, f32); DEBUG_INERT_MORTAR_COUNT] = [
-        (0.0, -1.0),
-        (1.0, 0.0),
-        (0.0, 1.0),
-        (-1.0, 0.0),
-        (1.0, -1.0),
-    ];
-    for (dx, dy) in MORTAR_OFFSETS {
-        let x = clump_center.0 + dx * DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES * ts;
-        let y = clump_center.1 + dy * DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES * ts;
-        let facing = (map_center - y).atan2(map_center - x);
-        let Some(id) = entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::MortarTeam, x, y)
-        else {
-            continue;
-        };
-        if let Some(e) = entities.get_mut(id) {
-            e.set_facing(facing);
-            e.set_weapon_facing(facing);
-            e.set_desired_weapon_facing(facing);
-            e.set_weapon_setup(WeaponSetup::Deployed);
-        }
-    }
-
-    if let Some(id) = entities.spawn_unit(
-        DEBUG_INERT_ENEMY_ID,
-        EntityKind::ScoutCar,
-        clump_center.0,
-        clump_center.1,
-    ) {
-        if let Some(e) = entities.get_mut(id) {
-            e.set_facing(center_facing);
-            e.set_weapon_facing(center_facing);
-            e.set_desired_weapon_facing(center_facing);
-        }
-    }
-
-    const DEPOT_OFFSETS: [(f32, f32); 4] = [(0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0)];
-    for (dx, dy) in DEPOT_OFFSETS {
-        let x = clump_center.0 + dx * DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES * ts;
-        let y = clump_center.1 + dy * DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES * ts;
-        entities.spawn_building(DEBUG_INERT_ENEMY_ID, EntityKind::Depot, x, y, true);
-    }
-
-    players.push(PlayerState {
-        id: DEBUG_INERT_ENEMY_ID,
-        team_id: DEBUG_INERT_ENEMY_ID,
-        faction_id: DEFAULT_FACTION_ID.to_string(),
-        name: "Inert Mortar Corner".to_string(),
-        color: "#8d2f2f".to_string(),
-        start_tile: clump_tile,
-        steel: 0,
-        oil: 0,
-        supply_used: 0,
-        supply_cap: 0,
-        is_ai: true,
-        score: ScoreState::default(),
-        upgrades: Default::default(),
-    });
-}
-
-fn debug_clockwise_adjacent_corner_tile(map: &Map, start: (u32, u32)) -> (u32, u32) {
-    let max_tile = map.size.saturating_sub(1);
-    let start_x = start.0.min(max_tile);
-    let start_y = start.1.min(max_tile);
-    let inset = DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES.ceil() as u32 + 1;
-    (
-        max_tile
-            .saturating_sub(start_y)
-            .clamp(inset, max_tile.saturating_sub(inset)),
-        start_x.clamp(inset, max_tile.saturating_sub(inset)),
-    )
-}
-
-fn debug_offset_world(
-    map: &Map,
-    start: (u32, u32),
-    side_tiles: f32,
-    back_tiles: f32,
-) -> (f32, f32) {
-    let (hx, hy) = map.tile_center(start.0, start.1);
-    let back_x = debug_back_axis(map, start.0);
-    let back_y = debug_back_axis(map, start.1);
-    let side_x = -back_y;
-    let side_y = back_x;
-    let ts = config::TILE_SIZE as f32;
-    clamp_debug_world(
-        map,
-        hx + (side_x * side_tiles + back_x * back_tiles) * ts,
-        hy + (side_y * side_tiles + back_y * back_tiles) * ts,
-    )
-}
-
-fn debug_back_axis(map: &Map, coord: u32) -> f32 {
-    const EDGE_BUFFER_TILES: u32 = 24;
-    if coord < EDGE_BUFFER_TILES {
-        return 1.0;
-    }
-    if coord.saturating_add(EDGE_BUFFER_TILES) >= map.size {
-        return -1.0;
-    }
-    if coord < map.size / 2 {
-        -1.0
-    } else {
-        1.0
-    }
-}
-
-fn clamp_debug_world(map: &Map, x: f32, y: f32) -> (f32, f32) {
-    let ts = config::TILE_SIZE as f32;
-    let max = (map.world_size_px() - ts).max(0.0);
-    (x.clamp(ts, max), y.clamp(ts, max))
-}
-
-fn debug_side_corner_world(map: &Map, start: (u32, u32), col: u32, row: u32) -> (f32, f32) {
-    const CORNER_INSET_TILES: u32 = 4;
-    const CORNER_SPACING_TILES: u32 = 4;
-
-    let max_tile = map.size.saturating_sub(1);
-    let mid = map.size / 2;
-    let x_tile = if start.0 < mid {
-        CORNER_INSET_TILES + col * CORNER_SPACING_TILES
-    } else {
-        max_tile.saturating_sub(CORNER_INSET_TILES + col * CORNER_SPACING_TILES)
-    };
-    let y_tile = if start.1 < mid {
-        max_tile.saturating_sub(CORNER_INSET_TILES + row * CORNER_SPACING_TILES)
-    } else {
-        CORNER_INSET_TILES + row * CORNER_SPACING_TILES
-    };
-    map.tile_center(x_tile.min(max_tile), y_tile.min(max_tile))
 }
 
 #[cfg(test)]

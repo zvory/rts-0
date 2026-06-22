@@ -5,7 +5,6 @@ use rts_rules::faction::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum FactionRequestContext {
     NormalLobby,
-    Quickstart,
     AiSeat,
     ReplayPlayback,
     ReplayBranch,
@@ -63,12 +62,6 @@ enum MissingFactionPolicy {
 const CONTEXT_POLICIES: &[FactionContextPolicy] = &[
     FactionContextPolicy {
         context: FactionRequestContext::NormalLobby,
-        missing: MissingFactionPolicy::Default,
-        playable: true,
-        test_fixture: false,
-    },
-    FactionContextPolicy {
-        context: FactionRequestContext::Quickstart,
         missing: MissingFactionPolicy::Default,
         playable: true,
         test_fixture: false,
@@ -197,7 +190,6 @@ mod tests {
 
     const ALL_CONTEXTS: &[FactionRequestContext] = &[
         FactionRequestContext::NormalLobby,
-        FactionRequestContext::Quickstart,
         FactionRequestContext::AiSeat,
         FactionRequestContext::ReplayPlayback,
         FactionRequestContext::ReplayBranch,

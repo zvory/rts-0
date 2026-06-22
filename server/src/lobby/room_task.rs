@@ -567,8 +567,6 @@ pub(super) struct RoomTask {
     human_team_assignments: HashMap<u32, TeamId>,
     /// Per-human active-seat faction selection. Spectators are omitted.
     human_faction_assignments: HashMap<u32, String>,
-    /// Lobby toggle: start matches with boosted opening resources.
-    quickstart: bool,
     /// Name of the map the host has selected (display name from JSON `name` field).
     selected_map: String,
     /// Current host (first joiner; reassigned to the next in `order` when the host leaves).
@@ -639,7 +637,6 @@ impl RoomTask {
             ai_players: Vec::new(),
             human_team_assignments: HashMap::new(),
             human_faction_assignments: HashMap::new(),
-            quickstart: false,
             selected_map: "Default".to_string(),
             host_id: None,
             phase: Phase::Lobby,
@@ -795,16 +792,7 @@ impl RoomTask {
         } else {
             SessionPolicy::for_room(&self.mode, phase)
         };
-        let projection = ProjectionPolicy::new(policy.visibility, policy.diagnostics);
-        if self.owner_movement_diagnostics_enabled_for_phase(phase) {
-            projection.with_owner_movement_paths()
-        } else {
-            projection
-        }
-    }
-
-    fn owner_movement_diagnostics_enabled_for_phase(&self, phase: SessionPhase) -> bool {
-        matches!(self.mode, RoomMode::Normal) && phase == SessionPhase::LiveMatch && self.quickstart
+        ProjectionPolicy::new(policy.visibility, policy.diagnostics)
     }
 
     fn is_dev_watch(&self) -> bool {
@@ -882,9 +870,6 @@ impl RoomTask {
                 ai_profile_id,
             } => self.on_set_ai_profile(player_id, target, ai_profile_id),
             RoomEvent::RemoveAi { player_id, target } => self.on_remove_ai(player_id, target),
-            RoomEvent::SetQuickstart { player_id, enabled } => {
-                self.on_set_quickstart(player_id, enabled)
-            }
             RoomEvent::SetSpectator {
                 player_id,
                 target,
@@ -1476,26 +1461,22 @@ impl RoomTask {
             crate::log_debug!(room = %self.room, player_id, "ignoring spectator faction selection");
             return;
         }
-        let context = if self.quickstart {
-            FactionRequestContext::Quickstart
-        } else {
-            FactionRequestContext::NormalLobby
-        };
-        let accepted = match validate_faction_request(context, Some(&faction_id)) {
-            FactionValidation::AcceptedPlayable { faction_id }
-            | FactionValidation::Defaulted { faction_id } => faction_id,
-            FactionValidation::AcceptedFixture { .. } => return,
-            FactionValidation::Rejected { requested, reason } => {
-                crate::log_debug!(
-                    room = %self.room,
-                    player_id,
-                    faction_id = ?requested,
-                    reason = ?reason,
-                    "ignoring invalid faction selection"
-                );
-                return;
-            }
-        };
+        let accepted =
+            match validate_faction_request(FactionRequestContext::NormalLobby, Some(&faction_id)) {
+                FactionValidation::AcceptedPlayable { faction_id }
+                | FactionValidation::Defaulted { faction_id } => faction_id,
+                FactionValidation::AcceptedFixture { .. } => return,
+                FactionValidation::Rejected { requested, reason } => {
+                    crate::log_debug!(
+                        room = %self.room,
+                        player_id,
+                        faction_id = ?requested,
+                        reason = ?reason,
+                        "ignoring invalid faction selection"
+                    );
+                    return;
+                }
+            };
         if self.human_faction_for(player_id) == accepted {
             return;
         }
@@ -1601,24 +1582,6 @@ impl RoomTask {
         self.ai_players.retain(|a| a.id != target);
         if self.ai_players.len() != before {
             crate::log_debug!(room = %self.room, ai_id = target, "AI opponent removed");
-            self.broadcast_lobby();
-        }
-    }
-
-    /// Host-only: toggle the lobby's boosted opening resources.
-    pub(super) fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
-        if self.is_dev_watch() {
-            return;
-        }
-        if self.match_countdown_deadline.is_some() {
-            return;
-        }
-        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
-            return;
-        }
-        if self.quickstart != enabled {
-            self.quickstart = enabled;
-            crate::log_debug!(room = %self.room, enabled, "quickstart toggled");
             self.broadcast_lobby();
         }
     }
@@ -2364,9 +2327,7 @@ impl RoomTask {
     }
 
     fn should_skip_match_countdown(&self) -> bool {
-        !self.session_policy().countdown_eligible
-            || self.quickstart
-            || self.total_player_count() <= 1
+        !self.session_policy().countdown_eligible || self.total_player_count() <= 1
     }
 
     /// Build and broadcast the current `lobby` message to everyone in the room.
@@ -2416,7 +2377,6 @@ impl RoomTask {
             host_id,
             players,
             can_start: self.can_start(),
-            quickstart: self.quickstart,
             team_preset: "custom".to_string(),
             map: self.selected_map.clone(),
             maps: Map::list_available(),
@@ -2498,11 +2458,6 @@ impl RoomTask {
             });
         }
 
-        let (starting_steel, starting_oil) = if self.quickstart {
-            (config::QUICKSTART_STEEL, config::QUICKSTART_OIL)
-        } else {
-            (config::STARTING_STEEL, config::STARTING_OIL)
-        };
         let seed = match_seed();
 
         // Load the selected map from disk. On failure, send an error to the host and abort.
@@ -2552,18 +2507,8 @@ impl RoomTask {
             }
         };
 
-        let game = if self.quickstart {
-            Game::new_with_debug_starting_loadout_and_random_ai_profiles_and_map_metadata(
-                &inits,
-                starting_steel,
-                starting_oil,
-                seed,
-                map,
-                map_metadata,
-            )
-        } else {
-            Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata)
-        };
+        let game =
+            Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata);
         let match_player_count = inits.len();
         let match_human_count = inits.iter().filter(|p| !p.is_ai).count();
         let match_map_name = self.selected_map.clone();
@@ -2619,7 +2564,6 @@ impl RoomTask {
             players: self.match_player_count,
             humans: self.match_human_count,
             ai: self.ai_players.len(),
-            quickstart: self.quickstart,
             participants: &self.match_participants,
         });
         self.mark_match_started_for_drain();
@@ -2722,7 +2666,6 @@ impl RoomTask {
             players: self.match_player_count,
             humans: self.match_human_count,
             ai: 0,
-            quickstart: false,
             participants: &self.match_participants,
         });
         self.mark_match_started_for_drain();
@@ -2821,7 +2764,6 @@ impl RoomTask {
             players: self.match_player_count,
             humans: self.match_human_count,
             ai: 0,
-            quickstart: false,
             participants: &self.match_participants,
         });
         self.mark_match_started_for_drain();
@@ -4235,7 +4177,7 @@ impl RoomTask {
                     participants: self.match_participants.clone(),
                     score_screen: score_json,
                     human_count: i32::try_from(self.match_human_count).unwrap_or(i32::MAX),
-                    debug_mode: self.quickstart,
+                    debug_mode: false,
                     local_only: self.match_history_local_only,
                     replay,
                 };
@@ -4325,7 +4267,7 @@ impl RoomTask {
 
     fn return_to_lobby(&mut self) {
         // Reset for the next match: drop the game/replay, clear ready flags, and re-advertise
-        // the lobby. AI slots, map selection, and quickstart persist for rematches.
+        // the lobby. AI slots and map selection persist for rematches.
         self.phase = Phase::Lobby;
         self.reset_after_live_match_for_room_phase();
         self.broadcast_lobby();
@@ -5741,41 +5683,6 @@ mod tests {
         assert!(!spectator_payload.capabilities.actions.replay_branch);
         assert!(spectator_payload.replay.is_none());
         assert!(spectator_payload.lab.is_none());
-        assert_eq!(
-            spectator_payload.diagnostics.movement_paths,
-            MovementPathDiagnosticScope::None
-        );
-        assert!(spectator_payload.diagnostics.observer_analysis);
-    }
-
-    #[test]
-    fn debug_mode_start_payloads_advertise_owner_only_movement_diagnostics() {
-        let mut task = RoomTask::new(
-            "debug-diagnostics-start-payload-test".to_string(),
-            RoomMode::Normal,
-            None,
-            false,
-            DrainHandle::default(),
-        );
-        let mut writer_player = add_test_room_player(&mut task, 1, true);
-        let mut writer_spectator = add_test_room_spectator(&mut task, 99);
-        task.host_id = Some(1);
-        task.on_set_quickstart(1, true);
-
-        task.start_match();
-
-        let player_payload = start_payloads(&mut writer_player)
-            .pop()
-            .expect("active player should receive start");
-        assert_eq!(
-            player_payload.diagnostics.movement_paths,
-            MovementPathDiagnosticScope::OwnerOnly
-        );
-        assert!(!player_payload.diagnostics.observer_analysis);
-
-        let spectator_payload = start_payloads(&mut writer_spectator)
-            .pop()
-            .expect("spectator should receive start");
         assert_eq!(
             spectator_payload.diagnostics.movement_paths,
             MovementPathDiagnosticScope::None
@@ -7314,13 +7221,11 @@ mod tests {
         task.on_ready(100, true);
         task.on_add_ai(100, None, None);
         task.on_remove_ai(100, 999);
-        task.on_set_quickstart(100, true);
         task.on_set_spectator(100, 100, false);
         task.on_select_map(100, "Badlands".to_string());
         task.on_start_request(100);
 
         assert!(task.ai_players.is_empty());
-        assert!(!task.quickstart);
         assert_eq!(task.selected_map, "Default");
         assert!(matches!(task.phase, Phase::BranchStaging(_)));
         assert!(!std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())

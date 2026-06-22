@@ -41,9 +41,9 @@ Lifecycle status is explicit and separate from catalog existence:
 
 | Faction id or path | Status | Current lifecycle policy |
 | --- | --- | --- |
-| `kriegsia` | playable | Default faction for missing non-replay requests. Supported by normal human lobby, quickstart/debug starts, AI seats, dev starts, self-play defaults, replay/branch records, match-history replay, post-match replay, spectator metadata, and local prediction when version/build metadata is compatible. |
+| `kriegsia` | playable | Default faction for missing non-replay requests. Supported by normal human lobby, AI seats, dev starts, self-play defaults, replay/branch records, match-history replay, post-match replay, spectator metadata, and local prediction when version/build metadata is compatible. |
 | `ekat` | playable | Human-selectable through normal lobby faction selection. Explicit playable validation accepts it for start/replay-capable contexts, and schema-2 replay/branch records may carry it. Public AI seat creation has no faction selector and still defaults to `kriegsia`; current local prediction is disabled when the local player is `ekat`. |
-| `phase2_empty_fixture` | test-fixture-only | Catalog and loadout exist for explicit Rust/test fixture coverage. It is rejected by normal lobby, quickstart, AI, replay, branch, dev scenario, self-play, match-history, and post-match paths unless the caller uses the `TestFixture` validation context or a direct lower-level sim test helper that deliberately owns the fixture. |
+| `phase2_empty_fixture` | test-fixture-only | Catalog and loadout exist for explicit Rust/test fixture coverage. It is rejected by normal lobby, AI, replay, branch, dev scenario, self-play, match-history, and post-match paths unless the caller uses the `TestFixture` validation context or a direct lower-level sim test helper that deliberately owns the fixture. |
 | `plans/archive/faction/*` | historical-only | Archived phase plans, handoffs, and lifecycle matrices are not active faction policy and are not checker lifecycle inputs. |
 
 ## Current Entity Identity
@@ -75,8 +75,8 @@ Ekat, or fixture special cases casually.
 
 Steel, Oil, and Supply are the only player resources in snapshots, compact snapshots, replay
 analysis, match history replay artifacts, and the HUD. Start-map resources are still only Steel and
-Oil nodes. Current starting values are `STARTING_STEEL = 75`, `STARTING_OIL = 0`,
-`STARTING_WORKERS = 4`, with quickstart resources set to `99_999` Steel and `99_999` Oil.
+Oil nodes. Current Kriegsia starting values are `STARTING_STEEL = 75`, `STARTING_OIL = 0`, and
+`STARTING_WORKERS = 4`.
 
 Compact snapshots encode resources as fixed scalar slots: tick, Steel, Oil, Supply used, and Supply
 cap. Spectator/replay `player_resources` use the same Steel/Oil/Supply fields. Later generic
@@ -92,8 +92,7 @@ The standard Kriegsia match start is defined by the `kriegsia.standard` faction 
 player gets one completed City Centre, four Workers in a ring, nearby Steel/Oil resource clusters,
 starting Steel and Oil, and supply from the City Centre. Unknown non-empty faction ids receive no
 catalog loadout, starting entities, starting Steel/Oil, or Kriegsia supply credit; lifecycle owners
-must validate before building a `Game`. Debug quickstart adds human-only extra buildings, combat
-units, resources, debug path overlays, and an inert enemy mortar corner for inspection.
+must validate before building a `Game`.
 
 The standard Ekat match start is defined by the `ekat.standard` faction loadout: one completed
 Zamok and one Ekat hero, with no starting Steel/Oil or Supply requirement. The
@@ -103,8 +102,8 @@ fixture tests only; catalog existence does not make that id product-playable.
 Replay starts reconstruct from recorded per-player `PlayerStartingLoadout` records. Replay
 validators reject missing loadouts, records for unknown players, faction mismatches, empty loadout
 ids, and loadout ids that do not exist in the player's faction catalog. Global starting Steel/Oil
-constructors remain compatibility helpers for tests and debug starts rather than replay/lifecycle
-reconstruction APIs.
+constructors remain compatibility helpers for tests rather than replay/lifecycle reconstruction
+APIs.
 
 ## Current Tech Tree
 
@@ -163,13 +162,12 @@ contracts intentionally.
 ## Lifecycle Paths
 
 This section is the maintained source of truth for match creation, playback, replay branch,
-spectator, dev scenario, self-play, quickstart, AI, prediction, match-history, and post-match replay
-paths. Later phases must update this section whenever they touch one of those lifecycle paths.
+spectator, dev scenario, self-play, AI, prediction, match-history, and post-match replay paths.
+Later phases must update this section whenever they touch one of those lifecycle paths.
 
 | Path | Faction source | Allowed factions | AI behavior | Prediction behavior | Replay/branch behavior | Tests or checks |
 | --- | --- | --- | --- | --- | --- | --- |
 | Normal lobby start | `LobbyPlayer.factionId` and `PlayerInit.faction_id`, defaulted by `lobby::faction_validation` | `kriegsia` and `ekat`; fixture and unknown ids reject | No AI assignment by `setFaction`; AI seats are separate | Enabled only for local Kriegsia when build/version metadata is compatible | Schema 2 records player faction id plus per-player loadout record | `tests/faction_integration.mjs`, `tests/prediction_controller.mjs`, `server/src/lobby/faction_validation.rs` tests |
-| Quickstart/debug start | Human lobby selection plus quickstart validation/defaulting | `kriegsia` and `ekat`; fixture and unknown ids reject | AI seats still default Kriegsia | Enabled only for local Kriegsia | Schema 2 records faction id and per-player debug/standard loadout records | `server/crates/sim/src/game/setup/tests.rs`, `server/src/lobby/faction_validation.rs` tests |
 | AI add/remove/start | AI `PlayerInit.faction_id`, created by public `addAi` | Public AI seats default to `kriegsia`; no public Ekat selector | Kriegsia-only through public lobby controls | Not applicable | Schema 2 records AI faction and per-player loadout if match starts | `tests/ai_integration.mjs`, `tests/server_integration.mjs` |
 | Fixture/dev faction start | Explicit Rust test/dev harness only | `phase2_empty_fixture` only in `TestFixture` validation or direct lower-level tests | Rejected unless a later phase explicitly adds fixture AI | Disabled when local fixture player is unsupported | Fixture ids stay in explicit test artifacts only | `server/crates/sim/src/game/setup/tests.rs`, `tests/prediction_controller.mjs`, `scripts/check-faction-assumptions.mjs` |
 | Replay playback | `ReplayArtifactV1.players[].faction_id` and `playerLoadouts[]` in artifact schema 2 | Recorded playable ids `kriegsia` or `ekat`; missing, unknown, and fixture ids reject | From artifact only | Disabled for replay viewers | Load from artifact schema, never lobby state | `server/crates/sim/src/game/replay.rs` tests, `server/src/lobby/room_task.rs` replay tests |
@@ -185,7 +183,7 @@ paths. Later phases must update this section whenever they touch one of those li
 - `scripts/check-faction-assumptions.mjs` validates this inventory's anchors and ratchets the
   current files that may contain direct current-faction kind or ability special cases.
 - `server/crates/rules/src/defs.rs` tests lock the current production catalog.
-- `server/crates/sim/src/game/setup/tests.rs` locks the current standard and debug start loadouts.
+- `server/crates/sim/src/game/setup/tests.rs` locks the current standard and fixture start loadouts.
 - `tests/protocol_parity.mjs` locks protocol kind, ability, upgrade, compact snapshot, and resource
   code parity.
 - `tests/hud_command_card.mjs` locks representative current command-card descriptors.
@@ -203,7 +201,7 @@ When faction behavior changes, update the owning source and its guard in the sam
 - Faction catalog facts, loadouts, and ability availability: update
   `server/crates/rules/src/faction.rs`, the Rust catalog dump, `client/src/config.js`, and
   `scripts/check-faction-catalog-parity.mjs`.
-- Lifecycle admission for lobby, quickstart, AI, replay, branch, dev scenario, self-play, match
+- Lifecycle admission for lobby, AI, replay, branch, dev scenario, self-play, match
   history, and fixture contexts: update `server/src/lobby/faction_validation.rs`, this inventory's
   lifecycle table, and focused server or Node tests for the touched path.
 - Wire vocabulary, payload fields, compact codes, default ids, and replay schema shape: update
