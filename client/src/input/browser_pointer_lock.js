@@ -40,6 +40,9 @@ export function _elementDebugSummary(el) {
 
 export function pointerLockDebugSnapshot() {
   const target = this._pointerLockTarget();
+  const tauriGlobals = Object.keys(globalThis)
+    .filter((key) => key.includes("TAURI"))
+    .sort();
   return {
     installedAppRuntime: this.installedAppRuntime(),
     pointerLocked: this.pointerLocked,
@@ -53,6 +56,9 @@ export function pointerLockDebugSnapshot() {
     exitPointerLock: typeof document.exitPointerLock,
     webkitExitPointerLock: typeof document.webkitExitPointerLock,
     nativeCursor: nativeCursorDebugSnapshot(this.desktopCursor),
+    nativeCursorBridgePresent: !!globalThis.__RTS_NATIVE_CURSOR,
+    desktopRuntime: globalThis.__RTS_DESKTOP_RUNTIME || null,
+    tauriGlobals,
     hasPointerLockElement: "pointerLockElement" in document,
     hasWebkitPointerLockElement: "webkitPointerLockElement" in document,
     documentHasFocus: typeof document.hasFocus === "function" ? document.hasFocus() : null,

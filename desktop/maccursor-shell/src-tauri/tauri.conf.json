@@ -5,6 +5,7 @@
   "identifier": "dev.bewegungskrieg.MacCursorShell",
   "build": {},
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",

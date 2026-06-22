@@ -9,6 +9,7 @@ import {
   cursorLockSupported,
   enterCursorLock,
   exitCursorLock,
+  installTauriNativeCursorBridge,
   installedAppRuntime,
   nativeDesktopCursorBridge,
 } from "../../client/src/input/cursor_lock.js";
@@ -202,6 +203,34 @@ import {
 
   assert(cursorLockSupported(true), "browser pointer lock keeps cursor lock available");
   assert(!cursorLockSupported(false, null), "cursor lock remains unavailable without browser or native support");
+  {
+    const priorRequiredRuntimeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "__RTS_DESKTOP_RUNTIME");
+    Object.defineProperty(globalThis, "__RTS_DESKTOP_RUNTIME", {
+      configurable: true,
+      value: { nativeCursorCapture: true, pointerLockDisabled: true },
+    });
+    assert(!cursorLockSupported(true, null), "desktop native-cursor runtime does not use browser Pointer Lock fallback");
+    let browserFallbackCalled = 0;
+    let bridgeError = null;
+    try {
+      await enterCursorLock(async () => {
+        browserFallbackCalled += 1;
+        return true;
+      }, null, null);
+    } catch (err) {
+      bridgeError = err;
+    }
+    assert(browserFallbackCalled === 0, "missing desktop bridge fails before browser Pointer Lock");
+    assert(
+      bridgeError?.message === "Native cursor bridge is unavailable in the desktop shell.",
+      "missing desktop bridge reports the native bridge failure",
+    );
+    if (priorRequiredRuntimeDescriptor) {
+      Object.defineProperty(globalThis, "__RTS_DESKTOP_RUNTIME", priorRequiredRuntimeDescriptor);
+    } else {
+      delete globalThis.__RTS_DESKTOP_RUNTIME;
+    }
+  }
 
   const fakeBridge = {
     startCalls: [],
@@ -223,6 +252,27 @@ import {
   };
   assert(cursorLockSupported(false, fakeBridge), "native cursor bridge makes cursor lock available without browser Pointer Lock");
   assert(nativeDesktopCursorBridge({ __RTS_NATIVE_CURSOR: fakeBridge }) === fakeBridge, "native desktop bridge is discovered from the runtime global");
+  const tauriCalls = [];
+  const tauriRoot = {
+    __TAURI__: {
+      core: {
+        invoke(cmd, payload) {
+          tauriCalls.push({ cmd, payload });
+          return Promise.resolve({ active: true, lastReason: "capture-start" });
+        },
+      },
+    },
+  };
+  const tauriBridge = installTauriNativeCursorBridge(tauriRoot);
+  assert(tauriBridge === nativeDesktopCursorBridge(tauriRoot), "Tauri global installs the native desktop bridge in the page world");
+  assert(tauriRoot.__RTS_DESKTOP_RUNTIME.nativeCursorCapture === true, "Tauri bridge marks native cursor capture as required");
+  const tauriStart = await tauriBridge.start({ x: 12, y: 34, width: 800, height: 600 });
+  assert(tauriStart.active === true, "Tauri native bridge start returns the command snapshot");
+  assert(tauriCalls[0].cmd === "maccursor_start", "Tauri native bridge invokes the Rust start command");
+  assert(
+    tauriCalls[0].payload.x === 12 && tauriCalls[0].payload.width === 800,
+    "Tauri native bridge forwards cursor and viewport bounds",
+  );
   let nativeBrowserFallbackCalled = 0;
   const nativeMode = await enterCursorLock(
     async () => {

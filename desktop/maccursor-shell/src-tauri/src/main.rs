@@ -43,6 +43,8 @@ impl Drop for ManagedServer {
 struct ServerLaunch {
     url: String,
     mode: &'static str,
+    autostart: bool,
+    autolock: bool,
 }
 
 fn main() {
@@ -84,6 +86,10 @@ fn run() -> ShellResult<()> {
                         })
                         .build()?;
                 native_cursor.install(&window);
+                let _ = app
+                    .handle()
+                    .set_activation_policy(tauri::ActivationPolicy::Regular);
+                let _ = window.set_focus();
                 Ok(())
             })
             .on_window_event(|window, event| {
@@ -112,6 +118,8 @@ fn launch_server(app: &tauri::AppHandle) -> ShellResult<ServerLaunch> {
         return Ok(ServerLaunch {
             url,
             mode: "external",
+            autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
+            autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
         });
     }
 
@@ -183,7 +191,16 @@ fn launch_server(app: &tauri::AppHandle) -> ShellResult<ServerLaunch> {
     Ok(ServerLaunch {
         url,
         mode: "spawned",
+        autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
+        autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
     })
+}
+
+fn env_flag(name: &str) -> bool {
+    matches!(
+        std::env::var(name).as_deref().map(str::trim),
+        Ok("1") | Ok("true") | Ok("TRUE") | Ok("yes") | Ok("YES") | Ok("on") | Ok("ON")
+    )
 }
 
 fn stop_child(child: &mut Child) {
@@ -246,6 +263,16 @@ fn extract_server_url(line: &str) -> Option<String> {
 }
 
 fn desktop_runtime_script(server: &ServerLaunch) -> String {
+    let autostart_script = if server.autostart {
+        desktop_autostart_script()
+    } else {
+        ""
+    };
+    let autolock_script = if server.autolock {
+        desktop_autolock_script()
+    } else {
+        ""
+    };
     format!(
         r#"
 (() => {{
@@ -255,6 +282,8 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
     nativeCursorBackend: true,
     nativeCursorCapture: true,
     pointerLockDisabled: true,
+    autostart: {autostart},
+    autolock: {autolock},
     serverMode: "{mode}",
     serverUrl: "{url}"
   }});
@@ -279,13 +308,6 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
     }} catch {{}}
   }};
 
-  const invoke = (cmd, payload = {{}}) => {{
-    const tauriInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
-    if (typeof tauriInvoke !== "function") {{
-      return Promise.reject(new Error("Tauri invoke bridge is unavailable."));
-    }}
-    return tauriInvoke(cmd, payload);
-  }};
   const listeners = new Set();
   const diagnostics = {{
     supported: true,
@@ -301,6 +323,20 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
     lastDeliveryLatencyMs: null,
     lastReason: "ready",
     lastError: null
+  }};
+  const invoke = (cmd, payload = {{}}) => {{
+    const candidates = [
+      window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke,
+      window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke,
+      window.__TAURI__ && window.__TAURI__.tauri && window.__TAURI__.tauri.invoke,
+      window.__TAURI__ && window.__TAURI__.invoke
+    ];
+    const tauriInvoke = candidates.find((candidate) => typeof candidate === "function");
+    if (typeof tauriInvoke !== "function") {{
+      diagnostics.lastError = "Tauri invoke bridge is unavailable.";
+      return Promise.reject(new Error(diagnostics.lastError));
+    }}
+    return tauriInvoke(cmd, payload);
   }};
   const mergeDiagnostics = (snapshot) => {{
     if (!snapshot || typeof snapshot !== "object") return snapshot;
@@ -347,6 +383,11 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
         mergeDiagnostics(snapshot);
         diagnostics.active = !!snapshot?.active;
         return snapshot;
+      }}).catch((err) => {{
+        diagnostics.active = false;
+        diagnostics.lastError = err && err.message ? err.message : String(err);
+        diagnostics.lastReason = "capture-start-failed";
+        throw err;
       }}),
       configure: (bounds = {{}}) => invoke("maccursor_configure", {{
         width: Number(bounds.width || 0),
@@ -376,11 +417,140 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
   replace(elementProto, "webkitRequestPointerLock");
   replace(htmlElementProto, "requestPointerLock");
   replace(htmlElementProto, "webkitRequestPointerLock");
+
+{autostart_script}
+{autolock_script}
 }})();
 "#,
+        autostart = server.autostart,
+        autolock = server.autolock,
+        autostart_script = autostart_script,
+        autolock_script = autolock_script,
         mode = server.mode,
         url = server.url
     )
+}
+
+fn desktop_autostart_script() -> &'static str {
+    r##"
+  const desktopAutostartSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const desktopAutostartWaitFor = async (probe, timeoutMs = 10000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const value = probe();
+      if (value) return value;
+      await desktopAutostartSleep(100);
+    }
+    throw new Error("desktop autostart timed out");
+  };
+  const desktopAutostartNote = (message) => {
+    diagnostics.lastReason = `autostart:${message}`;
+    window.__RTS_DESKTOP_AUTOSTART_STATUS = message;
+    console.warn("[RTS_DESKTOP_AUTOSTART]", message);
+  };
+  const desktopAutostartInput = (el, value) => {
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const desktopAutostart = async () => {
+    desktopAutostartNote("waiting-for-lobby");
+    await desktopAutostartWaitFor(() => document.querySelector("#lobby-name"));
+    await desktopAutostartSleep(250);
+    const room = `Desktop Cursor ${Date.now().toString(36)}`;
+    desktopAutostartInput(document.querySelector("#lobby-name"), "Commander");
+    desktopAutostartInput(document.querySelector("#lobby-room"), room);
+    desktopAutostartNote(`creating:${room}`);
+    const response = await fetch("/api/lobbies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room })
+    });
+    if (!response.ok && response.status !== 409) {
+      throw new Error(`lobby create failed ${response.status}`);
+    }
+    document.querySelector("#lobby-join")?.click();
+    desktopAutostartNote(`joining:${room}`);
+    const startButton = await desktopAutostartWaitFor(() => {
+      const button = document.querySelector("#lobby-start");
+      return button && !button.disabled ? button : null;
+    }).catch(async () => {
+      const ready = document.querySelector("#lobby-ready");
+      if (ready && !ready.disabled) ready.click();
+      return await desktopAutostartWaitFor(() => {
+        const button = document.querySelector("#lobby-start");
+        return button && !button.disabled ? button : null;
+      });
+    });
+    startButton.click();
+    desktopAutostartNote(`started:${room}`);
+  };
+  const runDesktopAutostart = () => {
+    void desktopAutostart().catch((err) => {
+      diagnostics.lastError = err && err.message ? err.message : String(err);
+      diagnostics.lastReason = "autostart-failed";
+      console.error("[RTS_DESKTOP_AUTOSTART]", diagnostics.lastError);
+    });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runDesktopAutostart, { once: true });
+  } else {
+    runDesktopAutostart();
+  }
+"##
+}
+
+fn desktop_autolock_script() -> &'static str {
+    r##"
+  const runDesktopAutolock = () => {
+    void (async () => {
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const waitFor = async (probe, timeoutMs = 10000) => {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+          const value = probe();
+          if (value) return value;
+          await sleep(100);
+        }
+        throw new Error("desktop autolock timed out");
+      };
+      const note = (message) => {
+        diagnostics.lastReason = `autolock:${message}`;
+        window.__RTS_DESKTOP_AUTOLOCK_STATUS = message;
+        console.warn("[RTS_DESKTOP_AUTOLOCK]", message);
+      };
+      note("waiting-for-match");
+      await waitFor(() => {
+        const screen = document.querySelector("#game-screen");
+        return screen && !screen.hidden ? screen : null;
+      }, 15000);
+      await waitFor(() => document.querySelector("#viewport canvas") || document.querySelector("#viewport"), 5000);
+      await sleep(500);
+      const settingsButton = await waitFor(() => {
+        const button = document.querySelector("#settings-button");
+        return button && !button.disabled ? button : null;
+      }, 5000);
+      settingsButton.click();
+      note("settings-opened");
+      const lockButton = await waitFor(() => {
+        const button = document.querySelector("#pointer-lock-toggle");
+        return button && !button.hidden && !button.disabled ? button : null;
+      }, 5000);
+      lockButton.click();
+      note("cursor-lock-clicked");
+    })().catch((err) => {
+      diagnostics.lastError = err && err.message ? err.message : String(err);
+      diagnostics.lastReason = "autolock-failed";
+      console.error("[RTS_DESKTOP_AUTOLOCK]", diagnostics.lastError);
+    });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runDesktopAutolock, { once: true });
+  } else {
+    runDesktopAutolock();
+  }
+"##
 }
 
 fn shell_error(message: impl Into<String>) -> Box<dyn Error> {
@@ -422,11 +592,17 @@ mod tests {
         let script = desktop_runtime_script(&ServerLaunch {
             url: "http://127.0.0.1:4000/".to_string(),
             mode: "spawned",
+            autostart: false,
+            autolock: false,
         });
         assert!(script.contains("__RTS_DESKTOP_RUNTIME"));
         assert!(script.contains("nativeCursorBackend: true"));
+        assert!(script.contains("autostart: false"));
+        assert!(script.contains("autolock: false"));
         assert!(script.contains("__RTS_NATIVE_CURSOR"));
         assert!(script.contains("maccursor_start"));
+        assert!(script.contains("__TAURI__.core"));
+        assert!(script.contains("capture-start-failed"));
         assert!(script.contains("pointerLockDisabled: true"));
         assert!(script.contains("requestPointerLock"));
     }
