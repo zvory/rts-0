@@ -217,8 +217,8 @@ mod tests {
         );
         assert!(lab.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
         assert!(lab.allows_room_time_operation(RoomTimeOperation::Step, true));
-        assert!(!lab.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
-        assert!(!lab.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
+        assert!(lab.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
+        assert!(lab.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
 
         let paused_lab = TickControl::new(
             ClockCapability::LAB,

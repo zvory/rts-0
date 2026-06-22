@@ -6,22 +6,21 @@
 use crate::protocol::Command;
 use rts_sim::game::lab::LabOp;
 use rts_sim::game::Game;
+use std::time::{Duration, Instant as StdInstant};
 
-#[allow(dead_code)]
 pub(super) struct LabTimeline {
     keyframes: Vec<LabTimelineKeyframe>,
     entries: Vec<LabTimelineEntry>,
     next_sequence: u64,
+    last_seek_at: Option<StdInstant>,
 }
 
-#[allow(dead_code)]
 pub(super) struct LabTimelineKeyframe {
     pub(super) tick: u32,
     pub(super) next_sequence: u64,
     pub(super) game: Box<Game>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct LabTimelineEntry {
     pub(super) sequence: u64,
@@ -31,23 +30,31 @@ pub(super) struct LabTimelineEntry {
     pub(super) kind: LabTimelineEntryKind,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum LabTimelineEntryKind {
     LabOperation { op_kind: String, op: LabOp },
     IssueCommandAs { player_id: u32, command: Command },
 }
 
+pub(super) struct LabTimelineSeek {
+    pub(super) target_tick: u32,
+    pub(super) keyframe_tick: u32,
+    pub(super) game: Game,
+    pub(super) rebuild_ms: u128,
+}
+
 impl LabTimeline {
     pub(super) const KEYFRAME_INTERVAL_TICKS: u32 = 2_000;
     pub(super) const MAX_KEYFRAMES: usize = 64;
     pub(super) const MAX_ENTRIES: usize = 50_000;
+    const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
 
     pub(super) fn new(game: &Game) -> Self {
         let mut timeline = Self {
             keyframes: Vec::new(),
             entries: Vec::new(),
             next_sequence: 0,
+            last_seek_at: None,
         };
         timeline.push_keyframe(game);
         timeline
@@ -57,6 +64,7 @@ impl LabTimeline {
         self.keyframes.clear();
         self.entries.clear();
         self.next_sequence = 0;
+        self.last_seek_at = None;
         self.push_keyframe(game);
     }
 
@@ -117,13 +125,98 @@ impl LabTimeline {
 
     pub(super) fn duration_ticks(&self, current_tick: u32) -> u32 {
         self.keyframes
-            .last()
-            .map(|keyframe| current_tick.max(keyframe.tick))
-            .unwrap_or(current_tick)
+            .iter()
+            .map(|keyframe| keyframe.tick)
+            .chain(self.entries.iter().map(|entry| entry.tick))
+            .fold(current_tick, u32::max)
     }
 
     pub(super) fn is_entry_cap_reached(&self) -> bool {
         self.entries.len() >= Self::MAX_ENTRIES
+    }
+
+    pub(super) fn truncate_future(&mut self, current_tick: u32) -> bool {
+        let old_entry_count = self.entries.len();
+        let old_keyframe_count = self.keyframes.len();
+        self.entries.retain(|entry| entry.tick <= current_tick);
+        self.keyframes
+            .retain(|keyframe| keyframe.tick <= current_tick);
+        if self.keyframes.is_empty() {
+            return old_entry_count != self.entries.len()
+                || old_keyframe_count != self.keyframes.len();
+        }
+        self.recompute_next_sequence();
+        old_entry_count != self.entries.len() || old_keyframe_count != self.keyframes.len()
+    }
+
+    pub(super) fn seek_back(
+        &mut self,
+        current_tick: u32,
+        ticks_back: u32,
+    ) -> Result<LabTimelineSeek, String> {
+        let target_tick = current_tick.saturating_sub(ticks_back);
+        self.seek_to(current_tick, target_tick)
+    }
+
+    pub(super) fn seek_to(
+        &mut self,
+        current_tick: u32,
+        target_tick: u32,
+    ) -> Result<LabTimelineSeek, String> {
+        if self
+            .last_seek_at
+            .is_some_and(|last_seek| last_seek.elapsed() < Self::SEEK_COOLDOWN)
+        {
+            return Err("Lab seek ignored; wait before seeking again.".to_string());
+        }
+        let target_tick = target_tick.min(self.duration_ticks(current_tick));
+        let rebuild_start = StdInstant::now();
+        let (keyframe_tick, keyframe_next_sequence, mut game) = self
+            .keyframes
+            .iter()
+            .rev()
+            .find(|keyframe| keyframe.tick <= target_tick)
+            .map(|keyframe| {
+                (
+                    keyframe.tick,
+                    keyframe.next_sequence,
+                    keyframe.game.clone_for_replay_keyframe(),
+                )
+            })
+            .ok_or_else(|| "Lab seek target is outside retained timeline history.".to_string())?;
+        if target_tick.saturating_sub(keyframe_tick) > Self::KEYFRAME_INTERVAL_TICKS {
+            return Err("Lab seek target is outside retained keyframe history.".to_string());
+        }
+
+        for entry in self
+            .entries
+            .iter()
+            .filter(|entry| entry.sequence >= keyframe_next_sequence && entry.tick <= target_tick)
+        {
+            if entry.tick < game.tick_count() {
+                return Err(format!(
+                    "Lab timeline entry {} is out of order: tick {} before {}.",
+                    entry.sequence,
+                    entry.tick,
+                    game.tick_count()
+                ));
+            }
+            while game.tick_count() < entry.tick {
+                game.tick();
+            }
+            Self::replay_entry(&mut game, entry)?;
+        }
+        while game.tick_count() < target_tick {
+            game.tick();
+        }
+
+        self.last_seek_at = Some(StdInstant::now());
+        Ok(LabTimelineSeek {
+            target_tick,
+            keyframe_tick,
+            game,
+            rebuild_ms: rebuild_start.elapsed().as_millis(),
+        })
     }
 
     #[cfg(test)]
@@ -147,6 +240,28 @@ impl LabTimeline {
         });
         self.next_sequence = self.next_sequence.saturating_add(1);
         debug_assert!(self.entries.len() <= Self::MAX_ENTRIES);
+    }
+
+    fn replay_entry(game: &mut Game, entry: &LabTimelineEntry) -> Result<(), String> {
+        match &entry.kind {
+            LabTimelineEntryKind::LabOperation { op_kind, op } => game
+                .apply_lab_op(op.clone())
+                .map(|_| ())
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline operation {op_kind} failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
+            LabTimelineEntryKind::IssueCommandAs { player_id, command } => game
+                .issue_lab_command_as(*player_id, command.clone())
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline issue-as failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
+        }
     }
 
     fn push_keyframe(&mut self, game: &Game) {
@@ -180,6 +295,20 @@ impl LabTimeline {
         if remove_count > 0 {
             self.entries.drain(0..remove_count);
         }
+    }
+
+    fn recompute_next_sequence(&mut self) {
+        let entry_next = self
+            .entries
+            .last()
+            .map(|entry| entry.sequence.saturating_add(1))
+            .unwrap_or(0);
+        let keyframe_next = self
+            .keyframes
+            .last()
+            .map(|keyframe| keyframe.next_sequence)
+            .unwrap_or(0);
+        self.next_sequence = entry_next.max(keyframe_next);
     }
 }
 

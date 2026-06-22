@@ -101,8 +101,8 @@ impl RoomTimeOperations {
     pub(super) const LAB: Self = Self {
         set_speed: true,
         step: true,
-        seek_relative: false,
-        seek_absolute: false,
+        seek_relative: true,
+        seek_absolute: true,
     };
 
     pub(super) fn allows(self, operation: RoomTimeOperation) -> bool {
@@ -993,9 +993,9 @@ mod tests {
         assert!(lab_caps.room_time.set_speed);
         assert!(lab_caps.room_time.pause);
         assert!(lab_caps.room_time.step);
-        assert!(!lab_caps.room_time.seek_relative);
-        assert!(!lab_caps.room_time.seek_absolute);
-        assert!(!lab_caps.room_time.timeline);
+        assert!(lab_caps.room_time.seek_relative);
+        assert!(lab_caps.room_time.seek_absolute);
+        assert!(lab_caps.room_time.timeline);
         assert!(!lab_caps.commands.gameplay);
         assert!(!lab_caps.match_controls.pause);
     }
