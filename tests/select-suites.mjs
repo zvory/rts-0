@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const suiteOrder = [
+  "source-file-sizes",
   "crate-boundaries",
   "cargo-fmt",
   "nextest-contract-protocol",
@@ -81,6 +82,26 @@ function isClientOnlyCiPath(pathname) {
     return false;
   }
   return !ciClientFullFallbackPrefixes.some((prefix) => pathname.startsWith(prefix));
+}
+
+function isSourceFileSizePath(pathname) {
+  return (
+    pathname === "scripts/source-file-size-baseline.json" ||
+    pathname === "tests/run-all.sh" ||
+    (
+      (
+        pathname.startsWith("server/") ||
+        pathname.startsWith("client/src/") ||
+        pathname.startsWith("tests/") ||
+        pathname.startsWith("scripts/")
+      ) &&
+      (
+        pathname.endsWith(".rs") ||
+        pathname.endsWith(".js") ||
+        pathname.endsWith(".mjs")
+      )
+    )
+  );
 }
 
 export function ciPolicy(files) {
@@ -243,6 +264,10 @@ export function selectSuites(files) {
       normalized === "tests/select-suites.mjs" ||
       normalized.startsWith("plans/archive/client-arch/");
     docsOnly &&= normalized.startsWith("docs/") || normalized.startsWith("plans/") || normalized.endsWith(".md");
+
+    if (isSourceFileSizePath(normalized)) {
+      suites.add("source-file-sizes");
+    }
 
     if (rustCode || normalized.startsWith("server/Cargo.")) {
       addAll(suites, ["crate-boundaries", "cargo-fmt", "cargo-clippy"]);
