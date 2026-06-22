@@ -792,8 +792,7 @@ impl RoomTask {
         } else {
             SessionPolicy::for_room(&self.mode, phase)
         };
-        let projection = ProjectionPolicy::new(policy.visibility, policy.diagnostics);
-        projection
+        ProjectionPolicy::new(policy.visibility, policy.diagnostics)
     }
 
     fn is_dev_watch(&self) -> bool {
