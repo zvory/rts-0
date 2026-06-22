@@ -9,6 +9,7 @@ map-editor.html   # standalone handcrafted-map editor; loads/saves server map JS
 renderer_preview.html / renderer_preview.js
                   # standalone Renderer preview linked from the Dev links menu
 styles.css        # HUD, lobby, menus, command card
+assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
   config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
@@ -19,12 +20,15 @@ src/
   prediction_settings.js # localStorage-backed prediction toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
+  state_ground_decals.js # client-only death-event decal queue, classification, owner/facing recovery
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
-                  # resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
+                  # decals, resources, fog overlay, feedback, rig schema/import, and renderer-local palette helpers
+  renderer/decals.js # GroundDecalLayer permanent decal texture, stamping, diagnostics, teardown
+  renderer/decals/ # SVG decal atlas manifest, loader, and deterministic stamp selection
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
@@ -251,6 +255,41 @@ export function buildRendererFeedbackView(state, options?)
   // feedback drawing without exposing the full mutable GameState. `options`
   // may inject frame-local entities and selectedEntities arrays.
 ```
+
+`state_ground_decals.js`
+```js
+export class GroundDecalBuffer {
+  applySnapshotEvents(events, context)
+  consumePending()
+  get pendingCount()
+  clear()
+}
+export function normalizeGroundDecalEvent(ev, context?)
+export function groundDecalClassForKind(kind)
+```
+`GameState.applySnapshot` feeds fog-filtered transient death events into this browser-local buffer.
+The buffer dedupes by death id, recovers owner/facing from the prior visible entity snapshot when
+possible, falls back to neutral color/deterministic facing when needed, and never infers hidden
+deaths from missing entities.
+
+`renderer/decals.js`
+```js
+export const GROUND_DECAL_TEXTURE_WORLD_SCALE
+export class GroundDecalLayer {
+  resetForMap(map)
+  stampBatch(decals, options?)
+  displayObjectCount()
+  diagnostics()
+  destroy()
+}
+```
+`GroundDecalLayer` owns one downsampled canvas-backed Pixi texture and one sprite on the `decals`
+world layer. New visible death decals are stamped into that texture in batches from SVG alpha-mask
+assets under `assets/decals/`; historical decals are pixels, not retained display objects or
+per-frame records. `diagnostics()` exposes total stamped decals, queued decals, texture update
+count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
+renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
+late async asset loads through `Renderer.destroy()` / rematch cleanup.
 
 `branch_staging.js`
 ```js
@@ -914,8 +953,25 @@ overlay container as smoke clouds, below selection rings and HP bars):
 - Ability objects are never routed through entity selection, minimap blips, HUD command-card state,
   or local prediction. They disappear when absent from the next authoritative snapshot.
 
-Smoke rendering (`renderer/feedback.js`, `_drawSmokes`; layer `smokes` between `selectionRings`
-and unit layer):
+Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `decals` between
+terrain and resources):
+- Decals are client-only, best-effort visual state derived only from received fog-filtered `death`
+  events. They are not persisted in the protocol, replay artifacts, match history, or server sim.
+- Infantry deaths stamp player-tinted SVG paint masks. Vehicle and support-weapon deaths stamp
+  blackened scorch masks with smaller player-colored paint fragments.
+- `GameState` queues only unpainted death ids and `Renderer` consumes the pending queue once per
+  frame. A skipped snapshot or reconnect may miss older decals; the client must not infer them.
+- The renderer stamps each new-death batch into one downsampled texture, updates that texture once
+  per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
+  redrawn during normal frames.
+- `Renderer.groundDecalDiagnostics()` exposes the permanent layer's stamped count, pending count,
+  texture update count, texture dimensions/downsample, layer child count, and asset-load status for
+  contract tests and local profiling.
+- `Renderer.destroy()` clears the decal texture/canvases and cancels late atlas loads so rematches
+  start with a fresh blank decal layer.
+
+Smoke rendering (`renderer/feedback.js`, `_drawSmokes`; layer `smokes` between unit bodies and
+selection rings):
 - Each frame, iterates `state.smokes` (the latest snapshot's fog-filtered cloud list).
 - Each cloud is rendered as layered translucent grey/white circles (overlapping offset blobs) with
   a dark semi-transparent core so the cloud reads as a LOS blocker without obscuring own unit
@@ -928,9 +984,9 @@ and unit layer):
   the next snapshot.
 
 ### 4.2 Rendering & look (PixiJS, SVG unit rigs — neutral PS1 field-command style)
-- Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
-  shadows → units → selection rings → health bars → fog overlay → shot-revealed units →
-  command/hover feedback → placement ghost →
+- Layers (back→front): terrain → ground decals → resource nodes → building shadows → buildings →
+  building overlays → unit shadows → units → smoke/ability ground effects → selection rings →
+  health bars → fog overlay → shot-revealed units → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
 - `/renderer_preview.html` is a standalone dev entry point linked from the index Dev links menu; it
   mounts the real Renderer on a synthetic grass map to preview all unit and building visuals with

@@ -181,6 +181,19 @@ export class GroundDecalLayer {
     return Array.isArray(this.layer?.children) ? this.layer.children.length : 0;
   }
 
+  diagnostics() {
+    return {
+      totalStamped: this.totalStamped,
+      pendingDecals: this._queuedUntilAssets.length,
+      textureUpdateCount: this.textureUpdateCount,
+      textureWidth: this.canvas?.width || 0,
+      textureHeight: this.canvas?.height || 0,
+      downsample: this.downsample,
+      layerChildCount: this.displayObjectCount(),
+      assetStatus: this.assetStatus,
+    };
+  }
+
   destroy() {
     this._assetLoadGeneration += 1;
     this.assetLoadPromise = null;

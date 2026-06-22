@@ -14,10 +14,10 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   `frame_recovery.js`, `frame_entity_views.js`, `match_health.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
   `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`; app lifecycle, dependency
-  injection, frame-loop health, observer analysis, room-time controls, and
+  injection, frame health, observer analysis, room-time controls, and
   replay/spectator/lab shell wiring.
-- `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
-  `progress_extrapolator.js`, prediction controllers/adapters, and browser-local display state.
+- `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`, `command_budget.js`,
+  `command_composer.js`, `progress_extrapolator.js`, prediction adapters, and local display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
@@ -26,8 +26,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   row clicks against the latest list before sending `join`.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
-- `renderer`: `renderer/` Pixi facade, layers, terrain, entities, fog, feedback, art helpers,
-  rig schema/import/runtime, and renderer-local palette helpers.
+- `renderer`: `renderer/` Pixi facade, layers, terrain, ground decals,
+  SVG decal atlas helpers, entities, fog, feedback, art helpers, rigs, and palette helpers.
 - `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`,
   `prediction_settings.js`, and `report_window_aggregate.js`.
 

@@ -393,6 +393,19 @@ export class Renderer {
     this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
+  groundDecalDiagnostics() {
+    return this._groundDecals?.diagnostics?.() || {
+      totalStamped: 0,
+      pendingDecals: 0,
+      textureUpdateCount: 0,
+      textureWidth: 0,
+      textureHeight: 0,
+      downsample: 0,
+      layerChildCount: 0,
+      assetStatus: "idle",
+    };
+  }
+
   _drawMissingTexture(entity, poolName) {
     if (!entity || entity.id == null || !this._pools?.[poolName]) return;
     const g = this._slot(poolName, entity.id);
