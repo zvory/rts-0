@@ -21,3 +21,14 @@ The better path is to keep the client as a normal browser game:
 
 Tauri-specific app code, build scripts, release workflows, and source detection were removed so the
 supported surface is just the web client and server.
+
+## 2026 Native Cursor Spike Note
+
+The local `desktop/maccursor-shell` spike does not reverse that product decision. It is a disposable
+macOS test shell for the native cursor plan: it starts the existing Rust server on a loopback
+ephemeral port, loads the served web client at that same origin, and injects a desktop runtime flag
+for later native cursor integration.
+
+Unlike the removed Tauri attempt, this shell deliberately disables browser Pointer Lock in the
+desktop path. Any later cursor success must come from the native macOS backend, not from measuring
+Chromium/WKWebView Pointer Lock again.

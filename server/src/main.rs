@@ -50,6 +50,10 @@ use rts_sim::perf;
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
+const DEFAULT_CLIENT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
+const DEFAULT_MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
+const RTS_CLIENT_DIR_ENV: &str = "RTS_CLIENT_DIR";
+const RTS_MAPS_DIR_ENV: &str = "RTS_MAPS_DIR";
 
 /// Treat unset/empty/`0`/`false`/`no`/`off` as falsy; anything else is true.
 fn env_truthy(key: &str) -> bool {
@@ -60,6 +64,22 @@ fn env_truthy(key: &str) -> bool {
         ),
         Err(_) => false,
     }
+}
+
+fn env_path_or_default(key: &str, default: &str) -> String {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| default.to_string())
+}
+
+fn configured_client_dir() -> String {
+    env_path_or_default(RTS_CLIENT_DIR_ENV, DEFAULT_CLIENT_DIR)
+}
+
+fn configured_maps_dir() -> String {
+    env_path_or_default(RTS_MAPS_DIR_ENV, DEFAULT_MAPS_DIR)
 }
 
 /// How long a connection may go without any inbound frame before we evict it. The client sends
@@ -112,9 +132,9 @@ async fn main() {
     }
 
     let version = rts_server::build_info::build_id().to_string();
-    let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
-    let index_html = build_versioned_index(client_dir, &version);
-    let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps").to_string();
+    let client_dir = configured_client_dir();
+    let index_html = build_versioned_index(&client_dir, &version);
+    let maps_dir = configured_maps_dir();
     let state = AppState {
         lobby: Lobby::new().with_match_history(lobby_db, false),
         index_html,
@@ -126,7 +146,7 @@ async fn main() {
     // Static files for everything except `/ws`; unknown paths fall back to `index.html` so the
     // single-page client loads regardless of the requested path.
     let static_service =
-        ServeDir::new(client_dir).fallback(ServeFile::new(format!("{client_dir}/index.html")));
+        ServeDir::new(&client_dir).fallback(ServeFile::new(format!("{client_dir}/index.html")));
 
     let app = Router::new()
         .route("/", get(index_handler))
@@ -852,6 +872,44 @@ fn collect_js_modules(dir: &std::path::Path, prefix: &std::path::Path, out: &mut
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn with_asset_env<R>(
+        client_dir: Option<&str>,
+        maps_dir: Option<&str>,
+        f: impl FnOnce() -> R,
+    ) -> R {
+        let _guard = env_lock().lock().unwrap();
+        let prior_client = std::env::var(RTS_CLIENT_DIR_ENV).ok();
+        let prior_maps = std::env::var(RTS_MAPS_DIR_ENV).ok();
+
+        match client_dir {
+            Some(value) => std::env::set_var(RTS_CLIENT_DIR_ENV, value),
+            None => std::env::remove_var(RTS_CLIENT_DIR_ENV),
+        }
+        match maps_dir {
+            Some(value) => std::env::set_var(RTS_MAPS_DIR_ENV, value),
+            None => std::env::remove_var(RTS_MAPS_DIR_ENV),
+        }
+
+        let result = f();
+
+        match prior_client {
+            Some(value) => std::env::set_var(RTS_CLIENT_DIR_ENV, value),
+            None => std::env::remove_var(RTS_CLIENT_DIR_ENV),
+        }
+        match prior_maps {
+            Some(value) => std::env::set_var(RTS_MAPS_DIR_ENV, value),
+            None => std::env::remove_var(RTS_MAPS_DIR_ENV),
+        }
+
+        result
+    }
     use rts_rules::faction::{DEFAULT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
 
     const TEST_PLAYER_ID: u32 = 42;
@@ -1092,6 +1150,30 @@ mod tests {
         assert!(html.contains("./src/main.js?v=test-version\""));
         assert!(html.contains("./styles.css?v=test-version\""));
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
+    }
+
+    #[test]
+    fn asset_paths_default_to_source_tree() {
+        with_asset_env(None, None, || {
+            assert_eq!(configured_client_dir(), DEFAULT_CLIENT_DIR);
+            assert_eq!(configured_maps_dir(), DEFAULT_MAPS_DIR);
+        });
+    }
+
+    #[test]
+    fn asset_paths_use_non_empty_env_overrides() {
+        with_asset_env(Some("/tmp/rts-client"), Some("/tmp/rts-maps"), || {
+            assert_eq!(configured_client_dir(), "/tmp/rts-client");
+            assert_eq!(configured_maps_dir(), "/tmp/rts-maps");
+        });
+    }
+
+    #[test]
+    fn blank_asset_path_overrides_fall_back_to_source_tree() {
+        with_asset_env(Some("  "), Some(""), || {
+            assert_eq!(configured_client_dir(), DEFAULT_CLIENT_DIR);
+            assert_eq!(configured_maps_dir(), DEFAULT_MAPS_DIR);
+        });
     }
 
     #[test]
