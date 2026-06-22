@@ -71,6 +71,7 @@ import {
   _cancelActiveLabTool,
   _cancelLabToolForBoxSelect,
   _consumeLabToolWorldClick,
+  _finishLabToolBoxSelection,
   _finishLabToolClick,
 } from "./lab_tools.js";
 import {
@@ -121,7 +122,7 @@ export class Input {
    * @param {import("./router.js").MatchInputRouter} [inputRouter] optional UI input router
    * @param {import("../hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey profile service.
    * @param {import("../client_intent.js").ClientIntent} [clientIntent] browser-local command/placement intent facade.
-   * @param {{consumeWorldClick?: (event: object) => void, cancel?: (reason:string) => object|null}} [labToolController] active lab setup tool callback seam.
+   * @param {object} [labToolController] active lab setup tool callback seam.
    */
   constructor(
     domElement,
@@ -851,6 +852,7 @@ export class Input {
 
     if (wasDragging) {
       this._lastClick = null;
+      if (drag.labToolId && this._finishLabToolBoxSelection(drag, ev)) return;
       this._commitBoxSelection(drag, ev.shiftKey);
     } else if (drag.labToolId) {
       this._finishLabToolClick(drag, p, ev);
@@ -1077,6 +1079,7 @@ Object.assign(Input.prototype, {
   _cancelActiveLabTool,
   _cancelLabToolForBoxSelect,
   _consumeLabToolWorldClick,
+  _finishLabToolBoxSelection,
   _finishLabToolClick,
   _controlGroupSlotFromKey,
   _handleControlGroupHotkey,

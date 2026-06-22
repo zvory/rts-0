@@ -92,22 +92,10 @@ export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY, anchor = n
 }
 
 export function _commitBoxSelection(drag, additive) {
-  const a = this._worldAt(Math.min(drag.x0, drag.x1), Math.min(drag.y0, drag.y1));
-  const b = this._worldAt(Math.max(drag.x0, drag.x1), Math.max(drag.y0, drag.y1));
-  const minX = Math.min(a.x, b.x);
-  const maxX = Math.max(a.x, b.x);
-  const minY = Math.min(a.y, b.y);
-  const maxY = Math.max(a.y, b.y);
-
-  const entities = this.state.entitiesInterpolated(1);
-  const spectator = !!this.state.spectator;
-
+  const entities = _selectableEntitiesInDragRect.call(this, drag);
   const units = [];
   const buildings = [];
   for (const e of entities) {
-    if (e.shotReveal || e.visionOnly) continue;
-    if (!selectableEntity(this.state, e, spectator)) continue;
-    if (!this._entityIntersectsRect(e, minX, minY, maxX, maxY)) continue;
     if (isUnit(e.kind)) units.push(e.id);
     else if (isBuilding(e.kind)) buildings.push(e.id);
   }
@@ -121,6 +109,38 @@ export function _commitBoxSelection(drag, additive) {
   }
   if (additive) addToSelection(this, picked);
   else setSelection(this, picked);
+}
+
+export function _dragWorldRect(drag) {
+  const a = this._worldAt(Math.min(drag.x0, drag.x1), Math.min(drag.y0, drag.y1));
+  const b = this._worldAt(Math.max(drag.x0, drag.x1), Math.max(drag.y0, drag.y1));
+  return {
+    minX: Math.min(a.x, b.x),
+    maxX: Math.max(a.x, b.x),
+    minY: Math.min(a.y, b.y),
+    maxY: Math.max(a.y, b.y),
+  };
+}
+
+export function _selectableEntitiesInDragRect(drag, options = {}) {
+  const { minX, minY, maxX, maxY } = _dragWorldRect.call(this, drag);
+  const entities = this.state.entitiesInterpolated(1);
+  const spectator = !!this.state.spectator;
+  const unitsOnly = !!options.unitsOnly;
+  const buildingsOnly = !!options.buildingsOnly;
+
+  return entities.filter((e) => {
+    if (e.shotReveal || e.visionOnly) return false;
+    if (unitsOnly && !isUnit(e.kind)) return false;
+    if (buildingsOnly && !isBuilding(e.kind)) return false;
+    if (!selectableEntity(this.state, e, spectator)) return false;
+    return this._entityIntersectsRect(e, minX, minY, maxX, maxY);
+  });
+}
+
+export function _selectableEntityIdsInDragRect(drag, options = {}) {
+  const ids = _selectableEntitiesInDragRect.call(this, drag, options).map((entity) => entity.id);
+  return options.sortByAnchor === false ? ids : this._closestIdsToPoint(ids, drag.x0, drag.y0);
 }
 
 export function _closestIdsToPoint(ids, screenX, screenY) {
@@ -168,7 +188,7 @@ function ownOwner(state, owner) {
     : Number(owner) === state?.playerId;
 }
 
-function selectableEntity(state, entity, spectator) {
+export function selectableEntity(state, entity, spectator) {
   if (state?.controlPolicy?.kind === "lab") return state.controlPolicy.canSelectEntity(entity, state);
   if (!spectator) return ownOwner(state, entity.owner);
   return entity.owner !== 0;

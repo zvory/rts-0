@@ -396,25 +396,28 @@ passive. Operator gameplay commands still flow through `commandIssuer.issueComma
 owner.
 
 Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
-may ask `Match.armLabTool(tool, { onWorldClick })` to arm a tool, and normal `Input` consumes a
-completed left world click before selection, command targeting, or placement. A left drag promotes
-to normal box selection and cancels the active lab tool instead of applying it. The callback
-receives the active tool payload plus exact world coordinates; `Match.cancelLabTool(reason)` clears
-the tool for Esc, right-click, teardown, box selection, or panel-driven cancellation. Window blur
-releases camera/input transient state but does not cancel the active lab tool. `Input` routes those
-cancellations through the injected lab tool controller so `Match` can publish an active/cancelled
-change back to the app-owned `LabPanel`, keeping the panel status and cancel affordance
-synchronized with keyboard, pointer, world-click, and teardown paths. Starting ordinary placement,
-command targeting, or command-card build menus cancels the active lab tool so setup tools do not
-share state with gameplay command modes. Unit and building spawning are lab panel palettes backed by
-the client faction catalog mirror and playable faction labels; each palette arms a persistent
-completed `spawnEntity` lab tool and every click sends the clicked world coordinates through
-`LabClient` until cancelled. The lab does not expose a secondary advanced spawn fallback; the panel
-spawn affordance is limited to playable faction unit and building palettes. Selected-entity
-repositioning also uses
-the shared tool path: `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends
-`moveEntity` requests for each id at the clicked world point, and leaves stale-id or partial-failure
-reporting visible through the lab result status. Delete and owner reassignment stay contextual to
+may ask `Match.armLabTool(tool, { onWorldClick, onBoxSelection })` to arm a tool, and normal
+`Input` consumes a completed left world click before selection, command targeting, or placement. A
+left drag normally promotes to box selection and cancels the active lab tool; tools that opt into
+`consumeBoxSelection` receive the selectable ids in the drag box instead. World-click callbacks
+receive the active tool payload, exact world coordinates, and any selectable hit entity id.
+`Match.cancelLabTool(reason)` clears the tool for Esc, right-click, teardown, ordinary box
+selection, or panel-driven cancellation. Window blur releases camera/input transient state but does
+not cancel the active lab tool. `Input` routes those cancellations through the injected lab tool
+controller so `Match` can publish an active/cancelled change back to the app-owned `LabPanel`,
+keeping the panel status and cancel affordance synchronized with keyboard, pointer, world-click,
+box-selection, and teardown paths. Starting ordinary placement, command targeting, or command-card
+build menus cancels the active lab tool so setup tools do not share state with gameplay command
+modes. Unit and building spawning are lab panel palettes backed by the client faction catalog mirror
+and playable faction labels; each palette arms a persistent completed `spawnEntity` lab tool and
+every click sends the clicked world coordinates through `LabClient` until cancelled. The lab does
+not expose a secondary advanced spawn fallback; the panel spawn affordance is limited to playable
+faction unit and building palettes. Selected-entity repositioning also uses the shared tool path:
+`LabPanel` captures the selected ids in a `moveSelected` tool payload, sends `moveEntity` requests
+for each id at the clicked world point, and leaves stale-id or partial-failure reporting visible
+through the lab result status. The remove tool arms a persistent `removeSelectableUnits` setup
+tool; clicking deletes the selectable unit under the cursor, and dragging deletes selectable units
+in the box without changing the current selection. Delete and owner reassignment stay contextual to
 the current selection, disable themselves when no selected entity ids are available, and summarize
 accepted plus rejected per-entity mutations after the individual server replies return.
 

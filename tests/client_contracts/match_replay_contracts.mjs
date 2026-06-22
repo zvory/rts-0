@@ -138,6 +138,23 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       screen: { x: 1, y: 2 },
     });
     assert(labToolMatch.clientIntent.activeLabTool?.id === persistent.id, "Match lab tool controller keeps persistent tools armed after world clicks");
+    let labToolBoxSelection = null;
+    const boxTool = labToolMatch.armLabTool(
+      { kind: "removeSelectableUnits", consumeBoxSelection: true, keepArmedOnBoxSelection: true },
+      { onBoxSelection: (event) => { labToolBoxSelection = event; } },
+    );
+    labToolMatch.consumeLabToolBoxSelection({
+      tool: boxTool,
+      entityIds: [31, 32],
+      screenRect: { x: 10, y: 20, w: 40, h: 60 },
+      worldRect: { minX: 10, minY: 20, maxX: 50, maxY: 80 },
+    });
+    assert(
+      labToolBoxSelection?.tool.id === boxTool.id &&
+        labToolBoxSelection.entityIds.join(",") === "31,32",
+      "Match lab tool controller routes box selections with selected entity ids",
+    );
+    assert(labToolMatch.clientIntent.activeLabTool?.id === boxTool.id, "Match lab tool controller keeps persistent tools armed after box selections");
   }
   {
     const priorWindowForReplayInput = globalThis.window;
