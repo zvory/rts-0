@@ -3,7 +3,7 @@
 ## Purpose
 
 Reduce review and merge risk around the balance/config mirror without changing gameplay. This plan
-exists because `plans/hotspotcleanup/phase-10.md` found a safe path only if validation expands before
+exists because `plans/archive/hotspotcleanup/phase-10.md` found a safe path only if validation expands before
 any source files move. Every phase is behavior-preserving: no cost, supply, sight, size, range,
 duration, ability, upgrade, faction, catalog, wiki-visible value, UI affordance, or exported API may
 change.
