@@ -127,12 +127,12 @@ function checkGenericRoomHelperModeShortcuts(file, source) {
 }
 
 function checkEndMatchPersistencePolicy(source) {
-  const endMatch = source.match(/fn end_match\([\s\S]*?\n    fn transition_to_replay_viewer/);
+  const endMatch = extractFunctionBody(source, "end_match");
   if (!endMatch) {
     failures.push("server/src/lobby/room_task.rs: missing end_match persistence guardrail target");
     return;
   }
-  const body = endMatch[0];
+  const body = endMatch;
   if (
     body.includes("ReplayArtifactV1::capture_from_game") &&
     !body.includes("should_capture_post_match_replay")
@@ -149,6 +149,27 @@ function checkEndMatchPersistencePolicy(source) {
       "server/src/lobby/room_task.rs: match-history replay attachment must be gated by persistence policy",
     );
   }
+}
+
+function extractFunctionBody(source, functionName) {
+  const signature = new RegExp(`\\n\\s*fn\\s+${functionName}\\s*\\(`);
+  const match = source.match(signature);
+  if (!match) return null;
+
+  const signatureStart = match.index + 1;
+  const bodyStart = source.indexOf("{", signatureStart);
+  if (bodyStart === -1) return null;
+
+  let depth = 0;
+  for (let i = bodyStart; i < source.length; i += 1) {
+    const char = source[i];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(signatureStart, i + 1);
+    }
+  }
+  return null;
 }
 
 function braceDelta(line) {

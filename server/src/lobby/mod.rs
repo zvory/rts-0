@@ -61,7 +61,7 @@ mod tick_control;
 
 pub use connection::{ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
-use replay_session::{validate_replay_vision_request, ReplaySession};
+use replay_session::ReplaySession;
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
 use room_task::{RoomMode, RoomTask};
 pub(crate) use snapshots::compact_snapshot_for_wire;
