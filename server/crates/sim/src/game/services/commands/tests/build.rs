@@ -1,0 +1,468 @@
+use super::*;
+
+#[test]
+fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (wx, wy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, wx, wy)
+        .expect("worker should spawn");
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = vec![player_state(1)];
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1], &entities, &map);
+    let mut smokes = SmokeCloudStore::new();
+    let mut ability_runtime = AbilityRuntime::new();
+    let mut mortar_shells = MortarShellStore::default();
+    let mut artillery_shells = ArtilleryShellStore::default();
+    let mut events: HashMap<u32, Vec<Event>> = players
+        .iter()
+        .map(|player| (player.id, Vec::new()))
+        .collect();
+
+    apply_commands(
+        &map,
+        &mut entities,
+        &mut players,
+        &spatial,
+        &mut coordinator,
+        &fog,
+        &mut smokes,
+        &mut ability_runtime,
+        &mut mortar_shells,
+        &mut artillery_shells,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::Depot,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+        &mut events,
+        1,
+    );
+
+    let worker = entities.get(worker).expect("worker should remain alive");
+    assert!(
+        matches!(worker.order(), Order::Build(_)),
+        "worker should keep the accepted build order"
+    );
+    let goal = worker
+        .path_goal()
+        .expect("build order should set a staging goal");
+    let goal_tile = map.tile_of(goal.0, goal.1);
+    assert!(
+        !footprint_tiles(EntityKind::Depot, 4, 4).contains(&goal_tile),
+        "build-over-self order should stage outside the requested footprint"
+    );
+    assert!(
+        events.get(&1).is_none_or(Vec::is_empty),
+        "valid build-over-self intent should not emit a failure notice"
+    );
+}
+
+#[test]
+fn build_order_does_not_pull_worker_off_active_construction() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, site_x, site_y)
+        .expect("worker should spawn");
+    let site = entities
+        .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+        .expect("scaffold should spawn");
+    let worker_entity = entities.get_mut(worker).expect("worker should exist");
+    worker_entity.set_order(Order::build(EntityKind::Depot, 4, 4));
+    worker_entity.mark_build_phase(BuildPhase::Constructing { site });
+    worker_entity.set_target_id(Some(site));
+
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = vec![player_state(1)];
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1], &entities, &map);
+    let mut smokes = SmokeCloudStore::new();
+    let mut ability_runtime = AbilityRuntime::new();
+    let mut mortar_shells = MortarShellStore::default();
+    let mut artillery_shells = ArtilleryShellStore::default();
+    let mut events: HashMap<u32, Vec<Event>> = players
+        .iter()
+        .map(|player| (player.id, Vec::new()))
+        .collect();
+
+    apply_commands(
+        &map,
+        &mut entities,
+        &mut players,
+        &spatial,
+        &mut coordinator,
+        &fog,
+        &mut smokes,
+        &mut ability_runtime,
+        &mut mortar_shells,
+        &mut artillery_shells,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::Barracks,
+                tile_x: 8,
+                tile_y: 8,
+                queued: false,
+            },
+        )],
+        &mut events,
+        1,
+    );
+
+    let worker = entities.get(worker).expect("worker should remain alive");
+    assert_eq!(
+        worker.build_phase(),
+        Some(BuildPhase::Constructing { site }),
+        "active build command should keep constructing the original scaffold"
+    );
+    assert_eq!(
+        worker.order().build_intent_tile(),
+        Some((EntityKind::Depot, 4, 4)),
+        "second build order must not replace the active construction intent"
+    );
+    assert_eq!(
+        worker.target_id(),
+        Some(site),
+        "worker should stay latched to the scaffold it is building"
+    );
+    assert!(
+        events.get(&1).is_none_or(Vec::is_empty),
+        "ignored build command should not emit a failure notice"
+    );
+}
+
+#[test]
+fn build_order_accepts_resuming_owned_scaffold() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+        .expect("worker should spawn");
+    let scaffold = entities
+        .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+        .expect("scaffold should spawn");
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = vec![player_state(1)];
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1], &entities, &map);
+    let mut smokes = SmokeCloudStore::new();
+    let mut ability_runtime = AbilityRuntime::new();
+    let mut mortar_shells = MortarShellStore::default();
+    let mut artillery_shells = ArtilleryShellStore::default();
+    let mut events = HashMap::new();
+
+    apply_commands(
+        &map,
+        &mut entities,
+        &mut players,
+        &spatial,
+        &mut coordinator,
+        &fog,
+        &mut smokes,
+        &mut ability_runtime,
+        &mut mortar_shells,
+        &mut artillery_shells,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::Depot,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+        &mut events,
+        1,
+    );
+
+    let worker = entities.get(worker).expect("worker should remain alive");
+    assert!(
+        matches!(worker.order(), Order::Build(_)),
+        "worker should accept the resume order"
+    );
+    assert_eq!(
+        worker.order().build_intent_tile(),
+        Some((EntityKind::Depot, 4, 4)),
+        "resume order should keep the scaffold footprint intent"
+    );
+    assert_ne!(
+        worker.path_goal(),
+        None,
+        "resume order should still path the worker to the scaffold"
+    );
+    assert!(
+        entities
+            .get(scaffold)
+            .expect("scaffold should survive")
+            .under_construction(),
+        "existing scaffold should remain available for resume"
+    );
+    assert!(
+        events.get(&1).is_none_or(Vec::is_empty),
+        "resume order should not emit a placement failure notice"
+    );
+}
+
+#[test]
+fn build_order_accepts_resuming_owned_scaffold_without_resources() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+        .expect("worker should spawn");
+    entities
+        .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+        .expect("scaffold should spawn");
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = vec![player_state(1)];
+    assert!(players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 1_000)));
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1], &entities, &map);
+    let mut smokes = SmokeCloudStore::new();
+    let mut ability_runtime = AbilityRuntime::new();
+    let mut mortar_shells = MortarShellStore::default();
+    let mut artillery_shells = ArtilleryShellStore::default();
+    let mut events = HashMap::new();
+
+    apply_commands(
+        &map,
+        &mut entities,
+        &mut players,
+        &spatial,
+        &mut coordinator,
+        &fog,
+        &mut smokes,
+        &mut ability_runtime,
+        &mut mortar_shells,
+        &mut artillery_shells,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![worker],
+                building: EntityKind::Depot,
+                tile_x: 4,
+                tile_y: 4,
+                queued: false,
+            },
+        )],
+        &mut events,
+        1,
+    );
+
+    let worker = entities.get(worker).expect("worker should remain alive");
+    assert!(
+        matches!(worker.order(), Order::Build(_)),
+        "worker should accept resume orders even when the original cost is no longer affordable"
+    );
+    assert_eq!(
+        worker.order().build_intent_tile(),
+        Some((EntityKind::Depot, 4, 4))
+    );
+    assert_eq!(players[0].steel, 0, "resume order should not charge steel");
+    assert_eq!(players[0].oil, 0, "resume order should not charge oil");
+    assert!(
+        events.get(&1).is_none_or(Vec::is_empty),
+        "resume order should not emit a resource shortage notice"
+    );
+}
+
+#[test]
+fn build_with_multiple_selected_workers_uses_idle_closest_worker() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let busy_close = entities
+        .spawn_unit(1, EntityKind::Worker, 555.0, 512.0)
+        .expect("busy worker should spawn");
+    let idle_far = entities
+        .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+        .expect("far worker should spawn");
+    let idle_close = entities
+        .spawn_unit(1, EntityKind::Worker, 570.0, 512.0)
+        .expect("close worker should spawn");
+    let node = entities
+        .spawn_node(EntityKind::Steel, 560.0, 560.0)
+        .expect("node should spawn");
+    entities
+        .get_mut(busy_close)
+        .expect("busy worker should exist")
+        .set_order(Order::gather(node));
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![busy_close, idle_far, idle_close],
+                building: EntityKind::Depot,
+                tile_x: 15,
+                tile_y: 15,
+                queued: false,
+            },
+        )],
+    );
+
+    assert!(matches!(
+        entities.get(idle_close).expect("close worker").order(),
+        Order::Build(_)
+    ));
+    assert!(matches!(
+        entities.get(idle_far).expect("far worker").order(),
+        Order::Idle
+    ));
+    assert!(matches!(
+        entities.get(busy_close).expect("busy worker").order(),
+        Order::Gather(_)
+    ));
+}
+
+#[test]
+fn queued_builds_distribute_across_selected_workers_by_queue_length() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let first = entities
+        .spawn_unit(1, EntityKind::Worker, cc_x + 64.0, cc_y)
+        .expect("first worker should spawn");
+    let second = entities
+        .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+        .expect("second worker should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        (0..4)
+            .map(|i| {
+                (
+                    1,
+                    SimCommand::Build {
+                        units: vec![first, second],
+                        building: EntityKind::Depot,
+                        tile_x: 10 + i,
+                        tile_y: 10,
+                        queued: true,
+                    },
+                )
+            })
+            .collect(),
+    );
+
+    assert_eq!(entities.get(first).unwrap().queued_orders().len(), 2);
+    assert_eq!(entities.get(second).unwrap().queued_orders().len(), 2);
+}
+
+#[test]
+fn queued_build_prefers_idle_worker_over_closer_active_builder() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("city centre should spawn");
+    let west = entities
+        .spawn_unit(1, EntityKind::Worker, 320.0, 512.0)
+        .expect("west worker should spawn");
+    let east = entities
+        .spawn_unit(1, EntityKind::Worker, 640.0, 512.0)
+        .expect("east worker should spawn");
+    entities
+        .get_mut(west)
+        .expect("west worker should exist")
+        .set_order(Order::build(EntityKind::Depot, 8, 16));
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Build {
+                units: vec![west, east],
+                building: EntityKind::Depot,
+                tile_x: 9,
+                tile_y: 16,
+                queued: true,
+            },
+        )],
+    );
+
+    assert!(
+        entities.get(west).unwrap().queued_orders().is_empty(),
+        "closer worker already walking to build should not receive the queued build"
+    );
+    assert_eq!(
+        entities.get(east).unwrap().queued_orders(),
+        &[OrderIntent::build(EntityKind::Depot, 9, 16)],
+        "idle worker should receive the next queued build"
+    );
+}
+
+#[test]
+fn repeated_invalid_queued_builds_stay_bounded() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+        .expect("worker should spawn");
+    let pending = (0..32)
+        .map(|_| {
+            (
+                1,
+                SimCommand::Build {
+                    units: vec![worker],
+                    building: EntityKind::Depot,
+                    tile_x: u32::MAX,
+                    tile_y: u32::MAX,
+                    queued: true,
+                },
+            )
+        })
+        .collect();
+
+    apply(&map, &mut entities, pending);
+
+    assert_eq!(
+        entities
+            .get(worker)
+            .expect("worker should exist")
+            .queued_orders()
+            .len(),
+        8,
+        "queued build intents should enforce the per-unit queue cap even when invalid"
+    );
+}
