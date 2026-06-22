@@ -19,6 +19,14 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 - Once you're done a task, explain in plain language what you've done and the gameplay impact.
 
+## Evidence and Scope
+
+- If the user asks to investigate, scout, audit, confirm, or explicitly says not to fix or change
+  behavior, keep the pass read-only unless the user later authorizes edits.
+- For current gameplay, balance, deployment, PR, CI, or merged-state questions, answer from current
+  repo/runtime/git evidence such as `origin/main`, targeted source/tests, `/version`, Fly logs, or
+  PR status. Do not use private agent memory as a source of truth.
+
 ## Balance and Gameplay Patch Notes
 
 - For balance or gameplay changes, collect patch-note bullets as you work so the final summary,

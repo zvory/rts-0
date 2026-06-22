@@ -1,6 +1,6 @@
 # Phase 2 - Client Contract Domain Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 

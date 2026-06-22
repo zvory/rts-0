@@ -1,0 +1,928 @@
+// tests/client_contracts/config_contracts.mjs
+// Domain contract assertions imported by ../client_contracts.mjs.
+
+import { assert } from "./assertions.mjs";
+import {
+  ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_RANGE_TILES,
+  ARTILLERY_SHELL_DELAY_TICKS,
+  MINING_CC_RANGE_TILES,
+  RIFLEMAN_CHARGE_COOLDOWN_TICKS,
+  SMOKE_ABILITY_COST,
+  ABILITIES,
+  STATS,
+  TICK_HZ,
+  UPGRADES,
+  WORKER_BUILDABLE,
+} from "../../client/src/config.js";
+import {
+  HUD,
+  formatTankOilUsed,
+  groupCooldownClocks,
+  playerHasCompletedKind,
+} from "../../client/src/hud.js";
+import {
+  ABILITY,
+  ABILITY_CODE,
+  EVENT,
+  EVENT_CODE,
+  KIND,
+  KIND_CODE,
+  ORDER_STAGE,
+  ORDER_STAGE_CODE,
+  SETUP,
+  UPGRADE,
+  UPGRADE_CODE,
+} from "../../client/src/protocol.js";
+import { Input } from "../../client/src/input/index.js";
+import { ClientIntent } from "../../client/src/client_intent.js";
+
+// Config
+// ---------------------------------------------------------------------------
+{
+  assert(MINING_CC_RANGE_TILES === 9, "client mirrors the server mining City Centre range");
+  assert(STATS[KIND.CITY_CENTRE].cost.steel === 200, "City Centre cost mirrors server");
+  assert(
+    Array.isArray(STATS[KIND.FACTORY].requires),
+    "Vehicle Works should expose all server-side build prerequisites",
+  );
+  assert(
+    STATS[KIND.FACTORY].label === "Vehicle Works",
+    "factory protocol kind should present as Vehicle Works",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].label === "Gun Works",
+    "steelworks protocol kind should present as Gun Works",
+  );
+  assert(
+    Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),
+    "Training Centre should expose all server-side build prerequisites",
+  );
+  assert(
+    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.CITY_CENTRE),
+    "Training Centre should require a City Centre in the command card",
+  );
+  assert(
+    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.BARRACKS),
+    "Training Centre should require a Barracks in the command card",
+  );
+  assert(STATS[KIND.TRAINING_CENTRE].buildTicks === 560, "Training Centre build time mirrors server");
+  assert(
+    STATS[KIND.FACTORY].requires.includes(KIND.CITY_CENTRE),
+    "Vehicle Works should require a City Centre in the command card",
+  );
+  assert(
+    STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
+    "Vehicle Works should require a Training Centre in the command card",
+  );
+  assert(STATS[KIND.FACTORY].buildTicks === 749, "Vehicle Works build time mirrors server");
+  assert(
+    STATS[KIND.FACTORY].trains[0] === KIND.SCOUT_CAR,
+    "Vehicle Works should put Scout Car in the leftmost train slot",
+  );
+  assert(
+    STATS[KIND.FACTORY].trains.includes(KIND.TANK),
+    "Vehicle Works should train Tanks after the unlock",
+  );
+  assert(
+    STATS[KIND.FACTORY].trains[2] === KIND.COMMAND_CAR,
+    "Vehicle Works should put Command Car in the top-right train slot",
+  );
+  assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
+  assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
+  assert(!("requires" in ABILITIES[ABILITY.SMOKE]), "Scout Car smoke should be available without Gun Works");
+  assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
+  assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
+  assert(KIND_CODE[KIND.ARTILLERY] === 16, "Artillery compact kind code should be reserved");
+  assert(KIND_CODE[KIND.RESEARCH_COMPLEX] === 17, "R&D Complex compact kind code should be reserved");
+  assert(KIND_CODE[KIND.COMMAND_CAR] === 18, "Command Car compact kind code should be reserved");
+  assert(KIND_CODE[KIND.EKAT] === 19, "Ekat compact kind code should be reserved");
+  assert(KIND_CODE[KIND.ZAMOK] === 20, "Zamok compact kind code should be reserved");
+  assert(KIND_CODE[KIND.TANK_TRAP] === 21, "Tank Trap compact kind code should be reserved");
+  assert(ABILITY_CODE[ABILITY.POINT_FIRE] === 4, "Point Fire compact ability code should be reserved");
+  assert(ABILITY_CODE[ABILITY.BREAKTHROUGH] === 5, "Breakthrough compact ability code should be reserved");
+  assert(ABILITY_CODE[ABILITY.EKAT_TELEPORT] === 6, "Ekat Teleport compact ability code should be reserved");
+  assert(ABILITY_CODE[ABILITY.EKAT_LINE_SHOT] === 7, "Ekat Line Shot compact ability code should be reserved");
+  assert(ABILITY_CODE[ABILITY.EKAT_MAGIC_ANCHOR] === 8, "Ekat Magic Anchor compact ability code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE] === 10, "Point Fire compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.BREAKTHROUGH] === 11, "Breakthrough compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_TELEPORT] === 12, "Ekat Teleport compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_LINE_SHOT] === 13, "Ekat Line Shot compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.EKAT_MAGIC_ANCHOR] === 14, "Ekat Magic Anchor compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.DECONSTRUCT] === 15, "Deconstruct compact order stage code should be reserved");
+  assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.OVERPENETRATION] === 10, "Overpenetration compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.ARTILLERY_FIRING] === 11, "Artillery firing compact event code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
+  assert(
+    STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
+      STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
+      STATS[KIND.COMMAND_CAR].supply === 4 &&
+      STATS[KIND.COMMAND_CAR].sight === 10 &&
+      STATS[KIND.COMMAND_CAR].size < STATS[KIND.SCOUT_CAR].size &&
+      STATS[KIND.COMMAND_CAR].body.length < STATS[KIND.SCOUT_CAR].body.length &&
+      STATS[KIND.COMMAND_CAR].body.width < STATS[KIND.SCOUT_CAR].body.width,
+    "Command Car stats mirror the planned server values and use a smaller body than Scout Car",
+  );
+  assert(
+    ABILITIES[ABILITY.BREAKTHROUGH].carriers.includes(KIND.COMMAND_CAR) &&
+      ABILITIES[ABILITY.BREAKTHROUGH].targetMode === "self" &&
+      ABILITIES[ABILITY.BREAKTHROUGH].radiusTiles === 9 &&
+      ABILITIES[ABILITY.BREAKTHROUGH].durationTicks === 180 &&
+      ABILITIES[ABILITY.BREAKTHROUGH].cooldownTicks === 750,
+    "Breakthrough ability exposes Command Car carrier, self target, radius, duration, and cooldown",
+  );
+  assert(
+    STATS[KIND.ARTILLERY].cost.steel === 300 &&
+      STATS[KIND.ARTILLERY].cost.oil === 100 &&
+      STATS[KIND.ARTILLERY].supply === 5,
+    "Artillery cost and supply mirror server",
+  );
+  assert(STATS[KIND.ARTILLERY].upgradeRequires === UPGRADE.ARTILLERY_UNLOCK, "Artillery training requires its unlock");
+  assert(
+    ABILITIES[ABILITY.POINT_FIRE].carriers.includes(KIND.ARTILLERY) &&
+      ABILITIES[ABILITY.POINT_FIRE].rangeTiles === ARTILLERY_MAX_RANGE_TILES &&
+      ABILITIES[ABILITY.POINT_FIRE].minRangeTiles === ARTILLERY_MIN_RANGE_TILES &&
+      ABILITIES[ABILITY.POINT_FIRE].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
+      ARTILLERY_SHELL_DELAY_TICKS === 150,
+    "Point Fire ability exposes Artillery carrier, max range, minimum range, and 5-second delay",
+  );
+  assert(
+    ABILITIES[ABILITY.EKAT_TELEPORT].queued === true &&
+      ABILITIES[ABILITY.EKAT_LINE_SHOT].queued === true &&
+      ABILITIES[ABILITY.EKAT_MAGIC_ANCHOR].queued === true,
+    "Ekat abilities expose queued command support",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].footW === 3 && STATS[KIND.STEELWORKS].footH === 3,
+    "Gun Works should be a 3x3 building",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].cost.steel === 150 && STATS[KIND.STEELWORKS].cost.oil === 100,
+    "Gun Works cost mirrors server",
+  );
+  assert(STATS[KIND.STEELWORKS].buildTicks === 599, "Gun Works build time mirrors server");
+  assert(
+    STATS[KIND.STEELWORKS].trains.includes(KIND.ANTI_TANK_GUN),
+    "Gun Works should train Anti-Tank Guns after the unlock",
+  );
+  assert(
+    !STATS[KIND.STEELWORKS].researches,
+    "Gun Works should no longer expose advanced unlock research",
+  );
+  assert(
+    !STATS[KIND.BARRACKS].trains.includes(KIND.ANTI_TANK_GUN),
+    "Barracks should no longer train Anti-Tank Guns",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
+    "Gun Works should require Training Centre tech in the command card",
+  );
+  assert(
+    STATS[KIND.RESEARCH_COMPLEX].label === "R&D Complex" &&
+      STATS[KIND.RESEARCH_COMPLEX].footW === 3 &&
+      STATS[KIND.RESEARCH_COMPLEX].footH === 3,
+    "R&D Complex should be a 3x3 command-card building",
+  );
+  assert(
+    STATS[KIND.RESEARCH_COMPLEX].cost.steel === 100 &&
+      STATS[KIND.RESEARCH_COMPLEX].cost.oil === 100 &&
+      STATS[KIND.RESEARCH_COMPLEX].buildTicks === 450,
+    "R&D Complex cost and build time mirror server",
+  );
+  assert(
+    STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ANTI_TANK_GUN_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ARTILLERY_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.TANK_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.COMMAND_CAR_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.MORTAR_AUTOCAST),
+    "R&D Complex should expose Anti-Tank Gun, Artillery, Tank, Command Car, and Mortar Autocast research",
+  );
+  assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
+  assert(
+    STATS[KIND.TRAINING_CENTRE].researches.includes(UPGRADE.METHAMPHETAMINES),
+    "Training Centre should expose Methamphetamines research",
+  );
+  assert(
+    UPGRADES[UPGRADE.METHAMPHETAMINES].cost.steel === 100 &&
+      UPGRADES[UPGRADE.METHAMPHETAMINES].cost.oil === 100 &&
+      UPGRADES[UPGRADE.METHAMPHETAMINES].researchTicks === 600,
+    "Methamphetamines research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.steel === 150 &&
+      UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.oil === 150 &&
+      UPGRADES[UPGRADE.MORTAR_AUTOCAST].researchTicks === 600,
+    "Mortar Autocast research cost and time mirror server",
+  );
+  assert(
+    STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in R&D Complex",
+    "Anti-Tank Gun training should explain the R&D Complex research requirement",
+  );
+  assert(
+    STATS[KIND.TANK].upgradeRequiresText === "Requires research in R&D Complex",
+    "Tank training should explain the R&D Complex research requirement",
+  );
+  assert(
+    STATS[KIND.TANK_TRAP].label === "Tank Trap" &&
+      STATS[KIND.TANK_TRAP].footW === 1 &&
+      STATS[KIND.TANK_TRAP].footH === 1 &&
+      STATS[KIND.TANK_TRAP].sight === 1 &&
+      STATS[KIND.TANK_TRAP].cost.steel === 15 &&
+      STATS[KIND.TANK_TRAP].cost.oil === 0 &&
+      STATS[KIND.TANK_TRAP].buildTicks === TICK_HZ * 10 &&
+      STATS[KIND.TANK_TRAP].requires === KIND.TRAINING_CENTRE,
+    "Tank Trap dormant metadata mirrors Phase 1 server rules",
+  );
+  assert(
+    WORKER_BUILDABLE.includes(KIND.TANK_TRAP),
+    "Tank Trap is exposed in the worker build menu in the placement phase",
+  );
+  const playerId = 1;
+  const underConstructionTrainingCentre = [
+    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: 0.5 },
+  ];
+  assert(
+    !playerHasCompletedKind(underConstructionTrainingCentre, playerId, KIND.TRAINING_CENTRE),
+    "Vehicle Works should not unlock while the Training Centre is still under construction",
+  );
+  const underConstructionBarracks = [
+    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { owner: playerId, kind: KIND.BARRACKS, buildProgress: 0.5 },
+  ];
+  assert(
+    !playerHasCompletedKind(underConstructionBarracks, playerId, KIND.BARRACKS),
+    "Training Centre should not unlock while the Barracks is still under construction",
+  );
+  const completedTrainingCentre = [
+    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
+  ];
+  assert(
+    playerHasCompletedKind(completedTrainingCentre, playerId, KIND.TRAINING_CENTRE),
+    "Vehicle Works should unlock once the Training Centre is complete",
+  );
+  assert(formatTankOilUsed(0.04) === "0.0", "tank oil panel rounds tiny values to tenths");
+  assert(formatTankOilUsed(9.94) === "9.9", "tank oil panel keeps tenths below ten oil");
+  assert(formatTankOilUsed(10.4) === "10", "tank oil panel rounds whole values above ten oil");
+  assert(formatTankOilUsed(-2) === "0.0", "tank oil panel clamps negative values");
+  assert(formatTankOilUsed(Number.NaN) === "0.0", "tank oil panel tolerates missing oilUsed");
+  const groupedNearlySameCooldowns = groupCooldownClocks([150, 149, 146], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  assert(groupedNearlySameCooldowns.length === 1, "nearby rifleman cooldowns share one clock arm");
+  assert(groupedNearlySameCooldowns[0].count === 3, "clock grouping keeps the grouped unit count");
+  const groupedDistinctCooldowns = groupCooldownClocks([150, 120, 60], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  assert(groupedDistinctCooldowns.length === 3, "visibly different rifleman cooldowns get separate clock arms");
+  const groupedIgnoringReady = groupCooldownClocks([0, 0, 30, 31], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  assert(groupedIgnoringReady.length === 1 && groupedIgnoringReady[0].count === 2, "ready riflemen do not create cooldown clocks");
+
+  const trained = [];
+  let selectedProductionBuildings = [
+    { id: 20, owner: playerId, kind: KIND.BARRACKS },
+    { id: 22, owner: playerId, kind: KIND.BARRACKS, buildProgress: 0.5 },
+    { id: 21, owner: playerId, kind: KIND.BARRACKS },
+    { id: 30, owner: playerId, kind: KIND.FACTORY },
+  ];
+  const hud = Object.create(HUD.prototype);
+  hud.state = {
+    playerId,
+    selectedEntities: () => selectedProductionBuildings,
+  };
+  hud.commandIssuer = {
+    command: (command) => trained.push(command),
+  };
+  hud._trainRoundRobin = new Map();
+  hud._cancelRoundRobin = new Map();
+
+  hud._issueTrain(KIND.RIFLEMAN);
+  hud._issueTrain(KIND.MACHINE_GUNNER);
+  hud._issueTrain(KIND.RIFLEMAN);
+  hud._issueTrain(KIND.SCOUT_CAR);
+  assert(
+    trained.map((command) => command.building).join(",") === "20,21,20,30",
+    "selected production buildings should receive train commands round-robin by compatible producer set",
+  );
+
+  selectedProductionBuildings = [
+    { id: 21, owner: playerId, kind: KIND.BARRACKS },
+    { id: 20, owner: playerId, kind: KIND.BARRACKS },
+  ];
+  hud._issueTrain(KIND.RIFLEMAN);
+  assert(
+    trained[4].building === 21,
+    "changing selected producer order should start the new round-robin set at its first building",
+  );
+
+  selectedProductionBuildings = [
+    { id: 20, owner: playerId, kind: KIND.BARRACKS, prodQueue: 1 },
+    { id: 21, owner: playerId, kind: KIND.BARRACKS, prodQueue: 2 },
+    { id: 30, owner: playerId, kind: KIND.FACTORY, prodQueue: 1 },
+  ];
+  hud._issueCancelProduction(KIND.BARRACKS);
+  hud._issueCancelProduction(KIND.BARRACKS);
+  hud._issueCancelProduction(KIND.BARRACKS);
+  assert(
+    trained.slice(5).map((command) => command.building).join(",") === "21,20,21",
+    "selected producing buildings should receive cancel commands reverse round-robin by producer kind",
+  );
+
+  const priorDocument = globalThis.document;
+  const priorMouseEvent = globalThis.MouseEvent;
+  const renderedButtons = [];
+  function fakeElement(tagName) {
+    const listeners = new Map();
+    return {
+      tagName: tagName.toUpperCase(),
+      children: [],
+      className: "",
+      dataset: {},
+      disabled: false,
+      innerHTML: "",
+      style: {
+        values: {},
+        setProperty(name, value) {
+          this.values[name] = value;
+        },
+      },
+      appendChild(child) {
+        if (child?.nodeType === "fragment") this.children.push(...child.children);
+        else this.children.push(child);
+      },
+      querySelector(selector) {
+        const abilityMatch = selector.match(/^button\[data-ability="([^"]+)"\]$/);
+        if (abilityMatch) {
+          return this.children.find((child) => child.dataset?.ability === abilityMatch[1]) || null;
+        }
+        return null;
+      },
+      querySelectorAll() {
+        return [];
+      },
+      addEventListener(type, listener) {
+        listeners.set(type, listener);
+      },
+      dispatchEvent(ev) {
+        listeners.get(ev.type)?.(ev);
+        return true;
+      },
+      click(ev = {}) {
+        listeners.get("click")?.({
+          type: "click",
+          preventDefault() {},
+          shiftKey: !!ev.shiftKey,
+        });
+      },
+    };
+  }
+  function renderCommandCard(hud) {
+    if (!hud.elCommand) hud.elCommand = fakeElement("div");
+    if (!hud.clientIntent) hud.clientIntent = new ClientIntent();
+    hud._renderCommandCard();
+    return hud.elCommand;
+  }
+  try {
+    globalThis.document = {
+      createDocumentFragment() {
+        return {
+          nodeType: "fragment",
+          children: [],
+          appendChild(child) {
+            this.children.push(child);
+          },
+        };
+      },
+      createElement(tagName) {
+        const el = fakeElement(tagName);
+        if (tagName === "button") renderedButtons.push(el);
+        return el;
+      },
+    };
+    globalThis.MouseEvent = class {
+      constructor(type, init = {}) {
+        this.type = type;
+        this.altKey = !!init.altKey;
+        this.ctrlKey = !!init.ctrlKey;
+        this.metaKey = !!init.metaKey;
+        this.shiftKey = !!init.shiftKey;
+        this.bubbles = !!init.bubbles;
+        this.cancelable = !!init.cancelable;
+      }
+      preventDefault() {}
+    };
+
+    const sent = [];
+    const selectedTrainingCentre = {
+      id: 77,
+      owner: playerId,
+      kind: KIND.TRAINING_CENTRE,
+      buildProgress: null,
+    };
+    const researchHud = Object.create(HUD.prototype);
+    researchHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 100 },
+      upgrades: [],
+      commandTarget: null,
+      selectedEntities: () => [selectedTrainingCentre],
+      entitiesInterpolated: () => [selectedTrainingCentre],
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    researchHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    researchHud._cardSig = null;
+    researchHud._resourceIcons = {};
+
+    renderCommandCard(researchHud);
+    const researchButton = renderedButtons.find((button) => button.innerHTML.includes("Methamphetamines"));
+    assert(researchButton && !researchButton.disabled, "Methamphetamines command-card button renders enabled");
+    assert(researchButton.dataset.hotkey === "Q", "Methamphetamines command-card button uses Q as its hotkey");
+    assert(researchButton.innerHTML.includes("Research time"), "Methamphetamines tooltip includes research time");
+    researchButton.click({ shiftKey: true });
+    assert(
+      sent.length === 1 &&
+        sent[0].c === "research" &&
+        sent[0].building === 77 &&
+        sent[0].upgrade === UPGRADE.METHAMPHETAMINES,
+      "Clicking Methamphetamines should send a research command",
+    );
+
+    const mortarButtonsBefore = renderedButtons.length;
+    const selectedMortar = {
+      id: 501,
+      owner: playerId,
+      kind: KIND.MORTAR_TEAM,
+      abilities: [{
+        ability: ABILITY.MORTAR_FIRE,
+        cooldownLeft: 30,
+        autocastEnabled: true,
+      }],
+    };
+    const mortarHud = Object.create(HUD.prototype);
+    mortarHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 100 },
+      commandTarget: null,
+      selectedEntities: () => [selectedMortar],
+      entitiesInterpolated: () => [selectedMortar],
+      beginCommandTarget(target) {
+        this.commandTarget = target;
+      },
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    mortarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    mortarHud.audio = null;
+    mortarHud._cardSig = null;
+    renderCommandCard(mortarHud);
+    const mortarButtonCount = renderedButtons.length;
+    assert(
+      mortarButtonCount > mortarButtonsBefore,
+      "selected Mortar Team should render an ability command button",
+    );
+    selectedMortar.abilities[0].cooldownLeft = 29;
+    renderCommandCard(mortarHud);
+    assert(
+      renderedButtons.length === mortarButtonCount,
+      "Mortar Fire cooldown ticks should update in place without rebuilding the command button",
+    );
+
+    renderedButtons.length = 0;
+    const selectedCommandCar = {
+      id: 601,
+      owner: playerId,
+      kind: KIND.COMMAND_CAR,
+      abilities: [{
+        ability: ABILITY.BREAKTHROUGH,
+        cooldownLeft: 0,
+      }],
+    };
+    const commandCarHud = Object.create(HUD.prototype);
+    commandCarHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 100 },
+      map: { tileSize: 32 },
+      commandTarget: null,
+      selectedEntities: () => [selectedCommandCar],
+      entitiesInterpolated: () => [selectedCommandCar],
+      updateAbilityTargetPreview(preview) {
+        this.abilityTargetPreview = preview;
+      },
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    commandCarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    commandCarHud.audio = null;
+    commandCarHud._cardSig = null;
+    renderCommandCard(commandCarHud);
+    const breakthroughButton = renderedButtons.find((button) => button.innerHTML.includes("Breakthrough"));
+    assert(breakthroughButton?.dataset.hotkey === "E", "Breakthrough should use the E command-card slot");
+    breakthroughButton.click({ shiftKey: true });
+    const breakthroughCommand = sent[sent.length - 1];
+    assert(
+      breakthroughCommand?.c === "useAbility" &&
+        breakthroughCommand.ability === ABILITY.BREAKTHROUGH &&
+        breakthroughCommand.units[0] === selectedCommandCar.id &&
+        breakthroughCommand.queued === true &&
+        !("x" in breakthroughCommand) &&
+        !("y" in breakthroughCommand),
+      "Clicking Breakthrough should issue a queued self-target ability command without coordinates",
+    );
+
+    const leftCommandCar = {
+      ...selectedCommandCar,
+      id: 602,
+      x: 0,
+      y: 0,
+    };
+    const centralCommandCar = {
+      ...selectedCommandCar,
+      id: 603,
+      x: 9,
+      y: 0,
+    };
+    const rightCommandCar = {
+      ...selectedCommandCar,
+      id: 604,
+      x: 30,
+      y: 0,
+    };
+    const coolingDownCommandCar = {
+      ...selectedCommandCar,
+      id: 605,
+      x: 10,
+      y: 0,
+      abilities: [{
+        ability: ABILITY.BREAKTHROUGH,
+        cooldownLeft: 5,
+      }],
+    };
+    commandCarHud.state.selectedEntities = () => [
+      leftCommandCar,
+      centralCommandCar,
+      rightCommandCar,
+      coolingDownCommandCar,
+    ];
+    commandCarHud.state.entitiesInterpolated = commandCarHud.state.selectedEntities;
+    commandCarHud._cardSig = null;
+    renderedButtons.length = 0;
+    renderCommandCard(commandCarHud);
+    const multiBreakthroughButton = renderedButtons.find((button) => button.innerHTML.includes("Breakthrough"));
+    multiBreakthroughButton.dispatchEvent({ type: "mouseenter" });
+    assert(
+      commandCarHud.clientIntent.abilityTargetPreview?.areaOrigins.length === 1 &&
+        commandCarHud.clientIntent.abilityTargetPreview.areaOrigins[0].id === centralCommandCar.id,
+      "Breakthrough hover preview should show only the Command Car that would activate",
+    );
+    multiBreakthroughButton.click({});
+    const multiBreakthroughCommand = sent[sent.length - 1];
+    assert(
+      multiBreakthroughCommand.units.length === 1 &&
+        multiBreakthroughCommand.units[0] === centralCommandCar.id,
+      "Breakthrough should issue from the most central ready Command Car only",
+    );
+
+    globalThis.document.getElementById = (id) => {
+      assert(id === "command-card", "Methamphetamines hotkey should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "Methamphetamines hotkey should query hotkey buttons");
+          return [researchButton];
+        },
+      };
+    };
+    const input = Object.create(Input.prototype);
+    input.state = researchHud.state;
+    const hotkeyEv = {
+      code: "KeyQ",
+      shiftKey: false,
+      repeat: false,
+      preventDefault() {},
+    };
+    const hotkeyResult = input._activateCommandHotkey(hotkeyEv);
+    assert(hotkeyResult?.handled === true, "Methamphetamines hotkey should activate the command-card button");
+    const hotkeyCommand = sent[sent.length - 1];
+    assert(
+      hotkeyCommand?.c === "research" &&
+        hotkeyCommand.building === 77 &&
+        hotkeyCommand.upgrade === UPGRADE.METHAMPHETAMINES,
+      "Methamphetamines hotkey should send a research command",
+    );
+
+    renderedButtons.length = 0;
+    const selectedFactory = {
+      id: 78,
+      owner: playerId,
+      kind: KIND.FACTORY,
+      buildProgress: null,
+    };
+    const factoryHud = Object.create(HUD.prototype);
+    factoryHud.state = {
+      playerId,
+      resources: { steel: 300, oil: 150 },
+      upgrades: [],
+      selectedEntities: () => [selectedFactory],
+      entitiesInterpolated: () => [selectedFactory],
+    };
+    factoryHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    factoryHud._cardSig = null;
+    factoryHud._trainRoundRobin = new Map();
+    factoryHud._cancelRoundRobin = new Map();
+    factoryHud._resourceIcons = {};
+    renderCommandCard(factoryHud);
+    const scoutCarButton = renderedButtons.find((button) => button.innerHTML.includes("Scout Car"));
+    const tankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
+    const commandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
+    const tankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    assert(scoutCarButton?.dataset.hotkey === "Q", "Scout Car training should keep the Q slot");
+    assert(tankButton?.dataset.hotkey === "W", "Tank training should occupy the top-middle W slot");
+    assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
+    assert(commandCarButton?.disabled, "Command Car training should be disabled before its R&D unlock");
+    assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
+
+    renderedButtons.length = 0;
+    factoryHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
+    factoryHud._cardSig = null;
+    renderCommandCard(factoryHud);
+    assert(
+      !renderedButtons.some((button) => button.innerHTML.includes("TK+")),
+      "completed Tank Production research should disappear from the command card",
+    );
+
+    renderedButtons.length = 0;
+    const selectedGunWorks = {
+      id: 79,
+      owner: playerId,
+      kind: KIND.STEELWORKS,
+      buildProgress: null,
+    };
+    const gunWorksHud = Object.create(HUD.prototype);
+    gunWorksHud.state = {
+      playerId,
+      resources: { steel: 300, oil: 200 },
+      upgrades: [],
+      selectedEntities: () => [selectedGunWorks],
+      entitiesInterpolated: () => [selectedGunWorks],
+    };
+    gunWorksHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    gunWorksHud._cardSig = null;
+    gunWorksHud._trainRoundRobin = new Map();
+    gunWorksHud._cancelRoundRobin = new Map();
+    gunWorksHud._resourceIcons = {};
+    renderCommandCard(gunWorksHud);
+    const mortarButton = renderedButtons.find((button) => button.innerHTML.includes("Mortar Team"));
+    const antiTankGunButton = renderedButtons.find((button) => button.innerHTML.includes("Anti-Tank Gun"));
+    const artilleryButton = renderedButtons.find((button) => button.innerHTML.includes("Artillery"));
+    const antiTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG+"));
+    const artilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
+    assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
+    assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
+    assert(!antiTankResearchButton, "Anti-Tank Gun Crews research should move out of Gun Works");
+    assert(!artilleryResearchButton, "Unlock Artillery research should move out of Gun Works");
+
+    renderedButtons.length = 0;
+    const selectedResearchComplex = {
+      id: 80,
+      owner: playerId,
+      kind: KIND.RESEARCH_COMPLEX,
+      buildProgress: null,
+    };
+    const rdHud = Object.create(HUD.prototype);
+    rdHud.state = {
+      playerId,
+      resources: { steel: 500, oil: 500 },
+      upgrades: [],
+      selectedEntities: () => [selectedResearchComplex],
+      entitiesInterpolated: () => [selectedResearchComplex],
+    };
+    rdHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    rdHud._cardSig = null;
+    rdHud._trainRoundRobin = new Map();
+    rdHud._cancelRoundRobin = new Map();
+    rdHud._resourceIcons = {};
+    renderCommandCard(rdHud);
+    const rdAntiTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG+"));
+    const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    const rdCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
+    const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
+    assert(rdAntiTankResearchButton?.dataset.hotkey === "Q", "Anti-Tank Gun Crews research should appear in R&D Complex");
+    assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
+    assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
+    assert(rdCommandCarResearchButton?.dataset.hotkey === "S", "Command Car research should appear in R&D Complex");
+    assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
+    assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
+    assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Unlock Artillery research should appear in R&D Complex");
+    assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before Anti-Tank Gun research");
+    assert(rdArtilleryResearchButton?.title === "Requires Anti-Tank Gun Research", "Artillery research should name Anti-Tank Gun prerequisite");
+
+    renderedButtons.length = 0;
+    rdHud.state.upgrades = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
+    rdHud._cardSig = null;
+    renderCommandCard(rdHud);
+    const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after Anti-Tank Gun research");
+
+    renderedButtons.length = 0;
+    rdHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
+    rdHud._cardSig = null;
+    renderCommandCard(rdHud);
+    const unlockedCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
+    assert(unlockedCommandCarResearchButton && !unlockedCommandCarResearchButton.disabled, "Command Car research should enable after Tank Production");
+
+    renderedButtons.length = 0;
+    const playedNotices = [];
+    let placements = 0;
+    const selectedWorker = { id: 90, owner: playerId, kind: KIND.WORKER };
+    const completedCityCentre = { id: 91, owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null };
+    const shortResourceHud = Object.create(HUD.prototype);
+    shortResourceHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 0 },
+      selectedEntities: () => [selectedWorker],
+      entitiesInterpolated: () => [selectedWorker, completedCityCentre],
+      beginPlacement() {
+        placements += 1;
+      },
+    };
+    shortResourceHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    shortResourceHud.audio = {
+      play(id) {
+        playedNotices.push(id);
+      },
+    };
+    shortResourceHud._cardSig = null;
+    shortResourceHud._resourceIcons = {};
+
+    shortResourceHud.clientIntent = new ClientIntent();
+    shortResourceHud.clientIntent.openWorkerBuildMenu();
+    renderCommandCard(shortResourceHud);
+    const barracksButton = renderedButtons.find((button) => button.innerHTML.includes("Barracks"));
+    const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Vehicle Works"));
+    assert(barracksButton && !barracksButton.disabled, "unlocked unaffordable build button stays clickable");
+    assert(
+      barracksButton.className.includes("unaffordable"),
+      "unlocked unaffordable build button gets the intermediate visual class",
+    );
+    assert(factoryButton?.disabled, "tech-locked build button stays hard-disabled");
+
+    barracksButton.click();
+    assert(placements === 0, "clicking an unaffordable build button should not enter placement");
+    assert(
+      playedNotices[0] === "notice_steel",
+      "clicking an unaffordable build button plays the missing-steel voice line",
+    );
+
+    globalThis.document.getElementById = (id) => {
+      assert(id === "command-card", "unaffordable build hotkey should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "unaffordable build hotkey should query hotkey buttons");
+          return [barracksButton];
+        },
+      };
+    };
+    input.state = shortResourceHud.state;
+    input._activateCommandHotkey({
+      code: `Key${barracksButton.dataset.hotkey}`,
+      shiftKey: false,
+      repeat: false,
+      preventDefault() {},
+    });
+    assert(placements === 0, "unaffordable build hotkey should not enter placement");
+    assert(playedNotices[1] === "notice_steel", "unaffordable build hotkey plays the missing-steel voice line");
+
+    assert(
+      shortResourceHud._missingResourceSoundId(
+        { steel: 50, oil: 0 },
+        { steel: 50, oil: 0, supplyUsed: 10, supplyCap: 10 },
+        1,
+      ) === "notice_supply",
+      "train unavailable feedback should play the supply voice line when resources are available",
+    );
+
+    renderedButtons.length = 0;
+    sent.length = 0;
+    const selectedAntiTankGun = { id: 88, owner: playerId, kind: KIND.ANTI_TANK_GUN, setupState: SETUP.DEPLOYED };
+    const selectedArtillery = { id: 89, owner: playerId, kind: KIND.ARTILLERY, setupState: SETUP.PACKED };
+    const antiTankGunHud = Object.create(HUD.prototype);
+    antiTankGunHud.state = {
+      playerId,
+      resources: { steel: 0, oil: 0 },
+      commandTarget: null,
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
+      entitiesInterpolated: () => [selectedAntiTankGun, selectedArtillery],
+      beginCommandTarget(kind) {
+        this.commandTarget = kind;
+      },
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    antiTankGunHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    antiTankGunHud._cardSig = null;
+
+    renderCommandCard(antiTankGunHud);
+    const setupButton = renderedButtons.find((button) => button.innerHTML.includes("Set Up"));
+    const tearDownButton = renderedButtons.find((button) => button.innerHTML.includes("Tear Down"));
+    assert(setupButton?.dataset.hotkey, "anti-tank gun Set Up button should keep its command-card hotkey");
+    assert(!tearDownButton, "anti-tank gun Tear Down should not occupy a command-card slot");
+
+    const setupCommands = [];
+    const setupInput = Object.create(Input.prototype);
+    setupInput.state = {
+      playerId,
+      selectedEntities: () => [selectedAntiTankGun, selectedArtillery],
+    };
+    setupInput.clientIntent = new ClientIntent();
+    setupInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
+    setupInput.clientIntent.addCommandFeedback = () => {};
+    setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
+    setupInput._worldAt = (x, y) => ({ x, y });
+    setupInput._entityAtWorld = () => null;
+    setupInput._selectedOwnUnitIds = () => [selectedAntiTankGun.id, selectedArtillery.id];
+    setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
+    assert(
+      setupCommands[0]?.c === "setupAntiTankGuns" &&
+        setupCommands[0].units.includes(selectedAntiTankGun.id) &&
+        setupCommands[0].units.includes(selectedArtillery.id) &&
+        setupCommands[0].queued === true,
+      "setupAntiTankGuns targeting includes selected artillery as setup-capable support weapons",
+    );
+
+    const movingAntiTankGun = {
+      ...selectedAntiTankGun,
+      x: 100,
+      y: 120,
+      orderPlan: [
+        { kind: ORDER_STAGE.MOVE, x: 320, y: 192 },
+        { kind: ORDER_STAGE.SETUP_ANTI_TANK_GUNS, x: 640, y: 192 },
+      ],
+    };
+    const movingArtillery = {
+      ...selectedArtillery,
+      x: 140,
+      y: 120,
+      orderPlan: [
+        { kind: ORDER_STAGE.ATTACK_MOVE, x: 352, y: 224 },
+      ],
+    };
+    const stationaryAntiTankGun = {
+      id: 90,
+      owner: playerId,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 180,
+      y: 120,
+    };
+    const previewInput = Object.create(Input.prototype);
+    previewInput.mouse = { x: 500, y: 300 };
+    previewInput.state = {
+      playerId,
+      selectedEntities: () => [movingAntiTankGun, movingArtillery, stationaryAntiTankGun],
+    };
+    previewInput.clientIntent = new ClientIntent();
+    previewInput.clientIntent.beginCommandTarget("setupAntiTankGuns");
+    previewInput._worldAt = (x, y) => ({ x, y });
+    previewInput._refreshAntiTankGunSetupPreview();
+    const unqueuedPreviewGuns = previewInput.clientIntent.antiTankGunSetupPreview?.guns || [];
+    assert(
+      unqueuedPreviewGuns[0]?.x === 100 && unqueuedPreviewGuns[0]?.y === 120,
+      "unqueued support setup preview keeps the current gun position",
+    );
+
+    previewInput._shiftKeyDown = true;
+    previewInput._refreshAntiTankGunSetupPreview();
+    const previewGuns = previewInput.clientIntent.antiTankGunSetupPreview?.guns || [];
+    assert(
+      previewGuns[0]?.x === 320 &&
+        previewGuns[0]?.y === 192 &&
+        movingAntiTankGun.x === 100 &&
+        movingAntiTankGun.y === 120,
+      "queued anti-tank gun setup preview uses the accepted movement endpoint without mutating the selected entity",
+    );
+    assert(
+      previewGuns[1]?.x === 352 && previewGuns[1]?.y === 224,
+      "artillery setup preview uses attack-move formation endpoints as projected origins",
+    );
+    assert(
+      previewGuns[2]?.x === 180 && previewGuns[2]?.y === 120,
+      "support setup preview falls back to current position when no movement plan is accepted",
+    );
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorMouseEvent === undefined) delete globalThis.MouseEvent;
+    else globalThis.MouseEvent = priorMouseEvent;
+  }
+}
+
+// ---------------------------------------------------------------------------
