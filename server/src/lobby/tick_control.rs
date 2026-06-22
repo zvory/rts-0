@@ -201,6 +201,37 @@ mod tests {
         );
         assert!(paused_dev_watch.can_step_room_time(true));
 
+        let lab = TickControl::new(
+            ClockCapability::LAB,
+            Some(RoomTimeClock {
+                speed: 2.0,
+                paused: false,
+            }),
+            1.0,
+            false,
+        );
+        assert_duration_close(lab.tick_interval(base), Duration::from_millis(45));
+        assert_eq!(
+            lab.scheduled_action(),
+            ScheduledTickAction::RoomControlled(RoomTimeSource::Lab)
+        );
+        assert!(lab.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
+        assert!(lab.allows_room_time_operation(RoomTimeOperation::Step, true));
+        assert!(!lab.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
+        assert!(!lab.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
+
+        let paused_lab = TickControl::new(
+            ClockCapability::LAB,
+            Some(RoomTimeClock {
+                speed: 2.0,
+                paused: true,
+            }),
+            1.0,
+            false,
+        );
+        assert_eq!(paused_lab.scheduled_action(), ScheduledTickAction::Noop);
+        assert!(paused_lab.can_step_room_time(true));
+
         let branch_staging = TickControl::new(ClockCapability::BRANCH_STAGING, None, 3.0, false);
         assert_duration_close(
             branch_staging.tick_interval(base),

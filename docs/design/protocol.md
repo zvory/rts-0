@@ -63,8 +63,8 @@ lobby/config dump replaces the source scrape.
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
-| `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback and dev scenario watch rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
-| `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms. |
+| `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback, dev scenario watch rooms, and lab rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
+| `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms and paused lab rooms. |
 | `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted only in replay rooms. |
 | `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
@@ -371,9 +371,9 @@ when their connection is mapped to an original active seat through the branch-li
 Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
 `visibility.replayVision: true`. Replay branch creation is advertised separately with
 `actions.replayBranch: true` only when the current replay can accept a branch request. Dev scenario
-watch rooms advertise speed/pause/step room-time controls without replay seek, replay-vision, or
-replay-branch controls. Clients must not infer these shared affordances from `replay`, `lab`,
-URL-local dev-watch state, or legacy debug flags.
+watch rooms and lab rooms advertise speed/pause/step room-time controls without replay seek,
+replay-vision, replay-branch, or timeline controls. Clients must not infer these shared affordances
+from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`. Late live spectator joins receive the same live start
 payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
@@ -384,7 +384,9 @@ metadata omitted. Labs use a hidden internal room id, a default two-team real `G
 server-owned projection. `role` names the room-owned operator/read-only viewer classification.
 Direct lab URL joiners currently receive `operator`; `readOnly` remains available for future
 explicit viewer modes. `operatorId` identifies the original lab joiner for compatibility metadata,
-not the sole authority for privileged lab operations.
+not the sole authority for privileged lab operations. Lab room-time controls are shared room state:
+any operator can pause, resume at a clamped positive speed, or step exactly one authoritative tick
+while paused, and the server emits `roomTimeState` after accepted lab room-time controls.
 
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
@@ -781,9 +783,9 @@ Events are best-effort visual flavor; the client must not depend on receiving th
 ### 2.6 Room time state and replay vision
 
 `roomTimeState` is a reliable server message that carries the shared room-controlled time
-cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms also send
-it after pause/resume and one-tick step controls so clients can confirm the authoritative room-time
-speed and tick:
+cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
+rooms also send it after pause/resume and one-tick step controls so clients can confirm the
+authoritative room-time speed and tick:
 ```
 {
   t: "roomTimeState",

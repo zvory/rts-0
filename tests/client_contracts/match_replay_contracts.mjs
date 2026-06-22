@@ -633,6 +633,53 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
   scenarioUi.destroy();
 
+  const labControls = fakeEl("div");
+  const labSpeed2 = fakeEl("button");
+  labSpeed2.className = "spd-btn";
+  labSpeed2.dataset.speed = "2";
+  const labPause = fakeEl("button");
+  labPause.className = "spd-btn dev-pause-btn";
+  labPause.dataset.speed = "0";
+  const labStep = fakeEl("button");
+  labStep.className = "spd-btn dev-step-btn";
+  labStep.dataset.stepRoomTime = "";
+  const labSeek = fakeEl("button");
+  labSeek.className = "spd-btn seek-btn";
+  labSeek.dataset.seekBack = "30";
+  labControls.appendChild(labSpeed2);
+  labControls.appendChild(labPause);
+  labControls.appendChild(labStep);
+  labControls.appendChild(labSeek);
+  dom.replaySpeed = labControls;
+  const labUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        spectator: true,
+        lab: { room: "sandbox", role: "operator" },
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+            step: true,
+          },
+        },
+      },
+    }),
+  });
+  assert(!labSpeed2.hidden, "lab mode shows positive speed controls when setSpeed is advertised");
+  assert(!labPause.hidden, "lab mode shows pause controls when pause is advertised");
+  assert(!labStep.hidden, "lab mode shows step controls when step is advertised");
+  assert(labSeek.hidden, "lab mode hides replay seek controls without seek capability");
+  labControls._listeners.get("click")({ target: labStep });
+  assert(replayNet.steps === 2, "lab step sends net.stepRoomTime through neutral controls");
+  labControls._listeners.get("click")({ target: labPause });
+  assert(replayNet.speeds.at(-1) === 0, "lab pause sends net.setRoomTimeSpeed");
+  labUi.destroy();
+
   const stepOnlyControls = fakeEl("div");
   const stepOnlySpeed = fakeEl("button");
   stepOnlySpeed.className = "spd-btn";
