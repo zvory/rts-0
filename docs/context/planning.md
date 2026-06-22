@@ -27,6 +27,10 @@ name is short, lowercase, and descriptive.
   launches the maintained Node runner in `scripts/phase-runner-agents.mjs`. Use `--pr --wait`
   for normal unattended completion so the runner waits for each PR to merge before reporting
   success. Planning and final review remain manual.
+- Prefer explicit phase ids when the requested chain includes `phase-0`, decimal phases such as
+  `phase-2.5`, named phases, or any first phase that must be included. `--from PHASE --to PHASE`
+  discovers phases strictly after `--from` and through `--to`; name the first phase explicitly when
+  inclusion matters.
 - Recovery, cleanup, canary, and alternate-runner procedures for PR-first phase work live in
   [docs/pr-first-workflow.md](../pr-first-workflow.md).
 

@@ -56,6 +56,11 @@ scripts/phase-runner.sh --plan ci --from 4 --to 6 --pr
 scripts/phase-runner.sh --plan ci --from 4 --to 6 --pr --wait
 ```
 
+Prefer explicit phase ids when a requested chain includes `phase-0`, decimal phases such as
+`phase-2.5`, named phases, or any first phase that must be included. `--from PHASE --to PHASE`
+discovers phases strictly after `--from` and through `--to`; name the first phase explicitly when
+inclusion matters.
+
 `scripts/phase-runner-result.schema.json` remains the committed structured-handoff contract used by
 the runner and by executor prompts. Keep the runner handoff validation and this schema in sync when
 the handoff shape changes. Intended follow-up extension points live in
