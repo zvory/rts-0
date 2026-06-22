@@ -107,6 +107,9 @@ const GROUP_RULES = [
     exact: [
       "client/src/hud.js",
       "client/src/hud_command_card.js",
+      "client/src/hud_command_dom.js",
+      "client/src/hud_control_groups.js",
+      "client/src/hud_resources.js",
       "client/src/hud_selection_panel.js",
       "client/src/hud_unit_commands.js",
       "client/src/resource_icons.js",

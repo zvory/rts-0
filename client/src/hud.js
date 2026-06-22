@@ -9,15 +9,32 @@
 // effects go through `commandIssuer.issueCommand(...)` or the injected client intent facade.
 
 import { cmd } from "./protocol.js";
-import { ABILITY, KIND, STATE, isBuilding } from "./protocol.js";
+import { ABILITY, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
-  PLAYER_PALETTE,
   STATS,
   TICK_HZ,
   UPGRADES,
 } from "./config.js";
+import {
+  buildControlGroupSummaries,
+  controlGroupMatchesSelection,
+  controlGroupTabsSignature,
+  dominantControlGroupKind,
+  renderControlGroupTabs,
+} from "./hud_control_groups.js";
 import { buildCommandCardDescriptors } from "./hud_command_card.js";
+import {
+  createCommandButton,
+  emptyCommandSlot,
+  renderDescriptorCardDom,
+  syncCooldownClockElement,
+} from "./hud_command_dom.js";
+import {
+  renderAllPlayersResources,
+  renderSinglePlayerResources,
+  restoreSinglePlayerResourceShell,
+} from "./hud_resources.js";
 import { HudSelectionPanel } from "./hud_selection_panel.js";
 import { resourceIconHtml } from "./resource_icons.js";
 export {
@@ -201,81 +218,38 @@ export class HUD {
   }
 
   _renderSinglePlayerResources() {
-    const r = this.state.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
-    // Restore static HUD content if we previously switched to multi-player mode.
-    if ((this._resSig && this._resSig.startsWith("multi:")) || !this.elSteel || !this.elOil || !this.elSupply) {
-      this._restoreSinglePlayerResourceShell();
-      this._resSig = null;
-    }
-    const steel = r.steel ?? 0;
-    const oil = r.oil ?? 0;
-    const used = r.supplyUsed ?? 0;
-    const cap = r.supplyCap ?? 0;
-    const sig = `single:${steel}:${oil}:${used}:${cap}`;
-    if (sig === this._resSig) {
-      this._recordHudDiagnostic("hud.dirty.resources.hit");
-      return;
-    }
-    this._recordHudDiagnostic("hud.dirty.resources.miss");
-    this._resSig = sig;
-
-    if (this.elSteel) this.elSteel.textContent = String(steel);
-    if (this.elOil) this.elOil.textContent = String(oil);
-    if (this.elSupply) {
-      this.elSupply.textContent = `${used} / ${cap}`;
-      // Flag over-cap (blocked production) so styles.css can color it.
-      this.elSupply.classList.toggle("supply-capped", cap > 0 && used >= cap);
-    }
+    const result = renderSinglePlayerResources({
+      state: this.state,
+      elHud: this.elHud,
+      elSteel: this.elSteel,
+      elOil: this.elOil,
+      elSupply: this.elSupply,
+      currentSig: this._resSig,
+      recordDiagnostic: (label, amount) => this._recordHudDiagnostic(label, amount),
+    });
+    this._resSig = result.sig;
+    this.elSteel = result.elSteel;
+    this.elOil = result.elOil;
+    this.elSupply = result.elSupply;
   }
 
   _restoreSinglePlayerResourceShell() {
-    if (!this.elHud) return;
-    this.elHud.innerHTML =
-      `<div class="res">${this._resourceIcon("steel")}<span id="res-steel">0</span></div>` +
-      `<div class="res">${this._resourceIcon("oil")}<span id="res-oil">0</span></div>` +
-      `<div class="res">${this._resourceIcon("supply")}<span id="res-supply">0 / 0</span></div>`;
-    this.elSteel = this.elHud.querySelector("#res-steel");
-    this.elOil = this.elHud.querySelector("#res-oil");
-    this.elSupply = this.elHud.querySelector("#res-supply");
+    const result = restoreSinglePlayerResourceShell(this.elHud);
+    this.elSteel = result.elSteel;
+    this.elOil = result.elOil;
+    this.elSupply = result.elSupply;
   }
 
   /** Render one resource row per player, with a color-coded dot identifying each player. */
   _renderAllPlayersResources(playerResources) {
-    if (!this.elHud) return;
-
-    // Build a signature to avoid rebuilding every frame.
-    const sig = "multi:" + playerResources.map(
-      (p) => `${p.id}:${p.steel}:${p.oil}:${p.supplyUsed}:${p.supplyCap}`,
-    ).join("|");
-    if (sig === this._resSig) {
-      this._recordHudDiagnostic("hud.dirty.resources.hit");
-      return;
-    }
-    this._recordHudDiagnostic("hud.dirty.resources.miss");
-    this._resSig = sig;
-
-    const players = this.state.players || [];
-    const frag = document.createDocumentFragment();
-    for (const pr of playerResources) {
-      // Look up this player's display color.
-      const playerInfo = players.find((p) => p.id === pr.id);
-      const idx = players.indexOf(playerInfo);
-      const color = (playerInfo && playerInfo.color) || PLAYER_PALETTE[idx % PLAYER_PALETTE.length] || "#888";
-      const name = (playerInfo && playerInfo.name) || `P${pr.id}`;
-      const supplyCapped = pr.supplyCap > 0 && pr.supplyUsed >= pr.supplyCap;
-
-      const row = document.createElement("div");
-      row.className = "res replay-player-res";
-      row.innerHTML =
-        `<span class="replay-player-dot" style="background:${color}" title="${name}"></span>` +
-        `${this._resourceIcon("steel")}<span class="replay-res-val">${pr.steel}</span>` +
-        `${this._resourceIcon("oil")}<span class="replay-res-val">${pr.oil}</span>` +
-        `${this._resourceIcon("supply")}` +
-        `<span class="replay-res-val${supplyCapped ? " supply-capped" : ""}">${pr.supplyUsed} / ${pr.supplyCap}</span>`;
-      frag.appendChild(row);
-    }
-    this.elHud.innerHTML = "";
-    this.elHud.appendChild(frag);
+    const result = renderAllPlayersResources({
+      state: this.state,
+      playerResources,
+      elHud: this.elHud,
+      currentSig: this._resSig,
+      recordDiagnostic: (label, amount) => this._recordHudDiagnostic(label, amount),
+    });
+    this._resSig = result.sig;
   }
 
   // --- Selected-units panel --------------------------------------------------
@@ -286,9 +260,7 @@ export class HUD {
     if (!tabs) return;
 
     const groups = this._controlGroupSummaries(frameViews);
-    const sig = groups.map((g) =>
-      g ? `${g.key}:${g.count}:${g.icon}:${g.selected ? 1 : 0}` : "-",
-    ).join("|");
+    const sig = controlGroupTabsSignature(groups);
     if (sig === this._controlGroupSig) {
       this._recordHudDiagnostic("hud.dirty.controlGroups.hit");
       return;
@@ -296,84 +268,20 @@ export class HUD {
     this._recordHudDiagnostic("hud.dirty.controlGroups.miss");
     this._controlGroupSig = sig;
 
-    const any = groups.some(Boolean);
-    tabs.classList.toggle("empty", !any);
-
-    const frag = document.createDocumentFragment();
-    for (const group of groups) {
-      const slot = document.createElement("div");
-      slot.className = "control-group-slot";
-      if (group) {
-        const tab = document.createElement("div");
-        tab.className = "control-group-tab" + (group.selected ? " selected" : "");
-        tab.setAttribute(
-          "aria-label",
-          `Control group ${group.key}: ${group.count} ${group.label}`,
-        );
-        tab.innerHTML =
-          `<span class="control-group-key">${group.key}</span>` +
-          `<span class="control-group-kind">${group.icon}</span>` +
-          `<span class="control-group-count">${group.count}</span>`;
-        slot.appendChild(tab);
-      }
-      frag.appendChild(slot);
-    }
-
-    tabs.innerHTML = "";
-    tabs.appendChild(frag);
+    renderControlGroupTabs(tabs, groups);
   }
 
   _controlGroupSummaries(frameViews = null) {
     const selected = frameSelectedEntities(this.state, frameViews);
-    const selectedIds = new Set(selected.map((e) => e.id));
-    const selectedCount = selectedIds.size;
-    const out = [];
-    const groups = this.state.controlGroups || [];
-    for (let slot = 0; slot < groups.length; slot++) {
-      const entities = typeof this.state.controlGroupEntities === "function"
-        ? this.state.controlGroupEntities(slot)
-        : [];
-      if (!entities || entities.length === 0) {
-        out.push(null);
-        continue;
-      }
-      const dominant = this._dominantControlGroupKind(entities);
-      const st = STATS[dominant.kind] || {};
-      out.push({
-        key: slot === 9 ? "0" : String(slot + 1),
-        count: entities.length,
-        icon: st.icon || dominant.kind,
-        label: st.label || dominant.kind,
-        selected: this._controlGroupMatchesSelection(entities, selectedIds, selectedCount),
-      });
-    }
-    return out;
+    return buildControlGroupSummaries(this.state, selected);
   }
 
   _dominantControlGroupKind(entities) {
-    const counts = new Map();
-    let best = { kind: entities[0].kind, count: 0, first: 0 };
-    for (let i = 0; i < entities.length; i++) {
-      const kind = entities[i].kind;
-      const entry = counts.get(kind) || { kind, count: 0, first: i };
-      entry.count += 1;
-      counts.set(kind, entry);
-      if (
-        entry.count > best.count ||
-        (entry.count === best.count && entry.first < best.first)
-      ) {
-        best = entry;
-      }
-    }
-    return best;
+    return dominantControlGroupKind(entities);
   }
 
   _controlGroupMatchesSelection(entities, selectedIds, selectedCount) {
-    if (selectedCount === 0 || entities.length !== selectedCount) return false;
-    for (const e of entities) {
-      if (!selectedIds.has(e.id)) return false;
-    }
-    return true;
+    return controlGroupMatchesSelection(entities, selectedIds, selectedCount);
   }
 
   _renderSelectedPanel(frameViews = null) {
@@ -463,14 +371,11 @@ export class HUD {
 
   _renderDescriptorCard(card, descriptorCard) {
     this._clearAbilityHoverPreview();
-    const frag = document.createDocumentFragment();
-    const slots = Array.isArray(descriptorCard.slots) ? descriptorCard.slots : [];
-    for (let i = 0; i < 9; i++) {
-      const descriptor = slots[i] || null;
-      frag.appendChild(descriptor ? this._cmdButton(this._descriptorButtonOptions(descriptor)) : this._emptyCommandSlot());
-    }
-    card.innerHTML = "";
-    card.appendChild(frag);
+    renderDescriptorCardDom(
+      card,
+      descriptorCard,
+      (descriptor) => this._cmdButton(this._descriptorButtonOptions(descriptor)),
+    );
   }
 
   _descriptorButtonOptions(descriptor) {
@@ -857,9 +762,7 @@ export class HUD {
   }
 
   _emptyCommandSlot() {
-    const el = document.createElement("div");
-    el.className = "cmd-empty";
-    return el;
+    return emptyCommandSlot();
   }
 
   _syncAbilityCooldownClocks(abilityAffordances) {
@@ -879,112 +782,11 @@ export class HUD {
   }
 
   _syncCooldownClockElement(button, cooldownClocks) {
-    const clocks = Array.isArray(cooldownClocks) ? cooldownClocks : [];
-    const arms = typeof button.querySelectorAll === "function"
-      ? Array.from(button.querySelectorAll(".cmd-cd-arm"))
-      : [];
-    if (arms.length !== clocks.length) return;
-    for (let i = 0; i < arms.length; i++) {
-      arms[i].style.setProperty("--cooldown-rotation", `${clocks[i].rotationDeg.toFixed(1)}deg`);
-    }
+    syncCooldownClockElement(button, cooldownClocks);
   }
 
-  /**
-   * Build a command-card button element.
-   * @param {object} opts
-   * @param {string} [opts.commandId] stable command identity for hotkey/profile tooling.
-   * @param {number} [opts.slotIndex] rendered command-card grid slot.
-   * @param {string} [opts.icon] glyph shown large.
-   * @param {string} opts.label visible name.
-   * @param {string} [opts.ability] ability id for dynamic cooldown-clock refreshes.
-   * @param {string} [opts.hotkey] keyboard hint shown in a corner.
-   * @param {{steel:number,oil:number}} [opts.cost] cost badge (omitted if absent).
-   * @param {boolean} opts.enabled whether the action is currently available.
-   * @param {boolean} [opts.unaffordable] true when tech is available but resources are short.
-   * @param {string} [opts.title] tooltip / disabled reason.
-   * @param {string} [opts.tooltipHtml] rich hover content rendered inside the button.
-   * @param {string} [opts.cls] extra class (e.g. "cancel").
-   * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
-   * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
-   * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
-   * @param {() => void} [opts.onMouseEnter] hover handler.
-   * @param {() => void} [opts.onMouseLeave] hover-exit handler.
-   * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
-   * @param {(ev: MouseEvent) => void} [opts.onContextMenu] right-click handler.
-   * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
-   * @returns {HTMLButtonElement}
-   */
   _cmdButton(opts) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    const classes = ["cmd-btn"];
-    if (opts.cls) classes.push(opts.cls);
-    if (opts.unaffordable) classes.push("unaffordable");
-    btn.className = classes.join(" ");
-    btn.disabled = !opts.enabled && !opts.unaffordable;
-    if (opts.title) btn.title = opts.title;
-    if (opts.hotkey) {
-      // Expose the hotkey so Input/keyboard handling and styles.css can find it.
-      btn.dataset.hotkey = opts.hotkey;
-    }
-    if (opts.commandId) btn.dataset.commandId = opts.commandId;
-    if (Number.isInteger(opts.slotIndex)) btn.dataset.slotIndex = String(opts.slotIndex);
-    if (opts.ability) btn.dataset.ability = opts.ability;
-    if (opts.repeatable) btn.dataset.repeatable = "true";
-    if (typeof opts.onMouseEnter === "function") {
-      btn.addEventListener("mouseenter", opts.onMouseEnter);
-      btn.addEventListener("focus", opts.onMouseEnter);
-    }
-    if (typeof opts.onMouseLeave === "function") {
-      btn.addEventListener("mouseleave", opts.onMouseLeave);
-      btn.addEventListener("blur", opts.onMouseLeave);
-    }
-    if (typeof opts.onContextMenu === "function") {
-      btn.addEventListener("contextmenu", (ev) => {
-        ev.preventDefault();
-        opts.onContextMenu(ev);
-      });
-    }
-
-    const costHtml = opts.cost
-      ? `<span class="cmd-cost">` +
-        (opts.cost.steel ? `<span class="c-steel">${opts.cost.steel}</span>` : "") +
-        (opts.cost.steel && opts.cost.oil ? `<span class="c-sep">/</span>` : "") +
-        (opts.cost.oil ? `<span class="c-oil">${opts.cost.oil}</span>` : "") +
-        `</span>`
-      : "";
-    const cooldownClocks = Array.isArray(opts.cooldownClocks) ? opts.cooldownClocks : [];
-    const cooldownHtml = cooldownClocks.length > 0
-      ? `<span class="cmd-cooldowns" aria-hidden="true">` +
-          `<span class="cmd-cd-clock">` +
-            cooldownClocks.map((group) =>
-              `<span class="cmd-cd-arm" style="--cooldown-rotation:${group.rotationDeg.toFixed(1)}deg"></span>`
-            ).join("") +
-          `</span>` +
-        `</span>`
-      : "";
-
-    btn.innerHTML =
-      `<span class="cmd-icon">${opts.icon || ""}</span>` +
-      `<span class="cmd-label">${opts.label || ""}</span>` +
-      (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +
-      cooldownHtml +
-      (opts.countBadge ? `<span class="cmd-ready-count">${opts.countBadge}</span>` : "") +
-      costHtml +
-      (opts.tooltipHtml ? `<span class="cmd-tooltip" role="tooltip">${opts.tooltipHtml}</span>` : "");
-
-    if (opts.enabled && typeof opts.onClick === "function") {
-      btn.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        opts.onClick(ev);
-      });
-    } else if (opts.unaffordable && typeof opts.onUnavailable === "function") {
-      btn.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        opts.onUnavailable(ev);
-      });
-    }
-    return btn;
+    return createCommandButton(opts);
   }
 
   _resourceIcon(kind) {
