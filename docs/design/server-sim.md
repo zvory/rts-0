@@ -265,7 +265,14 @@ alive.
   of game state — no locks around `Game`.
 - Room-mode and phase-dependent lobby checks use a lobby-local `SessionPolicy` descriptor for the
   current room mode and phase matrix, including dev-watch, replay-room, branch-staging, countdown,
-  speed-source, and match-history decisions.
+  speed-source, and match-history decisions. Live-match handlers live in `room_task/live.rs`,
+  replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
+  `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
+  bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
+  authority. Default lab URLs request the bundled `lategame`
+  lab scenario; `scenario=blank` keeps blank lab startup, and custom map or seed lab URLs stay blank
+  unless they set an explicit scenario. Bundled lab scenario startup uses the same restore-scenario
+  path as manual imports and starts with `operation_count=0` plus a tick-0 timeline keyframe.
 - The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead
   of reading room internals. Only normal lobby/countdown/live-match rooms are summarized; dev,
   replay, replay-artifact, replay-branch, and lab modes stay hidden. `GET /api/lobbies` collects

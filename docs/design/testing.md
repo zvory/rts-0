@@ -161,9 +161,10 @@ suites.
   Docs-only faction policy edits should select these guardrails without requiring live-server
   suites.
 - `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
-  changed behavior that crosses the room/network boundary. Tank Trap blocker/pathing changes should
-  include the focused gap/pathability regression and constructible horizontal, vertical, and
-  diagonal dev scenario coverage.
+  changed behavior that crosses the room/network boundary. Run
+  `node scripts/check-lobby-architecture.mjs` when changing lobby room-task ownership or mutation
+  boundaries. Tank Trap blocker/pathing changes should include the focused gap/pathability
+  regression and constructible horizontal, vertical, and diagonal dev scenario coverage.
 - SVG legacy unit renderer oracle: run `node tests/legacy_unit_visual_oracle.mjs` when legacy unit
   rendering behavior or `tests/fixtures/svg/legacy-unit-oracle.baseline.json` changes. The oracle
   uses a deterministic Node fixture, semantic measurements, and bounded pixel-diff thresholds across
