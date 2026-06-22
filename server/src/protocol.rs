@@ -1,7 +1,7 @@
 //! Server-shell adapter for the extracted protocol crate.
 //!
-//! Phase 1 keeps existing `rts_server::protocol` call sites stable while the wire protocol and
-//! semantic DTOs live in narrower crates.
+//! Keeps existing `rts_server::protocol` call sites stable while wire protocol DTOs live in
+//! `rts_protocol` and rules-aware kind conversion lives in the simulation adapter.
 
 pub use rts_protocol::*;
 pub use rts_sim::protocol::{kind_from_wire, kind_to_wire};
