@@ -28,7 +28,7 @@ Supabase Postgres. Schema in `server/migrations/`. Match summaries live in `matc
 | `participants`  | `text[]`        | Display names in seat order (humans then AI).   |
 | `score_screen`  | `jsonb`         | Whole `Vec<PlayerScore>` blob, opaque to SQL.   |
 | `human_count`   | `integer`       | Non-AI players at match start.                  |
-| `debug_mode`    | `boolean`       | Lobby Debug/quickstart was enabled.             |
+| `debug_mode`    | `boolean`       | Historical visibility flag for removed debug rows. New live rows write `false`. |
 | `local_only`    | `boolean`       | Hide local developer rows from public servers.  |
 
 Indexes: `(started_at desc)` for the front-page query, a partial `(started_at desc)` index for
@@ -66,8 +66,8 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - **Read**: `GET /api/matches?limit=N` — JSON array, newest first, `limit` clamped server-side to
   `[1, 100]`, defaults to 20. Returns `[]` when no DB is configured (so the client never needs
   to special-case missing-DB). The Recent Matches feed includes only rows with at least one
-  human player and `debug_mode = false`; AI-only and legacy quickstart/debug rows may be persisted
-  with replay artifacts but stay out of the lobby table. Local-only rows are included only when the
+  human player and `debug_mode = false`; AI-only and historical debug rows may be persisted with
+  replay artifacts but stay out of the lobby table. Local-only rows are included only when the
   request peer address is loopback; public beta/mainline requests filter them out. Each summary
   includes `replayAvailable` plus `replayUnavailableReason`. Availability is false when no replay
   row exists or its artifact schema, map schema, or map content hash is incompatible with the
@@ -117,7 +117,7 @@ A row is written when **all** of these are true:
 
 Anything else (local gate off, DB failures, dev rooms, test rooms, missing DB) silently skips the
 write. The simulation and lobby flow are unaffected. Replay artifacts use the same eligibility as
-match rows: if a match row is skipped, no replay row is written. Stored Debug/quickstart and
+match rows: if a match row is skipped, no replay row is written. Stored historical debug and
 AI-only rows are filtered from `/api/matches`, but the replay row remains linked to the owning
 `matches` row.
 

@@ -75,9 +75,9 @@ impl Game {
     /// Create a live lobby match where each AI chooses one strategy from the live profile pool.
     pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game;
 
-    /// Compatibility helper for tests and debug starts that still need explicit starting
-    /// Steel/Oil. Production replay/lifecycle reconstruction should use per-player
-    /// `PlayerStartingLoadout` records instead.
+    /// Compatibility helper for tests that still need explicit starting Steel/Oil. Production
+    /// replay/lifecycle reconstruction should use per-player `PlayerStartingLoadout` records
+    /// instead.
     pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
     /// Compatibility helper for callers that still name AI profile setup plus explicit starting
@@ -222,8 +222,8 @@ is never allied with a player.
 
 `PlayerInit.faction_id` is canonical faction identity. The default current faction is
 `kriegsia`, and the server/lobby layer validates requested or recorded faction ids before match
-assembly. That policy is separate from `rules::faction` catalog existence: normal lobby,
-quickstart, AI, self-play, and dev starts default missing requests to Kriegsia, explicit
+assembly. That policy is separate from `rules::faction` catalog existence: normal lobby, AI,
+self-play, and dev starts default missing requests to Kriegsia, explicit
 `kriegsia` and `ekat` requests are accepted as playable factions, replay paths require explicit
 recorded faction ids, and `phase2_empty_fixture` is accepted only by test-fixture contexts. The
 lower rules/sim layer also fails closed: empty faction ids may default only at the narrow

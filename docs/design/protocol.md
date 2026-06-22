@@ -55,7 +55,6 @@ lobby/config dump replaces the source scrape.
 | `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. `aiProfileId` may be one of the supported live AI profiles; omitted or unknown values default to the highest supported live AI version. |
 | `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects the live AI profile for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile ids are ignored. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
-| `setQuickstart` | `enabled: bool` | Legacy host-only quickstart compatibility command slated for deletion. Active tests and the normal lobby UI must not depend on it. |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
@@ -241,7 +240,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `t`        | Fields |
 |------------|--------|
 | `welcome`  | `playerId: u32` — assigned on connect. |
-| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
+| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
 | `matchCountdown` | `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, rejects new joins, and sends `start` only after the countdown duration elapses. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
@@ -358,21 +357,12 @@ Sent once when the match begins. Carries everything static for the whole match.
   players: [ { id, teamId, factionId, name, color, startTileX, startTileY } ], // active match players only
 }
 ```
-Units/buildings arrive via snapshots (so they obey fog), including
-the player's own starting City Centre + workers. The legacy `setQuickstart` compatibility path is
-kept only until deletion and must not be used by active tests or product UI; when the compatibility
-command is enabled, every player starts with 99,999 steel and 99,999 oil instead of the default
-opening resources, and each human player also starts with five supply depots, one Gun Works
-(`steelworks` kind), one R&D Complex (`research_complex` kind), one Training Centre, two Barracks,
-two Vehicle Works (`factory` kind), and five of each unit kind including Command Cars. The legacy
-quickstart preset also adds one inert enemy player in the clockwise-adjacent corner from the first
-human start, with five deployed Mortar Teams clumped around one Scout Car and four enemy Supply
-Depots five tiles north/east/south/west of the clump. It also sets
-`diagnostics.movementPaths: "ownerOnly"` for active players, which lets the client expose local
-movement-waypoint overlay controls for the owner-only `debugPath` fields in snapshots. Spectators
-do not receive that movement-path diagnostic affordance. Dev scenario start payloads may advertise
-`diagnostics.movementPaths: "all"` because those rooms intentionally use full-world diagnostic
-projection. Replay viewers and live spectators receive `diagnostics.observerAnalysis: true` only
+Units/buildings arrive via snapshots (so they obey fog), including the player's own starting
+loadout from the validated faction catalog. Normal solo starts may skip countdown because they are
+solo rooms, but they still use ordinary starting resources and ordinary faction loadouts. Dev
+scenario start payloads may advertise `diagnostics.movementPaths: "all"` because those rooms
+intentionally use full-world diagnostic projection. Replay viewers and live spectators receive
+`diagnostics.observerAnalysis: true` only
 when room projection policy will send observer-analysis payloads to that recipient.
 `capabilities` is the neutral control/affordance contract. Live active players receive
 `commands.gameplay: true` and `matchControls.pause: true`; spectators, replay viewers, dev-watch
@@ -401,8 +391,8 @@ simulation/replay/test-helper boundaries default to singleton FFA: the player's 
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
 The canonical default faction id is `kriegsia`; `ekat` is also a playable catalog id. Start payloads emit `factionId` for every active
 start player, lobby seat, and replay branch seat, and replay artifacts store `faction_id` for every
-player. Missing faction requests default to `kriegsia` in normal lobby, AI, quickstart, self-play,
-and dev-start contexts, while explicit `kriegsia` and `ekat` requests are accepted by the current
+player. Missing faction requests default to `kriegsia` in normal lobby, AI, self-play, and
+dev-start contexts, while explicit `kriegsia` and `ekat` requests are accepted by the current
 playable faction policy. Other ids are rejected unless a lifecycle path explicitly accepts recorded
 replay data or the `phase2_empty_fixture` test fixture.
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
@@ -625,9 +615,7 @@ them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
 `debugPath` is present only when the room's projection policy enables movement-path diagnostics for
-that recipient and only while the unit has remaining movement waypoints. The legacy quickstart/debug
-compatibility path still enables owner-only movement paths for active players until it is deleted in
-the lab session-controls follow-up. Dev scenario rooms may
+that recipient and only while the unit has remaining movement waypoints. Dev scenario rooms may
 enable full projected movement paths. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
 staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
 points in traversal order and `waypoints[0]` is the current movement target. The compact slot
@@ -902,8 +890,8 @@ Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timel
 lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
 fine-grained multi-operator permissions, visual iteration hot reload, and `/dev/scenario`
 migration. Those require separate typed messages instead of overloading `LabClientOp`.
-The legacy quickstart debug preset is intentionally not modeled as a lab preset here; debug-style
-prebuilt setups should return later as explicit lab scenario/preset protocol.
+Debug-style prebuilt setups should return later as explicit lab scenario/preset protocol, not as a
+hidden normal-lobby command.
 
 ### 2.7 Observer analysis state
 

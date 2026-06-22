@@ -472,7 +472,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
         .collect();
     game.map_metadata = super::dev_map_metadata(metadata_name);
     game.active_construction_sites.clear();
-    game.starting_loadout = StartingLoadout::DebugHuman;
+    game.starting_loadout = StartingLoadout::Standard;
     game.rng = rng;
     if let Some(player) = game.players.iter_mut().find(|player| player.id == player_id) {
         player.reset_for_dev_scenario(start_tile);

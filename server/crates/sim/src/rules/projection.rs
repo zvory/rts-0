@@ -468,9 +468,14 @@ fn active_order_plan_marker(
         Order::Build(order) => {
             build_marker(order.intent.kind, order.intent.tile_x, order.intent.tile_y)
         }
-        Order::Deconstruct(order) => {
-            target_marker("deconstruct", order.intent.target, entities, viewer, fog, smokes)
-        }
+        Order::Deconstruct(order) => target_marker(
+            "deconstruct",
+            order.intent.target,
+            entities,
+            viewer,
+            fog,
+            smokes,
+        ),
         Order::Ability(order) => point_marker(
             order.intent.ability.to_protocol_str(),
             order.intent.x,
@@ -958,7 +963,7 @@ mod tests {
     }
 
     #[test]
-    fn debug_path_is_runtime_debug_mode_owner_only_and_in_movement_order() {
+    fn debug_path_is_owner_only_and_in_movement_order() {
         let mut entities = EntityStore::new();
         let unit_id = entities
             .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
