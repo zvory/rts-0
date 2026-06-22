@@ -361,7 +361,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
 outward from the footprint edge, not from only the building center, so sight 1 reveals the full
-footprint plus a one-tile perimeter around it:
+footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal fog tiles:
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
@@ -373,7 +373,7 @@ footprint plus a one-tile perimeter around it:
 | research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately and trains Anti-Tank Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
-| tank_trap                  | Tank Trap          | 150 | 1     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, one-tile local fog reveal, not an elimination building; requires a completed Training Centre |
+| tank_trap                  | Tank Trap          | 150 | 0     | 15 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building; requires a completed Training Centre |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends
