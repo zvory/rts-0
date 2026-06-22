@@ -2,9 +2,11 @@
 //!
 //! The server is authoritative about visibility: each tick we recompute, for every player, a
 //! boolean grid of which tiles that player can currently see. A tile is visible if it falls
-//! within the sight circle of any of that player's entities (`sight_tiles`) and the line from
-//! the entity to that tile is not blocked by stone. The snapshot layer uses this to withhold
-//! neutral/enemy entities standing on non-visible tiles, making the fog cheat-proof.
+//! within the sight area of any of that player's entities (`sight_tiles`) and the line from
+//! the entity to that tile is not blocked by stone. Units stamp a circle from their body center;
+//! buildings stamp their full footprint plus `sight_tiles` around the footprint edge. The snapshot
+//! layer uses this to withhold neutral/enemy entities standing on non-visible tiles, making the fog
+//! cheat-proof.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
@@ -16,6 +18,7 @@ use crate::config;
 use crate::game::entity::{Entity, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
+use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
 
 /// Temporary sight left behind by an owned unit/building after it dies. This is used only by
@@ -129,7 +132,7 @@ impl Fog {
             let Some(grid) = self.grids.get_mut(&e.owner) else {
                 continue;
             };
-            stamp_sight(grid, size, e, &los);
+            stamp_sight(grid, size, e, map, &los);
         }
     }
 
@@ -229,9 +232,46 @@ impl Fog {
     }
 }
 
-/// Mark every tile within an entity's sight radius (a filled circle in tile space) as visible.
-fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, los: &LineOfSight<'_>) {
+/// Mark every tile within an entity's sight area as visible.
+fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, map: &Map, los: &LineOfSight<'_>) {
+    if e.is_building() {
+        stamp_building_sight(grid, size, e, map, los);
+        return;
+    }
     stamp_sight_at(grid, size, e.pos_x, e.pos_y, e.sight_tiles(), los);
+}
+
+fn stamp_building_sight(
+    grid: &mut [bool],
+    size: u32,
+    e: &Entity,
+    map: &Map,
+    los: &LineOfSight<'_>,
+) {
+    let r = e.sight_tiles() as i32;
+    if r <= 0 {
+        return;
+    }
+    let footprint = building_footprint(map, e);
+    for (origin_tx, origin_ty) in footprint {
+        if origin_tx >= size || origin_ty >= size {
+            continue;
+        }
+        let origin = map.tile_center(origin_tx, origin_ty);
+        for dy in -r..=r {
+            for dx in -r..=r {
+                let tx = origin_tx as i32 + dx;
+                let ty = origin_ty as i32 + dy;
+                if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
+                    continue;
+                }
+                if !los.tile_visible_from_world(origin, (tx as u32, ty as u32)) {
+                    continue;
+                }
+                grid[(ty as u32 * size + tx as u32) as usize] = true;
+            }
+        }
+    }
 }
 
 fn stamp_sight_at(
@@ -274,6 +314,15 @@ mod tests {
     use crate::game::entity::{EntityKind, EntityStore};
     use crate::protocol::terrain;
 
+    fn open_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
     fn map_with_rock_at(tile: (u32, u32)) -> Map {
         let size = 8;
         let mut terrain = vec![terrain::GRASS; (size * size) as usize];
@@ -300,6 +349,35 @@ mod tests {
 
         assert!(fog.is_visible(1, 3, 2));
         assert!(!fog.is_visible(1, 4, 2));
+    }
+
+    #[test]
+    fn building_sight_reveals_footprint_and_one_tile_perimeter() {
+        let map = open_map(8);
+        let mut entities = EntityStore::new();
+        let center = map.tile_center(3, 3);
+        entities
+            .spawn_building(1, EntityKind::Barracks, center.0, center.1, true)
+            .expect("barracks should spawn");
+        let mut fog = Fog::new(map.size);
+
+        fog.recompute(&[1], &entities, &map);
+
+        for ty in 2..=3 {
+            for tx in 2..=4 {
+                assert!(fog.is_visible(1, tx, ty), "footprint tile ({tx},{ty})");
+            }
+        }
+        for ty in 1..=4 {
+            for tx in 1..=5 {
+                assert!(
+                    fog.is_visible(1, tx, ty),
+                    "one-tile perimeter tile ({tx},{ty})"
+                );
+            }
+        }
+        assert!(!fog.is_visible(1, 0, 1));
+        assert!(!fog.is_visible(1, 6, 4));
     }
 
     #[test]

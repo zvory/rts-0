@@ -727,7 +727,10 @@ refreshes use team-current views derived from those raw live grids. Normal playe
 build a temporary team-current fog by unioning the raw live grids of living teammates only.
 Snapshot-only lingering death sight is layered after live fog and then unioned for projection, so
 lingering views remain non-actionable (`visionOnly`) and cannot validate commands or refresh
-remembered buildings. Neutral resource nodes never stamp vision.
+remembered buildings. Unit live fog stamps a center-origin sight circle. Building live fog stamps
+the whole building footprint plus `sight_tiles` outward from each footprint edge, so a building with
+1-tile sight sees itself and the one-tile perimeter around its edges. Neutral resource nodes never
+stamp vision.
 
 `game::building_memory::BuildingMemory` is server-only stale intel owned by `Game`. After live,
 smoke-aware fog is recomputed, the store records one latest-seen entry per

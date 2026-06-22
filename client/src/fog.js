@@ -46,9 +46,10 @@ export class Fog {
   /**
    * Recompute visibility for this frame from the player's own entities.
    *
-   * Clears `visibleGrid`, then for each owned entity stamps a filled circle of its
-   * sight radius (config `STATS[kind].sight`, in tiles) into both `visibleGrid` and
-   * `exploredGrid`. Explored is cumulative and is never cleared.
+   * Clears `visibleGrid`, then for each owned entity stamps its sight shape
+   * (config `STATS[kind].sight`, in tiles) into both `visibleGrid` and `exploredGrid`.
+   * Buildings reveal their footprint plus sight around the footprint edge; units reveal
+   * a filled circle. Explored is cumulative and is never cleared.
    *
    * @param {Array<{kind:string,x:number,y:number}>} ownEntities entities owned by this player (world px centers)
    * @param {number} tileSize world px per tile
@@ -89,7 +90,13 @@ export class Fog {
         const sight = (stat && stat.sight) || DEFAULT_SIGHT_TILES;
         const cx = e.x / tileSize;
         const cy = e.y / tileSize;
-        exploredChanged = this._stampCircle(cx, cy, sight, nextVisible) || exploredChanged;
+        if (stat?.footW && stat?.footH) {
+          exploredChanged =
+            this._stampFootprint(cx, cy, stat.footW, stat.footH, sight, nextVisible) ||
+            exploredChanged;
+        } else {
+          exploredChanged = this._stampCircle(cx, cy, sight, nextVisible) || exploredChanged;
+        }
       }
     }
 
@@ -133,6 +140,57 @@ export class Fog {
         }
       }
     }
+    return exploredChanged;
+  }
+
+  /**
+   * Mark a building footprint and its rectangular sight perimeter as visible and explored.
+   * Matches the authoritative server rule: a building with sight 1 sees every tile it covers,
+   * plus one tile out from each footprint edge.
+   * @private
+   */
+  _stampFootprint(cx, cy, footW, footH, radius, visibleGrid = this.visibleGrid) {
+    if (![cx, cy, footW, footH, radius].every(Number.isFinite)) return false;
+    const r = Math.floor(radius);
+    const w = Math.floor(footW);
+    const h = Math.floor(footH);
+    if (r <= 0 || w <= 0 || h <= 0) return false;
+
+    const centerTx = Math.floor(cx);
+    const centerTy = Math.floor(cy);
+    const originMinTx = centerTx - Math.floor(w / 2);
+    const originMinTy = centerTy - Math.floor(h / 2);
+    let exploredChanged = false;
+
+    for (let oy = 0; oy < h; oy++) {
+      for (let ox = 0; ox < w; ox++) {
+        const originTx = originMinTx + ox;
+        const originTy = originMinTy + oy;
+        if (originTx < 0 || originTy < 0 || originTx >= this.width || originTy >= this.height) {
+          continue;
+        }
+        const originX = originTx + 0.5;
+        const originY = originTy + 0.5;
+
+        for (let dy = -r; dy <= r; dy++) {
+          const ty = originTy + dy;
+          if (ty < 0 || ty >= this.height) continue;
+          const rowBase = ty * this.width;
+          for (let dx = -r; dx <= r; dx++) {
+            const tx = originTx + dx;
+            if (tx < 0 || tx >= this.width) continue;
+            if (!this._tileVisibleFrom(originX, originY, tx, ty)) continue;
+            const i = rowBase + tx;
+            visibleGrid[i] = 1;
+            if (this.exploredGrid[i] !== 1) {
+              this.exploredGrid[i] = 1;
+              exploredChanged = true;
+            }
+          }
+        }
+      }
+    }
+
     return exploredChanged;
   }
 
