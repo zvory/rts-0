@@ -1,6 +1,6 @@
 # Phase 1 - Client Contract Foundation
 
-Status: planned.
+Status: done.
 
 ## Goal
 
