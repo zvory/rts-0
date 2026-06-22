@@ -42,6 +42,7 @@ const AREA_BY_FILE = new Map(Object.entries({
 
   "net.js": "transport",
   "protocol.js": "transport",
+  "protocol_frame.js": "transport",
   "lab_client.js": "transport",
   "report_window_aggregate.js": "platform",
 
