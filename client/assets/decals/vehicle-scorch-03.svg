@@ -1,0 +1,5 @@
+<svg id="vehicle-scorch-03" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 48" width="72" height="48">
+  <polygon id="scorch.hull" points="12,13 34,8 58,14 64,27 53,37 27,39 10,30" fill="#fff" opacity="0.82"/>
+  <ellipse id="scorch.ash.center" cx="36" cy="24" rx="22" ry="10" fill="#fff" opacity="0.44"/>
+  <circle id="scorch.pit" cx="55" cy="18" r="6" fill="#fff" opacity="0.34"/>
+</svg>

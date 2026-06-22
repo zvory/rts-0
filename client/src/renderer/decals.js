@@ -1,10 +1,22 @@
 import { STATS } from "../config.js";
+import {
+  canLoadGroundDecalAtlas,
+  GROUND_DECAL_ATLAS_STATUS,
+  loadGroundDecalAtlas,
+} from "./decals/asset_loader.js";
+import {
+  createGroundDecalStampPlan,
+  mulberry32,
+  normalizeColorNumber,
+  rgba,
+} from "./decals/selection.js";
 
 export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
 
 const DECAL_CLASS_INFANTRY = "infantry";
 const DECAL_CLASS_SCORCH = "scorch";
-const NEUTRAL_COLOR = "#9aa0a8";
+const SCORCH_DARK = 0x070706;
+const SCORCH_WARM = 0x241a12;
 
 export class GroundDecalLayer {
   constructor({
@@ -13,16 +25,27 @@ export class GroundDecalLayer {
     getDocument = () => (typeof document !== "undefined" ? document : null),
     downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE,
     recordDiagnostic = null,
+    imageFactory = null,
+    loadAtlas = loadGroundDecalAtlas,
   } = {}) {
     this.layer = layer;
     this.pixi = pixi;
     this.getDocument = getDocument;
     this.downsample = downsample;
     this.recordDiagnostic = recordDiagnostic;
+    this.imageFactory = imageFactory;
+    this.loadAtlas = loadAtlas;
     this.canvas = null;
     this.ctx = null;
     this.texture = null;
     this.sprite = null;
+    this.atlas = null;
+    this.assetStatus = GROUND_DECAL_ATLAS_STATUS.IDLE;
+    this.assetLoadPromise = null;
+    this.assetLoadError = null;
+    this._assetLoadGeneration = 0;
+    this._queuedUntilAssets = [];
+    this._tintScratch = null;
     this.totalStamped = 0;
     this.textureUpdateCount = 0;
   }
@@ -52,16 +75,80 @@ export class GroundDecalLayer {
     this.sprite.scale.set(this.downsample);
     this.layer.addChild(this.sprite);
     this.recordDiagnostic?.("renderer.groundDecals.displayObjects", this.displayObjectCount());
+    this._beginAssetLoad(doc);
     return true;
   }
 
   stampBatch(decals, { onError = null } = {}) {
     if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
+    if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) {
+      this._queuedUntilAssets.push(...decals);
+      this.recordDiagnostic?.("renderer.groundDecals.queuedForAtlas", decals.length);
+      return 0;
+    }
+    const batch = this._queuedUntilAssets.length > 0
+      ? this._queuedUntilAssets.splice(0).concat(decals)
+      : decals;
+    return this._stampDecodedBatch(batch, { onError });
+  }
+
+  _beginAssetLoad(doc) {
+    this._assetLoadGeneration += 1;
+    const generation = this._assetLoadGeneration;
+    this.atlas?.destroy?.();
+    this.atlas = null;
+    this.assetLoadError = null;
+    this.assetLoadPromise = null;
+
+    if (!canLoadGroundDecalAtlas({ documentRef: doc, imageFactory: this.imageFactory })) {
+      this.assetStatus = GROUND_DECAL_ATLAS_STATUS.FAILED;
+      this.recordDiagnostic?.("renderer.groundDecals.assetFallback", 1);
+      return;
+    }
+
+    this.assetStatus = GROUND_DECAL_ATLAS_STATUS.PENDING;
+    this.recordDiagnostic?.("renderer.groundDecals.assetLoadPending", 1);
+    this.assetLoadPromise = this.loadAtlas({
+      documentRef: doc,
+      imageFactory: this.imageFactory,
+    }).then((atlas) => {
+      if (generation !== this._assetLoadGeneration || !this.ctx) {
+        atlas?.destroy?.();
+        return null;
+      }
+      this.atlas = atlas;
+      this.assetStatus = GROUND_DECAL_ATLAS_STATUS.READY;
+      this.recordDiagnostic?.("renderer.groundDecals.assetLoadReady", 1);
+      this._stampQueuedAfterAssetSettled();
+      return atlas;
+    }).catch((err) => {
+      if (generation !== this._assetLoadGeneration) return null;
+      this.assetLoadError = err;
+      this.assetStatus = GROUND_DECAL_ATLAS_STATUS.FAILED;
+      this.recordDiagnostic?.("renderer.groundDecals.assetLoadFailed", 1);
+      this._stampQueuedAfterAssetSettled();
+      return null;
+    });
+  }
+
+  _stampQueuedAfterAssetSettled() {
+    if (!this.ctx || this.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) return 0;
+    if (this._queuedUntilAssets.length === 0) return 0;
+    const queued = this._queuedUntilAssets.splice(0);
+    return this._stampDecodedBatch(queued);
+  }
+
+  _stampDecodedBatch(decals, { onError = null } = {}) {
+    if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
     this.recordDiagnostic?.("renderer.groundDecals.pending", decals.length);
     let stamped = 0;
+    const tintScratch = this.assetStatus === GROUND_DECAL_ATLAS_STATUS.READY
+      ? this._ensureTintScratch()
+      : null;
+    const atlas = this.assetStatus === GROUND_DECAL_ATLAS_STATUS.READY ? this.atlas : null;
     for (const decal of decals) {
       try {
-        if (stampGroundDecal(this.ctx, decal, this.downsample)) stamped += 1;
+        if (stampGroundDecal(this.ctx, decal, this.downsample, { atlas, tintScratch })) stamped += 1;
         else this.recordDiagnostic?.("renderer.groundDecals.skipped", 1);
       } catch (err) {
         this.recordDiagnostic?.("renderer.groundDecals.skipped", 1);
@@ -78,11 +165,35 @@ export class GroundDecalLayer {
     return stamped;
   }
 
+  _ensureTintScratch() {
+    if (this._tintScratch?.ctx) return this._tintScratch;
+    const doc = this.getDocument?.();
+    if (!doc || typeof doc.createElement !== "function") return null;
+    const canvas = doc.createElement("canvas");
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = false;
+    this._tintScratch = { canvas, ctx };
+    return this._tintScratch;
+  }
+
   displayObjectCount() {
     return Array.isArray(this.layer?.children) ? this.layer.children.length : 0;
   }
 
   destroy() {
+    this._assetLoadGeneration += 1;
+    this.assetLoadPromise = null;
+    this.assetLoadError = null;
+    this.assetStatus = GROUND_DECAL_ATLAS_STATUS.IDLE;
+    this._queuedUntilAssets = [];
+    this.atlas?.destroy?.();
+    this.atlas = null;
+    if (this._tintScratch?.canvas) {
+      this._tintScratch.canvas.width = 0;
+      this._tintScratch.canvas.height = 0;
+    }
+    this._tintScratch = null;
     if (this.sprite) {
       if (this.sprite.parent && typeof this.sprite.parent.removeChild === "function") {
         this.sprite.parent.removeChild(this.sprite);
@@ -119,7 +230,70 @@ export function _drawGroundDecals(state) {
   });
 }
 
-export function stampGroundDecal(ctx, decal, downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE) {
+export function stampGroundDecal(
+  ctx,
+  decal,
+  downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE,
+  { atlas = null, tintScratch = null } = {},
+) {
+  if (atlas && stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch)) return true;
+  return stampProceduralGroundDecal(ctx, decal, downsample);
+}
+
+function stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch) {
+  if (!ctx || !tintScratch || !decal || !Number.isFinite(decal.x) || !Number.isFinite(decal.y)) {
+    return false;
+  }
+  const plan = createGroundDecalStampPlan(decal, { assetCounts: atlasAssetCounts(atlas) });
+  if (!plan) return false;
+  const x = (decal.x + plan.offsetWorldX) / downsample;
+  const y = (decal.y + plan.offsetWorldY) / downsample;
+
+  if (plan.decalClass === DECAL_CLASS_INFANTRY) {
+    const mask = atlas.infantry?.[plan.variantIndex];
+    if (!mask) return false;
+    drawTintedMask(ctx, tintScratch, mask, SCORCH_DARK, x, y, downsample, {
+      rotation: plan.rotation,
+      scaleX: plan.scale * plan.flipX * 0.78,
+      scaleY: plan.scale * plan.flipY * 0.78,
+      opacity: plan.shadowOpacity,
+    });
+    return drawTintedMask(ctx, tintScratch, mask, plan.color, x, y, downsample, {
+      rotation: plan.rotation,
+      scaleX: plan.scale * plan.flipX,
+      scaleY: plan.scale * plan.flipY,
+      opacity: plan.opacity,
+    });
+  }
+
+  const scorch = atlas.vehicleScorch?.[plan.variantIndex];
+  if (!scorch) return false;
+  const paint = atlas.vehiclePaint?.[plan.paintVariantIndex];
+  const bodyScale = vehicleBodyScale(decal.kind);
+  drawTintedMask(ctx, tintScratch, scorch, SCORCH_DARK, x, y, downsample, {
+    rotation: plan.rotation,
+    scaleX: plan.scale * bodyScale * plan.flipX,
+    scaleY: plan.scale * bodyScale * plan.flipY,
+    opacity: plan.scorchOpacity,
+  });
+  drawTintedMask(ctx, tintScratch, scorch, SCORCH_WARM, x, y, downsample, {
+    rotation: plan.rotation,
+    scaleX: plan.scale * bodyScale * 0.72 * plan.flipX,
+    scaleY: plan.scale * bodyScale * 0.72 * plan.flipY,
+    opacity: plan.emberOpacity,
+  });
+  if (paint) {
+    drawTintedMask(ctx, tintScratch, paint, plan.color, x, y, downsample, {
+      rotation: plan.rotation,
+      scaleX: plan.scale * bodyScale * plan.flipX,
+      scaleY: plan.scale * bodyScale * plan.flipY,
+      opacity: plan.paintOpacity,
+    });
+  }
+  return true;
+}
+
+function stampProceduralGroundDecal(ctx, decal, downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE) {
   if (!ctx || !decal || !Number.isFinite(decal.x) || !Number.isFinite(decal.y)) return false;
   if (decal.decalClass !== DECAL_CLASS_INFANTRY && decal.decalClass !== DECAL_CLASS_SCORCH) {
     return false;
@@ -142,8 +316,61 @@ export function stampGroundDecal(ctx, decal, downsample = GROUND_DECAL_TEXTURE_W
   return true;
 }
 
+function drawTintedMask(ctx, scratch, mask, color, x, y, downsample, {
+  rotation,
+  scaleX,
+  scaleY,
+  opacity,
+}) {
+  if (!scratch?.ctx || !scratch?.canvas || !mask?.canvas) return false;
+  if (scratch.canvas.width !== mask.width || scratch.canvas.height !== mask.height) {
+    scratch.canvas.width = mask.width;
+    scratch.canvas.height = mask.height;
+    scratch.ctx.imageSmoothingEnabled = false;
+  }
+  const scratchCtx = scratch.ctx;
+  scratchCtx.globalAlpha = 1;
+  scratchCtx.globalCompositeOperation = "source-over";
+  scratchCtx.clearRect(0, 0, mask.width, mask.height);
+  scratchCtx.drawImage(mask.canvas, 0, 0, mask.width, mask.height);
+  scratchCtx.globalCompositeOperation = "source-in";
+  scratchCtx.fillStyle = rgba(color, 1);
+  scratchCtx.fillRect(0, 0, mask.width, mask.height);
+  scratchCtx.globalCompositeOperation = "source-over";
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.scale(scaleX, scaleY);
+  ctx.globalAlpha = opacity;
+  ctx.drawImage(
+    scratch.canvas,
+    -mask.width / (2 * downsample),
+    -mask.height / (2 * downsample),
+    mask.width / downsample,
+    mask.height / downsample,
+  );
+  ctx.restore();
+  return true;
+}
+
+function atlasAssetCounts(atlas) {
+  return {
+    infantry: atlas?.infantry?.length || 0,
+    vehicleScorch: atlas?.vehicleScorch?.length || 0,
+    vehiclePaint: atlas?.vehiclePaint?.length || 0,
+  };
+}
+
+function vehicleBodyScale(kind) {
+  const stat = STATS[kind] || {};
+  const body = stat.body || {};
+  const length = Math.max(22, body.length || (stat.size || 16) * 2.4);
+  return clamp(length / 50, 0.72, 1.35);
+}
+
 function stampInfantry(ctx, decal, rng, downsample) {
-  const color = normalizeColor(decal.color);
+  const color = normalizeColorNumber(decal.color);
   const blobs = 3 + (decal.variant % 3);
   for (let i = 0; i < blobs; i += 1) {
     const angle = seededAngle(rng);
@@ -158,7 +385,7 @@ function stampInfantry(ctx, decal, rng, downsample) {
 }
 
 function stampScorch(ctx, decal, rng, downsample) {
-  const color = normalizeColor(decal.color);
+  const color = normalizeColorNumber(decal.color);
   const stat = STATS[decal.kind] || {};
   const body = stat.body || {};
   const length = Math.max(22, body.length || (stat.size || 16) * 2.4) / downsample;
@@ -220,30 +447,10 @@ function updateTexture(texture) {
   else texture?.baseTexture?.update?.();
 }
 
-function normalizeColor(color) {
-  if (typeof color === "number" && Number.isFinite(color)) return color >>> 0;
-  const match = /^#?([0-9a-fA-F]{6})$/.exec(String(color || NEUTRAL_COLOR));
-  return match ? Number.parseInt(match[1], 16) : Number.parseInt(NEUTRAL_COLOR.slice(1), 16);
-}
-
-function rgba(color, alpha) {
-  const r = (color >> 16) & 0xff;
-  const g = (color >> 8) & 0xff;
-  const b = color & 0xff;
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
 function seededAngle(rng) {
   return (rng() * 2 - 1) * Math.PI;
 }
 
-function mulberry32(seed) {
-  let value = seed >>> 0;
-  return () => {
-    value = (value + 0x6d2b79f5) >>> 0;
-    let t = value;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }

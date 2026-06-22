@@ -1,0 +1,5 @@
+<svg id="vehicle-paint-05" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 48" width="72" height="48">
+  <rect id="paint.scrape.a" x="21" y="25" width="17" height="4" fill="#fff" opacity="0.82"/>
+  <rect id="paint.scrape.b" x="43" y="18" width="13" height="3" fill="#fff" opacity="0.68"/>
+  <polygon id="paint.chip" points="32,15 38,13 41,17 35,19" fill="#fff" opacity="0.6"/>
+</svg>
