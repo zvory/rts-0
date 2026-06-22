@@ -3,8 +3,9 @@
 //! The server is authoritative about visibility: each tick we recompute, for every player, a
 //! boolean grid of which tiles that player can currently see. A tile is visible if it falls
 //! within the sight circle of any of that player's entities (`sight_tiles`) and the line from
-//! the entity to that tile is not blocked by stone. The snapshot layer uses this to withhold
-//! neutral/enemy entities standing on non-visible tiles, making the fog cheat-proof.
+//! the entity to that tile is not blocked by stone, smoke, or non-Tank-Trap building footprints.
+//! The snapshot layer uses this to withhold neutral/enemy entities standing on non-visible tiles,
+//! making the fog cheat-proof.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
@@ -13,9 +14,10 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{Entity, EntityStore};
+use crate::game::entity::{static_blocker_class, Entity, EntityStore, StaticBlockerClass};
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
+use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
 
 /// Temporary sight left behind by an owned unit/building after it dies. This is used only by
@@ -111,9 +113,12 @@ impl Fog {
             }
         }
 
+        let building_mask = BuildingLosMask::new(store, map);
         let los = match smokes {
-            Some(smokes) => LineOfSight::with_smoke(map, smokes),
-            None => LineOfSight::new(map),
+            Some(smokes) => {
+                LineOfSight::with_smoke_and_building_blockers(map, smokes, &building_mask.blockers)
+            }
+            None => LineOfSight::with_building_blockers(map, &building_mask.blockers),
         };
         for e in store.iter() {
             if e.owner == 0 {
@@ -129,35 +134,50 @@ impl Fog {
             let Some(grid) = self.grids.get_mut(&e.owner) else {
                 continue;
             };
+            if static_blocker_class(e.kind) == StaticBlockerClass::AllGround {
+                stamp_building_footprint(grid, size, map, e);
+                continue;
+            }
             stamp_sight(grid, size, e, &los);
         }
+        reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
 
     /// Add temporary death-vision sight sources to already-recomputed grids.
     #[allow(dead_code)]
-    pub(crate) fn stamp_lingering_sources(&mut self, sources: &[LingeringSightSource], map: &Map) {
-        self.stamp_lingering_sources_inner(sources, map, None);
+    pub(crate) fn stamp_lingering_sources(
+        &mut self,
+        sources: &[LingeringSightSource],
+        map: &Map,
+        store: &EntityStore,
+    ) {
+        self.stamp_lingering_sources_inner(sources, map, store, None);
     }
 
     pub(crate) fn stamp_lingering_sources_with_smoke(
         &mut self,
         sources: &[LingeringSightSource],
         map: &Map,
+        store: &EntityStore,
         smokes: &SmokeCloudStore,
     ) {
-        self.stamp_lingering_sources_inner(sources, map, Some(smokes));
+        self.stamp_lingering_sources_inner(sources, map, store, Some(smokes));
     }
 
     fn stamp_lingering_sources_inner(
         &mut self,
         sources: &[LingeringSightSource],
         map: &Map,
+        store: &EntityStore,
         smokes: Option<&SmokeCloudStore>,
     ) {
         let size = self.size;
+        let building_mask = BuildingLosMask::new(store, map);
         let los = match smokes {
-            Some(smokes) => LineOfSight::with_smoke(map, smokes),
-            None => LineOfSight::new(map),
+            Some(smokes) => {
+                LineOfSight::with_smoke_and_building_blockers(map, smokes, &building_mask.blockers)
+            }
+            None => LineOfSight::with_building_blockers(map, &building_mask.blockers),
         };
         for source in sources {
             if smokes
@@ -171,6 +191,7 @@ impl Fog {
             };
             stamp_sight_at(grid, size, source.x, source.y, source.sight_tiles, &los);
         }
+        reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
 
     /// Whether `player` can currently see the tile `(tx, ty)`.
@@ -234,6 +255,14 @@ fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, los: &LineOfSight<'_>) 
     stamp_sight_at(grid, size, e.pos_x, e.pos_y, e.sight_tiles(), los);
 }
 
+fn stamp_building_footprint(grid: &mut [bool], size: u32, map: &Map, entity: &Entity) {
+    for (tx, ty) in building_footprint(map, entity) {
+        if tx < size && ty < size {
+            grid[(ty * size + tx) as usize] = true;
+        }
+    }
+}
+
 fn stamp_sight_at(
     grid: &mut [bool],
     size: u32,
@@ -268,78 +297,64 @@ fn stamp_sight_at(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::game::entity::{EntityKind, EntityStore};
-    use crate::protocol::terrain;
+struct BuildingLosMask {
+    blockers: Vec<bool>,
+    footprints: Vec<Vec<usize>>,
+}
 
-    fn map_with_rock_at(tile: (u32, u32)) -> Map {
-        let size = 8;
-        let mut terrain = vec![terrain::GRASS; (size * size) as usize];
-        terrain[(tile.1 * size + tile.0) as usize] = terrain::ROCK;
-        Map {
-            size,
-            terrain,
-            starts: vec![(1, 1)],
-            expansion_sites: Vec::new(),
+impl BuildingLosMask {
+    fn new(store: &EntityStore, map: &Map) -> Self {
+        let cells = (map.size * map.size) as usize;
+        let mut blockers = vec![false; cells];
+        let mut footprints = Vec::new();
+        for entity in store.iter() {
+            if entity.hp == 0
+                || static_blocker_class(entity.kind) != StaticBlockerClass::AllGround
+            {
+                continue;
+            }
+            let footprint = building_footprint(map, entity)
+                .into_iter()
+                .filter(|(tx, ty)| *tx < map.size && *ty < map.size)
+                .map(|(tx, ty)| (ty * map.size + tx) as usize)
+                .collect::<Vec<_>>();
+            if footprint.is_empty() {
+                continue;
+            }
+            for idx in &footprint {
+                blockers[*idx] = true;
+            }
+            footprints.push(footprint);
+        }
+        Self {
+            blockers,
+            footprints,
         }
     }
+}
 
-    #[test]
-    fn stone_blocks_authoritative_fog_behind_it() {
-        let map = map_with_rock_at((3, 2));
-        let mut entities = EntityStore::new();
-        let origin = map.tile_center(1, 2);
-        entities
-            .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
-            .expect("worker should spawn");
-        let mut fog = Fog::new(map.size);
-
-        fog.recompute(&[1], &entities, &map);
-
-        assert!(fog.is_visible(1, 3, 2));
-        assert!(!fog.is_visible(1, 4, 2));
+fn reveal_visible_building_footprints(
+    grids: &mut HashMap<u32, Vec<bool>>,
+    building_mask: &BuildingLosMask,
+) {
+    if building_mask.footprints.is_empty() {
+        return;
     }
-
-    #[test]
-    fn smoke_blocks_authoritative_fog_behind_it_but_reveals_cloud_edge() {
-        let map = map_with_rock_at((7, 7));
-        let mut entities = EntityStore::new();
-        let origin = map.tile_center(1, 2);
-        entities
-            .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
-            .expect("worker should spawn");
-        let mut smokes = SmokeCloudStore::new();
-        let smoke = map.tile_center(3, 2);
-        smokes
-            .spawn(smoke.0, smoke.1, 1.0, 100, 0)
-            .expect("smoke should spawn");
-        let mut fog = Fog::new(map.size);
-
-        fog.recompute_with_smoke(&[1], &entities, &map, &smokes);
-
-        assert!(fog.is_visible(1, 3, 2));
-        assert!(!fog.is_visible(1, 5, 2));
-    }
-
-    #[test]
-    fn unit_inside_smoke_does_not_stamp_vision() {
-        let map = map_with_rock_at((7, 7));
-        let mut entities = EntityStore::new();
-        let origin = map.tile_center(2, 2);
-        entities
-            .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
-            .expect("worker should spawn");
-        let mut smokes = SmokeCloudStore::new();
-        smokes
-            .spawn(origin.0, origin.1, 1.0, 100, 0)
-            .expect("smoke should spawn");
-        let mut fog = Fog::new(map.size);
-
-        fog.recompute_with_smoke(&[1], &entities, &map, &smokes);
-
-        assert!(!fog.is_visible(1, 2, 2));
-        assert!(!fog.is_visible(1, 3, 2));
+    for grid in grids.values_mut() {
+        for footprint in &building_mask.footprints {
+            if footprint
+                .iter()
+                .any(|idx| grid.get(*idx).copied().unwrap_or(false))
+            {
+                for idx in footprint {
+                    if let Some(visible) = grid.get_mut(*idx) {
+                        *visible = true;
+                    }
+                }
+            }
+        }
     }
 }
+
+#[cfg(test)]
+mod tests;

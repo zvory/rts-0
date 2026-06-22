@@ -81,7 +81,12 @@ impl Game {
             return self.fog.clone();
         }
         let mut fog = self.fog.clone();
-        fog.stamp_lingering_sources_with_smoke(&self.lingering_sight, &self.map, &self.smokes);
+        fog.stamp_lingering_sources_with_smoke(
+            &self.lingering_sight,
+            &self.map,
+            &self.entities,
+            &self.smokes,
+        );
         fog
     }
 
