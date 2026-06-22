@@ -35,6 +35,8 @@ const GROUP_RULES = [
       "server/src/protocol.rs",
     ],
     prefixes: [
+      "client/src/protocol/",
+      "client/src/protocol_",
       "tests/client_contracts/",
       "server/crates/protocol/",
       "server/crates/contract/",
