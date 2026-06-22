@@ -233,7 +233,7 @@ import { ClientIntent } from "../../client/src/client_intent.js";
     STATS[KIND.TANK_TRAP].label === "Tank Trap" &&
       STATS[KIND.TANK_TRAP].footW === 1 &&
       STATS[KIND.TANK_TRAP].footH === 1 &&
-      STATS[KIND.TANK_TRAP].sight === 1 &&
+      STATS[KIND.TANK_TRAP].sight === 0 &&
       STATS[KIND.TANK_TRAP].cost.steel === 15 &&
       STATS[KIND.TANK_TRAP].cost.oil === 0 &&
       STATS[KIND.TANK_TRAP].buildTicks === TICK_HZ * 10 &&
