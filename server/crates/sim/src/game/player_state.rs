@@ -27,6 +27,11 @@ impl PlayerState {
         true
     }
 
+    pub(crate) fn set_resources(&mut self, steel: u32, oil: u32) {
+        self.steel = steel;
+        self.oil = oil;
+    }
+
     pub(crate) fn spend_cost(&mut self, cost: ResourceCost) -> bool {
         self.spend_resources(cost.steel, cost.oil)
     }

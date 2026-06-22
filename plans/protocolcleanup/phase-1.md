@@ -1,6 +1,6 @@
 # Phase 1 - Mirror Guardrail Baseline
 
-Status: planned.
+Status: done.
 
 ## Goal
 

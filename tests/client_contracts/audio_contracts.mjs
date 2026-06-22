@@ -8,6 +8,7 @@ import {
 } from "./assertions.mjs";
 import {
   Audio,
+  SOUND_MANIFEST,
   noticeSoundId,
 } from "../../client/src/audio.js";
 import {
@@ -88,6 +89,12 @@ assert(noticeSoundId("Cannot build there") === "notice_cannot_build", "cannot-bu
 assert(noticeSoundId("Requirement not met") === null, "generic invalid notices stay silent");
 assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent");
 assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
+assert(
+  ["countdown_drei", "countdown_zwei", "countdown_eins"].every((id) =>
+    SOUND_MANIFEST.some((entry) => entry.id === id && entry.url.startsWith("/assets/sound/ui/"))
+  ),
+  "countdown voice cues are exposed through the shared sound manifest",
+);
 
 // Audio
 // ---------------------------------------------------------------------------

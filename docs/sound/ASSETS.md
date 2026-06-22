@@ -50,6 +50,9 @@ with licensed recordings before any commercial distribution.
 | `combat/combat_tank_cannon_06.mp3` | Tank cannon primary — extracted from US Army video, some compression artifacts | https://freesound.org/people/qubodup/sounds/161343/ | CC0 |
 | `units/units_tank_engine_idle_03.mp3` | Tank engine idle primary — clean, long, authentic | https://freesound.org/people/C-V/sounds/565598/ | unknown |
 | `buildings/buildings_construction_start_01.mp3` | Construction start — all buildings | https://freesound.org/people/dr19/sounds/353907/ | CC0 |
+| `ui/ui_countdown_drei_01.mp3` | Pre-match countdown: Drei | user-provided local file | unknown |
+| `ui/ui_countdown_zwei_01.mp3` | Pre-match countdown: Zwei | user-provided local file | unknown |
+| `ui/ui_countdown_eins_01.mp3` | Pre-match countdown: Eins | user-provided local file | unknown |
 
 ### Attribution required
 
@@ -62,4 +65,4 @@ with licensed recordings before any commercial distribution.
 - Grass infantry footstep pack: need 6–10 clean variations on grass surface
 - Tank engine running (moving): https://freesound.org/people/C-V/sounds/565597/ (same session as idle_03)
 - No explosion sounds (all candidates rejected — see SOUND_NOTES)
-- `ui/`, `ambient/` directories are empty
+- `ambient/` directory is empty

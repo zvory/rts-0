@@ -2,6 +2,7 @@ import {
   clientPerfReportFields,
   snapshotReportFields,
 } from "./client_perf_report.js";
+import { installTauriNativeCursorBridge } from "./input/cursor_lock.js";
 
 const MATCH_PING_MS = 2000;
 const NET_REPORT_MS = 10000;
@@ -82,6 +83,7 @@ export class MatchNetReporter {
       ...clientPerfReportFields(this.frameProfiler),
       hidden: !!document.hidden,
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : true,
+      ...cursorRuntimeReportFields(),
       wsBufferedBytes: clampU32(this.net.bufferedAmount),
       serverTickMs: clampU16(metrics.serverTickMs),
       serverLagMs: clampU16(metrics.serverLagMs),
@@ -125,6 +127,51 @@ export function predictionReportFields({ prediction, predictionAdapter } = {}) {
     wasmMemoryBytes: clampU32(wasm.memoryBytes),
     predictionReplayTicks: clampU16(wasm.lastReplayTicks),
   };
+}
+
+export function cursorRuntimeReportFields(root = globalThis) {
+  installTauriNativeCursorBridge(root);
+  const nativeCursor = root?.__RTS_NATIVE_CURSOR || null;
+  const nativeDiagnostics = safeNativeCursorDiagnostics(nativeCursor);
+  const tauriGlobals = Object.keys(root || {})
+    .filter((key) => key.includes("TAURI"))
+    .sort()
+    .join(",");
+  return {
+    desktopRuntimePresent: !!root?.__RTS_DESKTOP_RUNTIME,
+    nativeCursorBridgePresent: !!nativeCursor,
+    nativeCursorSupported: nativeCursorSupported(nativeCursor),
+    nativeCursorActive: !!nativeDiagnostics.active,
+    nativeCursorLastReason: clampString(nativeDiagnostics.lastReason),
+    nativeCursorLastError: clampString(nativeDiagnostics.lastError),
+    tauriInternalsPresent: !!root?.__TAURI_INTERNALS__,
+    tauriGlobalPresent: !!root?.__TAURI__,
+    tauriGlobals: clampString(tauriGlobals),
+  };
+}
+
+function safeNativeCursorDiagnostics(nativeCursor) {
+  if (!nativeCursor || typeof nativeCursor.diagnostics !== "function") return {};
+  try {
+    return nativeCursor.diagnostics() || {};
+  } catch {
+    return {};
+  }
+}
+
+function nativeCursorSupported(nativeCursor) {
+  if (!nativeCursor) return false;
+  if (typeof nativeCursor.supported !== "function") return nativeCursor.supported === true;
+  try {
+    return !!nativeCursor.supported();
+  } catch {
+    return false;
+  }
+}
+
+function clampString(value, maxLength = 160) {
+  if (value == null) return "";
+  return String(value).replace(/\s+/g, " ").slice(0, maxLength);
 }
 
 function clampedCommandReportFields(report = {}) {

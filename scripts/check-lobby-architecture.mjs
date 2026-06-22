@@ -20,8 +20,26 @@ const allowedSnapshotCalls = new Map(Object.entries({
 const snapshotCallRe = /\.\s*(snapshot_full_for|snapshot_for_spectator|snapshot_for)\s*\(/g;
 const labMutationCallRe = /\.\s*(apply_lab_op|issue_lab_command_as|restore_lab_scenario)\s*\(/g;
 const failures = [];
+const roomTaskRootBudget = {
+  file: "room_task.rs",
+  maxLines: 550,
+};
+const roomTaskChildLineBudgets = new Map(Object.entries({
+  "room_task/branch.rs": 340,
+  "room_task/dev.rs": 470,
+  "room_task/helpers.rs": 140,
+  "room_task/lab.rs": 1400,
+  "room_task/lifecycle.rs": 560,
+  "room_task/live.rs": 750,
+  "room_task/lobby.rs": 950,
+  "room_task/replay.rs": 720,
+  "room_task/types.rs": 220,
+}));
+const roomTaskTotalLineBudget = 5800;
 
-for (const file of listRustFiles(lobbySrc)) {
+const lobbyRustFiles = listRustFiles(lobbySrc);
+
+for (const file of lobbyRustFiles) {
   const abs = path.join(lobbySrc, file);
   const source = fs.readFileSync(abs, "utf8");
   const stripped = stripCfgTestModules(source);
@@ -34,7 +52,7 @@ for (const file of listRustFiles(lobbySrc)) {
     );
   }
 
-  if (file !== "room_task.rs" && file !== "room_task/lab.rs") {
+  if (file !== "room_task/lab.rs") {
     for (const match of stripped.matchAll(labMutationCallRe)) {
       failures.push(
         `${path.posix.join("server/src/lobby", file)}:${lineNumberAt(stripped, match.index)}: ${match[1]} must stay centralized in room_task/lab.rs lab request handling`,
@@ -43,8 +61,10 @@ for (const file of listRustFiles(lobbySrc)) {
   }
 
   checkGenericRoomHelperModeShortcuts(file, stripped);
-  if (file === "room_task.rs") checkEndMatchPersistencePolicy(stripped);
+  if (file === "room_task/lifecycle.rs") checkEndMatchPersistencePolicy(stripped);
 }
+
+checkRoomTaskModuleBudgets(lobbyRustFiles);
 
 if (failures.length > 0) {
   console.error("lobby architecture check failed:");
@@ -129,7 +149,7 @@ function checkGenericRoomHelperModeShortcuts(file, source) {
 function checkEndMatchPersistencePolicy(source) {
   const endMatch = extractFunctionBody(source, "end_match");
   if (!endMatch) {
-    failures.push("server/src/lobby/room_task.rs: missing end_match persistence guardrail target");
+    failures.push("server/src/lobby/room_task/lifecycle.rs: missing end_match persistence guardrail target");
     return;
   }
   const body = endMatch;
@@ -138,7 +158,7 @@ function checkEndMatchPersistencePolicy(source) {
     !body.includes("should_capture_post_match_replay")
   ) {
     failures.push(
-      "server/src/lobby/room_task.rs: end_match replay capture must be gated by persistence policy",
+      "server/src/lobby/room_task/lifecycle.rs: end_match replay capture must be gated by persistence policy",
     );
   }
   if (
@@ -146,13 +166,51 @@ function checkEndMatchPersistencePolicy(source) {
     !body.includes("should_attach_match_history_replay_artifact")
   ) {
     failures.push(
-      "server/src/lobby/room_task.rs: match-history replay attachment must be gated by persistence policy",
+      "server/src/lobby/room_task/lifecycle.rs: match-history replay attachment must be gated by persistence policy",
+    );
+  }
+}
+
+function checkRoomTaskModuleBudgets(files) {
+  let totalLines = 0;
+  const budgetedRoomTaskFiles = new Set([
+    roomTaskRootBudget.file,
+    ...roomTaskChildLineBudgets.keys(),
+  ]);
+
+  for (const file of files) {
+    if (file !== "room_task.rs" && !file.startsWith("room_task/")) continue;
+    const source = fs.readFileSync(path.join(lobbySrc, file), "utf8");
+    const lineCount = countLines(source);
+    totalLines += lineCount;
+
+    if (!budgetedRoomTaskFiles.has(file)) {
+      failures.push(
+        `${path.posix.join("server/src/lobby", file)}: room-task module needs an explicit size budget in scripts/check-lobby-architecture.mjs`,
+      );
+      continue;
+    }
+
+    const maxLines =
+      file === roomTaskRootBudget.file
+        ? roomTaskRootBudget.maxLines
+        : roomTaskChildLineBudgets.get(file);
+    if (lineCount > maxLines) {
+      failures.push(
+        `${path.posix.join("server/src/lobby", file)}: ${lineCount} lines exceeds room-task budget of ${maxLines}; split responsibilities before growing this module`,
+      );
+    }
+  }
+
+  if (totalLines > roomTaskTotalLineBudget) {
+    failures.push(
+      `server/src/lobby/room_task*: ${totalLines} total lines exceeds room-task runtime budget of ${roomTaskTotalLineBudget}; keep new behavior in existing focused modules or plan another split`,
     );
   }
 }
 
 function extractFunctionBody(source, functionName) {
-  const signature = new RegExp(`\\n\\s*fn\\s+${functionName}\\s*\\(`);
+  const signature = new RegExp(`\\n\\s*(?:pub(?:\\([^)]*\\))?\\s+)?fn\\s+${functionName}\\s*\\(`);
   const match = source.match(signature);
   if (!match) return null;
 
@@ -183,4 +241,10 @@ function braceDelta(line) {
 
 function lineNumberAt(source, index) {
   return source.slice(0, index).split("\n").length;
+}
+
+function countLines(source) {
+  if (source.length === 0) return 0;
+  const lines = source.split(/\r?\n/);
+  return lines.at(-1) === "" ? lines.length - 1 : lines.length;
 }

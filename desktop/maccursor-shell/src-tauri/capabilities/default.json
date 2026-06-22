@@ -2,10 +2,20 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default shell permissions for the local macOS cursor spike window.",
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:*",
+      "http://localhost:*"
+    ]
+  },
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "allow-maccursor-start",
+    "allow-maccursor-configure",
+    "allow-maccursor-stop",
+    "allow-maccursor-diagnostics"
   ]
 }

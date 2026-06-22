@@ -2747,17 +2747,21 @@
       "id": 1,
       "isAi": false,
       "name": "Lab Alpha",
-      "oil": 0,
-      "steel": 75,
       "teamId": 1,
-      "upgrades": [
-        "methamphetamines",
-        "anti_tank_gun_unlock",
-        "tank_unlock",
-        "artillery_unlock",
-        "command_car_unlock",
-        "mortar_autocast"
-      ]
+      "resources": {
+        "steel": 99999,
+        "oil": 99999
+      },
+      "research": {
+        "completed": [
+          "methamphetamines",
+          "anti_tank_gun_unlock",
+          "tank_unlock",
+          "artillery_unlock",
+          "command_car_unlock",
+          "mortar_autocast"
+        ]
+      }
     },
     {
       "color": "#d55e00",
@@ -2765,17 +2769,21 @@
       "id": 2,
       "isAi": false,
       "name": "Lab Bravo",
-      "oil": 0,
-      "steel": 75,
       "teamId": 2,
-      "upgrades": [
-        "methamphetamines",
-        "anti_tank_gun_unlock",
-        "tank_unlock",
-        "artillery_unlock",
-        "command_car_unlock",
-        "mortar_autocast"
-      ]
+      "resources": {
+        "steel": 99999,
+        "oil": 99999
+      },
+      "research": {
+        "completed": [
+          "methamphetamines",
+          "anti_tank_gun_unlock",
+          "tank_unlock",
+          "artillery_unlock",
+          "command_car_unlock",
+          "mortar_autocast"
+        ]
+      }
     }
   ],
   "schemaVersion": 1,

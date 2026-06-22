@@ -15,6 +15,7 @@ import {
   MAX_LOBBY_TEAMS,
   PLAYABLE_FACTIONS,
   betaFactionSelectEnabledForLocation,
+  countdownSoundId,
   shouldAcceptSpectatorDrop,
   shouldAcceptTeamDrop,
   teamSlotsForLobby,
@@ -39,6 +40,12 @@ import { textWithin } from "./dom_text.mjs";
 // ---------------------------------------------------------------------------
 {
   assert(MAX_LOBBY_TEAMS === 4, "lobby exposes four host-managed team slots");
+  assert(countdownSoundId("Drei!", 0, 3) === "countdown_drei", "countdown maps Drei to the first voice cue");
+  assert(countdownSoundId("Zwei!", 1, 3) === "countdown_zwei", "countdown maps Zwei to the second voice cue");
+  assert(countdownSoundId("Eins!", 2, 3) === "countdown_eins", "countdown maps Eins to the final voice cue");
+  assert(countdownSoundId("2", 1, 3) === "countdown_zwei", "countdown maps numeric labels to voice cues");
+  assert(countdownSoundId("Ready", 0, 3) === "countdown_drei", "three-word countdowns fall back to display order");
+  assert(countdownSoundId("Go", 0, 1) === null, "non-countdown words stay silent");
   assert(
     PLAYABLE_FACTIONS.find((entry) => entry.id === "ekat")?.label === "Ekat",
     "lobby faction selector labels the ekat faction as Ekat",

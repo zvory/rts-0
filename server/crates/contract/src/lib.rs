@@ -414,6 +414,19 @@ pub struct PlayerResourceSnapshot {
     pub supply_cap: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioResources {
+    pub steel: u32,
+    pub oil: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioResearch {
+    pub completed: Vec<String>,
+}
+
 /// Dynamic resource state the client is currently allowed to know.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

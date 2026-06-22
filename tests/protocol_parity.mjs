@@ -44,6 +44,7 @@ import {
   decodeServerMessage,
   msg,
 } from "../client/src/protocol.js";
+import * as protocolExports from "../client/src/protocol.js";
 import { PLAYER_PALETTE } from "../client/src/config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,8 +76,59 @@ const protocolContract = JSON.parse(
   ),
 );
 
+const STABLE_JS_PROTOCOL_EXPORTS = [
+  "ABILITY",
+  "ABILITY_CODE",
+  "ABILITY_OBJECT_KIND",
+  "ABILITY_OBJECT_KIND_CODE",
+  "BUILDING_KINDS",
+  "C",
+  "CMD",
+  "COMPACT_SNAPSHOT_VERSION",
+  "DEFAULT_FACTION_ID",
+  "EVENT",
+  "EVENT_CODE",
+  "KIND",
+  "KIND_CODE",
+  "LAB_ROLE",
+  "LAB_VISION",
+  "MOVEMENT_PATH_DIAGNOSTICS",
+  "NOTICE_SEVERITY",
+  "NOTICE_SEVERITY_CODE",
+  "ORDER_STAGE",
+  "ORDER_STAGE_CODE",
+  "PASSABLE",
+  "PREDICTION_PROTOCOL_VERSION",
+  "REPLAY_VISION",
+  "RESOURCE_KINDS",
+  "S",
+  "SETUP",
+  "SETUP_CODE",
+  "SNAPSHOT_CODEC",
+  "SNAPSHOT_CODEC_VERSION",
+  "SNAPSHOT_FRAME_KIND",
+  "STATE",
+  "STATE_CODE",
+  "TERRAIN",
+  "UNIT_KINDS",
+  "UPGRADE",
+  "UPGRADE_CODE",
+  "cmd",
+  "decodeServerMessage",
+  "isBuilding",
+  "isResource",
+  "isUnit",
+  "msg",
+  "parseServerFrame",
+];
+
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+function assertExportsPresent(label, moduleExports, stableNames) {
+  const missing = stableNames.filter((name) => !(name in moduleExports));
+  assert(missing.length === 0, `${label} missing stable exports: ${missing.join(", ")}`);
 }
 
 function extractRustPlayerPalette() {
@@ -131,6 +183,7 @@ function camelToSnake(name) {
 }
 
 assert(protocolContract.schemaVersion === 1, "protocol contract schema version must be 1");
+assertExportsPresent("client protocol public surface", protocolExports, STABLE_JS_PROTOCOL_EXPORTS);
 assert(protocolContract.unknownCodeSentinel === 255, "unknown compact code sentinel must stay 255");
 assertSameMap("server message tags", protocolContract.messageTags.server, S);
 assertSameMap("client message tags", protocolContract.messageTags.client, C);

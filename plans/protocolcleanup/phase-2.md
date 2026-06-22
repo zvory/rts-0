@@ -1,6 +1,6 @@
 # Phase 2 - Frame Transport Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 

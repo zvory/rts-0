@@ -136,6 +136,10 @@ impl NativeCursorBackend {
         session.y = clamp(finite_or(y, session.height / 2.0), 0.0, session.height);
 
         if !session.active {
+            eprintln!(
+                "maccursor-shell native capture start requested x={:.1} y={:.1} width={:.1} height={:.1}",
+                session.x, session.y, session.width, session.height
+            );
             match start_system_cursor_capture() {
                 Ok(capture) => {
                     session.cursor_hidden = capture.cursor_hidden;
@@ -143,10 +147,12 @@ impl NativeCursorBackend {
                     session.active = true;
                     session.last_reason = "capture-start".to_string();
                     session.last_error = None;
+                    eprintln!("maccursor-shell native capture started");
                 }
                 Err(err) => {
                     session.last_reason = "capture-start-failed".to_string();
                     session.last_error = Some(err.clone());
+                    eprintln!("maccursor-shell native capture failed: {err}");
                     return Err(err);
                 }
             }
@@ -169,6 +175,7 @@ impl NativeCursorBackend {
             let was_active = session.active;
             if was_active {
                 restore_system_cursor(session.cursor_hidden, session.cursor_disconnected);
+                eprintln!("maccursor-shell native capture stopped reason={reason}");
             }
             session.active = false;
             session.cursor_hidden = false;

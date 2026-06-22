@@ -1,6 +1,6 @@
 # Phase 3 - Constants And Contract Metadata Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 
