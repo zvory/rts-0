@@ -17,17 +17,15 @@ use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::tick_control::{RoomTimeClock, RoomTimeSpeed, ScheduledTickAction, TickControl};
 use super::*;
 use crate::protocol::{
-    Command, DiagnosticCapabilities, LabClientOp, LabResult, LabScenarioLabMetadata,
-    LabStartMetadata, LabStartRole, LabState, LabVisionMode, LivePauseState, NoticeSeverity,
-    RoomTimeState, StartPayload, DEFAULT_FACTION_ID,
+    Command, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
+    LabState, LabVisionMode, LivePauseState, NoticeSeverity, RoomTimeState, StartPayload,
+    DEFAULT_FACTION_ID,
 };
 #[cfg(test)]
 use crate::protocol::{
     MovementPathDiagnosticScope, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION,
 };
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
-use rand::rngs::SmallRng;
-use rand::SeedableRng;
 use rts_ai::{AiController, DEFAULT_LIVE_PROFILE_ID};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
@@ -41,178 +39,23 @@ use std::str::FromStr;
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
 
-/// A connected player as tracked inside a room.
-pub(super) struct RoomPlayer {
-    name: String,
-    pub(super) color: String,
-    ready: bool,
-    pub(super) spectator: bool,
-    pub(super) msg_tx: ConnectionSink,
-    pub(super) head_of_line_count: u32,
-    last_received_client_seq: u32,
-    pub(super) last_sim_consumed_client_seq: u32,
-    pub(super) last_sim_consumed_client_tick: Option<u32>,
-}
+mod helpers;
+mod types;
 
-#[derive(Debug, Clone, Copy)]
-pub(super) struct PendingClientCommandAck {
-    pub(super) connection_id: u32,
-    pub(super) client_seq: u32,
-}
-
-/// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
-/// no socket — it is materialized into an AI-driven player only when the match starts.
-struct AiSlot {
-    id: u32,
-    name: String,
-    team_id: TeamId,
-    faction_id: String,
-    profile_id: &'static str,
-}
-
-const MAX_LOBBY_TEAMS: TeamId = 4;
-
-const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
-    ["itest-", "ai-itest-", "client-smoke-", "reg-"];
-const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
-const LAB_PLAYER_ONE_ID: u32 = 1;
-const LAB_PLAYER_TWO_ID: u32 = 2;
-const LIVE_PAUSE_LIMIT: u8 = 3;
-const DRAINING_NEW_MATCHES_DISABLED_MSG: &str =
-    "Server is draining for deploy; new matches are disabled.";
-
-fn match_countdown_duration() -> Duration {
-    #[cfg(test)]
-    {
-        Duration::from_millis(1)
-    }
-    #[cfg(not(test))]
-    {
-        Duration::from_secs(3)
-    }
-}
-
-fn server_build_sha() -> &'static str {
-    crate::build_info::build_id()
-}
-
-pub(super) fn is_automated_match_history_room(room: &str) -> bool {
-    AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES
-        .iter()
-        .any(|prefix| room.starts_with(prefix))
-}
-
-pub(super) fn match_history_participants_are_automated(participants: &[String]) -> bool {
-    let mut has_alpha = false;
-    let mut has_bravo = false;
-    for participant in participants {
-        let name = participant.trim();
-        if name.eq_ignore_ascii_case("smoke") {
-            return true;
-        }
-        has_alpha |= name == "Alpha";
-        has_bravo |= name == "Bravo";
-    }
-    has_alpha && has_bravo
-}
-
-fn late_spectator_notice_name(name: &str) -> String {
-    let cleaned: String = name.trim().chars().filter(|ch| !ch.is_control()).collect();
-    let cleaned = cleaned.trim();
-    if cleaned.is_empty() {
-        "Commander".to_string()
-    } else {
-        cleaned.to_string()
-    }
-}
-
-fn live_ai_controllers(
-    players: &[PlayerInit],
-    ai_slots: &[AiSlot],
-    seed: u32,
-) -> Vec<AiController> {
-    let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
-    players
-        .iter()
-        .filter(|player| player.is_ai)
-        .map(|player| {
-            let profile_id = ai_slots
-                .iter()
-                .find(|ai| ai.id == player.id)
-                .map(|ai| ai.profile_id)
-                .unwrap_or_else(|| rts_ai::random_live_profile_id(&mut rng));
-            AiController::with_profile_id(player.id, profile_id)
-        })
-        .collect()
-}
-
-/// The room's current mode. `InGame` owns the live simulation outright.
-pub(super) enum Phase {
-    Lobby,
-    InGame(Box<Game>),
-    ReplayViewer(Box<ReplaySession>),
-    BranchStaging(Box<BranchStagingState>),
-}
-
-#[derive(Clone, Copy)]
-struct ReplayTickContext {
-    scheduler_lag: Duration,
-    tick_budget: Duration,
-    tick_start: StdInstant,
-    projection_policy: ProjectionPolicy,
-}
-
-#[derive(Clone, Copy)]
-enum LabSeekTarget {
-    Relative(u32),
-    Absolute(u32),
-}
-
-#[derive(Clone, Copy)]
-struct ReplayStartPayloadStamp {
-    policy: SessionPolicy,
-    diagnostics: DiagnosticCapabilities,
-}
-
-#[derive(Clone)]
-pub(super) enum RoomMode {
-    Normal,
-    DevScenario(DevScenarioConfig),
-    Replay { artifact: ReplayArtifactV1 },
-    ReplayArtifact { artifact: String },
-    ReplayBranch { seed: ReplayBranchSeed },
-    Lab(LabRoomConfig),
-}
-
-#[derive(Clone)]
-pub(super) struct LabRoomConfig {
-    pub(super) public_id: String,
-    pub(super) map_name: String,
-    pub(super) seed: Option<u32>,
-}
-
-#[derive(Clone)]
-pub(super) struct DevScenarioConfig {
-    pub(super) id: DevScenarioId,
-    pub(super) unit: EntityKind,
-    pub(super) count: usize,
-    pub(super) blocker: Option<EntityKind>,
-    pub(super) case: Option<&'static str>,
-}
-
-#[derive(Clone)]
-pub(super) enum DevScenarioId {
-    ScoutCarSnakingCorridor,
-    DirectReverseOrder,
-    ScoutCarWallChokepoint,
-    VehicleCornerWall,
-    VehicleSmallBlockBaseline,
-    FactoryZeroGapPerpendicular,
-    TankTrapLineHorizontal,
-    TankTrapLineVertical,
-    TankTrapLineDiagonal,
-    TankTrapPathingMatrix,
-}
+pub(super) use helpers::{
+    is_automated_match_history_room, match_history_participants_are_automated,
+};
+use helpers::{
+    late_spectator_notice_name, live_ai_controllers, match_countdown_duration, server_build_sha,
+    DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID, LIVE_PAUSE_LIMIT,
+    MATCH_COUNTDOWN_WORDS,
+};
+use types::{
+    AiSlot, LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickContext, MAX_LOBBY_TEAMS,
+};
+pub(super) use types::{
+    DevScenarioConfig, DevScenarioId, LabRoomConfig, PendingClientCommandAck, RoomMode, RoomPlayer,
+};
 
 enum DevDriver {
     Scenario(DevScenarioDriver),
