@@ -144,7 +144,8 @@ suites.
 
 - Phase runner plan/path handling: run `node tests/phase_runner_agents.mjs` when changing
   `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
-  names and sanitized worktree/log slugs.
+  names, sanitized worktree/log slugs, executor model inheritance, and generated `codex exec`
+  arguments.
 - `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS
   protocol mirror/decode tests, and Node integration when a top-level message or compact shape
   changed.
@@ -167,6 +168,9 @@ suites.
   rendering behavior or `tests/fixtures/svg/legacy-unit-oracle.baseline.json` changes. The oracle
   uses a deterministic Node fixture, semantic measurements, and bounded pixel-diff thresholds across
   current unit kinds and representative animation states.
+- Lab panel controls: run `node tests/client_contracts.mjs` and
+  `node scripts/check-client-architecture.mjs` when changing `client/src/lab_panel.js` player setup,
+  spawn, resources, research, or result re-render behavior.
 - Client performance harness: run `node --check scripts/client-perf-harness.mjs` and
   `node scripts/client-perf-harness.mjs --list` when changing the fixed browser performance
   workloads, stress-matrix dimensions, harness script, or documented performance workflow. Workload

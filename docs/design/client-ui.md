@@ -611,13 +611,21 @@ Frame-local entity views belong to the app-shell frame loop, not to `GameState`.
 fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
 should accept the injected frame view when called from the RAF path and fall back to `GameState`
 queries only for direct module tests or event handlers outside the frame. Static resource nodes with
-no remaining resources are omitted from frame-local entity views and minimap blips. Frame-local
-entity views may carry bounded render diagnostics for local profiling consumers without changing the
-authoritative snapshot model.
+no remaining resources are omitted from frame-local entity views and minimap blips. Minimap
+artillery firing indicators render as 30x24 SVG rig images without an extra surrounding ring.
+Frame-local entity views may carry bounded render diagnostics for local profiling consumers without
+changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
+into deduped, browser-local pending ground decal stamps and rendered below resources and fog as
+visual-only decals; they do not change server protocol, simulation, or balance.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
-rather than relying on the full mutable `GameState`. Tank Trap placement previews keep normal
+rather than relying on the full mutable `GameState`. Queued support-weapon setup previews use
+accepted move or attack-move order-plan endpoints as their field-of-fire origin; unqueued setup
+previews use the current support-weapon position. Minimap hover and click targeting feed support-weapon
+setup previews and commands from minimap world coordinates for Anti-Tank Guns and Artillery. HUD
+command-target arming preserves Shift, and input hover previews track Shift so queued previews match
+the command that will be issued. Tank Trap placement previews keep normal
 terrain, resource, building, and map-bounds checks, allow infantry overlap, and reject vehicle-body
 units. Tank Trap line dragging treats terrain, building, and map-bounds blockers as skipped sites,
 omits illegal build commands for those sites, and resumes on the far side; vehicle-body unit blockers
@@ -986,7 +994,7 @@ selection rings):
 - The render layer is cleared each frame so expired clouds vanish automatically when they drop from
   the next snapshot.
 
-### 4.2 Rendering & look (PixiJS, SVG unit rigs — neutral PS1 field-command style)
+### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
 - Layers (back→front): terrain → ground decals → resource nodes → building shadows → buildings →
   building overlays → unit shadows → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → shot-revealed units → command/hover feedback → placement ghost →
@@ -994,6 +1002,11 @@ selection rings):
 - `/renderer_preview.html` is a standalone dev entry point linked from the index Dev links menu; it
   mounts the real Renderer on a synthetic grass map to preview all unit and building visuals with
   zoom, team color, and animation controls outside a full match.
+- Spatial combat audio keeps full volume for nearby emitters, uses stronger attenuation after the
+  listener reference distance for distant emitters, and keeps the same hard drop distance.
+- Buildings: SVG-authored rig definitions are compiled at Renderer startup and rendered on the
+  buildings layer; shadows remain imperative draws, and progress bars, queue labels, and icons remain
+  imperative draws on the building overlays layer.
 - Units: SVG-authored rig parts rendered into Pixi containers, with low-detail hard-edged
   silhouettes tinted by player color, a dark drop shadow, dark outline, HP bar above when
   damaged/selected, and glowing selection ring when selected.
@@ -1072,14 +1085,15 @@ Current areas:
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
   `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
-- `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
-  `progress_extrapolator.js`, `prediction_controller.js`, `prediction_compatibility.js`,
-  `sim_wasm_adapter.js`.
+- `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
+  `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
+  `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, settings. The in-match debug status badge displays live and rolling
+  staging, lab panel, settings. Lobby AI creation is exposed from the roster's team context, not
+  as a duplicate global sidebar action. The in-match debug status badge displays live and rolling
   one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
