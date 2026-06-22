@@ -10,15 +10,18 @@ Run it from this directory:
 ./run.sh
 ```
 
+The runner builds `.build/MacCursorSpike.app` locally and launches it with
+`open -W` so AppKit treats the harness as a foreground app.
+
 Run the targeted smoke check without opening the interactive window:
 
 ```bash
 ./run.sh --self-test
 ```
 
-`--self-test` compiles the harness and checks event movement/cleanup logic
-without taking over the desktop cursor. Use the interactive command above for
-the real foreground-only CoreGraphics capture test.
+`--self-test` compiles the same app binary and checks event movement/cleanup
+logic without taking over the desktop cursor. Use the interactive command above
+for the real foreground-only CoreGraphics capture test.
 
 The harness uses AppKit local mouse events plus CoreGraphics cursor APIs:
 
