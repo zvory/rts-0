@@ -785,7 +785,8 @@ Events are best-effort visual flavor; the client must not depend on receiving th
 `roomTimeState` is a reliable server message that carries the shared room-controlled time
 cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
 rooms also send it after pause/resume and one-tick step controls so clients can confirm the
-authoritative room-time speed and tick:
+authoritative room-time speed and tick. Lab rooms also send it after timeline baseline resets and
+new timeline keyframes:
 ```
 {
   t: "roomTimeState",
@@ -798,9 +799,12 @@ authoritative room-time speed and tick:
   controllerId?: u32
 }
 ```
-`keyframeTicks` lists the replay keyframes the server has recorded so far. Clients may display
-them as seek marks, but a seek target is not limited to these ticks; the server restores the nearest
-recorded keyframe at or before the requested tick and fast-forwards from there.
+`keyframeTicks` lists the replay or lab keyframes the server has recorded so far. Replay clients
+may display them as seek marks, but a seek target is not limited to these ticks; the server restores
+the nearest recorded keyframe at or before the requested tick and fast-forwards from there. Lab
+rooms expose recorded baseline and periodic keyframe ticks through the same field, with
+`durationTicks` set to the current maximum recorded lab tick, but lab seek/timeline capabilities
+remain false until the lab rebuild path is enabled.
 
 `livePauseState` is a reliable server message that carries the authoritative live-match pause
 state. Normal live and branch-live match recipients receive it after `start` and after accepted or
@@ -892,10 +896,10 @@ Reliable lab server messages:
 | `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Recipient-scoped lab control metadata. World state still travels through `snapshot`. |
 | `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
 
-Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timeline/keyframes,
-lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
-fine-grained multi-operator permissions, visual iteration hot reload, and `/dev/scenario`
-migration. Those require separate typed messages instead of overloading `LabClientOp`.
+Lab protocol deliberately omits seek controls, lab simulation flags such as disabled damage or god
+mode, server-side public scenario storage, fine-grained multi-operator permissions, visual
+iteration hot reload, and `/dev/scenario` migration. Pause, speed, step, and room-local timeline
+metadata use the neutral room-time messages instead of overloading `LabClientOp`.
 Debug-style prebuilt setups should return later as explicit lab scenario/preset protocol, not as a
 hidden normal-lobby command.
 

@@ -352,6 +352,10 @@ AI controllers, or Tokio coordination into `rts-sim`:
 - `tick_control.rs` maps the session clock policy, replay pause/speed, dev-watch and lab pause
   state, and countdown state to the room ticker interval and scheduled action. `RoomTask` still
   owns the Tokio interval and remains the only task that advances a room.
+- `lab_timeline.rs` owns room-local in-memory lab rewind recording outside the simulation crate. It
+  records a baseline keyframe after lab `Game` creation or scenario import, records accepted lab
+  world mutations and issue-as commands in authoritative room order, and stores periodic cloned
+  `Game` keyframes for later seek/rebuild work.
 - `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
   per-viewer replay vision, lab viewers get their room-owned per-operator lab vision, branch-live
