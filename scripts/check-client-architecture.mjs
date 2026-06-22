@@ -29,6 +29,7 @@ const AREA_BY_FILE = new Map(Object.entries({
 
   "state.js": "model",
   "state_queries.js": "model",
+  "state_ground_decals.js": "model",
   "state_visual_effects.js": "model",
   "client_intent.js": "model",
   "command_budget.js": "model",
@@ -108,7 +109,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
   "hud.js": 44208,
   // Hotspot Cleanup Phase 6 extracted GameState query and visual-effect helpers.
-  "state.js": 29754,
+  // Death decals add a narrow browser-local decal queue owned by GameState.
+  "state.js": 30123,
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   "input/index.js": 40927,
   // Artillery minimap markers forward the visual-only firing event and inject the rig icon.

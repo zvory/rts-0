@@ -1,0 +1,117 @@
+// tests/client_contracts/ground_decal_contracts.mjs
+// Ground decal model and renderer contracts for client-only visible deaths.
+
+import { assert, assertApprox } from "./assertions.mjs";
+import { GameState } from "../../client/src/state.js";
+import {
+  GROUND_DECAL_CLASS,
+  GroundDecalBuffer,
+  groundDecalClassForKind,
+  normalizeGroundDecalEvent,
+} from "../../client/src/state_ground_decals.js";
+import { EVENT, KIND } from "../../client/src/protocol.js";
+
+const start = {
+  playerId: 1,
+  map: { width: 4, height: 4, tileSize: 32, terrain: new Array(16).fill(0), resources: [] },
+  players: [
+    { id: 1, name: "A", color: "#ff0000", startTileX: 1, startTileY: 1 },
+    { id: 2, name: "B", color: "#00ff00", startTileX: 2, startTileY: 2 },
+  ],
+};
+
+assert(groundDecalClassForKind(KIND.WORKER) === GROUND_DECAL_CLASS.INFANTRY, "workers leave infantry decals");
+assert(groundDecalClassForKind(KIND.MACHINE_GUNNER) === GROUND_DECAL_CLASS.INFANTRY, "machine gunners leave infantry decals");
+assert(groundDecalClassForKind(KIND.MORTAR_TEAM) === GROUND_DECAL_CLASS.INFANTRY, "mortar teams leave infantry decals");
+assert(groundDecalClassForKind(KIND.TANK) === GROUND_DECAL_CLASS.SCORCH, "tanks leave scorch decals");
+assert(groundDecalClassForKind(KIND.ANTI_TANK_GUN) === GROUND_DECAL_CLASS.SCORCH, "support guns leave scorch decals");
+assert(groundDecalClassForKind(KIND.STEEL) === GROUND_DECAL_CLASS.NONE, "resources leave no decals");
+assert(groundDecalClassForKind(KIND.CITY_CENTRE) === GROUND_DECAL_CLASS.NONE, "buildings leave no decals");
+assert(groundDecalClassForKind(KIND.TANK_TRAP) === GROUND_DECAL_CLASS.NONE, "tank traps leave no decals");
+
+{
+  const prevById = new Map([
+    [10, { id: 10, owner: 2, kind: KIND.TANK, x: 50, y: 60, facing: 1.25, weaponFacing: -0.5 }],
+  ]);
+  const decal = normalizeGroundDecalEvent(
+    { e: EVENT.DEATH, id: 10, x: 64, y: 96, kind: KIND.TANK },
+    { prevById, players: start.players, tick: 90 },
+  );
+  assert(decal.decalClass === GROUND_DECAL_CLASS.SCORCH, "normalizer classifies vehicle deaths");
+  assert(decal.owner === 2, "normalizer recovers owner from the previous entity snapshot");
+  assert(decal.color === "#00ff00", "normalizer resolves recovered owner color");
+  assertApprox(decal.facing, 1.25, 0.00001, "normalizer prefers previous entity facing");
+  assertApprox(decal.weaponFacing, -0.5, 0.00001, "normalizer preserves previous weapon facing");
+
+  const repeat = normalizeGroundDecalEvent(
+    { e: EVENT.DEATH, id: 10, x: 64, y: 96, kind: KIND.TANK },
+    { prevById, players: start.players, tick: 90 },
+  );
+  assert(decal.seed === repeat.seed, "normalizer output seed is deterministic for stable death data");
+  assert(decal.variant === repeat.variant, "normalizer output variant is deterministic for stable death data");
+}
+
+{
+  const curById = new Map([
+    [11, { id: 11, owner: 1, kind: KIND.RIFLEMAN, x: 30, y: 30, weaponFacing: 0.75 }],
+  ]);
+  const decal = normalizeGroundDecalEvent(
+    { e: EVENT.DEATH, id: 11, x: 30, y: 30, kind: KIND.RIFLEMAN },
+    { curById, players: start.players, tick: 12 },
+  );
+  assert(decal.decalClass === GROUND_DECAL_CLASS.INFANTRY, "normalizer classifies infantry deaths");
+  assert(decal.owner === 1, "normalizer falls back to current entity owner when previous is missing");
+  assertApprox(decal.facing, 0.75, 0.00001, "normalizer falls back from facing to weaponFacing");
+}
+
+{
+  const buffer = new GroundDecalBuffer();
+  const events = [
+    { e: EVENT.DEATH, id: 30, x: 80, y: 80, kind: KIND.WORKER },
+    { e: EVENT.DEATH, id: 30, x: 80, y: 80, kind: KIND.WORKER },
+    { e: EVENT.DEATH, id: 31, x: 96, y: 80, kind: KIND.STEEL },
+  ];
+  const queued = buffer.applySnapshotEvents(events, { players: start.players, tick: 1 });
+  assert(queued === 1, "ground decal buffer queues only one unpainted decal for duplicate death ids");
+  assert(buffer.pendingCount === 1, "ground decal buffer exposes pending queue count");
+  assert(buffer.consumePending().length === 1, "ground decal buffer consumes the queued decal");
+  assert(buffer.consumePending().length === 0, "ground decal buffer consume is one-shot");
+  buffer.applySnapshotEvents([events[0]], { players: start.players, tick: 2 });
+  assert(buffer.consumePending().length === 0, "painted death ids remain deduped after queue consumption");
+}
+
+{
+  const state = new GameState(start);
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [{ id: 50, owner: 2, kind: KIND.SCOUT_CAR, x: 96, y: 96, facing: 2.2, hp: 10, maxHp: 100 }],
+    events: [],
+  });
+  state.applySnapshot({
+    tick: 2,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: [{ e: EVENT.DEATH, id: 50, x: 96, y: 96, kind: KIND.SCOUT_CAR }],
+  });
+  const decals = state.consumePendingGroundDecals();
+  assert(decals.length === 1, "GameState.applySnapshot queues received death decals");
+  assert(decals[0].owner === 2, "GameState decal queue recovers owner from the prior current snapshot");
+  assertApprox(decals[0].facing, 2.2, 0.00001, "GameState decal queue recovers facing from the prior current snapshot");
+  state.applySnapshot({
+    tick: 3,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: [{ e: EVENT.DEATH, id: 50, x: 96, y: 96, kind: KIND.SCOUT_CAR }],
+  });
+  assert(state.consumePendingGroundDecals().length === 0, "GameState dedupes repeated death events by entity id");
+}

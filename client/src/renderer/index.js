@@ -4,7 +4,7 @@
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
-//   terrain → resources → building-shadows → buildings → building-overlays
+//   terrain → decals → resources → building-shadows → buildings → building-overlays
 //   → unit-shadows → units → selection-rings → hp-bars → fog → shot-reveals
 //   → feedback → placement-ghost → drag-box
 //
@@ -57,6 +57,7 @@ import {
 import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
+import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
 import { createLiveRigDefinitions } from "./rigs/live_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
@@ -112,6 +113,12 @@ export class Renderer {
       this.layers[name] = c;
       this.world.addChild(c);
     }
+    this._groundDecals = new GroundDecalLayer({
+      layer: this.layers.decals,
+      pixi: PIXI,
+      getDocument: () => (typeof document !== "undefined" ? document : null),
+      recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+    });
 
     // Long-lived single Graphics for the bulk overlays / per-frame vector draws.
     this._terrainSprite = null; // PIXI.Sprite of the cached terrain RenderTexture
@@ -253,6 +260,9 @@ export class Renderer {
         selectedEntities: frameViews?.selectedEntities,
       }),
     );
+    time("renderer.groundDecals", () => {
+      this._drawSafely("groundDecals", () => this._drawGroundDecals(state));
+    });
 
     // Nodes currently being mined: any worker latched to them. Used by
     // _drawResource to overlay an X marker.
@@ -611,6 +621,8 @@ export class Renderer {
     this._abilityObjectGfx.destroy();
     this._placementGfx.destroy();
     this._dragGfx.destroy();
+    this._groundDecals?.destroy();
+    this._groundDecals = null;
 
     // Cached terrain sprite + its generated texture.
     if (this._terrainSprite) {
@@ -628,6 +640,8 @@ export class Renderer {
 
 Object.assign(Renderer.prototype, {
   buildStaticMap,
+  _initGroundDecalsForMap,
+  _drawGroundDecals,
   _ownerColors,
   _tintFor,
   _deployedWeaponSetupVisual,

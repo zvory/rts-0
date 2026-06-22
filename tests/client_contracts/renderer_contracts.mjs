@@ -4,6 +4,7 @@
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { KIND } from "../../client/src/protocol.js";
+import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   _drawAbilityObjects,
@@ -111,6 +112,99 @@ import { installFakePixi } from "./pixi_fakes.mjs";
     console.error = priorConsoleError;
     restorePixi();
     delete globalThis.__rtsRenderErrors;
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  const priorDocument = globalThis.document;
+  const canvasContexts = [];
+  class FakeCanvasContext {
+    constructor() {
+      this.calls = [];
+    }
+    save() { this.calls.push(["save"]); }
+    restore() { this.calls.push(["restore"]); }
+    translate(x, y) { this.calls.push(["translate", x, y]); }
+    rotate(angle) { this.calls.push(["rotate", angle]); }
+    scale(x, y) { this.calls.push(["scale", x, y]); }
+    clearRect(x, y, w, h) { this.calls.push(["clearRect", x, y, w, h]); }
+    fillRect(x, y, w, h) { this.calls.push(["fillRect", x, y, w, h]); }
+    beginPath() { this.calls.push(["beginPath"]); }
+    moveTo(x, y) { this.calls.push(["moveTo", x, y]); }
+    lineTo(x, y) { this.calls.push(["lineTo", x, y]); }
+    closePath() { this.calls.push(["closePath"]); }
+    ellipse(x, y, rx, ry, rotation) { this.calls.push(["ellipse", x, y, rx, ry, rotation]); }
+    arc(x, y, radius, start, end) { this.calls.push(["arc", x, y, radius, start, end]); }
+    fill() { this.calls.push(["fill"]); }
+  }
+  globalThis.document = {
+    createElement(tag) {
+      assert(tag === "canvas", "ground decal renderer only creates canvas elements");
+      const ctx = new FakeCanvasContext();
+      canvasContexts.push(ctx);
+      return {
+        width: 0,
+        height: 0,
+        getContext(type) {
+          assert(type === "2d", "ground decal renderer requests a 2d canvas context");
+          return ctx;
+        },
+      };
+    },
+  };
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer.buildStaticMap({ width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0) });
+    assert(renderer.layers.decals.children.length === 1, "renderer creates exactly one permanent decal sprite");
+    assert(renderer._groundDecals.downsample === GROUND_DECAL_TEXTURE_WORLD_SCALE, "decal texture uses the configured downsample");
+
+    const pending = [];
+    for (let i = 0; i < 120; i += 1) {
+      pending.push({
+        id: 1000 + i,
+        kind: i % 2 === 0 ? KIND.WORKER : KIND.TANK,
+        decalClass: i % 2 === 0 ? "infantry" : "scorch",
+        x: 20 + (i % 12) * 12,
+        y: 24 + Math.floor(i / 12) * 10,
+        owner: 1,
+        color: "#4878c8",
+        facing: 0.1 * i,
+        weaponFacing: 0.1 * i,
+        seed: 9000 + i,
+        variant: i % 4,
+      });
+    }
+    const state = {
+      consumePendingGroundDecals() {
+        return pending.splice(0);
+      },
+    };
+    renderer._drawGroundDecals(state);
+    assert(renderer.layers.decals.children.length === 1, "stamping many decals does not create per-death display objects");
+    assert(renderer._groundDecals.totalStamped === 120, "renderer stamps all queued decals into the permanent texture");
+    assert(renderer._groundDecals.textureUpdateCount === 1, "renderer updates the decal texture once per consumed batch");
+    renderer._drawGroundDecals(state);
+    assert(renderer._groundDecals.textureUpdateCount === 1, "renderer does not update the decal texture when no decals are pending");
+    const decalCtx = canvasContexts[1];
+    assert(decalCtx.calls.some((call) => call[0] === "ellipse"), "infantry decals draw placeholder blob ellipses");
+    assert(decalCtx.calls.some((call) => call[0] === "fillRect"), "vehicle decals draw placeholder paint fragments");
+    renderer.destroy();
+    renderer.destroy();
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    restorePixi();
   }
 }
 
