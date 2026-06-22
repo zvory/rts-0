@@ -114,6 +114,11 @@ Tank-era production and frontal-wave composition are Tank-only, so Riflemen rema
 opening/defensive Barracks output rather than a continuing mid-game spend. It reserves up to four
 ready Machine Gunners before frontal-wave readiness is calculated, so those MGs do not satisfy Tank
 wave sizes.
+Tank-pivot transitions are gated by floated steel and oil rather than live supply count. This lets
+AI 1.0, AI 1.1, and AI 1.2 advance into Training Centre, Research Complex, Factory, and Tank
+production after low-supply attrition stalls, while avoiding a transition just because a large army
+survived. Once a transition-only tech building is owned or pending, the transition remains active
+after the first resource spend.
 When there is no local base threat, the reserved MGs receive deterministic individual attack-move
 stage orders roughly 20 tiles past the main steel line toward the nearest living public enemy start,
 using public resource geometry rather than hidden enemy positions. This pushes the defensive group

@@ -1756,6 +1756,69 @@ fn ai_1_1_tank_transition_does_not_train_riflemen() {
 }
 
 #[test]
+fn ai_1_1_and_1_2_float_resources_into_tank_tech_below_old_supply_gate() {
+    for profile in [&AI_1_1_TANK_MG, &AI_1_2_WAVE_COHORTS] {
+        let observation = observation(
+            AiEconomy {
+                steel: 450,
+                oil: 200,
+                supply_used: 12,
+                supply_cap: 30,
+            },
+            vec![
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::Barracks, Some(0)),
+                worker(20, AiEntityState::Idle),
+            ],
+        );
+
+        let decision = decide(
+            &observation,
+            profile,
+            &mut AiDecisionMemory::for_profile(profile),
+        );
+
+        assert!(
+            decision.intents.contains(&AiIntent::Build {
+                kind: EntityKind::TrainingCentre
+            }),
+            "{} should start tank tech from a floated resource bank even below 30 supply",
+            profile.id
+        );
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Rifleman
+        }));
+    }
+}
+
+#[test]
+fn high_supply_without_resource_float_does_not_start_ai_1_1_tank_transition() {
+    let observation = observation(
+        AiEconomy {
+            steel: 399,
+            oil: 149,
+            supply_used: 54,
+            supply_cap: 80,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            worker(20, AiEntityState::Idle),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_1_1_TANK_MG,
+        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+    );
+
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::TrainingCentre
+    }));
+}
+
+#[test]
 fn ai_1_0_can_expand_while_transitioning_to_vehicles() {
     let mut owned = vec![
         building(10, EntityKind::CityCentre, Some(0)),
@@ -2924,7 +2987,7 @@ fn steel_expansion_tanks_stages_support_weapons_on_enemy_facing_main_steel_line(
 }
 
 #[test]
-fn steel_expansion_tanks_switches_to_factory_at_fifty_supply() {
+fn steel_expansion_tanks_switches_to_factory_at_resource_float() {
     let observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
@@ -2961,7 +3024,7 @@ fn steel_expansion_tanks_switches_to_factory_at_fifty_supply() {
 }
 
 #[test]
-fn steel_expansion_tanks_trains_only_tanks_after_fifty_supply() {
+fn steel_expansion_tanks_trains_only_tanks_after_resource_float() {
     let mut observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
@@ -3160,7 +3223,7 @@ fn frontal_wave_readiness_reports_required_tank_gate() {
 }
 
 #[test]
-fn full_saturation_prioritizes_second_city_centre_at_fifty_supply() {
+fn full_saturation_prioritizes_second_city_centre_before_resource_float() {
     let observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 200,
@@ -3190,7 +3253,7 @@ fn full_saturation_prioritizes_second_city_centre_at_fifty_supply() {
         !decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Factory
         }),
-        "the first 50-supply macro spend should not let Factory preempt the expansion"
+        "the first resource-float macro spend should not let Factory preempt the expansion"
     );
 }
 
