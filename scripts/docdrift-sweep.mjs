@@ -1166,30 +1166,64 @@ function countOccurrences(text, needle) {
   return count;
 }
 
+class DocPatchApplyError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = "DocPatchApplyError";
+    this.details = details;
+  }
+}
+
 function applyDocPatches(repoRoot, patches) {
   const results = [];
+  const stagedFiles = new Map();
   for (const patch of patches) {
     const absPath = path.resolve(repoRoot, patch.path);
     if (!existsSync(absPath)) {
-      throw new Error(`doc patch target not found: ${patch.path}`);
+      throw new DocPatchApplyError(`doc patch target not found: ${patch.path}`, { patch, applications: results });
     }
-    const current = readFileSync(absPath, "utf8");
+    const current = stagedFiles.has(patch.path) ? stagedFiles.get(patch.path) : readFileSync(absPath, "utf8");
     if (current.includes(patch.replace)) {
       results.push({ path: patch.path, status: "already_applied", rationale: patch.rationale });
       continue;
     }
     const findCount = countOccurrences(current, patch.find);
     if (findCount === 1) {
-      writeFileSync(absPath, current.replace(patch.find, patch.replace));
+      stagedFiles.set(patch.path, current.replace(patch.find, patch.replace));
       results.push({ path: patch.path, status: "applied", rationale: patch.rationale });
       continue;
     }
     if (findCount === 0) {
-      throw new Error(`doc patch find text not found in ${patch.path}`);
+      throw new DocPatchApplyError(`doc patch find text not found in ${patch.path}`, { patch, applications: results });
     }
-    throw new Error(`doc patch find text matched ${findCount} times in ${patch.path}`);
+    throw new DocPatchApplyError(`doc patch find text matched ${findCount} times in ${patch.path}`, {
+      patch,
+      applications: results,
+    });
+  }
+  for (const [pathname, text] of stagedFiles) {
+    writeFileSync(path.resolve(repoRoot, pathname), text);
   }
   return results;
+}
+
+function docPatchFailure({ error, decision, commit, index, total, patchRecords }) {
+  return {
+    index: index + 1,
+    total,
+    commitSha: commit.sha,
+    shortSha: commit.shortSha,
+    subject: commit.subject,
+    message: error.message,
+    appliedRecords: patchRecords.length,
+    priorAppliedPatches: patchRecords
+      .flatMap((record) => record.applications)
+      .filter((application) => application.status === "applied").length,
+    decision: {
+      likelyDocs: decision.likelyDocs,
+      evidenceNote: decision.evidenceNote,
+    },
+  };
 }
 
 function generateDocPatchWithCodex(options, prompt) {
@@ -1347,78 +1381,84 @@ export function generateDocsReport(classifierReport, options) {
   const loadedFixture = options.noCodex ? loadDocPatchFixture(options.repoRoot, options.fixture) : null;
   const patchRecords = [];
   let estimatedPromptTokens = 0;
+  let failure = null;
   for (const [index, decision] of updateDecisions.entries()) {
     const commit = commitBySha.get(decision.commitSha);
     if (!commit) {
       throw new Error(`classifier decision references missing commit: ${decision.commitSha}`);
     }
-    const entry = buildDocPatchEntry({ options, decision, commit });
-    if (!entry.cacheHit) {
-      enforceDocPatchBudgets([entry], options);
-      if (estimatedPromptTokens + entry.promptTokens > options.maxTotalDocPromptTokens) {
-        throw new Error(
-          `doc patch budget exceeded: prompt estimate ${estimatedPromptTokens + entry.promptTokens} tokens exceeds --max-total-doc-prompt-tokens ${options.maxTotalDocPromptTokens}`,
-        );
+    try {
+      const entry = buildDocPatchEntry({ options, decision, commit });
+      if (!entry.cacheHit) {
+        enforceDocPatchBudgets([entry], options);
+        if (estimatedPromptTokens + entry.promptTokens > options.maxTotalDocPromptTokens) {
+          throw new Error(
+            `doc patch budget exceeded: prompt estimate ${estimatedPromptTokens + entry.promptTokens} tokens exceeds --max-total-doc-prompt-tokens ${options.maxTotalDocPromptTokens}`,
+          );
+        }
+        estimatedPromptTokens += entry.promptTokens;
       }
-      estimatedPromptTokens += entry.promptTokens;
-    }
-    const relativeCachePath = repoRelative(options.repoRoot, entry.cachePath);
-    let patchResult;
-    let invocation;
-    if (entry.cacheHit && entry.cached?.rawPatch) {
-      if (!options.noCodex) {
+      const relativeCachePath = repoRelative(options.repoRoot, entry.cachePath);
+      let patchResult;
+      let invocation;
+      if (entry.cacheHit && entry.cached?.rawPatch) {
+        if (!options.noCodex) {
+          console.error(
+            `docdrift: generate-docs ${index + 1}/${updateDecisions.length} ${entry.commit.shortSha} cache=hit reason=${entry.cacheReason}`,
+          );
+        }
+        patchResult = sanitizeDocPatchResult(entry.cached.rawPatch, entry.commit);
+        invocation = {
+          ...entry.cached.codex,
+          cachedFrom: relativeCachePath,
+        };
+      } else if (options.noCodex) {
+        patchResult = sanitizeDocPatchResult(fixtureDocPatchForCommit(loadedFixture.fixture, entry.commit), entry.commit);
+        invocation = {
+          command: null,
+          args: [],
+          mode: "fixture",
+          fixture: loadedFixture.path,
+          promptVersion: docPatchPromptVersion,
+        };
+      } else {
         console.error(
-          `docdrift: generate-docs ${index + 1}/${updateDecisions.length} ${entry.commit.shortSha} cache=hit reason=${entry.cacheReason}`,
+          `docdrift: generate-docs ${index + 1}/${updateDecisions.length} ${entry.commit.shortSha} cache=miss prompt_estimate=${entry.promptTokens} targets=${entry.docTargets.join(",") || "none"}`,
         );
+        const codexResult = generateDocPatchWithCodex(options, entry.prompt);
+        patchResult = sanitizeDocPatchResult(parseJsonObject(codexResult.rawText, `Codex doc patch output for ${entry.commit.shortSha}`), entry.commit);
+        invocation = codexResult.invocation;
       }
-      patchResult = sanitizeDocPatchResult(entry.cached.rawPatch, entry.commit);
-      invocation = {
-        ...entry.cached.codex,
-        cachedFrom: relativeCachePath,
+      const applications = applyDocPatches(options.repoRoot, patchResult.patches);
+      const record = buildDocPatchRecord({
+        commit: entry.commit,
+        decision: entry.decision,
+        docTargets: entry.docTargets,
+        docTargetSource: entry.docTargetSource,
+        docSections: entry.docSections,
+        patchResult,
+        promptHash: entry.promptHash,
+        promptTokens: entry.promptTokens,
+        cachePath: relativeCachePath,
+        cacheHit: entry.cacheHit,
+        cacheReason: entry.cacheReason,
+        invocation,
+        applications,
+      });
+      const cacheRecord = {
+        ...record,
+        rawPatch: patchResult,
+        cache: {
+          ...record.cache,
+          hit: false,
+        },
       };
-    } else if (options.noCodex) {
-      patchResult = sanitizeDocPatchResult(fixtureDocPatchForCommit(loadedFixture.fixture, entry.commit), entry.commit);
-      invocation = {
-        command: null,
-        args: [],
-        mode: "fixture",
-        fixture: loadedFixture.path,
-        promptVersion: docPatchPromptVersion,
-      };
-    } else {
-      console.error(
-        `docdrift: generate-docs ${index + 1}/${updateDecisions.length} ${entry.commit.shortSha} cache=miss prompt_estimate=${entry.promptTokens} targets=${entry.docTargets.join(",") || "none"}`,
-      );
-      const codexResult = generateDocPatchWithCodex(options, entry.prompt);
-      patchResult = sanitizeDocPatchResult(parseJsonObject(codexResult.rawText, `Codex doc patch output for ${entry.commit.shortSha}`), entry.commit);
-      invocation = codexResult.invocation;
+      writeCachedClassifierRecord(entry.cachePath, cacheRecord);
+      patchRecords.push(record);
+    } catch (error) {
+      failure = docPatchFailure({ error, decision, commit, index, total: updateDecisions.length, patchRecords });
+      break;
     }
-    const applications = applyDocPatches(options.repoRoot, patchResult.patches);
-    const record = buildDocPatchRecord({
-      commit: entry.commit,
-      decision: entry.decision,
-      docTargets: entry.docTargets,
-      docTargetSource: entry.docTargetSource,
-      docSections: entry.docSections,
-      patchResult,
-      promptHash: entry.promptHash,
-      promptTokens: entry.promptTokens,
-      cachePath: relativeCachePath,
-      cacheHit: entry.cacheHit,
-      cacheReason: entry.cacheReason,
-      invocation,
-      applications,
-    });
-    const cacheRecord = {
-      ...record,
-      rawPatch: patchResult,
-      cache: {
-        ...record.cache,
-        hit: false,
-      },
-    };
-    writeCachedClassifierRecord(entry.cachePath, cacheRecord);
-    patchRecords.push(record);
   }
 
   const applied = patchRecords.flatMap((record) => record.applications).filter((app) => app.status === "applied").length;
@@ -1433,6 +1473,8 @@ export function generateDocsReport(classifierReport, options) {
       cacheDir: repoRelative(options.repoRoot, cacheRoot),
       noCodex: options.noCodex,
       fixture: loadedFixture?.path ?? null,
+      partial: Boolean(failure),
+      failure,
       budget: {
         maxDocPromptTokens: options.maxDocPromptTokens,
         maxTotalDocPromptTokens: options.maxTotalDocPromptTokens,
@@ -1446,6 +1488,7 @@ export function generateDocsReport(classifierReport, options) {
         applied,
         alreadyApplied,
         cacheHits: patchRecords.filter((record) => record.cache.hit).length,
+        failed: Boolean(failure),
       },
     },
   };
@@ -1609,6 +1652,7 @@ function ensureSweepWorktree(options, lifecycle, headSha) {
 }
 
 function writeFullPrBody(operatorRepoRoot, runDir, report) {
+  const failure = report.docPatch?.failure;
   const bodyPath = path.join(runDir, "docdrift-pr-body.md");
   const lines = [
     "## Documentation Drift Sweep",
@@ -1618,10 +1662,16 @@ function writeFullPrBody(operatorRepoRoot, runDir, report) {
     `- Report: ${repoRelative(operatorRepoRoot, path.join(runDir, "docdrift-generate.json"))}`,
     `- Update-docs decisions: ${report.docPatch?.summary?.updateDocsDecisions ?? 0}`,
     `- Applied patches: ${report.docPatch?.summary?.applied ?? 0}`,
+    `- Partial run: ${report.docPatch?.partial ? "yes" : "no"}`,
     "",
-    "The local checkpoint is advanced only after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`.",
+    report.docPatch?.partial
+      ? "The local checkpoint is advanced only to the last source commit before the failed doc-patch commit after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`."
+      : "The local checkpoint is advanced only after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`.",
     "",
   ];
+  if (failure) {
+    lines.push("## Partial Failure", "", `- Failed commit: ${failure.shortSha} ${failure.subject}`, `- Error: ${failure.message}`, "");
+  }
   writeFileSync(bodyPath, lines.join("\n"));
   return bodyPath;
 }
@@ -1638,7 +1688,26 @@ function parseAgentPrOutput(output) {
 }
 
 function checkpointAdvanceTarget(report, sweepHeadSha) {
+  const partialTarget = partialCheckpointTarget(report);
+  if (partialTarget) {
+    return partialTarget;
+  }
+  if (report.docPatch?.partial) {
+    return null;
+  }
   return sweepHeadSha || report.head.sha;
+}
+
+function partialCheckpointTarget(report) {
+  const failedSha = report.docPatch?.failure?.commitSha;
+  if (!failedSha) {
+    return null;
+  }
+  const failedIndex = report.commits.findIndex((commit) => commit.sha === failedSha);
+  if (failedIndex <= 0) {
+    return null;
+  }
+  return report.commits[failedIndex - 1].sha;
 }
 
 function fullReport({ options, runId, runDir, lifecycle, collectionReport, generatedReport, action, checkpointAfter, pr, sweepHeadSha }) {
@@ -1802,7 +1871,8 @@ export function runFullSweep(options) {
 
   const docsDirt = statusShort(worktreePath, ["docs/design", "docs/context"]);
   if (!docsDirt) {
-    const checkpointPath = writeCheckpointAtomic(options.repoRoot, options.checkpointFile, generatedReport.head.sha);
+    const checkpointSha = checkpointAdvanceTarget(generatedReport, null);
+    const checkpointPath = checkpointSha ? writeCheckpointAtomic(options.repoRoot, options.checkpointFile, checkpointSha) : null;
     const report = fullReport({
       options,
       runId,
@@ -1810,8 +1880,12 @@ export function runFullSweep(options) {
       lifecycle,
       collectionReport,
       generatedReport,
-      action: "noop_no_doc_changes",
-      checkpointAfter: { path: checkpointPath, sha: generatedReport.head.sha },
+      action: generatedReport.docPatch?.partial
+        ? checkpointSha
+          ? "partial_failure_no_doc_changes_checkpoint_advanced"
+          : "partial_failure_no_doc_changes_checkpoint_unchanged"
+        : "noop_no_doc_changes",
+      checkpointAfter: checkpointSha ? { path: checkpointPath, sha: checkpointSha } : null,
       pr: null,
       sweepHeadSha: null,
     });
@@ -1823,9 +1897,17 @@ export function runFullSweep(options) {
   runLifecycleCommand(lifecycle, worktreePath, "commit docs changes", "git", [
     "commit",
     "-m",
-    "Sweep documentation drift",
+    generatedReport.docPatch?.partial ? "Sweep documentation drift partial prefix" : "Sweep documentation drift",
     "-m",
-    `Generated docs updates for ${generatedReport.base.sha.slice(0, 12)}..${generatedReport.head.sha.slice(0, 12)}.\n\nReport: ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
+    [
+      `Generated docs updates for ${generatedReport.base.sha.slice(0, 12)}..${(checkpointAdvanceTarget(generatedReport, null) ?? generatedReport.head.sha).slice(0, 12)}.`,
+      generatedReport.docPatch?.partial
+        ? `Partial sweep stopped at ${generatedReport.docPatch.failure.shortSha}: ${generatedReport.docPatch.failure.message}`
+        : null,
+      `Report: ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
   ]);
   const sweepHeadSha = git(worktreePath, ["rev-parse", "HEAD"]);
   runLifecycleCommand(lifecycle, worktreePath, "push sweep branch", "git", ["push", "-u", "origin", options.sweepBranch]);
@@ -1843,7 +1925,7 @@ export function runFullSweep(options) {
   runLifecycleCommand(lifecycle, worktreePath, "wait for PR merge", path.join(worktreePath, "scripts", "wait-pr.sh"), [String(pr.number)]);
 
   const checkpointSha = checkpointAdvanceTarget(generatedReport, sweepHeadSha);
-  const checkpointPath = writeCheckpointAtomic(options.repoRoot, options.checkpointFile, checkpointSha);
+  const checkpointPath = checkpointSha ? writeCheckpointAtomic(options.repoRoot, options.checkpointFile, checkpointSha) : null;
   const report = fullReport({
     options,
     runId,
@@ -1851,8 +1933,12 @@ export function runFullSweep(options) {
     lifecycle,
     collectionReport,
     generatedReport,
-    action: "pr_merged_checkpoint_advanced",
-    checkpointAfter: { path: checkpointPath, sha: checkpointSha },
+    action: generatedReport.docPatch?.partial
+      ? checkpointSha
+        ? "partial_pr_merged_checkpoint_advanced"
+        : "partial_pr_merged_checkpoint_unchanged"
+      : "pr_merged_checkpoint_advanced",
+    checkpointAfter: checkpointSha ? { path: checkpointPath, sha: checkpointSha } : null,
     pr,
     sweepHeadSha,
   });
@@ -2037,8 +2123,21 @@ function renderGenerateDocsMarkdown(report) {
     `- Already applied patches: ${report.docPatch.summary.alreadyApplied}`,
     `- Doc patch cache hits: ${report.docPatch.summary.cacheHits}`,
     `- Estimated doc patch prompt tokens: ${report.docPatch.budget.estimatedPromptTokens}`,
+    `- Partial failure: ${report.docPatch.partial ? "yes" : "no"}`,
     "",
   ];
+
+  if (report.docPatch.failure) {
+    lines.push(
+      "## Partial Failure",
+      "",
+      `- Failed decision: ${report.docPatch.failure.index}/${report.docPatch.failure.total}`,
+      `- Failed commit: ${report.docPatch.failure.shortSha} ${report.docPatch.failure.subject}`,
+      `- Successful records before failure: ${report.docPatch.failure.appliedRecords}`,
+      `- Error: ${report.docPatch.failure.message}`,
+      "",
+    );
+  }
 
   if (report.docPatch.summary.patchRecords === 0) {
     lines.push("No update_docs decisions produced documentation patches.", "");
@@ -2155,6 +2254,9 @@ function main() {
       console.log(JSON.stringify(report, null, 2));
     } else {
       process.stdout.write(renderMarkdown(report));
+    }
+    if (report.docPatch?.partial) {
+      process.exitCode = 1;
     }
   } catch (error) {
     console.error(`docdrift sweep failed: ${error.message}`);
