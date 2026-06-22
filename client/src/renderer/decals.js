@@ -1,4 +1,5 @@
 import { STATS } from "../config.js";
+import { KIND } from "../protocol.js";
 import {
   canLoadGroundDecalAtlas,
   GROUND_DECAL_ATLAS_STATUS,
@@ -19,6 +20,11 @@ const SCORCH_DARK = 0x070706;
 const SCORCH_ASH = 0x181816;
 const VEHICLE_SCORCH_MASK_LENGTH = 62;
 const VEHICLE_SCORCH_MASK_WIDTH = 38;
+const TANK_SCORCH_SCALE_X = 1.18;
+const TANK_SCORCH_SCALE_Y = 1.03;
+const TANK_SCORCH_OPACITY_SCALE = 1.28;
+const TANK_ASH_OPACITY_SCALE = 1.45;
+const TANK_PAINT_OPACITY_SCALE = 1.35;
 
 export class GroundDecalLayer {
   constructor({
@@ -285,24 +291,39 @@ function stampAuthoredGroundDecal(ctx, decal, atlas, downsample, tintScratch) {
   if (!scorch) return false;
   const paint = atlas.vehiclePaint?.[plan.paintVariantIndex];
   const bodyScale = vehicleBodyScale(decal.kind);
+  const opacityScale = vehicleScorchOpacityScale(decal.kind);
+  if (decal.kind === KIND.TANK) {
+    drawTintedMask(ctx, tintScratch, scorch, SCORCH_DARK, x, y, downsample, {
+      rotation: plan.rotation,
+      scaleX: plan.scale * bodyScale.x * 1.14 * plan.flipX,
+      scaleY: plan.scale * bodyScale.y * 1.14 * plan.flipY,
+      opacity: 0.12,
+    });
+    drawTintedMask(ctx, tintScratch, scorch, SCORCH_DARK, x, y, downsample, {
+      rotation: plan.rotation,
+      scaleX: plan.scale * bodyScale.x * 1.07 * plan.flipX,
+      scaleY: plan.scale * bodyScale.y * 1.07 * plan.flipY,
+      opacity: 0.18,
+    });
+  }
   drawTintedMask(ctx, tintScratch, scorch, SCORCH_DARK, x, y, downsample, {
     rotation: plan.rotation,
     scaleX: plan.scale * bodyScale.x * plan.flipX,
     scaleY: plan.scale * bodyScale.y * plan.flipY,
-    opacity: plan.scorchOpacity,
+    opacity: clamp(plan.scorchOpacity * opacityScale.scorch, 0, 0.86),
   });
   drawTintedMask(ctx, tintScratch, scorch, SCORCH_ASH, x, y, downsample, {
     rotation: plan.rotation,
     scaleX: plan.scale * bodyScale.x * 0.66 * plan.flipX,
     scaleY: plan.scale * bodyScale.y * 0.66 * plan.flipY,
-    opacity: plan.ashOpacity,
+    opacity: clamp(plan.ashOpacity * opacityScale.ash, 0, 0.2),
   });
   if (paint) {
     drawTintedMask(ctx, tintScratch, paint, plan.color, x, y, downsample, {
       rotation: plan.rotation,
       scaleX: plan.scale * bodyScale.x * plan.flipX,
       scaleY: plan.scale * bodyScale.y * plan.flipY,
-      opacity: plan.paintOpacity,
+      opacity: clamp(plan.paintOpacity * opacityScale.paint, 0, 0.32),
     });
   }
   return true;
@@ -382,9 +403,30 @@ function vehicleBodyScale(kind) {
   const body = stat.body || {};
   const length = Math.max(22, body.length || (stat.size || 16) * 2.4);
   const width = Math.max(12, body.width || (stat.size || 16) * 1.25);
+  if (kind === KIND.TANK) {
+    return {
+      x: TANK_SCORCH_SCALE_X,
+      y: TANK_SCORCH_SCALE_Y,
+    };
+  }
   return {
     x: clamp(length / VEHICLE_SCORCH_MASK_LENGTH, 0.56, 1.08),
     y: clamp(width / VEHICLE_SCORCH_MASK_WIDTH, 0.48, 0.98),
+  };
+}
+
+function vehicleScorchOpacityScale(kind) {
+  if (kind === KIND.TANK) {
+    return {
+      scorch: TANK_SCORCH_OPACITY_SCALE,
+      ash: TANK_ASH_OPACITY_SCALE,
+      paint: TANK_PAINT_OPACITY_SCALE,
+    };
+  }
+  return {
+    scorch: 1,
+    ash: 1,
+    paint: 1,
   };
 }
 
@@ -407,18 +449,29 @@ function stampScorch(ctx, decal, rng, downsample) {
   const color = normalizeColorNumber(decal.color);
   const stat = STATS[decal.kind] || {};
   const body = stat.body || {};
-  const length = Math.max(22, body.length || (stat.size || 16) * 2.4) / downsample;
-  const width = Math.max(12, body.width || (stat.size || 16) * 1.25) / downsample;
+  const isTank = decal.kind === KIND.TANK;
+  const lengthScale = isTank ? 1.65 : 1;
+  const widthScale = isTank ? 1.38 : 1;
+  const length = Math.max(22, body.length || (stat.size || 16) * 2.4) * lengthScale / downsample;
+  const width = Math.max(12, body.width || (stat.size || 16) * 1.25) * widthScale / downsample;
   const char = 0.8 + rng() * 0.16;
-  ctx.fillStyle = rgba(0x070706, 0.36);
+  if (isTank) {
+    ctx.fillStyle = rgba(0x070706, 0.12);
+    irregularHullPath(ctx, length * char * 1.14, width * 1.14 * (0.9 + rng() * 0.18), rng);
+    ctx.fill();
+    ctx.fillStyle = rgba(0x070706, 0.18);
+    irregularHullPath(ctx, length * char * 1.07, width * 1.07 * (0.9 + rng() * 0.18), rng);
+    ctx.fill();
+  }
+  ctx.fillStyle = rgba(0x070706, isTank ? 0.5 : 0.36);
   irregularHullPath(ctx, length * char, width * (0.9 + rng() * 0.18), rng);
   ctx.fill();
-  ctx.fillStyle = rgba(0x181816, 0.14);
+  ctx.fillStyle = rgba(0x181816, isTank ? 0.2 : 0.14);
   irregularHullPath(ctx, length * 0.76, width * 0.7, rng);
   ctx.fill();
 
   const chips = 2 + (decal.variant % 3);
-  ctx.fillStyle = rgba(color, 0.22);
+  ctx.fillStyle = rgba(color, isTank ? 0.3 : 0.22);
   for (let i = 0; i < chips; i += 1) {
     const px = (-length * 0.35) + rng() * length * 0.7;
     const py = (-width * 0.32) + rng() * width * 0.64;
