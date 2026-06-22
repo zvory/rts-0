@@ -22,10 +22,12 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/crates/rules/src/` and `server/crates/sim/src/rules/projection.rs` — declarative rules
   and fog-gated projection policy.
 - `server/crates/ai/src/` — AI opponents and self-play harnesses.
-- `server/src/lobby/room_task.rs`, `session_policy.rs`, `participants.rs`, `tick_control.rs`, and
-  `lab_timeline.rs` —
-  room ownership, lifecycle policy, public lobby-browser summaries, persistence/export policy,
-  seat/issuer resolution, clocking, and room-local lab rewind recording/rebuild.
+- `server/src/lobby/room_task.rs` plus `room_task/{types,lobby,live,lab,dev,replay,branch,lifecycle,helpers}.rs` —
+  the single room actor, room-owned state/types, event dispatch, mode-specific room handlers,
+  start/end/reset bookkeeping, public lobby-browser summaries, and room-local send helpers.
+- `server/src/lobby/session_policy.rs`, `participants.rs`, `tick_control.rs`, and
+  `lab_timeline.rs` — lifecycle policy, seat/issuer resolution, room-time scheduling, and
+  room-local lab rewind recording/rebuild.
 - `server/src/lobby/projection.rs`, `snapshot_fanout.rs`, and `snapshots.rs` — per-recipient
   visibility, fanout, compacting, and diagnostic snapshot options such as movement-path inclusion.
 - `server/src/lobby/launch.rs`, `live_tick.rs`, `replay_session.rs`, `replay_branch.rs`,
@@ -33,8 +35,10 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   capabilities, live/replay/branch execution, connection delivery, dev replay loading, and panic
   artifacts.
 - `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deployment drain coordination.
-- Guardrails: `scripts/check-lobby-architecture.mjs`, `scripts/check-crate-boundaries.mjs`, and
-  `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`.
+- Guardrails: `scripts/check-lobby-architecture.mjs` enforces lobby snapshot/lab mutation
+  boundaries plus explicit room-task file-size budgets; `scripts/check-crate-boundaries.mjs` and
+  `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`
+  enforce crate and sim architecture boundaries.
 
 ## Invariants
 - `Game::tick()` is panic-free: no `unwrap`/`expect`/unchecked indexing; stale ids are no-ops; use
