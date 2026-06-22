@@ -1923,6 +1923,15 @@ input[type="text"]:focus {
   font-size: 12px;
   padding: 4px 6px;
 }
+.lab-field input[type="checkbox"] {
+  justify-self: start;
+  min-width: 16px;
+  min-height: 16px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  accent-color: var(--accent);
+}
 .lab-spawn-palette {
   grid-column: 1 / -1;
   display: grid;

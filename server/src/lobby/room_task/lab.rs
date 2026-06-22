@@ -117,23 +117,29 @@ impl LabSession {
         self.set_vision_for(player_id, vision);
     }
 
-    pub(super) fn metadata_for(&self, player_id: u32) -> LabStartMetadata {
+    pub(super) fn metadata_for(
+        &self,
+        player_id: u32,
+        god_mode_players: Vec<u32>,
+    ) -> LabStartMetadata {
         LabStartMetadata {
             room: self.public_id.clone(),
             operator_id: self.operator_id,
             role: self.role_for(player_id),
             vision: self.vision_for(player_id),
+            god_mode_players,
             dirty: self.dirty,
             operation_count: self.operation_log.len() as u32,
         }
     }
 
-    pub(super) fn state_for(&self, player_id: u32) -> LabState {
+    pub(super) fn state_for(&self, player_id: u32, god_mode_players: Vec<u32>) -> LabState {
         LabState {
             room: self.public_id.clone(),
             operator_id: self.operator_id,
             role: self.role_for(player_id),
             vision: self.vision_for(player_id),
+            god_mode_players,
             dirty: self.dirty,
             operation_count: self.operation_log.len() as u32,
         }
@@ -159,6 +165,7 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
         LabClientOp::MoveEntity { .. } => "moveEntity",
         LabClientOp::SetEntityOwner { .. } => "setEntityOwner",
         LabClientOp::SetPlayerResources { .. } => "setPlayerResources",
+        LabClientOp::SetPlayerGodMode { .. } => "setPlayerGodMode",
         LabClientOp::SetCompletedResearch { .. } => "setCompletedResearch",
         LabClientOp::SetVision { .. } => "setVision",
         LabClientOp::IssueCommandAs { .. } => "issueCommandAs",
@@ -212,6 +219,9 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
             steel,
             oil,
         })),
+        LabClientOp::SetPlayerGodMode { player_id, enabled } => {
+            Ok(LabOp::SetPlayerGodMode { player_id, enabled })
+        }
         LabClientOp::SetCompletedResearch {
             player_id,
             upgrade,
@@ -365,6 +375,9 @@ fn lab_outcome_json(outcome: &LabOpOutcome) -> serde_json::Value {
             steel,
             oil,
         } => serde_json::json!({ "playerId": player_id, "steel": steel, "oil": oil }),
+        LabOpOutcome::PlayerGodModeSet { player_id, enabled } => {
+            serde_json::json!({ "playerId": player_id, "enabled": enabled })
+        }
         LabOpOutcome::CompletedResearchSet {
             player_id,
             upgrade,
@@ -707,9 +720,13 @@ impl RoomTask {
     }
 
     fn lab_start_metadata_for(&self, player_id: u32) -> Option<LabStartMetadata> {
+        let god_mode_players = self
+            .live_game()
+            .map(Game::lab_god_mode_players)
+            .unwrap_or_default();
         self.lab_session
             .as_ref()
-            .map(|session| session.metadata_for(player_id))
+            .map(|session| session.metadata_for(player_id, god_mode_players))
     }
 
     pub(super) fn lab_snapshot_projections(
@@ -1182,15 +1199,20 @@ impl RoomTask {
         let Some(session) = &self.lab_session else {
             return;
         };
+        let god_mode_players = self
+            .live_game()
+            .map(Game::lab_god_mode_players)
+            .unwrap_or_default();
         for &id in &self.order {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
+            let state = session.state_for(id, god_mode_players.clone());
             send_or_log(
                 &self.room,
                 id,
                 &player.msg_tx,
-                ServerMessage::LabState(session.state_for(id)),
+                ServerMessage::LabState(state),
             );
         }
     }

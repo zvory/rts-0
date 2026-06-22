@@ -7,7 +7,7 @@ import {
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
 } from "../../client/src/config.js";
-import { commandWithinBudget } from "../../client/src/command_budget.js";
+import { admitSelectionIds, commandWithinBudget } from "../../client/src/command_budget.js";
 import {
   KIND,
   STATE,
@@ -66,6 +66,29 @@ import {
       cmd.stop(legalInfantry.map((entity) => entity.id)),
     ).ok,
     "client command guard allows 24 one-supply units",
+  );
+
+  const labLimited = {
+    ...budgetState(tanks),
+    controlPolicy: {
+      kind: "lab",
+      unlimitedSelectionEnabled: () => false,
+    },
+  };
+  const labUnlimited = {
+    ...budgetState(tanks),
+    controlPolicy: {
+      kind: "lab",
+      unlimitedSelectionEnabled: () => true,
+    },
+  };
+  assert(
+    admitSelectionIds(labLimited, tanks.map((tank) => tank.id)).ids.length === 3,
+    "lab selection respects command supply when unlimited selection is disabled",
+  );
+  assert(
+    admitSelectionIds(labUnlimited, tanks.map((tank) => tank.id)).ids.length === tanks.length,
+    "lab selection admits every candidate when unlimited selection is enabled",
   );
 }
 

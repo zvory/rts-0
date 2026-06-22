@@ -186,6 +186,8 @@ pub struct LabStartMetadata {
     pub operator_id: u32,
     pub role: LabStartRole,
     pub vision: LabVisionMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub god_mode_players: Vec<u32>,
     pub dirty: bool,
     pub operation_count: u32,
 }

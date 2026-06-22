@@ -5,8 +5,15 @@ export function createLabControlPolicy({ labClient = null, metadata = null } = {
     kind: "lab",
     labClient,
     metadata,
+    unlimitedSelection: true,
     isOperator() {
       return currentRole(policy) === LAB_ROLE.OPERATOR;
+    },
+    unlimitedSelectionEnabled() {
+      return !!policy.unlimitedSelection;
+    },
+    setUnlimitedSelection(enabled) {
+      policy.unlimitedSelection = !!enabled;
     },
     canInspectEntity(entity) {
       return !!entity && Number(entity.owner) !== 0 && !entity.shotReveal && !entity.visionOnly;
@@ -113,6 +120,10 @@ export function createDefaultControlPolicy() {
     issueAsOwnerForSelection() {
       return null;
     },
+    unlimitedSelectionEnabled() {
+      return false;
+    },
+    setUnlimitedSelection() {},
     canControlOwner(owner, state = null) {
       return typeof state?.isOwnOwner === "function"
         ? state.isOwnOwner(owner)
