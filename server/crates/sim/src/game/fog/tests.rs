@@ -36,6 +36,35 @@ fn stone_blocks_authoritative_fog_behind_it() {
 }
 
 #[test]
+fn building_sight_reveals_footprint_and_one_tile_perimeter() {
+    let map = open_map(8);
+    let mut entities = EntityStore::new();
+    let center = map.tile_center(3, 3);
+    entities
+        .spawn_building(1, EntityKind::Barracks, center.0, center.1, true)
+        .expect("barracks should spawn");
+    let mut fog = Fog::new(map.size);
+
+    fog.recompute(&[1], &entities, &map);
+
+    for ty in 2..=3 {
+        for tx in 2..=4 {
+            assert!(fog.is_visible(1, tx, ty), "footprint tile ({tx},{ty})");
+        }
+    }
+    for ty in 1..=4 {
+        for tx in 1..=5 {
+            assert!(
+                fog.is_visible(1, tx, ty),
+                "one-tile perimeter tile ({tx},{ty})"
+            );
+        }
+    }
+    assert!(!fog.is_visible(1, 0, 1));
+    assert!(!fog.is_visible(1, 6, 4));
+}
+
+#[test]
 fn smoke_blocks_authoritative_fog_behind_it_but_reveals_cloud_edge() {
     let map = map_with_rock_at((7, 7));
     let mut entities = EntityStore::new();
@@ -57,7 +86,7 @@ fn smoke_blocks_authoritative_fog_behind_it_but_reveals_cloud_edge() {
 }
 
 #[test]
-fn owned_building_blocks_authoritative_fog_behind_it() {
+fn owned_building_blocks_authoritative_fog_beyond_edge_sight() {
     let map = open_map(10);
     let mut entities = EntityStore::new();
     let origin = map.tile_center(1, 3);
@@ -78,8 +107,12 @@ fn owned_building_blocks_authoritative_fog_behind_it() {
         "the visible building face should reveal the building footprint"
     );
     assert!(
-        !fog.is_visible(1, 5, 3),
-        "owned buildings should occlude the tile directly behind their footprint"
+        fog.is_visible(1, 5, 3),
+        "owned buildings should reveal one tile past their footprint edge"
+    );
+    assert!(
+        !fog.is_visible(1, 6, 3),
+        "owned buildings should still occlude tiles beyond their edge sight"
     );
 }
 

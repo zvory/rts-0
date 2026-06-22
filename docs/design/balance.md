@@ -359,7 +359,9 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 300 | 0   | 0     | 0  | 2.0   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; regenerates 1 HP/s |
 
-Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
+Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
+outward from the footprint edge, not from only the building center, so sight 1 reveals the full
+footprint plus a one-tile perimeter around it:
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|

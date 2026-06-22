@@ -2,10 +2,11 @@
 //!
 //! The server is authoritative about visibility: each tick we recompute, for every player, a
 //! boolean grid of which tiles that player can currently see. A tile is visible if it falls
-//! within the sight circle of any of that player's entities (`sight_tiles`) and the line from
+//! within the sight area of any of that player's entities (`sight_tiles`) and the line from
 //! the entity to that tile is not blocked by stone, smoke, or non-Tank-Trap building footprints.
-//! The snapshot layer uses this to withhold neutral/enemy entities standing on non-visible tiles,
-//! making the fog cheat-proof.
+//! Units stamp a circle from their body center; buildings stamp their full footprint plus
+//! `sight_tiles` around the footprint edge. The snapshot layer uses this to withhold neutral/enemy
+//! entities standing on non-visible tiles, making the fog cheat-proof.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
@@ -134,11 +135,7 @@ impl Fog {
             let Some(grid) = self.grids.get_mut(&e.owner) else {
                 continue;
             };
-            if static_blocker_class(e.kind) == StaticBlockerClass::AllGround {
-                stamp_building_footprint(grid, size, map, e);
-                continue;
-            }
-            stamp_sight(grid, size, e, &los);
+            stamp_sight(grid, size, e, map, &los);
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
@@ -250,15 +247,44 @@ impl Fog {
     }
 }
 
-/// Mark every tile within an entity's sight radius (a filled circle in tile space) as visible.
-fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, los: &LineOfSight<'_>) {
+/// Mark every tile within an entity's sight area as visible.
+fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, map: &Map, los: &LineOfSight<'_>) {
+    if e.is_building() {
+        stamp_building_sight(grid, size, e, map, los);
+        return;
+    }
     stamp_sight_at(grid, size, e.pos_x, e.pos_y, e.sight_tiles(), los);
 }
 
-fn stamp_building_footprint(grid: &mut [bool], size: u32, map: &Map, entity: &Entity) {
-    for (tx, ty) in building_footprint(map, entity) {
-        if tx < size && ty < size {
-            grid[(ty * size + tx) as usize] = true;
+fn stamp_building_sight(
+    grid: &mut [bool],
+    size: u32,
+    e: &Entity,
+    map: &Map,
+    los: &LineOfSight<'_>,
+) {
+    let r = e.sight_tiles() as i32;
+    if r <= 0 {
+        return;
+    }
+    let footprint = building_footprint(map, e);
+    for (origin_tx, origin_ty) in footprint {
+        if origin_tx >= size || origin_ty >= size {
+            continue;
+        }
+        let origin = map.tile_center(origin_tx, origin_ty);
+        for dy in -r..=r {
+            for dx in -r..=r {
+                let tx = origin_tx as i32 + dx;
+                let ty = origin_ty as i32 + dy;
+                if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
+                    continue;
+                }
+                if !los.tile_visible_from_world(origin, (tx as u32, ty as u32)) {
+                    continue;
+                }
+                grid[(ty as u32 * size + tx as u32) as usize] = true;
+            }
         }
     }
 }

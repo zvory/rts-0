@@ -8,7 +8,7 @@ import {
 } from "./assertions.mjs";
 import { Camera } from "../../client/src/camera.js";
 import { Fog } from "../../client/src/fog.js";
-import { TERRAIN } from "../../client/src/protocol.js";
+import { KIND, TERRAIN } from "../../client/src/protocol.js";
 
 // Camera
 // ---------------------------------------------------------------------------
@@ -101,6 +101,36 @@ import { TERRAIN } from "../../client/src/protocol.js";
   );
   assert(blockedFog.isVisible(3, 2) === true, "stone tile itself should be visible");
   assert(blockedFog.isVisible(4, 2) === false, "stone should block fog behind it");
+
+  const barracksFog = new Fog(8, 8);
+  barracksFog.update(
+    [{ kind: KIND.BARRACKS, x: 112, y: 112 }], // center of tile (3,3) at ts=32
+    32,
+  );
+  for (let ty = 2; ty <= 3; ty++) {
+    for (let tx = 2; tx <= 4; tx++) {
+      assert(
+        barracksFog.isVisible(tx, ty) === true,
+        `barracks footprint tile (${tx},${ty})`,
+      );
+    }
+  }
+  for (let ty = 1; ty <= 4; ty++) {
+    for (let tx = 1; tx <= 5; tx++) {
+      assert(
+        barracksFog.isVisible(tx, ty) === true,
+        `barracks perimeter tile (${tx},${ty})`,
+      );
+    }
+  }
+  assert(
+    barracksFog.isVisible(0, 1) === false,
+    "barracks sight should stop beyond west perimeter",
+  );
+  assert(
+    barracksFog.isVisible(6, 4) === false,
+    "barracks sight should stop beyond east perimeter",
+  );
 }
 
 // ---------------------------------------------------------------------------
