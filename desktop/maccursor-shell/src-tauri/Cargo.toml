@@ -1,0 +1,18 @@
+[package]
+name = "maccursor-shell"
+version = "0.1.0"
+edition = "2021"
+description = "Local macOS Tauri shell spike for Bewegungskrieg native cursor work"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.3", features = [] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
