@@ -16,6 +16,13 @@ pub(crate) struct LineOfSight<'a> {
     building_blockers: Option<&'a [bool]>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RaycastStep {
+    Clear,
+    ReachedTarget,
+    Blocked,
+}
+
 impl<'a> LineOfSight<'a> {
     pub(crate) fn new(map: &'a Map) -> Self {
         LineOfSight {
@@ -137,28 +144,38 @@ impl<'a> LineOfSight<'a> {
             if t_max_x < t_max_y {
                 tx += step_x;
                 t_max_x += t_delta_x;
-                if self.blocks_step((tx, ty), target, allow_opaque_target) {
-                    return false;
+                match self.trace_step((tx, ty), target, allow_opaque_target) {
+                    RaycastStep::Clear => {}
+                    RaycastStep::ReachedTarget => return true,
+                    RaycastStep::Blocked => return false,
                 }
             } else if t_max_y < t_max_x {
                 ty += step_y;
                 t_max_y += t_delta_y;
-                if self.blocks_step((tx, ty), target, allow_opaque_target) {
-                    return false;
+                match self.trace_step((tx, ty), target, allow_opaque_target) {
+                    RaycastStep::Clear => {}
+                    RaycastStep::ReachedTarget => return true,
+                    RaycastStep::Blocked => return false,
                 }
             } else {
                 let next_tx = tx + step_x;
                 let next_ty = ty + step_y;
-                if self.blocks_step((next_tx, ty), target, allow_opaque_target) {
-                    return false;
+                match self.trace_step((next_tx, ty), target, allow_opaque_target) {
+                    RaycastStep::Clear => {}
+                    RaycastStep::ReachedTarget => return true,
+                    RaycastStep::Blocked => return false,
                 }
-                if self.blocks_step((tx, next_ty), target, allow_opaque_target) {
-                    return false;
+                match self.trace_step((tx, next_ty), target, allow_opaque_target) {
+                    RaycastStep::Clear => {}
+                    RaycastStep::ReachedTarget => return true,
+                    RaycastStep::Blocked => return false,
                 }
                 tx = next_tx;
                 ty = next_ty;
-                if self.blocks_step((tx, ty), target, allow_opaque_target) {
-                    return false;
+                match self.trace_step((tx, ty), target, allow_opaque_target) {
+                    RaycastStep::Clear => {}
+                    RaycastStep::ReachedTarget => return true,
+                    RaycastStep::Blocked => return false,
                 }
                 t_max_x += t_delta_x;
                 t_max_y += t_delta_y;
@@ -168,15 +185,27 @@ impl<'a> LineOfSight<'a> {
         true
     }
 
-    fn blocks_step(&self, tile: (i32, i32), target: (u32, u32), allow_opaque_target: bool) -> bool {
+    fn trace_step(
+        &self,
+        tile: (i32, i32),
+        target: (u32, u32),
+        allow_opaque_target: bool,
+    ) -> RaycastStep {
         if !self.map.in_bounds(tile.0, tile.1) {
-            return true;
+            return RaycastStep::Blocked;
         }
         let current = (tile.0 as u32, tile.1 as u32);
-        if allow_opaque_target && current == target {
-            return false;
+        if current == target {
+            if allow_opaque_target || !self.tile_blocks(current) {
+                RaycastStep::ReachedTarget
+            } else {
+                RaycastStep::Blocked
+            }
+        } else if self.tile_blocks(current) {
+            RaycastStep::Blocked
+        } else {
+            RaycastStep::Clear
         }
-        self.tile_blocks(current)
     }
 
     fn tile_blocks(&self, tile: (u32, u32)) -> bool {
@@ -226,6 +255,15 @@ mod tests {
         }
     }
 
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![wire_terrain::GRASS; (size * size) as usize],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
     #[test]
     fn stone_blocks_world_point_line_of_sight() {
         let map = map_with_rock_at((3, 2));
@@ -260,5 +298,14 @@ mod tests {
         let los = LineOfSight::new(&map);
 
         assert!(!los.clear_between_world_points(map.tile_center(2, 2), map.tile_center(3, 3),));
+    }
+
+    #[test]
+    fn grid_corner_target_near_map_edge_does_not_step_past_endpoint() {
+        let map = flat_map(126);
+        let los = LineOfSight::new(&map);
+
+        assert!(los.clear_between_world_points((213.959, 3941.309), (32.0, 3968.0)));
+        assert!(los.clear_between_world_points((213.959, 3941.309), (160.0, 4000.0)));
     }
 }
