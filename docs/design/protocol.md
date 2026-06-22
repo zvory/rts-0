@@ -6,8 +6,8 @@ the same WebSocket. Field names are short but readable. Coordinates are **world 
 unless a field name ends in `Tile`. The canonical Rust definitions live in
 `server/crates/protocol/src/lib.rs`; the server-shell `server/src/protocol.rs` is an adapter for
 typed entity-kind conversion and legacy imports. The browser mirror lives in `client/src/protocol.js`
-(builders + constants). Rust and JS MUST agree on every tag, field name, and compact transport
-shape.
+(builders + constants), with frame transport internals in `client/src/protocol_frame.js`. Rust and
+JS MUST agree on every tag, field name, and compact transport shape.
 
 This is a pre-alpha, latest-version-only protocol. It may change incompatibly with older clients,
 servers, and replay artifacts; keep the current Rust and JS mirrors synchronized instead of
@@ -22,10 +22,12 @@ crate.
 
 `server/crates/protocol/src/lib.rs` owns the wire DTO vocabulary, message tags, compact code
 tables, compact slot schemas, `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, and the
-unknown compact-code sentinel (`255`). `server/crates/contract/src/lib.rs` owns shared semantic DTOs
-that the protocol crate re-exports, including start/snapshot contract records and
-`DEFAULT_FACTION_ID`. `rts-rules::EntityKind::stable_id()` owns domain identity strings; rules- or
-sim-aware conversion into protocol kind strings belongs in adapter modules, not in `rts-protocol`.
+unknown compact-code sentinel (`255`). MessagePack frame-writing internals live in
+`server/crates/protocol/src/messagepack_frame.rs` behind the public frame helpers re-exported by
+`lib.rs`. `server/crates/contract/src/lib.rs` owns shared semantic DTOs that the protocol crate
+re-exports, including start/snapshot contract records and `DEFAULT_FACTION_ID`.
+`rts-rules::EntityKind::stable_id()` owns domain identity strings; rules- or sim-aware conversion
+into protocol kind strings belongs in adapter modules, not in `rts-protocol`.
 
 `client/src/protocol.js` is the browser mirror and stable public import surface for protocol
 vocabulary, compact decode tables, message builders, and decode helpers. Future internal browser
@@ -509,9 +511,10 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 23. `client/src/net.js` parses the
-binary frame into the raw compact snapshot object, then `decodeCompactSnapshot` expands it back into
-the semantic object above before dispatching `S.SNAPSHOT`.
+`messagepack-compact`, codec version 1, compact snapshot version 23. `client/src/net.js` calls
+`parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
+compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
+before dispatching `S.SNAPSHOT`.
 
 The rollout is direct and latest-version-only. Reliable non-snapshot messages (`welcome`, `start`,
 `lobby`, `pong`, errors, room/lab/replay control messages, and game over) remain JSON text. The
@@ -584,7 +587,7 @@ an inventory only; it does not change the wire shape or compact snapshot version
 | `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/lib.rs` `kinds`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
 | `server/src/protocol.rs` and `server/crates/sim/src/protocol.rs` kind conversion | Rules/sim-aware adapter modules | No direct JS mirror beyond the protocol kind strings | domain adapter mapping | Rust adapter tests in both modules | One shared rules-aware adapter path with a single round-trip test | Not client data | No compact impact unless output kind strings/codes change |
 | `states`, `SETUP`, `NOTICE_SEVERITY`, `REPLAY_VISION`, and event discriminators | `server/crates/protocol/src/lib.rs` string vocabulary and event serialization | `client/src/protocol.js` constants and decoder | wire DTO / compact transport code | `tests/protocol_parity.mjs` checks state, setup, notice severity, and event compact codes; selected decoder fixtures | Structured protocol constants and compact event-shape dump | None | Bump when compact event/entity slots change |
-| `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, compact top-level keys, optional entity slots, limits, and net status slots | `server/crates/protocol/src/lib.rs` compact serializer | `client/src/protocol.js` `COMPACT_SNAPSHOT_VERSION`, decode helpers, `MAX_COMPACT_*` limits | compact transport code | `tests/protocol_parity.mjs` source-text version checks and fixture decode | Structured compact schema dump including slot names, order, caps, and version | None | Direct owner of compact version; slot/order changes require bump unless strictly optional trailing additions preserve decoder compatibility by explicit decision |
+| `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, compact top-level keys, optional entity slots, limits, and net status slots | `server/crates/protocol/src/lib.rs` compact serializer; `server/crates/protocol/src/messagepack_frame.rs` frame writer | `client/src/protocol.js` `COMPACT_SNAPSHOT_VERSION`, decode helpers, `MAX_COMPACT_*` limits; `client/src/protocol_frame.js` binary frame parser | compact transport code | `tests/protocol_parity.mjs` source-text version checks and fixture decode | Structured compact schema dump including slot names, order, caps, and version | None | Direct owner of compact version; slot/order changes require bump unless strictly optional trailing additions preserve decoder compatibility by explicit decision |
 | Compact code tables for kind, state, setup, order stage, ability, ability object kind, upgrade, notice severity, and event records | `server/crates/protocol/src/lib.rs` code functions and event serializer | `client/src/protocol.js` `*_CODE` maps | compact transport code | `tests/protocol_parity.mjs` extracts Rust functions/events and rejects duplicate or `255` real codes | Structured protocol constants dump generated from Rust instead of source scraping | None | `255` remains unknown/sentinel; real codes must not use it. New codes should append without reusing old values; incompatible reorder/removal requires compact version bump |
 | Ability and upgrade ids in command/research/snapshot payloads | Protocol string modules in `server/crates/protocol/src/lib.rs`; catalog facts in `server/crates/rules/src/faction.rs` | `client/src/protocol.js` `ABILITY`, `UPGRADE`, `ABILITY_CODE`, `UPGRADE_CODE`; command-card descriptors in `client/src/config.js` | wire DTO, compact transport code, faction catalog fact | `tests/protocol_parity.mjs` checks protocol ids/codes; `scripts/check-faction-catalog-parity.mjs` checks catalog-exposed ability codes and descriptors | Structured protocol dump plus complete faction catalog dump | None where mirrored from Rust; catalog descriptors are not UI-only when exported by Rust | Code/order changes can require compact bump; descriptor-only changes do not |
 | `DEFAULT_FACTION_ID` | `server/crates/contract/src/lib.rs`, re-exported by protocol | `client/src/protocol.js` | wire DTO / faction catalog fact | `tests/protocol_parity.mjs`; `scripts/check-faction-catalog-parity.mjs` checks default catalog id | Structured contract/catalog dump | None | No compact impact |
