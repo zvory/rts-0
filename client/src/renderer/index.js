@@ -4,8 +4,9 @@
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
-//   terrain → resources → building-shadows → buildings → unit-shadows → units
-//   → selection-rings → hp-bars → fog → shot-reveals → feedback → placement-ghost → drag-box
+//   terrain → resources → building-shadows → buildings → building-overlays
+//   → unit-shadows → units → selection-rings → hp-bars → fog → shot-reveals
+//   → feedback → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
 // Everything else is redrawn each frame, but per-entity Graphics are pooled and
@@ -136,6 +137,7 @@ export class Renderer {
       resources: new Map(),
       buildingShadows: new Map(),
       buildings: new Map(),
+      buildingOverlays: new Map(),
       unitShadows: new Map(),
       units: new Map(),
       selectionRings: new Map(),

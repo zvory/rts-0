@@ -6,6 +6,7 @@ export const LAYERS = [
   "resources",
   "buildingShadows",
   "buildings",
+  "buildingOverlays",
   "unitShadows",
   "units",
   "smokes",
