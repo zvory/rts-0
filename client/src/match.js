@@ -1,15 +1,8 @@
 import { Audio, noticeSoundId } from "./audio.js";
 import { Camera } from "./camera.js";
 import {
-  attackKindHasCombatSound,
-  machineGunnerHasAudibleTarget,
-  machineGunSoundKey,
-} from "./combat_audio.js";
-import {
-  clientPerfReportFields,
   createSnapshotProcessingReport,
   recordSnapshotProcessing,
-  snapshotReportFields,
 } from "./client_perf_report.js";
 import { Fog } from "./fog.js";
 import { createFrameErrorState, runMatchFrameSafely } from "./frame_recovery.js";
@@ -32,7 +25,7 @@ import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { ClientIntent } from "./client_intent.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, KIND, MOVEMENT_PATH_DIAGNOSTICS, NOTICE_SEVERITY, S } from "./protocol.js";
+import { EVENT, MOVEMENT_PATH_DIAGNOSTICS, NOTICE_SEVERITY, S } from "./protocol.js";
 import {
   UNDER_ATTACK_ID,
   VIEWPORT_ALERT_MARGIN_PX,
@@ -40,57 +33,12 @@ import {
   noticeDisplayText,
 } from "./alerts.js";
 import { dom, isTextEntry } from "./bootstrap.js";
-import { buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "./settings_panels.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
+import { MatchCombatAudio } from "./match_combat_audio.js";
+import { MatchNetReporter, predictionReportFields as buildPredictionReportFields } from "./match_net_reporter.js";
+import { buildMatchSettingsContext } from "./match_settings_context.js";
 
-const KAR98K_GAIN = 0.25;
-const MG_BURST_GAIN = 0.7;
-const MORTAR_LAUNCH_GAIN = 0.85;
-const ARTILLERY_FIRE_GAIN = 1.2;
-const MATCH_PING_MS = 2000;
-const NET_REPORT_MS = 10000;
 const PREDICTION_REPLAY_BUDGET_MS = 4;
-
-const COMBAT_SOUNDS = Object.freeze({
-  [KIND.TANK]: {
-    ids: ["combat_tank_01"],
-    priority: 4,
-    gain: 2,
-  },
-  [KIND.SCOUT_CAR]: {
-    ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
-    priority: 2.5,
-    gain: MG_BURST_GAIN,
-  },
-  [KIND.RIFLEMAN]: {
-    ids: ["combat_rifle_02", "combat_rifle_03"],
-    priority: 2,
-    gain: KAR98K_GAIN,
-  },
-  [KIND.ANTI_TANK_GUN]: {
-    ids: ["combat_tank_01"],
-    priority: 4,
-    gain: 2,
-  },
-  [KIND.MACHINE_GUNNER]: {
-    ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
-    priority: 2.5,
-    gain: MG_BURST_GAIN,
-  },
-});
-
-const POINT_FIRE_SOUNDS = Object.freeze({
-  [EVENT.MORTAR_LAUNCH]: {
-    id: "combat_mortar_launch_04",
-    priority: 3.5,
-    gain: MORTAR_LAUNCH_GAIN,
-  },
-  [EVENT.ARTILLERY_TARGET]: {
-    id: "combat_artillery_fire_05",
-    priority: 4.5,
-    gain: ARTILLERY_FIRE_GAIN,
-  },
-});
 
 export class Match {
   /**
@@ -117,8 +65,6 @@ export class Match {
     this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
-    this.missingCombatSoundKinds = new Set();
-    this.activeMachineGunSoundKeys = new Map();
     this.replayControls = null;
     this.observerAnalysisOverlay = null;
     this.livePauseOverlay = null;
@@ -130,8 +76,6 @@ export class Match {
       canUnpause: false,
     };
     this.giveUpSent = false;
-    this.matchPingTimer = undefined;
-    this.netReportTimer = undefined;
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
@@ -153,6 +97,16 @@ export class Match {
     if (!!options.predictionEnabled && !this.prediction.enabled && this.predictionCompatibility.reason) {
       this.prediction.recordDisableReason(this.predictionCompatibility.reason);
     }
+    this.netReporter = new MatchNetReporter({
+      net: this.net,
+      health: this.health,
+      frameProfiler: this.frameProfiler,
+      snapshotProcessingReport: this.snapshotProcessingReport,
+      diagnostics: this.diagnostics,
+      matchRunId: this.matchRunId,
+      getLastSnapshotTick: () => this.lastSnapshotTick,
+      getPredictionReportFields: () => this.predictionReportFields(),
+    });
     this.commandIssuer = {
       issueCommand: (command, options = {}) => {
         if (this.labControlPolicy?.kind === "lab") {
@@ -176,6 +130,10 @@ export class Match {
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
     this.state.controlPolicy = this.labControlPolicy;
+    this.combatAudio = this._timeInit(
+      "match.combatAudio",
+      () => new MatchCombatAudio({ audio: this.audio, state: this.state }),
+    );
     this.clientIntent = this._timeInit("match.clientIntent", () => new ClientIntent());
     this.camera = this._timeInit("match.camera", () => new Camera());
     this.renderer = this._timeInit("match.renderer", () => new Renderer(dom.viewport));
@@ -341,82 +299,23 @@ export class Match {
   }
 
   startMatchPings() {
-    this.stopMatchPings();
-    this.net.ping();
-    this.matchPingTimer = window.setInterval(() => this.net.ping(), MATCH_PING_MS);
+    this.netReporter.startMatchPings();
   }
 
   stopMatchPings() {
-    if (this.matchPingTimer !== undefined) {
-      clearInterval(this.matchPingTimer);
-      this.matchPingTimer = undefined;
-    }
+    this.netReporter.stopMatchPings();
   }
 
   startNetReports() {
-    this.stopNetReports();
-    this.netReportTimer = window.setInterval(() => this.sendNetReport(), NET_REPORT_MS);
+    this.netReporter.startNetReports();
   }
 
   stopNetReports() {
-    if (this.netReportTimer !== undefined) {
-      clearInterval(this.netReportTimer);
-      this.netReportTimer = undefined;
-    }
+    this.netReporter.stopNetReports();
   }
 
   sendNetReport() {
-    const stats = this.health.reportStats;
-    const metrics = this.health.metrics();
-    const transportStats = this.net.consumeSnapshotReportStats?.() || {};
-    const elapsedMs = performance.now() - this.health.reportStartedAt;
-    const avgFrameMs = stats.frameCount > 0 ? stats.frameTotalMs / stats.frameCount : 0;
-    const report = {
-      schemaVersion: 1,
-      matchRunId: this.matchRunId,
-      elapsedMs: clampU32(elapsedMs),
-      matchTick: clampU32(this.lastSnapshotTick),
-      rttMs: clampU16(metrics.latencyMs),
-      rttMaxMs: clampU16(stats.rttMaxMs),
-      badRttSamples: clampU32(stats.badRttSamples),
-      snapshotJitterMs: clampU16(metrics.jitterMs),
-      snapshotGapMaxMs: clampU16(stats.snapshotGapMaxMs),
-      jitterSamples: clampU32(stats.jitterSamples),
-      snapshots: clampU32(stats.snapshots),
-      ...snapshotReportFields({
-        reportStats: stats,
-        transportStats,
-        snapshotProcessing: this.snapshotProcessingReport,
-      }),
-      frameGapMaxMs: clampU16(stats.frameGapMaxMs),
-      fpsEstimate: clampU16(avgFrameMs > 0 ? 1000 / avgFrameMs : 0),
-      ...clientPerfReportFields(this.frameProfiler),
-      hidden: !!document.hidden,
-      focused: typeof document.hasFocus === "function" ? document.hasFocus() : true,
-      wsBufferedBytes: clampU32(this.net.bufferedAmount),
-      serverTickMs: clampU16(metrics.serverTickMs),
-      serverLagMs: clampU16(metrics.serverLagMs),
-      slowTickCount: clampU32(metrics.issues.slowTick.count),
-      headOfLineCount: clampU32(metrics.issues.headOfLine.count),
-      ...this.predictionReportFields(),
-    };
-    this.net.netReport(report);
-    this.diagnostics?.count("client.send.netReport", {
-      rttMs: report.rttMs,
-      rttMaxMs: report.rttMaxMs,
-      snapshotGapMaxMs: report.snapshotGapMaxMs,
-      jitterSamples: report.jitterSamples,
-      wsBufferedBytes: report.wsBufferedBytes,
-      predictionMode: report.predictionMode,
-      pendingCommandCount: report.pendingCommandCount,
-      correctionDistancePx: report.correctionDistancePx,
-      frameWorkMaxMs: report.frameWorkMaxMs,
-      rendererMaxMs: report.rendererMaxMs,
-      worstFramePhase: report.worstFramePhase,
-    });
-    this.health.resetReportStats();
-    this.frameProfiler?.resetReportWindow?.();
-    this.snapshotProcessingReport.reset();
+    this.netReporter.sendNetReport();
   }
 
   applyPredictionDisplayOverlay(overlay = null) {
@@ -562,21 +461,10 @@ export class Match {
   }
 
   predictionReportFields() {
-    const controller = this.prediction.debugSummary();
-    const wasm = this.predictionAdapter.diagnostics();
-    const commandReport = this.prediction.consumeCommandReportStats?.() || {};
-    return {
-      predictionMode: String(controller.mode || "disabled"),
-      pendingCommandCount: clampU16(controller.commandDiagnosticPendingCount ?? controller.pendingCommandCount),
-      acknowledgedCommandLatencyMs: clampU16(controller.ackLatencyMs),
-      ...clampedCommandReportFields(commandReport),
-      correctionDistancePx: clampU16(controller.maxCorrectionDistance),
-      correctionCount: clampU32(controller.correctionCount),
-      predictionDisableCount: clampU32(controller.disableCount),
-      wasmTickMs: clampU16(wasm.lastTickMs),
-      wasmMemoryBytes: clampU32(wasm.memoryBytes),
-      predictionReplayTicks: clampU16(wasm.lastReplayTicks),
-    };
+    return buildPredictionReportFields({
+      prediction: this.prediction,
+      predictionAdapter: this.predictionAdapter,
+    });
   }
 
   handleCommandReceipt(message) {
@@ -803,62 +691,26 @@ export class Match {
 
   mountSettings({ keepOpen = false } = {}) {
     if (!this.settings) return;
-    const spectator = !!this.state?.spectator || this.replayViewer;
-    const kind = this.replayViewer ? "replay" : spectator ? "spectator" : "match";
     const wasOpen = keepOpen && this.settings.isOpen();
-    this.settings.setContext({
-      kind,
-      spectator,
-      replay: this.replayViewer,
-      actions: [
-        buildPauseAction({
-          visible: !spectator && this.capabilities.matchControls?.pause && !this.livePauseState.paused,
-          disabled: !this.livePauseState.canPause,
-          label: this.livePauseActionLabel(),
-          title: this.livePauseActionTitle(),
-          onPause: this.onPauseGame,
-        }),
-        buildGiveUpAction({
-          visible: !spectator && !this.giveUpSent,
-          onOpen: this.onGiveUpOpen,
-        }),
-      ],
-      tabs: buildSettingsTabs({
-        audio: this.audio,
-        hotkeyProfiles: this.hotkeyProfiles,
-        game: {
-          kind,
-          spectator,
-          prediction: {
-            state: () => ({
-              hidden: spectator || this.replayViewer,
-              enabled: !!this.prediction.enabled,
-              active: !!this.prediction.enabled && !!this.predictionAdapter?.ready,
-              pending: !!this.prediction.enabled && !!this.predictionAdapter?.loading,
-              available: !this.replayViewer && !this.state?.spectator,
-            }),
-            onToggle: () => this.onPredictionEnabledChange?.(!this.prediction.enabled),
-          },
-          pointerLock: this.replayViewer ? null : {
-            state: () => ({
-              hidden: false,
-              supported: !!this.input?.pointerLockSupported(),
-              enabled: !!this.input?.pointerLocked,
-              locked: !!this.input?.pointerLocked,
-            }),
-            onToggle: this.onPointerLockToggle,
-          },
-        },
-        debug: {
-          available: this.capabilities.diagnostics.movementPaths !== MOVEMENT_PATH_DIAGNOSTICS.NONE,
-          state: () => ({
-            available: this.capabilities.diagnostics.movementPaths !== MOVEMENT_PATH_DIAGNOSTICS.NONE,
-            enabled: !!this.state?.debugPathOverlaysEnabled,
-          }),
-          onToggle: this.onDebugPathToggle,
-        },
-      }),
-    });
+    this.settings.setContext(buildMatchSettingsContext({
+      replayViewer: this.replayViewer,
+      state: this.state,
+      capabilities: this.capabilities,
+      livePauseState: this.livePauseState,
+      giveUpSent: this.giveUpSent,
+      audio: this.audio,
+      hotkeyProfiles: this.hotkeyProfiles,
+      prediction: this.prediction,
+      predictionAdapter: this.predictionAdapter,
+      input: this.input,
+      onPauseGame: this.onPauseGame,
+      onGiveUpOpen: this.onGiveUpOpen,
+      onPredictionEnabledChange: this.onPredictionEnabledChange,
+      onPointerLockToggle: this.onPointerLockToggle,
+      onDebugPathToggle: this.onDebugPathToggle,
+      livePauseActionLabel: () => this.livePauseActionLabel(),
+      livePauseActionTitle: () => this.livePauseActionTitle(),
+    }));
     if (wasOpen) this.settings.open({ focus: false });
   }
 
@@ -1026,81 +878,19 @@ export class Match {
   }
 
   playAttackSound(ev) {
-    if (!this.audio) return;
-    const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
-    const to = typeof ev.to === "number" ? this.state.entityById(ev.to) : null;
-    const pos = from || to;
-    if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
-
-    const kind = from?.kind || KIND.RIFLEMAN;
-    if (!attackKindHasCombatSound(kind)) return;
-    let spec = COMBAT_SOUNDS[kind];
-    if (!spec) {
-      spec = COMBAT_SOUNDS[KIND.RIFLEMAN];
-      if (!this.missingCombatSoundKinds.has(kind)) {
-        this.missingCombatSoundKinds.add(kind);
-        console.warn(`audio: missing combat sound mapping for ${kind}, using rifle`);
-      }
-    }
-    const id = this.audio.pickVariant(spec.ids);
-    if (!id) return;
-    const category = from && from.owner === this.state.playerId ? "combat_self" : "combat_other";
-    const key =
-      kind === KIND.MACHINE_GUNNER && typeof ev.from === "number"
-        ? machineGunSoundKey(ev.from)
-        : undefined;
-    const played = this.audio.play(id, {
-      x: pos.x,
-      y: pos.y,
-      category,
-      priority: spec.priority,
-      gain: spec.gain,
-      key,
-    });
-    if (played && key) this.activeMachineGunSoundKeys.set(ev.from, key);
+    this.combatAudio?.playAttackSound(ev);
   }
 
   playPointFireSound(ev) {
-    if (!this.audio) return;
-    const spec = POINT_FIRE_SOUNDS[ev.e];
-    if (!spec) return;
-    let pos = null;
-    if (ev.e === EVENT.MORTAR_LAUNCH && Number.isFinite(ev.fromX) && Number.isFinite(ev.fromY)) {
-      pos = { x: ev.fromX, y: ev.fromY };
-    } else if (ev.e === EVENT.ARTILLERY_TARGET && typeof ev.from === "number") {
-      const from = this.state.entityById(ev.from);
-      if (from && Number.isFinite(from.x) && Number.isFinite(from.y)) pos = from;
-    }
-    if (!pos) return;
-    const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
-    const category = from && from.owner === this.state.playerId ? "combat_self" : "combat_other";
-    this.audio.play(spec.id, {
-      x: pos.x,
-      y: pos.y,
-      category,
-      priority: spec.priority,
-      gain: spec.gain,
-    });
+    this.combatAudio?.playPointFireSound(ev);
   }
 
   stopInactiveMachineGunSounds() {
-    if (!this.audio || this.activeMachineGunSoundKeys.size === 0) return;
-    for (const [id, key] of this.activeMachineGunSoundKeys) {
-      if (machineGunnerHasAudibleTarget(this.state.entityById(id))) continue;
-      this.audio.stopByKey(key);
-      this.activeMachineGunSoundKeys.delete(id);
-    }
+    this.combatAudio?.stopInactiveMachineGunSounds();
   }
 
   stopAllMachineGunSounds() {
-    if (!this.audio) {
-      this.activeMachineGunSoundKeys.clear();
-      return;
-    }
-    for (const key of this.activeMachineGunSoundKeys.values()) {
-      this.audio.stopByKey(key);
-    }
-    this.activeMachineGunSoundKeys.clear();
+    this.combatAudio?.stopAllMachineGunSounds();
   }
 
   /**
@@ -1229,40 +1019,4 @@ export class Match {
       }
     }
   }
-}
-
-function clampU16(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.min(65535, Math.round(n));
-}
-
-function clampedCommandReportFields(report = {}) {
-  return {
-    commandsIssued: clampU32(report.commandsIssued),
-    commandSocketSendAccepted: clampU32(report.commandSocketSendAccepted),
-    commandServerReceived: clampU32(report.commandServerReceived),
-    commandSimAcknowledged: clampU32(report.commandSimAcknowledged),
-    commandRejected: clampU32(report.commandRejected),
-    commandIssueToServerReceiptLatestMs: clampU16(report.commandIssueToServerReceiptLatestMs),
-    commandIssueToServerReceiptMaxMs: clampU16(report.commandIssueToServerReceiptMaxMs),
-    commandIssueToServerReceiptP95Ms: clampU16(report.commandIssueToServerReceiptP95Ms),
-    commandServerReceiptToSimAckLatestMs: clampU16(report.commandServerReceiptToSimAckLatestMs),
-    commandServerReceiptToSimAckMaxMs: clampU16(report.commandServerReceiptToSimAckMaxMs),
-    commandServerReceiptToSimAckP95Ms: clampU16(report.commandServerReceiptToSimAckP95Ms),
-    commandIssueToSimAckLatestMs: clampU16(report.commandIssueToSimAckLatestMs),
-    commandIssueToSimAckMaxMs: clampU16(report.commandIssueToSimAckMaxMs),
-    commandIssueToSimAckP95Ms: clampU16(report.commandIssueToSimAckP95Ms),
-    commandAckSnapshotReceivedToAppliedLatestMs: clampU16(report.commandAckSnapshotReceivedToAppliedLatestMs),
-    commandAckSnapshotReceivedToAppliedMaxMs: clampU16(report.commandAckSnapshotReceivedToAppliedMaxMs),
-    commandAckSnapshotReceivedToAppliedP95Ms: clampU16(report.commandAckSnapshotReceivedToAppliedP95Ms),
-    oldestPendingCommandAgeMs: clampU16(report.oldestPendingCommandAgeMs),
-    maxPendingCommandCount: clampU16(report.maxPendingCommandCount),
-  };
-}
-
-function clampU32(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.min(4294967295, Math.round(n));
 }
