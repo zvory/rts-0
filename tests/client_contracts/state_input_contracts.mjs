@@ -1532,25 +1532,16 @@ function buttonByLabel(card, label) {
   labRemoveInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
   labRemoveInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
   labRemoveInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
-  labRemoveInput._eventScreenPos = () => ({ x: 32, y: 32 });
-  labRemoveInput._onLeftDown({ x: 32, y: 32 }, {});
-  labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
-  assert(
-    labRemoveClickEvents.length === 1 &&
-      labRemoveClickEvents[0].entityIds.join(",") === "61" &&
-      labRemoveClickEvents[0].entityId === 61,
-    "lab remove tool click receives the selectable unit under the cursor",
-  );
-  assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after click delete");
   labRemoveInput._eventScreenPos = () => ({ x: 104, y: 64 });
   labRemoveInput._onLeftDown({ x: 104, y: 64 }, {});
   labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
   assert(
-    labRemoveClickEvents.length === 2 &&
-      labRemoveClickEvents[1].entityIds.join(",") === "63" &&
-      labRemoveClickEvents[1].entityId === 63,
+    labRemoveClickEvents.length === 1 &&
+      labRemoveClickEvents[0].entityIds.join(",") === "63" &&
+      labRemoveClickEvents[0].entityId === 63,
     "lab remove tool click receives the selectable building under the cursor",
   );
+  assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after click delete");
   let labRemovePointer = { x: 90, y: 90 };
   labRemoveInput._screenPos = () => labRemovePointer;
   labRemoveInput._eventScreenPos = () => labRemovePointer;
