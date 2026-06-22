@@ -1,6 +1,6 @@
 # Phase 3 - Lobby Control Split
 
-Status: not started.
+Status: done.
 
 ## Goal
 
