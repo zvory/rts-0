@@ -4,9 +4,34 @@ pub(super) fn active_tech_transition(
     observation: &AiObservation,
     profile: &AiProfile,
 ) -> Option<TechTransitionPolicy> {
-    profile
-        .tech_transition
-        .filter(|transition| observation.economy.supply_used >= transition.supply_used_threshold)
+    profile.tech_transition.filter(|transition| {
+        resource_float_met(observation, *transition)
+            || transition_tech_path_started(observation, profile, *transition)
+    })
+}
+
+fn resource_float_met(observation: &AiObservation, transition: TechTransitionPolicy) -> bool {
+    observation.economy.steel >= transition.resource_float.steel
+        && observation.economy.oil >= transition.resource_float.oil
+}
+
+fn transition_tech_path_started(
+    observation: &AiObservation,
+    profile: &AiProfile,
+    transition: TechTransitionPolicy,
+) -> bool {
+    transition
+        .required_tech_path
+        .iter()
+        .copied()
+        .filter(|kind| !profile.buildings.required_tech_path.contains(kind))
+        .any(|kind| {
+            observation.owned.iter().any(|entity| entity.kind == kind)
+                || observation
+                    .pending_builds
+                    .iter()
+                    .any(|build| build.kind == kind)
+        })
 }
 
 pub(super) fn active_recovery(

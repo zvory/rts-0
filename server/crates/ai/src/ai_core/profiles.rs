@@ -11,6 +11,18 @@ pub(crate) const AI_1_1_TANK_MG_ID: &str = "ai_1_1_tank_mg";
 pub(crate) const AI_1_2_WAVE_COHORTS_ID: &str = "ai_1_2_wave_cohorts";
 
 const AI_1_2_FRONTAL_COHORT_TICKS: u32 = 3_600;
+const TANK_TECH_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
+    steel: 400,
+    oil: 150,
+};
+const SUPPORT_TO_TANK_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
+    steel: 500,
+    oil: 300,
+};
+const LATE_TANK_TECH_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
+    steel: 700,
+    oil: 300,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
@@ -192,10 +204,16 @@ impl FrontalWavePolicy {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TechTransitionPolicy {
-    pub(crate) supply_used_threshold: u32,
+    pub(crate) resource_float: ResourceFloatThreshold,
     pub(crate) required_tech_path: &'static [EntityKind],
     pub(crate) production: ProductionPolicy,
     pub(crate) attack: AttackPolicy,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ResourceFloatThreshold {
+    pub(crate) steel: u32,
+    pub(crate) oil: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -380,9 +398,9 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         }),
     }),
     tech_transition: Some(TechTransitionPolicy {
-        // If the proxy rush stalls and we accumulate supply, pivot to tanks so we can break a
+        // If the proxy rush stalls and we float resources, pivot to tanks so we can break a
         // contained game instead of bleeding riflemen into entrenched defenses.
-        supply_used_threshold: 70,
+        resource_float: LATE_TANK_TECH_FLOAT_THRESHOLD,
         required_tech_path: &TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
@@ -466,9 +484,9 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
-        // Once the rifle flood has put real bodies on the field, pivot to tanks so a stalemated
+        // Once the rifle flood is floating enough resources, pivot to tanks so a stalemated
         // saturation push doesn't bleed out against superior tech.
-        supply_used_threshold: 50,
+        resource_float: TANK_TECH_FLOAT_THRESHOLD,
         required_tech_path: &TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
@@ -618,7 +636,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
-        supply_used_threshold: 50,
+        resource_float: SUPPORT_TO_TANK_FLOAT_THRESHOLD,
         required_tech_path: &TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
@@ -702,7 +720,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
-        supply_used_threshold: 30,
+        resource_float: TANK_TECH_FLOAT_THRESHOLD,
         required_tech_path: &AI_1_0_TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
@@ -766,7 +784,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
     frontal_wave: FrontalWavePolicy::DEFAULT,
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
-        supply_used_threshold: 30,
+        resource_float: TANK_TECH_FLOAT_THRESHOLD,
         required_tech_path: &AI_1_0_TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
@@ -873,6 +891,7 @@ mod tests {
         assert_eq!(transition.attack.required_unit, Some(EntityKind::Tank));
         assert_eq!(transition.attack.unit_kinds, &[EntityKind::Tank]);
         assert_eq!(transition.attack.first_attack_size, 1);
+        assert_eq!(transition.resource_float, TANK_TECH_FLOAT_THRESHOLD);
         assert_eq!(
             AI_1_1_TANK_MG.defensive_machine_gunners,
             Some(DefensiveMachineGunnerPolicy { target_count: 4 })
@@ -977,7 +996,7 @@ mod tests {
         );
         assert_eq!(expansion.pre_expansion_steel_worker_cap, usize::MAX);
         assert_eq!(expansion.trigger_supply_used, 30);
-        assert_eq!(transition.supply_used_threshold, 50);
+        assert_eq!(transition.resource_float, TANK_TECH_FLOAT_THRESHOLD);
         assert_eq!(
             transition.required_tech_path,
             &[
@@ -1029,7 +1048,7 @@ mod tests {
         assert_eq!(STEEL_EXPANSION_TANKS.attack.first_attack_size, usize::MAX);
         assert!(STEEL_EXPANSION_TANKS.resources.tank_adaptive.is_none());
         let transition = STEEL_EXPANSION_TANKS.tech_transition.unwrap();
-        assert_eq!(transition.supply_used_threshold, 50);
+        assert_eq!(transition.resource_float, SUPPORT_TO_TANK_FLOAT_THRESHOLD);
         assert_eq!(
             transition.required_tech_path,
             &[
