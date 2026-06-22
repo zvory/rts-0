@@ -61,6 +61,7 @@ export class Match {
     this.labControlPolicy = options.labControlPolicy || null;
     this.onLabToolChange = options.onLabToolChange || null;
     this.labToolWorldClickHandler = null;
+    this.labToolBoxSelectionHandler = null;
     this.replayViewer = !!options.replayViewer;
     this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
@@ -185,6 +186,7 @@ export class Match {
           this.clientIntent,
           {
             consumeWorldClick: (event) => this.consumeLabToolWorldClick(event),
+            consumeBoxSelection: (event) => this.consumeLabToolBoxSelection(event),
             cancel: (reason) => this.cancelLabTool(reason),
           },
         ),
@@ -492,7 +494,9 @@ export class Match {
     const onWorldClick = typeof callbacks === "function"
       ? callbacks
       : callbacks?.onWorldClick;
+    const onBoxSelection = typeof callbacks === "object" ? callbacks?.onBoxSelection : null;
     this.labToolWorldClickHandler = typeof onWorldClick === "function" ? onWorldClick : null;
+    this.labToolBoxSelectionHandler = typeof onBoxSelection === "function" ? onBoxSelection : null;
     const active = this.clientIntent.beginLabTool(tool);
     this.publishLabToolChange({ type: "armed", tool: active });
     return active;
@@ -500,6 +504,7 @@ export class Match {
 
   cancelLabTool(reason = "cancelled") {
     this.labToolWorldClickHandler = null;
+    this.labToolBoxSelectionHandler = null;
     const cancelled = this.clientIntent?.cancelLabTool?.(reason) || null;
     if (cancelled) this.publishLabToolChange({ type: "cancelled", reason, tool: cancelled });
     return cancelled;
@@ -518,6 +523,22 @@ export class Match {
       this.handleLabToolActionError(err);
     } finally {
       if (!tool.keepArmedOnWorldClick) this.cancelLabTool("worldClick");
+    }
+  }
+
+  consumeLabToolBoxSelection(event) {
+    const tool = this.clientIntent?.activeLabTool || null;
+    if (!tool || event?.tool?.id !== tool.id) return;
+    const h = this.labToolBoxSelectionHandler;
+    try {
+      const r = h?.({ ...event, tool });
+      if (r && typeof r.catch === "function") {
+        r.catch((err) => this.handleLabToolActionError(err));
+      }
+    } catch (err) {
+      this.handleLabToolActionError(err);
+    } finally {
+      if (!tool.keepArmedOnBoxSelection) this.cancelLabTool("boxSelect");
     }
   }
 

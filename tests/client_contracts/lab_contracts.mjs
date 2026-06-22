@@ -270,8 +270,13 @@ await withFakeDocument(async () => {
       const toolAtArm = armedTool;
       armedCallbacks = {
         onWorldClick: (event) => {
-          const result = callbacks.onWorldClick(event);
+          const result = callbacks.onWorldClick?.(event);
           if (!toolAtArm.keepArmedOnWorldClick) this.cancelLabTool("worldClick");
+          return result;
+        },
+        onBoxSelection: (event) => {
+          const result = callbacks.onBoxSelection?.(event);
+          if (!toolAtArm.keepArmedOnBoxSelection) this.cancelLabTool("boxSelect");
           return result;
         },
       };
@@ -433,6 +438,34 @@ await withFakeDocument(async () => {
   panel.fields.get("building-spawn-faction").value = "ekat";
   panel.fields.get("building-spawn-faction").listeners.change();
   assert(panel.buildingSpawnPalette.kind === KIND.ZAMOK, "LabPanel faction selection updates the building palette deterministically");
+  buttonByText("Remove tool").listeners.click();
+  assert(armedTool?.kind === "removeSelectableUnits", "LabPanel arms a remove setup tool for map clicks and drags");
+  assert(
+    armedTool?.keepArmedOnWorldClick === true &&
+      armedTool?.consumeBoxSelection === true &&
+      armedTool?.keepArmedOnBoxSelection === true,
+    "LabPanel remove tool stays armed and consumes box selections",
+  );
+  assert(textWithin(root).includes("Armed: Remove units"), "LabPanel shows the armed remove tool state");
+  const removeClickPromise = armedCallbacks.onWorldClick({ tool: { ...armedTool }, entityIds: [41], x: 300, y: 320 });
+  assert(
+    sent.at(-1).op.op === "deleteEntity" &&
+      sent.at(-1).op.entityId === 41,
+    "LabPanel remove click deletes the hit selectable unit",
+  );
+  resolveLastLabResult({ outcome: { entityId: 41 } });
+  await removeClickPromise;
+  assert(textWithin(root).includes("Deleted 1 entity."), "LabPanel summarizes remove click deletes");
+  assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel remove tool stays armed after a click delete");
+  const removeBoxPromise = armedCallbacks.onBoxSelection({ tool: { ...armedTool }, entityIds: [42, 43] });
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 42, "LabPanel remove drag deletes the first boxed unit");
+  resolveLastLabResult({ outcome: { entityId: 42 } });
+  await Promise.resolve();
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 43, "LabPanel remove drag deletes all boxed units");
+  resolveLastLabResult({ outcome: { entityId: 43 } });
+  await removeBoxPromise;
+  assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes remove drag deletes");
+  assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel remove tool stays armed after a drag delete");
   assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
   assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
   assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");

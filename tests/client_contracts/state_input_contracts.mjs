@@ -1477,6 +1477,87 @@ function buttonByLabel(card, label) {
   assert(labDragSelections.length === 1, "dragging with a lab spawn tool falls through to box selection");
   assert(labDragBoxes.some(Boolean), "dragging with a lab spawn tool draws the selection box");
 
+  const labRemoveInput = Object.create(Input.prototype);
+  const labRemoveClickEvents = [];
+  const labRemoveBoxEvents = [];
+  const labRemoveSelections = [];
+  const labRemoveBoxes = [];
+  const removableUnits = [
+    { id: 61, owner: 2, kind: KIND.RIFLEMAN, x: 32, y: 32, hp: 45, maxHp: 45, state: STATE.IDLE },
+    { id: 62, owner: 1, kind: KIND.WORKER, x: 72, y: 72, hp: 40, maxHp: 40, state: STATE.IDLE },
+    { id: 63, owner: 1, kind: KIND.CITY_CENTRE, x: 64, y: 64, hp: 1000, maxHp: 1000, state: STATE.IDLE },
+    { id: 64, owner: 2, kind: KIND.RIFLEMAN, x: 48, y: 48, hp: 45, maxHp: 45, state: STATE.IDLE, shotReveal: true },
+  ];
+  labRemoveInput.clientIntent = new ClientIntent();
+  labRemoveInput.clientIntent.beginLabTool({
+    kind: "removeSelectableUnits",
+    payload: { unitsOnly: true },
+    keepArmedOnWorldClick: true,
+    consumeBoxSelection: true,
+    keepArmedOnBoxSelection: true,
+  });
+  labRemoveInput.labToolController = {
+    consumeWorldClick(event) {
+      labRemoveClickEvents.push(event);
+    },
+    consumeBoxSelection(event) {
+      labRemoveBoxEvents.push(event);
+    },
+    cancel(reason) {
+      return labRemoveInput.clientIntent.cancelLabTool(reason);
+    },
+  };
+  labRemoveInput.state = {
+    spectator: true,
+    map: { width: 8, height: 8, tileSize: 32 },
+    controlPolicy: {
+      kind: "lab",
+      canControlOwner: () => true,
+      canSelectEntity: (entity) => !!entity && Number(entity.owner) > 0 && !entity.shotReveal && !entity.visionOnly,
+    },
+    entitiesInterpolated() {
+      return removableUnits;
+    },
+  };
+  labRemoveInput.camera = { screenToWorld: (x, y) => ({ x, y }) };
+  labRemoveInput.pointerLocked = false;
+  labRemoveInput.cameraNavigation = null;
+  labRemoveInput.renderer = { drawSelectionBox(box) { labRemoveBoxes.push(box); } };
+  labRemoveInput._trackMouse = () => {};
+  labRemoveInput._routeLockedPointerMove = () => false;
+  labRemoveInput._routeLockedPointerUp = () => false;
+  labRemoveInput._finishTankTrapPlacementDrag = () => false;
+  labRemoveInput._commitBoxSelection = (drag) => labRemoveSelections.push(drag);
+  labRemoveInput._worldAt = Input.prototype._worldAt;
+  labRemoveInput._entityAtWorld = Input.prototype._entityAtWorld;
+  labRemoveInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
+  labRemoveInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
+  labRemoveInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
+  labRemoveInput._eventScreenPos = () => ({ x: 32, y: 32 });
+  labRemoveInput._onLeftDown({ x: 32, y: 32 }, {});
+  labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
+  assert(
+    labRemoveClickEvents.length === 1 &&
+      labRemoveClickEvents[0].entityIds.join(",") === "61" &&
+      labRemoveClickEvents[0].entityId === 61,
+    "lab remove tool click receives the selectable unit under the cursor",
+  );
+  assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after click delete");
+  let labRemovePointer = { x: 90, y: 90 };
+  labRemoveInput._screenPos = () => labRemovePointer;
+  labRemoveInput._eventScreenPos = () => labRemovePointer;
+  labRemoveInput._onLeftDown({ x: 10, y: 10 }, {});
+  labRemoveInput._handleMouseMove({});
+  labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
+  assert(labRemoveBoxEvents.length === 1, "lab remove tool consumes box selections");
+  assert(
+    labRemoveBoxEvents[0].entityIds.join(",") === "61,62",
+    "lab remove tool box selection receives selectable units, excluding buildings and shot reveals",
+  );
+  assert(labRemoveSelections.length === 0, "lab remove tool box selection does not fall through to normal selection");
+  assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after box delete");
+  assert(labRemoveBoxes.some(Boolean), "lab remove tool box selection still draws the selection box");
+
   const labRightClickInput = Object.create(Input.prototype);
   let labRightClickCancel = null;
   labRightClickInput.clientIntent = new ClientIntent();

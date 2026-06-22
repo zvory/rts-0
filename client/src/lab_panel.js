@@ -144,6 +144,7 @@ export class LabPanel {
     root.appendChild(this.renderTargetPlayer());
     root.appendChild(this.renderSpawnPalette());
     root.appendChild(this.renderBuildingSpawnPalette());
+    root.appendChild(this.renderMapTools());
 
     root.appendChild(this.fieldset("Selected", [
       this.readout(`${selectedIds.length} selected`),
@@ -202,6 +203,15 @@ export class LabPanel {
     return root;
   }
 
+  renderMapTools() {
+    return this.fieldset("Map Tools", [
+      this.button("Remove tool", () => this.armRemoveTool(), {
+        title: "Click or drag over selectable units to delete them",
+        dataset: { active: this.activeLabTool()?.kind === "removeSelectableUnits" ? "true" : "false" },
+      }),
+    ]);
+  }
+
   renderActiveToolStatus() {
     const active = this.activeLabTool();
     const section = document.createElement("section");
@@ -214,9 +224,7 @@ export class LabPanel {
     section.appendChild(label);
 
     if (active) {
-      const detailText = active.keepArmedOnWorldClick
-        ? "Click the map to apply repeatedly. Drag-select, right-click, or Esc cancels."
-        : "Click the map to apply. Drag-select, right-click, or Esc cancels.";
+      const detailText = labToolDetailText(active);
       const detail = this.readout(detailText);
       detail.className = "lab-readout lab-active-tool-detail";
       section.appendChild(detail);
@@ -727,6 +735,26 @@ export class LabPanel {
     return armed;
   }
 
+  armRemoveTool() {
+    if (typeof this.match?.armLabTool !== "function") return null;
+    const armed = this.match.armLabTool(
+      {
+        kind: "removeSelectableUnits",
+        payload: { unitsOnly: true },
+        label: "Remove units",
+        keepArmedOnWorldClick: true,
+        consumeBoxSelection: true,
+        keepArmedOnBoxSelection: true,
+      },
+      {
+        onWorldClick: (event) => this.deleteRemoveToolTargets(event),
+        onBoxSelection: (event) => this.deleteRemoveToolTargets(event),
+      },
+    );
+    this.render();
+    return armed;
+  }
+
   cancelActiveTool() {
     return this.match?.cancelLabTool?.("panelCancel") || null;
   }
@@ -763,15 +791,26 @@ export class LabPanel {
   }
 
   deleteSelected() {
-    return this.batchEntityMutation("deleteEntity", selectedEntityIds(this.selectedEntities()), (entityId) => (
-      this.labClient.deleteEntity(entityId)
-    ));
+    return this.deleteEntities(selectedEntityIds(this.selectedEntities()));
   }
 
-  async batchEntityMutation(op, entityIds, request) {
+  deleteRemoveToolTargets(event) {
+    return this.deleteEntities(
+      selectedEntityIdsFromPayload(event?.entityIds),
+      "No selectable units in the remove tool target.",
+    );
+  }
+
+  deleteEntities(entityIds, emptyMessage = "Select an entity first.") {
+    return this.batchEntityMutation("deleteEntity", entityIds, (entityId) => (
+      this.labClient.deleteEntity(entityId)
+    ), { emptyMessage });
+  }
+
+  async batchEntityMutation(op, entityIds, request, options = {}) {
     const ids = selectedEntityIdsFromPayload(entityIds);
     if (ids.length === 0) {
-      return this.publishLocalResult(op, false, "Select an entity first.");
+      return this.publishLocalResult(op, false, options.emptyMessage || "Select an entity first.");
     }
     const results = [];
     for (const entityId of ids) {
@@ -1113,7 +1152,21 @@ function labToolLabel(tool) {
     return kind ? `Spawn ${KIND_LABELS[kind] || kind}` : "Spawn";
   }
   if (tool?.kind === "moveSelected") return "Move selected";
+  if (tool?.kind === "removeSelectableUnits") return "Remove units";
   return "Setup tool";
+}
+
+function labToolDetailText(tool) {
+  const clickRepeatedly = !!tool?.keepArmedOnWorldClick;
+  const boxApplies = !!tool?.consumeBoxSelection;
+  const boxRepeatedly = !!tool?.keepArmedOnBoxSelection;
+  if (boxApplies) {
+    const cadence = clickRepeatedly || boxRepeatedly ? " repeatedly" : "";
+    return `Click or drag-select to apply${cadence}. Right-click or Esc cancels.`;
+  }
+  return clickRepeatedly
+    ? "Click the map to apply repeatedly. Drag-select, right-click, or Esc cancels."
+    : "Click the map to apply. Drag-select, right-click, or Esc cancels.";
 }
 
 function shouldSurfaceToolCancellation(reason) {

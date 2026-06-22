@@ -16,7 +16,7 @@ export class ClientIntent {
     /** @type {null | "move" | "attack" | "setupAntiTankGuns" | {kind:"ability",ability:string}} */
     this.commandTarget = null;
     this.commandComposer = new CommandComposer();
-    /** @type {null | {id:string,kind:string,payload?:object,label?:string,keepArmedOnWorldClick?:boolean}} */
+    /** @type {null | {id:string,kind:string,payload?:object,label?:string,keepArmedOnWorldClick?:boolean,consumeBoxSelection?:boolean,keepArmedOnBoxSelection?:boolean}} */
     this.activeLabTool = null;
     this._nextLabToolId = 1;
     /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
@@ -204,7 +204,7 @@ export class ClientIntent {
 
   /**
    * Arm a lab setup tool for world clicks.
-   * @param {{kind:string,payload?:object,label?:string,id?:string,keepArmedOnWorldClick?:boolean}} tool
+   * @param {{kind:string,payload?:object,label?:string,id?:string,keepArmedOnWorldClick?:boolean,consumeBoxSelection?:boolean,keepArmedOnBoxSelection?:boolean}} tool
    */
   beginLabTool(tool) {
     const kind = typeof tool?.kind === "string" && tool.kind ? tool.kind : "unknown";
@@ -221,6 +221,8 @@ export class ClientIntent {
     if (tool?.payload && typeof tool.payload === "object") active.payload = { ...tool.payload };
     if (typeof tool?.label === "string" && tool.label) active.label = tool.label;
     if (tool?.keepArmedOnWorldClick) active.keepArmedOnWorldClick = true;
+    if (tool?.consumeBoxSelection) active.consumeBoxSelection = true;
+    if (tool?.keepArmedOnBoxSelection) active.keepArmedOnBoxSelection = true;
     this.activeLabTool = active;
     return active;
   }
