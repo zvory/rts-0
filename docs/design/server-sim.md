@@ -710,9 +710,13 @@ schedules a pending cloud rather than spawning it immediately: impact is delayed
 (100 ms) at max range and scales down with launch distance. The server emits a transient
 owner-visible `smokeLaunch` event with caster and target positions for the client canister visual,
 but the projectile itself is not simulated as an entity. `services::line_of_sight`
-owns terrain raycasts used by fog and combat and can be constructed with the active smoke store as
-a dynamic blocker input. Stone/rock tiles block vision and ranged attacks. Fog may reveal the
-blocking stone tile itself and the visible edge of a smoke cloud, but not tiles behind blockers.
+owns terrain raycasts used by fog and combat and can be constructed with the active smoke store or
+a fog-only building-footprint blocker mask as dynamic blocker input. Stone/rock tiles block vision
+and ranged attacks. Non-Tank-Trap building footprints block authoritative fog for every player, so
+units do not see through friendly or enemy structures; the visible edge of a building footprint can
+still reveal that building's footprint for projection. Blocking buildings stamp their own footprint
+as visible but do not project sight through themselves. Fog may reveal the blocking stone tile
+itself and the visible edge of a smoke cloud, but not tiles behind blockers.
 Units inside smoke do not stamp vision; friendly units inside smoke remain owner-visible through
 projection, while enemy units inside smoke are withheld and cannot be targeted. Combat
 auto-acquisition and firing both use the smoke-aware LOS query; explicit attack orders may chase

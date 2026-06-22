@@ -3429,6 +3429,7 @@ fn vehicle_body_auto_acquisition_keeps_enemy_tank_traps_targetable() {
 
 #[test]
 fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
+    let map = open_map(12);
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -3439,13 +3440,16 @@ fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
     let intended = entities
         .spawn_unit(2, EntityKind::Worker, 230.0, 100.0)
         .expect("intended target should spawn");
+    let spotter = map.tile_center(7, 5);
+    entities
+        .spawn_unit(1, EntityKind::Worker, spotter.0, spotter.1)
+        .expect("spotter should spawn");
     entities
         .get_mut(attacker)
         .expect("attacker should exist")
         .set_order(Order::attack(intended));
     let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
     let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
-    let map = open_map(12);
 
     let events = run_combat_tick_on_map(
         &mut entities,
@@ -3482,6 +3486,7 @@ fn friendly_building_between_attacker_and_target_makes_direct_attack_pursue() {
 
 #[test]
 fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
+    let map = open_map(12);
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -3492,13 +3497,16 @@ fn enemy_building_between_attacker_and_target_makes_direct_attack_pursue() {
     let intended = entities
         .spawn_unit(2, EntityKind::Worker, 230.0, 100.0)
         .expect("intended target should spawn");
+    let spotter = map.tile_center(7, 5);
+    entities
+        .spawn_unit(1, EntityKind::Worker, spotter.0, spotter.1)
+        .expect("spotter should spawn");
     entities
         .get_mut(attacker)
         .expect("attacker should exist")
         .set_order(Order::attack(intended));
     let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
     let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
-    let map = open_map(12);
 
     let events = run_combat_tick_on_map(
         &mut entities,
