@@ -4,6 +4,7 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
+use super::lab_timeline::LabTimeline;
 use super::launch::{
     LaunchPrediction, LaunchRecipient, StartPayloadBuilder, StartPayloadRecipient,
 };
@@ -611,6 +612,7 @@ pub(super) struct RoomTask {
     live_paused_by: Option<u32>,
     live_pause_counts: HashMap<u32, u8>,
     lab_session: Option<LabSession>,
+    lab_timeline: Option<LabTimeline>,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
     ai_controllers: Vec<AiController>,
@@ -673,6 +675,7 @@ impl RoomTask {
             live_paused_by: None,
             live_pause_counts: HashMap::new(),
             lab_session: None,
+            lab_timeline: None,
             dev_driver: None,
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
@@ -2798,6 +2801,7 @@ impl RoomTask {
             participants: &self.match_participants,
         });
         self.mark_match_started_for_drain();
+        self.lab_timeline = Some(LabTimeline::new(&game));
         self.phase = Phase::InGame(Box::new(game));
         self.broadcast_lab_room_time_state();
     }
@@ -3247,7 +3251,12 @@ impl RoomTask {
         let Phase::InGame(game) = &self.phase else {
             return None;
         };
-        Some(self.room_time_state_for_live_game(game, self.lab_room_time_controller_id))
+        let mut state = self.room_time_state_for_live_game(game, self.lab_room_time_controller_id);
+        if let Some(timeline) = &self.lab_timeline {
+            state.duration_ticks = timeline.duration_ticks(game.tick_count());
+            state.keyframe_ticks = timeline.keyframe_ticks();
+        }
+        Some(state)
     }
 
     fn send_lab_room_time_state_to(&self, player_id: u32) {
@@ -3361,6 +3370,7 @@ impl RoomTask {
         let ai_player_count = self.ai_players.len();
         let spectator_visible_players = self.spectator_visible_player_ids();
         let lab_snapshot_projections = self.lab_snapshot_projections(&game);
+        let record_lab_timeline = matches!(self.mode, RoomMode::Lab(_));
         let result = LiveTickDriver {
             room: &self.room,
             scheduled,
@@ -3384,7 +3394,17 @@ impl RoomTask {
 
         match result {
             LiveTickResult::Continue(game) => {
+                let broadcast_lab_timeline_state = if record_lab_timeline {
+                    self.lab_timeline
+                        .as_mut()
+                        .is_some_and(|timeline| timeline.record_keyframe_if_due(&game))
+                } else {
+                    false
+                };
                 self.phase = Phase::InGame(game);
+                if broadcast_lab_timeline_state {
+                    self.broadcast_lab_room_time_state();
+                }
             }
             LiveTickResult::EndMatch {
                 game,
@@ -3598,6 +3618,17 @@ impl RoomTask {
             .unwrap_or(false)
     }
 
+    fn lab_timeline_entry_cap_reset_keyframe(&self) -> Option<Game> {
+        if !self
+            .lab_timeline
+            .as_ref()
+            .is_some_and(LabTimeline::is_entry_cap_reached)
+        {
+            return None;
+        }
+        self.live_game().map(Game::clone_for_replay_keyframe)
+    }
+
     fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
@@ -3761,15 +3792,22 @@ impl RoomTask {
     ) -> LabResult {
         let op = "issueCommandAs".to_string();
         let log_operations = self.session_policy().logs_lab_operations();
+        let timeline_capacity_reset = self.lab_timeline_entry_cap_reset_keyframe();
         let tick = {
             let Some(game) = self.live_game_mut() else {
                 return lab_result_error(request_id, op, "lab game is not running");
             };
-            if let Err(err) = game.issue_lab_command_as(command_player_id, cmd) {
+            if let Err(err) = game.issue_lab_command_as(command_player_id, cmd.clone()) {
                 return lab_result_error(request_id, op, &lab_error_text(&err));
             }
             game.tick_count()
         };
+        if let Some(timeline) = &mut self.lab_timeline {
+            if let Some(game) = timeline_capacity_reset.as_ref() {
+                timeline.reset(game);
+            }
+            timeline.record_issue_command_as(tick, request_id, operator_id, command_player_id, cmd);
+        }
         if let Some(session) = &mut self.lab_session {
             session.dirty = true;
             if log_operations {
@@ -3783,6 +3821,9 @@ impl RoomTask {
             }
         }
         self.broadcast_lab_state();
+        if timeline_capacity_reset.is_some() {
+            self.broadcast_lab_room_time_state();
+        }
         LabResult {
             request_id,
             ok: true,
@@ -3861,7 +3902,14 @@ impl RoomTask {
             Ok(op) => op,
             Err(err) => return lab_result_error(request_id, op_kind, &err),
         };
+        let resets_timeline = matches!(lab_op, LabOp::RestoreScenario(_));
+        let timeline_op = lab_op.clone();
         let log_operations = self.session_policy().logs_lab_operations();
+        let timeline_capacity_reset = if resets_timeline {
+            None
+        } else {
+            self.lab_timeline_entry_cap_reset_keyframe()
+        };
         let (tick, outcome_json) = {
             let Some(game) = self.live_game_mut() else {
                 return lab_result_error(request_id, op_kind, "lab game is not running");
@@ -3872,6 +3920,27 @@ impl RoomTask {
             };
             (game.tick_count(), lab_outcome_json(&outcome))
         };
+        let reset_game = if resets_timeline {
+            self.live_game().map(Game::clone_for_replay_keyframe)
+        } else {
+            None
+        };
+        if let Some(timeline) = &mut self.lab_timeline {
+            if let Some(game) = reset_game.as_ref() {
+                timeline.reset(game);
+            } else {
+                if let Some(game) = timeline_capacity_reset.as_ref() {
+                    timeline.reset(game);
+                }
+                timeline.record_lab_operation(
+                    tick,
+                    request_id,
+                    operator_id,
+                    op_kind.clone(),
+                    timeline_op,
+                );
+            }
+        }
         if let Some(session) = &mut self.lab_session {
             session.dirty = true;
             if let Some(vision) = imported_vision {
@@ -3888,6 +3957,9 @@ impl RoomTask {
             }
         }
         self.broadcast_lab_state();
+        if reset_game.is_some() || timeline_capacity_reset.is_some() {
+            self.broadcast_lab_room_time_state();
+        }
         LabResult {
             request_id,
             ok: true,
@@ -4449,6 +4521,7 @@ impl RoomTask {
         self.pending_recipient_notices.clear();
         self.reset_live_pause_state();
         self.lab_session = None;
+        self.lab_timeline = None;
         self.host_id = None;
         // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
         // joiner under this room name should start from a clean lobby.
@@ -4590,6 +4663,7 @@ fn test_tick_interval_override() -> Option<Duration> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::lab_timeline::LabTimelineEntryKind;
     use super::*;
     use crate::protocol::DEFAULT_FACTION_ID;
     use rts_rules::faction::{EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
@@ -6140,6 +6214,8 @@ mod tests {
             .collect();
         assert_eq!(states.len(), 1);
         assert_eq!(states[0].current_tick, 0);
+        assert_eq!(states[0].duration_ticks, 0);
+        assert_eq!(states[0].keyframe_ticks.as_slice(), &[0]);
         assert_eq!(states[0].speed, 1.0);
         assert!(!states[0].paused);
         assert!(!states[0].ended);
@@ -6366,6 +6442,112 @@ mod tests {
     }
 
     #[test]
+    fn lab_timeline_records_mutations_and_issue_as_commands() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        let (collab_tx, mut collab_writer) = ConnectionSink::new();
+        let (collab_ack, _collab_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Collaborator".to_string(),
+            true,
+            false,
+            collab_tx,
+            collab_ack,
+        );
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        while collab_writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_lab_request(
+            99,
+            30,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 456,
+                oil: 78,
+            },
+        );
+        assert!(lab_results(&mut operator_writer)[0].ok);
+
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should be running");
+        };
+        let worker = game
+            .snapshot_full_for(LAB_PLAYER_ONE_ID)
+            .entities
+            .iter()
+            .find(|entity| {
+                entity.owner == LAB_PLAYER_ONE_ID && entity.kind == crate::protocol::kinds::WORKER
+            })
+            .unwrap()
+            .id;
+        let issued_command = Command::Stop {
+            units: vec![worker],
+        };
+        task.on_lab_request(
+            100,
+            31,
+            LabClientOp::IssueCommandAs {
+                player_id: LAB_PLAYER_ONE_ID,
+                cmd: issued_command.clone(),
+            },
+        );
+        assert!(lab_results(&mut collab_writer)[0].ok);
+
+        let timeline = task.lab_timeline.as_ref().expect("lab timeline");
+        assert_eq!(timeline.keyframe_ticks(), vec![0]);
+        let entries = timeline.entries();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].sequence, 0);
+        assert_eq!(entries[0].tick, 0);
+        assert_eq!(entries[0].request_id, 30);
+        assert_eq!(entries[0].operator_id, 99);
+        match &entries[0].kind {
+            LabTimelineEntryKind::LabOperation {
+                op_kind,
+                op:
+                    LabOp::SetPlayerResources(LabSetPlayerResources {
+                        player_id,
+                        steel,
+                        oil,
+                    }),
+            } => {
+                assert_eq!(op_kind, "setPlayerResources");
+                assert_eq!(*player_id, LAB_PLAYER_ONE_ID);
+                assert_eq!(*steel, 456);
+                assert_eq!(*oil, 78);
+            }
+            other => panic!("unexpected first timeline entry: {other:?}"),
+        }
+        assert_eq!(entries[1].sequence, 1);
+        assert_eq!(entries[1].tick, 0);
+        assert_eq!(entries[1].request_id, 31);
+        assert_eq!(entries[1].operator_id, 100);
+        match &entries[1].kind {
+            LabTimelineEntryKind::IssueCommandAs { player_id, command } => {
+                assert_eq!(*player_id, LAB_PLAYER_ONE_ID);
+                assert_eq!(command, &issued_command);
+            }
+            other => panic!("unexpected second timeline entry: {other:?}"),
+        }
+    }
+
+    #[test]
     fn lab_read_only_role_rejects_privileged_ops() {
         let mut task = RoomTask::new(
             "__lab__:sandbox:map=Default".to_string(),
@@ -6553,6 +6735,113 @@ mod tests {
         assert_eq!(
             late_start.lab.as_ref().expect("lab metadata").vision,
             LabVisionMode::Team { team_id: 2 }
+        );
+    }
+
+    #[test]
+    fn lab_timeline_resets_on_scenario_import() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+        while writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_lab_request(
+            99,
+            40,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 777,
+                oil: 66,
+            },
+        );
+        assert!(lab_results(&mut writer)[0].ok);
+        assert_eq!(
+            task.lab_timeline
+                .as_ref()
+                .expect("lab timeline")
+                .entries()
+                .len(),
+            1
+        );
+
+        task.on_lab_request(
+            99,
+            41,
+            LabClientOp::ExportScenario {
+                name: Some("baseline".to_string()),
+            },
+        );
+        let export_result = lab_results(&mut writer).pop().expect("export result");
+        let scenario: crate::protocol::LabScenarioV1 = serde_json::from_value(
+            export_result
+                .outcome
+                .as_ref()
+                .and_then(|outcome| outcome.get("scenario"))
+                .cloned()
+                .expect("scenario outcome"),
+        )
+        .expect("scenario JSON");
+
+        task.on_lab_request(
+            99,
+            42,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 1,
+                oil: 1,
+            },
+        );
+        assert!(lab_results(&mut writer)[0].ok);
+        assert_eq!(
+            task.lab_timeline
+                .as_ref()
+                .expect("lab timeline")
+                .entries()
+                .len(),
+            2
+        );
+
+        task.on_lab_request(99, 43, LabClientOp::ImportScenario { scenario });
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::LabResult(result)
+                    if result.ok && result.request_id == 43 && result.op == "importScenario"
+            )
+        }));
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::LabState(state) if state.dirty && state.operation_count == 3
+            )
+        }));
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::RoomTimeState(state)
+                    if state.current_tick == 0
+                        && state.duration_ticks == 0
+                        && state.keyframe_ticks.as_slice() == &[0]
+            )
+        }));
+        let timeline = task.lab_timeline.as_ref().expect("lab timeline");
+        assert!(timeline.entries().is_empty());
+        assert_eq!(timeline.keyframe_ticks(), vec![0]);
+        assert_eq!(
+            task.lab_session
+                .as_ref()
+                .expect("lab session")
+                .operation_log
+                .len(),
+            3
         );
     }
 
