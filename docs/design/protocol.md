@@ -65,8 +65,8 @@ lobby/config dump replaces the source scrape.
 | `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
 | `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback, dev scenario watch rooms, and lab rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
 | `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms and paused lab rooms. |
-| `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted only in replay rooms. |
-| `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
+| `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted in replay and lab rooms. |
+| `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Lab rooms use room-local keyframes and recorded accepted lab operations/issue-as commands the same way, then re-send lab `start`, `roomTimeState`, `labState`, and a fresh snapshot. Replay and lab keyframes are recorded every 2,000 ticks while their authoritative time advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
 | `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations and issue-as commands are room-local; `setVision` changes only the requesting operator's projection. Accepted lab requests append to the lab operation log with the requesting connection id. |
 | `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
@@ -371,8 +371,9 @@ when their connection is mapped to an original active seat through the branch-li
 Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
 `visibility.replayVision: true`. Replay branch creation is advertised separately with
 `actions.replayBranch: true` only when the current replay can accept a branch request. Dev scenario
-watch rooms and lab rooms advertise speed/pause/step room-time controls without replay seek,
-replay-vision, replay-branch, or timeline controls. Clients must not infer these shared affordances
+watch rooms advertise speed/pause/step room-time controls without seek. Lab rooms advertise
+speed/pause/step/relative seek/absolute seek/timeline controls, but still do not advertise
+replay-vision or replay-branch controls. Clients must not infer these shared affordances
 from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`. Late live spectator joins receive the same live start
@@ -385,8 +386,13 @@ server-owned projection. `role` names the room-owned operator/read-only viewer c
 Direct lab URL joiners currently receive `operator`; `readOnly` remains available for future
 explicit viewer modes. `operatorId` identifies the original lab joiner for compatibility metadata,
 not the sole authority for privileged lab operations. Lab room-time controls are shared room state:
-any operator can pause, resume at a clamped positive speed, or step exactly one authoritative tick
-while paused, and the server emits `roomTimeState` after accepted lab room-time controls.
+any operator can pause, resume at a clamped positive speed, step exactly one authoritative tick
+while paused, seek relatively, or seek to an absolute retained lab timeline tick. Accepted lab seeks
+restore the nearest retained lab keyframe at or before the target, replay accepted lab operations
+and issue-as commands through normal server validation, re-send lab start metadata, broadcast
+`roomTimeState`/`labState`, and send fresh snapshots. If a new lab operation or issue-as command is
+accepted after a past seek, future lab timeline entries and keyframes after the current tick are
+truncated; there is no branch, redo, or undo protocol in this slice.
 
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
@@ -786,7 +792,7 @@ Events are best-effort visual flavor; the client must not depend on receiving th
 cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
 rooms also send it after pause/resume and one-tick step controls so clients can confirm the
 authoritative room-time speed and tick. Lab rooms also send it after timeline baseline resets and
-new timeline keyframes:
+new timeline keyframes, accepted seeks, and future-history truncation:
 ```
 {
   t: "roomTimeState",
@@ -799,12 +805,13 @@ new timeline keyframes:
   controllerId?: u32
 }
 ```
-`keyframeTicks` lists the replay or lab keyframes the server has recorded so far. Replay clients
-may display them as seek marks, but a seek target is not limited to these ticks; the server restores
-the nearest recorded keyframe at or before the requested tick and fast-forwards from there. Lab
-rooms expose recorded baseline and periodic keyframe ticks through the same field, with
-`durationTicks` set to the current maximum recorded lab tick, but lab seek/timeline capabilities
-remain false until the lab rebuild path is enabled.
+`keyframeTicks` lists the replay or lab keyframes the server has recorded so far. Replay and lab
+clients may display them as seek marks, but a seek target is not limited to these ticks; the server
+restores the nearest recorded keyframe at or before the requested tick and fast-forwards from there.
+Lab rooms expose recorded baseline and periodic keyframe ticks through the same field, with
+`durationTicks` set to the current maximum retained lab tick. Lab history is bounded by retained
+room-local keyframes and recorded entries; seek requests outside retained history are rejected with
+`error` instead of rebuilding from discarded state.
 
 `livePauseState` is a reliable server message that carries the authoritative live-match pause
 state. Normal live and branch-live match recipients receive it after `start` and after accepted or

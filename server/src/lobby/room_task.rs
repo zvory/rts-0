@@ -4,7 +4,7 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
-use super::lab_timeline::LabTimeline;
+use super::lab_timeline::{LabTimeline, LabTimelineEntry, LabTimelineEntryKind};
 use super::launch::{
     LaunchPrediction, LaunchRecipient, StartPayloadBuilder, StartPayloadRecipient,
 };
@@ -160,6 +160,12 @@ struct ReplayTickContext {
     tick_budget: Duration,
     tick_start: StdInstant,
     projection_policy: ProjectionPolicy,
+}
+
+#[derive(Clone, Copy)]
+enum LabSeekTarget {
+    Relative(u32),
+    Absolute(u32),
 }
 
 #[derive(Clone, Copy)]
@@ -3071,6 +3077,35 @@ impl RoomTask {
         );
     }
 
+    fn send_lab_start_payloads_to_all(&self, clear_pending_snapshot: bool) {
+        let Phase::InGame(game) = &self.phase else {
+            return;
+        };
+        let payload = game.start_payload();
+        let diagnostics = self
+            .projection_policy()
+            .diagnostic_capabilities_for(RecipientRole::Spectator);
+        let start_policy = self.session_policy();
+        let recipients = self.order.iter().filter_map(|&id| {
+            self.players.get(&id).map(|player| LaunchRecipient {
+                connection_id: id,
+                payload_player_id: self
+                    .lab_session
+                    .as_ref()
+                    .map(|session| session.view_player_id)
+                    .unwrap_or(LAB_PLAYER_ONE_ID),
+                prediction: LaunchPrediction::Disabled,
+                role: RecipientRole::Spectator,
+                diagnostics,
+                clear_pending_snapshot,
+                lab: self.lab_start_metadata_for(id),
+                msg_tx: player.msg_tx.clone(),
+            })
+        });
+        let builder = StartPayloadBuilder::simulation(start_policy, &payload);
+        super::launch::send_start_payloads(&self.room, &builder, recipients);
+    }
+
     fn lab_start_metadata_for(&self, player_id: u32) -> Option<LabStartMetadata> {
         self.lab_session
             .as_ref()
@@ -3130,6 +3165,51 @@ impl RoomTask {
             projections.insert(id, projection);
         }
         projections
+    }
+
+    fn fanout_current_lab_snapshots(&mut self) {
+        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::Lab) {
+            return;
+        }
+        let projection_policy = self.projection_policy();
+        let tick_budget = self.current_tick_interval();
+        let tick_start = StdInstant::now();
+        let game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::InGame(game) => game,
+            other => {
+                self.phase = other;
+                return;
+            }
+        };
+        let mut per_player_events: HashMap<u32, Vec<Event>> = HashMap::new();
+        let lab_snapshot_projections = self.lab_snapshot_projections(&game);
+        let recipients = self.order.clone();
+        SnapshotFanout::new(
+            &self.room,
+            Duration::ZERO,
+            tick_budget,
+            tick_start,
+            &mut self.slow_tick_count,
+            None,
+        )
+        .send_to_recipients(&mut self.players, recipients, |id, player| {
+            let projection = match lab_snapshot_projections.get(&id) {
+                Some(LabSnapshotProjection::FullWorld { view_player_id }) => projection_policy
+                    .live_snapshot_for(RecipientRole::Spectator, id, Some(*view_player_id), &[]),
+                Some(LabSnapshotProjection::PlayerUnion { player_ids }) => {
+                    projection_policy.replay_snapshot_for(player_ids.clone())
+                }
+                None => projection_policy.live_snapshot_for(
+                    RecipientRole::Spectator,
+                    id,
+                    Some(LAB_PLAYER_ONE_ID),
+                    &[],
+                ),
+            };
+            let snapshot = projection.snapshot_with_events(&game, &mut per_player_events, &[]);
+            Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
+        });
+        self.phase = Phase::InGame(game);
     }
 
     fn send_replay_start_to(&self, watcher_id: u32) {
@@ -3802,9 +3882,12 @@ impl RoomTask {
             }
             game.tick_count()
         };
+        let mut timeline_truncated = false;
         if let Some(timeline) = &mut self.lab_timeline {
             if let Some(game) = timeline_capacity_reset.as_ref() {
                 timeline.reset(game);
+            } else {
+                timeline_truncated = timeline.truncate_future(tick);
             }
             timeline.record_issue_command_as(tick, request_id, operator_id, command_player_id, cmd);
         }
@@ -3821,7 +3904,7 @@ impl RoomTask {
             }
         }
         self.broadcast_lab_state();
-        if timeline_capacity_reset.is_some() {
+        if timeline_capacity_reset.is_some() || timeline_truncated {
             self.broadcast_lab_room_time_state();
         }
         LabResult {
@@ -3925,12 +4008,15 @@ impl RoomTask {
         } else {
             None
         };
+        let mut timeline_truncated = false;
         if let Some(timeline) = &mut self.lab_timeline {
             if let Some(game) = reset_game.as_ref() {
                 timeline.reset(game);
             } else {
                 if let Some(game) = timeline_capacity_reset.as_ref() {
                     timeline.reset(game);
+                } else {
+                    timeline_truncated = timeline.truncate_future(tick);
                 }
                 timeline.record_lab_operation(
                     tick,
@@ -3957,7 +4043,7 @@ impl RoomTask {
             }
         }
         self.broadcast_lab_state();
-        if reset_game.is_some() || timeline_capacity_reset.is_some() {
+        if reset_game.is_some() || timeline_capacity_reset.is_some() || timeline_truncated {
             self.broadcast_lab_room_time_state();
         }
         LabResult {
@@ -4122,7 +4208,7 @@ impl RoomTask {
         self.broadcast(&self.branch_staging_message(staging));
     }
 
-    /// Rewind room-controlled replay time by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
+    /// Rewind room-controlled time by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
     /// No-op outside rooms whose clock capability allows relative seek.
     fn on_seek_room_time(&mut self, player_id: u32, ticks_back: u32) {
         if !self.tick_control().allows_room_time_operation(
@@ -4130,6 +4216,14 @@ impl RoomTask {
             self.players.contains_key(&player_id),
         ) {
             return;
+        }
+        match self.session_policy().clock.room_time_source() {
+            Some(RoomTimeSource::Lab) => {
+                self.on_seek_lab_room_time(player_id, LabSeekTarget::Relative(ticks_back));
+                return;
+            }
+            Some(RoomTimeSource::ReplayPlayback) => {}
+            Some(RoomTimeSource::DevScenario) | None => return,
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
@@ -4177,14 +4271,22 @@ impl RoomTask {
         }
     }
 
-    /// Seek room-controlled replay time to an absolute tick. No-op outside rooms whose clock
-    /// capability allows absolute seek.
+    /// Seek room-controlled time to an absolute tick. No-op outside rooms whose clock capability
+    /// allows absolute seek.
     fn on_seek_room_time_to(&mut self, player_id: u32, tick: u32) {
         if !self.tick_control().allows_room_time_operation(
             RoomTimeOperation::SeekAbsolute,
             self.players.contains_key(&player_id),
         ) {
             return;
+        }
+        match self.session_policy().clock.room_time_source() {
+            Some(RoomTimeSource::Lab) => {
+                self.on_seek_lab_room_time(player_id, LabSeekTarget::Absolute(tick));
+                return;
+            }
+            Some(RoomTimeSource::ReplayPlayback) => {}
+            Some(RoomTimeSource::DevScenario) | None => return,
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
@@ -4229,6 +4331,78 @@ impl RoomTask {
                     self.send_dev_error(&err);
                 }
             }
+        }
+    }
+
+    fn on_seek_lab_room_time(&mut self, player_id: u32, target: LabSeekTarget) {
+        if !self.lab_room_time_control_allowed(player_id) {
+            self.send_error_to(player_id, "Only lab operators can seek lab time.");
+            return;
+        }
+        let Some(current_tick) = self.live_game().map(Game::tick_count) else {
+            self.send_error_to(player_id, "Lab seek failed: lab game is not running.");
+            return;
+        };
+        let viewer_count = self.players.len();
+        let seek_result = {
+            let Some(timeline) = &mut self.lab_timeline else {
+                self.send_error_to(player_id, "Lab seek failed: timeline is not available.");
+                return;
+            };
+            match target {
+                LabSeekTarget::Relative(ticks_back) => {
+                    timeline.seek_back(current_tick, ticks_back, Self::replay_lab_timeline_entry)
+                }
+                LabSeekTarget::Absolute(tick) => {
+                    timeline.seek_to(current_tick, tick, Self::replay_lab_timeline_entry)
+                }
+            }
+        };
+        match seek_result {
+            Ok(seek) => {
+                crate::log_info!(
+                    room = %self.room,
+                    controller_id = player_id,
+                    viewer_count,
+                    from_tick = current_tick,
+                    to_tick = seek.target_tick,
+                    keyframe_tick = seek.keyframe_tick,
+                    rebuild_ms = seek.rebuild_ms,
+                    "lab seek rebuilt"
+                );
+                self.phase = Phase::InGame(Box::new(seek.game));
+                self.lab_room_time_controller_id = Some(player_id);
+                self.send_lab_start_payloads_to_all(true);
+                self.broadcast_lab_room_time_state();
+                self.broadcast_lab_state();
+                self.fanout_current_lab_snapshots();
+            }
+            Err(err) => {
+                crate::log_warn!(room = %self.room, error = %err, "lab seek failed");
+                self.send_error_to(player_id, &err);
+            }
+        }
+    }
+
+    fn replay_lab_timeline_entry(game: &mut Game, entry: &LabTimelineEntry) -> Result<(), String> {
+        match &entry.kind {
+            LabTimelineEntryKind::LabOperation { op_kind, op } => game
+                .apply_lab_op(op.clone())
+                .map(|_| ())
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline operation {op_kind} failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
+            LabTimelineEntryKind::IssueCommandAs { player_id, command } => game
+                .issue_lab_command_as(*player_id, command.clone())
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline issue-as failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
         }
     }
 
@@ -5273,6 +5447,56 @@ mod tests {
         }
     }
 
+    fn lab_snapshot(task: &RoomTask) -> Snapshot {
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should be running");
+        };
+        game.snapshot_full_for(LAB_PLAYER_ONE_ID)
+    }
+
+    fn lab_player_resources(task: &RoomTask, player_id: u32) -> (u32, u32) {
+        let snapshot = lab_snapshot(task);
+        let resources = snapshot
+            .player_resources
+            .iter()
+            .find(|resources| resources.id == player_id)
+            .expect("player resources");
+        (resources.steel, resources.oil)
+    }
+
+    fn lab_entity_position(task: &RoomTask, entity_id: u32) -> (f32, f32) {
+        let snapshot = lab_snapshot(task);
+        let entity = snapshot
+            .entities
+            .iter()
+            .find(|entity| entity.id == entity_id)
+            .expect("entity should be visible in full lab snapshot");
+        (entity.x, entity.y)
+    }
+
+    fn lab_worker_id(task: &RoomTask) -> u32 {
+        lab_snapshot(task)
+            .entities
+            .iter()
+            .find(|entity| {
+                entity.owner == LAB_PLAYER_ONE_ID && entity.kind == crate::protocol::kinds::WORKER
+            })
+            .expect("starting worker")
+            .id
+    }
+
+    fn lab_tile_center(task: &RoomTask, tile_x: u32, tile_y: u32) -> (f32, f32) {
+        let Phase::InGame(game) = &task.phase else {
+            panic!("lab should be running");
+        };
+        let map = game.start_payload().map;
+        let tile_size = map.tile_size as f32;
+        (
+            (tile_x as f32 + 0.5) * tile_size,
+            (tile_y as f32 + 0.5) * tile_size,
+        )
+    }
+
     fn replay_start_payload_after(room: &str, action: impl FnOnce(&mut RoomTask)) -> StartPayload {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 4);
@@ -5942,9 +6166,9 @@ mod tests {
         assert!(payload.capabilities.room_time.set_speed);
         assert!(payload.capabilities.room_time.pause);
         assert!(payload.capabilities.room_time.step);
-        assert!(!payload.capabilities.room_time.seek_relative);
-        assert!(!payload.capabilities.room_time.seek_absolute);
-        assert!(!payload.capabilities.room_time.timeline);
+        assert!(payload.capabilities.room_time.seek_relative);
+        assert!(payload.capabilities.room_time.seek_absolute);
+        assert!(payload.capabilities.room_time.timeline);
         assert!(!payload.capabilities.visibility.replay_vision);
         assert!(!payload.capabilities.actions.replay_branch);
         assert!(payload.diagnostics.is_empty());
@@ -6199,9 +6423,9 @@ mod tests {
         assert!(payload.capabilities.room_time.set_speed);
         assert!(payload.capabilities.room_time.pause);
         assert!(payload.capabilities.room_time.step);
-        assert!(!payload.capabilities.room_time.seek_relative);
-        assert!(!payload.capabilities.room_time.seek_absolute);
-        assert!(!payload.capabilities.room_time.timeline);
+        assert!(payload.capabilities.room_time.seek_relative);
+        assert!(payload.capabilities.room_time.seek_absolute);
+        assert!(payload.capabilities.room_time.timeline);
         assert!(!payload.capabilities.commands.gameplay);
         assert!(!payload.capabilities.match_controls.pause);
 
@@ -6545,6 +6769,320 @@ mod tests {
             }
             other => panic!("unexpected second timeline entry: {other:?}"),
         }
+    }
+
+    #[test]
+    fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        let (collab_tx, mut collab_writer) = ConnectionSink::new();
+        let (collab_ack, _collab_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Collaborator".to_string(),
+            true,
+            false,
+            collab_tx,
+            collab_ack,
+        );
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        while collab_writer.reliable_rx.try_recv().is_ok() {}
+
+        let spawn_position = lab_tile_center(&task, 30, 30);
+        task.on_lab_request(
+            99,
+            50,
+            LabClientOp::SpawnEntity {
+                owner: LAB_PLAYER_ONE_ID,
+                kind: crate::protocol::kinds::RIFLEMAN.to_string(),
+                x: spawn_position.0,
+                y: spawn_position.1,
+                completed: true,
+            },
+        );
+        let spawn_result = lab_results(&mut operator_writer)
+            .pop()
+            .expect("spawn result");
+        assert!(spawn_result.ok);
+        let entity_id = spawn_result
+            .outcome
+            .as_ref()
+            .and_then(|outcome| outcome.get("entityId"))
+            .and_then(serde_json::Value::as_u64)
+            .expect("spawned entity id") as u32;
+        while collab_writer.reliable_rx.try_recv().is_ok() {}
+        assert_eq!(lab_entity_position(&task, entity_id), spawn_position);
+
+        task.on_tick(TokioInstant::now());
+        assert_eq!(in_game_tick(&task), 1);
+        let move_position = lab_tile_center(&task, 31, 30);
+        task.on_lab_request(
+            99,
+            51,
+            LabClientOp::MoveEntity {
+                entity_id,
+                x: move_position.0,
+                y: move_position.1,
+            },
+        );
+        assert!(lab_results(&mut operator_writer)[0].ok);
+        while collab_writer.reliable_rx.try_recv().is_ok() {}
+        assert_eq!(lab_entity_position(&task, entity_id), move_position);
+
+        task.on_seek_room_time(100, 1);
+
+        assert_eq!(in_game_tick(&task), 0);
+        assert_eq!(lab_entity_position(&task, entity_id), spawn_position);
+        for writer in [&mut operator_writer, &mut collab_writer] {
+            let messages: Vec<_> =
+                std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+            assert!(messages.iter().any(|msg| {
+                matches!(
+                    msg,
+                    ServerMessage::Start(payload)
+                        if payload.lab.as_ref().is_some_and(|lab| lab.role == LabStartRole::Operator)
+                            && payload.capabilities.room_time.seek_absolute
+                            && payload.capabilities.room_time.timeline
+                )
+            }));
+            assert!(messages.iter().any(|msg| {
+                matches!(
+                    msg,
+                    ServerMessage::RoomTimeState(state)
+                        if state.current_tick == 0
+                            && state.duration_ticks == 1
+                            && state.keyframe_ticks.as_slice() == &[0]
+                            && state.controller_id == Some(100)
+                )
+            }));
+            assert!(messages.iter().any(|msg| {
+                matches!(
+                    msg,
+                    ServerMessage::LabState(state)
+                        if state.role == LabStartRole::Operator
+                            && state.vision == LabVisionMode::FullWorld
+                )
+            }));
+            assert!(writer.snapshots.take().is_some());
+        }
+    }
+
+    #[test]
+    fn lab_seek_replays_issue_as_commands_through_rebuild() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+
+        let worker = lab_worker_id(&task);
+        let start_position = lab_entity_position(&task, worker);
+        task.on_lab_request(
+            99,
+            60,
+            LabClientOp::IssueCommandAs {
+                player_id: LAB_PLAYER_ONE_ID,
+                cmd: Command::Move {
+                    units: vec![worker],
+                    x: start_position.0 + 128.0,
+                    y: start_position.1,
+                    queued: false,
+                },
+            },
+        );
+        assert!(lab_results(&mut operator_writer)[0].ok);
+
+        for _ in 0..12 {
+            task.on_tick(TokioInstant::now());
+        }
+        let moved_position = lab_entity_position(&task, worker);
+        assert_ne!(moved_position, start_position);
+
+        task.on_seek_room_time_to(99, 12);
+
+        assert_eq!(in_game_tick(&task), 12);
+        assert_eq!(lab_entity_position(&task, worker), moved_position);
+        let messages: Vec<_> =
+            std::iter::from_fn(|| operator_writer.reliable_rx.try_recv().ok()).collect();
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::RoomTimeState(state)
+                    if state.current_tick == 12 && state.controller_id == Some(99)
+            )
+        }));
+        assert!(operator_writer.snapshots.take().is_some());
+    }
+
+    #[test]
+    fn lab_timeline_truncates_future_after_past_seek_and_new_operation() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_lab_request(
+            99,
+            70,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 100,
+                oil: 10,
+            },
+        );
+        assert!(lab_results(&mut operator_writer)[0].ok);
+        task.on_tick(TokioInstant::now());
+        task.on_lab_request(
+            99,
+            71,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 200,
+                oil: 20,
+            },
+        );
+        assert!(lab_results(&mut operator_writer)[0].ok);
+        assert_eq!(lab_player_resources(&task, LAB_PLAYER_ONE_ID), (200, 20));
+        assert_eq!(
+            task.lab_timeline
+                .as_ref()
+                .expect("lab timeline")
+                .entries()
+                .len(),
+            2
+        );
+
+        task.on_seek_room_time_to(99, 0);
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        assert_eq!(lab_player_resources(&task, LAB_PLAYER_ONE_ID), (100, 10));
+
+        task.on_lab_request(
+            99,
+            72,
+            LabClientOp::SetPlayerResources {
+                player_id: LAB_PLAYER_ONE_ID,
+                steel: 300,
+                oil: 30,
+            },
+        );
+
+        assert_eq!(lab_player_resources(&task, LAB_PLAYER_ONE_ID), (300, 30));
+        let timeline = task.lab_timeline.as_ref().expect("lab timeline");
+        assert_eq!(timeline.entries().len(), 2);
+        assert!(timeline.entries().iter().all(|entry| entry.tick == 0));
+        assert_eq!(timeline.keyframe_ticks(), vec![0]);
+        let messages: Vec<_> =
+            std::iter::from_fn(|| operator_writer.reliable_rx.try_recv().ok()).collect();
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::LabResult(result)
+                    if result.ok && result.request_id == 72 && result.op == "setPlayerResources"
+            )
+        }));
+        assert!(messages.iter().any(|msg| {
+            matches!(
+                msg,
+                ServerMessage::RoomTimeState(state)
+                    if state.current_tick == 0
+                        && state.duration_ticks == 0
+                        && state.keyframe_ticks.as_slice() == &[0]
+            )
+        }));
+    }
+
+    #[test]
+    fn lab_seek_rejects_read_only_and_rapid_repeat_requests() {
+        let mut task = RoomTask::new(
+            "__lab__:sandbox:map=Default".to_string(),
+            RoomMode::Lab(lab_config()),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (operator_tx, mut operator_writer) = ConnectionSink::new();
+        let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            99,
+            "Operator".to_string(),
+            true,
+            false,
+            operator_tx,
+            operator_ack,
+        );
+        let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
+        let (viewer_ack, _viewer_ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(
+            100,
+            "Read Only".to_string(),
+            true,
+            false,
+            viewer_tx,
+            viewer_ack,
+        );
+        task.lab_session
+            .as_mut()
+            .expect("lab session")
+            .viewer_roles
+            .insert(100, LabStartRole::ReadOnly);
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        while viewer_writer.reliable_rx.try_recv().is_ok() {}
+
+        task.on_seek_room_time_to(100, 0);
+        assert!(matches!(
+            viewer_writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::Error { msg } if msg.contains("Only lab operators")
+        ));
+
+        task.on_seek_room_time_to(99, 0);
+        while operator_writer.reliable_rx.try_recv().is_ok() {}
+        task.on_seek_room_time_to(99, 0);
+        assert!(matches!(
+            operator_writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::Error { msg } if msg.contains("wait before seeking again")
+        ));
     }
 
     #[test]

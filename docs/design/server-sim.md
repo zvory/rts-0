@@ -354,8 +354,9 @@ AI controllers, or Tokio coordination into `rts-sim`:
   owns the Tokio interval and remains the only task that advances a room.
 - `lab_timeline.rs` owns room-local in-memory lab rewind recording outside the simulation crate. It
   records a baseline keyframe after lab `Game` creation or scenario import, records accepted lab
-  world mutations and issue-as commands in authoritative room order, and stores periodic cloned
-  `Game` keyframes for later seek/rebuild work.
+  world mutations and issue-as commands in authoritative room order, stores periodic cloned `Game`
+  keyframes, rebuilds lab seeks from the nearest retained keyframe, and truncates future history
+  after a past seek plus a new accepted lab operation or issue-as command.
 - `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
   per-viewer replay vision, lab viewers get their room-owned per-operator lab vision, branch-live
