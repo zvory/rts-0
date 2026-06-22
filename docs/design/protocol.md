@@ -886,7 +886,8 @@ units belong to that player; mixed-owner selections are rejected instead of part
   map: { name: string, schemaVersion: u32, contentHash: string },
   players: [{
     id: u32, teamId: u32, factionId: string, name: string, color: string, isAi: bool,
-    steel: u32, oil: u32, upgrades: string[]
+    resources: { steel: u32, oil: u32 },
+    research: { completed: string[] }
   }],
   entities: [{
     id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,

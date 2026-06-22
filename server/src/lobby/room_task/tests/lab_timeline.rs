@@ -491,7 +491,9 @@ fn lab_scenario_export_and_import_round_trip_through_room_ops() {
         LabVisionMode::Team { team_id: 2 }
     );
     assert!(scenario.players.iter().any(|player| {
-        player.id == LAB_PLAYER_ONE_ID && player.steel == 777 && player.oil == 66
+        player.id == LAB_PLAYER_ONE_ID
+            && player.resources.steel == 777
+            && player.resources.oil == 66
     }));
 
     task.on_lab_request(

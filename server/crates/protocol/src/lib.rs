@@ -17,12 +17,12 @@ pub use messagepack_frame::MESSAGEPACK_SNAPSHOT_FRAME_MAGIC;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
-    EntityView, Event, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
-    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ReplayStartMetadata,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,
-    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, VisibilityCapabilities,
-    DEFAULT_FACTION_ID,
+    EntityView, Event, LabScenarioResearch, LabScenarioResources, LabStartMetadata, LabStartRole,
+    LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
+    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
+    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
+    VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -587,9 +587,8 @@ pub struct LabScenarioPlayer {
     pub name: String,
     pub color: String,
     pub is_ai: bool,
-    pub steel: u32,
-    pub oil: u32,
-    pub upgrades: Vec<String>,
+    pub resources: LabScenarioResources,
+    pub research: LabScenarioResearch,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
