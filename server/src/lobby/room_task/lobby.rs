@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use rts_ai::DEFAULT_LIVE_PROFILE_ID;
 use rts_sim::game::map::Map;
-use tokio::time::Instant as TokioInstant;
 
 use super::super::connection::{send_or_log, ConnectionSink};
 use super::super::faction_validation::{
@@ -12,9 +11,7 @@ use super::super::participants::{CommandIssuer, Participants};
 use super::super::{
     next_player_id, LobbyJoinState, LobbySummary, LobbySummaryPhase, MAX_PLAYERS, PLAYER_PALETTE,
 };
-use super::helpers::{
-    match_countdown_duration, DRAINING_NEW_MATCHES_DISABLED_MSG, MATCH_COUNTDOWN_WORDS,
-};
+use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{AiSlot, Phase, RoomPlayer, MAX_LOBBY_TEAMS};
 use super::RoomTask;
 use crate::protocol::{LobbyPlayer, ServerMessage, TeamId};
@@ -759,7 +756,7 @@ impl RoomTask {
         self.match_countdown_deadline.is_none() && self.can_start_now()
     }
 
-    fn can_start_now(&self) -> bool {
+    pub(super) fn can_start_now(&self) -> bool {
         if let Phase::BranchStaging(staging) = &self.phase {
             return !self.new_live_session_blocked_by_drain() && staging.can_start();
         }
@@ -829,49 +826,5 @@ impl RoomTask {
             maps: Map::list_available(),
         };
         self.broadcast(&msg);
-    }
-
-    pub(super) fn start_match_countdown(&mut self) {
-        let duration = match_countdown_duration();
-        self.match_countdown_deadline = Some(TokioInstant::now() + duration);
-        if matches!(self.phase, Phase::BranchStaging(_)) {
-            self.broadcast_branch_staging();
-        } else {
-            self.broadcast_lobby();
-        }
-        let msg = ServerMessage::MatchCountdown {
-            duration_ms: duration.as_millis() as u32,
-            words: MATCH_COUNTDOWN_WORDS
-                .iter()
-                .map(|word| (*word).to_string())
-                .collect(),
-        };
-        self.broadcast(&msg);
-        crate::log_info!(room = %self.room, "match countdown started");
-    }
-
-    pub(super) fn finish_match_countdown_if_due(&mut self) -> bool {
-        let Some(deadline) = self.match_countdown_deadline else {
-            return false;
-        };
-        if TokioInstant::now() < deadline {
-            return true;
-        }
-        self.match_countdown_deadline = None;
-        if self.can_start_now() {
-            if matches!(self.phase, Phase::BranchStaging(_)) {
-                self.start_branch_live();
-            } else {
-                self.start_match();
-            }
-        } else {
-            crate::log_debug!(room = %self.room, "match countdown aborted; start preconditions changed");
-            if matches!(self.phase, Phase::BranchStaging(_)) {
-                self.broadcast_branch_staging();
-            } else {
-                self.broadcast_lobby();
-            }
-        }
-        true
     }
 }

@@ -43,7 +43,7 @@ for (const file of listRustFiles(lobbySrc)) {
   }
 
   checkGenericRoomHelperModeShortcuts(file, stripped);
-  if (file === "room_task.rs") checkEndMatchPersistencePolicy(stripped);
+  if (file === "room_task/lifecycle.rs") checkEndMatchPersistencePolicy(stripped);
 }
 
 if (failures.length > 0) {
@@ -129,7 +129,7 @@ function checkGenericRoomHelperModeShortcuts(file, source) {
 function checkEndMatchPersistencePolicy(source) {
   const endMatch = extractFunctionBody(source, "end_match");
   if (!endMatch) {
-    failures.push("server/src/lobby/room_task.rs: missing end_match persistence guardrail target");
+    failures.push("server/src/lobby/room_task/lifecycle.rs: missing end_match persistence guardrail target");
     return;
   }
   const body = endMatch;
@@ -138,7 +138,7 @@ function checkEndMatchPersistencePolicy(source) {
     !body.includes("should_capture_post_match_replay")
   ) {
     failures.push(
-      "server/src/lobby/room_task.rs: end_match replay capture must be gated by persistence policy",
+      "server/src/lobby/room_task/lifecycle.rs: end_match replay capture must be gated by persistence policy",
     );
   }
   if (
@@ -146,13 +146,13 @@ function checkEndMatchPersistencePolicy(source) {
     !body.includes("should_attach_match_history_replay_artifact")
   ) {
     failures.push(
-      "server/src/lobby/room_task.rs: match-history replay attachment must be gated by persistence policy",
+      "server/src/lobby/room_task/lifecycle.rs: match-history replay attachment must be gated by persistence policy",
     );
   }
 }
 
 function extractFunctionBody(source, functionName) {
-  const signature = new RegExp(`\\n\\s*fn\\s+${functionName}\\s*\\(`);
+  const signature = new RegExp(`\\n\\s*(?:pub(?:\\([^)]*\\))?\\s+)?fn\\s+${functionName}\\s*\\(`);
   const match = source.match(signature);
   if (!match) return null;
 
