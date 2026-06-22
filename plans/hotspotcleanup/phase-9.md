@@ -1,6 +1,6 @@
 # Phase 9 - Protocol Mirror Cleanup Gate
 
-Status: planned.
+Status: done.
 
 ## Goal
 
@@ -54,3 +54,25 @@ plan, if created, treats Rust, server adapters, JS, parity tests, and docs as on
 After implementation, mark this phase done and summarize either the new protocol cleanup plan path or
 the no-go reason, the exact protocol invariants that blocked movement, commands run, and what human
 decision is needed before protocol source files move.
+
+## Gate Decision
+
+Go, with guardrails. The safe path is a separate phase-runner-ready plan at
+`plans/protocolcleanup/plan.md`; this phase does not move protocol source files.
+
+Evidence:
+
+- `docs/design/protocol.md` already names the protocol crate as the owner of wire DTOs, compact
+  code tables, slot schemas, codec metadata, and protocol versions, with `client/src/protocol.js` as
+  the browser mirror.
+- `docs/design/protocol.md` also has a boundary inventory for semantic DTOs, compact code tables,
+  slot behavior, adapter kind conversion, default faction id, and lobby palette mirroring.
+- `tests/protocol_parity.mjs` compares the Rust protocol contract dump against JS tags,
+  vocabularies, compact codes, codec/version metadata, docs code tables, selected builders, and
+  compact decode fixtures.
+- Current source inspection found one large Rust protocol crate entry point, one large JS mirror,
+  small Rust adapter files, a shared contract DTO crate, and already split protocol client
+  contracts. That shape supports mechanical module extraction while keeping public imports stable.
+- The follow-up plan requires Rust and JS movement in paired phases and blocks on any compact
+  version bump, field rename, exported-name change, stale-client compatibility shim, or protocol
+  migration.
