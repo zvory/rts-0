@@ -10,6 +10,7 @@ import {
   enterCursorLock,
   exitCursorLock,
   installedAppRuntime,
+  nativeDesktopCursorBridge,
 } from "../../client/src/input/cursor_lock.js";
 import {
   DomClickInputZone,
@@ -168,6 +169,7 @@ import {
 {
   const priorMatchMedia = globalThis.matchMedia;
   const priorNavigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const priorDesktopRuntimeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "__RTS_DESKTOP_RUNTIME");
   globalThis.matchMedia = (query) => ({ matches: query === "(display-mode: standalone)" });
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -186,12 +188,61 @@ import {
     value: { standalone: false },
   });
   assert(!installedAppRuntime(), "regular browser tabs are not installed app runtimes");
+  Object.defineProperty(globalThis, "__RTS_DESKTOP_RUNTIME", {
+    configurable: true,
+    value: { shell: "tauri", platform: "macos" },
+  });
+  assert(installedAppRuntime(), "Tauri desktop runtime marks an installed app runtime");
   if (priorMatchMedia === undefined) delete globalThis.matchMedia;
   else globalThis.matchMedia = priorMatchMedia;
   if (priorNavigatorDescriptor) Object.defineProperty(globalThis, "navigator", priorNavigatorDescriptor);
   else delete globalThis.navigator;
+  if (priorDesktopRuntimeDescriptor) Object.defineProperty(globalThis, "__RTS_DESKTOP_RUNTIME", priorDesktopRuntimeDescriptor);
+  else delete globalThis.__RTS_DESKTOP_RUNTIME;
 
   assert(cursorLockSupported(true), "browser pointer lock keeps cursor lock available");
+  assert(!cursorLockSupported(false, null), "cursor lock remains unavailable without browser or native support");
+
+  const fakeBridge = {
+    startCalls: [],
+    stopCalls: [],
+    supported() {
+      return true;
+    },
+    start(bounds) {
+      this.startCalls.push(bounds);
+      return Promise.resolve({ active: true, mode: "native-macos" });
+    },
+    stop(reason) {
+      this.stopCalls.push(reason);
+      return Promise.resolve({ active: false });
+    },
+    diagnostics() {
+      return { supported: true, backend: "native-macos", active: false };
+    },
+  };
+  assert(cursorLockSupported(false, fakeBridge), "native cursor bridge makes cursor lock available without browser Pointer Lock");
+  assert(nativeDesktopCursorBridge({ __RTS_NATIVE_CURSOR: fakeBridge }) === fakeBridge, "native desktop bridge is discovered from the runtime global");
+  let nativeBrowserFallbackCalled = 0;
+  const nativeMode = await enterCursorLock(
+    async () => {
+      nativeBrowserFallbackCalled += 1;
+      return true;
+    },
+    { x: 42, y: 64 },
+    fakeBridge,
+    { width: 800, height: 600 },
+  );
+  assert(nativeMode === "native-macos", "native cursor bridge is preferred when available");
+  assert(nativeBrowserFallbackCalled === 0, "native cursor bridge does not invoke browser Pointer Lock fallback");
+  assert(fakeBridge.startCalls[0].x === 42 && fakeBridge.startCalls[0].width === 800, "native cursor bridge receives cursor and viewport bounds");
+  let nativeBrowserExitCalled = false;
+  await exitCursorLock("native-macos", () => {
+    nativeBrowserExitCalled = true;
+  }, fakeBridge, "test-stop");
+  assert(fakeBridge.stopCalls[0] === "test-stop", "native cursor exit releases native capture");
+  assert(!nativeBrowserExitCalled, "native cursor exit does not call browser Pointer Lock exit");
+
   let browserFallbackCalled = 0;
   const mode = await enterCursorLock(
     async () => {
@@ -391,4 +442,116 @@ import {
   assert(painted.style.transform === undefined, "locked mousemove defers virtual cursor paint");
   lockedMoveInput._flushPointerLockCursor();
   assert(painted.style.transform === "translate(13px, 16px)", "virtual cursor paint flushes once per frame");
+}
+
+{
+  const painted = { style: {} };
+  const nativeMoveInput = Object.create(Input.prototype);
+  nativeMoveInput.pointerLocked = true;
+  nativeMoveInput._cursorLockMode = "native-macos";
+  nativeMoveInput.mouse = { x: 10, y: 20 };
+  nativeMoveInput.dom = {
+    clientWidth: 100,
+    clientHeight: 100,
+    getBoundingClientRect() {
+      return { left: 5, top: 7, width: 100, height: 100 };
+    },
+  };
+  nativeMoveInput.cameraNavigation = null;
+  nativeMoveInput.inputRouter = null;
+  nativeMoveInput._panDrag = null;
+  nativeMoveInput._drag = null;
+  nativeMoveInput._pointerLockCursor = painted;
+  nativeMoveInput._pendingPointerLockCursor = null;
+  nativeMoveInput._handleNativeCursorEvent({ type: "move", x: 14, y: 15, dx: 4, dy: -5 });
+  assert(nativeMoveInput.mouse.x === 14 && nativeMoveInput.mouse.y === 15, "native move updates virtual cursor coordinates from native event coordinates");
+  assert(painted.style.transform === "translate(14px, 15px)", "native move paints the DOM cursor during the native event handler");
+  assert(nativeMoveInput._pendingPointerLockCursor === null, "native move does not wait for Input.update to flush the cursor visual");
+}
+
+{
+  let routed = null;
+  const nativeRouteInput = Object.create(Input.prototype);
+  nativeRouteInput.pointerLocked = true;
+  nativeRouteInput._cursorLockMode = "native-macos";
+  nativeRouteInput.mouse = { x: 0, y: 0 };
+  nativeRouteInput.dom = {
+    clientWidth: 120,
+    clientHeight: 80,
+    getBoundingClientRect() {
+      return { left: 10, top: 20, width: 120, height: 80 };
+    },
+  };
+  nativeRouteInput.cameraNavigation = null;
+  nativeRouteInput.inputRouter = {
+    pointerDown(ev) {
+      routed = ev;
+      return true;
+    },
+  };
+  nativeRouteInput._pointerLockCursor = { style: {} };
+  nativeRouteInput._pendingPointerLockCursor = null;
+  nativeRouteInput._panDrag = null;
+  nativeRouteInput._drag = null;
+  nativeRouteInput._handleNativeCursorEvent({ type: "down", button: 0, x: 33, y: 44 });
+  assert(routed.viewportX === 33 && routed.viewportY === 44, "native pointerDown routes viewport coords from the native cursor");
+  assert(routed.clientX === 43 && routed.clientY === 64, "native pointerDown routes client coords matching the native cursor");
+}
+
+{
+  let exits = 0;
+  const nativeBlurInput = Object.create(Input.prototype);
+  nativeBlurInput.pointerLocked = true;
+  nativeBlurInput._shiftKeyDown = true;
+  nativeBlurInput.cameraNavigation = { release() {} };
+  nativeBlurInput._drag = null;
+  nativeBlurInput._placement = () => null;
+  nativeBlurInput._intent = () => null;
+  nativeBlurInput.exitPointerLock = () => {
+    exits += 1;
+    return Promise.resolve(true);
+  };
+  nativeBlurInput._handleBlur();
+  assert(exits === 1, "blur releases native cursor capture through the cursor-lock seam");
+}
+
+{
+  let exits = 0;
+  let removedNativeListener = 0;
+  let cameraDestroyed = 0;
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  globalThis.window = {
+    removeEventListener() {},
+  };
+  globalThis.document = {
+    removeEventListener() {},
+  };
+  const nativeDestroyInput = Object.create(Input.prototype);
+  nativeDestroyInput.exitPointerLock = () => {
+    exits += 1;
+    return Promise.resolve(true);
+  };
+  nativeDestroyInput.dom = {
+    removeEventListener() {},
+  };
+  nativeDestroyInput.cameraNavigation = {
+    destroy() {
+      cameraDestroyed += 1;
+    },
+  };
+  nativeDestroyInput._removeNativeCursorListener = () => {
+    removedNativeListener += 1;
+  };
+  nativeDestroyInput._pointerLockCursor = {
+    remove() {},
+  };
+  nativeDestroyInput.destroy();
+  assert(exits === 1, "destroy releases native cursor capture through the cursor-lock seam");
+  assert(removedNativeListener === 1, "destroy removes the native cursor event listener");
+  assert(cameraDestroyed === 1, "destroy keeps existing camera navigation teardown");
+  if (priorWindow === undefined) delete globalThis.window;
+  else globalThis.window = priorWindow;
+  if (priorDocument === undefined) delete globalThis.document;
+  else globalThis.document = priorDocument;
 }

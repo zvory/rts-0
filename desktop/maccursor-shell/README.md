@@ -29,16 +29,21 @@ The WebView injects `window.__RTS_DESKTOP_RUNTIME` before the client scripts run
 {
   shell: "tauri",
   platform: "macos",
-  nativeCursorBackend: false,
+  nativeCursorBackend: true,
+  nativeCursorCapture: true,
   pointerLockDisabled: true,
   serverMode: "spawned" | "external"
 }
 ```
 
-Pointer Lock is deliberately disabled inside this shell. Phase 2 must not claim
-cursor success from Chromium/WKWebView Pointer Lock; Phase 3 should use
-`window.__RTS_DESKTOP_RUNTIME.nativeCursorBackend === false` as the flag to
-replace with a real native cursor backend.
+Pointer Lock is deliberately disabled inside this shell. Cursor-lock requests
+use `window.__RTS_NATIVE_CURSOR`, a Tauri-injected native bridge that hides and
+disconnects the macOS cursor, forwards native mouse movement/down/up/wheel
+events to the client, and exposes `diagnostics()` with the active backend,
+native event count, JS processed count, dropped event count, delivery latency,
+and whether movement is batched. The current visible cursor is a DOM cursor
+painted directly in the native event handler (`visual: "dom-event-time"`), not
+a native overlay.
 
 Manual check:
 
@@ -46,6 +51,8 @@ Manual check:
 2. Confirm the lobby loads in the desktop window.
 3. Create a local lobby and start a one-player sandbox or AI match.
 4. Confirm the WebSocket connects from the shell-loaded origin.
-5. Confirm the Pointer Lock toggle fails in the shell, then run `./runserver`
-   and confirm ordinary browser play still works.
-6. Quit the shell and confirm the spawned server process exits.
+5. Toggle cursor lock in the shell, move over terrain/HUD/minimap, right-click
+   move units, box-select, wheel zoom, and press Escape. Inspect
+   `window.__RTS_NATIVE_CURSOR.diagnostics()` if movement feels delayed.
+6. Run `./runserver` and confirm ordinary browser Pointer Lock still works.
+7. Quit the shell and confirm the spawned server process exits.

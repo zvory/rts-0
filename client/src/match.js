@@ -781,6 +781,7 @@ export class Match {
     const h = dom.viewport.clientHeight;
     this.renderer.resize(w, h);
     this.applyBounds();
+    this.input?.configureNativeCursorBounds?.();
   }
 
   cameraView() {

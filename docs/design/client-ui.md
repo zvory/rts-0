@@ -632,14 +632,19 @@ the budget are blocked before `Net.command`.
 `input/index.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?, labToolController?)
+  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?, hotkeyProfiles?, clientIntent?, labToolController?, desktopCursor?)
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
   // On Windows, browser saves use Alt+number, including browser fullscreen;
   // installed-app/standalone saves accept Alt/Ctrl/Cmd+number.
   // optional pointer-lock mode traps the browser cursor and drives a visible
-  // virtual cursor for edge pan on multi-monitor setups.
+  // virtual cursor for edge pan on multi-monitor setups. In the macOS Tauri
+  // spike, the optional desktopCursor bridge replaces browser Pointer Lock
+  // while keeping the same selection, command, HUD, minimap, wheel, and Escape
+  // routing contracts. Native desktop cursor visuals are painted directly from
+  // the native event handler and diagnostics expose backend, native/JS event
+  // counts, dropped events, and delivery latency.
   update(dt)                             // continuous handling (edge scroll handled by camera)
   // emits nothing to return; mutates state.selection / clientIntent and calls commandIssuer.issueCommand
 }
