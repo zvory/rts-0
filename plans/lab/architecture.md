@@ -9,6 +9,9 @@ Related subplans:
 - [Room architecture requirements](../archive/lab/room/requirements.md) defines the high-level goal that rooms,
   replays, dev scenarios, and labs evolve toward shared room primitives with explicit policies
   instead of duplicated special cases.
+- [Session controls](session-controls/plan.md) retires the legacy quickstart/debug preset path, makes
+  lab vision per-operator, and adds room-local lab time/timeline controls without introducing lab
+  flags or fine-grained permissions.
 
 ## Product Contract
 
