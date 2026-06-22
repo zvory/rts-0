@@ -29,6 +29,23 @@ import {
 const NAME_STORAGE_KEY = "rts.playerName";
 
 const MAX_PLAYERS = 4;
+const COUNTDOWN_SOUND_BY_WORD = Object.freeze({
+  "3": "countdown_drei",
+  three: "countdown_drei",
+  drei: "countdown_drei",
+  "2": "countdown_zwei",
+  two: "countdown_zwei",
+  zwei: "countdown_zwei",
+  zvei: "countdown_zwei",
+  "1": "countdown_eins",
+  one: "countdown_eins",
+  eins: "countdown_eins",
+});
+const COUNTDOWN_SOUND_BY_INDEX = Object.freeze([
+  "countdown_drei",
+  "countdown_zwei",
+  "countdown_eins",
+]);
 
 export {
   DEFAULT_AI_PROFILE_ID,
@@ -38,6 +55,18 @@ export {
   shouldAcceptTeamDrop,
   teamSlotsForLobby,
 };
+
+export function countdownSoundId(word, index = -1, total = 0) {
+  const normalized = String(word || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  if (COUNTDOWN_SOUND_BY_WORD[normalized]) return COUNTDOWN_SOUND_BY_WORD[normalized];
+  if (total === COUNTDOWN_SOUND_BY_INDEX.length && index >= 0) {
+    return COUNTDOWN_SOUND_BY_INDEX[index] || null;
+  }
+  return null;
+}
 
 export function betaFactionSelectEnabledForLocation(locationLike) {
   const host = String(locationLike?.hostname || "").toLowerCase();
@@ -61,10 +90,12 @@ export class Lobby {
   /**
    * @param {HTMLElement} rootEl the `#lobby-screen` section.
    * @param {import("./net.js").Net} net network seam (join/ready/start + event bus).
+   * @param {import("./audio.js").Audio|null} [audio] shared app audio engine.
    */
-  constructor(rootEl, net) {
+  constructor(rootEl, net, audio = null) {
     this.root = rootEl;
     this.net = net;
+    this.audio = audio;
 
     // Form + room blocks.
     this.elName = rootEl.querySelector("#lobby-name");
@@ -647,24 +678,35 @@ export class Lobby {
     this._countdownEl = overlay;
     this.root.appendChild(overlay);
 
-    const showWord = (word) => {
+    const showWord = (word, index) => {
       if (!this._countdownEl) return;
       this._countdownEl.textContent = word;
       this._countdownEl.classList.remove("pulse");
       // Restart the animation for each word.
       void this._countdownEl.offsetWidth;
       this._countdownEl.classList.add("pulse");
+      this._playCountdownWord(word, index, words.length);
     };
 
     words.forEach((word, index) => {
       const delay = Math.round(index * wordMs);
       if (delay <= 0) {
-        showWord(word);
+        showWord(word, index);
       } else {
-        this._countdownTimers.push(window.setTimeout(() => showWord(word), delay));
+        this._countdownTimers.push(window.setTimeout(() => showWord(word, index), delay));
       }
     });
     this._countdownTimers.push(window.setTimeout(() => this._clearCountdown(), durationMs + 1000));
+  }
+
+  _playCountdownWord(word, index, total) {
+    const id = countdownSoundId(word, index, total);
+    if (!id || !this.audio) return;
+    this.audio.playUI(id, {
+      priority: 8,
+      pitchVariance: 0,
+      dedupKey: `match-countdown:${index}`,
+    });
   }
 
   _clearCountdown() {

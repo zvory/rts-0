@@ -33,6 +33,7 @@ src/
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
+  sound_manifest.js # Stable sound ids and asset URLs
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   hud_command_card.js # Command-card descriptors, faction command ids, and grid hotkeys
   hud_selection_panel.js # Selected-unit strip/details panel
