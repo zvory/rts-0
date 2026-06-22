@@ -3,7 +3,7 @@
 # non-zero if anything failed. This is the canonical "is the build green?" command.
 #
 # What it runs, in order:
-#   1. Architecture/contract policy (crate boundaries + sim/client/lobby architecture + faction guardrails + test-selector self-check)
+#   1. Architecture/contract policy (source file sizes + crate boundaries + sim/client/lobby architecture + faction guardrails + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
 #   3. Rust nextest fast scripted tests (deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
@@ -55,6 +55,7 @@ SERVER_BIN="${RTS_SERVER_BIN:-$CARGO_TARGET_DIR/debug/rts-server}"
 # --- Options --------------------------------------------------------------------------------
 PORT="${PORT:-}"
 RUN_RUST=1
+RUN_SOURCE_SIZE=1
 RUN_STATIC_JS=1
 RUN_LIVE_NODE=1
 RUN_CLIENT=1
@@ -72,9 +73,9 @@ for arg in "$@"; do
   case "$arg" in
     --no-rust)   RUN_RUST=0 ;;
     --no-client) RUN_CLIENT=0 ;;
-    --only-rust) RUN_RUST=1; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=0 ;;
-    --only-live-node) RUN_RUST=0; RUN_STATIC_JS=1; RUN_LIVE_NODE=1; RUN_CLIENT=0 ;;
-    --only-browser) RUN_RUST=0; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=1 ;;
+    --only-rust) RUN_RUST=1; RUN_SOURCE_SIZE=1; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=0 ;;
+    --only-live-node) RUN_RUST=0; RUN_SOURCE_SIZE=1; RUN_STATIC_JS=1; RUN_LIVE_NODE=1; RUN_CLIENT=0 ;;
+    --only-browser) RUN_RUST=0; RUN_SOURCE_SIZE=0; RUN_STATIC_JS=0; RUN_LIVE_NODE=0; RUN_CLIENT=1 ;;
     --with-tri-state-browser|--with-tri-state) RUN_TRI_STATE_BROWSER=1 ;;
     --full-ai|--full-selfplay) RUN_FULL_AI=1 ;;
     --port) echo "use --port=N or PORT=N" >&2; exit 2 ;;
@@ -602,6 +603,13 @@ run_rust_suites_bg() {
     SKIPPED+=("Rust nextest full AI coverage (--no-rust)")
   fi
 }
+
+if [ "$RUN_SOURCE_SIZE" = "1" ]; then
+  run_suite_bg "Architecture: source file sizes" \
+    node "$REPO_ROOT/scripts/check-source-file-sizes.mjs"
+else
+  SKIPPED+=("Architecture: source file sizes")
+fi
 
 if [ "$RUN_STATIC_JS" = "1" ]; then
   run_suite_bg "JS protocol contracts" \

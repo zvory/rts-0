@@ -66,6 +66,9 @@ jobs:
       - name: Run docs health check
         run: node scripts/check-docs-health.mjs
 
+      - name: Run source file size check
+        run: node scripts/check-source-file-sizes.mjs
+
   server-build:
     name: CI / server binary
     runs-on: ubuntu-latest

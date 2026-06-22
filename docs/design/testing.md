@@ -203,6 +203,12 @@ suites.
 - `client/`: run JS protocol/client contract checks, minimap/input contracts where relevant, and
   client smoke. Include Node integration when protocol decode or network behavior changed.
 
+`scripts/check-source-file-sizes.mjs` runs as a cheap policy gate and enforces a 1500-line cap for
+Rust, JS, and MJS source/test files under `server/`, `client/src/`, `tests/`, and `scripts/`.
+Files that were already above the cap are frozen in `scripts/source-file-size-baseline.json`; new
+over-cap files fail, and frozen exceptions fail on growth. Shrinkage prints a ratchet note so the
+baseline can be lowered or removed.
+
 `scripts/check-crate-boundaries.mjs` is part of the gate and fails on forbidden Cargo package
 edges or server-only imports in lower crates. The sim architecture ratchet is also part of the gate:
 `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` fails when

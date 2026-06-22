@@ -1,0 +1,77 @@
+{
+  "schema": "source-file-size-baseline-v1",
+  "max_lines": 1500,
+  "reason": "Initial frozen exceptions for files already above the 1500-line source/test cap when the repo-wide size gate was added.",
+  "exceptions": [
+    {
+      "path": "scripts/client-perf-harness.mjs",
+      "lines": 1953,
+      "reason": "Existing oversized harness before repo-wide source-size gate."
+    },
+    {
+      "path": "scripts/docdrift-sweep.mjs",
+      "lines": 2167,
+      "reason": "Existing oversized docs sweep tool before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/ai/src/ai_core/actions.rs",
+      "lines": 1645,
+      "reason": "Existing oversized AI action module before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/ai/src/ai_core/decision/tests.rs",
+      "lines": 4370,
+      "reason": "Existing oversized AI decision test module before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/archcheck/src/lib.rs",
+      "lines": 1725,
+      "reason": "Existing oversized architecture checker before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/protocol/src/lib.rs",
+      "lines": 3387,
+      "reason": "Existing oversized protocol crate before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/sim/src/game/services/combat/tests.rs",
+      "lines": 3721,
+      "reason": "Existing oversized sim combat test module before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/sim/src/game/services/commands.rs",
+      "lines": 1927,
+      "reason": "Existing oversized command service before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/sim/src/game/services/move_coordinator.rs",
+      "lines": 2076,
+      "reason": "Existing oversized movement coordinator before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/sim/src/game/services/movement/tests.rs",
+      "lines": 5231,
+      "reason": "Existing oversized movement test module before repo-wide source-size gate."
+    },
+    {
+      "path": "server/crates/sim/src/game/services/pathing.rs",
+      "lines": 1985,
+      "reason": "Existing oversized pathing service before repo-wide source-size gate."
+    },
+    {
+      "path": "server/src/lobby/room_task.rs",
+      "lines": 8219,
+      "reason": "Existing oversized lobby room task before repo-wide source-size gate."
+    },
+    {
+      "path": "server/src/main.rs",
+      "lines": 2169,
+      "reason": "Existing oversized server shell before repo-wide source-size gate."
+    },
+    {
+      "path": "tests/client_contracts/state_input_contracts.mjs",
+      "lines": 2149,
+      "reason": "Existing oversized client contract suite before repo-wide source-size gate."
+    }
+  ]
+}

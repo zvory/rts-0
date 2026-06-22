@@ -31,14 +31,14 @@ Use when writing/debugging tests, changing CI/hooks, or choosing focused verific
 - `node scripts/check-wiki.mjs` — wiki route hardening, generated stats, and faction catalog
   parity.
 - Render perf: `node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10`; add `--stress-matrix`.
+- `node scripts/check-source-file-sizes.mjs` — enforce the 1500-line Rust/JS/MJS cap.
 - `node scripts/check-crate-boundaries.mjs` — enforce crate dependency direction.
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
   enforce `rts-sim::game` internal architecture ratchets.
 
 ## Invariants
-- The required PR gate is the aggregate `./tests/run-all.sh` check from the `Main test gate`
-  workflow. Split CI jobs cover server binary build, Rust/architecture, live Node, browser, and
-  tri-state coverage; docs-only changes skip expensive lanes but still run docs health.
+- The required PR gate is `./tests/run-all.sh` in `Main test gate`. Split CI covers server build,
+  Rust/architecture, live Node, browser, and tri-state; docs-only still runs cheap policy checks.
 - `tests/run-all.sh` uses nextest for Rust tests and prints timing summaries. Missing nextest is a
   local gate failure with an install hint.
 - Live Node suites need a running server. Use `tests/run-all.sh` to boot a private one, or start
