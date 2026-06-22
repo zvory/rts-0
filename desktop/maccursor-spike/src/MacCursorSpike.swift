@@ -137,6 +137,10 @@ private final class NativeCaptureSession {
         snapshot.active
     }
 
+    var position: CGPoint {
+        snapshot.position
+    }
+
     func start(reason: String) -> Bool {
         guard !snapshot.active else {
             return true
@@ -197,7 +201,7 @@ private final class NativeCaptureSession {
         let maxY = bounds.maxY - markerDiameter / 2.0
 
         snapshot.position.x = clamp(snapshot.position.x + deltaX, minX, maxX)
-        snapshot.position.y = clamp(snapshot.position.y - deltaY, minY, maxY)
+        snapshot.position.y = clamp(snapshot.position.y + deltaY, minY, maxY)
         snapshot.eventCount += 1
         snapshot.lastLatencyMilliseconds = max(
             0.0,
@@ -409,6 +413,10 @@ private func runSelfTest() -> Int32 {
         deltaY: -7.0,
         eventTimestamp: ProcessInfo.processInfo.systemUptime
     )
+    guard session.position.x == bounds.midX + 11.0 && session.position.y == bounds.midY - 7.0 else {
+        print("maccursor-spike self-test moved to unexpected position \(session.position)", to: &standardError)
+        return 1
+    }
     session.stop(reason: "self-test complete")
 
     guard !session.isActive else {
