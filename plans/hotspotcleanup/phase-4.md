@@ -1,6 +1,6 @@
 # Phase 4 - Broad Sim Game Test Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 
