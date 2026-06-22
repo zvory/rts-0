@@ -369,7 +369,6 @@ export class LabPanel {
   armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
   cancelActiveTool()
   setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
-  deleteSelected()                       // applies selected-entity delete mutation with batch result summary
   exportScenario(), importScenario()
   destroy()
 }
@@ -417,8 +416,8 @@ faction unit and building palettes. Selected-entity repositioning also uses the 
 for each id at the clicked world point, and leaves stale-id or partial-failure reporting visible
 through the lab result status. The remove tool arms a persistent `removeSelectableUnits` setup
 tool; clicking deletes the selectable unit under the cursor, and dragging deletes selectable units
-in the box without changing the current selection. Delete and owner reassignment stay contextual to
-the current selection, disable themselves when no selected entity ids are available, and summarize
+in the box without changing the current selection. Owner reassignment stays contextual to the
+current selection, disables itself when no selected entity ids are available, and summarizes
 accepted plus rejected per-entity mutations after the individual server replies return.
 
 `hotkey_profiles.js`

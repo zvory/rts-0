@@ -161,10 +161,6 @@ export class LabPanel {
         disabled: selectedActionDisabled,
         title: selectedActionTitle,
       }),
-      this.button("Delete", () => this.deleteSelected(), {
-        disabled: selectedActionDisabled,
-        title: selectedActionTitle,
-      }),
       this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
     ]));
 
@@ -788,10 +784,6 @@ export class LabPanel {
     return this.batchEntityMutation("setEntityOwner", selectedEntityIds(this.selectedEntities()), (entityId) => (
       this.labClient.setEntityOwner(entityId, owner)
     ));
-  }
-
-  deleteSelected() {
-    return this.deleteEntities(selectedEntityIds(this.selectedEntities()));
   }
 
   deleteRemoveToolTargets(event) {
