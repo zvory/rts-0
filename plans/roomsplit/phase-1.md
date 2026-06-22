@@ -1,6 +1,6 @@
 # Phase 1 - Test Split And Baseline
 
-Status: not started.
+Status: done.
 
 ## Goal
 
@@ -55,3 +55,20 @@ pause/step, match-history gating, and empty-room reset.
 After implementation, mark this phase done and summarize the new test module map, the focused test
 commands run, root/test line counts after the split, any tests deliberately left together, and the
 manual smoke paths the next phases still need to keep in mind.
+
+## Completion Baseline
+
+- `server/src/lobby/room_task.rs`: 4,839 lines after replacing the inline test module with
+  `#[cfg(test)] mod tests;`.
+- Split test modules:
+  - `tests/branch.rs`: 751 lines
+  - `tests/dev.rs`: 121 lines
+  - `tests/lab.rs`: 697 lines
+  - `tests/lab_timeline.rs`: 861 lines
+  - `tests/lifecycle.rs`: 206 lines
+  - `tests/live.rs`: 719 lines
+  - `tests/lobby.rs`: 397 lines
+  - `tests/replay.rs`: 446 lines
+  - `tests/support.rs`: 339 lines
+- Lab timeline, seek, scenario import/export, and lab vision tests are split into
+  `lab_timeline.rs` so the core `lab.rs` file does not become a new oversized test file.

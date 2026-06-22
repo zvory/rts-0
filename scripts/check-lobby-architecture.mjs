@@ -64,6 +64,7 @@ function listRustFiles(dir) {
       const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
       const abs = path.join(absDir, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name === "tests") continue;
         walk(abs, rel);
       } else if (entry.isFile() && entry.name.endsWith(".rs")) {
         out.push(rel.replaceAll(path.sep, "/"));
