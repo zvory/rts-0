@@ -1,6 +1,6 @@
 # Phase 4 - Compact Snapshot Codec Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 

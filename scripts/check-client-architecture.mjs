@@ -44,6 +44,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "protocol.js": "transport",
   "protocol_constants.js": "transport",
   "protocol_frame.js": "transport",
+  "protocol_snapshot.js": "transport",
   "lab_client.js": "transport",
   "report_window_aggregate.js": "platform",
 
@@ -120,6 +121,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "match.js": 47157,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
+  // Protocol cleanup split compact snapshot decoding behind protocol.js.
+  "protocol_snapshot.js": 23000,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   "hud_command_card.js": 29498,
   "renderer/shared.js": 28113,

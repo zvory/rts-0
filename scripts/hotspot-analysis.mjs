@@ -33,6 +33,7 @@ const GROUP_RULES = [
       "tests/protocol_parity.mjs",
       "client/src/protocol.js",
       "client/src/protocol_constants.js",
+      "client/src/protocol_snapshot.js",
       "server/crates/protocol/src/contract_metadata.rs",
       "server/src/protocol.rs",
     ],
