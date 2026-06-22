@@ -12,7 +12,6 @@ export default scenario("local_lane_simple_move", {
   setup: {
     kind: "liveRoom",
     prediction: "disabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

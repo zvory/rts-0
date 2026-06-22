@@ -88,7 +88,7 @@ export class Net {
   addAi(teamId?, aiProfileId?)
   setAiProfile(id, aiProfileId)
   removeAi(id)
-  setQuickstart(enabled)                 // legacy compatibility command; no normal lobby control
+  setQuickstart(enabled)                 // legacy compatibility command slated for deletion
   setSpectator(spectator, id?)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
   giveUp()
@@ -794,7 +794,7 @@ export class Lobby {
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
   // The normal product lobby exposes an Open Lab route affordance instead of a Debug mode
-  // quickstart toggle; Net.setQuickstart remains for internal/test compatibility only.
+  // quickstart toggle; Net.setQuickstart remains only as temporary deletion-target compatibility.
   // Teams are layout groups only; player colors come from each player record.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }

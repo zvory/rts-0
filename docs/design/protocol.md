@@ -55,7 +55,7 @@ lobby/config dump replaces the source scrape.
 | `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. `aiProfileId` may be one of the supported live AI profiles; omitted or unknown values default to the highest supported live AI version. |
 | `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects the live AI profile for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile ids are ignored. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
-| `setQuickstart` | `enabled: bool` | Legacy host-only quickstart compatibility command for internal/test callers. The normal lobby UI does not expose it. |
+| `setQuickstart` | `enabled: bool` | Legacy host-only quickstart compatibility command slated for deletion. Active tests and the normal lobby UI must not depend on it. |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
@@ -359,7 +359,8 @@ Sent once when the match begins. Carries everything static for the whole match.
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
-the player's own starting City Centre + workers. When the legacy `setQuickstart` compatibility
+the player's own starting City Centre + workers. The legacy `setQuickstart` compatibility path is
+kept only until deletion and must not be used by active tests or product UI; when the compatibility
 command is enabled, every player starts with 99,999 steel and 99,999 oil instead of the default
 opening resources, and each human player also starts with five supply depots, one Gun Works
 (`steelworks` kind), one R&D Complex (`research_complex` kind), one Training Centre, two Barracks,
@@ -625,7 +626,8 @@ The optional compact `n` prediction fields are present only for live active play
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
 `debugPath` is present only when the room's projection policy enables movement-path diagnostics for
 that recipient and only while the unit has remaining movement waypoints. The legacy quickstart/debug
-compatibility path enables owner-only movement paths for active players. Dev scenario rooms may
+compatibility path still enables owner-only movement paths for active players until it is deleted in
+the lab session-controls follow-up. Dev scenario rooms may
 enable full projected movement paths. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
 staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
 points in traversal order and `waypoints[0]` is the current movement target. The compact slot

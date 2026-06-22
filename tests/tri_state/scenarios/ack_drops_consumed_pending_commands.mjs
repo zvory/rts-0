@@ -13,7 +13,6 @@ export default scenario("ack_drops_consumed_pending_commands", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

@@ -11,7 +11,6 @@ export default scenario("local_lane_queued_move", {
   setup: {
     kind: "liveRoom",
     prediction: "disabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

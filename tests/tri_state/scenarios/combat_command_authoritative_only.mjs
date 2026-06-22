@@ -16,7 +16,6 @@ export default scenario("combat_command_authoritative_only", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",

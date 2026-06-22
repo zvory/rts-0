@@ -14,7 +14,6 @@ export default scenario("train_optimism_rejection_clears_by_seq", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

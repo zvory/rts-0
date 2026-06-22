@@ -13,7 +13,6 @@ export default scenario("stale_snapshot_ignored", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

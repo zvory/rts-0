@@ -13,7 +13,6 @@ export default scenario("duplicate_and_skipped_snapshots_are_diagnostic", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

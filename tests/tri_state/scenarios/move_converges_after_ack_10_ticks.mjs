@@ -16,7 +16,6 @@ export default scenario("move_converges_after_ack_10_ticks", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",
