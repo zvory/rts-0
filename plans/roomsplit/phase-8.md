@@ -1,6 +1,6 @@
 # Phase 8 - Guardrails And Documentation Closeout
 
-Status: not started.
+Status: done.
 
 ## Goal
 
@@ -60,3 +60,7 @@ and launch, empty-room reset, and drain warning behavior.
 After implementation, mark this phase done and summarize the final module map, size budgets added,
 hotspot-analysis result, commands run, manual smoke results or remaining checks, and any follow-up
 room-runtime simplification that should become a separate plan.
+
+Implementation note: `scripts/hotspot-analysis.mjs` already groups `server/src/lobby/**` under
+`server-lobby-runtime`, so the split `room_task/**` files remain trackable as one room-runtime
+ownership area without a script or group-map change.

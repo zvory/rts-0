@@ -187,9 +187,21 @@ pub struct LabScenarioPlayer {
     pub name: String,
     pub color: String,
     pub is_ai: bool,
+    pub resources: LabScenarioResources,
+    pub research: LabScenarioResearch,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioResources {
     pub steel: u32,
     pub oil: u32,
-    pub upgrades: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioResearch {
+    pub completed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -287,13 +299,17 @@ impl Game {
                 name: player.name.clone(),
                 color: player.color.clone(),
                 is_ai: player.is_ai,
-                steel: player.steel,
-                oil: player.oil,
-                upgrades: player
-                    .upgrades
-                    .iter()
-                    .map(|upgrade| upgrade.to_protocol_str().to_string())
-                    .collect(),
+                resources: LabScenarioResources {
+                    steel: player.steel,
+                    oil: player.oil,
+                },
+                research: LabScenarioResearch {
+                    completed: player
+                        .upgrades
+                        .iter()
+                        .map(|upgrade| upgrade.to_protocol_str().to_string())
+                        .collect(),
+                },
             })
             .collect();
 
@@ -393,7 +409,7 @@ impl Game {
                     reason: format!("player {} has invalid display metadata", player.id),
                 });
             }
-            if player.upgrades.len() > MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER {
+            if player.research.completed.len() > MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER {
                 return Err(LabError::InvalidScenario {
                     reason: format!("player {} has too many upgrades", player.id),
                 });
@@ -447,10 +463,9 @@ impl Game {
                     player_id: player.id,
                 });
             };
-            state.steel = player.steel;
-            state.oil = player.oil;
+            state.set_resources(player.resources.steel, player.resources.oil);
             state.upgrades.clear();
-            for upgrade_id in &player.upgrades {
+            for upgrade_id in &player.research.completed {
                 let upgrade =
                     UpgradeKind::from_str(upgrade_id).map_err(|_| LabError::InvalidResearch {
                         player_id: player.id,
@@ -1404,7 +1419,10 @@ mod tests {
     fn lab_scenario_restore_rejects_invalid_upgrade_string() {
         let mut game = default_map_game();
         let mut scenario = game.export_lab_scenario();
-        scenario.players[0].upgrades.push("not_real".to_string());
+        scenario.players[0]
+            .research
+            .completed
+            .push("not_real".to_string());
 
         assert!(matches!(
             game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),

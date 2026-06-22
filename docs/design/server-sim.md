@@ -206,7 +206,8 @@ backdoor: entity mutations validate known unit/building kinds, real players, fin
 positions, placement/collision legality, and stale ids before changing the world. Accepted lab
 mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
 fog, and building memory before returning. `LabScenarioV1` is setup data keyed by map identity,
-player state, entity records, and small lab metadata such as scenario name and exported tick;
+player resources, completed research, entity records, and small lab metadata such as scenario name
+and exported tick;
 room-owned protocol export adds the requesting operator's current lab vision metadata before
 sending JSON to the browser.
 Restore loads the named map, validates faction/research/kind data, recreates entities with fresh
@@ -321,14 +322,43 @@ alive.
   so viewers see authoritative union-fog or single-player fog, never full-world state.
 
 Lobby-owned runtime boundaries stay in `server/src/lobby/`; none of these helpers move transport,
-AI controllers, or Tokio coordination into `rts-sim`:
+AI controllers, or Tokio coordination into `rts-sim`. `RoomTask` remains the single Tokio owner of
+room membership, phase state, room-owned control state, and the active `Game`; the implementation is
+split into focused room-local modules:
 
-- `room_task.rs` remains the room lifecycle owner: membership, lobby/ingame/replay/branch phase
-  transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
-  `Game`. Empty private dev, replay, replay-artifact, and lab rooms are disposable; empty private
-  replay-branch rooms reset their live/staging state but keep `RoomMode::ReplayBranch`, so reserved
-  `__replay_branch__` names never decay into public normal lobbies while preserving the in-memory
-  branch seed.
+- `room_task.rs` is the actor shell. It defines the `RoomTask` state, constructs rooms, owns the
+  run loop and event receiver, maps `RoomEvent` variants to mode handlers, exposes phase/policy
+  helpers, and keeps tiny shared send utilities. It should stay small enough to load first when
+  orienting around room behavior.
+- `room_task/types.rs` contains room-owned data types, constants, and constructors shared by the
+  room-task modules, including `RoomPlayer`, `AiSlot`, `Phase`, `RoomMode`, lab/dev room config,
+  and replay/lab tick payload stamps.
+- `room_task/lobby.rs` owns ordinary public lobby behavior: summaries, joins/leaves, readiness,
+  host fallback, team and faction selection, AI seats, spectator flags, selected map, quickstart,
+  countdown entry, and lobby broadcasts.
+- `room_task/live.rs` owns live-match room controls: command routing, command receipts, pause and
+  unpause, give-up, late spectator attach, live start-payload glue, pending recipient notices, and
+  live snapshot notice plumbing.
+- `room_task/lab.rs` owns lab sessions: first-join launch, lab role/vision metadata, request
+  authorization, mutation and issue-as routing, result delivery, dirty state, operation logging,
+  state broadcasts, room-time controls, and scenario export/import.
+- `room_task/dev.rs` owns dev-watch and authored scenario rooms: dev joins, scenario launch, script
+  driver glue, room-time controls, and dev start-payload sends.
+- `room_task/replay.rs` owns replay viewer rooms: replay joins and prompts, replay start-payload
+  sends, room-time seek/speed/step, per-viewer vision, observer analysis, replay ticks, and
+  return-to-lobby replay behavior.
+- `room_task/branch.rs` owns replay-branch room handling: staging joins, original-seat
+  claim/release, staging broadcasts, branch launch preparation, and branch-live attach.
+- `room_task/lifecycle.rs` owns start/end/reset/drain bookkeeping around the room actor:
+  countdown completion, match launch setup, game-over handling, match-history persistence gates,
+  post-match replay transition, empty-room disposal, drain warnings, and slow-tick logging.
+- `room_task/helpers.rs` contains small shared room-task helpers such as countdown duration,
+  server-build metadata, and automated match-history room classification.
+
+Empty private dev, replay, replay-artifact, and lab rooms are disposable; empty private
+replay-branch rooms reset their live/staging state but keep `RoomMode::ReplayBranch`, so reserved
+`__replay_branch__` names never decay into public normal lobbies while preserving the in-memory
+branch seed.
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
   names the state source, join, clock, authority, mutation, visibility, diagnostics,
   persistence/export, drain launch/accounting, start-payload, and UI-affordance choices used by the
@@ -381,8 +411,11 @@ future lab work should consume the extracted primitives first and migrate scenar
 separate product-approved design. `scripts/check-lobby-architecture.mjs` guards the now-stable
 fanout boundary by failing new production lobby calls to `Game::snapshot_for*` outside
 `projection.rs`, except for the existing AI think context in `live_tick.rs`. The same guardrail
-keeps accepted lab mutation and issue-as calls centralized in `room_task.rs`, where role-based
-operator authorization, result routing, dirty state, and the append-only operation log live.
+keeps accepted lab mutation and issue-as calls centralized in `room_task/lab.rs`, where role-based
+operator authorization, result routing, dirty state, and the append-only operation log live. The
+checker also ratchets the post-split room-task shape: `room_task.rs`, each production child module,
+and the production room-task total all have explicit line budgets, and any new child module must add
+its own budget instead of silently becoming another hotspot.
 
 ### 3.3 Rules layer (`rules/`)
 

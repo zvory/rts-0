@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-maccursor-start"
+description = "Enables the maccursor_start command without any pre-configured scope."
+commands.allow = ["maccursor_start"]
+
+[[permission]]
+identifier = "deny-maccursor-start"
+description = "Denies the maccursor_start command without any pre-configured scope."
+commands.deny = ["maccursor_start"]

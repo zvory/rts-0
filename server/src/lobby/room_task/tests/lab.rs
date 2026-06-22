@@ -89,8 +89,13 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
     assert_eq!(scenario.seed, 3_566_641_871);
     assert_eq!(scenario.players.len(), 2);
     assert_eq!(scenario.entities.len(), 227);
+    assert_eq!(scenario.players[0].resources.steel, 99_999);
+    assert_eq!(scenario.players[0].resources.oil, 99_999);
+    assert_eq!(scenario.players[1].resources.steel, 99_999);
+    assert_eq!(scenario.players[1].resources.oil, 99_999);
     assert!(scenario.players[0]
-        .upgrades
+        .research
+        .completed
         .contains(&"anti_tank_gun_unlock".to_string()));
     assert_eq!(
         task.lab_timeline

@@ -1,6 +1,6 @@
 # Phase 7 - Lifecycle And Runtime State Cleanup
 
-Status: not started.
+Status: done.
 
 ## Goal
 

@@ -170,8 +170,14 @@ assert(
   `inventory must document current EntityKind::ALL count ${allEntries.length}`,
 );
 
-const protocol = read("server/crates/protocol/src/lib.rs");
-const clientProtocol = read("client/src/protocol.js");
+const protocol = [
+  read("server/crates/protocol/src/lib.rs"),
+  read("server/crates/protocol/src/contract_metadata.rs"),
+].join("\n");
+const clientProtocol = [
+  read("client/src/protocol.js"),
+  read("client/src/protocol_constants.js"),
+].join("\n");
 for (const token of ["WORKER", "EKAT", "CITY_CENTRE", "ZAMOK", "STEEL", "OIL"]) {
   assert(protocol.includes(`pub const ${token}`), `Rust protocol missing ${token}`);
   assert(clientProtocol.includes(`${token}:`), `client protocol missing ${token}`);

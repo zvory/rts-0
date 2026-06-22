@@ -33,8 +33,8 @@ use tokio::time::{interval, MissedTickBehavior};
 use crate::config;
 use crate::db::Db;
 use crate::protocol::{
-    BranchStagingOccupant, Event, LabClientOp, PlayerScore, ReplayBranchSeat, ReplayStartMetadata,
-    ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, TeamId,
+    Event, LabClientOp, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest, ResourceDelta,
+    ServerMessage, Snapshot, TeamId,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
@@ -61,7 +61,6 @@ mod tick_control;
 
 pub use connection::{ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
-use replay_session::ReplaySession;
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
 use room_task::{RoomMode, RoomTask};
 pub(crate) use snapshots::compact_snapshot_for_wire;

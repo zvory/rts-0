@@ -5,9 +5,12 @@ Client-to-server messages and reliable server-to-client messages are JSON object
 the same WebSocket. Field names are short but readable. Coordinates are **world pixels** (floats)
 unless a field name ends in `Tile`. The canonical Rust definitions live in
 `server/crates/protocol/src/lib.rs`; the server-shell `server/src/protocol.rs` is an adapter for
-typed entity-kind conversion and legacy imports. The browser mirror lives in `client/src/protocol.js`
-(builders + constants). Rust and JS MUST agree on every tag, field name, and compact transport
-shape.
+typed entity-kind conversion and legacy imports. Protocol constants, compact code tables, and the
+structured contract dump are factored into `server/crates/protocol/src/contract_metadata.rs` and
+re-exported through `lib.rs`. The browser mirror lives in `client/src/protocol.js` (builders +
+decode helpers), with constants in `client/src/protocol_constants.js` and frame transport internals
+in `client/src/protocol_frame.js`. Rust and JS MUST agree on every tag, field name, and compact
+transport shape.
 
 This is a pre-alpha, latest-version-only protocol. It may change incompatibly with older clients,
 servers, and replay artifacts; keep the current Rust and JS mirrors synchronized instead of
@@ -20,17 +23,22 @@ crate.
 
 ### 2.0 Boundary authority and guardrails
 
-`server/crates/protocol/src/lib.rs` owns the wire DTO vocabulary, message tags, compact code
-tables, compact slot schemas, `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, and the
-unknown compact-code sentinel (`255`). `server/crates/contract/src/lib.rs` owns shared semantic DTOs
-that the protocol crate re-exports, including start/snapshot contract records and
-`DEFAULT_FACTION_ID`. `rts-rules::EntityKind::stable_id()` owns domain identity strings; rules- or
-sim-aware conversion into protocol kind strings belongs in adapter modules, not in `rts-protocol`.
+`server/crates/protocol/src/lib.rs` owns the wire DTO vocabulary, with protocol constants, message
+tags, compact code tables, compact slot schemas, `COMPACT_SNAPSHOT_VERSION`,
+`PREDICTION_PROTOCOL_VERSION`, and the unknown compact-code sentinel (`255`) housed in
+`server/crates/protocol/src/contract_metadata.rs` and re-exported from `lib.rs`. MessagePack
+frame-writing internals live in
+`server/crates/protocol/src/messagepack_frame.rs` behind the public frame helpers re-exported by
+`lib.rs`. `server/crates/contract/src/lib.rs` owns shared semantic DTOs that the protocol crate
+re-exports, including start/snapshot contract records and `DEFAULT_FACTION_ID`.
+`rts-rules::EntityKind::stable_id()` owns domain identity strings; rules- or sim-aware conversion
+into protocol kind strings belongs in adapter modules, not in `rts-protocol`.
 
 `client/src/protocol.js` is the browser mirror and stable public import surface for protocol
-vocabulary, compact decode tables, message builders, and decode helpers. Future internal browser
-splits may live under `client/src/protocol_*.js` or `client/src/protocol/**`, but callers should
-continue importing through `client/src/protocol.js`. Protocol changes must update Rust DTOs or
+vocabulary, compact decode tables, message builders, and decode helpers. Internal browser constants
+and compact-code maps live in `client/src/protocol_constants.js`, while callers should continue
+importing through `client/src/protocol.js`. Future internal browser splits may live under
+`client/src/protocol_*.js` or `client/src/protocol/**`. Protocol changes must update Rust DTOs or
 dumps, the JS mirror, this design file, and focused parity coverage in the same commit. Compact slot
 order is append-only unless the compact snapshot version is intentionally bumped and the Rust
 serializer, JS decoder, parity fixture, and docs change together.
@@ -185,6 +193,15 @@ in a match:
   devicePixelRatioX100: u16, // latest devicePixelRatio multiplied by 100
   hidden: bool,             // document.hidden when the report was sent
   focused: bool,            // document.hasFocus() when available
+  desktopRuntimePresent: bool, // true when the desktop shell runtime flag exists
+  nativeCursorBridgePresent: bool, // true when the native cursor JS bridge exists
+  nativeCursorSupported: bool, // native cursor bridge support result
+  nativeCursorActive: bool, // native cursor capture active state from bridge diagnostics
+  nativeCursorLastReason: string, // bounded native cursor diagnostic reason
+  nativeCursorLastError: string, // bounded native cursor diagnostic error
+  tauriInternalsPresent: bool, // true when Tauri IPC internals are visible
+  tauriGlobalPresent: bool,   // true when the global Tauri API object is visible
+  tauriGlobals: string,       // bounded comma-separated Tauri global key summary
   wsBufferedBytes: u32,     // browser WebSocket bufferedAmount
   serverTickMs: u16,        // latest server tick work duration seen in snapshot netStatus
   serverLagMs: u16,         // latest scheduler lag seen in snapshot netStatus
@@ -220,21 +237,22 @@ in a match:
   predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
 }
 ```
-The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, and command milestone
-fields are report-window aggregates only; raw snapshot payloads, raw timestamp arrays, entity ids,
-unit ids, target ids, positions, replay data, and command payloads are not uploaded. The canonical
-single-segment payload budget is 1280 bytes. It is intentionally below a common 1460-byte Ethernet
-TCP MSS because the measured snapshot bytes are only WebSocket application payload bytes and exclude
-WebSocket framing plus TLS, TCP, and IP overhead. Command milestone timing splits local issue to
-receipt, receipt to sim acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to
-browser apply. The frame-work and renderer fields come from the browser's bounded frame-profiler
-report window; the local debug surface may keep richer cumulative phase tables, but those raw arrays
-and detailed recent frames are not uploaded. The server logs this message only when the aggregate
-contains notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure,
-packet-budget pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer
-cost, WebSocket backlog, server tick/scheduler pressure, command milestone delay/rejection, or
-prediction correction/fallback signals, alongside the connection's `player_id`, room name, and
-reported `match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
+The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, command milestone, and
+desktop cursor runtime fields are report-window aggregates or bounded summaries only; raw snapshot
+payloads, raw timestamp arrays, entity ids, unit ids, target ids, positions, replay data, command
+payloads, and raw cursor input events are not uploaded. The canonical single-segment payload budget
+is 1280 bytes. It is intentionally below a common 1460-byte Ethernet TCP MSS because the measured
+snapshot bytes are only WebSocket application payload bytes and exclude WebSocket framing plus TLS,
+TCP, and IP overhead. Command milestone timing splits local issue to receipt, receipt to sim
+acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to browser apply. The
+frame-work and renderer fields come from the browser's bounded frame-profiler report window; the
+local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
+recent frames are not uploaded. The server logs this message only when the aggregate contains
+notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure, packet-budget
+pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
+backlog, server tick/scheduler pressure, command milestone delay/rejection, or prediction
+correction/fallback signals, alongside the connection's `player_id`, room name, and reported
+`match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
 transport/browser/prediction/render behavior, not as gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)
@@ -509,9 +527,10 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 23. `client/src/net.js` parses the
-binary frame into the raw compact snapshot object, then `decodeCompactSnapshot` expands it back into
-the semantic object above before dispatching `S.SNAPSHOT`.
+`messagepack-compact`, codec version 1, compact snapshot version 23. `client/src/net.js` calls
+`parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
+compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
+before dispatching `S.SNAPSHOT`.
 
 The rollout is direct and latest-version-only. Reliable non-snapshot messages (`welcome`, `start`,
 `lobby`, `pong`, errors, room/lab/replay control messages, and game over) remain JSON text. The
@@ -580,13 +599,13 @@ an inventory only; it does not change the wire shape or compact snapshot version
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
 | `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby HTTP route handlers in `server/src/main.rs` and room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary and create-lobby behavior | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | None; JS is a protocol mirror | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
 | Semantic start/snapshot/replay/analysis DTOs | `server/crates/contract/src/lib.rs`, re-exported by `server/crates/protocol/src/lib.rs` | `client/src/protocol.js` decoder output consumed by client modules | wire DTO | `tests/protocol_parity.mjs` fixture decodes selected compact fields; Rust serde tests cover local serialization | Structured contract/schema dump for semantic DTO fields plus compact round-trip fixtures | None; JS is a protocol mirror | Compact bump only when the live compact representation changes |
-| `terrain` codes | `server/crates/protocol/src/lib.rs` `terrain`; adapter test checks rules terrain constants | `client/src/protocol.js` `TERRAIN` and `PASSABLE` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
-| `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/lib.rs` `kinds`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
+| `terrain` codes | `server/crates/protocol/src/contract_metadata.rs` `terrain`, re-exported by `lib.rs`; adapter test checks rules terrain constants | `client/src/protocol_constants.js` `TERRAIN` and `PASSABLE`, re-exported by `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
+| `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/contract_metadata.rs` `kinds`, re-exported by `lib.rs`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol_constants.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, re-exported by `client/src/protocol.js` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
 | `server/src/protocol.rs` and `server/crates/sim/src/protocol.rs` kind conversion | Rules/sim-aware adapter modules | No direct JS mirror beyond the protocol kind strings | domain adapter mapping | Rust adapter tests in both modules | One shared rules-aware adapter path with a single round-trip test | Not client data | No compact impact unless output kind strings/codes change |
-| `states`, `SETUP`, `NOTICE_SEVERITY`, `REPLAY_VISION`, and event discriminators | `server/crates/protocol/src/lib.rs` string vocabulary and event serialization | `client/src/protocol.js` constants and decoder | wire DTO / compact transport code | `tests/protocol_parity.mjs` checks state, setup, notice severity, and event compact codes; selected decoder fixtures | Structured protocol constants and compact event-shape dump | None | Bump when compact event/entity slots change |
-| `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, compact top-level keys, optional entity slots, limits, and net status slots | `server/crates/protocol/src/lib.rs` compact serializer | `client/src/protocol.js` `COMPACT_SNAPSHOT_VERSION`, decode helpers, `MAX_COMPACT_*` limits | compact transport code | `tests/protocol_parity.mjs` source-text version checks and fixture decode | Structured compact schema dump including slot names, order, caps, and version | None | Direct owner of compact version; slot/order changes require bump unless strictly optional trailing additions preserve decoder compatibility by explicit decision |
-| Compact code tables for kind, state, setup, order stage, ability, ability object kind, upgrade, notice severity, and event records | `server/crates/protocol/src/lib.rs` code functions and event serializer | `client/src/protocol.js` `*_CODE` maps | compact transport code | `tests/protocol_parity.mjs` extracts Rust functions/events and rejects duplicate or `255` real codes | Structured protocol constants dump generated from Rust instead of source scraping | None | `255` remains unknown/sentinel; real codes must not use it. New codes should append without reusing old values; incompatible reorder/removal requires compact version bump |
-| Ability and upgrade ids in command/research/snapshot payloads | Protocol string modules in `server/crates/protocol/src/lib.rs`; catalog facts in `server/crates/rules/src/faction.rs` | `client/src/protocol.js` `ABILITY`, `UPGRADE`, `ABILITY_CODE`, `UPGRADE_CODE`; command-card descriptors in `client/src/config.js` | wire DTO, compact transport code, faction catalog fact | `tests/protocol_parity.mjs` checks protocol ids/codes; `scripts/check-faction-catalog-parity.mjs` checks catalog-exposed ability codes and descriptors | Structured protocol dump plus complete faction catalog dump | None where mirrored from Rust; catalog descriptors are not UI-only when exported by Rust | Code/order changes can require compact bump; descriptor-only changes do not |
+| `states`, `SETUP`, `NOTICE_SEVERITY`, `REPLAY_VISION`, and event discriminators | `server/crates/protocol/src/contract_metadata.rs` string vocabulary, with event serialization still in `lib.rs` | `client/src/protocol_constants.js` constants, re-exported by `client/src/protocol.js`; decoder remains in `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` checks state, setup, notice severity, and event compact codes; selected decoder fixtures | Structured protocol constants and compact event-shape dump | None | Bump when compact event/entity slots change |
+| `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, compact top-level keys, optional entity slots, limits, and net status slots | `server/crates/protocol/src/contract_metadata.rs` owns versions and slot metadata; `server/crates/protocol/src/lib.rs` compact serializer; `server/crates/protocol/src/messagepack_frame.rs` frame writer | `client/src/protocol_constants.js` `COMPACT_SNAPSHOT_VERSION` and `MAX_COMPACT_*` limits; decode helpers remain in `client/src/protocol.js`; `client/src/protocol_frame.js` binary frame parser | compact transport code | `tests/protocol_parity.mjs` source-text version checks and fixture decode | Structured compact schema dump including slot names, order, caps, and version | None | Direct owner of compact version; slot/order changes require bump unless strictly optional trailing additions preserve decoder compatibility by explicit decision |
+| Compact code tables for kind, state, setup, order stage, ability, ability object kind, upgrade, notice severity, and event records | `server/crates/protocol/src/contract_metadata.rs` code tables and code functions; event serializer remains in `lib.rs` | `client/src/protocol_constants.js` `*_CODE` and reverse-code maps, re-exported through `client/src/protocol.js` where public | compact transport code | `tests/protocol_parity.mjs` extracts Rust functions/events and rejects duplicate or `255` real codes | Structured protocol constants dump generated from Rust instead of source scraping | None | `255` remains unknown/sentinel; real codes must not use it. New codes should append without reusing old values; incompatible reorder/removal requires compact version bump |
+| Ability and upgrade ids in command/research/snapshot payloads | Protocol string modules in `server/crates/protocol/src/contract_metadata.rs`; catalog facts in `server/crates/rules/src/faction.rs` | `client/src/protocol_constants.js` `ABILITY`, `UPGRADE`, `ABILITY_CODE`, `UPGRADE_CODE`, re-exported by `client/src/protocol.js`; command-card descriptors in `client/src/config.js` | wire DTO, compact transport code, faction catalog fact | `tests/protocol_parity.mjs` checks protocol ids/codes; `scripts/check-faction-catalog-parity.mjs` checks catalog-exposed ability codes and descriptors | Structured protocol dump plus complete faction catalog dump | None where mirrored from Rust; catalog descriptors are not UI-only when exported by Rust | Code/order changes can require compact bump; descriptor-only changes do not |
 | `DEFAULT_FACTION_ID` | `server/crates/contract/src/lib.rs`, re-exported by protocol | `client/src/protocol.js` | wire DTO / faction catalog fact | `tests/protocol_parity.mjs`; `scripts/check-faction-catalog-parity.mjs` checks default catalog id | Structured contract/catalog dump | None | No compact impact |
 | `PLAYER_PALETTE` lobby colors | `server/src/lobby/mod.rs` assigns authoritative lobby/start colors | `client/src/config.js` fallback palette | server-owned presentation data mirrored by client | `tests/protocol_parity.mjs` source-scrapes the Rust palette | Structured lobby/config dump | Not client-only because server sends assigned colors; JS is fallback/render mirror | No compact impact |
 
@@ -883,7 +902,8 @@ units belong to that player; mixed-owner selections are rejected instead of part
   map: { name: string, schemaVersion: u32, contentHash: string },
   players: [{
     id: u32, teamId: u32, factionId: string, name: string, color: string, isAi: bool,
-    steel: u32, oil: u32, upgrades: string[]
+    resources: { steel: u32, oil: u32 },
+    research: { completed: string[] }
   }],
   entities: [{
     id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
