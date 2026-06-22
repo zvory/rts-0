@@ -584,9 +584,21 @@ pub struct LabScenarioPlayer {
     pub name: String,
     pub color: String,
     pub is_ai: bool,
+    pub resources: LabScenarioResources,
+    pub research: LabScenarioResearch,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioResources {
     pub steel: u32,
     pub oil: u32,
-    pub upgrades: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioResearch {
+    pub completed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

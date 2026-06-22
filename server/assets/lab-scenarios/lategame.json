@@ -2747,13 +2747,17 @@
       "id": 1,
       "isAi": false,
       "name": "Lab Alpha",
-      "oil": 0,
-      "steel": 75,
       "teamId": 1,
-      "upgrades": [
-        "methamphetamines",
-        "anti_tank_gun_unlock"
-      ]
+      "resources": {
+        "steel": 99999,
+        "oil": 99999
+      },
+      "research": {
+        "completed": [
+          "methamphetamines",
+          "anti_tank_gun_unlock"
+        ]
+      }
     },
     {
       "color": "#d55e00",
@@ -2761,10 +2765,14 @@
       "id": 2,
       "isAi": false,
       "name": "Lab Bravo",
-      "oil": 0,
-      "steel": 75,
       "teamId": 2,
-      "upgrades": []
+      "resources": {
+        "steel": 99999,
+        "oil": 99999
+      },
+      "research": {
+        "completed": []
+      }
     }
   ],
   "schemaVersion": 1,
