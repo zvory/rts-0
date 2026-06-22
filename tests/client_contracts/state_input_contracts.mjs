@@ -1491,7 +1491,6 @@ function buttonByLabel(card, label) {
   labRemoveInput.clientIntent = new ClientIntent();
   labRemoveInput.clientIntent.beginLabTool({
     kind: "removeSelectableUnits",
-    payload: { unitsOnly: true },
     keepArmedOnWorldClick: true,
     consumeBoxSelection: true,
     keepArmedOnBoxSelection: true,
@@ -1543,6 +1542,15 @@ function buttonByLabel(card, label) {
     "lab remove tool click receives the selectable unit under the cursor",
   );
   assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after click delete");
+  labRemoveInput._eventScreenPos = () => ({ x: 104, y: 64 });
+  labRemoveInput._onLeftDown({ x: 104, y: 64 }, {});
+  labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
+  assert(
+    labRemoveClickEvents.length === 2 &&
+      labRemoveClickEvents[1].entityIds.join(",") === "63" &&
+      labRemoveClickEvents[1].entityId === 63,
+    "lab remove tool click receives the selectable building under the cursor",
+  );
   let labRemovePointer = { x: 90, y: 90 };
   labRemoveInput._screenPos = () => labRemovePointer;
   labRemoveInput._eventScreenPos = () => labRemovePointer;
@@ -1551,8 +1559,8 @@ function buttonByLabel(card, label) {
   labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
   assert(labRemoveBoxEvents.length === 1, "lab remove tool consumes box selections");
   assert(
-    labRemoveBoxEvents[0].entityIds.join(",") === "61,62",
-    "lab remove tool box selection receives selectable units, excluding buildings and shot reveals",
+    labRemoveBoxEvents[0].entityIds.join(",") === "61,63,62",
+    "lab remove tool box selection receives selectable units and buildings, excluding shot reveals",
   );
   assert(labRemoveSelections.length === 0, "lab remove tool box selection does not fall through to normal selection");
   assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after box delete");

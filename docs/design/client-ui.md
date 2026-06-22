@@ -469,8 +469,9 @@ faction unit and building palettes. Selected-entity repositioning also uses the 
 `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends `moveEntity` requests
 for each id at the clicked world point, and leaves stale-id or partial-failure reporting visible
 through the lab result status. The remove tool arms a persistent `removeSelectableUnits` setup
-tool; clicking deletes the selectable unit under the cursor, and dragging deletes selectable units
-in the box without changing the current selection. Owner reassignment stays contextual to the
+tool; clicking deletes the selectable unit or building under the cursor, and dragging deletes
+selectable units and buildings in the box without changing the current selection. Owner
+reassignment stays contextual to the
 current selection, disables itself when no selected entity ids are available, and summarizes
 accepted plus rejected per-entity mutations after the individual server replies return.
 

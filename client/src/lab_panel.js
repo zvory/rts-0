@@ -736,8 +736,7 @@ export class LabPanel {
     const armed = this.match.armLabTool(
       {
         kind: "removeSelectableUnits",
-        payload: { unitsOnly: true },
-        label: "Remove units",
+        label: "Remove entities",
         keepArmedOnWorldClick: true,
         consumeBoxSelection: true,
         keepArmedOnBoxSelection: true,
@@ -789,7 +788,7 @@ export class LabPanel {
   deleteRemoveToolTargets(event) {
     return this.deleteEntities(
       selectedEntityIdsFromPayload(event?.entityIds),
-      "No selectable units in the remove tool target.",
+      "No selectable entities in the remove tool target.",
     );
   }
 
@@ -1144,7 +1143,7 @@ function labToolLabel(tool) {
     return kind ? `Spawn ${KIND_LABELS[kind] || kind}` : "Spawn";
   }
   if (tool?.kind === "moveSelected") return "Move selected";
-  if (tool?.kind === "removeSelectableUnits") return "Remove units";
+  if (tool?.kind === "removeSelectableUnits") return "Remove entities";
   return "Setup tool";
 }
 

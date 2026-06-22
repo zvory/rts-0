@@ -446,22 +446,22 @@ await withFakeDocument(async () => {
       armedTool?.keepArmedOnBoxSelection === true,
     "LabPanel remove tool stays armed and consumes box selections",
   );
-  assert(textWithin(root).includes("Armed: Remove units"), "LabPanel shows the armed remove tool state");
+  assert(textWithin(root).includes("Armed: Remove entities"), "LabPanel shows the armed remove tool state");
   const removeClickPromise = armedCallbacks.onWorldClick({ tool: { ...armedTool }, entityIds: [41], x: 300, y: 320 });
   assert(
     sent.at(-1).op.op === "deleteEntity" &&
       sent.at(-1).op.entityId === 41,
-    "LabPanel remove click deletes the hit selectable unit",
+    "LabPanel remove click deletes the hit selectable entity",
   );
   resolveLastLabResult({ outcome: { entityId: 41 } });
   await removeClickPromise;
   assert(textWithin(root).includes("Deleted 1 entity."), "LabPanel summarizes remove click deletes");
   assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel remove tool stays armed after a click delete");
   const removeBoxPromise = armedCallbacks.onBoxSelection({ tool: { ...armedTool }, entityIds: [42, 43] });
-  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 42, "LabPanel remove drag deletes the first boxed unit");
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 42, "LabPanel remove drag deletes the first boxed entity");
   resolveLastLabResult({ outcome: { entityId: 42 } });
   await Promise.resolve();
-  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 43, "LabPanel remove drag deletes all boxed units");
+  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 43, "LabPanel remove drag deletes all boxed entities");
   resolveLastLabResult({ outcome: { entityId: 43 } });
   await removeBoxPromise;
   assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes remove drag deletes");
