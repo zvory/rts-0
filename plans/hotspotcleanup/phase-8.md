@@ -1,6 +1,6 @@
 # Phase 8 - AI Self-Play Test Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 
