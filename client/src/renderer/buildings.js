@@ -118,28 +118,33 @@ export function _drawBuilding(e, colorByOwner, state) {
     this._icon(e, e.x, e.y, Math.min(w, h) * 0.5, bodyAlpha);
   }
 
+  let overlay = null;
   if (underConstruction) {
+    overlay = this._slot("buildingOverlays", e.id);
+    overlay.position.set(0, 0);
     // Construction progress bar across the footprint base.
     const bw = w * 0.8;
     const bx = e.x - bw / 2;
     const by = y0 + h - 6;
-    g.beginFill(COLORS.hpBack, 0.85);
-    g.drawRect(bx, by, bw, 4);
-    g.endFill();
-    g.beginFill(COLORS.hpGood);
-    g.drawRect(bx, by, bw * clamp01(e.buildProgress), 4);
-    g.endFill();
+    overlay.beginFill(COLORS.hpBack, 0.85);
+    overlay.drawRect(bx, by, bw, 4);
+    overlay.endFill();
+    overlay.beginFill(COLORS.hpGood);
+    overlay.drawRect(bx, by, bw * clamp01(e.buildProgress), 4);
+    overlay.endFill();
   } else if (typeof e.prodProgress === "number" && e.prodProgress > 0) {
+    overlay = this._slot("buildingOverlays", e.id);
+    overlay.position.set(0, 0);
     // Unit production progress bar along the roof line.
     const bw = w * 0.78;
     const bx = e.x - bw / 2;
     const by = y0 + 6;
-    g.beginFill(COLORS.hpBack, 0.9);
-    g.drawRect(bx, by, bw, 5);
-    g.endFill();
-    g.beginFill(COLORS.hpGood);
-    g.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
-    g.endFill();
+    overlay.beginFill(COLORS.hpBack, 0.9);
+    overlay.drawRect(bx, by, bw, 5);
+    overlay.endFill();
+    overlay.beginFill(COLORS.hpGood);
+    overlay.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
+    overlay.endFill();
   }
 
   // Queue depth label: show items waiting behind the active production slot.

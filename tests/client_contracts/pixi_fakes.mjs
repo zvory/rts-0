@@ -86,6 +86,21 @@ export function installFakePixi() {
     }
   }
 
+  class FakeText {
+    constructor(text = "", style = {}) {
+      this.text = text;
+      this.style = style;
+      this.visible = true;
+      this.alpha = 1;
+      this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
+      this.scale = { set: (value = 1) => { this.scaleValue = value; } };
+      this.anchor = { set: (x = 0, y = x) => { this.anchorX = x; this.anchorY = y; } };
+    }
+    destroy() {
+      this.destroyed = true;
+    }
+  }
+
   class FakeApplication {
     constructor(options = {}) {
       this.options = options;
@@ -114,6 +129,7 @@ export function installFakePixi() {
     Application: FakeApplication,
     Container: FakeContainer,
     Graphics: PixiGraphics,
+    Text: FakeText,
     SCALE_MODES: { NEAREST: "nearest" },
     settings: {},
   };

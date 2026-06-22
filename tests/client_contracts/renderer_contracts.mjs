@@ -115,6 +115,52 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 }
 
 {
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = new Renderer(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
+      id: 501,
+      owner: 2,
+      kind: KIND.BARRACKS,
+      x: 160,
+      y: 160,
+      hp: 100,
+      maxHp: 400,
+      state: "idle",
+      buildProgress: 0.42,
+    };
+
+    renderer._drawBuilding(entity, new Map([[2, 0xc85050]]), {
+      playerId: 99,
+      players: [{ id: 2, color: "#c85050" }],
+      spectator: true,
+    });
+
+    const rig = renderer._liveRigPools.buildingRigs.get(entity.id)?.container;
+    const overlay = renderer._pools.buildingOverlays.get(entity.id);
+    const overlayRects = overlay?.calls.filter((call) => call[0] === "drawRect") || [];
+    const buildingsIndex = renderer.world.children.indexOf(renderer.layers.buildings);
+    const overlaysIndex = renderer.world.children.indexOf(renderer.layers.buildingOverlays);
+    assert(rig && renderer.layers.buildings.children.includes(rig), "SVG building rig renders on the buildings layer");
+    assert(overlayRects.length === 2, "under-construction building draws progress bar rectangles");
+    assert(overlaysIndex > buildingsIndex, "building progress overlay layer renders above SVG building bodies");
+  } finally {
+    restorePixi();
+  }
+}
+
+{
   const priorWindow = globalThis.window;
   const priorDocument = globalThis.document;
   const priorRequestAnimationFrame = globalThis.requestAnimationFrame;
