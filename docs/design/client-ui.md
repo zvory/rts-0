@@ -346,7 +346,7 @@ export class LabClient {
   setInitialState(state)
   subscribeState(handler)                // returns unsubscribe
   subscribeResult(handler)               // returns unsubscribe
-  setVision(vision)                      // sends {op:"setVision", vision}
+  setVision(vision)                      // sends {op:"setVision", vision} for this operator only
   request(op, options?)                  // allocates requestId, resolves with labResult/timeout
   destroy()
 }
@@ -384,12 +384,13 @@ export function createDefaultControlPolicy()
 `App` owns `LabClient`, `LabPanel`, and lab control policy lifetimes when a `start` payload carries
 `lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
 constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
-MVP exposes room-local vision, setup mutations, issue-as commands, and scenario import/export
+MVP exposes per-operator lab vision, setup mutations, issue-as commands, and scenario import/export
 through those collaborators while keeping the normal match screen authentic. Lab operator starts
-are still spectator-shaped for projection and prediction, but the injected control policy exposes
-`canUseCommandSurface(state)` so `Match` and HUD can keep selection plus the real command card
-available for operators while read-only lab viewers, replay viewers, and normal spectators remain
-passive. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
+are still spectator-shaped for projection and prediction, and `LabClient` treats `start.lab.vision`
+plus `labState.vision` as the recipient's server-authoritative choice. The injected control policy
+exposes `canUseCommandSurface(state)` so `Match` and HUD can keep selection plus the real command
+card available for operators while read-only lab viewers, replay viewers, and normal spectators
+remain passive. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
 `LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
 owner.
 

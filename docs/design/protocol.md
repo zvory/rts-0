@@ -68,7 +68,7 @@ lobby/config dump replaces the source scrape.
 | `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted only in replay rooms. |
 | `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
-| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations, issue-as commands, and vision changes are room-local and append to the lab operation log with the requesting connection id. |
+| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations and issue-as commands are room-local; `setVision` changes only the requesting operator's projection. Accepted lab requests append to the lab operation log with the requesting connection id. |
 | `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
@@ -340,7 +340,7 @@ Sent once when the match begins. Carries everything static for the whole match.
     room: string,                // safe public lab id, not the hidden internal room prefix
     operatorId: u32,
     role: "operator"|"readOnly",
-    vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] },
+    vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] }, // recipient's lab vision
     dirty: bool,
     operationCount: u32
   },
@@ -851,6 +851,8 @@ default is the union of all replay players.
 `LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
 `{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
 room task before snapshot projection; unknown, empty, or duplicate team selections are rejected.
+Lab vision is server-owned per operator, so one operator can inspect full world while another uses
+team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned.
 
@@ -873,9 +875,11 @@ units belong to that player; mixed-owner selections are rejected instead of part
   metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
 }
 ```
-Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome`. Import validates the schema,
-map metadata, player/team/resource/research/entity fields, restores through the public lab `Game`
-API, applies lab vision metadata, and returns an entity id remap in `outcome.entityIdMap`.
+Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome` using the requesting operator's
+current lab vision in `metadata.lab.vision`. Import validates the schema, map metadata,
+player/team/resource/research/entity fields, restores through the public lab `Game` API, applies
+scenario vision to the requester and future join default without overwriting already connected
+collaborators, and returns an entity id remap in `outcome.entityIdMap`.
 Transient snapshot fields, fog recipient projections, events, projectile runtime state, command
 logs, interpolation state, and lab operation result metadata are intentionally omitted.
 
@@ -883,7 +887,7 @@ Reliable lab server messages:
 
 | `t` | Fields | Meaning |
 |-----|--------|---------|
-| `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Room-local lab control metadata. World state still travels through `snapshot`. |
+| `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Recipient-scoped lab control metadata. World state still travels through `snapshot`. |
 | `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
 
 Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timeline/keyframes,
