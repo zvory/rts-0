@@ -597,8 +597,8 @@ Compact numeric codes:
 
 #### 2.4.1 Boundary inventory
 
-Phase 1 records the current source-of-truth map before later phases tighten enforcement. This is
-an inventory only; it does not change the wire shape or compact snapshot version.
+This inventory records the current source-of-truth map after the protocol mirror split. It does not
+change the wire shape or compact snapshot version.
 
 | Value/path | Rust owner | JS mirror path | Category | Current checker | Proposed future checker | Client-only exclusion reason | Compact version impact |
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
