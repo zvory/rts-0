@@ -153,15 +153,17 @@ impl LabTimeline {
         &mut self,
         current_tick: u32,
         ticks_back: u32,
+        replay_entry: impl FnMut(&mut Game, &LabTimelineEntry) -> Result<(), String>,
     ) -> Result<LabTimelineSeek, String> {
         let target_tick = current_tick.saturating_sub(ticks_back);
-        self.seek_to(current_tick, target_tick)
+        self.seek_to(current_tick, target_tick, replay_entry)
     }
 
     pub(super) fn seek_to(
         &mut self,
         current_tick: u32,
         target_tick: u32,
+        mut replay_entry: impl FnMut(&mut Game, &LabTimelineEntry) -> Result<(), String>,
     ) -> Result<LabTimelineSeek, String> {
         if self
             .last_seek_at
@@ -204,7 +206,7 @@ impl LabTimeline {
             while game.tick_count() < entry.tick {
                 game.tick();
             }
-            Self::replay_entry(&mut game, entry)?;
+            replay_entry(&mut game, entry)?;
         }
         while game.tick_count() < target_tick {
             game.tick();
@@ -240,28 +242,6 @@ impl LabTimeline {
         });
         self.next_sequence = self.next_sequence.saturating_add(1);
         debug_assert!(self.entries.len() <= Self::MAX_ENTRIES);
-    }
-
-    fn replay_entry(game: &mut Game, entry: &LabTimelineEntry) -> Result<(), String> {
-        match &entry.kind {
-            LabTimelineEntryKind::LabOperation { op_kind, op } => game
-                .apply_lab_op(op.clone())
-                .map(|_| ())
-                .map_err(|err| {
-                    format!(
-                        "Lab timeline operation {op_kind} failed at sequence {} request {}: {err:?}.",
-                        entry.sequence, entry.request_id
-                    )
-                }),
-            LabTimelineEntryKind::IssueCommandAs { player_id, command } => game
-                .issue_lab_command_as(*player_id, command.clone())
-                .map_err(|err| {
-                    format!(
-                        "Lab timeline issue-as failed at sequence {} request {}: {err:?}.",
-                        entry.sequence, entry.request_id
-                    )
-                }),
-        }
     }
 
     fn push_keyframe(&mut self, game: &Game) {

@@ -4,7 +4,7 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::faction_validation::{
     default_faction_id_for, validate_faction_request, FactionRequestContext, FactionValidation,
 };
-use super::lab_timeline::LabTimeline;
+use super::lab_timeline::{LabTimeline, LabTimelineEntry, LabTimelineEntryKind};
 use super::launch::{
     LaunchPrediction, LaunchRecipient, StartPayloadBuilder, StartPayloadRecipient,
 };
@@ -4350,8 +4350,12 @@ impl RoomTask {
                 return;
             };
             match target {
-                LabSeekTarget::Relative(ticks_back) => timeline.seek_back(current_tick, ticks_back),
-                LabSeekTarget::Absolute(tick) => timeline.seek_to(current_tick, tick),
+                LabSeekTarget::Relative(ticks_back) => {
+                    timeline.seek_back(current_tick, ticks_back, Self::replay_lab_timeline_entry)
+                }
+                LabSeekTarget::Absolute(tick) => {
+                    timeline.seek_to(current_tick, tick, Self::replay_lab_timeline_entry)
+                }
             }
         };
         match seek_result {
@@ -4377,6 +4381,28 @@ impl RoomTask {
                 crate::log_warn!(room = %self.room, error = %err, "lab seek failed");
                 self.send_error_to(player_id, &err);
             }
+        }
+    }
+
+    fn replay_lab_timeline_entry(game: &mut Game, entry: &LabTimelineEntry) -> Result<(), String> {
+        match &entry.kind {
+            LabTimelineEntryKind::LabOperation { op_kind, op } => game
+                .apply_lab_op(op.clone())
+                .map(|_| ())
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline operation {op_kind} failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
+            LabTimelineEntryKind::IssueCommandAs { player_id, command } => game
+                .issue_lab_command_as(*player_id, command.clone())
+                .map_err(|err| {
+                    format!(
+                        "Lab timeline issue-as failed at sequence {} request {}: {err:?}.",
+                        entry.sequence, entry.request_id
+                    )
+                }),
         }
     }
 
