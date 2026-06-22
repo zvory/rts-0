@@ -14,8 +14,8 @@ use crate::ai_core::observation::{
     AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AI_1_0_TECH, AI_1_1_TANK_MG, RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION,
-    STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
+    AI_1_0_TECH, AI_1_1_TANK_MG, AI_1_2_WAVE_COHORTS, RIFLE_FLOOD_FAST,
+    RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
@@ -117,6 +117,12 @@ fn combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         target_id: None,
         free_for_combat: true,
     }
+}
+
+fn launched_combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
+    let mut unit = combat_at(id, kind, x, y);
+    unit.state = AiEntityState::Attack;
+    unit
 }
 
 fn enemy(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
@@ -3631,6 +3637,206 @@ fn ai_1_1_attacks_with_its_first_ready_tank() {
 }
 
 #[test]
+fn ai_1_2_stages_forming_rifle_waves_on_a_line() {
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![building_at(
+        10,
+        EntityKind::CityCentre,
+        Some(0),
+        8.5 * ts,
+        8.5 * ts,
+    )];
+    owned.extend((0..3).map(|i| {
+        combat_at(
+            30 + i,
+            EntityKind::Rifleman,
+            (8.0 + i as f32 * 0.5) * ts,
+            8.0 * ts,
+        )
+    }));
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 3,
+            supply_cap: 20,
+        },
+        owned,
+    );
+
+    let decision = decide(
+        &observation,
+        &AI_1_2_WAVE_COHORTS,
+        &mut AiDecisionMemory::for_profile(&AI_1_2_WAVE_COHORTS),
+    );
+
+    let stage_targets: Vec<(u32, f32, f32)> = decision
+        .commands
+        .iter()
+        .filter_map(|command| match command {
+            Command::AttackMove { units, x, y, .. } if units.len() == 1 => Some((units[0], *x, *y)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        stage_targets
+            .iter()
+            .map(|(id, _, _)| *id)
+            .collect::<Vec<_>>(),
+        vec![30, 31, 32],
+        "forming AI 1.2 waves should receive deterministic individual stage slots"
+    );
+
+    let steel_center =
+        main_steel_cluster_center(&observation).expect("main steel cluster should be found");
+    let enemy = AiFacts::from_observation(&observation)
+        .nearest_public_enemy_base
+        .expect("enemy base should be public");
+    let dir = normalized_direction(steel_center, (enemy.x, enemy.y))
+        .expect("enemy should not overlap the main steel");
+    let perp = (-dir.1, dir.0);
+    let mut lateral_offsets = Vec::new();
+    for (_, x, y) in &stage_targets {
+        let dx = *x - steel_center.0;
+        let dy = *y - steel_center.1;
+        lateral_offsets.push((dx * perp.0 + dy * perp.1) / ts);
+    }
+    lateral_offsets.sort_by(|left, right| left.total_cmp(right));
+    let spread = lateral_offsets.last().unwrap() - lateral_offsets.first().unwrap();
+    assert!(
+        spread >= 2.5,
+        "forming AI 1.2 waves should spread across a line, got {spread} tiles"
+    );
+}
+
+#[test]
+fn ai_1_2_fresh_rifle_wave_does_not_count_already_launched_attackers() {
+    let ts = config::TILE_SIZE as f32;
+    let mut memory = AiDecisionMemory::for_profile(&AI_1_2_WAVE_COHORTS);
+    let first_wave = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 4,
+            supply_cap: 20,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            combat_at(30, EntityKind::Rifleman, 8.5 * ts, 8.5 * ts),
+            combat_at(31, EntityKind::Rifleman, 9.0 * ts, 8.5 * ts),
+            combat_at(32, EntityKind::Rifleman, 9.5 * ts, 8.5 * ts),
+            combat_at(33, EntityKind::Rifleman, 10.0 * ts, 8.5 * ts),
+        ],
+    );
+
+    let first_decision = decide(&first_wave, &AI_1_2_WAVE_COHORTS, &mut memory);
+    assert!(
+        first_decision.commands.iter().any(|command| matches!(
+            command,
+            Command::AttackMove { units, .. } if units.as_slice() == [30, 31, 32, 33]
+        )),
+        "AI 1.2 should still launch the first four-Rifleman wave"
+    );
+
+    let mut next_wave = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 6,
+            supply_cap: 20,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            launched_combat_at(30, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts),
+            launched_combat_at(31, EntityKind::Rifleman, 14.5 * ts, 14.0 * ts),
+            launched_combat_at(32, EntityKind::Rifleman, 15.0 * ts, 14.0 * ts),
+            launched_combat_at(33, EntityKind::Rifleman, 15.5 * ts, 14.0 * ts),
+            combat_at(34, EntityKind::Rifleman, 8.5 * ts, 9.0 * ts),
+            combat_at(35, EntityKind::Rifleman, 9.0 * ts, 9.0 * ts),
+        ],
+    );
+    next_wave.tick = first_wave.tick + AI_1_2_WAVE_COHORTS.attack.reissue_cadence_ticks;
+
+    let next_decision = decide(&next_wave, &AI_1_2_WAVE_COHORTS, &mut memory);
+
+    assert!(
+        !next_decision.intents.iter().any(|intent| {
+            matches!(
+                intent,
+                AiIntent::Attack { units } if units.iter().any(|id| [30, 31, 32, 33].contains(id))
+            )
+        }),
+        "launched Riflemen should not satisfy the next outbound wave threshold"
+    );
+    assert!(
+        next_decision.intents.iter().any(|intent| {
+            matches!(
+                intent,
+                AiIntent::Stage { units } if units.as_slice() == [34, 35]
+            )
+        }),
+        "only fresh Riflemen should stage for the next AI 1.2 wave"
+    );
+}
+
+#[test]
+fn ai_1_2_launched_attackers_can_still_defend_when_local() {
+    let ts = config::TILE_SIZE as f32;
+    let mut memory = AiDecisionMemory::for_profile(&AI_1_2_WAVE_COHORTS);
+    let first_wave = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 4,
+            supply_cap: 20,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            combat_at(30, EntityKind::Rifleman, 8.5 * ts, 8.5 * ts),
+            combat_at(31, EntityKind::Rifleman, 9.0 * ts, 8.5 * ts),
+            combat_at(32, EntityKind::Rifleman, 9.5 * ts, 8.5 * ts),
+            combat_at(33, EntityKind::Rifleman, 10.0 * ts, 8.5 * ts),
+        ],
+    );
+    let first_decision = decide(&first_wave, &AI_1_2_WAVE_COHORTS, &mut memory);
+    assert!(first_decision.intents.iter().any(|intent| {
+        matches!(
+            intent,
+            AiIntent::Attack { units } if units.as_slice() == [30, 31, 32, 33]
+        )
+    }));
+
+    let mut defense = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 4,
+            supply_cap: 20,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            launched_combat_at(30, EntityKind::Rifleman, 8.5 * ts, 8.5 * ts),
+            launched_combat_at(31, EntityKind::Rifleman, 9.0 * ts, 8.5 * ts),
+            launched_combat_at(32, EntityKind::Rifleman, 9.5 * ts, 8.5 * ts),
+            launched_combat_at(33, EntityKind::Rifleman, 10.0 * ts, 8.5 * ts),
+        ],
+    );
+    defense.tick = first_wave.tick + AI_1_2_WAVE_COHORTS.attack.reissue_cadence_ticks;
+    defense
+        .visible_enemies
+        .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
+
+    let decision = decide(&defense, &AI_1_2_WAVE_COHORTS, &mut memory);
+
+    assert!(decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Attack { units, target, .. } if units.as_slice() == [30, 31, 32, 33] && *target == 90
+        )
+    }));
+}
+
+#[test]
 fn full_saturation_rifle_wave_uses_attack_move_to_enemy_base() {
     let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
     owned.extend((0..6).map(|i| combat(30 + i, EntityKind::Rifleman)));
@@ -3999,7 +4205,7 @@ fn idle_midfield_rifle_raid_resumes_after_cleared_fight() {
         vec![building(10, EntityKind::CityCentre, Some(0)), raider],
     );
     let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
-    memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick);
+    memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick, &[30]);
 
     let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
 
@@ -4027,7 +4233,7 @@ fn idle_home_rifle_does_not_resume_raid_before_wave_cadence() {
         vec![building(10, EntityKind::CityCentre, Some(0)), raider],
     );
     let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
-    memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick);
+    memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick, &[30]);
 
     let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
 

@@ -39,10 +39,15 @@ pub(super) fn plan_frontal_wave(
     profile: &AiProfile,
     excluded_units: &BTreeSet<u32>,
 ) -> FrontalWavePlan {
+    let owned_units: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
+    let launched_units =
+        memory.launched_frontal_unit_exclusions(profile, observation.tick, &owned_units);
+    let mut excluded_units = excluded_units.clone();
+    excluded_units.extend(launched_units);
     let ready_units = actions::select_ready_combat_units_excluding(
         &observation.owned,
         attack.unit_kinds,
-        excluded_units,
+        &excluded_units,
     );
     let desired_size = memory.desired_attack_size_for(profile, attack, observation.tick);
     let attack_due = memory.attack_due_for(profile, attack, observation.tick);
@@ -115,7 +120,9 @@ pub(super) fn issue_frontal_wave(
         return None;
     }
 
-    let staged = if stages_expansion_defensive_line(profile, attack) {
+    let staged = if stages_expansion_defensive_line(profile, attack)
+        || profile.frontal_wave.line_staging
+    {
         stage_main_steel_defensive_line(
             actions,
             observation,

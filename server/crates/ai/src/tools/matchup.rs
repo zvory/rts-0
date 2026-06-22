@@ -310,12 +310,14 @@ fn print_profiles() {
     }
     println!();
     println!("aliases:");
-    println!("  ai -> ai_1_1_tank_mg");
+    println!("  ai -> ai_1_2_wave_cohorts");
     println!("  ai1 -> ai_1_0_tech");
     println!("  ai_1_0 -> ai_1_0_tech");
-    println!("  default -> ai_1_1_tank_mg");
+    println!("  default -> ai_1_2_wave_cohorts");
     println!("  ai_1_1 -> ai_1_1_tank_mg");
     println!("  ai11 -> ai_1_1_tank_mg");
+    println!("  ai_1_2 -> ai_1_2_wave_cohorts");
+    println!("  ai12 -> ai_1_2_wave_cohorts");
 }
 
 fn print_usage() {
@@ -338,6 +340,7 @@ Options:
 Examples:
   cargo run --bin ai-matchup -- ai ai
   cargo run --bin ai-matchup -- ai_1_1 ai_1_0_tech --seed 7 --ticks 3000 --json
+  cargo run --bin ai-matchup -- ai_1_2 ai_1_1 --seed 7 --ticks 3000 --json
   cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
 "
     );
