@@ -1,6 +1,6 @@
 # Phase 10 - Balance Mirror Cleanup Gate
 
-Status: planned.
+Status: done.
 
 ## Goal
 
@@ -59,3 +59,21 @@ plan, if created, proves no numeric drift and keeps Rust authoritative with the 
 After implementation, mark this phase done and summarize either the new balance cleanup plan path or
 the no-go reason, the exact mirror invariants that blocked movement, commands run, and what human
 decision is needed before balance/config source files move.
+
+## Result
+
+Created `plans/balancecleanup/plan.md` with five executor-ready phases:
+
+1. Mirror guardrail baseline.
+2. Structured mirror snapshot before file movement.
+3. Client config split behind stable re-exports.
+4. Rust balance split behind stable `rts_rules::balance::*` exports.
+5. No-drift closeout and hotspot tracking confirmation.
+
+The gate found a safe path only if validation expands before source movement. Current evidence shows
+Rust rules remain authoritative through `balance.rs`, `defs.rs`, and `faction.rs`; server and sim
+config files are thin compatibility re-export shims; the client config mixes Rust-owned mirrors with
+client-only presentation data; faction parity and wiki checks already cover many visible stats,
+bodies, resources, upgrades, abilities, and catalogs. The follow-up plan therefore requires
+structured no-drift checks and explicit command-budget mirror coverage before splitting either the
+client or Rust balance files.
