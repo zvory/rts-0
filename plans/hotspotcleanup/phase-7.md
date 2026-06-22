@@ -1,6 +1,6 @@
 # Phase 7 - Match Shell Collaborators
 
-Status: planned.
+Status: done.
 
 ## Goal
 
