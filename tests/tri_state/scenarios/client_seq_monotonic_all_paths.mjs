@@ -11,7 +11,6 @@ export default scenario("client_seq_monotonic_all_paths", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

@@ -14,7 +14,6 @@ export default scenario("production_progress_extrapolates_during_snapshot_gap", 
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: false,
   },
   network: { mode: "direct" },
   steps: [

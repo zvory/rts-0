@@ -14,7 +14,6 @@ export default scenario("train_optimistic_queue_confirms_after_ack", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: false,
   },
   network: { mode: "direct" },
   steps: [

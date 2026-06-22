@@ -14,7 +14,6 @@ export default scenario("hidden_blocker_correction_no_leak", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",

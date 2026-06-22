@@ -16,7 +16,6 @@ export default scenario("stop_corrects_predicted_motion", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",

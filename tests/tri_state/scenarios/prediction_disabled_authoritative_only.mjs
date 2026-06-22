@@ -13,7 +13,6 @@ export default scenario("prediction_disabled_authoritative_only", {
     kind: "liveRoom",
     players: 1,
     prediction: "disabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",

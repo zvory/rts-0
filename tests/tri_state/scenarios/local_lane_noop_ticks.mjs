@@ -11,7 +11,6 @@ export default scenario("local_lane_noop_ticks", {
   setup: {
     kind: "liveRoom",
     prediction: "disabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

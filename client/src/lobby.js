@@ -450,7 +450,7 @@ export class Lobby {
     return betaFactionSelectEnabledForLocation(window.location);
   }
 
-  /** Keep an optional legacy quickstart control synced when an internal/test shell supplies one. */
+  /** Keep an optional legacy quickstart control synced until protocol compatibility is deleted. */
   _reflectQuickstart() {
     if (!this.chkQuickstart) return;
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;

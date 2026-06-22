@@ -9,7 +9,6 @@ export default scenario("unsupported_command_is_explicit", {
   setup: {
     kind: "liveRoom",
     prediction: "disabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

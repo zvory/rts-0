@@ -12,7 +12,6 @@ export default scenario("remote_client_basic_move", {
     kind: "liveRoom",
     players: 1,
     prediction: "disabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

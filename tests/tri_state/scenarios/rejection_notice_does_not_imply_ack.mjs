@@ -15,7 +15,6 @@ export default scenario("rejection_notice_does_not_imply_ack", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

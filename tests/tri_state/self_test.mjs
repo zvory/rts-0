@@ -16,7 +16,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tri-state-test-"));
   });
   assert.equal(s.name, "unit_contract");
   assert.equal(s.setup.kind, "liveRoom");
-  assert.equal(s.setup.quickstart, true);
+  assert.equal("quickstart" in s.setup, false);
   assert.throws(() => scenario("Bad Name", { steps: [selectOwn("worker")] }), /invalid scenario name/);
 }
 
