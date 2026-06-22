@@ -144,7 +144,13 @@ import { CommandComposer } from "../client/src/command_composer.js";
 import { ClientIntent } from "../client/src/client_intent.js";
 import { LabClient, labVision, labVisionLabel } from "../client/src/lab_client.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "../client/src/lab_control_policy.js";
-import { LabPanel, labSpawnFactionOptions, labSpawnUnitKindsForFaction } from "../client/src/lab_panel.js";
+import {
+  LabPanel,
+  labBuildingSpawnFactionOptions,
+  labSpawnBuildingKindsForFaction,
+  labSpawnFactionOptions,
+  labSpawnUnitKindsForFaction,
+} from "../client/src/lab_panel.js";
 import { LabPanelWindowChrome } from "../client/src/lab_panel_window.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { Minimap } from "../client/src/minimap.js";
@@ -3482,6 +3488,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
             timeline: true,
           },
           visibility: { replayVision: true },
+          actions: { replayBranch: true },
         },
       },
     }),
@@ -3552,7 +3559,36 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(!replayControls.querySelector(".replay-timeline"), "destroy removes generated timeline");
   assert(replayControls._listeners.size === 0, "destroy removes replay speed click listener");
 
+  const replayVisionOnlyControls = fakeEl("div");
+  dom.replaySpeed = replayVisionOnlyControls;
+  const replayVisionOnlyUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: true,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        replay: { durationTicks: 1_000 },
+        capabilities: {
+          roomTime: { available: true },
+          visibility: { replayVision: true },
+        },
+      },
+    }),
+  });
+  assert(
+    replayVisionOnlyControls.querySelector(".replay-vision-controls"),
+    "replay vision capability still builds replay fog controls",
+  );
+  assert(
+    !replayVisionOnlyControls.querySelector(".replay-branch-btn"),
+    "replay vision alone does not build a replay branch button",
+  );
+  replayVisionOnlyUi.destroy();
+
   const scenarioControls = fakeEl("div");
+  const scenarioSpeed2 = fakeEl("button");
+  scenarioSpeed2.className = "spd-btn";
+  scenarioSpeed2.dataset.speed = "2";
   const scenarioSpeed0 = fakeEl("button");
   scenarioSpeed0.className = "spd-btn dev-pause-btn";
   scenarioSpeed0.dataset.speed = "0";
@@ -3562,6 +3598,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   const scenarioSeek = fakeEl("button");
   scenarioSeek.className = "spd-btn seek-btn";
   scenarioSeek.dataset.seekBack = "30";
+  scenarioControls.appendChild(scenarioSpeed2);
   scenarioControls.appendChild(scenarioSpeed0);
   scenarioControls.appendChild(scenarioStep);
   scenarioControls.appendChild(scenarioSeek);
@@ -3584,13 +3621,67 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       },
     }),
   });
+  assert(!scenarioSpeed2.hidden, "scenario mode shows positive speed controls when setSpeed is advertised");
   assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
+  assert(!scenarioSpeed0.hidden, "scenario mode shows pause controls when pause is advertised");
   assert(!scenarioStep.hidden, "scenario mode shows step controls");
+  scenarioControls._listeners.get("click")({ target: scenarioSpeed2 });
+  assert(replayNet.speeds.at(-1) === 2, "scenario speed click sends net.setRoomTimeSpeed");
   scenarioControls._listeners.get("click")({ target: scenarioStep });
   assert(replayNet.steps === 1, "scenario step sends net.stepRoomTime");
   scenarioControls._listeners.get("click")({ target: scenarioSpeed0 });
   assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
   scenarioUi.destroy();
+
+  const stepOnlyControls = fakeEl("div");
+  const stepOnlySpeed = fakeEl("button");
+  stepOnlySpeed.className = "spd-btn";
+  stepOnlySpeed.dataset.speed = "2";
+  const stepOnlyPause = fakeEl("button");
+  stepOnlyPause.className = "spd-btn dev-pause-btn";
+  stepOnlyPause.dataset.speed = "0";
+  const stepOnlyStep = fakeEl("button");
+  stepOnlyStep.className = "spd-btn dev-step-btn";
+  stepOnlyStep.dataset.stepRoomTime = "";
+  const stepOnlySeek = fakeEl("button");
+  stepOnlySeek.className = "spd-btn seek-btn";
+  stepOnlySeek.dataset.seekBack = "30";
+  stepOnlyControls.appendChild(stepOnlySpeed);
+  stepOnlyControls.appendChild(stepOnlyPause);
+  stepOnlyControls.appendChild(stepOnlyStep);
+  stepOnlyControls.appendChild(stepOnlySeek);
+  dom.replaySpeed = stepOnlyControls;
+  const stepOnlyUi = new ReplayControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        spectator: true,
+        capabilities: {
+          roomTime: {
+            available: true,
+            step: true,
+          },
+        },
+      },
+    }),
+  });
+  assert(stepOnlySpeed.hidden, "positive speed controls hide without setSpeed capability");
+  assert(stepOnlyPause.hidden, "pause controls hide without pause capability");
+  assert(!stepOnlyStep.hidden, "step controls show with step capability");
+  assert(stepOnlySeek.hidden, "relative seek controls hide without seekRelative capability");
+  const speedsBeforeStepOnlyClicks = replayNet.speeds.length;
+  const seeksBeforeStepOnlyClicks = replayNet.seekBacks.length;
+  const stepsBeforeStepOnlyClicks = replayNet.steps;
+  stepOnlyControls._listeners.get("click")({ target: stepOnlySpeed });
+  stepOnlyControls._listeners.get("click")({ target: stepOnlyPause });
+  stepOnlyControls._listeners.get("click")({ target: stepOnlySeek });
+  assert(replayNet.speeds.length === speedsBeforeStepOnlyClicks, "hidden speed/pause controls are inert without capability");
+  assert(replayNet.seekBacks.length === seeksBeforeStepOnlyClicks, "hidden seek controls are inert without capability");
+  stepOnlyControls._listeners.get("click")({ target: stepOnlyStep });
+  assert(replayNet.steps === stepsBeforeStepOnlyClicks + 1, "step controls still send when step is advertised");
+  stepOnlyUi.destroy();
 
   const noCapabilityControls = fakeEl("div");
   dom.replaySpeed = noCapabilityControls;
@@ -4533,6 +4624,11 @@ function fakeAudioContext() {
     "normal lobby does not render the legacy quickstart control");
   assert(!indexHtml.includes("Debug mode"),
     "normal lobby copy no longer advertises Debug mode as the experimentation path");
+  const staticStepButton = indexHtml.match(/<button[^>]*class="[^"]*\bdev-step-btn\b[^"]*"[^>]*>/)?.[0] || "";
+  assert(staticStepButton.includes("data-step-room-time"),
+    "static dev scenario Step button uses the neutral room-time step contract");
+  assert(!staticStepButton.includes("data-step-dev-tick"),
+    "static dev scenario Step button does not use stale dev-specific step markup");
 
   const sorted = sortLobbySummaries([
     { room: "old-open", hostName: "A", createdAtUnixMs: 100, joinState: "open" },
@@ -5015,6 +5111,24 @@ function fakeAudioContext() {
     [KIND.EKAT],
     "LabPanel spawn palette filters Ekat to Ekat units",
   );
+  assertDeepEqual(
+    labBuildingSpawnFactionOptions().map((entry) => entry.id),
+    ["kriegsia", "ekat"],
+    "LabPanel building spawn palette exposes product-playable faction catalogs",
+  );
+  assert(
+    labSpawnBuildingKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.CITY_CENTRE),
+    "LabPanel building spawn palette includes Kriegsia catalog buildings",
+  );
+  assert(
+    !labSpawnBuildingKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.RIFLEMAN),
+    "LabPanel building spawn palette excludes units from building options",
+  );
+  assertDeepEqual(
+    labSpawnBuildingKindsForFaction("ekat"),
+    [KIND.ZAMOK],
+    "LabPanel building spawn palette filters Ekat to Ekat buildings",
+  );
 }
 
 await withFakeDocument(async () => {
@@ -5205,6 +5319,10 @@ await withFakeDocument(async () => {
   );
   assert(!textWithin(root).includes("Advanced Spawn"), "LabPanel omits the advanced spawn form");
   assert(
+    textWithin(root).includes("Unit Spawn") && textWithin(root).includes("Building Spawn"),
+    "LabPanel renders separate unit and building spawn sections",
+  );
+  assert(
     !panel.fields.has("spawn-owner") &&
       !panel.fields.has("advanced-spawn-owner") &&
       !panel.fields.has("resource-player") &&
@@ -5265,6 +5383,28 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").value = "ekat";
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
+  panel.armBuildingSpawnPaletteTool(KIND.CITY_CENTRE);
+  assert(armedTool?.kind === "spawnEntity", "LabPanel building palette arms the spawn lab tool through Match");
+  assert(
+    armedTool.payload.owner === 2 &&
+      armedTool.payload.kind === KIND.CITY_CENTRE &&
+      armedTool.payload.factionId === DEFAULT_FACTION_ID &&
+      armedTool.payload.completed === true,
+    "LabPanel building palette captures owner, faction, and kind with completed spawn payloads",
+  );
+  armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 240, y: 288 });
+  assert(
+    sent.at(-1).op.op === "spawnEntity" &&
+      sent.at(-1).op.owner === 2 &&
+      sent.at(-1).op.kind === KIND.CITY_CENTRE &&
+      sent.at(-1).op.x === 240 &&
+      sent.at(-1).op.y === 288 &&
+      sent.at(-1).op.completed === true,
+    "LabPanel building spawn tool sends clicked world coordinates through LabClient",
+  );
+  panel.fields.get("building-spawn-faction").value = "ekat";
+  panel.fields.get("building-spawn-faction").listeners.change();
+  assert(panel.buildingSpawnPalette.kind === KIND.ZAMOK, "LabPanel faction selection updates the building palette deterministically");
   assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
   assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
   assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");
@@ -5351,6 +5491,29 @@ await withFakeDocument(async () => {
       panel.fields.get("resource-steel").value === "900" &&
       panel.fields.get("resource-oil").value === "300",
     "LabPanel preserves resource form values after set-resources results re-render the panel",
+  );
+  const giveAllPromise = buttonByText("Give All").listeners.click();
+  assert(
+    sent.at(-1).op.op === "setPlayerResources" &&
+      sent.at(-1).op.playerId === 1 &&
+      sent.at(-1).op.steel === 99999 &&
+      sent.at(-1).op.oil === 99999,
+    "LabPanel Give All starts by giving player one maximum lab resources",
+  );
+  resolveLastLabResult({ outcome: { playerId: 1, steel: 99999, oil: 99999 } });
+  await Promise.resolve();
+  assert(
+    sent.at(-1).op.op === "setPlayerResources" &&
+      sent.at(-1).op.playerId === 2 &&
+      sent.at(-1).op.steel === 99999 &&
+      sent.at(-1).op.oil === 99999,
+    "LabPanel Give All sends maximum lab resources to every player",
+  );
+  resolveLastLabResult({ outcome: { playerId: 2, steel: 99999, oil: 99999 } });
+  await giveAllPromise;
+  assert(
+    textWithin(root).includes("Gave 2 players 99999 steel and 99999 oil."),
+    "LabPanel Give All summarizes the all-player resource grant",
   );
   playerButtonById(2).listeners.click();
   panel.fields.get("research-upgrade").value = UPGRADE.TANK_UNLOCK;
@@ -5909,7 +6072,7 @@ await withFakeDocument(async () => {
     STATS[KIND.TANK_TRAP].label === "Tank Trap" &&
       STATS[KIND.TANK_TRAP].footW === 1 &&
       STATS[KIND.TANK_TRAP].footH === 1 &&
-      STATS[KIND.TANK_TRAP].sight === 0 &&
+      STATS[KIND.TANK_TRAP].sight === 1 &&
       STATS[KIND.TANK_TRAP].cost.steel === 15 &&
       STATS[KIND.TANK_TRAP].cost.oil === 0 &&
       STATS[KIND.TANK_TRAP].buildTicks === TICK_HZ * 10 &&

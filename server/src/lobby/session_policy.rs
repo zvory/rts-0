@@ -1,7 +1,7 @@
 use super::room_task::RoomMode;
 use crate::protocol::{
-    CommandCapabilities, MatchControlCapabilities, RoomCapabilities, RoomTimeCapabilities,
-    VisibilityCapabilities,
+    ActionCapabilities, CommandCapabilities, MatchControlCapabilities, RoomCapabilities,
+    RoomTimeCapabilities, VisibilityCapabilities,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,6 +243,23 @@ pub(super) enum LabOperationLogPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SessionDrainPolicy {
+    NoAuthoritativeSession,
+    DrainTrackedAuthoritative,
+    UntrackedTool,
+}
+
+impl SessionDrainPolicy {
+    fn allows_new_session_while_draining(self) -> bool {
+        !matches!(self, SessionDrainPolicy::DrainTrackedAuthoritative)
+    }
+
+    fn tracks_active_session(self) -> bool {
+        matches!(self, SessionDrainPolicy::DrainTrackedAuthoritative)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct PersistencePolicy {
     match_history: MatchHistoryPolicy,
     post_match_replay: ReplayArtifactPolicy,
@@ -337,6 +354,7 @@ pub(super) struct SessionPolicy {
     pub(super) export: ExportPolicy,
     pub(super) affordance: AffordancePolicy,
     pub(super) persistence: PersistencePolicy,
+    pub(super) drain: SessionDrainPolicy,
     pub(super) start_payload: StartPayloadPolicy,
     pub(super) countdown_eligible: bool,
 }
@@ -357,6 +375,7 @@ impl SessionPolicy {
                 export: ExportPolicy::NONE,
                 affordance: AffordancePolicy::Lobby,
                 persistence: PersistencePolicy::NONE,
+                drain: SessionDrainPolicy::DrainTrackedAuthoritative,
                 start_payload: StartPayloadPolicy::None,
                 countdown_eligible: true,
             },
@@ -373,6 +392,7 @@ impl SessionPolicy {
                 export: ExportPolicy::NONE,
                 affordance: AffordancePolicy::LiveMatch,
                 persistence: PersistencePolicy::MATCH_HISTORY_AND_REPLAY_ARTIFACTS,
+                drain: SessionDrainPolicy::DrainTrackedAuthoritative,
                 start_payload: StartPayloadPolicy::LiveMatch,
                 countdown_eligible: false,
             },
@@ -389,6 +409,7 @@ impl SessionPolicy {
                 export: ExportPolicy::NONE,
                 affordance: AffordancePolicy::ReplayViewer,
                 persistence: PersistencePolicy::NONE,
+                drain: SessionDrainPolicy::NoAuthoritativeSession,
                 start_payload: StartPayloadPolicy::ReplayViewer,
                 countdown_eligible: false,
             },
@@ -405,6 +426,7 @@ impl SessionPolicy {
                 export: ExportPolicy::NONE,
                 affordance: AffordancePolicy::BranchStaging,
                 persistence: PersistencePolicy::SUPPRESSED,
+                drain: SessionDrainPolicy::DrainTrackedAuthoritative,
                 start_payload: StartPayloadPolicy::None,
                 countdown_eligible: true,
             },
@@ -423,6 +445,7 @@ impl SessionPolicy {
                 policy.export = ExportPolicy::NONE;
                 policy.affordance = AffordancePolicy::DevWatch;
                 policy.persistence = PersistencePolicy::SUPPRESSED;
+                policy.drain = SessionDrainPolicy::UntrackedTool;
                 policy.start_payload = StartPayloadPolicy::DevWatch;
                 policy.countdown_eligible = false;
             }
@@ -439,6 +462,7 @@ impl SessionPolicy {
                 policy.export = ExportPolicy::NONE;
                 policy.affordance = AffordancePolicy::ReplayViewer;
                 policy.persistence = PersistencePolicy::NONE;
+                policy.drain = SessionDrainPolicy::NoAuthoritativeSession;
                 policy.start_payload = StartPayloadPolicy::ReplayViewer;
                 policy.countdown_eligible = false;
             }
@@ -455,6 +479,7 @@ impl SessionPolicy {
                 policy.export = ExportPolicy::NONE;
                 policy.affordance = AffordancePolicy::ReplayViewer;
                 policy.persistence = PersistencePolicy::NONE;
+                policy.drain = SessionDrainPolicy::NoAuthoritativeSession;
                 policy.start_payload = StartPayloadPolicy::ReplayViewer;
                 policy.countdown_eligible = false;
             }
@@ -496,6 +521,7 @@ impl SessionPolicy {
                     SessionPhase::LiveMatch => PersistencePolicy::REPLAY_BRANCH_LIVE,
                     _ => PersistencePolicy::SUPPRESSED,
                 };
+                policy.drain = SessionDrainPolicy::DrainTrackedAuthoritative;
                 policy.start_payload = match phase {
                     SessionPhase::LiveMatch => StartPayloadPolicy::ReplayBranchLive,
                     _ => StartPayloadPolicy::None,
@@ -513,6 +539,7 @@ impl SessionPolicy {
                 policy.export = ExportPolicy::LAB_SCENARIO;
                 policy.affordance = AffordancePolicy::Lab;
                 policy.persistence = PersistencePolicy::LAB_ROOM_LOCAL;
+                policy.drain = SessionDrainPolicy::DrainTrackedAuthoritative;
                 policy.start_payload = StartPayloadPolicy::Lab;
                 policy.countdown_eligible = false;
             }
@@ -533,11 +560,12 @@ impl SessionPolicy {
         self.join == JoinPolicy::ReplayPromptOrAttach
     }
 
-    pub(super) fn uses_branch_room_join(self) -> bool {
-        matches!(
-            self.join,
-            JoinPolicy::BranchStaging | JoinPolicy::BranchLiveAttach
-        )
+    pub(super) fn uses_branch_staging_join(self) -> bool {
+        self.join == JoinPolicy::BranchStaging
+    }
+
+    pub(super) fn uses_branch_live_attach(self) -> bool {
+        self.join == JoinPolicy::BranchLiveAttach
     }
 
     pub(super) fn uses_lab_room_join(self) -> bool {
@@ -577,6 +605,14 @@ impl SessionPolicy {
         self.mutation == MutationPolicy::LabPrivilegedOps
     }
 
+    pub(super) fn allows_new_session_while_draining(self) -> bool {
+        self.drain.allows_new_session_while_draining()
+    }
+
+    pub(super) fn tracks_active_session_for_drain(self) -> bool {
+        self.drain.tracks_active_session()
+    }
+
     pub(super) fn has_authoritative_mutation(self) -> bool {
         !matches!(self.mutation, MutationPolicy::None)
     }
@@ -603,6 +639,7 @@ impl SessionPolicy {
                             | MutationPolicy::BranchLiveSeatAliasGameplay
                     ),
             },
+            actions: ActionCapabilities::default(),
         }
     }
 
@@ -973,6 +1010,38 @@ mod tests {
         assert!(lab.logs_lab_operations());
         assert!(lab.allows_lab_scenario_io());
         assert!(lab.allows_lab_privileged_ops());
+    }
+
+    #[test]
+    fn drain_policy_names_launch_and_active_session_accounting() {
+        let live = SessionPolicy::new(SessionMode::Normal, SessionPhase::LiveMatch);
+        assert!(!live.allows_new_session_while_draining());
+        assert!(live.tracks_active_session_for_drain());
+
+        let branch_staging =
+            SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::BranchStaging);
+        assert!(!branch_staging.allows_new_session_while_draining());
+        assert!(branch_staging.tracks_active_session_for_drain());
+
+        let branch_live = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);
+        assert!(!branch_live.allows_new_session_while_draining());
+        assert!(branch_live.tracks_active_session_for_drain());
+
+        let lab_lobby = SessionPolicy::new(SessionMode::Lab, SessionPhase::Lobby);
+        assert!(!lab_lobby.allows_new_session_while_draining());
+        assert!(lab_lobby.tracks_active_session_for_drain());
+
+        let lab_live = SessionPolicy::new(SessionMode::Lab, SessionPhase::LiveMatch);
+        assert!(!lab_live.allows_new_session_while_draining());
+        assert!(lab_live.tracks_active_session_for_drain());
+
+        let dev = SessionPolicy::new(SessionMode::DevScenario, SessionPhase::LiveMatch);
+        assert!(dev.allows_new_session_while_draining());
+        assert!(!dev.tracks_active_session_for_drain());
+
+        let replay = SessionPolicy::new(SessionMode::Replay, SessionPhase::ReplayViewer);
+        assert!(replay.allows_new_session_while_draining());
+        assert!(!replay.tracks_active_session_for_drain());
     }
 
     #[test]

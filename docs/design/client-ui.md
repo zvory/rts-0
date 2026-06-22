@@ -332,9 +332,10 @@ createRoomCapabilities({ startPayload })
 ```
 `Match` and app-shell controls consume this parsed `startPayload.capabilities` and
 `startPayload.diagnostics` record for room-time controls, diagnostic settings, observer analysis,
-vision controls, live pause controls, and read-only/gameplay command affordances. Product shells may
-still use product metadata for launch/routing and owned controls such as replay branch creation or
-lab scenario tools, but shared affordances must not be inferred from replay/dev/lab identity.
+vision controls, live pause controls, replay branch actions, and read-only/gameplay command
+affordances. Product shells may still use product metadata for launch/routing and owned controls
+such as lab scenario tools, but shared affordances must not be inferred from replay/dev/lab
+identity.
 
 `lab_client.js`
 ```js
@@ -355,10 +356,13 @@ export const labVision                   // fullWorld(), team(teamId), teams(tea
 ```js
 export function labSpawnFactionOptions()
 export function labSpawnUnitKindsForFaction(factionId)
+export function labBuildingSpawnFactionOptions()
+export function labSpawnBuildingKindsForFaction(factionId)
 export class LabPanel {
   constructor({ root, labClient, launch, startPayload, match? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
+  armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
   armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
   cancelActiveTool()
   setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
@@ -399,11 +403,12 @@ cancellations through the injected lab tool controller so `Match` can publish an
 change back to the app-owned `LabPanel`, keeping the panel status and cancel affordance
 synchronized with keyboard, pointer, world-click, and teardown paths. Starting ordinary placement,
 command targeting, or command-card build menus cancels the active lab tool so setup tools do not
-share state with gameplay command modes. Unit spawning is a lab panel palette backed by the client
-faction catalog mirror and playable faction labels; the palette arms a persistent `spawnEntity` lab
-tool and every completed click sends the clicked world coordinates through `LabClient` until
-cancelled. The lab does not expose a secondary advanced spawn fallback; the panel spawn affordance
-is limited to the playable faction unit palette. Selected-entity repositioning also uses
+share state with gameplay command modes. Unit and building spawning are lab panel palettes backed by
+the client faction catalog mirror and playable faction labels; each palette arms a persistent
+completed `spawnEntity` lab tool and every click sends the clicked world coordinates through
+`LabClient` until cancelled. The lab does not expose a secondary advanced spawn fallback; the panel
+spawn affordance is limited to playable faction unit and building palettes. Selected-entity
+repositioning also uses
 the shared tool path: `LabPanel` captures the selected ids in a `moveSelected` tool payload, sends
 `moveEntity` requests for each id at the clicked world point, and leaves stale-id or partial-failure
 reporting visible through the lab result status. Delete and owner reassignment stay contextual to

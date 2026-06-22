@@ -6,7 +6,9 @@ use super::room_task::{
 };
 use super::snapshots::compact_snapshot_for_wire;
 use super::*;
-use crate::protocol::{kinds, EntityView, Event, ResourceDelta};
+use crate::protocol::{kinds, EntityView, Event, ResourceDelta, DEFAULT_FACTION_ID};
+use rts_sim::game::replay::ReplayArtifactV1;
+use rts_sim::game::{Game, PlayerInit};
 
 fn join_test_player(task: &mut RoomTask, player_id: u32) {
     let (msg_tx, _writer) = ConnectionSink::new();
@@ -41,6 +43,16 @@ async fn join_room_handle(
     name: &str,
     spectator: bool,
 ) -> ConnectionWriter {
+    join_room_handle_with_replay_ok(handle, player_id, name, spectator, false).await
+}
+
+async fn join_room_handle_with_replay_ok(
+    handle: &RoomHandle,
+    player_id: u32,
+    name: &str,
+    spectator: bool,
+    replay_ok: bool,
+) -> ConnectionWriter {
     let (msg_tx, writer) = ConnectionSink::new();
     let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
     handle
@@ -49,7 +61,7 @@ async fn join_room_handle(
             player_id,
             name: name.to_string(),
             spectator,
-            replay_ok: false,
+            replay_ok,
             msg_tx,
             ack: ack_tx,
         })
@@ -59,8 +71,34 @@ async fn join_room_handle(
     writer
 }
 
+async fn wait_for_lobby_room_count(lobby: &Lobby, expected: usize) {
+    tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if lobby.rooms.lock().await.len() == expected {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("lobby room count did not settle");
+}
+
 fn test_drain() -> DrainHandle {
     DrainHandle::default()
+}
+
+fn registry_test_replay_artifact() -> ReplayArtifactV1 {
+    let players = vec![PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        name: "Replay Player".to_string(),
+        color: PLAYER_PALETTE[0].to_string(),
+        is_ai: false,
+    }];
+    let game = Game::new(&players, 0x5150_3003);
+    ReplayArtifactV1::capture_from_game(&game, crate::build_info::build_id(), None, game.scores())
 }
 
 fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
@@ -407,15 +445,40 @@ async fn create_lobby_rejects_duplicate_names() {
     let lobby = Lobby::new();
 
     let room = lobby
-        .create_lobby("  browser-one  ")
+        .create_lobby("  alex's lobby  ")
         .await
         .expect("first create should reserve normalized lobby name");
-    assert_eq!(room, "browser-one");
+    assert_eq!(room, "alex's lobby");
 
     assert!(matches!(
-        lobby.create_lobby("browser-one").await,
+        lobby.create_lobby("alex's lobby").await,
         Err(CreateLobbyError::Duplicate)
     ));
+}
+
+#[tokio::test]
+async fn create_lobby_abandoned_reservation_expires_and_name_can_be_recreated() {
+    let lobby = Lobby::new();
+
+    let room = lobby
+        .create_lobby("abandoned-browser-room")
+        .await
+        .expect("first create should reserve the lobby name");
+
+    assert!(matches!(
+        lobby.create_lobby(&room).await,
+        Err(CreateLobbyError::Duplicate)
+    ));
+
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    assert_eq!(
+        lobby
+            .create_lobby(&room)
+            .await
+            .expect("expired pending create lease should release the name"),
+        room
+    );
 }
 
 #[tokio::test]
@@ -473,6 +536,68 @@ async fn create_lobby_drain_rejects_new_names_but_existing_rooms_remain_joinable
 }
 
 #[tokio::test]
+async fn registry_disposal_removes_matching_room() {
+    let lobby = Lobby::new();
+    let handle = lobby.get_or_create("disposable-room").await;
+
+    handle
+        .event_tx
+        .send(RoomEvent::ReportDisposableIfEmpty)
+        .await
+        .expect("room task should accept disposal probe");
+
+    wait_for_lobby_room_count(&lobby, 0).await;
+}
+
+#[tokio::test]
+async fn registry_disposal_ignores_stale_room_identity() {
+    let lobby = Lobby::new();
+    let old = lobby.get_or_create("reused-name").await;
+    let old_identity = old.identity;
+
+    assert!(
+        lobby
+            .request_room_disposal_for_test("reused-name", old_identity)
+            .await,
+        "old room should be removable before the name is reused"
+    );
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    let newer = lobby.get_or_create("reused-name").await;
+    assert_ne!(newer.identity, old_identity);
+    assert!(
+        !lobby
+            .request_room_disposal_for_test("reused-name", old_identity)
+            .await,
+        "stale disposal must not remove a newer room under the same name"
+    );
+
+    let rooms = lobby.rooms.lock().await;
+    let current = rooms
+        .get("reused-name")
+        .expect("newer room should remain registered");
+    assert_eq!(current.identity, newer.identity);
+}
+
+#[tokio::test]
+async fn registry_disposal_stops_room_task() {
+    let lobby = Lobby::new();
+    let handle = lobby.get_or_create("shutdown-room").await;
+    let event_tx = handle.event_tx.clone();
+
+    handle
+        .event_tx
+        .send(RoomEvent::ReportDisposableIfEmpty)
+        .await
+        .expect("room task should accept disposal probe");
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    tokio::time::timeout(Duration::from_secs(1), event_tx.closed())
+        .await
+        .expect("disposed room task should close its event receiver");
+}
+
+#[tokio::test]
 async fn lobby_summaries_collect_browser_safe_rows_from_room_tasks() {
     let lobby = Lobby::new();
     let room = lobby
@@ -495,12 +620,129 @@ async fn lobby_summaries_collect_browser_safe_rows_from_room_tasks() {
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::Open);
     assert_eq!(summary.occupied_slots, 1);
+    assert!(matches!(
+        lobby.create_lobby(&room).await,
+        Err(CreateLobbyError::Duplicate)
+    ));
 
     handle
         .event_tx
         .send(RoomEvent::Leave { player_id: 9001 })
         .await
         .expect("cleanup leave should send");
+}
+
+#[tokio::test]
+async fn empty_public_lobby_has_no_reconnect_grace_and_releases_name() {
+    let lobby = Lobby::new();
+    let room = lobby
+        .create_lobby("no-reconnect-grace")
+        .await
+        .expect("lobby should be created");
+    let handle = lobby
+        .get_or_create_join_target(&room)
+        .await
+        .expect("created lobby should stay joinable");
+    let _writer = join_room_handle(&handle, 42, "Departing Host", false).await;
+
+    assert!(lobby
+        .summaries()
+        .await
+        .iter()
+        .any(|summary| summary.room == room));
+
+    handle
+        .event_tx
+        .send(RoomEvent::Leave { player_id: 42 })
+        .await
+        .expect("leave should send");
+    wait_for_lobby_room_count(&lobby, 0).await;
+
+    assert!(!lobby
+        .summaries()
+        .await
+        .iter()
+        .any(|summary| summary.room == room));
+    assert_eq!(
+        lobby
+            .create_lobby(&room)
+            .await
+            .expect("empty public lobby name should be available immediately"),
+        room
+    );
+}
+
+#[tokio::test]
+async fn empty_recreatable_internal_rooms_are_disposed_and_hidden_from_browser() {
+    let lobby = Lobby::new();
+    for (idx, (room, replay_ok)) in [
+        (
+            "__dev_scenario__:direct_reverse_order:unit=tank:count=1".to_string(),
+            false,
+        ),
+        ("__lab__:phase3-lab:map=Default:seed=123".to_string(), false),
+        (
+            "__replay_artifact__:phase3-missing-artifact".to_string(),
+            true,
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let handle = lobby.get_or_create(&room).await;
+        let _writer = join_room_handle_with_replay_ok(
+            &handle,
+            7000 + idx as u32,
+            "Internal Viewer",
+            true,
+            replay_ok,
+        )
+        .await;
+
+        assert!(
+            lobby
+                .summaries()
+                .await
+                .iter()
+                .all(|summary| summary.room != room),
+            "{room} should stay out of the public lobby browser while occupied"
+        );
+
+        handle
+            .event_tx
+            .send(RoomEvent::Leave {
+                player_id: 7000 + idx as u32,
+            })
+            .await
+            .expect("internal room leave should send");
+        wait_for_lobby_room_count(&lobby, 0).await;
+    }
+}
+
+#[tokio::test]
+async fn empty_persisted_replay_room_is_disposed_and_hidden_from_browser() {
+    let lobby = Lobby::new();
+    let room = lobby
+        .create_replay_room(registry_test_replay_artifact())
+        .await;
+    let handle = lobby
+        .get_or_create_join_target(&room)
+        .await
+        .expect("created replay room should be joinable");
+    let _writer = join_room_handle_with_replay_ok(&handle, 7100, "Replay Viewer", true, true).await;
+
+    assert!(lobby
+        .summaries()
+        .await
+        .iter()
+        .all(|summary| summary.room != room));
+
+    handle
+        .event_tx
+        .send(RoomEvent::Leave { player_id: 7100 })
+        .await
+        .expect("replay room leave should send");
+    wait_for_lobby_room_count(&lobby, 0).await;
 }
 
 #[tokio::test]

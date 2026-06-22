@@ -8,6 +8,7 @@ const labVision = Object.freeze({
   team: (teamId) => msg.labVisionTeam(teamId),
   teams: (teamIds) => msg.labVisionTeams(teamIds),
 });
+const GIVE_ALL_RESOURCE_AMOUNT = 99999;
 
 export class LabPanel {
   constructor({ root, labClient, launch = null, startPayload = null, match = null }) {
@@ -25,6 +26,10 @@ export class LabPanel {
       researchUpgrade: "",
     };
     this.spawnPalette = {
+      factionId: DEFAULT_FACTION_ID,
+      kind: "",
+    };
+    this.buildingSpawnPalette = {
       factionId: DEFAULT_FACTION_ID,
       kind: "",
     };
@@ -138,6 +143,7 @@ export class LabPanel {
     root.appendChild(this.renderActiveToolStatus());
     root.appendChild(this.renderTargetPlayer());
     root.appendChild(this.renderSpawnPalette());
+    root.appendChild(this.renderBuildingSpawnPalette());
 
     root.appendChild(this.fieldset("Selected", [
       this.readout(`${selectedIds.length} selected`),
@@ -174,6 +180,9 @@ export class LabPanel {
         },
       }),
       this.button("Set resources", () => this.setPlayerResources()),
+      this.button("Give All", () => this.giveAllPlayerResources(), {
+        title: "Give every player 99999 steel and 99999 oil",
+      }),
       this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels(), {
         value: this.playerState.researchUpgrade,
         onChange: (value) => {
@@ -451,6 +460,32 @@ export class LabPanel {
     return this.fieldset("Unit Spawn", controls);
   }
 
+  renderBuildingSpawnPalette() {
+    this.normalizeBuildingSpawnPalette();
+    const factionOptions = labBuildingSpawnFactionOptions();
+    const factionLabels = Object.fromEntries(factionOptions.map((entry) => [entry.id, entry.label]));
+    const buildingKinds = labSpawnBuildingKindsForFaction(this.buildingSpawnPalette.factionId);
+    const controls = [
+      this.selectField(
+        "building-spawn-faction",
+        "Faction",
+        factionOptions.map((entry) => entry.id),
+        factionLabels,
+        {
+          value: this.buildingSpawnPalette.factionId,
+          onChange: (value) => {
+            this.buildingSpawnPalette.factionId = value;
+            this.buildingSpawnPalette.kind = "";
+            this.render();
+          },
+        },
+      ),
+      this.buildingSpawnPaletteReadout(buildingKinds),
+      this.buildingSpawnPaletteGrid(buildingKinds),
+    ];
+    return this.fieldset("Building Spawn", controls);
+  }
+
   spawnPaletteGrid(unitKinds) {
     const grid = document.createElement("div");
     grid.className = "lab-spawn-palette";
@@ -470,11 +505,37 @@ export class LabPanel {
     return grid;
   }
 
+  buildingSpawnPaletteGrid(buildingKinds) {
+    const grid = document.createElement("div");
+    grid.className = "lab-spawn-palette";
+    for (const kind of buildingKinds) {
+      const stats = STATS[kind] || {};
+      const button = this.button(stats.label || kind, () => this.armBuildingSpawnPaletteTool(kind), {
+        className: "lab-btn lab-spawn-option",
+        title: `Spawn ${stats.label || kind}`,
+        dataset: {
+          kind,
+          selected: kind === this.buildingSpawnPalette.kind ? "true" : "false",
+          active: this.spawnToolActive(kind) ? "true" : "false",
+        },
+      });
+      grid.appendChild(button);
+    }
+    return grid;
+  }
+
   spawnPaletteReadout(unitKinds) {
     if (unitKinds.length > 0) {
       return this.readout(`${factionLabel(this.spawnPalette.factionId)} units`);
     }
     return this.readout("No unit catalog entries");
+  }
+
+  buildingSpawnPaletteReadout(buildingKinds) {
+    if (buildingKinds.length > 0) {
+      return this.readout(`${factionLabel(this.buildingSpawnPalette.factionId, labBuildingSpawnFactionOptions())} buildings`);
+    }
+    return this.readout("No building catalog entries");
   }
 
   armSpawnPaletteTool(kind = this.spawnPalette.kind) {
@@ -484,6 +545,19 @@ export class LabPanel {
     const payload = {
       owner: this.targetPlayer(),
       factionId: this.spawnPalette.factionId,
+      kind,
+      completed: true,
+    };
+    return this.armSpawnTool(payload);
+  }
+
+  armBuildingSpawnPaletteTool(kind = this.buildingSpawnPalette.kind) {
+    this.captureBuildingSpawnPaletteFields();
+    if (!kind) return null;
+    this.buildingSpawnPalette.kind = kind;
+    const payload = {
+      owner: this.targetPlayer(),
+      factionId: this.buildingSpawnPalette.factionId,
       kind,
       completed: true,
     };
@@ -530,6 +604,18 @@ export class LabPanel {
     }
   }
 
+  normalizeBuildingSpawnPalette() {
+    this.targetPlayerId = this.validOwner(this.targetPlayerId);
+    const factions = labBuildingSpawnFactionOptions();
+    if (!factions.some((entry) => entry.id === this.buildingSpawnPalette.factionId)) {
+      this.buildingSpawnPalette.factionId = factions[0]?.id || DEFAULT_FACTION_ID;
+    }
+    const buildingKinds = labSpawnBuildingKindsForFaction(this.buildingSpawnPalette.factionId);
+    if (!buildingKinds.includes(this.buildingSpawnPalette.kind)) {
+      this.buildingSpawnPalette.kind = buildingKinds[0] || "";
+    }
+  }
+
   validOwner(owner) {
     const numericOwner = Number(owner);
     const owners = this.players().map((player) => Number(player.id)).filter((id) => Number.isFinite(id));
@@ -539,6 +625,11 @@ export class LabPanel {
   captureSpawnPaletteFields() {
     this.captureTargetPlayerField();
     this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
+  }
+
+  captureBuildingSpawnPaletteFields() {
+    this.captureTargetPlayerField();
+    this.buildingSpawnPalette.factionId = this.value("building-spawn-faction") || this.buildingSpawnPalette.factionId;
   }
 
   captureTargetPlayerField() {
@@ -553,6 +644,9 @@ export class LabPanel {
       this.playerState.researchUpgrade = this.value("research-upgrade") || this.playerState.researchUpgrade;
     }
     if (this.fields.has("spawn-faction")) this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
+    if (this.fields.has("building-spawn-faction")) {
+      this.buildingSpawnPalette.factionId = this.value("building-spawn-faction") || this.buildingSpawnPalette.factionId;
+    }
   }
 
   targetPlayer() {
@@ -585,6 +679,25 @@ export class LabPanel {
       this.playerState.steel,
       this.playerState.oil,
     );
+  }
+
+  async giveAllPlayerResources() {
+    const players = this.players()
+      .map((player) => Number(player.id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (players.length === 0) {
+      return this.publishLocalResult("setPlayerResources", false, "No players available.");
+    }
+    const results = [];
+    for (const playerId of players) {
+      const result = await this.labClient.setPlayerResources(
+        playerId,
+        GIVE_ALL_RESOURCE_AMOUNT,
+        GIVE_ALL_RESOURCE_AMOUNT,
+      );
+      results.push({ playerId, result });
+    }
+    return this.publishPlayerResourceBatchResult(results);
   }
 
   setCompletedResearch() {
@@ -678,6 +791,26 @@ export class LabPanel {
     const accepted = results.length - failures.length;
     const summary = batchResultSummary(op, accepted, failures);
     return this.publishLocalResult(op, failures.length === 0, summary, {
+      requestId: results.at(-1)?.result?.requestId,
+      outcome: {
+        summary,
+        accepted,
+        rejected: failures.length,
+        failures,
+      },
+    });
+  }
+
+  publishPlayerResourceBatchResult(results) {
+    const failures = results
+      .filter(({ result }) => !result?.ok)
+      .map(({ playerId, result }) => ({
+        playerId,
+        error: result?.error || "setPlayerResources rejected",
+      }));
+    const accepted = results.length - failures.length;
+    const summary = playerResourceBatchSummary(accepted, failures);
+    return this.publishLocalResult("setPlayerResources", failures.length === 0, summary, {
       requestId: results.at(-1)?.result?.requestId,
       outcome: {
         summary,
@@ -864,8 +997,16 @@ export function labSpawnUnitKindsForFaction(factionId) {
   return factionCatalog(factionId).units.filter((kind) => STATS[kind]);
 }
 
-function factionLabel(factionId) {
-  return labSpawnFactionOptions().find((entry) => entry.id === factionId)?.label || String(factionId || "");
+export function labBuildingSpawnFactionOptions() {
+  return PLAYABLE_FACTIONS.filter((entry) => labSpawnBuildingKindsForFaction(entry.id).length > 0);
+}
+
+export function labSpawnBuildingKindsForFaction(factionId) {
+  return factionCatalog(factionId).buildings.filter((kind) => STATS[kind]);
+}
+
+function factionLabel(factionId, options = labSpawnFactionOptions()) {
+  return options.find((entry) => entry.id === factionId)?.label || String(factionId || "");
 }
 
 function playerButtonLabel(player) {
@@ -952,6 +1093,19 @@ function batchOperationLabel(op) {
   return { success: `${op} accepted for`, failure: op };
 }
 
+function playerResourceBatchSummary(accepted, failures) {
+  const rejected = failures.length;
+  const acceptedText = accepted > 0
+    ? `Gave ${accepted} ${playerNoun(accepted)} ${GIVE_ALL_RESOURCE_AMOUNT} steel and ${GIVE_ALL_RESOURCE_AMOUNT} oil`
+    : "";
+  const rejectedText = rejected > 0
+    ? `${rejected} rejected${playerFailureDetails(failures)}`
+    : "";
+  if (acceptedText && rejectedText) return `${acceptedText}; ${rejectedText}`;
+  if (acceptedText) return `${acceptedText}.`;
+  return `Give All rejected for ${rejected} ${playerNoun(rejected)}${playerFailureDetails(failures)}`;
+}
+
 function labToolLabel(tool) {
   if (typeof tool?.label === "string" && tool.label) return tool.label;
   if (tool?.kind === "spawnEntity") {
@@ -970,9 +1124,20 @@ function entityNoun(count) {
   return count === 1 ? "entity" : "entities";
 }
 
+function playerNoun(count) {
+  return count === 1 ? "player" : "players";
+}
+
 function failureDetails(failures) {
   if (!failures.length) return "";
   const shown = failures.slice(0, 3).map((failure) => `#${failure.entityId}: ${failure.error}`);
+  const suffix = failures.length > shown.length ? `; +${failures.length - shown.length} more` : "";
+  return `: ${shown.join("; ")}${suffix}.`;
+}
+
+function playerFailureDetails(failures) {
+  if (!failures.length) return "";
+  const shown = failures.slice(0, 3).map((failure) => `P${failure.playerId}: ${failure.error}`);
   const suffix = failures.length > shown.length ? `; +${failures.length - shown.length} more` : "";
   return `: ${shown.join("; ")}${suffix}.`;
 }

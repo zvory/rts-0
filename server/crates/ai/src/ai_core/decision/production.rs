@@ -58,11 +58,50 @@ pub(super) fn build_search_for_kind(
     mut build_search: ai_shared::BuildSearch,
     kind: EntityKind,
 ) -> ai_shared::BuildSearch {
-    if kind == EntityKind::Factory {
+    if matches!(kind, EntityKind::Factory | EntityKind::Steelworks) {
+        build_search.max_radius = build_search
+            .max_radius
+            .max(ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS);
         build_search.prefer_away_from_center = false;
         build_search.prefer_toward_center = true;
     }
     build_search
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn short_search() -> ai_shared::BuildSearch {
+        ai_shared::BuildSearch {
+            min_radius: 2,
+            max_radius: 6,
+            prefer_away_from_center: true,
+            prefer_toward_center: false,
+        }
+    }
+
+    #[test]
+    fn vehicle_and_gun_works_expand_forward_build_search() {
+        for kind in [EntityKind::Factory, EntityKind::Steelworks] {
+            let search = build_search_for_kind(short_search(), kind);
+            assert_eq!(
+                search.max_radius,
+                ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS
+            );
+            assert!(!search.prefer_away_from_center);
+            assert!(search.prefer_toward_center);
+        }
+    }
+
+    #[test]
+    fn ordinary_buildings_keep_their_requested_search_band() {
+        let search = build_search_for_kind(short_search(), EntityKind::Barracks);
+
+        assert_eq!(search.max_radius, 6);
+        assert!(search.prefer_away_from_center);
+        assert!(!search.prefer_toward_center);
+    }
 }
 
 pub(super) fn should_save_for_first_tech_unit(

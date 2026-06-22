@@ -1,6 +1,8 @@
 use super::replay_validation;
 use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
-use crate::protocol::{Event, ReplayBranchSeat, ReplayVisionRequest, RoomTimeState, StartPayload};
+use crate::protocol::{
+    Event, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest, RoomTimeState,
+};
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
 use rts_sim::game::replay::{ReplayArtifactV1, ReplayValidationError};
@@ -232,14 +234,8 @@ impl ReplaySession {
         self.artifact.players.iter().map(|p| p.id).collect()
     }
 
-    pub(super) fn start_payload_for(&self, viewer_id: u32) -> StartPayload {
-        StartPayload {
-            player_id: viewer_id,
-            spectator: true,
-            capabilities: Default::default(),
-            replay: Some(self.artifact.start_metadata()),
-            ..self.game.start_payload()
-        }
+    pub(super) fn start_metadata(&self) -> ReplayStartMetadata {
+        self.artifact.start_metadata()
     }
 
     pub(super) fn state(&self) -> RoomTimeState {
@@ -282,8 +278,12 @@ impl ReplaySession {
         self.viewer_vision.remove(&viewer_id);
     }
 
+    pub(super) fn can_create_replay_branch(&self) -> bool {
+        !self.artifact.players.iter().any(|player| player.is_ai)
+    }
+
     pub(super) fn branch_seed(&self) -> Result<ReplayBranchSeed, String> {
-        if self.artifact.players.iter().any(|player| player.is_ai) {
+        if !self.can_create_replay_branch() {
             return Err("Replay branching does not support replays with AI seats yet.".to_string());
         }
         let source_tick = self.current_tick();

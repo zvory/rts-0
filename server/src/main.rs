@@ -955,33 +955,9 @@ mod tests {
             })
         );
 
-        let (probe_tx, _probe_writer) = lobby::ConnectionSink::new();
-        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
-        source_handle
-            .event_tx
-            .send(RoomEvent::Join {
-                player_id: TEST_PLAYER_ID,
-                name: "Transfer Probe".to_string(),
-                spectator: false,
-                replay_ok: false,
-                msg_tx: probe_tx,
-                ack: ack_tx,
-            })
+        tokio::time::timeout(Duration::from_secs(1), source_handle.event_tx.closed())
             .await
-            .expect("source room should still accept events");
-        assert_eq!(
-            ack_rx.await,
-            Ok(true),
-            "transfer should remove the player from the previous room"
-        );
-
-        source_handle
-            .event_tx
-            .send(RoomEvent::Leave {
-                player_id: TEST_PLAYER_ID,
-            })
-            .await
-            .expect("source cleanup leave should send");
+            .expect("empty source room should be disposed after transfer");
         if let Some(handle) = current_room {
             handle
                 .event_tx

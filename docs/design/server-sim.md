@@ -268,10 +268,18 @@ alive.
   of reading room internals. Only normal lobby/countdown/live-match rooms are summarized; dev,
   replay, replay-artifact, replay-branch, and lab modes stay hidden, and create-only lobby
   reservation rejects duplicate or reserved/internal names before the later WebSocket join path.
-  `GET /api/lobbies` collects those summaries with a short timeout and returns browser-safe DTOs
-  sorted by joinability then age; the client polls that route every 1.5 seconds and preflights a
-  clicked row against the latest route response before sending `join`. No WebSocket push message
-  currently exists for the browser list; the HTTP poll cadence is the accepted freshness target.
+  That reservation is only a short pending-create lease: if no human joins before the lease probe,
+  the empty normal room asks the registry to dispose its exact room handle. After the last human
+  leaves a normal public lobby, live match, one-player sandbox, or post-match replay, the room task
+  clears its own lifecycle bookkeeping and asks the registry to remove the public name immediately;
+  there is no host reconnect grace. Empty dev-scenario, replay, replay-artifact, and lab rooms also
+  dispose their private registry handles once their last viewer leaves; replay-branch rooms are the
+  retained private exception because their branch seed exists only inside the room handle until a
+  branch launches. `GET /api/lobbies` collects those summaries with a short timeout and returns
+  browser-safe DTOs sorted by joinability then age; the client polls that route every 1.5 seconds
+  and preflights a clicked row against the latest route response before sending `join`. No WebSocket
+  push message currently exists for the browser list; the HTTP poll cadence is the accepted
+  freshness target.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
   `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay
@@ -295,15 +303,19 @@ alive.
   id and appended after normal live projection in `LiveTickDriver`, then cleared for each recipient
   only after snapshot fanout accepts that recipient's next live snapshot. While live pause is active
   no snapshot fanout occurs, so queued late-spectator notices wait for the next emitted live
-  snapshot after unpause.
-- Lab rooms are hidden `RoomMode::Lab` rooms that start a real `Game` on first join with a
-  room-owned collaborator session record. Direct lab joiners currently receive the operator role;
-  the original joiner remains in `operatorId` metadata for compatibility, not as the only mutation
-  authority. They use the shared launch helper with `StartPayload.lab` metadata and prediction
-  disabled. Lab setup mutations call `Game::apply_lab_op`; issue-as commands call
-  `Game::issue_lab_command_as`, which rejects mixed-owner selections before queuing a normal
-  command. Lab state, dirty flags, viewer roles, selected vision, and append-only operation log
-  records stay in the room task rather than in `Game`.
+  snapshot after unpause. Replay-branch live rooms use the same observer attach shape for late joins
+  to the private branch room; they do not return to branch staging or create another original-seat
+  mapping.
+- Lab rooms are hidden `RoomMode::Lab` rooms that start a drain-tracked real `Game` on first join
+  with a room-owned collaborator session record. Existing lab rooms remain joinable during deploy
+  drain, but a lab that has not launched yet rejects the first join instead of creating a new
+  authoritative session. Direct lab joiners currently receive the operator role; the original
+  joiner remains in `operatorId` metadata for compatibility, not as the only mutation authority.
+  They use the shared launch helper with `StartPayload.lab` metadata and prediction disabled. Lab
+  setup mutations call `Game::apply_lab_op`; issue-as commands call `Game::issue_lab_command_as`,
+  which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,
+  viewer roles, selected vision, and append-only operation log records stay in the room task rather
+  than in `Game`.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -319,15 +331,18 @@ AI controllers, or Tokio coordination into `rts-sim`:
 
 - `room_task.rs` remains the room lifecycle owner: membership, lobby/ingame/replay/branch phase
   transitions, start/end/reset/drain bookkeeping, match-history dispatch, and the single owned
-  `Game`.
+  `Game`. Empty private dev, replay, replay-artifact, and lab rooms are disposable; empty private
+  replay-branch rooms reset their live/staging state but keep `RoomMode::ReplayBranch`, so reserved
+  `__replay_branch__` names never decay into public normal lobbies while preserving the in-memory
+  branch seed.
 - `session_policy.rs` is the explicit internal descriptor for the current room mode and phase. It
   names the state source, join, clock, authority, mutation, visibility, diagnostics,
-  persistence/export, start-payload, and UI-affordance choices used by the rest of the lobby
-  helpers. Persistence is split into match-history eligibility, transient post-match replay
-  capture, match-history replay-artifact attachment, and room-local lab operation logging. Product
-  identity still selects real setup paths such as replay-artifact loading, dev scenario
-  construction, replay-branch seeding, and lab room initialization; lower-level helpers should
-  consume the explicit policy fields when the behavior is shared.
+  persistence/export, drain launch/accounting, start-payload, and UI-affordance choices used by the
+  rest of the lobby helpers. Persistence is split into match-history eligibility, transient
+  post-match replay capture, match-history replay-artifact attachment, and room-local lab operation
+  logging. Product identity still selects real setup paths such as replay-artifact loading, dev
+  scenario construction, replay-branch seeding, and lab room initialization; lower-level helpers
+  should consume the explicit policy fields when the behavior is shared.
 - `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
   human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
   aliases, and command issuer resolution.
@@ -338,10 +353,13 @@ AI controllers, or Tokio coordination into `rts-sim`:
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
   per-viewer replay vision, branch-live active players use original-seat aliases, and dev-watch
   viewers get full-world scenario snapshots.
-- `launch.rs` owns common `StartPayload` stamping for live, replay-branch-live, and dev-watch
-  starts: player id, spectator flag, prediction build/version, recipient capability metadata,
-  pending snapshot clearing, and the send loop. Replay viewer payloads remain in
-  `replay_session.rs` because they also carry replay metadata.
+- `launch.rs` owns the lobby start-payload builder and send loop for live, replay-branch-live,
+  lab, dev-watch, and replay viewer starts. The builder consumes `SessionPolicy`, recipient role,
+  projection-derived diagnostics, prediction eligibility, pending snapshot behavior, and
+  source-specific metadata to stamp player id, spectator flag, prediction build/version,
+  recipient capabilities, diagnostics, replay metadata, and lab metadata. `Game::start_payload()`
+  remains the source of static simulation start data, while `replay_session.rs` keeps replay
+  playback state and exposes replay start metadata for the builder.
 - `live_tick.rs` runs one live simulation tick around the existing `Game` seam: AI command enqueue,
   `Game::tick`, recipient-specific room notice injection after projection, snapshot fanout,
   observer analysis, defeat/game-over checks, and panic replay capture.
