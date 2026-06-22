@@ -1,7 +1,11 @@
 pub(super) use super::super::super::lab_timeline::LabTimelineEntryKind;
+pub(super) use super::super::super::replay_branch::BranchStagingState;
 pub(super) use super::super::*;
-pub(super) use crate::protocol::DEFAULT_FACTION_ID;
+pub(super) use crate::protocol::{NoticeSeverity, DEFAULT_FACTION_ID};
 pub(super) use rts_rules::faction::{EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
+pub(super) use rts_sim::game::map::Map;
+
+pub(super) use super::super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 
 pub(super) fn replay_test_players(count: usize) -> Vec<PlayerInit> {
     (1..=count as u32)
