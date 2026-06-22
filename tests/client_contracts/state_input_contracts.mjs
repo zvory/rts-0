@@ -1491,7 +1491,6 @@ function buttonByLabel(card, label) {
   labRemoveInput.clientIntent = new ClientIntent();
   labRemoveInput.clientIntent.beginLabTool({
     kind: "removeSelectableUnits",
-    payload: { unitsOnly: true },
     keepArmedOnWorldClick: true,
     consumeBoxSelection: true,
     keepArmedOnBoxSelection: true,
@@ -1533,14 +1532,14 @@ function buttonByLabel(card, label) {
   labRemoveInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
   labRemoveInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
   labRemoveInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
-  labRemoveInput._eventScreenPos = () => ({ x: 32, y: 32 });
-  labRemoveInput._onLeftDown({ x: 32, y: 32 }, {});
+  labRemoveInput._eventScreenPos = () => ({ x: 104, y: 64 });
+  labRemoveInput._onLeftDown({ x: 104, y: 64 }, {});
   labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
   assert(
     labRemoveClickEvents.length === 1 &&
-      labRemoveClickEvents[0].entityIds.join(",") === "61" &&
-      labRemoveClickEvents[0].entityId === 61,
-    "lab remove tool click receives the selectable unit under the cursor",
+      labRemoveClickEvents[0].entityIds.join(",") === "63" &&
+      labRemoveClickEvents[0].entityId === 63,
+    "lab remove tool click receives the selectable building under the cursor",
   );
   assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after click delete");
   let labRemovePointer = { x: 90, y: 90 };
@@ -1551,8 +1550,8 @@ function buttonByLabel(card, label) {
   labRemoveInput._handleMouseUp({ button: 0, shiftKey: false });
   assert(labRemoveBoxEvents.length === 1, "lab remove tool consumes box selections");
   assert(
-    labRemoveBoxEvents[0].entityIds.join(",") === "61,62",
-    "lab remove tool box selection receives selectable units, excluding buildings and shot reveals",
+    labRemoveBoxEvents[0].entityIds.join(",") === "61,63,62",
+    "lab remove tool box selection receives selectable units and buildings, excluding shot reveals",
   );
   assert(labRemoveSelections.length === 0, "lab remove tool box selection does not fall through to normal selection");
   assert(labRemoveInput.clientIntent.activeLabTool !== null, "lab remove tool stays armed after box delete");
