@@ -2,12 +2,6 @@ use super::fixtures::*;
 use super::*;
 
 fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
-    queued_move_fixture_with_lobby_debug(false)
-}
-
-fn queued_move_fixture_with_lobby_debug(
-    lobby_debug: bool,
-) -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -16,16 +10,7 @@ fn queued_move_fixture_with_lobby_debug(
         color: "#fff".into(),
         is_ai: false,
     }];
-    let mut game = if lobby_debug {
-        Game::new_with_debug_starting_loadout_and_random_ai_profiles(
-            &players,
-            crate::config::QUICKSTART_STEEL,
-            crate::config::QUICKSTART_OIL,
-            0x5150_0001,
-        )
-    } else {
-        Game::new_for_replay(&players, 0x5150_0001)
-    };
+    let mut game = Game::new_for_replay(&players, 0x5150_0001);
     for tile in &mut game.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
@@ -845,7 +830,7 @@ fn snapshot_options_control_runtime_movement_debug_path() {
             true,
         ),
     ] {
-        let (mut game, unit, first, _, _) = queued_move_fixture_with_lobby_debug(true);
+        let (mut game, unit, first, _, _) = queued_move_fixture();
 
         game.enqueue(
             1,

@@ -55,7 +55,6 @@ lobby/config dump replaces the source scrape.
 | `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. `aiProfileId` may be one of the supported live AI profiles; omitted or unknown values default to the highest supported live AI version. |
 | `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects the live AI profile for an existing AI lobby seat (lobby phase only, host-only). Unknown AI ids and unsupported profile ids are ignored. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
-| `setQuickstart` | `enabled: bool` | Legacy host-only quickstart compatibility command for internal/test callers. The normal lobby UI does not expose it. |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
@@ -64,12 +63,12 @@ lobby/config dump replaces the source scrape.
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
-| `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback and dev scenario watch rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
-| `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms. |
-| `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted only in replay rooms. |
-| `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
+| `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback, dev scenario watch rooms, and lab rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
+| `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms and paused lab rooms. |
+| `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted in replay and lab rooms. |
+| `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Lab rooms use room-local keyframes and recorded accepted lab operations/issue-as commands the same way, then re-send lab `start`, `roomTimeState`, `labState`, and a fresh snapshot. Replay and lab keyframes are recorded every 2,000 ticks while their authoritative time advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
-| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations, issue-as commands, and vision changes are room-local and append to the lab operation log with the requesting connection id. |
+| `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations and issue-as commands are room-local; `setVision` changes only the requesting operator's projection. Accepted lab requests append to the lab operation log with the requesting connection id. |
 | `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
@@ -241,7 +240,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `t`        | Fields |
 |------------|--------|
 | `welcome`  | `playerId: u32` — assigned on connect. |
-| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
+| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
 | `matchCountdown` | `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, rejects new joins, and sends `start` only after the countdown duration elapses. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
@@ -341,7 +340,7 @@ Sent once when the match begins. Carries everything static for the whole match.
     room: string,                // safe public lab id, not the hidden internal room prefix
     operatorId: u32,
     role: "operator"|"readOnly",
-    vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] },
+    vision: { mode: "fullWorld" } | { mode: "team", teamId: u32 } | { mode: "teams", teamIds: u32[] }, // recipient's lab vision
     dirty: bool,
     operationCount: u32
   },
@@ -358,20 +357,12 @@ Sent once when the match begins. Carries everything static for the whole match.
   players: [ { id, teamId, factionId, name, color, startTileX, startTileY } ], // active match players only
 }
 ```
-Units/buildings arrive via snapshots (so they obey fog), including
-the player's own starting City Centre + workers. When the legacy `setQuickstart` compatibility
-command is enabled, every player starts with 99,999 steel and 99,999 oil instead of the default
-opening resources, and each human player also starts with five supply depots, one Gun Works
-(`steelworks` kind), one R&D Complex (`research_complex` kind), one Training Centre, two Barracks,
-two Vehicle Works (`factory` kind), and five of each unit kind including Command Cars. The legacy
-quickstart preset also adds one inert enemy player in the clockwise-adjacent corner from the first
-human start, with five deployed Mortar Teams clumped around one Scout Car and four enemy Supply
-Depots five tiles north/east/south/west of the clump. It also sets
-`diagnostics.movementPaths: "ownerOnly"` for active players, which lets the client expose local
-movement-waypoint overlay controls for the owner-only `debugPath` fields in snapshots. Spectators
-do not receive that movement-path diagnostic affordance. Dev scenario start payloads may advertise
-`diagnostics.movementPaths: "all"` because those rooms intentionally use full-world diagnostic
-projection. Replay viewers and live spectators receive `diagnostics.observerAnalysis: true` only
+Units/buildings arrive via snapshots (so they obey fog), including the player's own starting
+loadout from the validated faction catalog. Normal solo starts may skip countdown because they are
+solo rooms, but they still use ordinary starting resources and ordinary faction loadouts. Dev
+scenario start payloads may advertise `diagnostics.movementPaths: "all"` because those rooms
+intentionally use full-world diagnostic projection. Replay viewers and live spectators receive
+`diagnostics.observerAnalysis: true` only
 when room projection policy will send observer-analysis payloads to that recipient.
 `capabilities` is the neutral control/affordance contract. Live active players receive
 `commands.gameplay: true` and `matchControls.pause: true`; spectators, replay viewers, dev-watch
@@ -380,9 +371,12 @@ when their connection is mapped to an original active seat through the branch-li
 Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
 `visibility.replayVision: true`. Replay branch creation is advertised separately with
 `actions.replayBranch: true` only when the current replay can accept a branch request. Dev scenario
-watch rooms advertise speed/pause/step room-time controls without replay seek, replay-vision, or
-replay-branch controls. Clients must not infer these shared affordances from `replay`, `lab`,
-URL-local dev-watch state, or legacy debug flags.
+watch rooms advertise speed/pause/step room-time controls without seek. Lab rooms advertise
+speed/pause/step/relative seek/absolute seek/timeline controls, but still do not advertise
+replay-vision or replay-branch controls. Clients must not infer these shared affordances
+from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
+The browser's shared room-time controls render lab seek and keyframe metadata from these
+capabilities and `roomTimeState`; per-operator lab vision remains a separate lab-control state.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`. Late live spectator joins receive the same live start
 payload shape stamped from the current `Game::start_payload()` tick, with prediction metadata
@@ -393,15 +387,22 @@ metadata omitted. Labs use a hidden internal room id, a default two-team real `G
 server-owned projection. `role` names the room-owned operator/read-only viewer classification.
 Direct lab URL joiners currently receive `operator`; `readOnly` remains available for future
 explicit viewer modes. `operatorId` identifies the original lab joiner for compatibility metadata,
-not the sole authority for privileged lab operations.
+not the sole authority for privileged lab operations. Lab room-time controls are shared room state:
+any operator can pause, resume at a clamped positive speed, step exactly one authoritative tick
+while paused, seek relatively, or seek to an absolute retained lab timeline tick. Accepted lab seeks
+restore the nearest retained lab keyframe at or before the target, replay accepted lab operations
+and issue-as commands through normal server validation, re-send lab start metadata, broadcast
+`roomTimeState`/`labState`, and send fresh snapshots. If a new lab operation or issue-as command is
+accepted after a past seek, future lab timeline entries and keyframes after the current tick are
+truncated; there is no branch, redo, or undo protocol in this slice.
 
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
 The canonical default faction id is `kriegsia`; `ekat` is also a playable catalog id. Start payloads emit `factionId` for every active
 start player, lobby seat, and replay branch seat, and replay artifacts store `faction_id` for every
-player. Missing faction requests default to `kriegsia` in normal lobby, AI, quickstart, self-play,
-and dev-start contexts, while explicit `kriegsia` and `ekat` requests are accepted by the current
+player. Missing faction requests default to `kriegsia` in normal lobby, AI, self-play, and
+dev-start contexts, while explicit `kriegsia` and `ekat` requests are accepted by the current
 playable faction policy. Other ids are rejected unless a lifecycle path explicitly accepts recorded
 replay data or the `phase2_empty_fixture` test fixture.
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
@@ -624,8 +625,7 @@ them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
 `debugPath` is present only when the room's projection policy enables movement-path diagnostics for
-that recipient and only while the unit has remaining movement waypoints. The legacy quickstart/debug
-compatibility path enables owner-only movement paths for active players. Dev scenario rooms may
+that recipient and only while the unit has remaining movement waypoints. Dev scenario rooms may
 enable full projected movement paths. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
 staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
 points in traversal order and `waypoints[0]` is the current movement target. The compact slot
@@ -791,9 +791,10 @@ Events are best-effort visual flavor; the client must not depend on receiving th
 ### 2.6 Room time state and replay vision
 
 `roomTimeState` is a reliable server message that carries the shared room-controlled time
-cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms also send
-it after pause/resume and one-tick step controls so clients can confirm the authoritative room-time
-speed and tick:
+cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
+rooms also send it after pause/resume and one-tick step controls so clients can confirm the
+authoritative room-time speed and tick. Lab rooms also send it after timeline baseline resets and
+new timeline keyframes, accepted seeks, and future-history truncation:
 ```
 {
   t: "roomTimeState",
@@ -806,9 +807,13 @@ speed and tick:
   controllerId?: u32
 }
 ```
-`keyframeTicks` lists the replay keyframes the server has recorded so far. Clients may display
-them as seek marks, but a seek target is not limited to these ticks; the server restores the nearest
-recorded keyframe at or before the requested tick and fast-forwards from there.
+`keyframeTicks` lists the replay or lab keyframes the server has recorded so far. Replay and lab
+clients may display them as seek marks, but a seek target is not limited to these ticks; the server
+restores the nearest recorded keyframe at or before the requested tick and fast-forwards from there.
+Lab rooms expose recorded baseline and periodic keyframe ticks through the same field, with
+`durationTicks` set to the current maximum retained lab tick. Lab history is bounded by retained
+room-local keyframes and recorded entries; seek requests outside retained history are rejected with
+`error` instead of rebuilding from discarded state.
 
 `livePauseState` is a reliable server message that carries the authoritative live-match pause
 state. Normal live and branch-live match recipients receive it after `start` and after accepted or
@@ -861,6 +866,8 @@ default is the union of all replay players.
 `LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
 `{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
 room task before snapshot projection; unknown, empty, or duplicate team selections are rejected.
+Lab vision is server-owned per operator, so one operator can inspect full world while another uses
+team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned.
 
@@ -883,9 +890,11 @@ units belong to that player; mixed-owner selections are rejected instead of part
   metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
 }
 ```
-Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome`. Import validates the schema,
-map metadata, player/team/resource/research/entity fields, restores through the public lab `Game`
-API, applies lab vision metadata, and returns an entity id remap in `outcome.entityIdMap`.
+Export returns `{ scenario: LabScenarioV1 }` in `labResult.outcome` using the requesting operator's
+current lab vision in `metadata.lab.vision`. Import validates the schema, map metadata,
+player/team/resource/research/entity fields, restores through the public lab `Game` API, applies
+scenario vision to the requester and future join default without overwriting already connected
+collaborators, and returns an entity id remap in `outcome.entityIdMap`.
 Transient snapshot fields, fog recipient projections, events, projectile runtime state, command
 logs, interpolation state, and lab operation result metadata are intentionally omitted.
 
@@ -893,15 +902,15 @@ Reliable lab server messages:
 
 | `t` | Fields | Meaning |
 |-----|--------|---------|
-| `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Room-local lab control metadata. World state still travels through `snapshot`. |
+| `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Recipient-scoped lab control metadata. World state still travels through `snapshot`. |
 | `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
 
-Lab MVP protocol deliberately omits pause/step/seek controls, tick-perfect timeline/keyframes,
-lab simulation flags such as disabled damage or god mode, server-side public scenario storage,
-fine-grained multi-operator permissions, visual iteration hot reload, and `/dev/scenario`
-migration. Those require separate typed messages instead of overloading `LabClientOp`.
-The legacy quickstart debug preset is intentionally not modeled as a lab preset here; debug-style
-prebuilt setups should return later as explicit lab scenario/preset protocol.
+Lab protocol deliberately omits seek controls, lab simulation flags such as disabled damage or god
+mode, server-side public scenario storage, fine-grained multi-operator permissions, visual
+iteration hot reload, and `/dev/scenario` migration. Pause, speed, step, and room-local timeline
+metadata use the neutral room-time messages instead of overloading `LabClientOp`.
+Debug-style prebuilt setups should return later as explicit lab scenario/preset protocol, not as a
+hidden normal-lobby command.
 
 ### 2.7 Observer analysis state
 

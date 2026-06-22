@@ -14,7 +14,6 @@ export default scenario("coalesced_snapshots_replay_pending", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",

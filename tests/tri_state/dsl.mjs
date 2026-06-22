@@ -13,7 +13,6 @@ export function scenario(name, definition) {
       kind: setup.kind || "liveRoom",
       players: setup.players ?? 1,
       prediction: setup.prediction || "disabled",
-      quickstart: setup.quickstart !== false,
       devScenario: setup.devScenario || null,
       localBaseline: setup.localBaseline || "initial",
     },

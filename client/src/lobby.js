@@ -80,8 +80,6 @@ export class Lobby {
     this.elSeatsSummary = rootEl.querySelector("#lobby-seats-summary");
     this.elObserversSummary = rootEl.querySelector("#lobby-observers-summary");
     this.btnReady = rootEl.querySelector("#lobby-ready");
-    this.chkQuickstart = rootEl.querySelector("#lobby-quickstart");
-    this.chkQuickstartInput = this.chkQuickstart?.querySelector("input[type='checkbox']") || null;
     this.btnStart = rootEl.querySelector("#lobby-start");
     this.elStatus = rootEl.querySelector("#lobby-status");
     this.selMap = rootEl.querySelector("#lobby-map");
@@ -97,7 +95,6 @@ export class Lobby {
     this._spectator = false;
     this._hostId = null;
     this._canStart = false;
-    this._quickstart = false;
     this._teamPreset = "custom";
     this._selectedMap = "";
     this._availableMaps = [];
@@ -213,12 +210,6 @@ export class Lobby {
       if (this.btnStart.disabled) return;
       this.net.start();
     });
-
-    if (this.chkQuickstartInput) {
-      this.chkQuickstartInput.addEventListener("change", () => {
-        this.net.setQuickstart(!!this.chkQuickstartInput.checked);
-      });
-    }
 
     // Map selector: host-only. Non-hosts see the selected map as a label.
     if (this.selMap) {
@@ -384,13 +375,12 @@ export class Lobby {
 
   /**
    * Render a `lobby` server message (§2.2): room, hostId, players[], canStart.
-   * @param {{room:string,hostId:number,players:Array,canStart:boolean,quickstart:boolean}} m
+   * @param {{room:string,hostId:number,players:Array,canStart:boolean}} m
    */
   _renderLobby(m) {
     if (!m) return;
     this._hostId = m.hostId;
     this._canStart = !!m.canStart;
-    this._quickstart = !!m.quickstart;
     this._teamPreset = m.teamPreset || "custom";
     this._selectedMap = m.map || "";
     this._availableMaps = Array.isArray(m.maps) ? m.maps : [];
@@ -407,7 +397,6 @@ export class Lobby {
     this._reflectSummary(m.room, players);
     this._renderPlayers(players);
     this._reflectStartButton();
-    this._reflectQuickstart();
     this._reflectMap();
     this._reflectTeamPreset();
 
@@ -448,15 +437,6 @@ export class Lobby {
 
   _betaFactionSelectEnabled() {
     return betaFactionSelectEnabledForLocation(window.location);
-  }
-
-  /** Keep an optional legacy quickstart control synced when an internal/test shell supplies one. */
-  _reflectQuickstart() {
-    if (!this.chkQuickstart) return;
-    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
-    this.chkQuickstart.hidden = !isHost;
-    this.chkQuickstart.disabled = this._countdownActive || !isHost;
-    this.chkQuickstartInput.checked = !!this._quickstart;
   }
 
   /** Render the map selector in the summary row for hosts, or the map name for non-hosts. */
@@ -656,7 +636,6 @@ export class Lobby {
     this._countdownActive = true;
     this._reflectReadyButton();
     this._reflectStartButton();
-    this._reflectQuickstart();
     this._reflectMap();
     this._reflectTeamPreset();
     this.setStatus("Match starting...");
@@ -698,7 +677,6 @@ export class Lobby {
     }
     this._reflectReadyButton();
     this._reflectStartButton();
-    this._reflectQuickstart();
     this._reflectMap();
     this._reflectTeamPreset();
   }

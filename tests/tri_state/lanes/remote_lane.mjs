@@ -38,10 +38,6 @@ export class RemoteLane {
     await this.waitFor((message) => message.t === "welcome", 3000, "welcome");
     this.send({ t: "join", name: "Remote", room: this.room });
     await this.waitFor((message) => message.t === "lobby", 3000, "lobby join");
-    if (this.scenario.setup.quickstart) {
-      this.send({ t: "setQuickstart", enabled: true });
-      await this.waitFor((message) => message.t === "lobby" && message.quickstart === true, 3000, "quickstart");
-    }
     this.send({ t: "ready", ready: true });
     await this.waitFor((message) => message.t === "lobby" && message.canStart, 3000, "canStart");
     this.send({ t: "start" });
@@ -212,7 +208,6 @@ function compactMessage(message) {
         spectator: !!player.isSpectator,
       })),
       canStart: message.canStart,
-      quickstart: message.quickstart,
       map: message.map,
     };
   }

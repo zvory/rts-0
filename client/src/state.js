@@ -8,6 +8,7 @@
 import { admitSelectionIds } from "./command_budget.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
+import { GroundDecalBuffer } from "./state_ground_decals.js";
 import {
   isAllyOwner as queryIsAllyOwner,
   isEnemyOwner as queryIsEnemyOwner,
@@ -119,6 +120,7 @@ export class GameState {
     this.visibleTiles = [];
 
     this.visualEffects = new VisualEffectBuffers();
+    this.groundDecals = new GroundDecalBuffer();
     /** @type {Map<number, object>} owned predicted entity id -> predicted entity view. */
     this.predictedById = new Map();
     this.predictionCorrectionById = new Map();
@@ -318,6 +320,12 @@ export class GameState {
     this._curById = new Map();
     for (const e of entities) this._curById.set(e.id, e);
     this.visualEffects.pruneRecoilForSnapshot(this._curById);
+    this.groundDecals.applySnapshotEvents(events, {
+      prevById: this._prevById,
+      curById: this._curById,
+      players: this.players,
+      tick: msg.tick,
+    });
 
     this.resources = {
       steel: msg.steel | 0,
@@ -344,6 +352,10 @@ export class GameState {
 
   addMortarLaunch(ev, now = performance.now()) {
     this.visualEffects.addMortarLaunch(ev, now);
+  }
+
+  consumePendingGroundDecals() {
+    return this.groundDecals.consumePending();
   }
 
   addMortarImpact(ev, now = performance.now()) {

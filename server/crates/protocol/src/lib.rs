@@ -157,8 +157,6 @@ pub enum ClientMessage {
     },
     /// Host removes a previously-added AI opponent by its player id (lobby phase only).
     RemoveAi { id: u32 },
-    /// Host toggles the lobby's debug mode.
-    SetQuickstart { enabled: bool },
     /// Switch between player and spectator role while still in the lobby. `id` is optional for
     /// self-targeting compatibility; host-targeted changes include the target human player id.
     SetSpectator {
@@ -678,7 +676,6 @@ pub enum ServerMessage {
         host_id: u32,
         players: Vec<LobbyPlayer>,
         can_start: bool,
-        quickstart: bool,
         team_preset: String,
         /// Currently selected map name.
         map: String,
@@ -1263,7 +1260,6 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("ADD_AI", "addAi"),
                 ("SET_AI_PROFILE", "setAiProfile"),
                 ("REMOVE_AI", "removeAi"),
-                ("SET_QUICKSTART", "setQuickstart"),
                 ("SET_SPECTATOR", "setSpectator"),
                 ("COMMAND", "command"),
                 ("GIVE_UP", "giveUp"),

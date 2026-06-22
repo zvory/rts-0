@@ -29,12 +29,15 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `lobby` carries `map` (selected stable map name) and `maps[]` (`{name, description}` catalog
   rows). Replay start metadata separately uses `mapName`.
 - Lab start payloads carry `lab` metadata with the public lab id, original operator id, recipient
-  role, current shared lab vision mode, dirty flag, and operation count.
+  role, that recipient's current lab vision mode, dirty flag, and operation count.
 - Start payloads carry recipient-scoped `capabilities` metadata for shared room-time, replay-vision,
   and gameplay-command affordances. The client parser must not infer these from replay/dev/lab
-  mode names.
+  mode names. Lab timeline controls use neutral room-time speed, pause, step, relative seek,
+  absolute seek, and `roomTimeState` keyframe metadata; they are not `LabClientOp` messages.
 - Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
   movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
+- The active protocol has no quickstart/debug lobby command or start-payload flag. Normal solo
+  countdown skipping is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?`, and `isSpectator`; spectators are
   lobby members but not active match players.
 

@@ -45,6 +45,7 @@ mod connection;
 mod crash_replay;
 mod dev_replay;
 mod faction_validation;
+mod lab_timeline;
 mod launch;
 mod live_tick;
 mod participants;
@@ -217,8 +218,6 @@ pub enum RoomEvent {
     },
     /// The host asked to remove an AI opponent by id (lobby phase only; honored only from host).
     RemoveAi { player_id: u32, target: u32 },
-    /// The host toggled the lobby's start-with-more-money mode.
-    SetQuickstart { player_id: u32, enabled: bool },
     /// A connected human switched between active player and spectator role in the lobby. `target`
     /// may differ from `player_id` only for host-managed lobby moves.
     SetSpectator {

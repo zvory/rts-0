@@ -1,0 +1,5 @@
+<svg id="infantry-splash-03" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <path id="splash.main" d="M10 12 L15 8 L21 10 L24 16 L20 22 L13 23 L8 18 Z" fill="#fff" opacity="0.9"/>
+  <circle id="splash.dot.a" cx="6.5" cy="20.5" r="1.8" fill="#fff" opacity="0.64"/>
+  <circle id="splash.dot.b" cx="25" cy="9" r="1.5" fill="#fff" opacity="0.55"/>
+</svg>

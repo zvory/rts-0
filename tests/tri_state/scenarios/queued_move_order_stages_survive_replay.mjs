@@ -15,7 +15,6 @@ export default scenario("queued_move_order_stages_survive_replay", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",

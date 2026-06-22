@@ -16,7 +16,6 @@ export default scenario("move_predicts_before_authoritative_echo", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",
@@ -28,13 +27,13 @@ export default scenario("move_predicts_before_authoritative_echo", {
   steps: [
     waitForClientPredictionReady(),
     capture("before-move"),
-    selectOwn("scout_car", 0),
+    selectOwn("worker", 0),
     setClientSnapshotDelivery(false),
     issue("move", { dx: 192, dy: 0 }),
     waitMs(1500),
     advanceClientPredictionVisual(),
     capture("after-predicted-move"),
-    assertClientAuthoritativeOwnedStable({ before: "before-move", after: "after-predicted-move", unit: "scout_car" }),
-    assertClientRenderedOwnedAdvanced({ before: "before-move", after: "after-predicted-move", unit: "scout_car", minDistancePx: 1 }),
+    assertClientAuthoritativeOwnedStable({ before: "before-move", after: "after-predicted-move", unit: "worker" }),
+    assertClientRenderedOwnedAdvanced({ before: "before-move", after: "after-predicted-move", unit: "worker", minDistancePx: 1 }),
   ],
 });

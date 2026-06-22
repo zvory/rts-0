@@ -13,7 +13,6 @@ export default scenario("socket_receipt_not_reconciliation_ack", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

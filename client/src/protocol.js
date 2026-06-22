@@ -34,7 +34,6 @@ export const C = Object.freeze({
   ADD_AI: "addAi",
   SET_AI_PROFILE: "setAiProfile",
   REMOVE_AI: "removeAi",
-  SET_QUICKSTART: "setQuickstart",
   SET_SPECTATOR: "setSpectator",
   COMMAND: "command",
   GIVE_UP: "giveUp",
@@ -1151,7 +1150,6 @@ export const msg = Object.freeze({
   },
   setAiProfile: (id, aiProfileId) => ({ t: C.SET_AI_PROFILE, id, aiProfileId }),
   removeAi: (id) => ({ t: C.REMOVE_AI, id }),
-  setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
   setSpectator: (spectator, id = undefined) => {
     const payload = { t: C.SET_SPECTATOR, spectator: !!spectator };
     if (id != null) payload.id = id;

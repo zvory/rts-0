@@ -12,7 +12,6 @@ export default scenario("queued_order_visibility", {
     kind: "liveRoom",
     players: 1,
     prediction: "disabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

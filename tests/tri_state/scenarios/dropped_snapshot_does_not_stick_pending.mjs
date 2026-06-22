@@ -14,7 +14,6 @@ export default scenario("dropped_snapshot_does_not_stick_pending", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: {
     mode: "profile",

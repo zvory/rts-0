@@ -28,7 +28,7 @@ pub struct MatchRecord {
     pub score_screen: serde_json::Value,
     /// Number of non-AI players in the match. Public recent-match reads hide rows with none.
     pub human_count: i32,
-    /// True when the lobby Debug mode / quickstart loadout was enabled for this match.
+    /// Historical visibility flag for removed debug rows. New live product rows write false.
     pub debug_mode: bool,
     /// True for developer-local rows that should only be visible from localhost requests.
     pub local_only: bool,

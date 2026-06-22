@@ -50,7 +50,6 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assertHasMethod(net, "setTeamPreset", "Net");
   assertHasMethod(net, "setTeam", "Net");
   assertHasMethod(net, "setFaction", "Net");
-  assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setRoomTimeSpeed", "Net");
   assertHasMethod(net, "stepRoomTime", "Net");
   assertHasMethod(net, "seekRoomTime", "Net");

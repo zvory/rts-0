@@ -64,7 +64,7 @@ src/
   match_settings_context.js # Match settings action/tab context builder
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
-  replay_controls.js # Replay/scenario speed, seek, vision, and timeline controls
+  replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
@@ -88,7 +88,6 @@ export class Net {
   addAi(teamId?, aiProfileId?)
   setAiProfile(id, aiProfileId)
   removeAi(id)
-  setQuickstart(enabled)                 // legacy compatibility command; no normal lobby control
   setSpectator(spectator, id?)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
   giveUp()
@@ -100,9 +99,9 @@ export class Net {
   createSnapshotReportStats()
   consumeSnapshotReportStats()
   noteSnapshotFrame({bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind})
-  setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario time
-  stepRoomTime()                         // paused dev-scenario room time
-  seekRoomTime(ticksBack)                // room-controlled replay time; pass huge N for full reset
+  setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario/lab time
+  stepRoomTime()                         // paused dev-scenario/lab room time
+  seekRoomTime(ticksBack)                // room-controlled replay/lab time; pass huge N for full reset
   seekRoomTimeTo(tick)
   setReplayVision(vision)
   lab(requestId, op)                     // lab rooms only; request id allocated by LabClient
@@ -329,6 +328,21 @@ export class LivePauseOverlay {
 }
 ```
 
+`replay_controls.js`
+```js
+export class RoomTimeControls {
+  constructor({ net, state, replayViewer?, capabilities, label? })
+  applyRoomTimeState(state)
+  noteSnapshotTick(tick)
+  destroy()
+}
+export class ReplayControls extends RoomTimeControls
+```
+`RoomTimeControls` renders pause/resume, speed, step, relative seek, absolute timeline seek, tick
+status, and keyframe marks only from `capabilities.roomTime`. Replay fog-perspective controls and
+the replay-branch button remain gated by replay-specific visibility/action capabilities, not by lab
+or URL identity.
+
 `room_capabilities.js`
 ```js
 createRoomCapabilities({ startPayload })
@@ -347,7 +361,7 @@ export class LabClient {
   setInitialState(state)
   subscribeState(handler)                // returns unsubscribe
   subscribeResult(handler)               // returns unsubscribe
-  setVision(vision)                      // sends {op:"setVision", vision}
+  setVision(vision)                      // sends {op:"setVision", vision} for this operator only
   request(op, options?)                  // allocates requestId, resolves with labResult/timeout
   destroy()
 }
@@ -369,7 +383,6 @@ export class LabPanel {
   armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
   cancelActiveTool()
   setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
-  deleteSelected()                       // applies selected-entity delete mutation with batch result summary
   exportScenario(), importScenario()
   destroy()
 }
@@ -386,12 +399,13 @@ export function createDefaultControlPolicy()
 `App` owns `LabClient`, `LabPanel`, and lab control policy lifetimes when a `start` payload carries
 `lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
 constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
-MVP exposes room-local vision, setup mutations, issue-as commands, and scenario import/export
+MVP exposes per-operator lab vision, setup mutations, issue-as commands, and scenario import/export
 through those collaborators while keeping the normal match screen authentic. Lab operator starts
-are still spectator-shaped for projection and prediction, but the injected control policy exposes
-`canUseCommandSurface(state)` so `Match` and HUD can keep selection plus the real command card
-available for operators while read-only lab viewers, replay viewers, and normal spectators remain
-passive. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
+are still spectator-shaped for projection and prediction, and `LabClient` treats `start.lab.vision`
+plus `labState.vision` as the recipient's server-authoritative choice. The injected control policy
+exposes `canUseCommandSurface(state)` so `Match` and HUD can keep selection plus the real command
+card available for operators while read-only lab viewers, replay viewers, and normal spectators
+remain passive. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
 `LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
 owner.
 
@@ -417,8 +431,8 @@ faction unit and building palettes. Selected-entity repositioning also uses the 
 for each id at the clicked world point, and leaves stale-id or partial-failure reporting visible
 through the lab result status. The remove tool arms a persistent `removeSelectableUnits` setup
 tool; clicking deletes the selectable unit under the cursor, and dragging deletes selectable units
-in the box without changing the current selection. Delete and owner reassignment stay contextual to
-the current selection, disable themselves when no selected entity ids are available, and summarize
+in the box without changing the current selection. Owner reassignment stays contextual to the
+current selection, disables itself when no selected entity ids are available, and summarizes
 accepted plus rejected per-entity mutations after the individual server replies return.
 
 `hotkey_profiles.js`
@@ -793,8 +807,7 @@ export class Lobby {
   // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
   // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
-  // The normal product lobby exposes an Open Lab route affordance instead of a Debug mode
-  // quickstart toggle; Net.setQuickstart remains for internal/test compatibility only.
+  // The normal product lobby exposes an Open Lab route affordance instead of a debug setup toggle.
   // Teams are layout groups only; player colors come from each player record.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }

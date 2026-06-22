@@ -100,13 +100,6 @@ impl ProjectionPolicy {
         }
     }
 
-    pub(super) fn with_owner_movement_paths(self) -> Self {
-        Self {
-            diagnostics: self.diagnostics.with_owner_movement_paths(),
-            ..self
-        }
-    }
-
     pub(super) fn live_snapshot_for(
         self,
         role: RecipientRole,
@@ -184,12 +177,6 @@ impl ProjectionPolicy {
     fn movement_path_scope_for(self, role: RecipientRole) -> MovementPathDiagnosticScope {
         match (self.diagnostics.movement_paths, role) {
             (MovementPathDiagnosticPolicy::None, _) => MovementPathDiagnosticScope::None,
-            (MovementPathDiagnosticPolicy::OwnerOnly, RecipientRole::ActivePlayer) => {
-                MovementPathDiagnosticScope::OwnerOnly
-            }
-            (MovementPathDiagnosticPolicy::OwnerOnly, RecipientRole::Spectator) => {
-                MovementPathDiagnosticScope::None
-            }
             (MovementPathDiagnosticPolicy::AllProjected, _) => MovementPathDiagnosticScope::All,
         }
     }
@@ -240,20 +227,6 @@ mod tests {
             !policy
                 .diagnostic_capabilities_for(RecipientRole::ActivePlayer)
                 .observer_analysis
-        );
-
-        let debug_policy = policy.with_owner_movement_paths();
-        assert_eq!(
-            debug_policy
-                .diagnostic_capabilities_for(RecipientRole::ActivePlayer)
-                .movement_paths,
-            MovementPathDiagnosticScope::OwnerOnly
-        );
-        assert_eq!(
-            debug_policy
-                .diagnostic_capabilities_for(RecipientRole::Spectator)
-                .movement_paths,
-            MovementPathDiagnosticScope::None
         );
     }
 

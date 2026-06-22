@@ -13,7 +13,6 @@ export default scenario("ack_three_leaves_four_five_pending", {
     kind: "liveRoom",
     players: 1,
     prediction: "enabled",
-    quickstart: true,
   },
   network: { mode: "direct" },
   steps: [

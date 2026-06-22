@@ -342,7 +342,6 @@ pub struct MatchStartedLog<'a> {
     pub players: usize,
     pub humans: usize,
     pub ai: usize,
-    pub quickstart: bool,
     pub participants: &'a [String],
 }
 
@@ -358,7 +357,6 @@ pub fn log_match_started(ctx: MatchStartedLog<'_>) {
         players = ctx.players,
         humans = ctx.humans,
         ai = ctx.ai,
-        quickstart = ctx.quickstart,
         participants = ?ctx.participants,
         "match started"
     );

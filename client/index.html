@@ -30,8 +30,6 @@
                 #lobby-start, #lobby-status
                 #lobby-room and #lobby-join remain hidden compatibility controls, not visible
                 pre-join product controls.
-                Legacy quickstart remains a protocol/test compatibility command, not a visible
-                normal lobby control.
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selection-area, #control-group-tabs,
@@ -197,13 +195,13 @@
           </div>
         </div>
 
-        <!-- Replay seek + speed controls (only shown during replay dev-watch) -->
+        <!-- Room-time controls for replay, dev-watch, and lab rooms -->
         <div id="replay-speed" hidden>
           <button class="spd-btn seek-btn" data-seek-back="2147483647" title="Restart from tick 0">⟲ Reset</button>
           <button class="spd-btn seek-btn" data-seek-back="600" title="Rewind 20 seconds">−20s</button>
           <button class="spd-btn seek-btn" data-seek-back="300" title="Rewind 10 seconds">−10s</button>
           <button class="spd-btn seek-btn" data-seek-back="150" title="Rewind 5 seconds">−5s</button>
-          <button class="spd-btn dev-pause-btn" data-speed="0" title="Pause dev scenario">Pause</button>
+          <button class="spd-btn dev-pause-btn" data-speed="0" title="Pause room time">Pause</button>
           <button class="spd-btn dev-step-btn" data-step-room-time="1" title="Advance one simulation tick">Step</button>
           <span class="spd-sep"></span>
           <button class="spd-btn" data-speed="0.5">0.5×</button>

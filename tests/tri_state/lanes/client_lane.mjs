@@ -212,13 +212,12 @@ export class ClientLane {
     }, this.scenario.setup.prediction, this.networkProfile);
     await this.page.goto(url.href, { waitUntil: "networkidle2", timeout: 15000 });
     await this.page.waitForFunction(() => window.__rts?.net?.playerId != null, { timeout: 5000 });
-    await this.page.evaluate((room, quickstart) => {
+    await this.page.evaluate((room) => {
       const app = window.__rts;
       app.net.join("Client", room);
-      if (quickstart) app.net.setQuickstart(true);
       app.net.ready(true);
       app.net.start();
-    }, this.room, this.scenario.setup.quickstart);
+    }, this.room);
     await this.waitForMatch();
     await this.page.evaluate((prediction) => {
       window.__rts.setPredictionEnabled(prediction === "enabled");

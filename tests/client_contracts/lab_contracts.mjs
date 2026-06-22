@@ -468,7 +468,7 @@ await withFakeDocument(async () => {
   assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel remove tool stays armed after a drag delete");
   assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
   assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
-  assert(buttonByText("Delete").disabled, "LabPanel disables selected deletes without a selection");
+  assert(!buttonByText("Delete"), "LabPanel does not expose a duplicate selected-delete button");
   selectedEntities = [
     { id: 31, owner: 1, kind: KIND.RIFLEMAN },
     { id: 32, owner: 2, kind: KIND.RIFLEMAN },
@@ -526,14 +526,6 @@ await withFakeDocument(async () => {
   resolveLastLabResult({ outcome: { entityId: 32, owner: 1 } });
   await setOwnerPromise;
   assert(textWithin(root).includes("Updated owner for 2 entities."), "LabPanel summarizes accepted owner changes");
-  const deletePromise = buttonByText("Delete").listeners.click();
-  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 31, "LabPanel selected delete sends the first selected entity id");
-  resolveLastLabResult({ outcome: { entityId: 31 } });
-  await Promise.resolve();
-  assert(sent.at(-1).op.op === "deleteEntity" && sent.at(-1).op.entityId === 32, "LabPanel selected delete sends all selected entity ids");
-  resolveLastLabResult({ outcome: { entityId: 32 } });
-  await deletePromise;
-  assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes accepted deletes");
   playerButtonById(1).listeners.click();
   panel.fields.get("resource-steel").value = "900";
   panel.fields.get("resource-oil").value = "300";

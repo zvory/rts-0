@@ -2985,7 +2985,7 @@ input[type="text"]:focus {
   font-weight: 700;
 }
 
-/* --- Replay speed controls --- */
+/* --- Room-time controls --- */
 #replay-speed {
   position: absolute;
   bottom: 12px;
@@ -3323,7 +3323,7 @@ input[type="text"]:focus {
 .replay-timeline-progress {
   position: absolute;
   inset: 0 auto 0 0;
-  width: var(--replay-progress, 0%);
+  width: var(--room-time-progress, var(--replay-progress, 0%));
   background: rgba(236, 199, 103, 0.24);
   pointer-events: none;
 }
