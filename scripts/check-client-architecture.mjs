@@ -42,7 +42,10 @@ const AREA_BY_FILE = new Map(Object.entries({
   "config.js": "rules-mirror",
 
   "hud.js": "ui",
+  "hud_command_dom.js": "ui",
   "hud_command_card.js": "ui",
+  "hud_control_groups.js": "ui",
+  "hud_resources.js": "ui",
   "hud_selection_panel.js": "ui",
   "hud_unit_commands.js": "ui",
   "hotkey_editor.js": "ui",
