@@ -323,6 +323,24 @@ pub struct ClientNetReport {
     pub device_pixel_ratio_x100: u16,
     pub hidden: bool,
     pub focused: bool,
+    #[serde(default)]
+    pub desktop_runtime_present: bool,
+    #[serde(default)]
+    pub native_cursor_bridge_present: bool,
+    #[serde(default)]
+    pub native_cursor_supported: bool,
+    #[serde(default)]
+    pub native_cursor_active: bool,
+    #[serde(default)]
+    pub native_cursor_last_reason: String,
+    #[serde(default)]
+    pub native_cursor_last_error: String,
+    #[serde(default)]
+    pub tauri_internals_present: bool,
+    #[serde(default)]
+    pub tauri_global_present: bool,
+    #[serde(default)]
+    pub tauri_globals: String,
     pub ws_buffered_bytes: u32,
     pub server_tick_ms: u16,
     pub server_lag_ms: u16,

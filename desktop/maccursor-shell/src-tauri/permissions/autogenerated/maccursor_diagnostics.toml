@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-maccursor-diagnostics"
+description = "Enables the maccursor_diagnostics command without any pre-configured scope."
+commands.allow = ["maccursor_diagnostics"]
+
+[[permission]]
+identifier = "deny-maccursor-diagnostics"
+description = "Denies the maccursor_diagnostics command without any pre-configured scope."
+commands.deny = ["maccursor_diagnostics"]

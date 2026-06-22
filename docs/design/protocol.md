@@ -187,6 +187,15 @@ in a match:
   devicePixelRatioX100: u16, // latest devicePixelRatio multiplied by 100
   hidden: bool,             // document.hidden when the report was sent
   focused: bool,            // document.hasFocus() when available
+  desktopRuntimePresent: bool, // true when the desktop shell runtime flag exists
+  nativeCursorBridgePresent: bool, // true when the native cursor JS bridge exists
+  nativeCursorSupported: bool, // native cursor bridge support result
+  nativeCursorActive: bool, // native cursor capture active state from bridge diagnostics
+  nativeCursorLastReason: string, // bounded native cursor diagnostic reason
+  nativeCursorLastError: string, // bounded native cursor diagnostic error
+  tauriInternalsPresent: bool, // true when Tauri IPC internals are visible
+  tauriGlobalPresent: bool,   // true when the global Tauri API object is visible
+  tauriGlobals: string,       // bounded comma-separated Tauri global key summary
   wsBufferedBytes: u32,     // browser WebSocket bufferedAmount
   serverTickMs: u16,        // latest server tick work duration seen in snapshot netStatus
   serverLagMs: u16,         // latest scheduler lag seen in snapshot netStatus
@@ -222,21 +231,22 @@ in a match:
   predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
 }
 ```
-The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, and command milestone
-fields are report-window aggregates only; raw snapshot payloads, raw timestamp arrays, entity ids,
-unit ids, target ids, positions, replay data, and command payloads are not uploaded. The canonical
-single-segment payload budget is 1280 bytes. It is intentionally below a common 1460-byte Ethernet
-TCP MSS because the measured snapshot bytes are only WebSocket application payload bytes and exclude
-WebSocket framing plus TLS, TCP, and IP overhead. Command milestone timing splits local issue to
-receipt, receipt to sim acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to
-browser apply. The frame-work and renderer fields come from the browser's bounded frame-profiler
-report window; the local debug surface may keep richer cumulative phase tables, but those raw arrays
-and detailed recent frames are not uploaded. The server logs this message only when the aggregate
-contains notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure,
-packet-budget pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer
-cost, WebSocket backlog, server tick/scheduler pressure, command milestone delay/rejection, or
-prediction correction/fallback signals, alongside the connection's `player_id`, room name, and
-reported `match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
+The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, command milestone, and
+desktop cursor runtime fields are report-window aggregates or bounded summaries only; raw snapshot
+payloads, raw timestamp arrays, entity ids, unit ids, target ids, positions, replay data, command
+payloads, and raw cursor input events are not uploaded. The canonical single-segment payload budget
+is 1280 bytes. It is intentionally below a common 1460-byte Ethernet TCP MSS because the measured
+snapshot bytes are only WebSocket application payload bytes and exclude WebSocket framing plus TLS,
+TCP, and IP overhead. Command milestone timing splits local issue to receipt, receipt to sim
+acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to browser apply. The
+frame-work and renderer fields come from the browser's bounded frame-profiler report window; the
+local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
+recent frames are not uploaded. The server logs this message only when the aggregate contains
+notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure, packet-budget
+pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
+backlog, server tick/scheduler pressure, command milestone delay/rejection, or prediction
+correction/fallback signals, alongside the connection's `player_id`, room name, and reported
+`match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
 transport/browser/prediction/render behavior, not as gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)
