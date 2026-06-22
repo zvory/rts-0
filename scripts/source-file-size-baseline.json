@@ -10,8 +10,8 @@
     },
     {
       "path": "scripts/docdrift-sweep.mjs",
-      "lines": 2167,
-      "reason": "Existing oversized docs sweep tool before repo-wide source-size gate."
+      "lines": 1997,
+      "reason": "Docs sweep core remains over the cap after renderer extraction; keep ratcheting as follow-up pieces split out."
     },
     {
       "path": "server/crates/ai/src/ai_core/actions.rs",
