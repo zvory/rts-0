@@ -106,7 +106,14 @@ pub(super) fn lab_config() -> LabRoomConfig {
         public_id: "sandbox".to_string(),
         map_name: "Default".to_string(),
         seed: Some(0x1A2B_3C4D),
+        scenario: None,
     }
+}
+
+pub(super) fn lategame_lab_config() -> LabRoomConfig {
+    let mut config = lab_config();
+    config.scenario = Some(LabScenarioPreset::Lategame);
+    config
 }
 
 pub(super) fn summary_task(room: &str) -> RoomTask {

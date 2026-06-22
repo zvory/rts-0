@@ -1,4 +1,6 @@
-use super::room_task::{DevScenarioConfig, DevScenarioId, LabRoomConfig, RoomMode};
+use super::room_task::{
+    DevScenarioConfig, DevScenarioId, LabRoomConfig, LabScenarioPreset, RoomMode,
+};
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
 use rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
@@ -48,6 +50,7 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
     }
     let mut map_name = "Default".to_string();
     let mut seed = None;
+    let mut scenario = None;
     for part in parts {
         if let Some(map) = part.strip_prefix("map=") {
             if !safe_lab_token(map, 48) {
@@ -56,6 +59,15 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
             map_name = map.to_string();
         } else if let Some(raw_seed) = part.strip_prefix("seed=") {
             seed = Some(raw_seed.parse::<u32>().ok()?);
+        } else if let Some(raw_scenario) = part.strip_prefix("scenario=") {
+            if raw_scenario == "blank" {
+                scenario = None;
+            } else {
+                if !safe_lab_token(raw_scenario, 48) {
+                    return None;
+                }
+                scenario = Some(LabScenarioPreset::from_id(raw_scenario)?);
+            }
         } else {
             return None;
         }
@@ -64,6 +76,7 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
         public_id: public_id.to_string(),
         map_name,
         seed,
+        scenario,
     })
 }
 
@@ -167,8 +180,25 @@ mod tests {
                 assert_eq!(config.public_id, "sandbox");
                 assert_eq!(config.map_name, "low-econ");
                 assert_eq!(config.seed, Some(12345));
+                assert_eq!(config.scenario, None);
             }
             _ => panic!("safe lab room should parse as lab mode"),
+        }
+    }
+
+    #[test]
+    fn room_mode_for_accepts_default_lab_scenario_preset() {
+        match room_mode_for("__lab__:sandbox:map=Default:scenario=lategame") {
+            RoomMode::Lab(config) => {
+                assert_eq!(config.public_id, "sandbox");
+                assert_eq!(config.scenario, Some(LabScenarioPreset::Lategame));
+            }
+            _ => panic!("safe lab scenario room should parse as lab mode"),
+        }
+
+        match room_mode_for("__lab__:sandbox:map=Default:scenario=blank") {
+            RoomMode::Lab(config) => assert_eq!(config.scenario, None),
+            _ => panic!("safe blank lab scenario room should parse as lab mode"),
         }
     }
 
@@ -184,6 +214,10 @@ mod tests {
         ));
         assert!(matches!(
             room_mode_for("__lab__:sandbox:seed=not-a-number"),
+            RoomMode::Normal
+        ));
+        assert!(matches!(
+            room_mode_for("__lab__:sandbox:scenario=unknown"),
             RoomMode::Normal
         ));
     }

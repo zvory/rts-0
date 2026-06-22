@@ -59,6 +59,49 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
 }
 
 #[test]
+fn lab_start_payload_can_use_bundled_lategame_scenario() {
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default:scenario=lategame".to_string(),
+        RoomMode::Lab(lategame_lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    let starts = start_payloads(&mut writer);
+    assert_eq!(starts.len(), 1);
+    assert_eq!(starts[0].players.len(), 2);
+    assert_eq!(starts[0].players[0].name, "Lab Alpha");
+    assert_eq!(starts[0].players[1].name, "Lab Bravo");
+    let lab = starts[0].lab.as_ref().expect("lab metadata");
+    assert_eq!(lab.vision, LabVisionMode::FullWorld);
+    assert!(!lab.dirty);
+    assert_eq!(lab.operation_count, 0);
+    let Phase::InGame(game) = &task.phase else {
+        panic!("lategame lab should start immediately");
+    };
+    let scenario = game.export_lab_scenario();
+    assert_eq!(scenario.seed, 3_566_641_871);
+    assert_eq!(scenario.players.len(), 2);
+    assert_eq!(scenario.entities.len(), 227);
+    assert!(scenario.players[0]
+        .upgrades
+        .contains(&"anti_tank_gun_unlock".to_string()));
+    assert_eq!(
+        task.lab_timeline
+            .as_ref()
+            .expect("lab timeline")
+            .keyframe_ticks(),
+        vec![0]
+    );
+}
+
+#[test]
 fn lab_room_first_join_during_drain_is_rejected_without_starting_session() {
     let drain = DrainHandle::default();
     drain.begin_draining(Duration::from_secs(295));
