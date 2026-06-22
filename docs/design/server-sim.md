@@ -207,7 +207,8 @@ positions, placement/collision legality, and stale ids before changing the world
 mutations clear stale orders and reservations where needed, then rebuild supply, spatial index,
 fog, and building memory before returning. `LabScenarioV1` is setup data keyed by map identity,
 player state, entity records, and small lab metadata such as scenario name and exported tick;
-room-owned protocol export adds current lab vision metadata before sending JSON to the browser.
+room-owned protocol export adds the requesting operator's current lab vision metadata before
+sending JSON to the browser.
 Restore loads the named map, validates faction/research/kind data, recreates entities with fresh
 ids, repairs derived state, and returns the id remap for callers that need to reconcile UI
 selection. Snapshot-only projections, transient events, projectile runtime state, and command logs
@@ -314,8 +315,8 @@ alive.
   They use the shared launch helper with `StartPayload.lab` metadata and prediction disabled. Lab
   setup mutations call `Game::apply_lab_op`; issue-as commands call `Game::issue_lab_command_as`,
   which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,
-  viewer roles, selected vision, and append-only operation log records stay in the room task rather
-  than in `Game`.
+  viewer roles, per-operator selected vision, the future-join vision default, and append-only
+  operation log records stay in the room task rather than in `Game`.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -351,8 +352,8 @@ AI controllers, or Tokio coordination into `rts-sim`:
   interval and remains the only task that advances a room.
 - `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
-  per-viewer replay vision, branch-live active players use original-seat aliases, and dev-watch
-  viewers get full-world scenario snapshots.
+  per-viewer replay vision, lab viewers get their room-owned per-operator lab vision, branch-live
+  active players use original-seat aliases, and dev-watch viewers get full-world scenario snapshots.
 - `launch.rs` owns the lobby start-payload builder and send loop for live, replay-branch-live,
   lab, dev-watch, and replay viewer starts. The builder consumes `SessionPolicy`, recipient role,
   projection-derived diagnostics, prediction eligibility, pending snapshot behavior, and
