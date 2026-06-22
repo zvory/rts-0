@@ -14,16 +14,16 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   `frame_recovery.js`, `frame_entity_views.js`, `match_health.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
   `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`; app lifecycle, dependency
-  injection, frame-loop health, observer analysis, capability-driven room-time controls, and
+  injection, frame-loop health, observer analysis, room-time controls, and
   replay/spectator/lab shell wiring.
 - `model`: `state.js`, `client_intent.js`, `command_budget.js`, `command_composer.js`,
   `progress_extrapolator.js`, prediction controllers/adapters, and browser-local display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
-  controller/browser/roster views, match history, resource icons, scoreboard, status badge, minimap, branch
-  staging, lab panel, and settings. The pre-join lobby browser polls `GET /api/lobbies` and
-  preflights row clicks against the latest list before sending `join`.
+  controller/browser/roster views, match history, resource icons, scoreboard, status badge, minimap,
+  branch staging, lab panel, and settings. The lobby browser polls `GET /api/lobbies` and preflights
+  row clicks against the latest list before sending `join`.
 - `input`: `input/` plus `replay_camera_input.js`; shared command-free camera gestures live in
   `input/camera_navigation.js`.
 - `renderer`: `renderer/` Pixi facade, layers, terrain, entities, fog, feedback, art helpers,
