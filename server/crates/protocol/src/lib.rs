@@ -14,12 +14,12 @@ use std::fmt;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, CommandCapabilities, DebugPathPoint, DebugPathView, DiagnosticCapabilities,
-    EntityView, Event, LabStartMetadata, LabStartRole, LabVisionMode, MapInfo,
-    MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ReplayStartMetadata,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,
-    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, VisibilityCapabilities,
-    DEFAULT_FACTION_ID,
+    EntityView, Event, LabScenarioResearch, LabScenarioResources, LabStartMetadata, LabStartRole,
+    LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
+    ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities,
+    RoomTimeState, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
+    VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -586,19 +586,6 @@ pub struct LabScenarioPlayer {
     pub is_ai: bool,
     pub resources: LabScenarioResources,
     pub research: LabScenarioResearch,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioResources {
-    pub steel: u32,
-    pub oil: u32,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioResearch {
-    pub completed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
