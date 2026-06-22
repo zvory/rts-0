@@ -463,8 +463,7 @@ impl Game {
                     player_id: player.id,
                 });
             };
-            state.steel = player.resources.steel;
-            state.oil = player.resources.oil;
+            state.set_resources(player.resources.steel, player.resources.oil);
             state.upgrades.clear();
             for upgrade_id in &player.research.completed {
                 let upgrade =
