@@ -28,9 +28,10 @@
   while keeping explored history locally. Local sight stamping exists only as a fallback for
   older/dev object snapshots; the server remains the fog authority.
 - Local development exposes game-backed dev scenario pages under `/dev/scenarios` and a neutral
-  saved-artifact replay launcher at `/dev/replay-artifact?replay=<artifact_name>`. Scenario rooms
-  stream **full-world** snapshots for authored local debugging; saved self-play artifacts use the
-  same replay viewer runtime as post-match and match-history replays.
+  saved-artifact replay launcher at `/?replayArtifact=<artifact_name>`. The older
+  `/dev/replay-artifact?replay=<artifact_name>` route redirects to that canonical URL. Scenario
+  rooms stream **full-world** snapshots for authored local debugging; saved self-play artifacts use
+  the same replay viewer runtime as post-match and match-history replays.
 - The same server exposes a lightweight documentation wiki at `/wiki`. It renders only allowlisted
   Markdown under `docs/context` and `docs/design`, rewrites relative Markdown doc links into
   `/wiki/...` links, rejects traversal or unsupported paths, and serves `/wiki/stats` from

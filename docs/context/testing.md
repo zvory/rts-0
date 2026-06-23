@@ -58,7 +58,7 @@ If a self-play test fails and the cause is not obvious, start a fresh server on 
 use macOS `open` to load the replay artifact:
 
 ```bash
-open "http://localhost:<port>/dev/replay-artifact?replay=<artifact_name>"
+open "http://localhost:<port>/?replayArtifact=<artifact_name>"
 ```
 
 Do not use the Browser skill for this flow.

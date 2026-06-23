@@ -146,7 +146,8 @@ too, set `RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact
 explicit safe artifact name; successful runs are then written under the target dir's
 `selfplay-artifacts/<name>/`.
 When you open a replay artifact in the browser, use the server instance that produced it, or
-start a fresh one on its own port before loading `/dev/replay-artifact?replay=<artifact_name>`.
+start a fresh one on its own port before loading `/?replayArtifact=<artifact_name>`. The older
+`/dev/replay-artifact?replay=<artifact_name>` route redirects to that canonical launch URL.
 
 ```bash
 RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
