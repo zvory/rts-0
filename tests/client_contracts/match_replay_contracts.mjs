@@ -126,6 +126,28 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
     assert(commandCard.hidden, "read-only lab viewer hides the command card");
 
+    const staleConfirm = { hidden: true };
+    const staleConfirmButton = {
+      disabled: true,
+      textContent: "Giving up...",
+      focus() { this.focused = true; },
+    };
+    dom.giveUpConfirm = staleConfirm;
+    dom.giveUpConfirmButton = staleConfirmButton;
+    const giveUpMatch = Object.create(Match.prototype);
+    giveUpMatch.replayViewer = false;
+    giveUpMatch.state = { spectator: false };
+    giveUpMatch.giveUpSent = false;
+    giveUpMatch.settings = null;
+    giveUpMatch.openGiveUpConfirm();
+    assert(!staleConfirm.hidden, "live player match opens the give-up confirmation");
+    assert(!staleConfirmButton.disabled && staleConfirmButton.textContent === "Give up",
+      "give-up confirmation resets stale pending button state before showing");
+    giveUpMatch.closeMenus();
+    assert(staleConfirm.hidden, "closeMenus hides the give-up confirmation");
+    assert(!staleConfirmButton.disabled && staleConfirmButton.textContent === "Give up",
+      "closeMenus resets give-up confirmation button state");
+
     const labToolMatch = Object.create(Match.prototype);
     labToolMatch.clientIntent = new ClientIntent();
     const labToolChanges = [];
