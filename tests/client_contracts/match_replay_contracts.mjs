@@ -1118,7 +1118,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   };
   manualPointerLockMatch.syncPointerLockUi = () => {};
   manualPointerLockMatch.togglePointerLock();
-  assert(toggledPointerLock === 1, "manual cursor-lock action is the only Pointer Lock request path");
+  assert(toggledPointerLock === 1, "browser cursor-lock action remains manual");
   assert(closedSettings === 1, "manual cursor-lock request closes settings before requesting lock");
 
   let unsupportedToast = null;
@@ -1130,6 +1130,109 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(toggledPointerLock === 1, "unsupported cursor-lock action does not request Pointer Lock");
   assert(unsupportedToast === "Cursor lock is not supported by this browser.",
     "unsupported cursor lock surfaces the existing support message");
+
+  const priorDesktopRuntime = globalThis.__RTS_DESKTOP_RUNTIME;
+  const priorWindowSetTimeout = globalThis.window.setTimeout;
+  const priorWindowClearTimeout = globalThis.window.clearTimeout;
+  const priorDocumentAddEventListener = globalThis.document.addEventListener;
+  const priorDocumentRemoveEventListener = globalThis.document.removeEventListener;
+  const priorDocumentHasFocus = globalThis.document.hasFocus;
+  const priorWindowSearch = globalThis.window.location.search;
+  const documentListeners = new Map();
+  const timers = [];
+  const clearedTimers = [];
+  globalThis.__RTS_DESKTOP_RUNTIME = {
+    shell: "tauri",
+    nativeCursorCapture: true,
+    aggressiveCursorLock: true,
+  };
+  globalThis.window.setTimeout = (fn, ms) => {
+    const id = timers.length + 1;
+    timers.push({ id, fn, ms });
+    return id;
+  };
+  globalThis.window.clearTimeout = (id) => {
+    clearedTimers.push(id);
+  };
+  globalThis.document.addEventListener = (type, handler) => {
+    documentListeners.set(type, handler);
+  };
+  globalThis.document.removeEventListener = (type, handler) => {
+    if (documentListeners.get(type) === handler) documentListeners.delete(type);
+  };
+  try {
+    const optInMatch = Object.create(Match.prototype);
+    optInMatch.replayViewer = false;
+    optInMatch.input = { requestPointerLock() {} };
+    assert(optInMatch.shouldUseDesktopCursorAutoLock(), "Tauri native cursor runtime opts matches into aggressive cursor lock");
+    optInMatch.replayViewer = true;
+    assert(!optInMatch.shouldUseDesktopCursorAutoLock(), "replay viewers do not auto-lock the cursor");
+    globalThis.window.location.search = "?rtsNoAutoPointerLock=1";
+    optInMatch.replayViewer = false;
+    assert(!optInMatch.shouldUseDesktopCursorAutoLock(), "rtsNoAutoPointerLock disables desktop cursor auto-lock");
+    globalThis.window.location.search = "";
+
+    const autoLockMatch = Object.create(Match.prototype);
+    let requestedLocks = 0;
+    let autoClosedSettings = 0;
+    let syncedPointerUi = 0;
+    let lockToast = null;
+    autoLockMatch.replayViewer = false;
+    autoLockMatch.desktopCursorAutoLockEnabled = true;
+    autoLockMatch.desktopCursorAutoLockTimer = null;
+    autoLockMatch.desktopCursorAutoLockInFlight = false;
+    autoLockMatch.desktopCursorAutoLockFailures = 0;
+    autoLockMatch.onDesktopCursorAutoLockSignal = autoLockMatch.handleDesktopCursorAutoLockSignal.bind(autoLockMatch);
+    autoLockMatch.input = {
+      pointerLocked: false,
+      pointerLockSupported: () => true,
+      requestPointerLock() {
+        requestedLocks += 1;
+        this.pointerLocked = true;
+        autoLockMatch.handlePointerLockChange(true);
+        return Promise.resolve(true);
+      },
+    };
+    autoLockMatch.closeSettingsMenu = () => { autoClosedSettings += 1; };
+    autoLockMatch.toast = (msg) => { lockToast = msg; };
+    autoLockMatch.syncPointerLockUi = () => { syncedPointerUi += 1; };
+    autoLockMatch.installDesktopCursorAutoLock();
+    assert(timers[0]?.ms === 250, "desktop cursor auto-lock waits briefly after match mount");
+    timers.shift().fn();
+    await Promise.resolve();
+    assert(requestedLocks === 1, "desktop cursor auto-lock requests capture after match mount");
+    assert(autoClosedSettings === 1, "desktop cursor auto-lock closes settings after capture succeeds");
+    assert(lockToast === "Cursor locked. Alt-Tab to leave the game.",
+      "desktop cursor auto-lock explains Alt-Tab release");
+
+    autoLockMatch.input.pointerLocked = false;
+    autoLockMatch.handlePointerLockChange(false);
+    assert(timers[0]?.ms === 120, "focused cursor unlock schedules a quick desktop relock");
+    timers.shift().fn();
+    await Promise.resolve();
+    assert(requestedLocks === 2, "focused cursor unlock re-requests desktop cursor capture");
+    assert(syncedPointerUi >= 2, "desktop cursor auto-lock keeps the settings UI synchronized");
+
+    autoLockMatch.input.pointerLocked = false;
+    autoLockMatch.handleDesktopCursorAutoLockSignal();
+    const pendingTimer = autoLockMatch.desktopCursorAutoLockTimer;
+    autoLockMatch.teardownDesktopCursorAutoLock();
+    assert(clearedTimers.includes(pendingTimer), "desktop cursor auto-lock clears pending relock timers on teardown");
+    assert(!windowListeners.has("focus") && !windowListeners.has("pageshow") && !documentListeners.has("visibilitychange"),
+      "desktop cursor auto-lock removes focus and visibility listeners on teardown");
+  } finally {
+    if (priorDesktopRuntime === undefined) delete globalThis.__RTS_DESKTOP_RUNTIME;
+    else globalThis.__RTS_DESKTOP_RUNTIME = priorDesktopRuntime;
+    globalThis.window.setTimeout = priorWindowSetTimeout;
+    if (priorWindowClearTimeout === undefined) delete globalThis.window.clearTimeout;
+    else globalThis.window.clearTimeout = priorWindowClearTimeout;
+    if (priorDocumentAddEventListener === undefined) delete globalThis.document.addEventListener;
+    else globalThis.document.addEventListener = priorDocumentAddEventListener;
+    if (priorDocumentRemoveEventListener === undefined) delete globalThis.document.removeEventListener;
+    else globalThis.document.removeEventListener = priorDocumentRemoveEventListener;
+    globalThis.document.hasFocus = priorDocumentHasFocus;
+    globalThis.window.location.search = priorWindowSearch;
+  }
 
   if (priorWindow === undefined) delete globalThis.window;
   else globalThis.window = priorWindow;

@@ -704,6 +704,7 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     nativeCursorBackend: true,
     nativeCursorCapture: true,
     pointerLockDisabled: true,
+    aggressiveCursorLock: true,
     autostart: {autostart},
     autolock: {autolock},
     serverMode: selectedProfile ? "release" : developerSelected ? "developer" : "startup",
@@ -1030,8 +1031,12 @@ fn desktop_autolock_script() -> &'static str {
         const button = document.querySelector("#pointer-lock-toggle");
         return button && !button.hidden && !button.disabled ? button : null;
       }, 5000);
-      lockButton.click();
-      note("cursor-lock-clicked");
+      if (lockButton.getAttribute("aria-checked") === "true") {
+        note("cursor-lock-already-active");
+      } else {
+        lockButton.click();
+        note("cursor-lock-clicked");
+      }
     })().catch((err) => {
       diagnostics.lastError = err && err.message ? err.message : String(err);
       diagnostics.lastReason = "autolock-failed";
@@ -1246,6 +1251,7 @@ mod tests {
         assert!(script.contains("https://rts-0-zvorygin.fly.dev/"));
         assert!(script.contains("const defaultProfileId = \"beta\""));
         assert!(script.contains("nativeCursorBackend: true"));
+        assert!(script.contains("aggressiveCursorLock: true"));
         assert!(script.contains("autostart: false"));
         assert!(script.contains("autolock: false"));
         assert!(script.contains("serverMode: selectedProfile ? \"release\""));
@@ -1262,5 +1268,16 @@ mod tests {
         assert!(script.contains("native_cursor_capture_start_failed"));
         assert!(script.contains("pointerLockDisabled: true"));
         assert!(script.contains("requestPointerLock"));
+    }
+
+    #[test]
+    fn desktop_autolock_helper_preserves_existing_cursor_capture() {
+        let script = desktop_runtime_script(&RuntimeScriptOptions {
+            developer_server_url: Some("http://127.0.0.1:4000/".to_string()),
+            autostart: false,
+            autolock: true,
+        });
+        assert!(script.contains("cursor-lock-already-active"));
+        assert!(script.contains("cursor-lock-clicked"));
     }
 }

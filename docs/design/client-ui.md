@@ -713,9 +713,10 @@ export class Input {
   // virtual cursor for edge pan on multi-monitor setups. In the macOS Tauri
   // spike, the optional desktopCursor bridge replaces browser Pointer Lock
   // while keeping the same selection, command, HUD, minimap, wheel, and Escape
-  // routing contracts. Native desktop cursor visuals are painted directly from
-  // the native event handler and diagnostics expose backend, native/JS event
-  // counts, dropped events, and delivery latency.
+  // routing contracts. Match auto-requests that native bridge for Tauri matches
+  // and retries on focus/visibility return. Native desktop cursor visuals are
+  // painted directly from the native event handler and diagnostics expose backend,
+  // native/JS event counts, dropped events, and delivery latency.
   update(dt)                             // continuous handling (edge scroll handled by camera)
   // emits nothing to return; mutates state.selection / clientIntent and calls commandIssuer.issueCommand
 }

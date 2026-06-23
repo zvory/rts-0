@@ -29,6 +29,7 @@ spike:
   nativeCursorBackend: true,
   nativeCursorCapture: true,
   pointerLockDisabled: true,
+  aggressiveCursorLock: true,
   serverMode: "startup" | "release" | "developer",
   serverUrl: "https://rts-0-zvorygin-beta.fly.dev/" | "https://rts-0-zvorygin.fly.dev/" | null,
   releaseChannel: "beta" | "mainline" | null
@@ -43,6 +44,11 @@ native event count, JS processed count, dropped event count, delivery latency,
 and whether movement is batched. The current visible cursor is a DOM cursor
 painted directly in the native event handler (`visual: "dom-event-time"`), not
 a native overlay.
+
+Once a non-replay match starts in the Tauri shell, the web client aggressively
+requests native cursor capture, retries on focused unlocks, and grabs the cursor
+again after the window regains focus. Alt-Tab releases capture through the shell
+window blur handler; focusing the game window again re-captures it.
 
 Developer-only shortcuts for local debug runs:
 
@@ -123,8 +129,9 @@ Manual check:
 5. From the lobby, use **Open Lab** and confirm the lab opens in the same
    shell window and starts the lab room.
 6. Start a one-player sandbox or AI match from either release channel.
-7. Toggle cursor lock in the shell, move over terrain/HUD/minimap, right-click
-   move units, box-select, wheel zoom, and press Escape. Inspect
+7. Confirm the shell locks the cursor automatically in-match, then Alt-Tab away
+   and back to confirm it re-locks. Move over terrain/HUD/minimap, right-click
+   move units, box-select, and wheel zoom. Inspect
    `window.__RTS_NATIVE_CURSOR.diagnostics()` if movement feels delayed.
 8. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
    `shell.log` contains startup and selected-profile events.
