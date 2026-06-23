@@ -1975,6 +1975,7 @@ input[type="text"]:focus {
   pointer-events: auto;
 }
 #game-menu[data-settings-context="match"],
+#game-menu[data-settings-context="lab"],
 #game-menu[data-settings-context="spectator"],
 #game-menu[data-settings-context="replay"] {
   top: auto;
@@ -3023,19 +3024,110 @@ input[type="text"]:focus {
 /* --- Room-time controls --- */
 #replay-speed {
   position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 70px;
+  left: 12px;
   z-index: 30;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  width: min(520px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: auto;
+  border-radius: var(--radius);
+  color: var(--ink);
+  pointer-events: auto;
 }
 #replay-speed.replay-viewer-controls {
-  bottom: 14px;
+  top: 70px;
+}
+#replay-speed[hidden] {
+  display: none;
+}
+#replay-speed.room-time-floating-panel {
+  background: rgba(39, 37, 31, 0.94);
+  border: 1px solid var(--panel-edge);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.room-time-panel-titlebar,
+.room-time-panel-drag-handle,
+.room-time-panel-body {
+  display: flex;
+  align-items: center;
+}
+.room-time-panel-titlebar {
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+.room-time-panel-drag-handle {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 8px;
+  padding: 3px 5px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  cursor: grab;
+  user-select: none;
+}
+.room-time-panel-drag-handle:hover,
+.room-time-panel-drag-handle:focus-visible,
+#replay-speed[data-panel-dragging="true"] .room-time-panel-drag-handle {
+  background: rgba(17, 17, 15, 0.46);
+  color: var(--ink);
+  outline: none;
+}
+#replay-speed[data-panel-dragging="true"] .room-time-panel-drag-handle {
+  cursor: grabbing;
+}
+.room-time-panel-grip {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.room-time-panel-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.room-time-panel-reset {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.72);
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 4px 7px;
+}
+.room-time-panel-reset:hover,
+.room-time-panel-reset:focus-visible {
+  border-color: var(--accent);
+  color: var(--ink);
+  outline: none;
+}
+.room-time-panel-body {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
 }
 
 /* --- Observer analysis overlay --- */
@@ -3337,13 +3429,14 @@ input[type="text"]:focus {
 .replay-timeline {
   flex-basis: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: stretch;
   order: 10;
   margin-top: 3px;
 }
 .replay-timeline-track {
   position: relative;
-  width: min(720px, calc(100vw - 44px));
+  width: 100%;
+  min-width: min(240px, 100%);
   height: 18px;
   appearance: none;
   border: 1px solid var(--panel-edge);

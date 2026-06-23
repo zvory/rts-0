@@ -13,6 +13,7 @@ import {
 } from "./fakes.mjs";
 import {
   MAX_LOBBY_TEAMS,
+  Lobby,
   PLAYABLE_FACTIONS,
   betaFactionSelectEnabledForLocation,
   countdownSoundId,
@@ -137,6 +138,96 @@ import { textWithin } from "./dom_text.mjs";
   );
 }
 
+{
+  let stoppedPolling = 0;
+  let startedPolling = 0;
+  let clearedCountdown = 0;
+  let hidReplayPrompt = 0;
+  let renderedBrowser = null;
+  let statusText = "old";
+  const lobby = Object.assign(Object.create(Lobby.prototype), {
+    root: { hidden: false, classList: fakeClassList() },
+    net: { playerId: 7 },
+    roomBlock: { hidden: false },
+    elSetupKicker: { textContent: "Host controls" },
+    elSetupTitle: { textContent: "Match setup" },
+    elPlayers: { innerHTML: "occupied" },
+    elRoomDisplay: { textContent: "Old room" },
+    elMapSummary: { textContent: "No Terrain", hidden: true },
+    elSeatsSummary: { textContent: "2 / 4" },
+    elObserversSummary: { textContent: "1" },
+    btnJoin: { textContent: "Switch room" },
+    btnCreateLobby: { hidden: true, disabled: true },
+    btnReady: {
+      textContent: "Unready",
+      disabled: false,
+      classList: fakeClassList(),
+      setAttribute(name, value) {
+        this[name] = String(value);
+      },
+    },
+    btnStart: { disabled: false, classList: fakeClassList() },
+    selMap: null,
+    browserView: { rows: [{ room: "Fresh lobby" }] },
+    _joined: true,
+    _ready: true,
+    _spectator: false,
+    _hostId: 7,
+    _canStart: true,
+    _teamPreset: "custom",
+    _selectedMap: "No Terrain",
+    _availableMaps: [{ name: "No Terrain" }],
+    _playerCount: 2,
+    _browserActionPending: true,
+    _browserConnected: true,
+    _fetchImpl: () => Promise.resolve(),
+    _pendingBrowserJoinRoom: "Old room",
+    _pendingReplayRoom: "Old room",
+    _promptReturnFocus: {},
+    _stopLobbyBrowserPolling() {
+      stoppedPolling += 1;
+    },
+    _startLobbyBrowserPolling() {
+      startedPolling += 1;
+    },
+    _clearCountdown() {
+      clearedCountdown += 1;
+    },
+    _hideReplayPrompt() {
+      hidReplayPrompt += 1;
+    },
+    _renderLobbyBrowser(args) {
+      renderedBrowser = args;
+    },
+    _reflectTeamPreset() {},
+    setStatus(text) {
+      statusText = text;
+    },
+  });
+
+  lobby.resetToBrowser();
+
+  assert(!lobby._joined && !lobby._ready && !lobby._spectator, "lobby reset clears joined/ready/spectator state");
+  assert(lobby._hostId === null && lobby._canStart === false, "lobby reset clears host/start state");
+  assert(lobby._pendingBrowserJoinRoom === "" && lobby._browserActionPending === false,
+    "lobby reset clears pending browser join state");
+  assert(lobby._pendingReplayRoom === "" && lobby._promptReturnFocus === null,
+    "lobby reset clears replay prompt state");
+  assert(lobby.elPlayers.innerHTML === "", "lobby reset clears the stale roster");
+  assert(lobby.roomBlock.hidden, "lobby reset hides the joined-room setup panel");
+  assert(lobby.elSetupTitle.textContent === "Lobby browser", "lobby reset restores browser title");
+  assert(lobby.btnCreateLobby.hidden === false && lobby.btnCreateLobby.disabled === false,
+    "lobby reset re-enables create-lobby affordance");
+  assert(lobby.btnReady.textContent === "Ready" && lobby.btnReady["aria-pressed"] === "false",
+    "lobby reset restores the ready button to inactive state");
+  assert(lobby.btnStart.disabled, "lobby reset disables stale start control");
+  assert(lobby.elSeatsSummary.textContent === "0 / 4" && lobby.elObserversSummary.textContent === "0",
+    "lobby reset clears stale room summary counts");
+  assert(stoppedPolling === 1 && startedPolling === 1 && clearedCountdown === 1 && hidReplayPrompt === 1,
+    "lobby reset restarts browser polling and clears transient room UI");
+  assert(renderedBrowser?.error === "" && statusText === "", "lobby reset redraws browser without stale errors");
+}
+
 // ---------------------------------------------------------------------------
 // Lobby browser UI helpers
 // ---------------------------------------------------------------------------
@@ -176,8 +267,8 @@ import { textWithin } from "./dom_text.mjs";
     "DOM contract documents room-name controls as hidden compatibility only");
   assert(indexHtml.includes('id="lobby-lab-open"'),
     "normal lobby exposes a direct lab entry affordance");
-  assert(indexHtml.includes('href="/lab?room=default&map=Default"'),
-    "normal lobby lab entry uses the direct shared lab URL contract");
+  assert(indexHtml.includes('href="/lab"'),
+    "normal lobby lab entry opens the default lab scenario without URL overrides");
   assert(!indexHtml.includes('id="lobby-quickstart"'),
     "normal lobby does not render the legacy quickstart control");
   assert(!indexHtml.includes("Debug mode"),

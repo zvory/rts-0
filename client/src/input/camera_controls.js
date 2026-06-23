@@ -43,12 +43,15 @@ export function _handleKeyDown(ev) {
       this._quickCastCommandTarget(ev);
     }
     const intent = clientIntent(this);
+    const repeatedWorldAbilityTarget = repeatedWorldAbilityHotkeyTarget(intent?.commandTarget);
     if (
       intent?.commandTarget &&
       typeof intent.holdCommandTarget === "function" &&
-      (ev.shiftKey || repeatedWorldAbilityHotkeyTarget(intent.commandTarget))
+      (ev.shiftKey || repeatedWorldAbilityTarget)
     ) {
-      intent.holdCommandTarget(intent.commandTarget, ev.code, ev.shiftKey);
+      intent.holdCommandTarget(intent.commandTarget, ev.code, ev.shiftKey, {
+        preserveTapOnRelease: repeatedWorldAbilityTarget && !ev.shiftKey,
+      });
     }
     return;
   }

@@ -46,6 +46,21 @@ export function buildGiveUpAction({ visible, onOpen }) {
   };
 }
 
+export function buildBackToLobbyAction({ visible, onBackToLobby }) {
+  return {
+    render() {
+      if (!visible) return null;
+      const button = document.createElement("button");
+      button.id = "back-to-lobby-open";
+      button.type = "button";
+      button.className = "settings-match-action";
+      button.textContent = "Back to Lobby";
+      button.addEventListener("click", () => onBackToLobby?.());
+      return button;
+    },
+  };
+}
+
 export function buildPauseAction({ visible, disabled = false, label = "Pause", title = "", onPause }) {
   return {
     render() {
@@ -246,6 +261,7 @@ function renderMutedText(root, text) {
 
 function contextLabel(kind) {
   if (kind === "match") return "Live match";
+  if (kind === "lab") return "Lab";
   if (kind === "replay") return "Replay";
   if (kind === "spectator") return "Spectator match";
   return "Lobby";

@@ -13,6 +13,7 @@ import {
 } from "./fakes.mjs";
 import { buildCommandCardContextCatalog } from "../../client/src/hud_command_card.js";
 import {
+  buildBackToLobbyAction,
   buildGiveUpAction,
   buildPauseAction,
   buildSettingsTabs,
@@ -86,6 +87,18 @@ function hotkeyService() {
     assert(giveUpOpened, "settings: live give-up action calls injected opener");
     assert(buildGiveUpAction({ visible: false, onOpen: () => {} }).render() === null,
       "settings: spectator/replay contexts omit give-up action");
+  });
+
+  withFakeSettingsDocument(() => {
+    let returned = false;
+    const action = buildBackToLobbyAction({ visible: true, onBackToLobby: () => { returned = true; } });
+    const button = action.render();
+    assert(button.id === "back-to-lobby-open", "settings: back-to-lobby action keeps pinned id");
+    assert(button.textContent === "Back to Lobby", "settings: back-to-lobby action uses expected label");
+    button.listeners.click();
+    assert(returned, "settings: back-to-lobby action calls injected return handler");
+    assert(buildBackToLobbyAction({ visible: false, onBackToLobby: () => {} }).render() === null,
+      "settings: contexts without lobby return omit back-to-lobby action");
   });
 
   withFakeSettingsDocument(() => {

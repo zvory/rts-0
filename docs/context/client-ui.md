@@ -13,9 +13,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_*.js`, `client_perf_report.js`, `frame_profiler.js`,
   `frame_recovery.js`, `frame_entity_views.js`, `match_health.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
-  `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`; app lifecycle, dependency
-  injection, frame health, observer analysis, room-time controls, and
-  replay/spectator/lab shell wiring.
+  `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`; app lifecycle, DI,
+  frame health, observer analysis, room-time controls, and replay/spectator/lab wiring.
 - `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`, `command_budget.js`,
   `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.

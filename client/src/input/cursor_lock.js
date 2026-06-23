@@ -33,6 +33,7 @@ export function installTauriNativeCursorBridge(root = globalThis) {
     nativeCursorBackend: true,
     nativeCursorCapture: true,
     pointerLockDisabled: true,
+    aggressiveCursorLock: true,
   });
   defineRuntimeGlobal(root, "__RTS_DESKTOP_RUNTIME", runtime);
 

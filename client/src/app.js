@@ -303,6 +303,7 @@ export class App {
         initialCamera: carriedCamera,
         hotkeyProfiles: this.hotkeyProfiles,
         settings: this.settings,
+        onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
@@ -492,6 +493,7 @@ export class App {
     if (dom.branchScreen) this.branchStaging.hide();
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;
+    this.lobby.resetToBrowser();
     this.lobby.show();
     this.mountLobbySettings();
     // A new match row may have just been written server-side; pull the freshest list.

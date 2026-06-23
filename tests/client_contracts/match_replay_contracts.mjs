@@ -35,9 +35,29 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     textContent: "",
     title: "",
   };
+  const windowListeners = new Map();
+  const localStorageValues = new Map();
   globalThis.window = {
     location: { protocol: "http:", host: "localhost", search: "" },
-    localStorage: { getItem() { return null; } },
+    innerWidth: 1000,
+    innerHeight: 700,
+    localStorage: {
+      getItem(key) {
+        return localStorageValues.has(key) ? localStorageValues.get(key) : null;
+      },
+      setItem(key, value) {
+        localStorageValues.set(key, String(value));
+      },
+      removeItem(key) {
+        localStorageValues.delete(key);
+      },
+    },
+    addEventListener(type, handler) {
+      windowListeners.set(type, handler);
+    },
+    removeEventListener(type, handler) {
+      if (windowListeners.get(type) === handler) windowListeners.delete(type);
+    },
     setTimeout(fn) {
       fn();
       return 1;
@@ -384,7 +404,17 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
         return this.parentNode?.closest?.(selector) || null;
       },
       getBoundingClientRect() {
-        return { left: 0, width: 200 };
+        const px = (value, fallback) => {
+          if (typeof value !== "string" || !value.endsWith("px")) return fallback;
+          const parsed = Number.parseFloat(value);
+          return Number.isFinite(parsed) ? parsed : fallback;
+        };
+        return {
+          left: px(this.style.left, 0),
+          top: px(this.style.top, 0),
+          width: px(this.style.width, 200),
+          height: px(this.style.height, 80),
+        };
       },
       querySelector(selector) {
         return this.querySelectorAll(selector)[0] || null;
@@ -496,8 +526,45 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   });
   assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
   assert(replayControls.classList.contains("replay-viewer-controls"), "replay viewer controls keep wrapper class");
+  assert(replayControls.classList.contains("room-time-floating-panel"), "room-time controls mount as a floating panel");
+  const dragHandle = replayControls.querySelector(".room-time-panel-drag-handle");
+  assert(replayControls.querySelector(".room-time-panel-title")?.textContent === "Replay",
+    "floating replay controls include a labeled drag handle");
+  assert(replayControls.querySelector(".room-time-panel-body")?.querySelector(".seek-btn") === seekBack,
+    "floating panel wraps the existing room-time buttons in its body");
   assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
   assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
+  dragHandle._listeners.get("pointerdown")({
+    button: 0,
+    isPrimary: true,
+    pointerId: 7,
+    clientX: 20,
+    clientY: 30,
+    currentTarget: dragHandle,
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  windowListeners.get("pointermove")({
+    pointerId: 7,
+    clientX: 120,
+    clientY: 80,
+    preventDefault() {},
+  });
+  assert(replayControls.style.left === "112px" && replayControls.style.top === "62px",
+    "dragging the floating room-time panel updates its screen position");
+  windowListeners.get("pointerup")({ pointerId: 7 });
+  assert(localStorageValues.has("rts.roomTimeControls.panel.v1"),
+    "floating room-time panel position is persisted after drag");
+  dragHandle._listeners.get("keydown")({
+    key: "ArrowRight",
+    preventDefault() {},
+  });
+  assert(replayControls.style.left === "136px", "drag handle arrow keys nudge the room-time panel");
+  const resetPanel = replayControls.querySelector(".room-time-panel-reset");
+  resetPanel._listeners.get("click")({});
+  assert(!localStorageValues.has("rts.roomTimeControls.panel.v1"), "reset clears the persisted room-time panel position");
+  assert(replayControls.style.left === "" && replayControls.style.top === "",
+    "reset returns the floating room-time panel to its default CSS position");
   const pauseReplay = replayControls.querySelector(".replay-pause-btn");
   assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause button");
   const branchReplay = replayControls.querySelector(".replay-branch-btn");
@@ -558,6 +625,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(!replayControls.querySelector(".replay-vision-controls"), "destroy removes generated vision controls");
   assert(!replayControls.querySelector(".replay-tick-status"), "destroy removes generated status");
   assert(!replayControls.querySelector(".replay-timeline"), "destroy removes generated timeline");
+  assert(!replayControls.querySelector(".room-time-panel-drag-handle"), "destroy removes floating room-time panel chrome");
+  assert(replayControls.children.includes(seekBack), "destroy unwraps static room-time controls back onto the root");
   assert(replayControls._listeners.size === 0, "destroy removes replay speed click listener");
 
   const replayVisionOnlyControls = fakeEl("div");
@@ -1049,7 +1118,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   };
   manualPointerLockMatch.syncPointerLockUi = () => {};
   manualPointerLockMatch.togglePointerLock();
-  assert(toggledPointerLock === 1, "manual cursor-lock action is the only Pointer Lock request path");
+  assert(toggledPointerLock === 1, "browser cursor-lock action remains manual");
   assert(closedSettings === 1, "manual cursor-lock request closes settings before requesting lock");
 
   let unsupportedToast = null;
@@ -1061,6 +1130,109 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(toggledPointerLock === 1, "unsupported cursor-lock action does not request Pointer Lock");
   assert(unsupportedToast === "Cursor lock is not supported by this browser.",
     "unsupported cursor lock surfaces the existing support message");
+
+  const priorDesktopRuntime = globalThis.__RTS_DESKTOP_RUNTIME;
+  const priorWindowSetTimeout = globalThis.window.setTimeout;
+  const priorWindowClearTimeout = globalThis.window.clearTimeout;
+  const priorDocumentAddEventListener = globalThis.document.addEventListener;
+  const priorDocumentRemoveEventListener = globalThis.document.removeEventListener;
+  const priorDocumentHasFocus = globalThis.document.hasFocus;
+  const priorWindowSearch = globalThis.window.location.search;
+  const documentListeners = new Map();
+  const timers = [];
+  const clearedTimers = [];
+  globalThis.__RTS_DESKTOP_RUNTIME = {
+    shell: "tauri",
+    nativeCursorCapture: true,
+    aggressiveCursorLock: true,
+  };
+  globalThis.window.setTimeout = (fn, ms) => {
+    const id = timers.length + 1;
+    timers.push({ id, fn, ms });
+    return id;
+  };
+  globalThis.window.clearTimeout = (id) => {
+    clearedTimers.push(id);
+  };
+  globalThis.document.addEventListener = (type, handler) => {
+    documentListeners.set(type, handler);
+  };
+  globalThis.document.removeEventListener = (type, handler) => {
+    if (documentListeners.get(type) === handler) documentListeners.delete(type);
+  };
+  try {
+    const optInMatch = Object.create(Match.prototype);
+    optInMatch.replayViewer = false;
+    optInMatch.input = { requestPointerLock() {} };
+    assert(optInMatch.shouldUseDesktopCursorAutoLock(), "Tauri native cursor runtime opts matches into aggressive cursor lock");
+    optInMatch.replayViewer = true;
+    assert(!optInMatch.shouldUseDesktopCursorAutoLock(), "replay viewers do not auto-lock the cursor");
+    globalThis.window.location.search = "?rtsNoAutoPointerLock=1";
+    optInMatch.replayViewer = false;
+    assert(!optInMatch.shouldUseDesktopCursorAutoLock(), "rtsNoAutoPointerLock disables desktop cursor auto-lock");
+    globalThis.window.location.search = "";
+
+    const autoLockMatch = Object.create(Match.prototype);
+    let requestedLocks = 0;
+    let autoClosedSettings = 0;
+    let syncedPointerUi = 0;
+    let lockToast = null;
+    autoLockMatch.replayViewer = false;
+    autoLockMatch.desktopCursorAutoLockEnabled = true;
+    autoLockMatch.desktopCursorAutoLockTimer = null;
+    autoLockMatch.desktopCursorAutoLockInFlight = false;
+    autoLockMatch.desktopCursorAutoLockFailures = 0;
+    autoLockMatch.onDesktopCursorAutoLockSignal = autoLockMatch.handleDesktopCursorAutoLockSignal.bind(autoLockMatch);
+    autoLockMatch.input = {
+      pointerLocked: false,
+      pointerLockSupported: () => true,
+      requestPointerLock() {
+        requestedLocks += 1;
+        this.pointerLocked = true;
+        autoLockMatch.handlePointerLockChange(true);
+        return Promise.resolve(true);
+      },
+    };
+    autoLockMatch.closeSettingsMenu = () => { autoClosedSettings += 1; };
+    autoLockMatch.toast = (msg) => { lockToast = msg; };
+    autoLockMatch.syncPointerLockUi = () => { syncedPointerUi += 1; };
+    autoLockMatch.installDesktopCursorAutoLock();
+    assert(timers[0]?.ms === 250, "desktop cursor auto-lock waits briefly after match mount");
+    timers.shift().fn();
+    await Promise.resolve();
+    assert(requestedLocks === 1, "desktop cursor auto-lock requests capture after match mount");
+    assert(autoClosedSettings === 1, "desktop cursor auto-lock closes settings after capture succeeds");
+    assert(lockToast === "Cursor locked. Alt-Tab to leave the game.",
+      "desktop cursor auto-lock explains Alt-Tab release");
+
+    autoLockMatch.input.pointerLocked = false;
+    autoLockMatch.handlePointerLockChange(false);
+    assert(timers[0]?.ms === 120, "focused cursor unlock schedules a quick desktop relock");
+    timers.shift().fn();
+    await Promise.resolve();
+    assert(requestedLocks === 2, "focused cursor unlock re-requests desktop cursor capture");
+    assert(syncedPointerUi >= 2, "desktop cursor auto-lock keeps the settings UI synchronized");
+
+    autoLockMatch.input.pointerLocked = false;
+    autoLockMatch.handleDesktopCursorAutoLockSignal();
+    const pendingTimer = autoLockMatch.desktopCursorAutoLockTimer;
+    autoLockMatch.teardownDesktopCursorAutoLock();
+    assert(clearedTimers.includes(pendingTimer), "desktop cursor auto-lock clears pending relock timers on teardown");
+    assert(!windowListeners.has("focus") && !windowListeners.has("pageshow") && !documentListeners.has("visibilitychange"),
+      "desktop cursor auto-lock removes focus and visibility listeners on teardown");
+  } finally {
+    if (priorDesktopRuntime === undefined) delete globalThis.__RTS_DESKTOP_RUNTIME;
+    else globalThis.__RTS_DESKTOP_RUNTIME = priorDesktopRuntime;
+    globalThis.window.setTimeout = priorWindowSetTimeout;
+    if (priorWindowClearTimeout === undefined) delete globalThis.window.clearTimeout;
+    else globalThis.window.clearTimeout = priorWindowClearTimeout;
+    if (priorDocumentAddEventListener === undefined) delete globalThis.document.addEventListener;
+    else globalThis.document.addEventListener = priorDocumentAddEventListener;
+    if (priorDocumentRemoveEventListener === undefined) delete globalThis.document.removeEventListener;
+    else globalThis.document.removeEventListener = priorDocumentRemoveEventListener;
+    globalThis.document.hasFocus = priorDocumentHasFocus;
+    globalThis.window.location.search = priorWindowSearch;
+  }
 
   if (priorWindow === undefined) delete globalThis.window;
   else globalThis.window = priorWindow;

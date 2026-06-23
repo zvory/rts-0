@@ -70,6 +70,7 @@ src/
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
+  room_time_panel.js # Floating, draggable chrome around shared room-time controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
@@ -585,7 +586,7 @@ export class ClientIntent {
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid,options?), endPlacement()
   commandTarget                          // null | "move" | "attack" | "setupAntiTankGuns" | ability target object
   beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
-  holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
+  holdCommandTarget(kind, key, shiftKey, options?), releaseCommandTargetKey(key, shiftKey)
   releaseCommandTargetShift()
   commandFeedback, addCommandFeedback(kind, x, y, append?, radiusTiles?, now?), liveCommandFeedback(now)
   resourceMiningPreview, updateResourceMiningPreview(preview)
@@ -712,9 +713,10 @@ export class Input {
   // virtual cursor for edge pan on multi-monitor setups. In the macOS Tauri
   // spike, the optional desktopCursor bridge replaces browser Pointer Lock
   // while keeping the same selection, command, HUD, minimap, wheel, and Escape
-  // routing contracts. Native desktop cursor visuals are painted directly from
-  // the native event handler and diagnostics expose backend, native/JS event
-  // counts, dropped events, and delivery latency.
+  // routing contracts. Match auto-requests that native bridge for Tauri matches
+  // and retries on focus/visibility return. Native desktop cursor visuals are
+  // painted directly from the native event handler and diagnostics expose backend,
+  // native/JS event counts, dropped events, and delivery latency.
   update(dt)                             // continuous handling (edge scroll handled by camera)
   // emits nothing to return; mutates state.selection / clientIntent and calls commandIssuer.issueCommand
 }
@@ -768,9 +770,12 @@ minimap receive `ClientIntent` from `Match`; input and minimap clicks call
 clicks use one composer path instead of command-specific sticky flags. A plain
 targeted-order command-card hotkey tap arms the target after keyup; pressing the same resolved
 hotkey again inside the quick-cast window issues it at the current cursor world point. Shift does
-the same with `queued: true` and keeps the target armed until Shift is released. After an unqueued
-quick-cast consumes the armed target, the next near, still viewport left-click is ignored as an
-accidental confirmation click; moving far enough to become a drag restores normal selection.
+the same with `queued: true` and keeps the target armed until Shift is released. World-point
+ability hotkeys follow the same tap contract: tapping and releasing the key keeps targeting armed
+until the first unqueued world click, while physically holding the key only extends targeting for
+repeated clicks. After an unqueued quick-cast consumes the armed target, the next near, still
+viewport left-click is ignored as an accidental confirmation click; moving far enough to become a
+drag restores normal selection.
 
 `input/router.js`
 ```js
@@ -928,6 +933,9 @@ the input module enters targeted cursor mode:
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
   hotkey is still held for repeated world-point targeting.
+- Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
+  armed until the first unqueued world click. That click issues the ability and clears targeting
+  unless Shift is still preserving queued targeting.
 - If the selected unit's owner-only ability affordance includes an active return object, the command
   card sends `recastAbility(ability, readyIds, targetObjectId, queued)` directly instead of arming a
   world-point cursor. The server remains authoritative for the availability tick and destination
@@ -1091,7 +1099,7 @@ Current areas:
   `match_net_reporter.js`, `match_settings_context.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
-  `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
+  `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
   `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
@@ -1105,8 +1113,9 @@ Current areas:
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, including `/lab` launch URL mode/scenario defaults, audio, combat audio,
-  alerts, fog, camera, prediction settings, `report_window_aggregate.js`.
+- `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` launch
+  URL mode/scenario defaults, audio, combat audio, alerts, fog, camera, prediction settings,
+  `report_window_aggregate.js`.
 
 Import rules:
 - `protocol.js` and `config.js` are shared mirrors and may be imported where needed.

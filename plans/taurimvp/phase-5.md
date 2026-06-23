@@ -2,7 +2,50 @@
 
 ## Phase Status
 
-- [ ] Planned.
+- [x] Done.
+
+## Final Gate Result - 2026-06-23
+
+Recommendation: ship the unsigned macOS MVP shell to playtesters.
+
+Tested artifact:
+
+- Artifact: `maccursor-shell-v0.1.0-252fc8f35a0d-arm64`
+- App bundle: `RTS Mac Cursor Shell.app`
+- Git SHA: `252fc8f35a0d1a798229782dcdcffc9666a3ab18`
+- Zip SHA-256: `3db3bd908a94bef87c4569b484ba08053f23ce20f1ea3f07c5962ca3e0eb5e00`
+- Target: macOS arm64, unsigned, thin-shell bundle
+
+Tested Mac:
+
+- macOS 15.7.7 build 24G720
+- MacBook Pro `MacBookPro18,3`
+- Apple M1 Pro, 16 GB memory
+
+Release channels checked:
+
+- Beta: `https://rts-0-zvorygin-beta.fly.dev/`, `/version` returned `eea9a3f3250f`.
+- Mainline: `https://rts-0-zvorygin.fly.dev/`, `/version` returned `9a86566770a3`.
+
+Manual result:
+
+- Startup selector opened from the built unsigned app and exposed only Beta and Mainline.
+- Beta and Mainline navigation worked.
+- Lab launch stayed inside the same shell window.
+- In-game native cursor capture started and stopped, and the tester confirmed the cursor/gameplay
+  path looked good.
+- Core cursor workflows were accepted for playtesting: selection boxes, right-click orders,
+  HUD/command-card interaction, minimap interaction, edge pan, wheel zoom, Escape unlock, app
+  focus/blur cleanup, and normal quit.
+- Shell logs were present at
+  `~/Library/Logs/dev.bewegungskrieg.MacCursorShell/shell.log` and recorded startup, profile
+  selection, navigation, Lab navigation, and native cursor capture events.
+- Artifact manifest confirmed no bundled `rts-server`, client assets, maps, lab scenarios, or
+  match-history runtime data.
+
+Known follow-up: this is still an unsigned macOS-only playtest artifact. Signing, notarization,
+auto-update, cross-platform packaging, and wider release automation remain intentionally out of
+scope.
 
 ## Plain-Language Summary
 
