@@ -912,7 +912,8 @@ units belong to that player; mixed-owner selections are rejected instead of part
   }],
   entities: [{
     id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
-    constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32
+    constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32,
+    setUp?: bool, setupTarget?: { x: f32, y: f32 }
   }],
   metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
 }
@@ -922,6 +923,10 @@ current lab vision in `metadata.lab.vision`. Import validates the schema, map me
 player/team/resource/research/entity fields, restores through the public lab `Game` API, applies
 scenario vision to the requester and future join default without overwriting already connected
 collaborators, and returns an entity id remap in `outcome.entityIdMap`.
+`setUp` serializes only stable deployed support-weapon state for machine gunners, anti-tank guns,
+mortar teams, and artillery; omitted `setUp` defaults to false on import. `setupTarget` is a finite
+world point used to reconstruct the unit's facing; it is required when `setUp` is true and rejected
+otherwise. Setup and teardown transition timers are still transient and are not serialized.
 Transient snapshot fields, fog recipient projections, events, projectile runtime state, command
 logs, interpolation state, and lab operation result metadata are intentionally omitted.
 

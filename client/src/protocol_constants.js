@@ -54,6 +54,11 @@ export const C = Object.freeze({
   SELECT_MAP: "selectMap",
 });
 
+export const LAB_SCENARIO = Object.freeze({
+  KIND: "labScenario",
+  SCHEMA_VERSION: 1,
+});
+
 // --- Command discriminators (the `c` field) ---
 export const CMD = Object.freeze({
   MOVE: "move",

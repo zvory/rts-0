@@ -17,6 +17,7 @@ import {
   EVENT_CODE,
   KIND,
   KIND_CODE,
+  LAB_SCENARIO,
   LAB_ROLE,
   LAB_VISION,
   MOVEMENT_PATH_DIAGNOSTICS,
@@ -375,7 +376,7 @@ assert(
   "lab scenario export builder must emit the exact wire shape",
 );
 assert(
-  JSON.stringify(msg.labImportScenario(15, { schemaVersion: 1, kind: "labScenario" })) ===
+  JSON.stringify(msg.labImportScenario(15, { schemaVersion: LAB_SCENARIO.SCHEMA_VERSION, kind: LAB_SCENARIO.KIND })) ===
     JSON.stringify({ t: "lab", requestId: 15, op: { op: "importScenario", scenario: { schemaVersion: 1, kind: "labScenario" } } }),
   "lab scenario import builder must emit the exact wire shape",
 );
@@ -383,7 +384,12 @@ assert(
   rust.includes("ExportScenario") &&
     rust.includes("ImportScenario") &&
     rust.includes("LabScenarioV1") &&
-    protocolDoc.includes("LabScenarioV1"),
+    rust.includes("set_up") &&
+    LAB_SCENARIO.KIND === "labScenario" &&
+    LAB_SCENARIO.SCHEMA_VERSION === 1 &&
+    protocolDoc.includes("LabScenarioV1") &&
+    protocolDoc.includes("setUp") &&
+    protocolDoc.includes("setupTarget"),
   "lab scenario import/export protocol surface must be documented and mirrored",
 );
 assert(

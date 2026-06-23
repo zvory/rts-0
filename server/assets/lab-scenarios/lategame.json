@@ -2755,7 +2755,11 @@
       "research": {
         "completed": [
           "methamphetamines",
-          "anti_tank_gun_unlock"
+          "anti_tank_gun_unlock",
+          "tank_unlock",
+          "artillery_unlock",
+          "command_car_unlock",
+          "mortar_autocast"
         ]
       }
     },
@@ -2771,7 +2775,14 @@
         "oil": 99999
       },
       "research": {
-        "completed": []
+        "completed": [
+          "methamphetamines",
+          "anti_tank_gun_unlock",
+          "tank_unlock",
+          "artillery_unlock",
+          "command_car_unlock",
+          "mortar_autocast"
+        ]
       }
     }
   ],

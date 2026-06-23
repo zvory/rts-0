@@ -24,6 +24,17 @@ use crate::rules;
 
 use super::{systems, Game, MapMetadata, PlayerInit};
 
+mod scenario;
+
+pub use scenario::{
+    LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioPlayer, LabScenarioPoint,
+    LabScenarioResearch, LabScenarioResources, LabScenarioV1,
+};
+use scenario::{
+    lab_entity_is_set_up, lab_entity_setup_target, restore_lab_entity_setup,
+    validate_lab_entity_setup_shape,
+};
+
 pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
 const LAB_SCENARIO_KIND: &str = "labScenario";
 const MAX_LAB_SCENARIO_NAME_LEN: usize = 80;
@@ -108,6 +119,19 @@ pub enum LabOpOutcome {
     ScenarioRestored(LabScenarioRestore),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioRestore {
+    pub entity_id_map: Vec<LabEntityIdRemap>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabEntityIdRemap {
+    pub old_id: u32,
+    pub new_id: u32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabError {
     StaleEntity {
@@ -149,87 +173,6 @@ pub enum LabError {
     InvalidCommand {
         reason: String,
     },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioV1 {
-    pub schema_version: u32,
-    pub kind: String,
-    pub name: String,
-    pub seed: u32,
-    pub map: LabScenarioMap,
-    pub players: Vec<LabScenarioPlayer>,
-    pub entities: Vec<LabScenarioEntity>,
-    pub metadata: LabScenarioMetadata,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioMetadata {
-    pub exported_tick: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioMap {
-    pub name: String,
-    pub schema_version: u32,
-    pub content_hash: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioPlayer {
-    pub id: u32,
-    pub team_id: u32,
-    pub faction_id: String,
-    pub name: String,
-    pub color: String,
-    pub is_ai: bool,
-    pub resources: LabScenarioResources,
-    pub research: LabScenarioResearch,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioResources {
-    pub steel: u32,
-    pub oil: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioResearch {
-    pub completed: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioEntity {
-    pub id: u32,
-    pub owner: u32,
-    pub kind: String,
-    pub x: f32,
-    pub y: f32,
-    pub hp: u32,
-    pub completed: bool,
-    pub construction_progress: Option<u32>,
-    pub construction_total: Option<u32>,
-    pub resource_remaining: Option<u32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioRestore {
-    pub entity_id_map: Vec<LabEntityIdRemap>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabEntityIdRemap {
-    pub old_id: u32,
-    pub new_id: u32,
 }
 
 impl Game {
@@ -327,6 +270,8 @@ impl Game {
                 construction_progress: entity.construction.as_ref().map(|state| state.progress),
                 construction_total: entity.construction.as_ref().map(|state| state.total),
                 resource_remaining: entity.remaining(),
+                set_up: lab_entity_is_set_up(entity),
+                setup_target: lab_entity_setup_target(&self.map, entity),
             })
             .collect();
 
@@ -489,6 +434,7 @@ impl Game {
                 kind: entity.kind.clone(),
                 operation: "restoreScenario",
             })?;
+            validate_lab_entity_setup_shape(entity, kind)?;
             let new_id = restored.restore_lab_entity(entity, kind)?;
             entity_id_map.push(LabEntityIdRemap {
                 old_id: entity.id,
@@ -672,6 +618,7 @@ impl Game {
                 .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
             if let Some(restored) = self.entities.get_mut(id) {
                 restored.hp = entity.hp.min(restored.max_hp).max(1);
+                restore_lab_entity_setup(&self.map, entity, restored)?;
             }
             id
         } else if kind.is_building() {
@@ -984,6 +931,7 @@ fn order_intent_references_entity(intent: &OrderIntent, entity_id: u32) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::entity::WeaponSetup;
     use crate::game::services::occupancy::footprint_center;
     use crate::protocol::terrain;
 
@@ -1364,7 +1312,9 @@ mod tests {
     fn lab_scenario_export_restore_round_trips_setup_with_id_remap() {
         let mut game = default_map_game();
         let (x, y) = free_unit_position(&game, EntityKind::ScoutCar);
-        let LabOpOutcome::Spawned { entity_id } = game
+        let LabOpOutcome::Spawned {
+            entity_id: scout_id,
+        } = game
             .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
                 owner: 1,
                 kind: EntityKind::ScoutCar,
@@ -1376,6 +1326,30 @@ mod tests {
         else {
             panic!("unexpected outcome");
         };
+        let (x, y) = free_unit_position(&game, EntityKind::AntiTankGun);
+        let LabOpOutcome::Spawned {
+            entity_id: gun_id,
+        } = game
+            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                owner: 1,
+                kind: EntityKind::AntiTankGun,
+                x,
+                y,
+                completed: true,
+            }))
+            .expect("anti-tank gun should spawn")
+        else {
+            panic!("unexpected outcome");
+        };
+        let setup_target = tile_center(&game, 40, 32);
+        let setup_facing = (setup_target.1 - y).atan2(setup_target.0 - x);
+        {
+            let gun = game.entities.get_mut(gun_id).expect("spawned gun");
+            gun.set_weapon_setup(WeaponSetup::Deployed);
+            gun.set_emplacement_facing(Some(setup_facing));
+            gun.set_weapon_facing(setup_facing);
+            gun.set_desired_weapon_facing(setup_facing);
+        }
         game.apply_lab_op(LabOp::SetPlayerResources(LabSetPlayerResources {
             player_id: 1,
             steel: 321,
@@ -1390,6 +1364,21 @@ mod tests {
         .expect("research should set");
 
         let scenario = game.export_lab_scenario();
+        let exported_scout = scenario
+            .entities
+            .iter()
+            .find(|entity| entity.id == scout_id)
+            .expect("exported scout");
+        assert!(!exported_scout.set_up);
+        assert_eq!(exported_scout.setup_target, None);
+        let exported_gun = scenario
+            .entities
+            .iter()
+            .find(|entity| entity.id == gun_id)
+            .expect("exported gun");
+        assert!(exported_gun.set_up);
+        assert!(exported_gun.setup_target.is_some());
+
         let mut restored = default_map_game();
         let LabOpOutcome::ScenarioRestored(result) = restored
             .apply_lab_op(LabOp::RestoreScenario(Box::new(scenario)))
@@ -1400,11 +1389,23 @@ mod tests {
         let remap = result
             .entity_id_map
             .iter()
-            .find(|entry| entry.old_id == entity_id)
+            .find(|entry| entry.old_id == scout_id)
             .expect("spawned entity should be remapped");
         let restored_scout = restored.entities.get(remap.new_id).expect("restored scout");
         assert_eq!(restored_scout.kind, EntityKind::ScoutCar);
         assert_eq!(restored_scout.owner, 1);
+        assert!(matches!(restored_scout.weapon_setup(), WeaponSetup::Packed));
+        let gun_remap = result
+            .entity_id_map
+            .iter()
+            .find(|entry| entry.old_id == gun_id)
+            .expect("gun should be remapped");
+        let restored_gun = restored.entities.get(gun_remap.new_id).expect("restored gun");
+        assert_eq!(restored_gun.kind, EntityKind::AntiTankGun);
+        assert!(matches!(restored_gun.weapon_setup(), WeaponSetup::Deployed));
+        assert!(
+            (restored_gun.emplacement_facing().unwrap_or_default() - setup_facing).abs() < 0.001
+        );
         assert_eq!(
             (restored.snapshot_for(1).steel, restored.snapshot_for(1).oil),
             (321, 654)
@@ -1442,6 +1443,14 @@ mod tests {
 
         let mut scenario = game.export_lab_scenario();
         scenario.name.clear();
+        assert!(matches!(
+            game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
+            Err(LabError::InvalidScenario { .. })
+        ));
+
+        let mut scenario = game.export_lab_scenario();
+        scenario.entities[0].set_up = true;
+        scenario.entities[0].setup_target = Some(LabScenarioPoint { x: 100.0, y: 100.0 });
         assert!(matches!(
             game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
             Err(LabError::InvalidScenario { .. })
