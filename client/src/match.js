@@ -39,6 +39,32 @@ import { MatchNetReporter, predictionReportFields as buildPredictionReportFields
 import { buildMatchSettingsContext } from "./match_settings_context.js";
 
 const PREDICTION_REPLAY_BUDGET_MS = 4;
+const DESKTOP_CURSOR_AUTOLOCK_INITIAL_DELAY_MS = 250;
+const DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS = 120;
+const DESKTOP_CURSOR_AUTOLOCK_RETRY_BASE_MS = 750;
+const DESKTOP_CURSOR_AUTOLOCK_RETRY_MAX_MS = 5000;
+
+function desktopRuntime(root = globalThis) {
+  return root?.__RTS_DESKTOP_RUNTIME || root?.window?.__RTS_DESKTOP_RUNTIME || null;
+}
+
+function desktopCursorAutoLockOptedOut(root = globalThis) {
+  const search = root?.location?.search || root?.window?.location?.search || "";
+  if (!search) return false;
+  try {
+    return new URLSearchParams(search).get("rtsNoAutoPointerLock") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function desktopCursorAggressiveLockEnabled(root = globalThis) {
+  const runtime = desktopRuntime(root);
+  return runtime?.shell === "tauri" &&
+    runtime?.nativeCursorCapture === true &&
+    runtime?.aggressiveCursorLock !== false &&
+    !desktopCursorAutoLockOptedOut(root);
+}
 
 export class Match {
   /**
@@ -127,6 +153,11 @@ export class Match {
       },
     };
     this.pointerLockDiagnosticShown = false;
+    this.desktopCursorAutoLockEnabled = false;
+    this.desktopCursorAutoLockTimer = null;
+    this.desktopCursorAutoLockInFlight = false;
+    this.desktopCursorAutoLockFailures = 0;
+    this.onDesktopCursorAutoLockSignal = this.handleDesktopCursorAutoLockSignal.bind(this);
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
@@ -251,6 +282,7 @@ export class Match {
       this.input.onPointerLockChange = this.onPointerLockChange;
       this.input.onPointerLockError = this.onPointerLockError;
     }
+    this.desktopCursorAutoLockEnabled = this.shouldUseDesktopCursorAutoLock();
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     this.net.on(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
@@ -263,6 +295,7 @@ export class Match {
       dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
     }
     this.mountSettings();
+    this.installDesktopCursorAutoLock();
 
     this.rafId = requestAnimationFrame(this.tickFn);
     this.startMatchPings();
@@ -637,6 +670,99 @@ export class Match {
     this.syncLivePauseUi();
   }
 
+  shouldUseDesktopCursorAutoLock() {
+    return !this.replayViewer &&
+      desktopCursorAggressiveLockEnabled() &&
+      typeof this.input?.requestPointerLock === "function";
+  }
+
+  desktopCursorAutoLockCanRun() {
+    if (!this.desktopCursorAutoLockEnabled) return false;
+    if (!this.input || this.input.pointerLocked) return false;
+    const doc = globalThis.document;
+    if (doc?.hidden) return false;
+    if (typeof doc?.hasFocus === "function" && !doc.hasFocus()) return false;
+    return true;
+  }
+
+  installDesktopCursorAutoLock() {
+    if (!this.desktopCursorAutoLockEnabled) return;
+    const win = globalThis.window;
+    const doc = globalThis.document;
+    win?.addEventListener?.("focus", this.onDesktopCursorAutoLockSignal);
+    win?.addEventListener?.("pageshow", this.onDesktopCursorAutoLockSignal);
+    doc?.addEventListener?.("visibilitychange", this.onDesktopCursorAutoLockSignal);
+    this.scheduleDesktopCursorAutoLock("match-start", DESKTOP_CURSOR_AUTOLOCK_INITIAL_DELAY_MS);
+  }
+
+  teardownDesktopCursorAutoLock() {
+    const win = globalThis.window;
+    const doc = globalThis.document;
+    win?.removeEventListener?.("focus", this.onDesktopCursorAutoLockSignal);
+    win?.removeEventListener?.("pageshow", this.onDesktopCursorAutoLockSignal);
+    doc?.removeEventListener?.("visibilitychange", this.onDesktopCursorAutoLockSignal);
+    this.clearDesktopCursorAutoLockTimer();
+    this.desktopCursorAutoLockEnabled = false;
+    this.desktopCursorAutoLockInFlight = false;
+  }
+
+  handleDesktopCursorAutoLockSignal() {
+    this.scheduleDesktopCursorAutoLock("focus", DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS);
+  }
+
+  scheduleDesktopCursorAutoLock(reason, delayMs = DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS) {
+    if (!this.desktopCursorAutoLockEnabled) return;
+    if (this.desktopCursorAutoLockTimer != null || this.desktopCursorAutoLockInFlight) return;
+    if (!this.input || this.input.pointerLocked) return;
+    const setTimer = globalThis.window?.setTimeout || globalThis.setTimeout;
+    if (typeof setTimer !== "function") {
+      void this.requestDesktopCursorAutoLock(reason);
+      return;
+    }
+    this.desktopCursorAutoLockTimer = setTimer(() => {
+      this.desktopCursorAutoLockTimer = null;
+      void this.requestDesktopCursorAutoLock(reason);
+    }, Math.max(0, delayMs));
+  }
+
+  clearDesktopCursorAutoLockTimer() {
+    if (this.desktopCursorAutoLockTimer == null) return;
+    const clearTimer = globalThis.window?.clearTimeout || globalThis.clearTimeout;
+    if (typeof clearTimer === "function") clearTimer(this.desktopCursorAutoLockTimer);
+    this.desktopCursorAutoLockTimer = null;
+  }
+
+  async requestDesktopCursorAutoLock(reason = "auto") {
+    if (!this.desktopCursorAutoLockCanRun() || this.desktopCursorAutoLockInFlight) return false;
+    if (!this.input?.pointerLockSupported?.()) {
+      this.syncPointerLockUi();
+      return false;
+    }
+    this.desktopCursorAutoLockInFlight = true;
+    let locked = false;
+    try {
+      locked = await this.input.requestPointerLock();
+    } catch (err) {
+      this.handlePointerLockError(err);
+    } finally {
+      this.desktopCursorAutoLockInFlight = false;
+    }
+    this.syncPointerLockUi();
+    if (locked) {
+      this.desktopCursorAutoLockFailures = 0;
+      return true;
+    }
+    this.desktopCursorAutoLockFailures += 1;
+    if (this.desktopCursorAutoLockCanRun()) {
+      const retryDelay = Math.min(
+        DESKTOP_CURSOR_AUTOLOCK_RETRY_MAX_MS,
+        DESKTOP_CURSOR_AUTOLOCK_RETRY_BASE_MS * (2 ** Math.min(this.desktopCursorAutoLockFailures - 1, 3)),
+      );
+      this.scheduleDesktopCursorAutoLock(`retry:${reason}`, retryDelay);
+    }
+    return false;
+  }
+
   togglePointerLock() {
     if (!this.input?.pointerLockSupported()) {
       this.toast("Cursor lock is not supported by this browser.");
@@ -660,7 +786,14 @@ export class Match {
   handlePointerLockChange(locked) {
     if (locked) {
       this.closeSettingsMenu();
-      this.toast("Cursor locked. Press Esc to unlock.");
+      this.desktopCursorAutoLockFailures = 0;
+      this.toast(
+        this.desktopCursorAutoLockEnabled
+          ? "Cursor locked. Alt-Tab to leave the game."
+          : "Cursor locked. Press Esc to unlock.",
+      );
+    } else {
+      this.scheduleDesktopCursorAutoLock("cursor-unlocked", DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS);
     }
     this.syncPointerLockUi();
   }
@@ -1012,6 +1145,7 @@ export class Match {
     this.sendNetReport();
     this.skipFinalNetReport = true;
     this.stop();
+    this.teardownDesktopCursorAutoLock();
     this.stopMatchPings();
     this.stopNetReports();
     this.stopAllMachineGunSounds();
@@ -1051,6 +1185,7 @@ export class Match {
   destroy() {
     if (!this.skipFinalNetReport) this.sendNetReport();
     this.stop();
+    this.teardownDesktopCursorAutoLock();
     this.stopMatchPings();
     this.stopNetReports();
     this.stopAllMachineGunSounds();
