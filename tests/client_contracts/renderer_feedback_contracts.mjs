@@ -1,7 +1,7 @@
 // tests/client_contracts/renderer_feedback_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
-import { assert } from "./assertions.mjs";
+import { assert, assertApprox } from "./assertions.mjs";
 import { COLORS } from "../../client/src/config.js";
 import {
   ABILITY,
@@ -16,11 +16,23 @@ import {
   _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
   _drawMortarImpacts,
+  _drawMortarShells,
   _drawPlacement,
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
+
+function polygonCenter(points) {
+  let x = 0;
+  let y = 0;
+  const count = points.length / 2;
+  for (let i = 0; i < points.length; i += 2) {
+    x += points[i];
+    y += points[i + 1];
+  }
+  return { x: x / count, y: y / count };
+}
 
 {
   let selectedReads = 0;
@@ -147,6 +159,44 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawPolygon"), "renderer feedback draws live mortar impacts without missing helper references");
   assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
+}
+
+{
+  const priorNow = performance.now;
+  const fixedNow = 2000;
+  const shell = {
+    fromX: 100,
+    fromY: 50,
+    toX: 300,
+    toY: 250,
+    durationMs: 2000,
+    createdAt: 1500,
+  };
+  const feedbackGfx = new RecordingGraphics();
+
+  performance.now = () => fixedNow;
+  try {
+    _drawMortarShells.call({ _feedbackGfx: feedbackGfx }, {
+      liveMortarShells(now) {
+        assertApprox(now, fixedNow, 0.001, "mortar shell renderer samples current frame time");
+        return [shell];
+      },
+    });
+  } finally {
+    performance.now = priorNow;
+  }
+
+  const expectedX = 150;
+  const expectedY = 100;
+  const shadow = feedbackGfx.calls.find((call) => call[0] === "drawEllipse");
+  const body = feedbackGfx.calls.find((call) => call[0] === "drawPolygon");
+  assert(shadow, "mortar shell renderer draws the shell shadow");
+  assert(body, "mortar shell renderer draws the shell body");
+  const bodyCenter = polygonCenter(body[1]);
+  assertApprox(shadow[1], expectedX, 0.001, "mortar shell shadow advances linearly on x");
+  assertApprox(shadow[2], expectedY, 0.001, "mortar shell shadow advances linearly on y");
+  assertApprox(bodyCenter.x, expectedX, 0.001, "mortar shell body center advances linearly on x");
+  assertApprox(bodyCenter.y, expectedY, 0.001, "mortar shell body center advances linearly on y");
 }
 
 {

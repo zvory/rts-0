@@ -39,11 +39,11 @@ import {
   dashedLine,
   drawAntiTankGun,
   drawFacingWedge,
+  drawFreeRotatedRect,
   drawImpassableEdge,
   drawInfantryBase,
   drawInfantryMachineGun,
   drawInfantryRifle,
-  drawRotatedRect,
   drawScoutCar,
   drawTankFuelCue,
   drawTankHull,
@@ -872,35 +872,28 @@ export function _drawMortarShells(state) {
   for (const shell of shells) {
     const duration = Math.max(1, shell.durationMs || 1);
     const t = clamp01((now - shell.createdAt) / duration);
-    const eased = t * t * (3 - 2 * t);
     const dx = shell.toX - shell.fromX;
     const dy = shell.toY - shell.fromY;
     const len = Math.hypot(dx, dy);
-    const arcHeight = Math.min(44, Math.max(12, len * 0.075));
-    const arc = Math.sin(Math.PI * t) * arcHeight;
-    const x = shell.fromX + dx * eased;
-    const y = shell.fromY + dy * eased - arc;
+    const x = shell.fromX + dx * t;
+    const y = shell.fromY + dy * t;
     const stretch = Math.sin(Math.PI * t);
     const shellLen = (5.5 + stretch * 6.5) * 1.25;
     const shellWidth = (4.2 - stretch * 1.2) * 1.25;
-    const groundSpeed = 6 * t * (1 - t);
-    const tangentX = dx * groundSpeed;
-    const tangentY = dy * groundSpeed - Math.PI * Math.cos(Math.PI * t) * arcHeight;
-    const tangentLen = Math.hypot(tangentX, tangentY);
-    const angle = tangentLen > 0.001 ? Math.atan2(tangentY, tangentX) : Math.atan2(dy, dx);
+    const angle = len > 0.001 ? Math.atan2(dy, dx) : 0;
     const ux = Math.cos(angle);
     const uy = Math.sin(angle);
     const shadowAlpha = 0.22 * (1 - stretch * 0.55);
 
     g.lineStyle(0, 0x000000, 0);
     g.beginFill(0x050505, shadowAlpha);
-    g.drawEllipse(shell.fromX + dx * eased, shell.fromY + dy * eased, 4.4, 2.2);
+    g.drawEllipse(x, y, 4.4, 2.2);
     g.endFill();
     g.beginFill(0x050505, 1);
-    drawRotatedRect(g, x, y, shellLen, shellWidth, angle);
+    drawFreeRotatedRect(g, x, y, shellLen, shellWidth, angle);
     g.endFill();
     g.beginFill(0x2d2d2d, 1);
-    drawRotatedRect(
+    drawFreeRotatedRect(
       g,
       x - uy * shellWidth * 0.24,
       y + ux * shellWidth * 0.24,
