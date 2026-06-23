@@ -1,13 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::error::Error;
-use std::io::{BufRead, BufReader, Read};
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::{self, Sender};
-use std::sync::Mutex;
-use std::thread;
-use std::time::{Duration, Instant};
 
 mod native_cursor;
 
@@ -15,34 +8,70 @@ use native_cursor::{
     maccursor_configure, maccursor_diagnostics, maccursor_start, maccursor_stop,
     NativeCursorBackend,
 };
+use serde::Serialize;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
-const SERVER_READY_TIMEOUT: Duration = Duration::from_secs(120);
+const DEFAULT_PROFILE_ID: &str = "beta";
 const SERVER_URL_ENV: &str = "RTS_DESKTOP_SERVER_URL";
+const STARTUP_ENTRYPOINT: &str = "index.html";
 const WINDOW_LABEL: &str = "main";
 
 type ShellResult<T> = Result<T, Box<dyn Error>>;
 
-struct ManagedServer {
-    child: Mutex<Option<Child>>,
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerProfile {
+    id: &'static str,
+    label: &'static str,
+    url: &'static str,
+    summary: &'static str,
 }
 
-impl Drop for ManagedServer {
-    fn drop(&mut self) {
-        let Ok(mut child) = self.child.lock() else {
-            return;
-        };
-        if let Some(mut child) = child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
+static BUILT_IN_PROFILES: [ServerProfile; 2] = [
+    ServerProfile {
+        id: "beta",
+        label: "Beta",
+        url: "https://rts-0-zvorygin-beta.fly.dev/",
+        summary: "Playtest channel",
+    },
+    ServerProfile {
+        id: "mainline",
+        label: "Mainline",
+        url: "https://rts-0-zvorygin.fly.dev/",
+        summary: "Current public release",
+    },
+];
+
+#[derive(Debug, Clone)]
+enum InitialNavigation {
+    Startup,
+    DeveloperServer { url: String },
+}
+
+impl InitialNavigation {
+    fn developer_url(&self) -> Option<&str> {
+        match self {
+            InitialNavigation::Startup => None,
+            InitialNavigation::DeveloperServer { url } => Some(url),
+        }
+    }
+
+    fn webview_url(&self) -> ShellResult<WebviewUrl> {
+        match self {
+            InitialNavigation::Startup => Ok(WebviewUrl::App(STARTUP_ENTRYPOINT.into())),
+            InitialNavigation::DeveloperServer { url } => {
+                let url: tauri::Url = url.parse().map_err(|err| {
+                    shell_error(format!("invalid developer server URL {url}: {err}"))
+                })?;
+                Ok(WebviewUrl::External(url))
+            }
         }
     }
 }
 
 #[derive(Debug, Clone)]
-struct ServerLaunch {
-    url: String,
-    mode: &'static str,
+struct RuntimeScriptOptions {
+    developer_server_url: Option<String>,
     autostart: bool,
     autolock: bool,
 }
@@ -68,23 +97,33 @@ fn run() -> ShellResult<()> {
                 maccursor_diagnostics
             ])
             .setup(|app| {
-                let server = launch_server(app.handle())?;
-                let url: tauri::Url = server.url.parse().map_err(|err| {
-                    shell_error(format!("invalid server URL {}: {err}", server.url))
-                })?;
+                let initial_navigation = initial_navigation()?;
+                let developer_navigation_url = initial_navigation
+                    .developer_url()
+                    .map(str::parse::<tauri::Url>)
+                    .transpose()
+                    .map_err(|err| {
+                        shell_error(format!(
+                            "invalid developer server URL from {SERVER_URL_ENV}: {err}"
+                        ))
+                    })?;
                 let native_cursor = NativeCursorBackend::default();
                 app.manage(native_cursor.clone());
-                let runtime_script = desktop_runtime_script(&server);
-                let window =
-                    WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::External(url))
-                        .title("Bewegungskrieg")
-                        .inner_size(1280.0, 820.0)
-                        .min_inner_size(960.0, 640.0)
-                        .initialization_script(runtime_script)
-                        .on_navigation(|url| {
-                            matches!(url.host_str(), Some("127.0.0.1") | Some("localhost"))
-                        })
-                        .build()?;
+                let runtime_script = desktop_runtime_script(&RuntimeScriptOptions {
+                    developer_server_url: initial_navigation.developer_url().map(str::to_string),
+                    autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
+                    autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
+                });
+                let initial_webview_url = initial_navigation.webview_url()?;
+                let window = WebviewWindowBuilder::new(app, WINDOW_LABEL, initial_webview_url)
+                    .title("Bewegungskrieg")
+                    .inner_size(1280.0, 820.0)
+                    .min_inner_size(960.0, 640.0)
+                    .initialization_script(runtime_script)
+                    .on_navigation(move |url| {
+                        navigation_allowed(url, developer_navigation_url.as_ref())
+                    })
+                    .build()?;
                 native_cursor.install(&window);
                 let _ = app
                     .handle()
@@ -112,88 +151,23 @@ fn run() -> ShellResult<()> {
     }
 }
 
-fn launch_server(app: &tauri::AppHandle) -> ShellResult<ServerLaunch> {
-    if let Ok(url) = std::env::var(SERVER_URL_ENV) {
-        let url = normalize_server_url(&url)?;
-        return Ok(ServerLaunch {
-            url,
-            mode: "external",
-            autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
-            autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
-        });
+fn initial_navigation() -> ShellResult<InitialNavigation> {
+    match std::env::var(SERVER_URL_ENV) {
+        Ok(url) => initial_navigation_from_developer_url(Some(url.as_str())),
+        Err(std::env::VarError::NotPresent) => initial_navigation_from_developer_url(None),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            Err(shell_error(format!("{SERVER_URL_ENV} is not valid UTF-8")))
+        }
     }
+}
 
-    let repo_root = repo_root()?;
-    let mut child = Command::new("cargo")
-        .arg("run")
-        .arg("--manifest-path")
-        .arg(repo_root.join("server/Cargo.toml"))
-        .arg("--bin")
-        .arg("rts-server")
-        .env("RTS_ADDR", "127.0.0.1:0")
-        .env("RTS_CLIENT_DIR", repo_root.join("client"))
-        .env("RTS_MAPS_DIR", repo_root.join("server/assets/maps"))
-        .env("RTS_DESKTOP_SHELL", "maccursor")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| shell_error(format!("failed to spawn rts-server through cargo: {err}")))?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| shell_error("failed to capture rts-server stdout"))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| shell_error("failed to capture rts-server stderr"))?;
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || forward_server_output("stdout", stdout, Some(tx)));
-    thread::spawn(move || forward_server_output("stderr", stderr, None));
-
-    let deadline = Instant::now() + SERVER_READY_TIMEOUT;
-    let url = loop {
-        match rx.recv_timeout(Duration::from_millis(200)) {
-            Ok(url) => match normalize_server_url(&url) {
-                Ok(url) => break url,
-                Err(err) => {
-                    stop_child(&mut child);
-                    return Err(err);
-                }
-            },
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                stop_child(&mut child);
-                return Err(shell_error(
-                    "rts-server output closed before a listen URL was reported",
-                ));
-            }
-        }
-        if let Some(status) = child.try_wait()? {
-            return Err(shell_error(format!(
-                "rts-server exited before startup: {status}"
-            )));
-        }
-        if Instant::now() >= deadline {
-            stop_child(&mut child);
-            return Err(shell_error(format!(
-                "timed out after {}s waiting for rts-server to report its listen URL",
-                SERVER_READY_TIMEOUT.as_secs()
-            )));
-        }
-    };
-
-    app.manage(ManagedServer {
-        child: Mutex::new(Some(child)),
-    });
-
-    Ok(ServerLaunch {
-        url,
-        mode: "spawned",
-        autostart: env_flag("RTS_DESKTOP_AUTOSTART"),
-        autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
-    })
+fn initial_navigation_from_developer_url(value: Option<&str>) -> ShellResult<InitialNavigation> {
+    match value {
+        Some(url) => Ok(InitialNavigation::DeveloperServer {
+            url: normalize_developer_server_url(url)?,
+        }),
+        None => Ok(InitialNavigation::Startup),
+    }
 }
 
 fn env_flag(name: &str) -> bool {
@@ -203,22 +177,7 @@ fn env_flag(name: &str) -> bool {
     )
 }
 
-fn stop_child(child: &mut Child) {
-    let _ = child.kill();
-    let _ = child.wait();
-}
-
-fn repo_root() -> ShellResult<PathBuf> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .and_then(Path::parent)
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .ok_or_else(|| shell_error("failed to resolve repository root from CARGO_MANIFEST_DIR"))
-}
-
-fn normalize_server_url(value: &str) -> ShellResult<String> {
+fn normalize_developer_server_url(value: &str) -> ShellResult<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Err(shell_error("server URL is empty"));
@@ -239,43 +198,86 @@ fn normalize_server_url(value: &str) -> ShellResult<String> {
     Ok(url.to_string())
 }
 
-fn forward_server_output<R: Read + Send + 'static>(
-    stream: &'static str,
-    reader: R,
-    ready_tx: Option<Sender<String>>,
-) {
-    let mut ready_tx = ready_tx;
-    for line in BufReader::new(reader).lines().map_while(Result::ok) {
-        eprintln!("[rts-server:{stream}] {line}");
-        if let (Some(tx), Some(url)) = (ready_tx.as_ref(), extract_server_url(&line)) {
-            let _ = tx.send(url);
-            ready_tx = None;
-        }
-    }
+fn navigation_allowed(url: &tauri::Url, developer_url: Option<&tauri::Url>) -> bool {
+    app_url_allowed(url)
+        || release_profile_for_url(url).is_some()
+        || developer_url
+            .map(|developer_url| same_origin(url, developer_url))
+            .unwrap_or(false)
 }
 
-fn extract_server_url(line: &str) -> Option<String> {
-    let start = line.find("open http://")? + "open ".len();
-    line[start..]
-        .split_whitespace()
-        .next()
-        .map(|url| url.trim_end_matches(['.', ',']).to_string())
+fn app_url_allowed(url: &tauri::Url) -> bool {
+    matches!(url.scheme(), "tauri")
+        || matches!(
+            (url.scheme(), url.host_str()),
+            ("http" | "https", Some("tauri.localhost"))
+        )
 }
 
-fn desktop_runtime_script(server: &ServerLaunch) -> String {
-    let autostart_script = if server.autostart {
-        desktop_autostart_script()
+fn release_profile_for_url(url: &tauri::Url) -> Option<&'static ServerProfile> {
+    BUILT_IN_PROFILES.iter().find(|profile| {
+        profile
+            .url
+            .parse::<tauri::Url>()
+            .map(|profile_url| same_origin(url, &profile_url))
+            .unwrap_or(false)
+    })
+}
+
+fn same_origin(left: &tauri::Url, right: &tauri::Url) -> bool {
+    left.scheme() == right.scheme()
+        && left.host_str() == right.host_str()
+        && left.port_or_known_default() == right.port_or_known_default()
+}
+
+fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
+    let autostart_script = if options.autostart {
+        gated_automation_script(desktop_autostart_script())
     } else {
-        ""
+        String::new()
     };
-    let autolock_script = if server.autolock {
-        desktop_autolock_script()
+    let autolock_script = if options.autolock {
+        gated_automation_script(desktop_autolock_script())
     } else {
-        ""
+        String::new()
     };
+    let profiles_json =
+        serde_json::to_string(&BUILT_IN_PROFILES).expect("built-in profiles serialize");
+    let default_profile_id =
+        serde_json::to_string(DEFAULT_PROFILE_ID).expect("default profile id serializes");
+    let developer_server_url =
+        serde_json::to_string(&options.developer_server_url).expect("developer URL serializes");
     format!(
         r#"
 (() => {{
+  const profiles = Object.freeze({profiles}.map((profile) => Object.freeze({{ ...profile }})));
+  const defaultProfileId = {default_profile_id};
+  const developerServerUrl = {developer_server_url};
+  const parseUrl = (value) => {{
+    try {{
+      return new URL(value);
+    }} catch {{
+      return null;
+    }}
+  }};
+  const sameOrigin = (left, right) => {{
+    if (!left || !right) return false;
+    return left.protocol === right.protocol && left.hostname === right.hostname && left.port === right.port;
+  }};
+  const currentUrl = parseUrl(window.location.href);
+  const selectedProfile = profiles.find((profile) => sameOrigin(currentUrl, parseUrl(profile.url))) || null;
+  const developerSelected = !!developerServerUrl && sameOrigin(currentUrl, parseUrl(developerServerUrl));
+
+  Object.defineProperty(window, "__RTS_DESKTOP_STARTUP", {{
+    value: Object.freeze({{
+      profiles,
+      defaultProfileId,
+      developerServerUrl
+    }}),
+    configurable: false,
+    writable: false
+  }});
+
   const runtime = Object.freeze({{
     shell: "tauri",
     platform: "macos",
@@ -284,8 +286,9 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
     pointerLockDisabled: true,
     autostart: {autostart},
     autolock: {autolock},
-    serverMode: "{mode}",
-    serverUrl: "{url}"
+    serverMode: selectedProfile ? "release" : developerSelected ? "developer" : "startup",
+    serverUrl: selectedProfile ? selectedProfile.url : developerSelected ? developerServerUrl : null,
+    releaseChannel: selectedProfile ? selectedProfile.id : null
   }});
   Object.defineProperty(window, "__RTS_DESKTOP_RUNTIME", {{
     value: runtime,
@@ -422,12 +425,23 @@ fn desktop_runtime_script(server: &ServerLaunch) -> String {
 {autolock_script}
 }})();
 "#,
-        autostart = server.autostart,
-        autolock = server.autolock,
+        autostart = options.autostart,
+        autolock = options.autolock,
         autostart_script = autostart_script,
         autolock_script = autolock_script,
-        mode = server.mode,
-        url = server.url
+        default_profile_id = default_profile_id,
+        developer_server_url = developer_server_url,
+        profiles = profiles_json
+    )
+}
+
+fn gated_automation_script(script: &'static str) -> String {
+    format!(
+        r#"
+  if (runtime.serverMode !== "startup") {{
+{script}
+  }}
+"#
     )
 }
 
@@ -565,40 +579,89 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extracts_server_url_from_log_line() {
-        let line = "INFO Bewegungskrieg server listening - open http://127.0.0.1:41231/";
+    fn built_in_profiles_match_release_urls() {
+        assert_eq!(BUILT_IN_PROFILES.len(), 2);
+        assert_eq!(BUILT_IN_PROFILES[0].id, "beta");
         assert_eq!(
-            extract_server_url(line).as_deref(),
-            Some("http://127.0.0.1:41231/")
+            BUILT_IN_PROFILES[0].url,
+            "https://rts-0-zvorygin-beta.fly.dev/"
+        );
+        assert_eq!(BUILT_IN_PROFILES[1].id, "mainline");
+        assert_eq!(BUILT_IN_PROFILES[1].url, "https://rts-0-zvorygin.fly.dev/");
+        for profile in BUILT_IN_PROFILES.iter() {
+            let url: tauri::Url = profile.url.parse().unwrap();
+            assert_eq!(url.scheme(), "https");
+        }
+        assert!(BUILT_IN_PROFILES
+            .iter()
+            .any(|profile| profile.id == DEFAULT_PROFILE_ID));
+    }
+
+    #[test]
+    fn defaults_to_startup_selector_without_developer_url() {
+        let navigation = initial_navigation_from_developer_url(None).unwrap();
+        assert!(matches!(navigation, InitialNavigation::Startup));
+        assert_eq!(navigation.developer_url(), None);
+        assert_eq!(
+            navigation.webview_url().unwrap().to_string(),
+            STARTUP_ENTRYPOINT
         );
     }
 
     #[test]
-    fn normalizes_loopback_server_url() {
+    fn normalizes_loopback_developer_server_url() {
         assert_eq!(
-            normalize_server_url(" http://localhost:8080/ ").unwrap(),
+            normalize_developer_server_url(" http://localhost:8080/ ").unwrap(),
             "http://localhost:8080/"
         );
+        let navigation =
+            initial_navigation_from_developer_url(Some(" http://127.0.0.1:41231/ ")).unwrap();
+        assert_eq!(navigation.developer_url(), Some("http://127.0.0.1:41231/"));
     }
 
     #[test]
-    fn rejects_non_loopback_server_url() {
-        assert!(normalize_server_url("https://example.com/").is_err());
-        assert!(normalize_server_url("http://192.0.2.10:8080/").is_err());
+    fn rejects_non_loopback_developer_server_url() {
+        assert!(normalize_developer_server_url("https://example.com/").is_err());
+        assert!(normalize_developer_server_url("http://192.0.2.10:8080/").is_err());
+    }
+
+    #[test]
+    fn navigation_policy_allows_startup_release_and_developer_origins() {
+        let startup_url: tauri::Url = "tauri://localhost/index.html".parse().unwrap();
+        assert!(navigation_allowed(&startup_url, None));
+
+        let beta_url: tauri::Url = "https://rts-0-zvorygin-beta.fly.dev/rooms".parse().unwrap();
+        let mainline_url: tauri::Url = "https://rts-0-zvorygin.fly.dev/?room=test".parse().unwrap();
+        assert!(navigation_allowed(&beta_url, None));
+        assert!(navigation_allowed(&mainline_url, None));
+
+        let developer_url: tauri::Url = "http://localhost:41231/".parse().unwrap();
+        let developer_path: tauri::Url = "http://localhost:41231/play".parse().unwrap();
+        let other_port: tauri::Url = "http://localhost:41232/play".parse().unwrap();
+        let unrelated: tauri::Url = "https://example.com/".parse().unwrap();
+        assert!(navigation_allowed(&developer_path, Some(&developer_url)));
+        assert!(!navigation_allowed(&other_port, Some(&developer_url)));
+        assert!(!navigation_allowed(&unrelated, None));
     }
 
     #[test]
     fn runtime_script_exposes_desktop_flag_and_disables_pointer_lock() {
-        let script = desktop_runtime_script(&ServerLaunch {
-            url: "http://127.0.0.1:4000/".to_string(),
-            mode: "spawned",
+        let script = desktop_runtime_script(&RuntimeScriptOptions {
+            developer_server_url: Some("http://127.0.0.1:4000/".to_string()),
             autostart: false,
             autolock: false,
         });
+        assert!(script.contains("__RTS_DESKTOP_STARTUP"));
         assert!(script.contains("__RTS_DESKTOP_RUNTIME"));
+        assert!(script.contains("https://rts-0-zvorygin-beta.fly.dev/"));
+        assert!(script.contains("https://rts-0-zvorygin.fly.dev/"));
+        assert!(script.contains("const defaultProfileId = \"beta\""));
         assert!(script.contains("nativeCursorBackend: true"));
         assert!(script.contains("autostart: false"));
         assert!(script.contains("autolock: false"));
+        assert!(script.contains("serverMode: selectedProfile ? \"release\""));
+        assert!(script.contains("releaseChannel: selectedProfile ? selectedProfile.id : null"));
+        assert!(script.contains("http://127.0.0.1:4000/"));
         assert!(script.contains("__RTS_NATIVE_CURSOR"));
         assert!(script.contains("maccursor_start"));
         assert!(script.contains("__TAURI__.core"));
