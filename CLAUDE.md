@@ -59,12 +59,15 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   ```
 
 - Use one branch per worktree. Branch names must start with `zvorygin/`.
-- Create project worktrees under `/tmp/rts-worktrees` to keep the repo directory clean. Use a
-  descriptive directory name that matches the branch:
+- Create project worktrees under `/tmp/rts-worktrees` to keep the repo directory clean. Fetch first,
+  then branch from `origin/main` so the new worktree includes recently merged agent PRs even when
+  the local `main` checkout has not been pulled yet. Use a descriptive directory name that matches
+  the branch:
 
   ```bash
   mkdir -p /tmp/rts-worktrees
-  git worktree add /tmp/rts-worktrees/my-feature -b zvorygin/my-feature main
+  git fetch origin main
+  git worktree add /tmp/rts-worktrees/my-feature -b zvorygin/my-feature origin/main
   ```
 
 - Agents must only edit files inside their assigned worktree. Do not edit the original checkout or
