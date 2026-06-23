@@ -361,6 +361,9 @@ await withFakeDocument(async () => {
   const spawnPanel = (kind) => findFakes(root, (el) => (
     el.tagName === "SECTION" && el.dataset?.spawnPanel === kind
   ))[0];
+  const sectionByClass = (className) => findFakes(root, (el) => (
+    el.tagName === "SECTION" && String(el.className).split(/\s+/).includes(className)
+  ))[0];
   const resolveLastLabResult = (options = {}) => {
     const envelope = sent.at(-1);
     net._emit("labResult", {
@@ -402,6 +405,19 @@ await withFakeDocument(async () => {
     textWithin(root).includes("Options") && textWithin(root).includes("Unlimited commands"),
     "LabPanel renders command limit controls in an Options panel",
   );
+  assert(
+    textWithin(sectionByClass("lab-options")).includes("Vision") &&
+      textWithin(sectionByClass("lab-options")).includes("Unlimited commands") &&
+      !textWithin(sectionByClass("lab-options")).includes("Unit Spawn"),
+    "LabPanel groups global controls in the Options section",
+  );
+  assert(
+    textWithin(sectionByClass("lab-tools")).includes("Unit Spawn") &&
+      textWithin(sectionByClass("lab-tools")).includes("Building Spawn") &&
+      textWithin(sectionByClass("lab-tools")).includes("Remove tool") &&
+      !textWithin(sectionByClass("lab-tools")).includes("Unlimited commands"),
+    "LabPanel groups placement tools in the Tools section",
+  );
   assert(!textWithin(root).includes("Unlimited selection"), "LabPanel removes the old unlimited selection option");
   const commandLimitToggle = panel.fields.get("ignore-command-limits");
   commandLimitToggle.checked = false;
@@ -430,9 +446,7 @@ await withFakeDocument(async () => {
       !panel.fields.has("research-completed"),
     "LabPanel does not expose advanced spawn or completion toggles",
   );
-  const teamButton = root.children[0].children
-    .flatMap((child) => child.children || [])
-    .find((child) => child.textContent === "Team 2");
+  const teamButton = buttonByText("Team 2");
   teamButton.listeners.click();
   assert(sent.at(-1).op.vision.teamId === 2, "LabPanel vision controls send lab vision requests");
   playerButtonById(2).listeners.click();
