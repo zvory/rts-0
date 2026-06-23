@@ -7,6 +7,8 @@
 use std::collections::HashSet;
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
+
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
 use crate::game::map::Map;
@@ -25,8 +27,8 @@ use super::{systems, Game, MapMetadata, PlayerInit};
 mod scenario;
 
 pub use scenario::{
-    LabEntityIdRemap, LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioPlayer,
-    LabScenarioPoint, LabScenarioResearch, LabScenarioResources, LabScenarioRestore, LabScenarioV1,
+    LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioPlayer, LabScenarioPoint,
+    LabScenarioResearch, LabScenarioResources, LabScenarioV1,
 };
 use scenario::{
     lab_entity_is_set_up, lab_entity_setup_target, restore_lab_entity_setup,
@@ -115,6 +117,19 @@ pub enum LabOpOutcome {
         completed: bool,
     },
     ScenarioRestored(LabScenarioRestore),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioRestore {
+    pub entity_id_map: Vec<LabEntityIdRemap>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabEntityIdRemap {
+    pub old_id: u32,
+    pub new_id: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]

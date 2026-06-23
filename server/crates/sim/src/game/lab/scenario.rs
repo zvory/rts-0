@@ -84,19 +84,6 @@ pub struct LabScenarioPoint {
     pub y: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabScenarioRestore {
-    pub entity_id_map: Vec<LabEntityIdRemap>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LabEntityIdRemap {
-    pub old_id: u32,
-    pub new_id: u32,
-}
-
 pub(super) fn lab_entity_is_set_up(entity: &Entity) -> bool {
     lab_setup_capable(entity.kind) && matches!(entity.weapon_setup(), WeaponSetup::Deployed)
 }
