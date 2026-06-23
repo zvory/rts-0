@@ -7,22 +7,23 @@
 ## Plain-Language Summary
 
 The shell needs enough logging to support playtesters without a terminal. It should persist shell
-startup events, selected server profile, local server output, and native cursor failures. Startup
-failures should show a simple in-app error with a way to find or copy the relevant logs.
+startup events, selected server profile, navigation/connectivity failures, and native cursor
+failures. Startup failures should show a simple in-app error with a way to find or copy the relevant
+logs.
 
 ## Objective
 
-Add basic app-local diagnostics for startup, server selection, local server launch, connection, and
+Add basic app-local diagnostics for startup, server selection, website navigation, connection, and
 native cursor capture failures.
 
 ## Scope
 
 - Create an app log directory under the user's macOS app data or logs directory.
 - Write a shell log with timestamped startup events, selected server profile id/URL, app version,
-  build id if available, packaged/dev mode, and local server lifecycle events.
-- Capture local server stdout/stderr to a persistent log file in packaged and dev local modes.
-- Add a small in-app startup failure surface for invalid server URLs, failed local server launch,
-  server-ready timeout, remote navigation rejection, and native cursor capture start failure.
+  shell build id if available, and packaged/dev mode.
+- Add a small in-app startup failure surface for invalid server URLs, remote navigation rejection,
+  navigation/load timeout, WebSocket/connectivity hints when practical, and native cursor capture
+  start failure.
 - Add a way to reveal/copy the log path from the startup screen or error surface.
 - Optionally bridge a small set of desktop-runtime JS errors into the shell log, especially native
   cursor bridge failures and autostart/autolock failures.
@@ -48,12 +49,12 @@ Avoid touching:
 - Run `cargo test --manifest-path desktop/maccursor-shell/src-tauri/Cargo.toml`.
 - Add focused tests for log path selection, URL redaction if implemented, and startup failure state
   formatting.
-- Manually force at least one bad URL and one local-server startup failure to confirm an in-app
-  error and log file are produced.
+- Manually force at least one bad URL and one unreachable server URL to confirm an in-app error and
+  log file are produced.
 
 ## Manual Testing Focus
 
-Trigger a bad custom URL and a failed local launch, then confirm the app explains the failure and
+Trigger a bad custom URL and an unreachable URL, then confirm the app explains the failure and
 points to logs.
 
 ## Handoff Expectations

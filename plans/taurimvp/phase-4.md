@@ -7,8 +7,8 @@
 ## Plain-Language Summary
 
 Create one repeatable command for producing the unsigned macOS MVP shell artifact. The output should
-be a copied app bundle or zip that includes the packaged local runtime and enough metadata to tell
-which build a tester ran. Keep the instructions focused on opening the unsigned app and finding logs.
+be a copied app bundle or zip for the thin shell and enough metadata to tell which build a tester
+ran. Keep the instructions focused on opening the unsigned app, choosing a server, and finding logs.
 
 ## Objective
 
@@ -18,13 +18,16 @@ full release workflow.
 ## Scope
 
 - Add a local build command or script for the unsigned macOS playtest artifact.
-- Include build metadata such as git SHA, date, target architecture, shell version, and bundled
-  server build id in an artifact manifest.
+- Include build metadata such as git SHA, date, target architecture, and shell version in an
+  artifact manifest.
 - Produce an artifact name that includes version/SHA/architecture.
 - Include a minimal README beside the artifact covering:
   - how to open the unsigned app on macOS,
-  - beta/mainline/custom/local startup choices,
+  - beta/mainline/custom/local URL startup choices,
+  - local URL mode requires a separately running repo server,
   - where logs live.
+- Confirm the artifact does not include `rts-server`, client assets, maps, lab scenarios, or other
+  game runtime assets.
 - Do not include tester-facing gameplay "what to test" notes.
 - Document prerequisites for the developer building the artifact.
 - Keep the existing PR full gate as the authoritative broad test gate; add only focused local checks
@@ -50,6 +53,7 @@ Avoid touching:
 - Run `cargo test --manifest-path desktop/maccursor-shell/src-tauri/Cargo.toml`.
 - Run focused checks named by previous phases.
 - Confirm the artifact manifest and README are present in the output.
+- Inspect the artifact contents and confirm it is a thin shell only.
 
 ## Manual Testing Focus
 
@@ -58,4 +62,5 @@ Open the produced unsigned artifact on the build Mac and confirm the startup sel
 ## Handoff Expectations
 
 The handoff must include the exact build command, artifact path, artifact contents, target
-architecture, and any known issue a playtester may hit while opening an unsigned app.
+architecture, confirmation that no game server/assets are bundled, and any known issue a playtester
+may hit while opening an unsigned app.
