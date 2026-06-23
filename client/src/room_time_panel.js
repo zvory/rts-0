@@ -6,6 +6,7 @@ const ROOM_TIME_PANEL_KEY_STEP = 24;
 const ROOM_TIME_PANEL_KEY_STEP_LARGE = 72;
 const ROOM_TIME_PANEL_DEFAULT_WIDTH = 420;
 const ROOM_TIME_PANEL_DEFAULT_HEIGHT = 120;
+const ROOM_TIME_PANEL_STORAGE_SCHEMA_VERSION = 1;
 
 export class FloatingRoomTimePanel {
   constructor({ root, label }) {
@@ -16,6 +17,8 @@ export class FloatingRoomTimePanel {
     this.windowListeners = [];
     this.activeListeners = [];
     this.drag = null;
+    this.collapsed = false;
+    this.collapseButton = null;
   }
 
   mount() {
@@ -25,8 +28,9 @@ export class FloatingRoomTimePanel {
     let body = this.root.querySelector(".room-time-panel-body");
     let dragHandle = this.root.querySelector(".room-time-panel-drag-handle");
     let reset = this.root.querySelector(".room-time-panel-reset");
+    let collapse = this.root.querySelector(".room-time-panel-collapse");
 
-    if (!body || !dragHandle || !reset) {
+    if (!body || !dragHandle || !reset || !collapse) {
       const existing = Array.from(this.root.children || []);
       const header = document.createElement("div");
       header.className = "room-time-panel-titlebar";
@@ -53,20 +57,31 @@ export class FloatingRoomTimePanel {
       reset.className = "room-time-panel-reset";
       reset.textContent = "Reset";
 
+      collapse = document.createElement("button");
+      collapse.type = "button";
+      collapse.className = "room-time-panel-collapse";
+
       body = document.createElement("div");
       body.className = "room-time-panel-body";
       for (const child of existing) body.appendChild(child);
 
+      const actions = document.createElement("div");
+      actions.className = "room-time-panel-actions";
+      actions.appendChild(collapse);
+      actions.appendChild(reset);
+
       header.appendChild(dragHandle);
-      header.appendChild(reset);
+      header.appendChild(actions);
       this.root.replaceChildren(header, body);
     }
 
+    this.collapseButton = collapse;
     this.syncLabels();
     this.contentEl = body;
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginDrag(event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleKeyDown(event));
     this.listenRender(reset, "click", () => this.resetPosition());
+    this.listenRender(collapse, "click", () => this.toggleCollapsed());
     this.listenWindow("resize", () => this.constrainToViewport());
     this.restorePosition();
     return this.contentEl;
@@ -75,6 +90,7 @@ export class FloatingRoomTimePanel {
   syncLabels() {
     const dragHandle = this.root?.querySelector(".room-time-panel-drag-handle");
     const reset = this.root?.querySelector(".room-time-panel-reset");
+    const collapse = this.root?.querySelector(".room-time-panel-collapse");
     const title = this.root?.querySelector(".room-time-panel-title");
     if (title) title.textContent = this.label;
     dragHandle?.setAttribute("aria-label", `Move ${this.label.toLowerCase()} controls`);
@@ -82,6 +98,15 @@ export class FloatingRoomTimePanel {
       reset.title = `Reset ${this.label.toLowerCase()} controls position`;
       reset.setAttribute("aria-label", `Reset ${this.label.toLowerCase()} controls position`);
     }
+    if (collapse) {
+      const action = this.collapsed ? "Expand" : "Collapse";
+      collapse.textContent = action;
+      collapse.title = `${action} ${this.label.toLowerCase()} controls`;
+      collapse.setAttribute("aria-label", `${action} ${this.label.toLowerCase()} controls`);
+      collapse.setAttribute("aria-expanded", this.collapsed ? "false" : "true");
+    }
+    if (this.contentEl) this.contentEl.hidden = this.collapsed;
+    if (this.root?.dataset) this.root.dataset.collapsed = this.collapsed ? "true" : "false";
   }
 
   destroy() {
@@ -95,7 +120,9 @@ export class FloatingRoomTimePanel {
     }
     this.root?.classList?.remove("room-time-floating-panel");
     if (this.root?.dataset) delete this.root.dataset.panelDragging;
+    if (this.root?.dataset) delete this.root.dataset.collapsed;
     this.contentEl = null;
+    this.collapseButton = null;
   }
 
   listenRender(target, type, handler) {
@@ -209,12 +236,14 @@ export class FloatingRoomTimePanel {
 
   restorePosition() {
     const saved = this.readPosition();
+    this.setCollapsed(saved?.collapsed === true, { save: false });
     if (saved) this.applyPosition(saved);
   }
 
   resetPosition() {
     this.removeStoredPosition();
     this.clearPositionStyles();
+    this.setCollapsed(false, { save: false });
   }
 
   constrainToViewport() {
@@ -265,15 +294,29 @@ export class FloatingRoomTimePanel {
     clearStyle(this.root, "transform");
   }
 
+  toggleCollapsed() {
+    this.setCollapsed(!this.collapsed);
+  }
+
+  setCollapsed(collapsed, options = {}) {
+    this.collapsed = !!collapsed;
+    this.syncLabels();
+    if (options.save !== false) this.savePosition(this.currentRect());
+  }
+
   readPosition() {
     try {
       const raw = globalThis.window?.localStorage?.getItem?.(ROOM_TIME_PANEL_STORAGE_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (parsed?.schemaVersion !== 1) return null;
+      if (parsed?.schemaVersion !== ROOM_TIME_PANEL_STORAGE_SCHEMA_VERSION) return null;
       const left = Number(parsed.left);
       const top = Number(parsed.top);
-      return Number.isFinite(left) && Number.isFinite(top) ? { left, top } : null;
+      const position = Number.isFinite(left) && Number.isFinite(top) ? { left, top } : null;
+      return {
+        ...(position || {}),
+        collapsed: parsed.collapsed === true,
+      };
     } catch {
       return null;
     }
@@ -283,9 +326,10 @@ export class FloatingRoomTimePanel {
     try {
       const next = this.constrainPosition(position);
       globalThis.window?.localStorage?.setItem?.(ROOM_TIME_PANEL_STORAGE_KEY, JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: ROOM_TIME_PANEL_STORAGE_SCHEMA_VERSION,
         left: next.left,
         top: next.top,
+        collapsed: this.collapsed,
       }));
     } catch {
       // Room-time panel position is a convenience only.

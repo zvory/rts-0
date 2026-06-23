@@ -560,11 +560,24 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     preventDefault() {},
   });
   assert(replayControls.style.left === "136px", "drag handle arrow keys nudge the room-time panel");
+  const collapsePanel = replayControls.querySelector(".room-time-panel-collapse");
+  collapsePanel._listeners.get("click")({});
+  assert(
+    replayControls.dataset.collapsed === "true" &&
+      replayControls.querySelector(".room-time-panel-body").hidden === true &&
+      JSON.parse(localStorageValues.get("rts.roomTimeControls.panel.v1")).collapsed === true,
+    "collapse hides and persists the floating room-time panel body",
+  );
   const resetPanel = replayControls.querySelector(".room-time-panel-reset");
   resetPanel._listeners.get("click")({});
   assert(!localStorageValues.has("rts.roomTimeControls.panel.v1"), "reset clears the persisted room-time panel position");
   assert(replayControls.style.left === "" && replayControls.style.top === "",
     "reset returns the floating room-time panel to its default CSS position");
+  assert(
+    replayControls.dataset.collapsed === "false" &&
+      replayControls.querySelector(".room-time-panel-body").hidden === false,
+    "reset expands the floating room-time panel",
+  );
   const pauseReplay = replayControls.querySelector(".replay-pause-btn");
   assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause button");
   const branchReplay = replayControls.querySelector(".replay-branch-btn");
