@@ -1,20 +1,33 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::error::Error;
+use std::{
+    error::Error,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 
+mod diagnostics;
 mod native_cursor;
 
+use diagnostics::{bounded_log_text, ShellDiagnostics, ShellLogInfo};
 use native_cursor::{
     maccursor_configure, maccursor_diagnostics, maccursor_start, maccursor_stop,
     NativeCursorBackend,
 };
 use serde::Serialize;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use serde_json::json;
+use tauri::{
+    webview::{PageLoadEvent, PageLoadPayload},
+    Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
 
 const DEFAULT_PROFILE_ID: &str = "beta";
 const SERVER_URL_ENV: &str = "RTS_DESKTOP_SERVER_URL";
 const STARTUP_ENTRYPOINT: &str = "index.html";
+const STARTUP_ERROR_URL: &str = "tauri://localhost/index.html";
 const WINDOW_LABEL: &str = "main";
+const NAVIGATION_LOAD_TIMEOUT_MS: u64 = 15_000;
 
 type ShellResult<T> = Result<T, Box<dyn Error>>;
 
@@ -92,6 +105,51 @@ struct RuntimeScriptOptions {
     autolock: bool,
 }
 
+#[derive(Clone, Default)]
+struct NavigationMonitor {
+    inner: Arc<Mutex<NavigationMonitorState>>,
+}
+
+#[derive(Default)]
+struct NavigationMonitorState {
+    sequence: u64,
+    pending: Option<PendingNavigation>,
+}
+
+#[derive(Clone, Debug)]
+struct PendingNavigation {
+    sequence: u64,
+    url: String,
+    profile_id: Option<&'static str>,
+}
+
+impl NavigationMonitor {
+    fn start(&self, url: String, profile_id: Option<&'static str>) -> Option<PendingNavigation> {
+        let mut state = self.inner.lock().ok()?;
+        state.sequence = state.sequence.saturating_add(1);
+        let pending = PendingNavigation {
+            sequence: state.sequence,
+            url,
+            profile_id,
+        };
+        state.pending = Some(pending.clone());
+        Some(pending)
+    }
+
+    fn clear(&self) -> Option<PendingNavigation> {
+        self.inner.lock().ok()?.pending.take()
+    }
+
+    fn clear_sequence(&self, sequence: u64) -> Option<PendingNavigation> {
+        let mut state = self.inner.lock().ok()?;
+        let pending = state.pending.as_ref()?;
+        if pending.sequence == sequence {
+            return state.pending.take();
+        }
+        None
+    }
+}
+
 fn main() {
     if let Err(err) = run() {
         eprintln!("maccursor-shell failed: {err}");
@@ -110,10 +168,23 @@ fn run() -> ShellResult<()> {
                 maccursor_start,
                 maccursor_configure,
                 maccursor_stop,
-                maccursor_diagnostics
+                maccursor_diagnostics,
+                desktop_log_info,
+                desktop_reveal_logs,
+                desktop_log_client_event,
+                desktop_open_profile
             ])
             .setup(|app| {
+                let diagnostics =
+                    ShellDiagnostics::open(app.path().app_log_dir().map_err(|err| {
+                        shell_error(format!("failed to resolve app log directory: {err}"))
+                    })?)
+                    .map_err(shell_error)?;
+                app.manage(diagnostics.clone());
+
                 let initial_navigation = initial_navigation()?;
+                log_shell_start(&diagnostics, &initial_navigation);
+                log_startup_configuration(&diagnostics);
                 let developer_navigation_url = initial_navigation
                     .developer_url()
                     .map(str::parse::<tauri::Url>)
@@ -123,7 +194,7 @@ fn run() -> ShellResult<()> {
                             "invalid developer server URL from {SERVER_URL_ENV}: {err}"
                         ))
                     })?;
-                let native_cursor = NativeCursorBackend::default();
+                let native_cursor = NativeCursorBackend::with_diagnostics(diagnostics.clone());
                 app.manage(native_cursor.clone());
                 let runtime_script = desktop_runtime_script(&RuntimeScriptOptions {
                     developer_server_url: initial_navigation.developer_url().map(str::to_string),
@@ -131,13 +202,32 @@ fn run() -> ShellResult<()> {
                     autolock: env_flag("RTS_DESKTOP_AUTOLOCK"),
                 });
                 let initial_webview_url = initial_navigation.webview_url()?;
+                let navigation_monitor = NavigationMonitor::default();
+                let navigation_policy_diagnostics = diagnostics.clone();
+                let page_load_diagnostics = diagnostics.clone();
+                let page_load_monitor = navigation_monitor.clone();
                 let window = WebviewWindowBuilder::new(app, WINDOW_LABEL, initial_webview_url)
                     .title("Bewegungskrieg")
                     .inner_size(1280.0, 820.0)
                     .min_inner_size(960.0, 640.0)
                     .initialization_script(runtime_script)
                     .on_navigation(move |url| {
-                        navigation_allowed(url, developer_navigation_url.as_ref())
+                        let allowed = navigation_allowed(url, developer_navigation_url.as_ref());
+                        if !allowed {
+                            navigation_policy_diagnostics.log_event(
+                                "navigation_rejected",
+                                json!({ "url": redact_url_for_log(url.as_str()) }),
+                            );
+                        }
+                        allowed
+                    })
+                    .on_page_load(move |window, payload| {
+                        handle_page_load(
+                            &page_load_diagnostics,
+                            &page_load_monitor,
+                            &window,
+                            payload,
+                        );
                     })
                     .build()?;
                 native_cursor.install(&window);
@@ -165,6 +255,279 @@ fn run() -> ShellResult<()> {
             .run(tauri::generate_context!())?;
         Ok(())
     }
+}
+
+#[tauri::command]
+fn desktop_log_info(
+    window: WebviewWindow,
+    diagnostics: tauri::State<'_, ShellDiagnostics>,
+) -> Result<ShellLogInfo, String> {
+    ensure_startup_context(&window)?;
+    Ok(diagnostics.log_info())
+}
+
+#[tauri::command]
+fn desktop_reveal_logs(
+    window: WebviewWindow,
+    diagnostics: tauri::State<'_, ShellDiagnostics>,
+) -> Result<(), String> {
+    ensure_startup_context(&window)?;
+    std::fs::create_dir_all(diagnostics.log_dir())
+        .map_err(|err| format!("failed to create shell log directory: {err}"))?;
+    std::process::Command::new("open")
+        .arg(diagnostics.log_dir())
+        .spawn()
+        .map_err(|err| format!("failed to reveal shell log directory: {err}"))?;
+    diagnostics.log_event("log_directory_revealed", json!({}));
+    Ok(())
+}
+
+#[tauri::command]
+fn desktop_log_client_event(
+    window: WebviewWindow,
+    diagnostics: tauri::State<'_, ShellDiagnostics>,
+    event: String,
+    message: Option<String>,
+    url: Option<String>,
+) -> Result<(), String> {
+    let current_url = window
+        .url()
+        .ok()
+        .map(|url| redact_url_for_log(url.as_str()));
+    diagnostics.log_event(
+        "client_runtime_event",
+        json!({
+            "source": bounded_log_text(&event),
+            "message": message.as_deref().map(bounded_log_text),
+            "url": url.as_deref().map(redact_url_for_log),
+            "currentUrl": current_url,
+        }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+fn desktop_open_profile(
+    window: WebviewWindow,
+    diagnostics: tauri::State<'_, ShellDiagnostics>,
+    profile_id: String,
+) -> Result<(), String> {
+    ensure_startup_context(&window)?;
+    let profile = server_profile_for_id(&profile_id)
+        .ok_or_else(|| format!("unknown release channel {profile_id}"))?;
+    let url: tauri::Url = profile.url.parse::<tauri::Url>().map_err(|err| {
+        let message = format!("built-in release channel {} has an invalid URL", profile.id);
+        diagnostics.log_event(
+            "startup_profile_invalid",
+            json!({
+                "profileId": profile.id,
+                "message": err.to_string(),
+            }),
+        );
+        message
+    })?;
+    if !navigation_allowed(&url, None) {
+        diagnostics.log_event(
+            "navigation_rejected",
+            json!({
+                "profileId": profile.id,
+                "url": redact_url_for_log(profile.url),
+            }),
+        );
+        return Err(format!(
+            "release channel {} is not allowed by the shell navigation policy",
+            profile.label
+        ));
+    }
+
+    diagnostics.log_event(
+        "selected_profile",
+        json!({
+            "profileId": profile.id,
+            "label": profile.label,
+            "url": redact_url_for_log(profile.url),
+        }),
+    );
+    window
+        .navigate(url)
+        .map_err(|err| format!("failed to open release channel {}: {err}", profile.label))
+}
+
+fn ensure_startup_context(window: &WebviewWindow) -> Result<(), String> {
+    let url = window
+        .url()
+        .map_err(|err| format!("failed to read current WebView URL: {err}"))?;
+    if app_url_allowed(&url) {
+        Ok(())
+    } else {
+        Err("log-path commands are available only on the startup or shell error screen".to_string())
+    }
+}
+
+fn server_profile_for_id(profile_id: &str) -> Option<&'static ServerProfile> {
+    BUILT_IN_PROFILES
+        .iter()
+        .find(|profile| profile.id == profile_id)
+}
+
+fn log_shell_start(diagnostics: &ShellDiagnostics, initial_navigation: &InitialNavigation) {
+    diagnostics.log_event(
+        "shell_start",
+        json!({
+            "appVersion": env!("CARGO_PKG_VERSION"),
+            "buildId": shell_build_id(),
+            "packagingMode": if cfg!(debug_assertions) { "dev" } else { "packaged" },
+            "initialMode": match initial_navigation {
+                InitialNavigation::Startup => "startup",
+                InitialNavigation::DeveloperServer { .. } => "developer",
+            },
+            "developerServerUrl": initial_navigation
+                .developer_url()
+                .map(redact_url_for_log),
+        }),
+    );
+}
+
+fn log_startup_configuration(diagnostics: &ShellDiagnostics) {
+    let profiles: Vec<_> = BUILT_IN_PROFILES
+        .iter()
+        .map(|profile| {
+            let parsed = profile.url.parse::<tauri::Url>();
+            if let Err(err) = &parsed {
+                diagnostics.log_event(
+                    "startup_profile_invalid",
+                    json!({
+                        "profileId": profile.id,
+                        "label": profile.label,
+                        "message": err.to_string(),
+                    }),
+                );
+            }
+            json!({
+                "profileId": profile.id,
+                "label": profile.label,
+                "url": parsed
+                    .as_ref()
+                    .map(|url| redact_url_for_log(url.as_str()))
+                    .unwrap_or_else(|_| "<invalid-url>".to_string()),
+                "valid": parsed.is_ok(),
+            })
+        })
+        .collect();
+    diagnostics.log_event(
+        "startup_profiles_configured",
+        json!({
+            "defaultProfileId": DEFAULT_PROFILE_ID,
+            "profiles": profiles,
+        }),
+    );
+}
+
+fn handle_page_load(
+    diagnostics: &ShellDiagnostics,
+    monitor: &NavigationMonitor,
+    window: &WebviewWindow,
+    payload: PageLoadPayload<'_>,
+) {
+    let url = payload.url();
+    if app_url_allowed(url) {
+        let _ = monitor.clear();
+        return;
+    }
+
+    match payload.event() {
+        PageLoadEvent::Started => {
+            let profile_id = release_profile_for_url(url).map(|profile| profile.id);
+            let redacted_url = redact_url_for_log(url.as_str());
+            diagnostics.log_event(
+                "navigation_started",
+                json!({
+                    "profileId": profile_id,
+                    "url": redacted_url,
+                }),
+            );
+            if let Some(pending) = monitor.start(redacted_url, profile_id) {
+                spawn_navigation_timeout(
+                    diagnostics.clone(),
+                    monitor.clone(),
+                    window.clone(),
+                    pending,
+                );
+            }
+        }
+        PageLoadEvent::Finished => {
+            let pending = monitor.clear();
+            diagnostics.log_event(
+                "navigation_finished",
+                json!({
+                    "profileId": pending.as_ref().and_then(|pending| pending.profile_id),
+                    "url": redact_url_for_log(url.as_str()),
+                }),
+            );
+        }
+    }
+}
+
+fn spawn_navigation_timeout(
+    diagnostics: ShellDiagnostics,
+    monitor: NavigationMonitor,
+    window: WebviewWindow,
+    pending: PendingNavigation,
+) {
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(NAVIGATION_LOAD_TIMEOUT_MS));
+        let Some(current) = monitor.clear_sequence(pending.sequence) else {
+            return;
+        };
+        let message = startup_failure_message("load-timeout");
+        diagnostics.log_event(
+            "navigation_timeout",
+            json!({
+                "profileId": current.profile_id,
+                "url": current.url,
+                "timeoutMs": NAVIGATION_LOAD_TIMEOUT_MS,
+                "message": message,
+            }),
+        );
+        match startup_failure_url("load-timeout", message, Some(&current.url)) {
+            Ok(url) => {
+                if let Err(err) = window.navigate(url) {
+                    diagnostics.log_event(
+                        "startup_failure_navigation_failed",
+                        json!({ "message": err.to_string() }),
+                    );
+                }
+            }
+            Err(err) => diagnostics.log_event(
+                "startup_failure_navigation_failed",
+                json!({ "message": err }),
+            ),
+        }
+    });
+}
+
+fn startup_failure_message(code: &str) -> &'static str {
+    match code {
+        "load-timeout" => {
+            "The selected release channel did not finish loading. Check network connectivity or try another channel."
+        }
+        _ => "The desktop shell could not open the selected release channel.",
+    }
+}
+
+fn startup_failure_url(code: &str, message: &str, url: Option<&str>) -> Result<tauri::Url, String> {
+    let mut startup_url =
+        tauri::Url::parse(STARTUP_ERROR_URL).map_err(|err| format!("bad startup URL: {err}"))?;
+    {
+        let mut query = startup_url.query_pairs_mut();
+        query
+            .append_pair("failure", code)
+            .append_pair("message", message);
+        if let Some(url) = url {
+            query.append_pair("url", &redact_url_for_log(url));
+        }
+    }
+    Ok(startup_url)
 }
 
 fn initial_navigation() -> ShellResult<InitialNavigation> {
@@ -256,6 +619,35 @@ fn same_origin(left: &tauri::Url, right: &tauri::Url) -> bool {
     left.scheme() == right.scheme()
         && left.host_str() == right.host_str()
         && left.port_or_known_default() == right.port_or_known_default()
+}
+
+fn redact_url_for_log(value: &str) -> String {
+    match value.parse::<tauri::Url>() {
+        Ok(url) if url.scheme() == "tauri" => "tauri://localhost/index.html".to_string(),
+        Ok(url) => {
+            let host = url.host_str().unwrap_or("<no-host>");
+            let port = url
+                .port()
+                .map(|port| format!(":{port}"))
+                .unwrap_or_default();
+            let path = if url.path().is_empty() {
+                "/"
+            } else {
+                url.path()
+            };
+            format!("{}://{}{}{}", url.scheme(), host, port, path)
+        }
+        Err(_) => bounded_log_text(value),
+    }
+}
+
+fn shell_build_id() -> Option<String> {
+    std::env::var("RTS_DESKTOP_BUILD_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| option_env!("GITHUB_SHA").map(str::to_string))
+        .or_else(|| option_env!("VERGEN_GIT_SHA").map(str::to_string))
+        .map(|value| bounded_log_text(&value))
 }
 
 fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
@@ -369,6 +761,36 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
     }}
     return tauriInvoke(cmd, payload);
   }};
+  const desktopLogEvent = (event, message) => {{
+    const safeMessage = message == null ? null : String(message).slice(0, 600);
+    return invoke("desktop_log_client_event", {{
+      event,
+      message: safeMessage,
+      url: window.location.href
+    }}).catch(() => {{}});
+  }};
+  const showDesktopShellFailure = (message) => {{
+    if (document.getElementById("rts-desktop-shell-failure")) return;
+    const panel = document.createElement("aside");
+    panel.id = "rts-desktop-shell-failure";
+    panel.setAttribute("role", "status");
+    panel.style.cssText = [
+      "position:fixed",
+      "left:16px",
+      "bottom:16px",
+      "z-index:2147483647",
+      "max-width:min(420px,calc(100vw - 32px))",
+      "padding:12px 14px",
+      "border:1px solid rgba(154,47,47,.35)",
+      "border-radius:8px",
+      "background:#fff",
+      "color:#181a1b",
+      "box-shadow:0 12px 36px rgba(0,0,0,.18)",
+      "font:13px/1.35 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+    ].join(";");
+    panel.textContent = message;
+    document.body?.append(panel);
+  }};
   const mergeDiagnostics = (snapshot) => {{
     if (!snapshot || typeof snapshot !== "object") return snapshot;
     diagnostics.active = !!snapshot.active;
@@ -418,6 +840,8 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
         diagnostics.active = false;
         diagnostics.lastError = err && err.message ? err.message : String(err);
         diagnostics.lastReason = "capture-start-failed";
+        void desktopLogEvent("native_cursor_capture_start_failed", diagnostics.lastError);
+        showDesktopShellFailure("Native cursor capture failed. Logs are available from the startup screen.");
         throw err;
       }}),
       configure: (bounds = {{}}) => invoke("maccursor_configure", {{
@@ -532,6 +956,7 @@ fn desktop_autostart_script() -> &'static str {
     void desktopAutostart().catch((err) => {
       diagnostics.lastError = err && err.message ? err.message : String(err);
       diagnostics.lastReason = "autostart-failed";
+      void desktopLogEvent("desktop_autostart_failed", diagnostics.lastError);
       console.error("[RTS_DESKTOP_AUTOSTART]", diagnostics.lastError);
     });
   };
@@ -584,6 +1009,7 @@ fn desktop_autolock_script() -> &'static str {
     })().catch((err) => {
       diagnostics.lastError = err && err.message ? err.message : String(err);
       diagnostics.lastReason = "autolock-failed";
+      void desktopLogEvent("desktop_autolock_failed", diagnostics.lastError);
       console.error("[RTS_DESKTOP_AUTOLOCK]", diagnostics.lastError);
     });
   };
@@ -748,6 +1174,35 @@ mod tests {
     }
 
     #[test]
+    fn redacts_query_strings_from_logged_urls() {
+        assert_eq!(
+            redact_url_for_log("https://rts-0-zvorygin-beta.fly.dev/play?token=secret#frag"),
+            "https://rts-0-zvorygin-beta.fly.dev/play"
+        );
+        assert_eq!(
+            redact_url_for_log("tauri://localhost/index.html?message=secret"),
+            "tauri://localhost/index.html"
+        );
+    }
+
+    #[test]
+    fn startup_failure_url_formats_error_state_without_raw_query() {
+        let message = startup_failure_message("load-timeout");
+        let url = startup_failure_url(
+            "load-timeout",
+            message,
+            Some("https://rts-0-zvorygin-beta.fly.dev/?token=secret"),
+        )
+        .unwrap();
+        assert_eq!(url.scheme(), "tauri");
+        assert_eq!(url.host_str(), Some("localhost"));
+        assert!(url.as_str().contains("failure=load-timeout"));
+        assert!(url.as_str().contains("message="));
+        assert!(!url.as_str().contains("secret"));
+        assert!(message.contains("network connectivity"));
+    }
+
+    #[test]
     fn runtime_script_exposes_desktop_flag_and_disables_pointer_lock() {
         let script = desktop_runtime_script(&RuntimeScriptOptions {
             developer_server_url: Some("http://127.0.0.1:4000/".to_string()),
@@ -767,8 +1222,10 @@ mod tests {
         assert!(script.contains("http://127.0.0.1:4000/"));
         assert!(script.contains("__RTS_NATIVE_CURSOR"));
         assert!(script.contains("maccursor_start"));
+        assert!(script.contains("desktop_log_client_event"));
         assert!(script.contains("__TAURI__.core"));
         assert!(script.contains("capture-start-failed"));
+        assert!(script.contains("native_cursor_capture_start_failed"));
         assert!(script.contains("pointerLockDisabled: true"));
         assert!(script.contains("requestPointerLock"));
     }

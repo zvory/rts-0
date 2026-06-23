@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-desktop-reveal-logs"
+description = "Enables the desktop_reveal_logs command without any pre-configured scope."
+commands.allow = ["desktop_reveal_logs"]
+
+[[permission]]
+identifier = "deny-desktop-reveal-logs"
+description = "Denies the desktop_reveal_logs command without any pre-configured scope."
+commands.deny = ["desktop_reveal_logs"]
