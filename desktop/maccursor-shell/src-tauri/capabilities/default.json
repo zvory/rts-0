@@ -18,6 +18,10 @@
     "allow-maccursor-start",
     "allow-maccursor-configure",
     "allow-maccursor-stop",
-    "allow-maccursor-diagnostics"
+    "allow-maccursor-diagnostics",
+    "allow-desktop-log-info",
+    "allow-desktop-reveal-logs",
+    "allow-desktop-log-client-event",
+    "allow-desktop-open-profile"
   ]
 }

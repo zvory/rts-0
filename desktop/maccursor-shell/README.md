@@ -54,6 +54,25 @@ Developer-only shortcuts for local debug runs:
   engineering aids after a release channel or developer loopback server loads.
   They do not run on the startup selector page.
 
+## Local logs
+
+The shell writes local JSONL diagnostics to Tauri's app log directory:
+
+```text
+~/Library/Logs/dev.bewegungskrieg.MacCursorShell/shell.log
+```
+
+The startup screen has **Copy log path** and **Reveal logs** actions. Log-path
+commands are guarded so loaded beta/mainline pages can record bounded runtime
+events but cannot read or reveal local filesystem paths.
+
+Logged events include shell startup, app version, optional build id,
+dev/packaged mode, configured release profiles, selected profile id/URL,
+navigation start/finish/rejection/timeout, native cursor capture start/failure,
+and desktop autostart/autolock failures. URLs are logged without query strings
+or fragments. The shell does not upload logs, record gameplay commands, collect
+telemetry, or include secrets intentionally.
+
 Manual check:
 
 1. Run `./run.sh`.
@@ -66,3 +85,5 @@ Manual check:
 6. Toggle cursor lock in the shell, move over terrain/HUD/minimap, right-click
    move units, box-select, wheel zoom, and press Escape. Inspect
    `window.__RTS_NATIVE_CURSOR.diagnostics()` if movement feels delayed.
+7. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
+   `shell.log` contains startup and selected-profile events.

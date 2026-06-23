@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-desktop-log-info"
+description = "Enables the desktop_log_info command without any pre-configured scope."
+commands.allow = ["desktop_log_info"]
+
+[[permission]]
+identifier = "deny-desktop-log-info"
+description = "Denies the desktop_log_info command without any pre-configured scope."
+commands.deny = ["desktop_log_info"]

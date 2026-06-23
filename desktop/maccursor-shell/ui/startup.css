@@ -156,6 +156,45 @@ h1 {
   font-weight: 700;
 }
 
+.diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.diagnostics-actions[hidden],
+.log-path[hidden] {
+  display: none;
+}
+
+.diagnostics-action {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.diagnostics-action:hover,
+.diagnostics-action:focus-visible {
+  border-color: var(--blue);
+  outline: none;
+}
+
+.log-path {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 620px) {
   .shell {
     align-items: start;
