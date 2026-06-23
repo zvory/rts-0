@@ -3226,7 +3226,7 @@ fn frontal_wave_readiness_reports_required_tank_gate() {
 fn full_saturation_prioritizes_second_city_centre_before_resource_float() {
     let observation = with_expansion_resources(observation(
         AiEconomy {
-            steel: 200,
+            steel: rts_rules::economy::cost(EntityKind::CityCentre).0,
             oil: 150,
             supply_used: 50,
             supply_cap: 100,
