@@ -54,6 +54,45 @@ Developer-only shortcuts for local debug runs:
   engineering aids after a release channel or developer loopback server loads.
   They do not run on the startup selector page.
 
+## Unsigned macOS artifact
+
+Build a local unsigned playtest artifact from this directory:
+
+```bash
+./build-unsigned.mjs
+```
+
+Prerequisites:
+
+- macOS with Xcode command line tools installed.
+- Rust/Cargo and `cargo tauri` 2.x available on `PATH`.
+- Node.js 18 or newer for the build wrapper.
+- A git checkout so the artifact manifest can record the exact commit SHA.
+
+By default the output is written under:
+
+```text
+src-tauri/target/unsigned-playtest/
+```
+
+The artifact directory and zip are named
+`maccursor-shell-v<version>-<short-sha>-<arch>`. Each artifact directory
+contains `RTS Mac Cursor Shell.app`, `manifest.json`, `README.md`, and
+`contents.txt`. The manifest records the git SHA, build date, target
+architecture, shell version, Tauri product metadata, release-channel URLs, and
+the thin-shell asset check. `contents.txt` lists the payload files with SHA-256
+hashes and byte sizes.
+
+The command invokes `cargo tauri build --bundles app --no-sign --ci` with a
+temporary config override that enables the app bundle target. The artifact is
+not Developer ID signed, notarized, or stapled. The command copies only the
+Tauri app bundle into the artifact directory, creates a zip, and fails if the
+bundle contains obvious game runtime assets such as `rts-server`, `client/`,
+`maps/`, `lab-scenarios/`, or match-history data. The app still loads all game
+content from the selected beta or mainline website.
+
+Use `./build-unsigned.mjs --output <dir>` to write the artifact somewhere else.
+
 ## Local logs
 
 The shell writes local JSONL diagnostics to Tauri's app log directory:
