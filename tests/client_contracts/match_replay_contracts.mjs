@@ -35,9 +35,29 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     textContent: "",
     title: "",
   };
+  const windowListeners = new Map();
+  const localStorageValues = new Map();
   globalThis.window = {
     location: { protocol: "http:", host: "localhost", search: "" },
-    localStorage: { getItem() { return null; } },
+    innerWidth: 1000,
+    innerHeight: 700,
+    localStorage: {
+      getItem(key) {
+        return localStorageValues.has(key) ? localStorageValues.get(key) : null;
+      },
+      setItem(key, value) {
+        localStorageValues.set(key, String(value));
+      },
+      removeItem(key) {
+        localStorageValues.delete(key);
+      },
+    },
+    addEventListener(type, handler) {
+      windowListeners.set(type, handler);
+    },
+    removeEventListener(type, handler) {
+      if (windowListeners.get(type) === handler) windowListeners.delete(type);
+    },
     setTimeout(fn) {
       fn();
       return 1;
@@ -384,7 +404,17 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
         return this.parentNode?.closest?.(selector) || null;
       },
       getBoundingClientRect() {
-        return { left: 0, width: 200 };
+        const px = (value, fallback) => {
+          if (typeof value !== "string" || !value.endsWith("px")) return fallback;
+          const parsed = Number.parseFloat(value);
+          return Number.isFinite(parsed) ? parsed : fallback;
+        };
+        return {
+          left: px(this.style.left, 0),
+          top: px(this.style.top, 0),
+          width: px(this.style.width, 200),
+          height: px(this.style.height, 80),
+        };
       },
       querySelector(selector) {
         return this.querySelectorAll(selector)[0] || null;
@@ -496,8 +526,45 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   });
   assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
   assert(replayControls.classList.contains("replay-viewer-controls"), "replay viewer controls keep wrapper class");
+  assert(replayControls.classList.contains("room-time-floating-panel"), "room-time controls mount as a floating panel");
+  const dragHandle = replayControls.querySelector(".room-time-panel-drag-handle");
+  assert(replayControls.querySelector(".room-time-panel-title")?.textContent === "Replay",
+    "floating replay controls include a labeled drag handle");
+  assert(replayControls.querySelector(".room-time-panel-body")?.querySelector(".seek-btn") === seekBack,
+    "floating panel wraps the existing room-time buttons in its body");
   assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
   assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
+  dragHandle._listeners.get("pointerdown")({
+    button: 0,
+    isPrimary: true,
+    pointerId: 7,
+    clientX: 20,
+    clientY: 30,
+    currentTarget: dragHandle,
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  windowListeners.get("pointermove")({
+    pointerId: 7,
+    clientX: 120,
+    clientY: 80,
+    preventDefault() {},
+  });
+  assert(replayControls.style.left === "112px" && replayControls.style.top === "62px",
+    "dragging the floating room-time panel updates its screen position");
+  windowListeners.get("pointerup")({ pointerId: 7 });
+  assert(localStorageValues.has("rts.roomTimeControls.panel.v1"),
+    "floating room-time panel position is persisted after drag");
+  dragHandle._listeners.get("keydown")({
+    key: "ArrowRight",
+    preventDefault() {},
+  });
+  assert(replayControls.style.left === "136px", "drag handle arrow keys nudge the room-time panel");
+  const resetPanel = replayControls.querySelector(".room-time-panel-reset");
+  resetPanel._listeners.get("click")({});
+  assert(!localStorageValues.has("rts.roomTimeControls.panel.v1"), "reset clears the persisted room-time panel position");
+  assert(replayControls.style.left === "" && replayControls.style.top === "",
+    "reset returns the floating room-time panel to its default CSS position");
   const pauseReplay = replayControls.querySelector(".replay-pause-btn");
   assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause button");
   const branchReplay = replayControls.querySelector(".replay-branch-btn");
@@ -558,6 +625,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(!replayControls.querySelector(".replay-vision-controls"), "destroy removes generated vision controls");
   assert(!replayControls.querySelector(".replay-tick-status"), "destroy removes generated status");
   assert(!replayControls.querySelector(".replay-timeline"), "destroy removes generated timeline");
+  assert(!replayControls.querySelector(".room-time-panel-drag-handle"), "destroy removes floating room-time panel chrome");
+  assert(replayControls.children.includes(seekBack), "destroy unwraps static room-time controls back onto the root");
   assert(replayControls._listeners.size === 0, "destroy removes replay speed click listener");
 
   const replayVisionOnlyControls = fakeEl("div");

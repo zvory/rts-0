@@ -70,6 +70,7 @@ src/
   frame_recovery.js # Frame-loop soft-failure logging and rescheduling diagnostics
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
+  room_time_panel.js # Floating, draggable chrome around shared room-time controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
   bootstrap.js    # DOM lookup, ws/dev-watch/lab launch config, startup helpers
@@ -1091,7 +1092,7 @@ Current areas:
   `match_net_reporter.js`, `match_settings_context.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
-  `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
+  `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
   `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
