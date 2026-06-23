@@ -1,8 +1,9 @@
-import { buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "./settings_panels.js";
+import { buildBackToLobbyAction, buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "./settings_panels.js";
 import { MOVEMENT_PATH_DIAGNOSTICS } from "./protocol.js";
 
 export function buildMatchSettingsContext({
   replayViewer,
+  labMetadata,
   state,
   capabilities,
   livePauseState,
@@ -14,15 +15,26 @@ export function buildMatchSettingsContext({
   input,
   onPauseGame,
   onGiveUpOpen,
+  onBackToLobby,
   onPredictionEnabledChange,
   onPointerLockToggle,
   onDebugPathToggle,
   livePauseActionLabel,
   livePauseActionTitle,
 }) {
+  const lab = !!labMetadata;
   const spectator = !!state?.spectator || !!replayViewer;
-  const kind = replayViewer ? "replay" : spectator ? "spectator" : "match";
+  const kind = lab ? "lab" : replayViewer ? "replay" : spectator ? "spectator" : "match";
   const movementPathsAvailable = capabilities.diagnostics.movementPaths !== MOVEMENT_PATH_DIAGNOSTICS.NONE;
+  const leaveAction = (replayViewer || lab)
+    ? buildBackToLobbyAction({
+      visible: typeof onBackToLobby === "function",
+      onBackToLobby,
+    })
+    : buildGiveUpAction({
+      visible: !spectator && !giveUpSent,
+      onOpen: onGiveUpOpen,
+    });
   return {
     kind,
     spectator,
@@ -35,10 +47,7 @@ export function buildMatchSettingsContext({
         title: livePauseActionTitle?.() || "",
         onPause: onPauseGame,
       }),
-      buildGiveUpAction({
-        visible: !spectator && !giveUpSent,
-        onOpen: onGiveUpOpen,
-      }),
+      leaveAction,
     ],
     tabs: buildSettingsTabs({
       audio,

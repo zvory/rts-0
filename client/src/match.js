@@ -55,6 +55,7 @@ export class Match {
     this.diagnostics = diagnostics;
     this.hotkeyProfiles = options.hotkeyProfiles || null;
     this.settings = options.settings || null;
+    this.backToLobbyHandler = options.onBackToLobby || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
     this.labMetadata = options.labMetadata || null;
     this.labClient = options.labClient || null;
@@ -241,6 +242,7 @@ export class Match {
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
     this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
     this.onGiveUpConfirm = this.requestGiveUp.bind(this);
+    this.onBackToLobby = this.requestBackToLobby.bind(this);
     this.onPauseGame = this.requestPauseGame.bind(this);
     this.onUnpauseGame = this.requestUnpauseGame.bind(this);
     this.onPointerLockToggle = this.togglePointerLock.bind(this);
@@ -604,6 +606,11 @@ export class Match {
     this.net.giveUp();
   }
 
+  requestBackToLobby() {
+    this.settings?.close();
+    this.backToLobbyHandler?.();
+  }
+
   requestPauseGame() {
     if (!this.capabilities.matchControls?.pause) return;
     if (this.livePauseState.paused || !this.livePauseState.canPause) {
@@ -765,6 +772,7 @@ export class Match {
     const wasOpen = keepOpen && this.settings.isOpen();
     this.settings.setContext(buildMatchSettingsContext({
       replayViewer: this.replayViewer,
+      labMetadata: this.labMetadata,
       state: this.state,
       capabilities: this.capabilities,
       livePauseState: this.livePauseState,
@@ -776,6 +784,7 @@ export class Match {
       input: this.input,
       onPauseGame: this.onPauseGame,
       onGiveUpOpen: this.onGiveUpOpen,
+      onBackToLobby: this.onBackToLobby,
       onPredictionEnabledChange: this.onPredictionEnabledChange,
       onPointerLockToggle: this.onPointerLockToggle,
       onDebugPathToggle: this.onDebugPathToggle,

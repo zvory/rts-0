@@ -257,3 +257,54 @@ withFakeSettingsDocument(() => {
   assert(pointerLockToggled === 1, "match settings context toggles pointer lock through the injected callback");
   assert(debugToggled === 1, "match settings context toggles debug paths through the injected callback");
 });
+
+withFakeSettingsDocument(() => {
+  let returned = 0;
+  const context = buildMatchSettingsContext({
+    replayViewer: true,
+    state: { spectator: true },
+    capabilities: {
+      matchControls: { pause: false },
+      diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.NONE },
+    },
+    livePauseState: { paused: false, canPause: false },
+    giveUpSent: false,
+    audio: {},
+    hotkeyProfiles: null,
+    prediction: { enabled: false },
+    input: null,
+    onBackToLobby: () => { returned += 1; },
+  });
+  assert(context.kind === "replay" && context.replay, "match settings context identifies replay viewers");
+  const button = context.actions[1].render();
+  assert(button.id === "back-to-lobby-open" && button.textContent === "Back to Lobby",
+    "match settings context shows replay back-to-lobby action in the leave slot");
+  button.listeners.click();
+  assert(returned === 1, "match settings context wires replay back-to-lobby callback");
+});
+
+withFakeSettingsDocument(() => {
+  let returned = 0;
+  const context = buildMatchSettingsContext({
+    replayViewer: false,
+    labMetadata: { role: "operator" },
+    state: { spectator: true },
+    capabilities: {
+      matchControls: { pause: false },
+      diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.NONE },
+    },
+    livePauseState: { paused: false, canPause: false },
+    giveUpSent: false,
+    audio: {},
+    hotkeyProfiles: null,
+    prediction: { enabled: false },
+    input: null,
+    onBackToLobby: () => { returned += 1; },
+  });
+  assert(context.kind === "lab" && context.spectator, "match settings context identifies lab sessions");
+  const button = context.actions[1].render();
+  assert(button.id === "back-to-lobby-open" && button.textContent === "Back to Lobby",
+    "match settings context shows lab back-to-lobby action in the leave slot");
+  button.listeners.click();
+  assert(returned === 1, "match settings context wires lab back-to-lobby callback");
+});
