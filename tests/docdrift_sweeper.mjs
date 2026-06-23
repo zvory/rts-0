@@ -702,6 +702,30 @@ try {
   assert.ok(fakeArgs.includes("-c"));
   assert.ok(fakeArgs.includes('approval_policy="never"'));
 
+  const slowCodex = writeExecutable(
+    "slow-codex",
+    [
+      "#!/usr/bin/env node",
+      "setTimeout(() => {}, 5000);",
+      "",
+    ].join("\n"),
+  );
+  assert.match(
+    classifyFailure([
+      "--base",
+      checkpointCommit,
+      "--head",
+      simCommit,
+      "--codex-command",
+      slowCodex,
+      "--codex-timeout-seconds",
+      "1",
+      "--classifier-cache",
+      ".docdrift/slow-codex-cache",
+    ]),
+    /Codex classifier timed out after 1s/,
+  );
+
   const generateOutDir = path.join(fixtureRoot, "generate-out");
   generateDocs([
     "--base",
@@ -835,6 +859,8 @@ try {
     "--head",
     "origin/main",
     "--max-commits",
+    "300",
+    "--codex-timeout-seconds",
     "300",
     "--checkpoint-ref",
     "docdrift-checkpoint",

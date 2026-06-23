@@ -292,7 +292,9 @@ path before any live Codex smoke. Classifier decisions are cached under the igno
 `.docdrift/classifier-cache/` runtime directory by prompt version and commit SHA, and reports can be
 written with `--out-dir`. Live Codex calls run read-only with approval policy forced to `never` via
 Codex config override, emit per-commit progress on stderr, and record token usage when the Codex
-JSON event stream includes it.
+JSON event stream includes it. Each Codex CLI invocation is wall-time bounded by
+`--codex-timeout-seconds` so a wedged classifier or doc-patch generation call fails the run and
+leaves the daily failure marker instead of blocking launchd indefinitely.
 
 `scripts/docdrift-sweep.mjs --generate-docs` reruns or reuses the classifier records, selects only
 `update_docs` decisions, loads targeted authoritative design-doc sections, and asks Codex CLI for
@@ -330,7 +332,8 @@ Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, includ
 `docdrift-sweep.mjs` options after it, for example `--dry-run` for a lifecycle preview or
 `--run-id <id>` for predictable report paths. The wrapper defaults scheduled runs to
 `--max-commits 300` so ordinary daily backlog does not trip the interactive classifier guard; set
-`DOC_DRIFT_MAX_COMMITS` to override that limit. When the daily command exits non-zero, it writes an
+`DOC_DRIFT_MAX_COMMITS` to override that limit. It also passes `--codex-timeout-seconds` from
+`DOC_DRIFT_CODEX_TIMEOUT_SECONDS`, defaulting to 300 seconds per Codex call. When the daily command exits non-zero, it writes an
 ignored `.docdrift/last-failure.md` marker with the command, UTC timestamps, exit code, and stdout
 and stderr tails, and it clears that marker after the next successful run. The wrapper only runs the
 command; it does not install or require a launchd job for other developers.

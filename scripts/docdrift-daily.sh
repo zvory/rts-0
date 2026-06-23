@@ -6,6 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 max_commits="${DOC_DRIFT_MAX_COMMITS:-300}"
+codex_timeout_seconds="${DOC_DRIFT_CODEX_TIMEOUT_SECONDS:-300}"
 observability_dir="${DOC_DRIFT_OBSERVABILITY_DIR:-.docdrift}"
 failure_file="$observability_dir/last-failure.md"
 stdout_log="$(mktemp "${TMPDIR:-/tmp}/rts-docdrift-daily-stdout.XXXXXX")"
@@ -17,7 +18,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-command=(node scripts/docdrift-sweep.mjs --full --head origin/main --max-commits "$max_commits" "$@")
+command=(
+  node scripts/docdrift-sweep.mjs
+  --full
+  --head origin/main
+  --max-commits "$max_commits"
+  --codex-timeout-seconds "$codex_timeout_seconds"
+  "$@"
+)
 command_display="$(printf "%q " "${command[@]}")"
 command_display="${command_display% }"
 
