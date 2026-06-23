@@ -195,16 +195,13 @@ export const msg = Object.freeze({
     requestId,
     op: { op: "setPlayerResources", playerId, steel, oil },
   }),
+  labSetPlayerGodMode: (r, p, on) => ({t:C.LAB,requestId:r,op:{op:"setPlayerGodMode",playerId:p,enabled:!!on}}),
   labSetCompletedResearch: (requestId, playerId, upgrade, completed) => ({
     t: C.LAB,
     requestId,
     op: { op: "setCompletedResearch", playerId, upgrade, completed: !!completed },
   }),
-  labSetVision: (requestId, vision) => ({
-    t: C.LAB,
-    requestId,
-    op: { op: "setVision", vision },
-  }),
+  labSetVision: (requestId, vision) => ({ t: C.LAB, requestId, op: { op: "setVision", vision } }),
   labIssueCommandAs: (requestId, playerId, command) => ({
     t: C.LAB,
     requestId,

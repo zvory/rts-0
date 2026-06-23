@@ -103,7 +103,11 @@ function uniqueLiveSelectionEntities(state, ids, seen = new Set()) {
 }
 
 function shouldBudgetSelection(state, base, candidates) {
-  if (!state || state.spectator) return false;
+  if (!state) return false;
+  if (state.controlPolicy?.kind === "lab") {
+    return !state.controlPolicy.unlimitedSelectionEnabled?.();
+  }
+  if (state.spectator) return false;
   const all = base.concat(candidates);
   if (all.length === 0) return true;
   return all.every(

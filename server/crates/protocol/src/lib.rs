@@ -489,11 +489,8 @@ pub enum LabClientOp {
         entity_id: u32,
         owner: u32,
     },
-    SetPlayerResources {
-        player_id: u32,
-        steel: u32,
-        oil: u32,
-    },
+    SetPlayerResources { player_id: u32, steel: u32, oil: u32 },
+    SetPlayerGodMode { player_id: u32, enabled: bool },
     SetCompletedResearch {
         player_id: u32,
         upgrade: String,
@@ -738,6 +735,8 @@ pub struct LabState {
     pub operator_id: u32,
     pub role: LabStartRole,
     pub vision: LabVisionMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub god_mode_players: Vec<u32>,
     pub dirty: bool,
     pub operation_count: u32,
 }

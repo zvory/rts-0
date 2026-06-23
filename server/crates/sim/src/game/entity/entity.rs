@@ -37,6 +37,7 @@ pub struct Entity {
 
     pub hp: u32,
     pub max_hp: u32,
+    invulnerable: bool,
     /// Player id that most recently damaged this target. Used for score attribution when the
     /// death system removes the entity.
     last_damage_owner: Option<u32>,
@@ -67,6 +68,7 @@ impl Entity {
             pos_y: y,
             hp: s.hp,
             max_hp: s.hp,
+            invulnerable: false,
             last_damage_owner: None,
             last_damage_tick: None,
             last_damage_pos: None,
@@ -106,6 +108,7 @@ impl Entity {
                 construction_hp_for_progress(s.hp, 0, s.build_ticks)
             },
             max_hp: s.hp,
+            invulnerable: false,
             last_damage_owner: None,
             last_damage_tick: None,
             last_damage_pos: None,
@@ -147,6 +150,7 @@ impl Entity {
             pos_y: y,
             hp: 1,
             max_hp: 1,
+            invulnerable: false,
             last_damage_owner: None,
             last_damage_tick: None,
             last_damage_pos: None,
@@ -749,12 +753,20 @@ impl Entity {
         self.last_damage_owner = owner;
     }
 
+    pub fn invulnerable(&self) -> bool {
+        self.invulnerable
+    }
+
+    pub fn set_invulnerable(&mut self, invulnerable: bool) {
+        self.invulnerable = invulnerable;
+    }
+
     pub fn apply_damage(
         &mut self,
         amount: u32,
         attribution: Option<(u32, (f32, f32), u32)>,
     ) -> bool {
-        if self.hp == 0 || amount == 0 {
+        if self.hp == 0 || amount == 0 || self.invulnerable {
             return false;
         }
         self.hp = self.hp.saturating_sub(amount);

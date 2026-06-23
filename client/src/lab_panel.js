@@ -149,6 +149,9 @@ export class LabPanel {
     root.appendChild(this.renderMapTools());
 
     root.appendChild(this.fieldset("Selected", [
+      this.checkboxField("unlimited-selection", "Unlimited selection", this.unlimitedSelectionEnabled(), {
+        onChange: (enabled) => this.setUnlimitedSelection(enabled),
+      }),
       this.readout(`${selectedIds.length} selected`),
       this.button("Move to point", () => this.armMoveSelectedTool(), {
         disabled: selectedActionDisabled,
@@ -181,6 +184,9 @@ export class LabPanel {
       this.button("Set resources", () => this.setPlayerResources()),
       this.button("Give All", () => this.giveAllPlayerResources(), {
         title: "Give every player 99999 steel and 99999 oil",
+      }),
+      this.checkboxField("player-god-mode", "God mode", this.playerGodModeEnabled(), {
+        onChange: (enabled) => this.setPlayerGodMode(enabled),
       }),
       this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels(), {
         value: this.playerState.researchUpgrade,
@@ -772,6 +778,34 @@ export class LabPanel {
       this.playerState.researchUpgrade,
       true,
     );
+  }
+
+  setPlayerGodMode(enabled) {
+    this.captureTargetPlayerField();
+    return this.labClient.setPlayerGodMode(this.targetPlayer(), enabled);
+  }
+
+  playerGodModeEnabled() {
+    const target = this.targetPlayer();
+    return (this.state?.godModePlayers || []).map(Number).includes(target);
+  }
+
+  setUnlimitedSelection(enabled) {
+    const policy = this.labControlPolicy();
+    policy?.setUnlimitedSelection?.(enabled);
+    if (!enabled && this.match?.state?.selection) {
+      this.match.state.setSelection(Array.from(this.match.state.selection));
+    }
+    const summary = enabled ? "Unlimited selection enabled." : "Unlimited selection limited.";
+    return this.publishLocalResult("unlimitedSelection", true, summary);
+  }
+
+  unlimitedSelectionEnabled() {
+    return this.labControlPolicy()?.unlimitedSelectionEnabled?.() ?? true;
+  }
+
+  labControlPolicy() {
+    return this.match?.state?.controlPolicy || null;
   }
 
   armMoveSelectedTool() {
