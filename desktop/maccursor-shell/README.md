@@ -44,11 +44,12 @@ and whether movement is batched. The current visible cursor is a DOM cursor
 painted directly in the native event handler (`visual: "dom-event-time"`), not
 a native overlay.
 
-Developer-only shortcuts:
+Developer-only shortcuts for local debug runs:
 
 - `RTS_DESKTOP_SERVER_URL=http://127.0.0.1:<port>/ ./run.sh` skips the startup
   selector and opens a loopback server started outside the shell. Non-loopback
-  URLs are rejected.
+  URLs are rejected. This override is ignored by release builds so the packaged
+  MVP path always starts at the Beta/Mainline selector.
 - `RTS_DESKTOP_AUTOSTART=1` and `RTS_DESKTOP_AUTOLOCK=1` are still available as
   engineering aids after a release channel or developer loopback server loads.
   They do not run on the startup selector page.

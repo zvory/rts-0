@@ -69,6 +69,22 @@ impl InitialNavigation {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeveloperServerPolicy {
+    Enabled,
+    Disabled,
+}
+
+impl DeveloperServerPolicy {
+    fn current_build() -> Self {
+        if cfg!(debug_assertions) {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RuntimeScriptOptions {
     developer_server_url: Option<String>,
@@ -152,16 +168,28 @@ fn run() -> ShellResult<()> {
 }
 
 fn initial_navigation() -> ShellResult<InitialNavigation> {
+    let policy = DeveloperServerPolicy::current_build();
+    if policy == DeveloperServerPolicy::Disabled {
+        return Ok(InitialNavigation::Startup);
+    }
+
     match std::env::var(SERVER_URL_ENV) {
-        Ok(url) => initial_navigation_from_developer_url(Some(url.as_str())),
-        Err(std::env::VarError::NotPresent) => initial_navigation_from_developer_url(None),
+        Ok(url) => initial_navigation_from_developer_url(Some(url.as_str()), policy),
+        Err(std::env::VarError::NotPresent) => initial_navigation_from_developer_url(None, policy),
         Err(std::env::VarError::NotUnicode(_)) => {
             Err(shell_error(format!("{SERVER_URL_ENV} is not valid UTF-8")))
         }
     }
 }
 
-fn initial_navigation_from_developer_url(value: Option<&str>) -> ShellResult<InitialNavigation> {
+fn initial_navigation_from_developer_url(
+    value: Option<&str>,
+    policy: DeveloperServerPolicy,
+) -> ShellResult<InitialNavigation> {
+    if policy == DeveloperServerPolicy::Disabled {
+        return Ok(InitialNavigation::Startup);
+    }
+
     match value {
         Some(url) => Ok(InitialNavigation::DeveloperServer {
             url: normalize_developer_server_url(url)?,
@@ -598,8 +626,65 @@ mod tests {
     }
 
     #[test]
+    fn shipped_profiles_are_remote_urls_without_local_server_command() {
+        let script = desktop_runtime_script(&RuntimeScriptOptions {
+            developer_server_url: None,
+            autostart: false,
+            autolock: false,
+        });
+
+        assert!(script.contains("const developerServerUrl = null"));
+        for profile in BUILT_IN_PROFILES.iter() {
+            let url: tauri::Url = profile.url.parse().unwrap();
+            assert_eq!(url.scheme(), "https");
+            assert!(!matches!(
+                url.host_str(),
+                Some("127.0.0.1") | Some("localhost")
+            ));
+        }
+        for forbidden in ["127.0.0.1", "localhost", "rts-server", "cargo run"] {
+            assert!(
+                !script.contains(forbidden),
+                "release startup runtime should not reference {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn bundle_config_excludes_game_runtime_assets() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config["build"]["frontendDist"], "../ui");
+
+        let bundle = &config["bundle"];
+        assert!(bundle.get("externalBin").is_none());
+        assert!(bundle
+            .get("resources")
+            .and_then(serde_json::Value::as_array)
+            .map(|resources| resources.is_empty())
+            .unwrap_or(true));
+
+        let raw_config = include_str!("../tauri.conf.json");
+        for forbidden in [
+            "rts-server",
+            "../client",
+            "../../client",
+            "maps",
+            "lab-scenarios",
+            "match-history",
+            "server/Cargo.toml",
+        ] {
+            assert!(
+                !raw_config.contains(forbidden),
+                "bundle config should not include game asset path {forbidden}"
+            );
+        }
+    }
+
+    #[test]
     fn defaults_to_startup_selector_without_developer_url() {
-        let navigation = initial_navigation_from_developer_url(None).unwrap();
+        let navigation =
+            initial_navigation_from_developer_url(None, DeveloperServerPolicy::Enabled).unwrap();
         assert!(matches!(navigation, InitialNavigation::Startup));
         assert_eq!(navigation.developer_url(), None);
         assert_eq!(
@@ -614,9 +699,27 @@ mod tests {
             normalize_developer_server_url(" http://localhost:8080/ ").unwrap(),
             "http://localhost:8080/"
         );
-        let navigation =
-            initial_navigation_from_developer_url(Some(" http://127.0.0.1:41231/ ")).unwrap();
+        let navigation = initial_navigation_from_developer_url(
+            Some(" http://127.0.0.1:41231/ "),
+            DeveloperServerPolicy::Enabled,
+        )
+        .unwrap();
         assert_eq!(navigation.developer_url(), Some("http://127.0.0.1:41231/"));
+    }
+
+    #[test]
+    fn packaged_policy_ignores_developer_server_url_override() {
+        let navigation = initial_navigation_from_developer_url(
+            Some("http://127.0.0.1:41231/"),
+            DeveloperServerPolicy::Disabled,
+        )
+        .unwrap();
+        assert!(matches!(navigation, InitialNavigation::Startup));
+        assert_eq!(navigation.developer_url(), None);
+        assert_eq!(
+            navigation.webview_url().unwrap().to_string(),
+            STARTUP_ENTRYPOINT
+        );
     }
 
     #[test]
