@@ -5,7 +5,7 @@
 - [ ] Deferred to `plans/taurimvp/phase-5.md`.
 
 This manual plausibility gate should now run after the Tauri MVP shell has startup server selection,
-packaged local mode, basic logs, and an unsigned release artifact. Use
+thin-shell packaging, basic logs, and an unsigned release artifact. Use
 `plans/taurimvp/phase-5.md` as the active final manual gate.
 
 ## Plain-Language Summary

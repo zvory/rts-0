@@ -7,7 +7,7 @@
 ## Plain-Language Summary
 
 This phase is intentionally delayed until someone can test on macOS. Use the built unsigned app
-from Phase 4 and run the real startup, server-selection, local-mode, and native-cursor gameplay
+from Phase 4 and run the real startup, server-selection, local-URL, and native-cursor gameplay
 checks. The output should be a clear ship or stop decision for sending the MVP shell to playtesters.
 
 ## Objective
@@ -17,8 +17,10 @@ Perform the final human gate after the technical shipping prep is complete.
 ## Scope
 
 - Use the unsigned artifact from Phase 4, not `cargo run`.
-- Verify startup selection for beta, mainline, a custom server URL, and local packaged mode.
+- Verify startup selection for beta, mainline, a custom server URL, and a local URL pointing at a
+  separately running repo server.
 - Verify basic logs are created and accessible after normal launch and at least one forced failure.
+- Confirm the shipped artifact is thin and does not include or start a local game server.
 - Run the original maccursor in-game plausibility checks:
   - native cursor capture starts and stops,
   - cursor feels immediate enough for playtesting,
@@ -56,7 +58,8 @@ Avoid touching:
 ## Manual Testing Focus
 
 Use the app as a player would: pick a server, join or create a match, enable native cursor mode, and
-play long enough to judge latency and cleanup reliability.
+play long enough to judge latency and cleanup reliability. For the local URL path, start the repo
+server separately before opening the shell.
 
 ## Handoff Expectations
 
