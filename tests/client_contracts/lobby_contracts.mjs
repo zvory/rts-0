@@ -176,8 +176,8 @@ import { textWithin } from "./dom_text.mjs";
     "DOM contract documents room-name controls as hidden compatibility only");
   assert(indexHtml.includes('id="lobby-lab-open"'),
     "normal lobby exposes a direct lab entry affordance");
-  assert(indexHtml.includes('href="/lab?room=default&map=Default"'),
-    "normal lobby lab entry uses the direct shared lab URL contract");
+  assert(indexHtml.includes('href="/lab"'),
+    "normal lobby lab entry opens the default lab scenario without URL overrides");
   assert(!indexHtml.includes('id="lobby-quickstart"'),
     "normal lobby does not render the legacy quickstart control");
   assert(!indexHtml.includes("Debug mode"),
