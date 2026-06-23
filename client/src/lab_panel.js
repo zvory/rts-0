@@ -88,9 +88,8 @@ export class LabPanel {
     this.optionsEl.hidden = false;
     this.optionsEl.replaceChildren();
     this.optionsEl.appendChild(this.optionsWindowChrome.renderHeader({
-      kicker: "Lab Options",
-      title: this.publicRoomName(),
-      collapseLabel: "lab options panel",
+      kicker: "Options",
+      collapseLabel: "options panel",
     }));
 
     const body = this.panelBody();
@@ -119,9 +118,8 @@ export class LabPanel {
     this.toolsEl.hidden = false;
     this.toolsEl.replaceChildren();
     this.toolsEl.appendChild(this.toolsWindowChrome.renderHeader({
-      kicker: "Lab Tools",
-      title: this.publicRoomName(),
-      collapseLabel: "lab tools panel",
+      kicker: "Tools",
+      collapseLabel: "tools panel",
     }));
 
     const body = this.panelBody();

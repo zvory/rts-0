@@ -56,9 +56,13 @@ export class LabPanelWindowChrome {
     const kickerNode = document.createElement("span");
     kickerNode.className = "lab-panel-kicker";
     kickerNode.textContent = kicker;
-    const titleNode = document.createElement("h2");
-    titleNode.textContent = title;
-    titleGroup.append(kickerNode, titleNode);
+    titleGroup.append(kickerNode);
+    const normalizedTitle = String(title || "").trim();
+    if (normalizedTitle) {
+      const titleNode = document.createElement("h2");
+      titleNode.textContent = normalizedTitle;
+      titleGroup.append(titleNode);
+    }
     dragHandle.append(grip, titleGroup);
 
     const reset = document.createElement("button");
@@ -285,7 +289,7 @@ export class LabPanelWindowChrome {
     if (!this.collapseButton) return;
     const collapsed = this.collapsed;
     const label = this.collapseLabel || "panel";
-    this.collapseButton.textContent = collapsed ? "Expand" : "Collapse";
+    this.collapseButton.textContent = collapsed ? "▸" : "▾";
     this.collapseButton.title = `${collapsed ? "Expand" : "Collapse"} ${label}`;
     this.collapseButton.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${label}`);
     this.collapseButton.setAttribute("aria-expanded", collapsed ? "false" : "true");
