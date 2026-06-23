@@ -769,9 +769,12 @@ minimap receive `ClientIntent` from `Match`; input and minimap clicks call
 clicks use one composer path instead of command-specific sticky flags. A plain
 targeted-order command-card hotkey tap arms the target after keyup; pressing the same resolved
 hotkey again inside the quick-cast window issues it at the current cursor world point. Shift does
-the same with `queued: true` and keeps the target armed until Shift is released. After an unqueued
-quick-cast consumes the armed target, the next near, still viewport left-click is ignored as an
-accidental confirmation click; moving far enough to become a drag restores normal selection.
+the same with `queued: true` and keeps the target armed until Shift is released. World-point
+ability hotkeys follow the same tap contract: tapping and releasing the key keeps targeting armed
+until the first unqueued world click, while physically holding the key only extends targeting for
+repeated clicks. After an unqueued quick-cast consumes the armed target, the next near, still
+viewport left-click is ignored as an accidental confirmation click; moving far enough to become a
+drag restores normal selection.
 
 `input/router.js`
 ```js
@@ -929,6 +932,9 @@ the input module enters targeted cursor mode:
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
   hotkey is still held for repeated world-point targeting.
+- Tapping and releasing the resolved world-point ability hotkey before clicking keeps targeting
+  armed until the first unqueued world click. That click issues the ability and clears targeting
+  unless Shift is still preserving queued targeting.
 - If the selected unit's owner-only ability affordance includes an active return object, the command
   card sends `recastAbility(ability, readyIds, targetObjectId, queued)` directly instead of arming a
   world-point cursor. The server remains authoritative for the availability tick and destination
