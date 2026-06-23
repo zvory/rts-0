@@ -422,15 +422,17 @@ export class LabPanel {
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
-  armMoveSelectedTool()                  // arms a Match-owned moveSelected world-click tool
   cancelActiveTool()
-  setSelectedOwner()                     // applies selected-entity owner mutation with batch result summary
   exportScenario(), importScenario()
   destroy()
 }
 ```
-`lab_panel_window.js` owns the local drag, resize, reset, keyboard nudge, viewport-clamping, and
-localStorage geometry hint for the app-owned lab panel. It has no transport or match authority.
+`LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
+status, lab vision, command-limit policy, scenario import/export, and result status; Tools owns
+target player, player state, spawn palettes, active tool status, and the remove setup tool.
+`lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
+viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
+transport or match authority.
 
 `lab_control_policy.js`
 ```js
@@ -471,15 +473,10 @@ modes. Unit and building spawning are lab panel palettes backed by the client fa
 and playable faction labels; each palette arms a persistent completed `spawnEntity` lab tool and
 every click sends the clicked world coordinates through `LabClient` until cancelled. The lab does
 not expose a secondary advanced spawn fallback; the panel spawn affordance is limited to playable
-faction unit and building palettes. Selected-entity repositioning also uses the shared tool path:
-`LabPanel` captures the selected ids in a `moveSelected` tool payload, sends `moveEntity` requests
-for each id at the clicked world point, and leaves stale-id or partial-failure reporting visible
-through the lab result status. The remove tool arms a persistent `removeSelectableUnits` setup
-tool; clicking deletes the selectable unit or building under the cursor, and dragging deletes
-selectable units and buildings in the box without changing the current selection. Owner
-reassignment stays contextual to the
-current selection, disables itself when no selected entity ids are available, and summarizes
-accepted plus rejected per-entity mutations after the individual server replies return.
+faction unit and building palettes. The visible map-editing surface is limited to the remove tool:
+it arms a persistent `removeSelectableUnits` setup tool; clicking deletes the selectable unit or
+building under the cursor, and dragging deletes selectable units and buildings in the box without
+changing the current selection.
 
 `hotkey_profiles.js`
 ```js

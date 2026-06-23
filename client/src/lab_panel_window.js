@@ -9,6 +9,7 @@ const MIN_WIDTH = 260;
 const MIN_HEIGHT = 220;
 const KEYBOARD_STEP = 24;
 const KEYBOARD_LARGE_STEP = 72;
+const STORAGE_SCHEMA_VERSION = 1;
 
 export class LabPanelWindowChrome {
   constructor(el, options = {}) {
@@ -20,13 +21,18 @@ export class LabPanelWindowChrome {
     this.windowListeners = [];
     this.activeListeners = [];
     this.activeInteraction = null;
+    this.collapsed = false;
+    this.collapseButton = null;
+    this.collapseLabel = "panel";
 
     this.restoreGeometry();
     this.listenWindow("resize", () => this.constrainToViewport());
   }
 
-  renderHeader({ kicker = "Lab", title = "" } = {}) {
+  renderHeader({ kicker = "Lab", title = "", collapseLabel = "panel" } = {}) {
     this.clearRenderListeners();
+    this.collapseButton = null;
+    this.collapseLabel = collapseLabel || "panel";
 
     const header = document.createElement("header");
     header.className = "lab-panel-titlebar";
@@ -62,11 +68,23 @@ export class LabPanelWindowChrome {
     reset.title = "Reset lab panel position and size";
     reset.setAttribute("aria-label", "Reset lab panel position and size");
 
+    const collapse = document.createElement("button");
+    collapse.type = "button";
+    collapse.className = "lab-btn lab-panel-collapse";
+    collapse.dataset.labPanelCollapse = "true";
+    this.collapseButton = collapse;
+    this.syncCollapseButton();
+
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginInteraction("move", event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleMoveKey(event));
     this.listenRender(reset, "click", () => this.resetGeometry());
+    this.listenRender(collapse, "click", () => this.toggleCollapsed());
 
-    header.append(dragHandle, reset);
+    const actions = document.createElement("div");
+    actions.className = "lab-panel-titlebar-actions";
+    actions.append(collapse, reset);
+
+    header.append(dragHandle, actions);
     return header;
   }
 
@@ -89,6 +107,7 @@ export class LabPanelWindowChrome {
       target.removeEventListener?.(type, handler);
     }
     this.windowListeners = [];
+    this.collapseButton = null;
   }
 
   beginInteraction(mode, event) {
@@ -187,8 +206,9 @@ export class LabPanelWindowChrome {
   }
 
   restoreGeometry() {
-    const saved = this.readGeometry();
-    if (saved) this.applyGeometry(saved);
+    const saved = this.readStoredState();
+    this.setCollapsed(saved?.collapsed === true, { save: false });
+    if (saved?.geometry) this.applyGeometry(saved.geometry);
     else this.el.dataset.windowed = "false";
   }
 
@@ -196,13 +216,14 @@ export class LabPanelWindowChrome {
     this.removeStoredGeometry();
     this.clearGeometryStyles();
     this.el.dataset.windowed = "false";
+    this.setCollapsed(false, { save: false });
   }
 
   currentGeometry() {
     const viewport = this.viewport();
     const rect = this.el.getBoundingClientRect?.();
-    const width = finitePositive(rect?.width) || parsePixels(this.el.style.width) || defaultWidth(viewport);
-    const height = finitePositive(rect?.height) || parsePixels(this.el.style.height) || defaultHeight(viewport);
+    const width = parsePixels(this.el.style.width) || finitePositive(rect?.width) || defaultWidth(viewport);
+    const height = parsePixels(this.el.style.height) || finitePositive(rect?.height) || defaultHeight(viewport);
     const left = finiteNumber(rect?.left) ?? parsePixels(this.el.style.left) ?? defaultLeft(viewport, width);
     const top = finiteNumber(rect?.top) ?? parsePixels(this.el.style.top) ?? DEFAULT_TOP;
     return this.constrainGeometry({ left, top, width, height });
@@ -249,6 +270,27 @@ export class LabPanelWindowChrome {
     clearStyle(this.el, "max-height");
   }
 
+  toggleCollapsed() {
+    this.setCollapsed(!this.collapsed);
+  }
+
+  setCollapsed(collapsed, options = {}) {
+    this.collapsed = !!collapsed;
+    this.el.dataset.collapsed = this.collapsed ? "true" : "false";
+    this.syncCollapseButton();
+    if (options.save !== false) this.saveCollapsedState();
+  }
+
+  syncCollapseButton() {
+    if (!this.collapseButton) return;
+    const collapsed = this.collapsed;
+    const label = this.collapseLabel || "panel";
+    this.collapseButton.textContent = collapsed ? "Expand" : "Collapse";
+    this.collapseButton.title = `${collapsed ? "Expand" : "Collapse"} ${label}`;
+    this.collapseButton.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${label}`);
+    this.collapseButton.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  }
+
   viewport() {
     const documentElement = globalThis.document?.documentElement;
     return {
@@ -285,33 +327,54 @@ export class LabPanelWindowChrome {
     this.activeListeners.push([this.windowObj, type, handler]);
   }
 
-  readGeometry() {
+  readStoredState() {
     try {
       const raw = this.storage?.getItem?.(this.storageKey);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (parsed?.schemaVersion !== 1) return null;
+      if (parsed?.schemaVersion !== STORAGE_SCHEMA_VERSION) return null;
       const geometry = {
         left: Number(parsed.left),
         top: Number(parsed.top),
         width: Number(parsed.width),
         height: Number(parsed.height),
       };
-      return Object.values(geometry).every(Number.isFinite) ? geometry : null;
+      return {
+        collapsed: parsed.collapsed === true,
+        geometry: Object.values(geometry).every(Number.isFinite) ? geometry : null,
+      };
     } catch {
       return null;
     }
+  }
+
+  readGeometry() {
+    return this.readStoredState()?.geometry || null;
   }
 
   saveGeometry(geometry) {
     try {
       const next = this.constrainGeometry(geometry);
       this.storage?.setItem?.(this.storageKey, JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: STORAGE_SCHEMA_VERSION,
+        collapsed: this.collapsed,
         ...next,
       }));
     } catch {
       // Local storage is an ergonomic hint, not a requirement for lab controls.
+    }
+  }
+
+  saveCollapsedState() {
+    try {
+      const stored = this.readStoredState();
+      this.storage?.setItem?.(this.storageKey, JSON.stringify({
+        schemaVersion: STORAGE_SCHEMA_VERSION,
+        collapsed: this.collapsed,
+        ...(stored?.geometry || {}),
+      }));
+    } catch {
+      // Ignore unavailable storage.
     }
   }
 

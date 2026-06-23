@@ -1614,7 +1614,7 @@ input[type="text"]:focus {
 #selection-area,
 #game-menu,
 #command-card,
-#lab-panel,
+.lab-panel,
 #toast {
   position: absolute;
   z-index: var(--hud-z);
@@ -1626,16 +1626,14 @@ input[type="text"]:focus {
 #minimap-wrap,
 #selected-panel,
 #command-card,
-#lab-panel {
+.lab-panel {
   background: rgba(39, 37, 31, 0.94);
   border: 1px solid var(--panel-edge);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* --- Lab shell controls --- */
-#lab-panel {
-  top: 58px;
-  right: 12px;
+.lab-panel {
   width: min(320px, calc(100vw - 24px));
   min-width: min(260px, calc(100vw - 24px));
   max-height: clamp(260px, calc(100vh - 368px), 560px);
@@ -1646,8 +1644,29 @@ input[type="text"]:focus {
   padding: 10px 10px 16px;
   color: var(--ink);
 }
+.lab-panel[hidden] {
+  display: none;
+}
+.lab-options-window {
+  top: 58px;
+  right: 12px;
+}
+.lab-tools-window {
+  top: 58px;
+  right: 344px;
+}
 .lab-panel[data-windowed="true"] {
   min-height: min(220px, calc(100vh - 24px));
+}
+.lab-panel[data-collapsed="true"] {
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  padding-bottom: 10px;
+}
+.lab-panel[data-collapsed="true"] .lab-panel-body,
+.lab-panel[data-collapsed="true"] .lab-panel-resize-handle {
+  display: none;
 }
 .lab-panel-titlebar {
   position: sticky;
@@ -1660,6 +1679,14 @@ input[type="text"]:focus {
   margin-bottom: 8px;
   padding: 0 0 8px;
   background: linear-gradient(rgba(39, 37, 31, 0.98), rgba(39, 37, 31, 0.9));
+}
+.lab-panel-body {
+  display: grid;
+  gap: 10px;
+}
+.lab-panel[data-collapsed="true"] .lab-panel-titlebar {
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 .lab-panel-drag-handle {
   display: grid;
@@ -1710,7 +1737,14 @@ input[type="text"]:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.lab-panel-reset {
+.lab-panel-titlebar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+.lab-panel-reset,
+.lab-panel-collapse {
   flex: 0 0 auto;
 }
 .lab-panel-resize-handle {
@@ -1759,7 +1793,7 @@ input[type="text"]:focus {
 .lab-panel-section {
   display: grid;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 0;
 }
 .lab-panel-section-title {
   margin: 0;
@@ -1834,6 +1868,11 @@ input[type="text"]:focus {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: stretch;
+}
+.lab-remove-tool-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }
 .lab-tool-group {
   display: grid;
@@ -1965,6 +2004,12 @@ input[type="text"]:focus {
 }
 .lab-result[data-state="ok"] {
   color: #bde6ba;
+}
+@media (max-width: 720px) {
+  .lab-tools-window {
+    top: 274px;
+    right: 12px;
+  }
 }
 
 /* --- Settings menu --- */
@@ -3052,6 +3097,10 @@ input[type="text"]:focus {
   border: 1px solid var(--panel-edge);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
+#replay-speed.room-time-floating-panel[data-collapsed="true"] {
+  width: min(260px, calc(100vw - 24px));
+  overflow: visible;
+}
 .room-time-panel-titlebar,
 .room-time-panel-drag-handle,
 .room-time-panel-body {
@@ -3103,7 +3152,14 @@ input[type="text"]:focus {
   text-transform: uppercase;
   white-space: nowrap;
 }
-.room-time-panel-reset {
+.room-time-panel-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+}
+.room-time-panel-reset,
+.room-time-panel-collapse {
   appearance: none;
   flex: 0 0 auto;
   border: 1px solid var(--panel-edge);
@@ -3118,7 +3174,9 @@ input[type="text"]:focus {
   padding: 4px 7px;
 }
 .room-time-panel-reset:hover,
-.room-time-panel-reset:focus-visible {
+.room-time-panel-reset:focus-visible,
+.room-time-panel-collapse:hover,
+.room-time-panel-collapse:focus-visible {
   border-color: var(--accent);
   color: var(--ink);
   outline: none;
@@ -3128,6 +3186,9 @@ input[type="text"]:focus {
   justify-content: flex-start;
   gap: 4px;
   min-width: 0;
+}
+.room-time-panel-body[hidden] {
+  display: none;
 }
 
 /* --- Observer analysis overlay --- */

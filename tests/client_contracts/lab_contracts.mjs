@@ -364,6 +364,9 @@ await withFakeDocument(async () => {
   const sectionByClass = (className) => findFakes(root, (el) => (
     el.tagName === "SECTION" && String(el.className).split(/\s+/).includes(className)
   ))[0];
+  const panelByClass = (className) => findFakes(root, (el) => (
+    el.tagName === "ASIDE" && String(el.className).split(/\s+/).includes(className)
+  ))[0];
   const resolveLastLabResult = (options = {}) => {
     const envelope = sent.at(-1);
     net._emit("labResult", {
@@ -376,11 +379,18 @@ await withFakeDocument(async () => {
     });
   };
 
-  assert(root.children.length === 1, "LabPanel mounts inside the app-owned root");
-  assert(textWithin(root).includes("Reset"), "LabPanel exposes a reset affordance for its movable panel");
+  const optionsPanel = panelByClass("lab-options-window");
+  const toolsPanel = panelByClass("lab-tools-window");
+  assert(root.children.length === 2, "LabPanel mounts separate options and tools windows inside the app-owned root");
+  assert(optionsPanel && toolsPanel && !toolsPanel.hidden, "LabPanel shows both floating windows for operators");
+  assert(textWithin(root).includes("Reset"), "LabPanel exposes reset affordances for its movable panels");
   assert(
-    root.children[0].children.some((child) => child.className === "lab-panel-resize-handle"),
-    "LabPanel exposes a visible resize handle",
+    [optionsPanel, toolsPanel].every((child) => child.children.some((grandchild) => grandchild.className === "lab-panel-resize-handle")),
+    "LabPanel exposes visible resize handles for both windows",
+  );
+  assert(
+    findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === "Collapse").length >= 2,
+    "LabPanel exposes collapse affordances for both windows",
   );
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
@@ -408,16 +418,22 @@ await withFakeDocument(async () => {
   assert(
     textWithin(sectionByClass("lab-options")).includes("Vision") &&
       textWithin(sectionByClass("lab-options")).includes("Unlimited commands") &&
-      !textWithin(sectionByClass("lab-options")).includes("Unit Spawn"),
+      textWithin(sectionByClass("lab-options")).includes("Scenario") &&
+      !textWithin(sectionByClass("lab-options")).includes("Unit Spawn") &&
+      !textWithin(sectionByClass("lab-options")).includes("Player State"),
     "LabPanel groups global controls in the Options section",
   );
   assert(
     textWithin(sectionByClass("lab-tools")).includes("Unit Spawn") &&
       textWithin(sectionByClass("lab-tools")).includes("Building Spawn") &&
+      textWithin(sectionByClass("lab-tools")).includes("Player State") &&
       textWithin(sectionByClass("lab-tools")).includes("Remove tool") &&
-      !textWithin(sectionByClass("lab-tools")).includes("Unlimited commands"),
+      !textWithin(sectionByClass("lab-tools")).includes("Unlimited commands") &&
+      !textWithin(sectionByClass("lab-tools")).includes("Scenario"),
     "LabPanel groups placement tools in the Tools section",
   );
+  assert(!textWithin(root).includes("Map Tools"), "LabPanel removes the old Map Tools section label");
+  assert(!buttonByText("Move to point") && !buttonByText("Set owner"), "LabPanel removes the old selected move and owner tools");
   assert(!textWithin(root).includes("Unlimited selection"), "LabPanel removes the old unlimited selection option");
   const commandLimitToggle = panel.fields.get("ignore-command-limits");
   commandLimitToggle.checked = false;
@@ -435,7 +451,8 @@ await withFakeDocument(async () => {
     !panel.fields.has("spawn-owner") &&
       !panel.fields.has("advanced-spawn-owner") &&
       !panel.fields.has("resource-player") &&
-      !panel.fields.has("research-player"),
+      !panel.fields.has("research-player") &&
+      !panel.fields.has("set-owner"),
     "LabPanel does not render per-tool player selectors for spawn or player-state controls",
   );
   assert(
@@ -547,66 +564,16 @@ await withFakeDocument(async () => {
   await removeBoxPromise;
   assert(textWithin(root).includes("Deleted 2 entities."), "LabPanel summarizes remove drag deletes");
   assert(match.clientIntent.activeLabTool?.id === armedTool.id, "LabPanel remove tool stays armed after a drag delete");
-  assert(buttonByText("Move to point").disabled, "LabPanel disables selected move without a selection");
-  assert(buttonByText("Set owner").disabled, "LabPanel disables selected owner changes without a selection");
   assert(!buttonByText("Delete"), "LabPanel does not expose a duplicate selected-delete button");
   selectedEntities = [
     { id: 31, owner: 1, kind: KIND.RIFLEMAN },
     { id: 32, owner: 2, kind: KIND.RIFLEMAN },
   ];
   panel.render();
-  assert(!buttonByText("Move to point").disabled, "LabPanel enables selected move for selected entities");
-  buttonByText("Move to point").listeners.click();
   assert(
-    armedTool?.kind === "moveSelected" && armedTool.payload.entityIds.join(",") === "31,32",
-    "LabPanel move-selected tool captures the selected entity ids in the tool payload",
+    !buttonByText("Move to point") && !buttonByText("Set owner"),
+    "LabPanel keeps selected move and owner controls removed even when entities are selected",
   );
-  assert(textWithin(root).includes("Armed: Move 2 selected"), "LabPanel shows the armed selected-move tool state");
-  match.cancelLabTool("rightClick");
-  assert(textWithin(root).includes("Move 2 selected cancelled."), "LabPanel surfaces pointer cancellation through the status path");
-  buttonByText("Move to point").listeners.click();
-  const movePromise = armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 129.4, y: 160.6 });
-  assert(
-    sent.at(-1).op.op === "moveEntity" &&
-      sent.at(-1).op.entityId === 31 &&
-      sent.at(-1).op.x === 129.4 &&
-      sent.at(-1).op.y === 160.6,
-    "LabPanel selected move sends the clicked world coordinates for the first selected entity",
-  );
-  resolveLastLabResult({ outcome: { entityId: 31, x: 129.4, y: 160.6 } });
-  await Promise.resolve();
-  assert(
-    sent.at(-1).op.op === "moveEntity" &&
-      sent.at(-1).op.entityId === 32 &&
-      sent.at(-1).op.x === 129.4 &&
-      sent.at(-1).op.y === 160.6,
-    "LabPanel selected move reuses the clicked world coordinates for each selected entity",
-  );
-  resolveLastLabResult({ ok: false, error: "entity 32 not found" });
-  await movePromise;
-  assert(
-    textWithin(root).includes("Moved 1 entity; 1 rejected: #32: entity 32 not found."),
-    "LabPanel summarizes partial selected-move rejections",
-  );
-  panel.fields.get("set-owner").value = "1";
-  const setOwnerPromise = buttonByText("Set owner").listeners.click();
-  assert(
-    sent.at(-1).op.op === "setEntityOwner" &&
-      sent.at(-1).op.entityId === 31 &&
-      sent.at(-1).op.owner === 1,
-    "LabPanel selected owner change sends the requested owner for the first selected entity",
-  );
-  resolveLastLabResult({ outcome: { entityId: 31, owner: 1 } });
-  await Promise.resolve();
-  assert(
-    sent.at(-1).op.op === "setEntityOwner" &&
-      sent.at(-1).op.entityId === 32 &&
-      sent.at(-1).op.owner === 1,
-    "LabPanel selected owner change sends all selected entity ids",
-  );
-  resolveLastLabResult({ outcome: { entityId: 32, owner: 1 } });
-  await setOwnerPromise;
-  assert(textWithin(root).includes("Updated owner for 2 entities."), "LabPanel summarizes accepted owner changes");
   playerButtonById(1).listeners.click();
   panel.fields.get("resource-steel").value = "900";
   panel.fields.get("resource-oil").value = "300";
@@ -682,7 +649,7 @@ await withFakeDocument(async () => {
   panel.destroy();
   labClient.destroy();
   assert(cancelledToolReason === "panelDestroy", "LabPanel cancels an active lab tool on teardown");
-  assert(root.children[0].removed === true, "LabPanel destroy removes its DOM root");
+  assert(root.children.every((child) => child.removed === true), "LabPanel destroy removes both DOM roots");
 });
 
 await withFakeDocument(async () => {
@@ -712,7 +679,9 @@ await withFakeDocument(async () => {
   el.append(header, resizeHandle);
 
   const dragHandle = header.children[0];
-  const resetButton = header.children[1];
+  const actions = header.children[1];
+  const collapseButton = actions.children[0];
+  const resetButton = actions.children[1];
   dragHandle.listeners.pointerdown({
     button: 0,
     pointerId: 7,
@@ -743,8 +712,17 @@ await withFakeDocument(async () => {
   });
   assert(el.style.left === "572px", "LabPanelWindowChrome keyboard move nudges the clamped panel");
 
+  collapseButton.listeners.click();
+  assert(
+    el.dataset.collapsed === "true" &&
+      collapseButton.textContent === "Expand" &&
+      JSON.parse(storage.values.get("test.lab.panel.window")).collapsed === true,
+    "LabPanelWindowChrome persists collapsed panel state",
+  );
+
   resetButton.listeners.click();
   assert(el.dataset.windowed === "false", "LabPanelWindowChrome reset returns to the stylesheet layout");
+  assert(el.dataset.collapsed === "false", "LabPanelWindowChrome reset expands the panel");
   assert(!storage.values.has("test.lab.panel.window"), "LabPanelWindowChrome reset clears stored geometry");
   chrome.destroy();
   assert(!windowListeners.has("resize"), "LabPanelWindowChrome removes global listeners on destroy");

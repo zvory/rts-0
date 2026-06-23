@@ -9,6 +9,8 @@ const labVision = Object.freeze({
   teams: (teamIds) => msg.labVisionTeams(teamIds),
 });
 const GIVE_ALL_RESOURCE_AMOUNT = 99999;
+const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
+const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
 
 export class LabPanel {
   constructor({ root, labClient, launch = null, startPayload = null, match = null }) {
@@ -40,12 +42,16 @@ export class LabPanel {
     this.listeners = [];
     this.unsubscribeState = null;
     this.unsubscribeResult = null;
-    this.el = document.createElement("aside");
-    this.el.id = "lab-panel";
-    this.el.className = "lab-panel";
-    this.el.setAttribute("aria-label", "Lab controls");
-    this.root.appendChild(this.el);
-    this.windowChrome = new LabPanelWindowChrome(this.el);
+    this.optionsEl = this.createPanelElement("lab-options-panel", "lab-options-window", "Lab options and room information");
+    this.toolsEl = this.createPanelElement("lab-tools-panel", "lab-tools-window", "Lab setup tools");
+    this.el = this.optionsEl;
+    this.root.append(this.optionsEl, this.toolsEl);
+    this.optionsWindowChrome = new LabPanelWindowChrome(this.optionsEl, {
+      storageKey: OPTIONS_PANEL_STORAGE_KEY,
+    });
+    this.toolsWindowChrome = new LabPanelWindowChrome(this.toolsEl, {
+      storageKey: TOOLS_PANEL_STORAGE_KEY,
+    });
     this.render();
     this.unsubscribeState = this.labClient.subscribeState((state) => {
       this.state = state;
@@ -57,20 +63,37 @@ export class LabPanel {
     });
   }
 
+  createPanelElement(id, className, ariaLabel) {
+    const el = document.createElement("aside");
+    el.id = id;
+    el.className = `lab-panel ${className}`;
+    el.setAttribute("aria-label", ariaLabel);
+    return el;
+  }
+
   render() {
     this.removeListeners();
-    this.windowChrome.clearRenderListeners();
+    this.optionsWindowChrome.clearRenderListeners();
+    this.toolsWindowChrome.clearRenderListeners();
     this.teamInputs.clear();
     this.playerButtons.clear();
     this.spawnPanels.clear();
     this.fields.clear();
-    this.el.replaceChildren();
 
-    this.el.appendChild(this.windowChrome.renderHeader({
-      kicker: "Lab",
+    this.renderOptionsWindow();
+    this.renderToolsWindow();
+  }
+
+  renderOptionsWindow() {
+    this.optionsEl.hidden = false;
+    this.optionsEl.replaceChildren();
+    this.optionsEl.appendChild(this.optionsWindowChrome.renderHeader({
+      kicker: "Lab Options",
       title: this.publicRoomName(),
+      collapseLabel: "lab options panel",
     }));
 
+    const body = this.panelBody();
     const status = document.createElement("dl");
     status.className = "lab-status-grid";
     this.addStatus(status, "Role", roleLabel(this.state?.role));
@@ -78,14 +101,43 @@ export class LabPanel {
     this.addStatus(status, "Vision", labVisionLabel(this.state?.vision));
     this.addStatus(status, "Dirty", this.state?.dirty ? "Yes" : "No");
     this.addStatus(status, "Ops", String(this.state?.operationCount ?? 0));
-    this.el.appendChild(status);
+    body.appendChild(status);
+    body.appendChild(this.renderOptionsPanel());
+    body.appendChild(this.renderResultStatus());
 
-    this.el.appendChild(this.renderOptionsPanel());
+    this.optionsEl.appendChild(body);
+    this.optionsEl.appendChild(this.optionsWindowChrome.renderResizeHandle());
+  }
 
-    if (this.canOperate()) {
-      this.el.appendChild(this.renderToolsPanel());
+  renderToolsWindow() {
+    if (!this.canOperate()) {
+      this.toolsEl.hidden = true;
+      this.toolsEl.replaceChildren();
+      return;
     }
 
+    this.toolsEl.hidden = false;
+    this.toolsEl.replaceChildren();
+    this.toolsEl.appendChild(this.toolsWindowChrome.renderHeader({
+      kicker: "Lab Tools",
+      title: this.publicRoomName(),
+      collapseLabel: "lab tools panel",
+    }));
+
+    const body = this.panelBody();
+    body.appendChild(this.renderToolsPanel());
+    this.toolsEl.appendChild(body);
+    this.toolsEl.appendChild(this.toolsWindowChrome.renderResizeHandle());
+  }
+
+  panelBody(...children) {
+    const body = document.createElement("div");
+    body.className = "lab-panel-body";
+    for (const child of children) body.appendChild(child);
+    return body;
+  }
+
+  renderResultStatus() {
     const result = document.createElement("p");
     result.className = "lab-result";
     if (this.lastResult) {
@@ -95,8 +147,7 @@ export class LabPanel {
       result.textContent = "Ready";
       result.dataset.state = "idle";
     }
-    this.el.appendChild(result);
-    this.el.appendChild(this.windowChrome.renderResizeHandle());
+    return result;
   }
 
   panelSection(title, className) {
@@ -117,35 +168,6 @@ export class LabPanel {
     if (!this.canOperate()) return root;
 
     root.appendChild(this.renderCommandOptions());
-    root.appendChild(this.renderTargetPlayer());
-
-    this.normalizePlayerState();
-    root.appendChild(this.fieldset("Player State", [
-      this.numberField("resource-steel", "Steel", this.playerState.steel, {
-        onChange: (value) => {
-          this.playerState.steel = toUint(value);
-        },
-      }),
-      this.numberField("resource-oil", "Oil", this.playerState.oil, {
-        onChange: (value) => {
-          this.playerState.oil = toUint(value);
-        },
-      }),
-      this.button("Set resources", () => this.setPlayerResources()),
-      this.button("Give All", () => this.giveAllPlayerResources(), {
-        title: "Give every player 99999 steel and 99999 oil",
-      }),
-      this.checkboxField("player-god-mode", "God mode", this.playerGodModeEnabled(), {
-        onChange: (enabled) => this.setPlayerGodMode(enabled),
-      }),
-      this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels(), {
-        value: this.playerState.researchUpgrade,
-        onChange: (value) => {
-          this.playerState.researchUpgrade = value;
-        },
-      }),
-      this.button("Set research", () => this.setCompletedResearch()),
-    ]));
 
     root.appendChild(this.fieldset("Scenario", [
       this.inputField("scenario-name", "Name", "text", this.defaultScenarioName()),
@@ -191,22 +213,12 @@ export class LabPanel {
   renderToolsPanel() {
     const root = this.panelSection("Tools", "lab-tools");
 
-    const selection = this.selectedEntities();
-    const selectedIds = selectedEntityIds(selection);
-    const issueOwner = singleOwner(selection);
-    const hasSelection = selectedIds.length > 0;
-    const selectedActionDisabled = !hasSelection;
-    const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
-
     root.appendChild(this.renderActiveToolStatus());
+    root.appendChild(this.renderTargetPlayer());
+    root.appendChild(this.renderPlayerStatePanel());
+    root.appendChild(this.renderRemoveTool());
     root.appendChild(this.renderSpawnPalette());
     root.appendChild(this.renderBuildingSpawnPalette());
-    root.appendChild(this.renderMapTools({
-      selectedIds,
-      issueOwner,
-      selectedActionDisabled,
-      selectedActionTitle,
-    }));
 
     return root;
   }
@@ -219,33 +231,46 @@ export class LabPanel {
     ]);
   }
 
-  renderMapTools({
-    selectedIds = [],
-    issueOwner = null,
-    selectedActionDisabled = true,
-    selectedActionTitle = "",
-  } = {}) {
-    return this.fieldset("Map Tools", [
+  renderPlayerStatePanel() {
+    this.normalizePlayerState();
+    return this.fieldset("Player State", [
+      this.numberField("resource-steel", "Steel", this.playerState.steel, {
+        onChange: (value) => {
+          this.playerState.steel = toUint(value);
+        },
+      }),
+      this.numberField("resource-oil", "Oil", this.playerState.oil, {
+        onChange: (value) => {
+          this.playerState.oil = toUint(value);
+        },
+      }),
+      this.button("Set resources", () => this.setPlayerResources()),
+      this.button("Give All", () => this.giveAllPlayerResources(), {
+        title: "Give every player 99999 steel and 99999 oil",
+      }),
+      this.checkboxField("player-god-mode", "God mode", this.playerGodModeEnabled(), {
+        onChange: (enabled) => this.setPlayerGodMode(enabled),
+      }),
+      this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels(), {
+        value: this.playerState.researchUpgrade,
+        onChange: (value) => {
+          this.playerState.researchUpgrade = value;
+        },
+      }),
+      this.button("Set research", () => this.setCompletedResearch()),
+    ]);
+  }
+
+  renderRemoveTool() {
+    const wrap = document.createElement("div");
+    wrap.className = "lab-remove-tool-row";
+    wrap.appendChild(
       this.button("Remove tool", () => this.armRemoveTool(), {
         title: "Click or drag over selectable units to delete them",
         dataset: { active: this.activeLabTool()?.kind === "removeSelectableUnits" ? "true" : "false" },
       }),
-      this.readout(`${selectedIds.length} selected`),
-      this.button("Move to point", () => this.armMoveSelectedTool(), {
-        disabled: selectedActionDisabled,
-        title: selectedActionTitle,
-        dataset: { active: this.activeLabTool()?.kind === "moveSelected" ? "true" : "false" },
-      }),
-      this.playerSelectField("set-owner", "Owner", {
-        value: issueOwner ?? undefined,
-        disabled: selectedActionDisabled,
-      }),
-      this.button("Set owner", () => this.setSelectedOwner(), {
-        disabled: selectedActionDisabled,
-        title: selectedActionTitle,
-      }),
-      this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
-    ]);
+    );
+    return wrap;
   }
 
   renderActiveToolStatus() {
@@ -837,24 +862,6 @@ export class LabPanel {
     return this.match?.state?.controlPolicy || null;
   }
 
-  armMoveSelectedTool() {
-    if (typeof this.match?.armLabTool !== "function") return null;
-    const entityIds = selectedEntityIds(this.selectedEntities());
-    if (entityIds.length === 0) {
-      return this.publishLocalResult("moveEntity", false, "Select an entity first.");
-    }
-    const armed = this.match.armLabTool(
-      {
-        kind: "moveSelected",
-        payload: { entityIds },
-        label: `Move ${entityIds.length} selected`,
-      },
-      { onWorldClick: (event) => this.moveSelectedTo(event) },
-    );
-    this.render();
-    return armed;
-  }
-
   armRemoveTool() {
     if (typeof this.match?.armLabTool !== "function") return null;
     const armed = this.match.armLabTool(
@@ -890,23 +897,6 @@ export class LabPanel {
       };
     }
     this.render();
-  }
-
-  moveSelectedTo(event) {
-    const entityIds = selectedEntityIdsFromPayload(event?.tool?.payload?.entityIds);
-    if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) {
-      return this.publishLocalResult("moveEntity", false, "Pick a valid world point.");
-    }
-    return this.batchEntityMutation("moveEntity", entityIds, (entityId) => (
-      this.labClient.moveEntity(entityId, event.x, event.y)
-    ));
-  }
-
-  setSelectedOwner() {
-    const owner = this.validOwner(this.int("set-owner"));
-    return this.batchEntityMutation("setEntityOwner", selectedEntityIds(this.selectedEntities()), (entityId) => (
-      this.labClient.setEntityOwner(entityId, owner)
-    ));
   }
 
   deleteRemoveToolTargets(event) {
@@ -1014,12 +1004,6 @@ export class LabPanel {
       return Promise.resolve(this.lastResult);
     }
     return this.labClient.importScenario(scenario);
-  }
-
-  selectedEntities() {
-    return typeof this.match?.state?.selectedEntities === "function"
-      ? this.match.state.selectedEntities()
-      : [];
   }
 
   activeLabTool() {
@@ -1134,8 +1118,10 @@ export class LabPanel {
     this.unsubscribeState?.();
     this.unsubscribeResult?.();
     this.removeListeners();
-    this.windowChrome.destroy();
-    this.el.remove();
+    this.optionsWindowChrome.destroy();
+    this.toolsWindowChrome.destroy();
+    this.optionsEl.remove();
+    this.toolsEl.remove();
   }
 }
 
@@ -1204,15 +1190,6 @@ function upgradeLabels() {
   return Object.fromEntries(
     Object.entries(UPGRADES).map(([upgrade, def]) => [upgrade, def.label || upgrade]),
   );
-}
-
-function singleOwner(selection) {
-  const owners = new Set((selection || []).map((entity) => Number(entity.owner)).filter((owner) => owner > 0));
-  return owners.size === 1 ? Array.from(owners)[0] : null;
-}
-
-function selectedEntityIds(selection) {
-  return selectedEntityIdsFromPayload((selection || []).map((entity) => entity?.id));
 }
 
 function selectedEntityIdsFromPayload(entityIds) {
