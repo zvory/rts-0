@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bewegungskrieg Desktop</title>
+    <link rel="stylesheet" href="./startup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="selector" aria-labelledby="startup-title">
+        <div class="masthead">
+          <p class="eyebrow">Bewegungskrieg</p>
+          <h1 id="startup-title">Choose release channel</h1>
+        </div>
+
+        <div id="profile-list" class="profile-list" aria-label="Release channels"></div>
+        <p id="startup-status" class="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script type="module" src="./startup.js"></script>
+  </body>
+</html>

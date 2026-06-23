@@ -1,8 +1,16 @@
-# macOS Tauri Desktop Shell Spike
+# macOS Tauri Desktop Shell
 
-This is the Phase 2 shell for `plans/maccursor/phase-2.md`. It hosts the
-current served RTS client in a macOS-first Tauri WebView and keeps the normal
-same-origin `/ws` URL model intact.
+This is the macOS Tauri shell for the live Bewegungskrieg web client. It opens a
+shell-owned startup selector first, then loads one of the built-in release
+channels in the same window:
+
+- Beta: `https://rts-0-zvorygin-beta.fly.dev/`
+- Mainline: `https://rts-0-zvorygin.fly.dev/`
+
+The MVP startup UI intentionally has no local server profile, loopback option,
+or custom URL entry. The shell does not start `rts-server` and does not serve or
+bundle game assets; the selected release website provides the client, maps, and
+WebSocket endpoint.
 
 Run it from this directory on macOS:
 
@@ -10,20 +18,9 @@ Run it from this directory on macOS:
 ./run.sh
 ```
 
-The shell starts the existing Rust server with:
-
-- `RTS_ADDR=127.0.0.1:0` so the OS chooses a free loopback-only port.
-- `RTS_CLIENT_DIR=<repo>/client` so static client files are found from the
-  shell-launched process.
-- `RTS_MAPS_DIR=<repo>/server/assets/maps` so the HTTP map catalog uses the
-  same source-tree maps during the spike.
-
-The shell reads the server log line that contains `open http://...`, opens that
-exact URL in the Tauri window, and keeps WebSocket derivation based on
-`window.location`. Use `RTS_DESKTOP_SERVER_URL=http://127.0.0.1:<port>/ ./run.sh`
-to point the shell at a server you started yourself instead of spawning one.
-
-The WebView injects `window.__RTS_DESKTOP_RUNTIME` before the client scripts run:
+The WebView injects `window.__RTS_DESKTOP_RUNTIME` before client scripts run.
+Remote beta/mainline pages receive the same native cursor bridge as the earlier
+spike:
 
 ```js
 {
@@ -32,7 +29,9 @@ The WebView injects `window.__RTS_DESKTOP_RUNTIME` before the client scripts run
   nativeCursorBackend: true,
   nativeCursorCapture: true,
   pointerLockDisabled: true,
-  serverMode: "spawned" | "external"
+  serverMode: "startup" | "release" | "developer",
+  serverUrl: "https://rts-0-zvorygin-beta.fly.dev/" | "https://rts-0-zvorygin.fly.dev/" | null,
+  releaseChannel: "beta" | "mainline" | null
 }
 ```
 
@@ -45,14 +44,24 @@ and whether movement is batched. The current visible cursor is a DOM cursor
 painted directly in the native event handler (`visual: "dom-event-time"`), not
 a native overlay.
 
+Developer-only shortcuts:
+
+- `RTS_DESKTOP_SERVER_URL=http://127.0.0.1:<port>/ ./run.sh` skips the startup
+  selector and opens a loopback server started outside the shell. Non-loopback
+  URLs are rejected.
+- `RTS_DESKTOP_AUTOSTART=1` and `RTS_DESKTOP_AUTOLOCK=1` are still available as
+  engineering aids after a release channel or developer loopback server loads.
+  They do not run on the startup selector page.
+
 Manual check:
 
 1. Run `./run.sh`.
-2. Confirm the lobby loads in the desktop window.
-3. Create a local lobby and start a one-player sandbox or AI match.
-4. Confirm the WebSocket connects from the shell-loaded origin.
-5. Toggle cursor lock in the shell, move over terrain/HUD/minimap, right-click
+2. Confirm only Beta and Mainline choices appear.
+3. Choose Beta and confirm the loaded page uses
+   `https://rts-0-zvorygin-beta.fly.dev/`.
+4. Restart, choose Mainline, and confirm the loaded page uses
+   `https://rts-0-zvorygin.fly.dev/`.
+5. Start a one-player sandbox or AI match from either release channel.
+6. Toggle cursor lock in the shell, move over terrain/HUD/minimap, right-click
    move units, box-select, wheel zoom, and press Escape. Inspect
    `window.__RTS_NATIVE_CURSOR.diagnostics()` if movement feels delayed.
-6. Run `./runserver` and confirm ordinary browser Pointer Lock still works.
-7. Quit the shell and confirm the spawned server process exits.
