@@ -35,6 +35,31 @@ import { CommandComposer } from "../../client/src/command_composer.js";
   composer.releaseShift();
   assert(composer.target === null, "Shift release clears the preserved held ability");
 
+  const tapPreservedComposer = new CommandComposer();
+  const smokeTarget = { kind: "ability", ability: ABILITY.SMOKE };
+  tapPreservedComposer.arm(smokeTarget, { now: 400 });
+  tapPreservedComposer.hold(smokeTarget, "KeyD", { preserveTapOnRelease: true });
+  tapPreservedComposer.releaseKey("KeyD", { shiftKey: false });
+  assert(
+    tapPreservedComposer.target?.ability === ABILITY.SMOKE,
+    "tap-preserved ability key release keeps targeting armed before the click",
+  );
+  issued = tapPreservedComposer.issue({ shiftKey: false });
+  assert(
+    issued.target?.ability === ABILITY.SMOKE &&
+      issued.keepArmed === false &&
+      tapPreservedComposer.target === null,
+    "tap-preserved ability click consumes targeting after the key was released",
+  );
+
+  const heldRepeatComposer = new CommandComposer();
+  heldRepeatComposer.arm(smokeTarget, { now: 800 });
+  heldRepeatComposer.hold(smokeTarget, "KeyD", { preserveTapOnRelease: true });
+  issued = heldRepeatComposer.issue({ shiftKey: false });
+  assert(issued.keepArmed === true, "held tap-preserved ability stays armed after a click while the key is down");
+  heldRepeatComposer.releaseKey("KeyD", { shiftKey: false });
+  assert(heldRepeatComposer.target === null, "held tap-preserved ability clears on keyup after issuing");
+
   composer.arm("move");
   composer.cancel();
   assert(composer.target === null, "cancel clears the armed command");
