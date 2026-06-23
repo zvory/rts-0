@@ -148,7 +148,7 @@ fn lab_command_admission_ignores_budget_and_uses_large_bounded_window() {
     let mut players = vec![player_state(1), player_state(2)];
     let mut smokes = SmokeCloudStore::new();
 
-    apply_pending_with_players_and_smokes(
+    apply_with_players_and_smokes(
         &map,
         &mut entities,
         &mut players,

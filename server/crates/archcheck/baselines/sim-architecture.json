@@ -1,5 +1,5 @@
 {
-  "reason": "Phase 4 moved existing game tests into split modules",
+  "reason": "Extract command planner facts while keeping command admission internal",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -39,11 +39,11 @@
     },
     {
       "path": "commands.rs",
-      "lines": 18
+      "lines": 58
     },
     {
       "path": "entity/entity.rs",
-      "lines": 1224
+      "lines": 1236
     },
     {
       "path": "entity/kind.rs",
@@ -87,7 +87,15 @@
     },
     {
       "path": "lab.rs",
-      "lines": 1432
+      "lines": 1474
+    },
+    {
+      "path": "lab/scenario.rs",
+      "lines": 227
+    },
+    {
+      "path": "lab_god_mode_tests.rs",
+      "lines": 162
     },
     {
       "path": "map.rs",
@@ -107,7 +115,7 @@
     },
     {
       "path": "mod.rs",
-      "lines": 484
+      "lines": 491
     },
     {
       "path": "mortar.rs",
@@ -123,7 +131,7 @@
     },
     {
       "path": "player_state.rs",
-      "lines": 74
+      "lines": 79
     },
     {
       "path": "replay.rs",
@@ -183,15 +191,19 @@
     },
     {
       "path": "services/commands.rs",
-      "lines": 1927
+      "lines": 1883
     },
     {
       "path": "services/commands/guards.rs",
       "lines": 80
     },
     {
+      "path": "services/commands/planner_facts.rs",
+      "lines": 122
+    },
+    {
       "path": "services/commands/tests.rs",
-      "lines": 144
+      "lines": 156
     },
     {
       "path": "services/commands/tests/abilities.rs",
@@ -203,7 +215,7 @@
     },
     {
       "path": "services/commands/tests/command_budget.rs",
-      "lines": 140
+      "lines": 172
     },
     {
       "path": "services/commands/tests/orders.rs",
@@ -251,7 +263,7 @@
     },
     {
       "path": "services/line_of_sight.rs",
-      "lines": 264
+      "lines": 311
     },
     {
       "path": "services/mod.rs",
@@ -335,7 +347,7 @@
     },
     {
       "path": "setup.rs",
-      "lines": 805
+      "lines": 491
     },
     {
       "path": "setup/dev_scenarios.rs",
@@ -355,7 +367,7 @@
     },
     {
       "path": "setup/tests.rs",
-      "lines": 403
+      "lines": 255
     },
     {
       "path": "smoke.rs",
@@ -371,7 +383,7 @@
     },
     {
       "path": "systems.rs",
-      "lines": 433
+      "lines": 432
     },
     {
       "path": "teams.rs",
@@ -411,7 +423,7 @@
     },
     {
       "path": "tests/movement_replay_tests.rs",
-      "lines": 1043
+      "lines": 1028
     },
     {
       "path": "tests/resources_mining_tests.rs",
@@ -427,7 +439,7 @@
     },
     {
       "path": "tests/tank_trap_tests.rs",
-      "lines": 167
+      "lines": 162
     },
     {
       "path": "upgrade.rs",
@@ -521,6 +533,12 @@
     },
     {
       "source": "commands",
+      "target": "ability_orders",
+      "path": "services/commands/planner_facts.rs",
+      "line": 4
+    },
+    {
+      "source": "commands",
       "target": "construction",
       "path": "services/commands.rs",
       "line": 19
@@ -548,6 +566,12 @@
       "target": "order_planner",
       "path": "services/commands.rs",
       "line": 28
+    },
+    {
+      "source": "commands",
+      "target": "order_planner",
+      "path": "services/commands/planner_facts.rs",
+      "line": 5
     },
     {
       "source": "commands",
@@ -857,42 +881,42 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 70,
+      "line": 79,
       "name": "apply_commands"
     },
     {
       "path": "services/commands.rs",
-      "line": 1495,
+      "line": 1451,
       "name": "artillery_point_fire_system"
     },
     {
       "path": "services/commands.rs",
-      "line": 1317,
+      "line": 1273,
       "name": "order_artillery_point_fire"
     },
     {
       "path": "services/commands.rs",
-      "line": 1851,
+      "line": 1807,
       "name": "order_cancel"
     },
     {
       "path": "services/commands.rs",
-      "line": 1736,
+      "line": 1692,
       "name": "order_train"
     },
     {
       "path": "services/commands.rs",
-      "line": 1364,
+      "line": 1320,
       "name": "try_fire_artillery"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 29,
+      "line": 30,
       "name": "apply_with_players"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 39,
+      "line": 40,
       "name": "apply_with_players_and_smokes"
     },
     {
@@ -947,14 +971,14 @@
     },
     {
       "path": "systems.rs",
-      "line": 110,
+      "line": 109,
       "name": "run_tick"
     }
   ],
   "player_state_usages": [
     {
       "path": "lab.rs",
-      "line": 930,
+      "line": 907,
       "code": "player: &super::PlayerState,"
     },
     {
@@ -1034,52 +1058,52 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 1088,
+      "line": 1034,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1659,
+      "line": 1615,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 73,
+      "line": 82,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 706,
+      "line": 649,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1177,
+      "line": 1124,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1320,
+      "line": 1276,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1366,
+      "line": 1322,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1498,
+      "line": 1454,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1738,
+      "line": 1694,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1853,
+      "line": 1809,
       "code": "players: &mut [PlayerState],"
     },
     {
@@ -1089,22 +1113,22 @@
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 88,
+      "line": 100,
       "code": "PlayerState {"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 87,
+      "line": 99,
       "code": "fn player_state(id: u32) -> PlayerState {"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 32,
+      "line": 33,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 42,
+      "line": 43,
       "code": "players: &mut [PlayerState],"
     },
     {
@@ -1249,28 +1273,13 @@
     },
     {
       "path": "setup.rs",
-      "line": 291,
+      "line": 235,
       "code": "let mut ps = PlayerState {"
     },
     {
       "path": "setup.rs",
-      "line": 519,
+      "line": 451,
       "code": "player: &mut PlayerState,"
-    },
-    {
-      "path": "setup.rs",
-      "line": 565,
-      "code": "player: &mut PlayerState,"
-    },
-    {
-      "path": "setup.rs",
-      "line": 715,
-      "code": "players.push(PlayerState {"
-    },
-    {
-      "path": "setup.rs",
-      "line": 648,
-      "code": "players: &mut Vec<PlayerState>,"
     },
     {
       "path": "snapshot.rs",
@@ -1279,39 +1288,27 @@
     },
     {
       "path": "systems.rs",
-      "line": 113,
+      "line": 112,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "systems.rs",
-      "line": 37,
+      "line": 36,
       "code": "use crate::game::PlayerState;"
     }
   ],
   "player_state_field_writes": [
     {
       "path": "lab.rs",
-      "line": 597,
+      "line": 540,
       "field": "oil",
       "code": "player.oil = input.oil;"
     },
     {
       "path": "lab.rs",
-      "line": 451,
-      "field": "oil",
-      "code": "state.oil = player.oil;"
-    },
-    {
-      "path": "lab.rs",
-      "line": 596,
+      "line": 539,
       "field": "steel",
       "code": "player.steel = input.steel;"
-    },
-    {
-      "path": "lab.rs",
-      "line": 450,
-      "field": "steel",
-      "code": "state.steel = player.steel;"
     },
     {
       "path": "services/movement/tests.rs",
@@ -1335,19 +1332,19 @@
   "entity_field_writes": [
     {
       "path": "lab.rs",
-      "line": 659,
+      "line": 620,
       "field": "hp",
       "code": "restored.hp = entity.hp.min(restored.max_hp).max(1);"
     },
     {
       "path": "lab.rs",
-      "line": 693,
+      "line": 655,
       "field": "hp",
       "code": "restored.hp = entity.hp.min(restored.max_hp).max(1);"
     },
     {
       "path": "lab.rs",
-      "line": 572,
+      "line": 515,
       "field": "owner",
       "code": "entity.owner = input.owner;"
     },
@@ -1519,7 +1516,7 @@
     },
     {
       "path": "entity/entity.rs",
-      "count": 126
+      "count": 128
     },
     {
       "path": "entity/mod.rs",
@@ -1551,7 +1548,11 @@
     },
     {
       "path": "lab.rs",
-      "count": 21
+      "count": 19
+    },
+    {
+      "path": "lab/scenario.rs",
+      "count": 8
     },
     {
       "path": "map.rs",
@@ -1571,7 +1572,7 @@
     },
     {
       "path": "player_state.rs",
-      "count": 11
+      "count": 12
     },
     {
       "path": "replay.rs",
@@ -1591,7 +1592,7 @@
     },
     {
       "path": "services/commands.rs",
-      "count": 4
+      "count": 3
     },
     {
       "path": "services/construction.rs",
@@ -1683,7 +1684,7 @@
     },
     {
       "path": "setup.rs",
-      "count": 21
+      "count": 18
     },
     {
       "path": "setup/dev_scenarios.rs",

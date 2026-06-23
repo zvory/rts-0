@@ -1,16 +1,16 @@
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CommandAdmission {
+pub(in crate::game) enum CommandAdmission {
     Normal,
     LabIgnoreCommandLimits,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct PendingCommand {
-    pub(crate) player: u32,
-    pub(crate) command: SimCommand,
-    pub(crate) admission: CommandAdmission,
+pub(in crate::game) struct PendingCommand {
+    pub(in crate::game) player: u32,
+    pub(in crate::game) command: SimCommand,
+    pub(in crate::game) admission: CommandAdmission,
 }
 
 impl PendingCommand {
@@ -36,7 +36,11 @@ impl Game {
         self.pending.push(PendingCommand::normal(player, cmd));
     }
 
-    pub(crate) fn enqueue_lab_command_ignoring_limits(&mut self, player: u32, cmd: SimCommand) {
+    pub(in crate::game) fn enqueue_lab_command_ignoring_limits(
+        &mut self,
+        player: u32,
+        cmd: SimCommand,
+    ) {
         self.pending
             .push(PendingCommand::lab_ignore_command_limits(player, cmd));
     }

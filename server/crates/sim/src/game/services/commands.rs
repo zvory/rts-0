@@ -76,7 +76,7 @@ struct CommandAdmissionPolicy {
 
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn apply_commands(
+pub(in crate::game) fn apply_commands(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
