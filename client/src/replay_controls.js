@@ -1,5 +1,6 @@
 import { dom } from "./bootstrap.js";
 import { REPLAY_VISION } from "./protocol.js";
+import { FloatingRoomTimePanel } from "./room_time_panel.js";
 
 export class RoomTimeControls {
   constructor({ net, state, replayViewer = false, capabilities = null, label = null }) {
@@ -17,6 +18,7 @@ export class RoomTimeControls {
     this.roomTimeSeekTargetTick = null;
     this.roomTimeHandler = null;
     this.lastRoomTimeSpeed = 2;
+    this.floatingPanel = null;
 
     if (!dom.replaySpeed || !this.roomTime.available) return;
 
@@ -24,6 +26,8 @@ export class RoomTimeControls {
     dom.replaySpeed.classList.toggle("replay-viewer-controls", this.replayViewer);
     dom.replaySpeed.classList.add("room-time-controls");
     dom.replaySpeed.setAttribute("aria-label", `${this.label} controls`);
+    this.floatingPanel = new FloatingRoomTimePanel({ root: dom.replaySpeed, label: this.label });
+    this.floatingPanel.mount();
     for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn")) {
       const speed = parseFloat(btn.dataset.speed);
       if (Number.isFinite(speed) && speed > 0) btn.hidden = !this.roomTime.setSpeed;
@@ -46,6 +50,10 @@ export class RoomTimeControls {
     this.buildRoomTimeStatus();
     if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
     this.updateRoomTimePauseButton();
+  }
+
+  roomTimeControlSurface() {
+    return this.floatingPanel?.contentEl || dom.replaySpeed?.querySelector(".room-time-panel-body") || dom.replaySpeed;
   }
 
   onRoomTimeControlClick(e) {
@@ -147,28 +155,34 @@ export class RoomTimeControls {
 
   buildReplayPauseControl() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-pause-btn")) return;
+    const surface = this.roomTimeControlSurface();
+    if (!surface) return;
     const pause = document.createElement("button");
     pause.type = "button";
     pause.className = "spd-btn replay-pause-btn";
     pause.dataset.replayPauseToggle = "1";
     pause.textContent = "Pause";
     pause.title = "Pause replay playback.";
-    dom.replaySpeed.appendChild(pause);
+    surface.appendChild(pause);
   }
 
   buildReplayBranchControl() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-branch-btn")) return;
+    const surface = this.roomTimeControlSurface();
+    if (!surface) return;
     const resume = document.createElement("button");
     resume.type = "button";
     resume.className = "spd-btn replay-branch-btn";
     resume.textContent = "Resume play from here";
     resume.title = "Create a practice branch from the current replay tick.";
     resume.addEventListener("click", () => this.net.requestReplayBranch());
-    dom.replaySpeed.appendChild(resume);
+    surface.appendChild(resume);
   }
 
   buildReplayVisionControls() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-vision-controls")) return;
+    const surface = this.roomTimeControlSurface();
+    if (!surface) return;
 
     const group = document.createElement("div");
     group.className = "replay-vision-controls";
@@ -195,20 +209,24 @@ export class RoomTimeControls {
     }
 
     group.addEventListener("click", (ev) => this.onReplayVisionClick(ev));
-    dom.replaySpeed.appendChild(group);
+    surface.appendChild(group);
   }
 
   buildRoomTimeStatus() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-tick-status")) return;
+    const surface = this.roomTimeControlSurface();
+    if (!surface) return;
     const status = document.createElement("span");
     status.className = "replay-status replay-tick-status room-time-tick-status";
     status.textContent = `${this.label} 0 / 0`;
-    dom.replaySpeed.appendChild(status);
+    surface.appendChild(status);
   }
 
   buildRoomTimeTimeline() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-timeline")) return;
     if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
+    const surface = this.roomTimeControlSurface();
+    if (!surface) return;
 
     const wrap = document.createElement("div");
     wrap.className = "replay-timeline room-time-timeline";
@@ -229,7 +247,7 @@ export class RoomTimeControls {
     track.appendChild(marks);
 
     wrap.appendChild(track);
-    dom.replaySpeed.appendChild(wrap);
+    surface.appendChild(wrap);
     this.updateRoomTimeTimeline();
   }
 
@@ -413,6 +431,8 @@ export class RoomTimeControls {
     dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
     dom.replaySpeed.querySelector(".replay-tick-status")?.remove();
     dom.replaySpeed.querySelector(".replay-timeline")?.remove();
+    this.floatingPanel?.destroy();
+    this.floatingPanel = null;
   }
 }
 
