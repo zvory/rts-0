@@ -79,6 +79,7 @@ export function parseArgs(argv) {
     codexArgs: [],
     codexCommand: "codex",
     codexModel: null,
+    codexTimeoutSeconds: 300,
     checkpointFile: defaultCheckpointFile,
     checkpointSeedFile: defaultCheckpointSeedFile,
     checkpointRef: null,
@@ -137,6 +138,8 @@ export function parseArgs(argv) {
       options.codexCommand = readValue("--codex-command");
     } else if (arg === "--codex-model" || arg.startsWith("--codex-model=")) {
       options.codexModel = readValue("--codex-model");
+    } else if (arg === "--codex-timeout-seconds" || arg.startsWith("--codex-timeout-seconds=")) {
+      options.codexTimeoutSeconds = parsePositiveInteger(readValue("--codex-timeout-seconds"), "--codex-timeout-seconds");
     } else if (arg === "--checkpoint-ref" || arg.startsWith("--checkpoint-ref=")) {
       options.checkpointRef = readValue("--checkpoint-ref");
     } else if (arg === "--checkpoint-file" || arg.startsWith("--checkpoint-file=")) {
@@ -720,18 +723,23 @@ function codexUsageFromStdout(stdout) {
   return latest;
 }
 
+function codexExecOptions(options, prompt) {
+  return { cwd: options.repoRoot, encoding: "utf8", input: prompt, maxBuffer: 1024 * 1024 * 5, stdio: ["pipe", "pipe", "pipe"], timeout: options.codexTimeoutSeconds * 1000 };
+}
+
+function codexFailureMessage(error, label, timeoutSeconds) {
+  const stderr = error.stderr?.toString().trim();
+  return error.code === "ETIMEDOUT" || error.signal === "SIGTERM"
+    ? `${label} timed out after ${timeoutSeconds}s`
+    : `${label} failed: ${stderr || error.message}`;
+}
+
 function classifyWithCodex(options, prompt) {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "rts-docdrift-codex-"));
   const outputPath = path.join(tempDir, "last-message.txt");
   const args = codexInvocationArgs(options, outputPath);
   try {
-    const stdout = execFileSync(options.codexCommand, args, {
-      cwd: options.repoRoot,
-      encoding: "utf8",
-      input: prompt,
-      maxBuffer: 1024 * 1024 * 5,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const stdout = execFileSync(options.codexCommand, args, codexExecOptions(options, prompt));
     if (!existsSync(outputPath)) {
       throw new Error("Codex CLI did not write --output-last-message");
     }
@@ -746,8 +754,7 @@ function classifyWithCodex(options, prompt) {
       },
     };
   } catch (error) {
-    const stderr = error.stderr?.toString().trim();
-    throw new Error(`Codex classifier failed: ${stderr || error.message}`);
+    throw new Error(codexFailureMessage(error, "Codex classifier", options.codexTimeoutSeconds));
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -1232,13 +1239,7 @@ function generateDocPatchWithCodex(options, prompt) {
   const outputPath = path.join(tempDir, "last-message.txt");
   const args = codexInvocationArgs(options, outputPath);
   try {
-    const stdout = execFileSync(options.codexCommand, args, {
-      cwd: options.repoRoot,
-      encoding: "utf8",
-      input: prompt,
-      maxBuffer: 1024 * 1024 * 5,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const stdout = execFileSync(options.codexCommand, args, codexExecOptions(options, prompt));
     if (!existsSync(outputPath)) {
       throw new Error("Codex CLI did not write --output-last-message");
     }
@@ -1253,8 +1254,7 @@ function generateDocPatchWithCodex(options, prompt) {
       },
     };
   } catch (error) {
-    const stderr = error.stderr?.toString().trim();
-    throw new Error(`Codex doc patch generator failed: ${stderr || error.message}`);
+    throw new Error(codexFailureMessage(error, "Codex doc patch generator", options.codexTimeoutSeconds));
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
