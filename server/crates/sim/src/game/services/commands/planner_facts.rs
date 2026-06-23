@@ -1,0 +1,122 @@
+use crate::game::ability::AbilityKind;
+use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent, MAX_QUEUED_ORDERS};
+use crate::game::map::Map;
+use crate::game::services::ability_orders;
+use crate::game::services::order_planner as planner;
+use crate::rules;
+
+use super::guards::dedupe_cap_units;
+
+pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
+    planner::PlannerConfig {
+        max_units_per_command,
+        max_queue_len: MAX_QUEUED_ORDERS,
+    }
+}
+
+pub(super) fn planner_facts(
+    entities: &EntityStore,
+    player: u32,
+    faction_id: &str,
+    units: &[u32],
+    ability: Option<AbilityFactInput<'_>>,
+    max_units_per_command: usize,
+) -> Vec<planner::UnitFacts> {
+    dedupe_cap_units(units.to_vec(), max_units_per_command)
+        .into_iter()
+        .filter_map(|id| {
+            let e = entities.get(id)?;
+            if !e.is_unit() || e.owner != player {
+                return None;
+            }
+            let mut facts = planner::UnitFacts::new(id);
+            facts.pos = planner::Point::new(e.pos_x, e.pos_y);
+            facts.queue_len = e.queued_orders().len();
+            facts.queue_terminal = e
+                .queued_orders()
+                .iter()
+                .any(|intent| matches!(intent, OrderIntent::PointFire(_)));
+            facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
+            facts.activity = match e.order() {
+                Order::Idle | Order::HoldPosition => planner::UnitActivity::Idle,
+                Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
+                    planner::UnitActivity::Moving
+                }
+                _ => planner::UnitActivity::Busy,
+            };
+            facts.can_attack = e.can_attack();
+            facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
+            facts.can_build = rules::faction::catalog_for(faction_id)
+                .is_some_and(|catalog| catalog.builders.contains(&e.kind));
+            facts.can_setup_anti_tank_gun =
+                matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
+            if let Some(ability) = ability {
+                if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
+                    && ability_orders::caster_allowed_by_faction(
+                        entities,
+                        faction_id,
+                        id,
+                        ability.kind,
+                    )
+                    && ability.tech_ready
+                {
+                    facts.abilities.push(planner::AbilityFacts {
+                        ability: ability.id,
+                        ready_at_issue: true,
+                        can_execute_without_interrupt: ability.target.is_some_and(|(x, y)| {
+                            world_ability_can_execute_without_interrupt(ability.kind)
+                                && ability_orders::caster_in_range(
+                                    ability.map,
+                                    entities,
+                                    id,
+                                    ability.kind,
+                                    x,
+                                    y,
+                                )
+                                && ability_orders::world_ability_current_facing_ready(
+                                    entities,
+                                    id,
+                                    ability.kind,
+                                    x,
+                                    y,
+                                )
+                        }),
+                        can_interrupt_active_order: world_ability_may_interrupt_active_order(
+                            ability.kind,
+                        ),
+                    });
+                }
+            }
+            Some(facts)
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct AbilityFactInput<'a> {
+    pub(super) kind: AbilityKind,
+    pub(super) id: planner::AbilityId,
+    pub(super) tech_ready: bool,
+    pub(super) target: Option<(f32, f32)>,
+    pub(super) map: &'a Map,
+}
+
+fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
+    matches!(
+        ability,
+        AbilityKind::Smoke
+            | AbilityKind::EkatTeleport
+            | AbilityKind::EkatLineShot
+            | AbilityKind::EkatMagicAnchor
+    )
+}
+
+fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
+    matches!(
+        ability,
+        AbilityKind::MortarFire
+            | AbilityKind::EkatTeleport
+            | AbilityKind::EkatLineShot
+            | AbilityKind::EkatMagicAnchor
+    )
+}

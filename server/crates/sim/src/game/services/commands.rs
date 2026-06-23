@@ -8,7 +8,6 @@ use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::command::SimCommand;
 use crate::game::entity::{
     EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, ResearchItem, WeaponSetup,
-    MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -46,11 +45,13 @@ const LAB_MAX_UNITS_PER_COMMAND: usize = 4096;
 const MAX_RALLY_STAGES: usize = 4;
 
 mod guards;
+mod planner_facts;
 
 use self::guards::{
     dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
     unit_can_accept_player_command,
 };
+use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
 
 struct CommandExecutionContext<'a, 'pathing> {
     map: &'a Map,
@@ -123,6 +124,18 @@ pub(crate) fn apply_commands(
             );
         }};
     }
+    macro_rules! admission_facts {
+        ($player:expr, $faction_id:expr, $admission:expr, $units:expr, $ability:expr) => {
+            planner_facts(
+                entities,
+                $player,
+                $faction_id,
+                &$units,
+                $ability,
+                $admission.max_units_per_command,
+            )
+        };
+    }
     for pending_command in pending {
         let player = pending_command.player;
         let cmd = pending_command.command;
@@ -160,14 +173,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(
-                        entities,
-                        player,
-                        &faction_id,
-                        &units,
-                        None,
-                        command_admission.max_units_per_command
-                    ),
+                    admission_facts!(player, &faction_id, command_admission, units, None),
                     &request,
                     command_admission
                 );
@@ -192,14 +198,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(
-                        entities,
-                        player,
-                        &faction_id,
-                        &units,
-                        None,
-                        command_admission.max_units_per_command
-                    ),
+                    admission_facts!(player, &faction_id, command_admission, units, None),
                     &request,
                     command_admission
                 );
@@ -226,14 +225,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(
-                        entities,
-                        player,
-                        &faction_id,
-                        &units,
-                        None,
-                        command_admission.max_units_per_command
-                    ),
+                    admission_facts!(player, &faction_id, command_admission, units, None),
                     &request,
                     command_admission
                 );
@@ -265,14 +257,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(
-                        entities,
-                        player,
-                        &faction_id,
-                        &units,
-                        None,
-                        command_admission.max_units_per_command
-                    ),
+                    admission_facts!(player, &faction_id, command_admission, units, None),
                     &request,
                     command_admission
                 );
@@ -295,14 +280,7 @@ pub(crate) fn apply_commands(
                         face_toward: planner::Point::new(x, y),
                     },
                 };
-                let facts = planner_facts(
-                    entities,
-                    player,
-                    &faction_id,
-                    &units,
-                    None,
-                    command_admission.max_units_per_command,
-                );
+                let facts = admission_facts!(player, &faction_id, command_admission, units, None);
                 apply_planned!(player, facts, &request, command_admission);
             }
             SimCommand::TearDownAntiTankGuns { units } => {
@@ -441,14 +419,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(
-                        entities,
-                        player,
-                        &faction_id,
-                        &units,
-                        None,
-                        command_admission.max_units_per_command
-                    ),
+                    admission_facts!(player, &faction_id, command_admission, units, None),
                     &request,
                     command_admission
                 );
@@ -479,14 +450,7 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(
-                        entities,
-                        player,
-                        &faction_id,
-                        &units,
-                        None,
-                        command_admission.max_units_per_command
-                    ),
+                    admission_facts!(player, &faction_id, command_admission, units, None),
                     &request,
                     command_admission
                 );
@@ -674,120 +638,6 @@ fn build_target_center(building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, 
     (
         tile_x as f32 * ts + stats.foot_w as f32 * ts * 0.5,
         tile_y as f32 * ts + stats.foot_h as f32 * ts * 0.5,
-    )
-}
-
-fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
-    planner::PlannerConfig {
-        max_units_per_command,
-        max_queue_len: MAX_QUEUED_ORDERS,
-    }
-}
-
-fn planner_facts(
-    entities: &EntityStore,
-    player: u32,
-    faction_id: &str,
-    units: &[u32],
-    ability: Option<AbilityFactInput>,
-    max_units_per_command: usize,
-) -> Vec<planner::UnitFacts> {
-    dedupe_cap_units(units.to_vec(), max_units_per_command)
-        .into_iter()
-        .filter_map(|id| {
-            let e = entities.get(id)?;
-            if !e.is_unit() || e.owner != player {
-                return None;
-            }
-            let mut facts = planner::UnitFacts::new(id);
-            facts.pos = planner::Point::new(e.pos_x, e.pos_y);
-            facts.queue_len = e.queued_orders().len();
-            facts.queue_terminal = e
-                .queued_orders()
-                .iter()
-                .any(|intent| matches!(intent, OrderIntent::PointFire(_)));
-            facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
-            facts.activity = match e.order() {
-                Order::Idle | Order::HoldPosition => planner::UnitActivity::Idle,
-                Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
-                    planner::UnitActivity::Moving
-                }
-                _ => planner::UnitActivity::Busy,
-            };
-            facts.can_attack = e.can_attack();
-            facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
-            facts.can_build = rules::faction::catalog_for(faction_id)
-                .is_some_and(|catalog| catalog.builders.contains(&e.kind));
-            facts.can_setup_anti_tank_gun =
-                matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
-            if let Some(ability) = ability {
-                if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
-                    && ability_orders::caster_allowed_by_faction(
-                        entities,
-                        faction_id,
-                        id,
-                        ability.kind,
-                    )
-                    && ability.tech_ready
-                {
-                    facts.abilities.push(planner::AbilityFacts {
-                        ability: ability.id,
-                        ready_at_issue: true,
-                        can_execute_without_interrupt: ability.target.is_some_and(|(x, y)| {
-                            world_ability_can_execute_without_interrupt(ability.kind)
-                                && ability_orders::caster_in_range(
-                                    ability.map,
-                                    entities,
-                                    id,
-                                    ability.kind,
-                                    x,
-                                    y,
-                                )
-                                && ability_orders::world_ability_current_facing_ready(
-                                    entities,
-                                    id,
-                                    ability.kind,
-                                    x,
-                                    y,
-                                )
-                        }),
-                        can_interrupt_active_order: world_ability_may_interrupt_active_order(
-                            ability.kind,
-                        ),
-                    });
-                }
-            }
-            Some(facts)
-        })
-        .collect()
-}
-
-#[derive(Clone, Copy)]
-struct AbilityFactInput<'a> {
-    kind: AbilityKind,
-    id: planner::AbilityId,
-    tech_ready: bool,
-    target: Option<(f32, f32)>,
-    map: &'a Map,
-}
-
-fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
-    matches!(
-        ability,
-        AbilityKind::Smoke
-            | AbilityKind::EkatTeleport
-            | AbilityKind::EkatLineShot
-            | AbilityKind::EkatMagicAnchor
-    )
-}
-
-fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
-    matches!(
-        ability,
-        AbilityKind::MortarFire
-            | AbilityKind::EkatTeleport
-            | AbilityKind::EkatLineShot
-            | AbilityKind::EkatMagicAnchor
     )
 }
 
