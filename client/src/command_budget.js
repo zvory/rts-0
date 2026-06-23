@@ -57,17 +57,24 @@ export function admitSelectionIds(state, ids, { baseIds = [] } = {}) {
   return { ids: admitted.map((entity) => entity.id), overflow, ...budget };
 }
 
-export function commandWithinBudget(state, command) {
+export function commandWithinBudget(state, command, { ownerId = null, ignoreCommandLimits = false } = {}) {
+  if (ignoreCommandLimits) return { ok: true, used: 0, cap: Number.POSITIVE_INFINITY };
+
   const units = Array.isArray(command?.units) ? command.units : null;
   if (!units) return { ok: true, used: 0, cap: BASE_COMMAND_SUPPLY_CAP };
 
+  const expectedOwner = Number(ownerId);
+  const hasOwnerOverride = Number.isInteger(expectedOwner) && expectedOwner > 0;
   const seen = new Set();
   const entities = [];
   for (const id of units) {
     if (!Number.isInteger(id) || seen.has(id)) continue;
     seen.add(id);
     const entity = typeof state?.entityById === "function" ? state.entityById(id) : null;
-    if (!entity || !state?.isOwnOwner?.(entity.owner) || !isUnit(entity.kind) || entity.state === STATE.CONSTRUCT) {
+    const ownerMatches = hasOwnerOverride
+      ? Number(entity?.owner) === expectedOwner
+      : !!state?.isOwnOwner?.(entity?.owner);
+    if (!entity || !ownerMatches || !isUnit(entity.kind) || entity.state === STATE.CONSTRUCT) {
       continue;
     }
     entities.push(entity);
@@ -105,7 +112,7 @@ function uniqueLiveSelectionEntities(state, ids, seen = new Set()) {
 function shouldBudgetSelection(state, base, candidates) {
   if (!state) return false;
   if (state.controlPolicy?.kind === "lab") {
-    return !state.controlPolicy.unlimitedSelectionEnabled?.();
+    return false;
   }
   if (state.spectator) return false;
   const all = base.concat(candidates);

@@ -202,10 +202,10 @@ export const msg = Object.freeze({
     op: { op: "setCompletedResearch", playerId, upgrade, completed: !!completed },
   }),
   labSetVision: (requestId, vision) => ({ t: C.LAB, requestId, op: { op: "setVision", vision } }),
-  labIssueCommandAs: (requestId, playerId, command) => ({
+  labIssueCommandAs: (requestId, playerId, command, ignoreCommandLimits = false) => ({
     t: C.LAB,
     requestId,
-    op: { op: "issueCommandAs", playerId, cmd: command },
+    op: { op: "issueCommandAs", playerId, cmd: command, ignoreCommandLimits: !!ignoreCommandLimits },
   }),
   requestReplayBranch: () => ({ t: C.REQUEST_REPLAY_BRANCH }),
   claimBranchSeat: (playerId) => ({ t: C.CLAIM_BRANCH_SEAT, playerId }),

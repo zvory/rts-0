@@ -138,3 +138,35 @@ fn command_unit_id_processing_remains_absolutely_bounded() {
         "only the bounded leading id window should be inspected"
     );
 }
+
+#[test]
+fn lab_command_admission_ignores_budget_and_uses_large_bounded_window() {
+    let map = flat_map(256);
+    let mut entities = EntityStore::new();
+    let units = spawn_units(&mut entities, 1, EntityKind::Rifleman, 1_000);
+    mark_units_moving(&mut entities, &units);
+    let mut players = vec![player_state(1), player_state(2)];
+    let mut smokes = SmokeCloudStore::new();
+
+    apply_pending_with_players_and_smokes(
+        &map,
+        &mut entities,
+        &mut players,
+        &mut smokes,
+        vec![PendingCommand {
+            player: 1,
+            command: SimCommand::Stop {
+                units: units.clone(),
+            },
+            admission: CommandAdmission::LabIgnoreCommandLimits,
+        }],
+    );
+
+    assert!(
+        units.iter().all(|id| matches!(
+            entities.get(*id).map(|entity| entity.order()),
+            Some(Order::Idle)
+        )),
+        "lab command-limit bypass should let one command affect 1,000 units"
+    );
+}

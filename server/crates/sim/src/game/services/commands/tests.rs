@@ -33,7 +33,13 @@ fn apply_with_players(
     pending: Vec<(u32, SimCommand)>,
 ) -> HashMap<u32, Vec<Event>> {
     let mut smokes = SmokeCloudStore::new();
-    apply_with_players_and_smokes(map, entities, players, &mut smokes, pending)
+    apply_pending_with_players_and_smokes(
+        map,
+        entities,
+        players,
+        &mut smokes,
+        normal_pending(pending),
+    )
 }
 
 fn apply_with_players_and_smokes(
@@ -42,6 +48,16 @@ fn apply_with_players_and_smokes(
     players: &mut [PlayerState],
     smokes: &mut SmokeCloudStore,
     pending: Vec<(u32, SimCommand)>,
+) -> HashMap<u32, Vec<Event>> {
+    apply_pending_with_players_and_smokes(map, entities, players, smokes, normal_pending(pending))
+}
+
+fn apply_pending_with_players_and_smokes(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    smokes: &mut SmokeCloudStore,
+    pending: Vec<PendingCommand>,
 ) -> HashMap<u32, Vec<Event>> {
     let spatial = SpatialIndex::build(entities, map.size);
     let occ = Occupancy::build(map, entities);
@@ -73,6 +89,17 @@ fn apply_with_players_and_smokes(
         1,
     );
     events
+}
+
+fn normal_pending(pending: Vec<(u32, SimCommand)>) -> Vec<PendingCommand> {
+    pending
+        .into_iter()
+        .map(|(player, command)| PendingCommand {
+            player,
+            command,
+            admission: CommandAdmission::Normal,
+        })
+        .collect()
 }
 
 fn flat_map(size: u32) -> Map {

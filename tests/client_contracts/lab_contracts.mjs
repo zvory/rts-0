@@ -115,7 +115,28 @@ import { textWithin } from "./dom_text.mjs";
   assert(!policy.canControlOwner(1, state), "lab control policy rejects non-selected owners");
   assert(policy.canUseCommandSurface(state), "lab operator can use the command surface");
   const issued = await policy.issueCommand(cmd.move([11], 20, 30), { state });
-  assert(issued.sent && requests[0].playerId === 2, "lab control policy routes gameplay commands through issue-as");
+  assert(
+    issued.sent && requests[0].playerId === 2 && requests[0].ignoreCommandLimits === true,
+    "lab control policy routes gameplay commands through issue-as with command limits disabled by default",
+  );
+  const overBudgetUnits = Array.from({ length: 25 }, (_, index) => ({
+    id: 100 + index,
+    owner: 2,
+    kind: KIND.RIFLEMAN,
+    state: "idle",
+  }));
+  const overBudgetState = {
+    selectedEntities() {
+      return overBudgetUnits;
+    },
+    entityById(id) {
+      return overBudgetUnits.find((entity) => entity.id === id) || null;
+    },
+  };
+  policy.setIgnoreCommandLimits(false);
+  const blocked = policy.issueCommand(cmd.stop(overBudgetUnits.map((entity) => entity.id)), { state: overBudgetState });
+  assert(blocked.blocked === "commandBudget", "lab control policy can restore the command supply guard");
+  policy.setIgnoreCommandLimits(true);
   const mixedState = {
     selectedEntities() {
       return [{ id: 11, owner: 1, kind: KIND.RIFLEMAN }, { id: 12, owner: 2, kind: KIND.RIFLEMAN }];
@@ -264,6 +285,7 @@ await withFakeDocument(async () => {
   let armedCallbacks = null;
   let cancelledToolReason = null;
   let selectedEntities = [];
+  let ignoreCommandLimits = true;
   let panel = null;
   const match = {
     clientIntent: new ClientIntent(),
@@ -271,6 +293,14 @@ await withFakeDocument(async () => {
     state: {
       map: { width: 64, height: 64 },
       playerResources: [{ steel: 500, oil: 200 }],
+      controlPolicy: {
+        ignoreCommandLimitsEnabled() {
+          return ignoreCommandLimits;
+        },
+        setIgnoreCommandLimits(enabled) {
+          ignoreCommandLimits = !!enabled;
+        },
+      },
       selectedEntities() {
         return selectedEntities;
       },
@@ -368,6 +398,16 @@ await withFakeDocument(async () => {
     textWithin(root).includes("Unit Spawn") && textWithin(root).includes("Building Spawn"),
     "LabPanel renders separate unit and building spawn sections",
   );
+  assert(
+    textWithin(root).includes("Options") && textWithin(root).includes("Unlimited commands"),
+    "LabPanel renders command limit controls in an Options panel",
+  );
+  assert(!textWithin(root).includes("Unlimited selection"), "LabPanel removes the old unlimited selection option");
+  const commandLimitToggle = panel.fields.get("ignore-command-limits");
+  commandLimitToggle.checked = false;
+  commandLimitToggle.listeners.change();
+  assert(!ignoreCommandLimits, "LabPanel command option toggles command limit policy");
+  assert(textWithin(root).includes("Command limit restored."), "LabPanel summarizes command limit restoration");
   assert(
     spawnPanel("units")?.dataset.targetPlayerId === "1" &&
       spawnPanel("units")?.dataset.targetColor === "#2255aa" &&

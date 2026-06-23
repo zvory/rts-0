@@ -64,6 +64,7 @@ fn lab_timeline_records_mutations_and_issue_as_commands() {
         LabClientOp::IssueCommandAs {
             player_id: LAB_PLAYER_ONE_ID,
             cmd: issued_command.clone(),
+            ignore_command_limits: true,
         },
     );
     assert!(lab_results(&mut collab_writer)[0].ok);
@@ -98,9 +99,14 @@ fn lab_timeline_records_mutations_and_issue_as_commands() {
     assert_eq!(entries[1].request_id, 31);
     assert_eq!(entries[1].operator_id, 100);
     match &entries[1].kind {
-        LabTimelineEntryKind::IssueCommandAs { player_id, command } => {
+        LabTimelineEntryKind::IssueCommandAs {
+            player_id,
+            command,
+            options,
+        } => {
             assert_eq!(*player_id, LAB_PLAYER_ONE_ID);
             assert_eq!(command, &issued_command);
+            assert!(options.ignore_command_limits);
         }
         other => panic!("unexpected second timeline entry: {other:?}"),
     }
@@ -250,6 +256,7 @@ fn lab_seek_replays_issue_as_commands_through_rebuild() {
                 y: start_position.1,
                 queued: false,
             },
+            ignore_command_limits: false,
         },
     );
     assert!(lab_results(&mut operator_writer)[0].ok);
@@ -700,6 +707,7 @@ fn lab_issue_as_accepts_single_owner_and_rejects_mixed_owner_commands() {
             cmd: Command::Stop {
                 units: vec![unit_one],
             },
+            ignore_command_limits: false,
         },
     );
     task.on_lab_request(
@@ -710,6 +718,7 @@ fn lab_issue_as_accepts_single_owner_and_rejects_mixed_owner_commands() {
             cmd: Command::Stop {
                 units: vec![unit_one, unit_two],
             },
+            ignore_command_limits: false,
         },
     );
 

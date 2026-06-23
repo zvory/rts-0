@@ -176,6 +176,11 @@ pub enum LabError {
     },
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LabCommandOptions {
+    pub ignore_command_limits: bool,
+}
+
 impl Game {
     pub fn new_lab(players: &[PlayerInit], seed: u32, map: Map, map_metadata: MapMetadata) -> Game {
         Self::new_inner_with_map(
@@ -208,6 +213,7 @@ impl Game {
         &mut self,
         player_id: u32,
         command: Command,
+        options: LabCommandOptions,
     ) -> Result<(), LabError> {
         self.validate_owner(player_id)?;
         let authority_entities = command_authority_entities(&command);
@@ -231,7 +237,12 @@ impl Game {
                 });
             }
         }
-        self.enqueue(player_id, super::command::SimCommand::from_protocol(command));
+        let command = super::command::SimCommand::from_protocol(command);
+        if options.ignore_command_limits {
+            self.enqueue_lab_command_ignoring_limits(player_id, command);
+        } else {
+            self.enqueue(player_id, command);
+        }
         Ok(())
     }
 

@@ -4,8 +4,9 @@ use std::time::{Duration, Instant as StdInstant};
 
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
-    LabError, LabMoveEntity, LabOp, LabOpOutcome, LabScenarioV1 as SimLabScenarioV1,
-    LabSetCompletedResearch, LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity,
+    LabCommandOptions, LabError, LabMoveEntity, LabOp, LabOpOutcome,
+    LabScenarioV1 as SimLabScenarioV1, LabSetCompletedResearch, LabSetEntityOwner,
+    LabSetPlayerResources, LabSpawnEntity,
 };
 use rts_sim::game::map::Map;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -934,7 +935,16 @@ impl RoomTask {
             LabClientOp::IssueCommandAs {
                 player_id: command_player_id,
                 cmd,
-            } => self.apply_lab_issue_command(request_id, player_id, command_player_id, cmd),
+                ignore_command_limits,
+            } => self.apply_lab_issue_command(
+                request_id,
+                player_id,
+                command_player_id,
+                cmd,
+                LabCommandOptions {
+                    ignore_command_limits,
+                },
+            ),
             op => self.apply_lab_mutation(player_id, request_id, op),
         };
         self.send_lab_result_to(player_id, result);
@@ -983,6 +993,7 @@ impl RoomTask {
         operator_id: u32,
         command_player_id: u32,
         cmd: Command,
+        options: LabCommandOptions,
     ) -> LabResult {
         let op = "issueCommandAs".to_string();
         let log_operations = self.session_policy().logs_lab_operations();
@@ -991,7 +1002,7 @@ impl RoomTask {
             let Some(game) = self.live_game_mut() else {
                 return lab_result_error(request_id, op, "lab game is not running");
             };
-            if let Err(err) = game.issue_lab_command_as(command_player_id, cmd.clone()) {
+            if let Err(err) = game.issue_lab_command_as(command_player_id, cmd.clone(), options) {
                 return lab_result_error(request_id, op, &lab_error_text(&err));
             }
             game.tick_count()
@@ -1003,7 +1014,14 @@ impl RoomTask {
             } else {
                 timeline_truncated = timeline.truncate_future(tick);
             }
-            timeline.record_issue_command_as(tick, request_id, operator_id, command_player_id, cmd);
+            timeline.record_issue_command_as(
+                tick,
+                request_id,
+                operator_id,
+                command_player_id,
+                cmd,
+                options,
+            );
         }
         if let Some(session) = &mut self.lab_session {
             session.dirty = true;
@@ -1278,8 +1296,12 @@ impl RoomTask {
                         entry.sequence, entry.request_id
                     )
                 }),
-            LabTimelineEntryKind::IssueCommandAs { player_id, command } => game
-                .issue_lab_command_as(*player_id, command.clone())
+            LabTimelineEntryKind::IssueCommandAs {
+                player_id,
+                command,
+                options,
+            } => game
+                .issue_lab_command_as(*player_id, command.clone(), *options)
                 .map_err(|err| {
                     format!(
                         "Lab timeline issue-as failed at sequence {} request {}: {err:?}.",

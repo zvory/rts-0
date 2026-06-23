@@ -587,6 +587,7 @@ fn lab_collaborators_can_mutate_issue_commands_and_log_requester() {
             cmd: Command::Stop {
                 units: vec![worker],
             },
+            ignore_command_limits: false,
         },
     );
     assert!(lab_results(&mut collab_writer)[0].ok);

@@ -446,11 +446,12 @@ authentic. Lab operator starts are still spectator-shaped for projection and pre
 `LabClient` treats `start.lab.vision` plus `labState.vision` as the recipient's server-authoritative
 choice; `start.lab.godModePlayers` plus `labState.godModePlayers` mirror room-scoped player god
 mode. The injected control policy exposes `canUseCommandSurface(state)` and local
-`unlimitedSelectionEnabled()`/`setUnlimitedSelection(enabled)` controls so `Match` and HUD can keep
-selection plus the real command card available for operators while read-only lab viewers, replay
-viewers, and normal spectators remain passive. Operator gameplay commands still flow through
-`commandIssuer.issueCommand`, where `LabControlPolicy` wraps them as lab `issueCommandAs` requests
-for the single controllable selected owner.
+`ignoreCommandLimitsEnabled()`/`setIgnoreCommandLimits(enabled)` controls so `Match` and HUD can
+keep selection plus the real command card available for operators while read-only lab viewers,
+replay viewers, and normal spectators remain passive. Lab selection itself is not toggled by this
+control. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
+`LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
+owner and includes whether that command should bypass the normal command-supply limit.
 
 Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
 may ask `Match.armLabTool(tool, { onWorldClick, onBoxSelection })` to arm a tool, and normal

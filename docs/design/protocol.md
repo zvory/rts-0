@@ -886,7 +886,7 @@ default is the union of all replay players.
 { op: "setPlayerGodMode", playerId: u32, enabled: bool }
 { op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
 { op: "setVision", vision: LabVisionMode }
-{ op: "issueCommandAs", playerId: u32, cmd: Command }
+{ op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
 { op: "exportScenario", name?: string }
 { op: "importScenario", scenario: LabScenarioV1 }
 ```
@@ -896,7 +896,9 @@ room task before snapshot projection; unknown, empty, or duplicate team selectio
 Lab vision is server-owned per operator, so one operator can inspect full world while another uses
 team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
-units belong to that player; mixed-owner selections are rejected instead of partitioned.
+units belong to that player; mixed-owner selections are rejected instead of partitioned. When
+`ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses
+the larger bounded lab command window instead of the ordinary live-player unit-id window.
 `setPlayerGodMode` is lab-only room state: enabled players' units ignore incoming damage, while
 buildings and resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.

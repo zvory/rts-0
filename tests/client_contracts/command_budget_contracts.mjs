@@ -68,27 +68,27 @@ import {
     "client command guard allows 24 one-supply units",
   );
 
-  const labLimited = {
+  const labState = {
     ...budgetState(tanks),
     controlPolicy: {
       kind: "lab",
-      unlimitedSelectionEnabled: () => false,
-    },
-  };
-  const labUnlimited = {
-    ...budgetState(tanks),
-    controlPolicy: {
-      kind: "lab",
-      unlimitedSelectionEnabled: () => true,
+      ignoreCommandLimitsEnabled: () => false,
     },
   };
   assert(
-    admitSelectionIds(labLimited, tanks.map((tank) => tank.id)).ids.length === 3,
-    "lab selection respects command supply when unlimited selection is disabled",
+    admitSelectionIds(labState, tanks.map((tank) => tank.id)).ids.length === tanks.length,
+    "lab selection is not changed by the command-limit option",
   );
   assert(
-    admitSelectionIds(labUnlimited, tanks.map((tank) => tank.id)).ids.length === tanks.length,
-    "lab selection admits every candidate when unlimited selection is enabled",
+    !commandWithinBudget(labState, cmd.move(tanks.map((tank) => tank.id), 100, 100), { ownerId: 1 }).ok,
+    "lab command guard can still apply command supply when limits are enabled",
+  );
+  assert(
+    commandWithinBudget(labState, cmd.move(tanks.map((tank) => tank.id), 100, 100), {
+      ownerId: 1,
+      ignoreCommandLimits: true,
+    }).ok,
+    "lab command guard can ignore command supply when command limits are disabled",
   );
 }
 

@@ -50,8 +50,9 @@ Use when adding, removing, or changing any field on a client↔server message, s
   positional events) must be gated on visibility/ownership. Never send a player an entity or
   position they can't see. See [docs/design/protocol.md](../design/protocol.md) §2.4 and
   [docs/design/hardening.md](../design/hardening.md).
-- **Clients are untrusted.** Validate and bound everything inbound: dedupe + cap unit lists
-  (`MAX_UNITS_PER_COMMAND`), size-limit frames, range/overflow-check placement coords. See
+- **Clients are untrusted.** Validate and bound everything inbound: dedupe + cap ordinary unit lists
+  (`MAX_UNITS_PER_COMMAND`) and lab command-limit-bypass unit lists (`LAB_MAX_UNITS_PER_COMMAND`),
+  size-limit frames, range/overflow-check placement coords. See
   [deployment.md](deployment.md) and [docs/design/hardening.md](../design/hardening.md).
 - `rts-protocol` depends only on `rts-contract` among workspace crates. Kind conversion that needs
   rules/sim vocabulary belongs in adapter modules.
