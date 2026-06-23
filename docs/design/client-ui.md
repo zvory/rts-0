@@ -1106,8 +1106,9 @@ Current areas:
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, including `/lab` launch URL mode/scenario defaults, audio, combat audio,
-  alerts, fog, camera, prediction settings, `report_window_aggregate.js`.
+- `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` launch
+  URL mode/scenario defaults, audio, combat audio, alerts, fog, camera, prediction settings,
+  `report_window_aggregate.js`.
 
 Import rules:
 - `protocol.js` and `config.js` are shared mirrors and may be imported where needed.
