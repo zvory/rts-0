@@ -225,11 +225,11 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
   unless the user explicitly asks for broader local coverage.
 - If a self-play test fails and the reason is not immediately obvious, do **not** sink time into
   speculative debugging first. Start a fresh server on its own port, then use
-  the macOS `open` command to open a local self-play spectation replay so the user can inspect the
+  the macOS `open` command to open a local saved self-play replay so the user can inspect the
   failure state directly. Do
   **not** use the Browser skill for this flow. Use
-  `open "http://localhost:<port>/dev/selfplay?replay=<artifact_name>"` (for example
-  `open "http://localhost:<port>/dev/selfplay?replay=manual_worker_rush_latest"`), not the in-app
+  `open "http://localhost:<port>/?replayArtifact=<artifact_name>"` (for example
+  `open "http://localhost:<port>/?replayArtifact=manual_worker_rush_latest"`), not the in-app
   browser.
 - A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner. Empty
   rooms reset to lobby so a room name is never stuck mid-match.
