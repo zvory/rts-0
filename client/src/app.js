@@ -303,6 +303,7 @@ export class App {
         initialCamera: carriedCamera,
         hotkeyProfiles: this.hotkeyProfiles,
         settings: this.settings,
+        onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
