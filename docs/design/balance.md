@@ -318,7 +318,7 @@ activation/autocast policy instead of being folded into default targeting.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 12 steel patches with 1,000 steel each + 3 oil
   patches with 3,333 oil each nearby.
-- Supply: City Centre, Zamok, and Depot each give `+8`; hard cap `200`.
+- Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
@@ -365,8 +365,8 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 600 | 1     | 200 | 3x3  | 550       | trains worker; +8 supply; players start with one free |
-| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +8 supply; no trains/research in first playable slice |
+| city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains worker; +10 supply; players start with one free |
+| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +10 supply; no trains/research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
