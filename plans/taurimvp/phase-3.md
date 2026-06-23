@@ -21,14 +21,14 @@ native cursor capture failures.
 - Create an app log directory under the user's macOS app data or logs directory.
 - Write a shell log with timestamped startup events, selected server profile id/URL, app version,
   shell build id if available, and packaged/dev mode.
-- Add a small in-app startup failure surface for invalid server URLs, remote navigation rejection,
-  navigation/load timeout, WebSocket/connectivity hints when practical, and native cursor capture
-  start failure.
+- Add a small in-app startup failure surface for bad built-in release-channel configuration, remote
+  navigation rejection, navigation/load timeout, WebSocket/connectivity hints when practical, and
+  native cursor capture start failure.
 - Add a way to reveal/copy the log path from the startup screen or error surface.
 - Optionally bridge a small set of desktop-runtime JS errors into the shell log, especially native
   cursor bridge failures and autostart/autolock failures.
 - Keep logs local. Do not add upload, telemetry, or external crash reporting.
-- Avoid logging secrets or full custom URL query strings if future URLs may carry tokens.
+- Avoid logging secrets or unnecessary query strings if future release URLs carry tokens.
 
 ## Expected Touch Points
 
@@ -49,13 +49,13 @@ Avoid touching:
 - Run `cargo test --manifest-path desktop/maccursor-shell/src-tauri/Cargo.toml`.
 - Add focused tests for log path selection, URL redaction if implemented, and startup failure state
   formatting.
-- Manually force at least one bad URL and one unreachable server URL to confirm an in-app error and
-  log file are produced.
+- Manually force at least one bad built-in URL configuration and one unreachable release URL to
+  confirm an in-app error and log file are produced.
 
 ## Manual Testing Focus
 
-Trigger a bad custom URL and an unreachable URL, then confirm the app explains the failure and
-points to logs.
+Trigger a bad release-channel URL configuration and an unreachable beta/mainline URL, then confirm
+the app explains the failure and points to logs.
 
 ## Handoff Expectations
 

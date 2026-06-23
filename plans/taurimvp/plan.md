@@ -4,18 +4,17 @@
 
 ### Phase 1 - Startup Server Picker
 
-Replace immediate server launch with a shell-owned startup screen that lets players choose beta,
-mainline, a local dev URL, or a custom server URL before the game loads. The default choices should
-include beta and mainline, while custom URLs are normalized, validated, persisted, and shown again on
-later launches. The shell must load the selected website and provide native cursor support without
-owning the game server or static assets.
+Replace immediate server launch with a shell-owned startup screen that lets players choose beta or
+mainline before the game loads. The first-attempt MVP should not expose a local loopback profile or
+custom URL entry. The shell must load the selected release website and provide native cursor support
+without owning the game server or static assets.
 
 ### Phase 2 - Thin Shell Runtime Boundary
 
 Remove the shell's current server-spawning assumption from the shippable path. The app should never
 bundle or launch `rts-server`, `client/`, maps, or other game assets; those are fetched from the
-selected server origin just like a browser would. The local option should be a convenience profile
-for a developer who has already checked out the repo and started their own local server.
+selected beta or mainline origin just like a browser would. Developer-only URL overrides may exist
+outside the packaged playtest flow, but they must not appear as local/custom options in the MVP UI.
 
 ### Phase 3 - Basic Logs And Failure Surfaces
 
@@ -33,10 +32,10 @@ assets, notarization, signing, auto-update, or tester-facing "what to test" note
 
 ### Phase 5 - Final Manual Gate
 
-Run the delayed in-game plausibility gate only after the startup picker, packaging, and logging work
-has landed. The final pass should use the built app, verify beta/mainline/custom/local startup paths,
-then do the native cursor gameplay checks from the original maccursor Phase 4. Any small fixes found
-here can land in this phase, but do not start this phase until someone can actually test on macOS.
+Run the final built-artifact gate only after the startup picker, packaging, and logging work has
+landed. The final pass should use the built app, verify beta and mainline startup paths, then do the
+native cursor gameplay checks from the original maccursor Phase 4. Any small fixes found here can
+land in this phase, but do not start this phase until someone can actually test on macOS.
 
 ## Cross-Phase Constraints
 
@@ -45,18 +44,15 @@ here can land in this phase, but do not start this phase until someone can actua
   automation beyond a local unsigned artifact command.
 - Preserve normal browser play and the current browser Pointer Lock path.
 - Keep the desktop native cursor path feature-gated through the Tauri runtime bridge.
-- Remote server URLs must be explicit player choices. Allow `https://` for remote servers and allow
-  plain `http://` only for loopback/local development.
+- The MVP startup UI must offer only the built-in beta and mainline release channels.
 - The shipped shell must be thin. Do not bundle `rts-server`, `client/`, maps, lab scenarios, or
   other game assets; load all game content from the selected website.
 - The startup selector should ship with beta and mainline defaults. Verify the exact URLs from repo
   deploy config or current deployment evidence during implementation.
-- Custom server entries should persist in the user's app config, not in repo files.
-- A remote custom URL is a trust boundary. Do not send secrets, local file paths, or elevated shell
-  capabilities to arbitrary sites; keep Tauri command access limited to the native cursor and
-  desktop-shell commands required by this app.
-- The local profile is only a URL shortcut to a server the user started separately. The app must not
-  start, stop, configure, or package that local server.
+- Do not add custom server URL entry, custom server persistence, or a local loopback profile for this
+  first playtest attempt.
+- Keep Tauri command access limited to the native cursor and desktop-shell commands required by this
+  app. Do not send secrets, local file paths, or unrelated shell capabilities to loaded sites.
 - Keep the final manual gate at the end. Earlier phases may include small smoke checks, but they
   should not depend on the user being home to do gameplay testing.
 - Each implementation phase must land on its own `zvorygin/` branch, be pushed as an owned PR with
