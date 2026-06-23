@@ -22,7 +22,6 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
-use crate::game::command::SimCommand;
 use crate::game::entity::EntityStore;
 use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::map::Map;
@@ -120,7 +119,7 @@ pub(crate) fn run_tick(
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
     active_construction_sites: &mut BTreeSet<u32>,
-    pending: Vec<(u32, SimCommand)>,
+    pending: Vec<crate::game::commands::PendingCommand>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
     mut perf: Option<&mut crate::perf::TickPerf>,

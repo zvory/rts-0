@@ -2,9 +2,12 @@
 The server treats every client as potentially hostile. Limits live next to the code:
 - **WebSocket frame cap** (`main.rs`): `max_message_size`/`max_frame_size` = 256 KiB. Oversized
   frames are rejected and the connection closed before they reach serde.
-- **Command unit cap and budget** (`services/commands.rs`): unit-list commands inspect at most
-  `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject over-budget
-  human commands before planning. The human command budget is 24 supply plus
+- **Command unit cap and budget** (`services/commands.rs`): ordinary unit-list commands inspect at
+  most `MAX_UNITS_PER_COMMAND = 256` submitted ids, dedupe that bounded window, and reject
+  over-budget human commands before planning. Lab `issueCommandAs` requests that explicitly set
+  `ignoreCommandLimits` bypass the command-supply budget and inspect at most
+  `LAB_MAX_UNITS_PER_COMMAND = 4096` submitted ids, still bounded by the WebSocket frame cap. The
+  human command budget is 24 supply plus
   `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the Command Car's own command weight for each submitted
   owned Command Car, with mirrored unit supply as command weight and a fallback weight of 1.
   AI-owned players are exempt from the command-budget gameplay limit because live AI still enqueues

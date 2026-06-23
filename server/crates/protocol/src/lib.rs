@@ -502,6 +502,8 @@ pub enum LabClientOp {
     IssueCommandAs {
         player_id: u32,
         cmd: Command,
+        #[serde(default, skip_serializing_if = "is_false")]
+        ignore_command_limits: bool,
     },
 }
 

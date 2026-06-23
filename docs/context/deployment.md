@@ -19,7 +19,8 @@ relative to the server crate, so `cargo run` from `server/` is the whole dev loo
 
 ## Invariants
 - **Clients are untrusted.** Validate and bound every wire input:
-  - command unit lists deduped + capped (`MAX_UNITS_PER_COMMAND`)
+  - ordinary command unit lists deduped + capped (`MAX_UNITS_PER_COMMAND`); lab command-limit
+    bypass lists use the larger bounded `LAB_MAX_UNITS_PER_COMMAND`
   - WebSocket frames size-limited
   - placement coords range/overflow-checked
 - **No panics on tick or network paths.** Stale ids = no-op. Use `checked_*` arithmetic on

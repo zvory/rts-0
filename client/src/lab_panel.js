@@ -143,31 +143,16 @@ export class LabPanel {
     const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
 
     root.appendChild(this.renderActiveToolStatus());
+    root.appendChild(this.renderOptions());
     root.appendChild(this.renderTargetPlayer());
     root.appendChild(this.renderSpawnPalette());
     root.appendChild(this.renderBuildingSpawnPalette());
-    root.appendChild(this.renderMapTools());
-
-    root.appendChild(this.fieldset("Selected", [
-      this.checkboxField("unlimited-selection", "Unlimited selection", this.unlimitedSelectionEnabled(), {
-        onChange: (enabled) => this.setUnlimitedSelection(enabled),
-      }),
-      this.readout(`${selectedIds.length} selected`),
-      this.button("Move to point", () => this.armMoveSelectedTool(), {
-        disabled: selectedActionDisabled,
-        title: selectedActionTitle,
-        dataset: { active: this.activeLabTool()?.kind === "moveSelected" ? "true" : "false" },
-      }),
-      this.playerSelectField("set-owner", "Owner", {
-        value: issueOwner ?? undefined,
-        disabled: selectedActionDisabled,
-      }),
-      this.button("Set owner", () => this.setSelectedOwner(), {
-        disabled: selectedActionDisabled,
-        title: selectedActionTitle,
-      }),
-      this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
-    ]));
+    root.appendChild(this.renderMapTools({
+      selectedIds,
+      issueOwner,
+      selectedActionDisabled,
+      selectedActionTitle,
+    }));
 
     this.normalizePlayerState();
     root.appendChild(this.fieldset("Player State", [
@@ -207,12 +192,40 @@ export class LabPanel {
     return root;
   }
 
-  renderMapTools() {
+  renderOptions() {
+    return this.fieldset("Options", [
+      this.checkboxField("ignore-command-limits", "Unlimited commands", this.ignoreCommandLimitsEnabled(), {
+        onChange: (enabled) => this.setIgnoreCommandLimits(enabled),
+      }),
+    ]);
+  }
+
+  renderMapTools({
+    selectedIds = [],
+    issueOwner = null,
+    selectedActionDisabled = true,
+    selectedActionTitle = "",
+  } = {}) {
     return this.fieldset("Map Tools", [
       this.button("Remove tool", () => this.armRemoveTool(), {
         title: "Click or drag over selectable units to delete them",
         dataset: { active: this.activeLabTool()?.kind === "removeSelectableUnits" ? "true" : "false" },
       }),
+      this.readout(`${selectedIds.length} selected`),
+      this.button("Move to point", () => this.armMoveSelectedTool(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+        dataset: { active: this.activeLabTool()?.kind === "moveSelected" ? "true" : "false" },
+      }),
+      this.playerSelectField("set-owner", "Owner", {
+        value: issueOwner ?? undefined,
+        disabled: selectedActionDisabled,
+      }),
+      this.button("Set owner", () => this.setSelectedOwner(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+      }),
+      this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
     ]);
   }
 
@@ -790,18 +803,15 @@ export class LabPanel {
     return (this.state?.godModePlayers || []).map(Number).includes(target);
   }
 
-  setUnlimitedSelection(enabled) {
+  setIgnoreCommandLimits(enabled) {
     const policy = this.labControlPolicy();
-    policy?.setUnlimitedSelection?.(enabled);
-    if (!enabled && this.match?.state?.selection) {
-      this.match.state.setSelection(Array.from(this.match.state.selection));
-    }
-    const summary = enabled ? "Unlimited selection enabled." : "Unlimited selection limited.";
-    return this.publishLocalResult("unlimitedSelection", true, summary);
+    policy?.setIgnoreCommandLimits?.(enabled);
+    const summary = enabled ? "Unlimited commands enabled." : "Command limit restored.";
+    return this.publishLocalResult("ignoreCommandLimits", true, summary);
   }
 
-  unlimitedSelectionEnabled() {
-    return this.labControlPolicy()?.unlimitedSelectionEnabled?.() ?? true;
+  ignoreCommandLimitsEnabled() {
+    return this.labControlPolicy()?.ignoreCommandLimitsEnabled?.() ?? true;
   }
 
   labControlPolicy() {

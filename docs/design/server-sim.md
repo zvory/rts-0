@@ -602,7 +602,9 @@ below. Human command budget is supply-based: 24 base command supply plus
 mirrored supply weight, so Command Cars offset their own weight before adding bonus capacity.
 AI-owned players are exempt from this budget because live AI
 still issues ordinary `SimCommand`s through
-`Game::enqueue`. `services::order_planner` is the pure
+`Game::enqueue`. Lab `issueCommandAs` can also opt into a lab-only admission mode that bypasses
+the command-supply budget and uses a larger bounded unit-id window for scenario-scale commands.
+`services::order_planner` is the pure
 reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
 economy, or cooldown mutation dependency; it accepts plain facts and emits one of three effects:
 

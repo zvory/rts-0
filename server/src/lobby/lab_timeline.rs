@@ -4,7 +4,7 @@
 //! for a later seek/rebuild pass without making timeline state part of the simulation crate.
 
 use crate::protocol::Command;
-use rts_sim::game::lab::LabOp;
+use rts_sim::game::lab::{LabCommandOptions, LabOp};
 use rts_sim::game::Game;
 use std::time::{Duration, Instant as StdInstant};
 
@@ -32,8 +32,15 @@ pub(super) struct LabTimelineEntry {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum LabTimelineEntryKind {
-    LabOperation { op_kind: String, op: LabOp },
-    IssueCommandAs { player_id: u32, command: Command },
+    LabOperation {
+        op_kind: String,
+        op: LabOp,
+    },
+    IssueCommandAs {
+        player_id: u32,
+        command: Command,
+        options: LabCommandOptions,
+    },
 }
 
 pub(super) struct LabTimelineSeek {
@@ -107,12 +114,17 @@ impl LabTimeline {
         operator_id: u32,
         player_id: u32,
         command: Command,
+        options: LabCommandOptions,
     ) {
         self.push_entry(
             tick,
             request_id,
             operator_id,
-            LabTimelineEntryKind::IssueCommandAs { player_id, command },
+            LabTimelineEntryKind::IssueCommandAs {
+                player_id,
+                command,
+                options,
+            },
         );
     }
 

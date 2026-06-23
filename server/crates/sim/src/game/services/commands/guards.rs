@@ -4,14 +4,14 @@ use crate::game::entity::{BuildPhase, EntityKind, EntityStore, RallyIntent, Rall
 use crate::game::map::Map;
 use crate::rules;
 
-use super::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS, MAX_UNITS_PER_COMMAND};
+use super::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS};
 
 /// Dedupe a command's unit ids (preserving first-seen order) and cap inspected ids at
-/// `MAX_UNITS_PER_COMMAND`.
-pub(super) fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
+/// the caller's bounded command window.
+pub(super) fn dedupe_cap_units(units: Vec<u32>, max_units_per_command: usize) -> Vec<u32> {
     let mut seen = HashSet::new();
-    let mut out = Vec::with_capacity(units.len().min(MAX_UNITS_PER_COMMAND));
-    for id in units.into_iter().take(MAX_UNITS_PER_COMMAND) {
+    let mut out = Vec::with_capacity(units.len().min(max_units_per_command));
+    for id in units.into_iter().take(max_units_per_command) {
         if seen.insert(id) {
             out.push(id);
         }

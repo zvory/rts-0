@@ -152,7 +152,7 @@ pub struct Game {
     players: Vec<PlayerState>,
     /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
     /// issuing player so ownership can be validated on apply.
-    pending: Vec<(u32, SimCommand)>,
+    pending: Vec<commands::PendingCommand>,
     /// Authoritative commands stamped with the tick where they were applied. Includes AI commands
     /// because they are emitted into the same pending queue before command application.
     command_log: Vec<CommandLogEntry>,
