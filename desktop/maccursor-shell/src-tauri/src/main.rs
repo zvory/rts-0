@@ -769,6 +769,32 @@ fn desktop_runtime_script(options: &RuntimeScriptOptions) -> String {
       url: window.location.href
     }}).catch(() => {{}});
   }};
+  const sameOriginTargetBlankUrl = (anchor) => {{
+    if (!anchor || String(anchor.target || "").toLowerCase() !== "_blank") return null;
+    const href = anchor.getAttribute("href") || "";
+    if (!href || anchor.hasAttribute("download")) return null;
+    try {{
+      const url = new URL(href, window.location.href);
+      return url.origin === window.location.origin ? url : null;
+    }} catch {{
+      return null;
+    }}
+  }};
+  const redirectSameOriginTargetBlank = (event) => {{
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const target = event.target;
+    const element = target && typeof target.closest === "function" ? target : target && target.parentElement;
+    const anchor = element && typeof element.closest === "function" ? element.closest("a[target]") : null;
+    const url = sameOriginTargetBlankUrl(anchor);
+    if (!url) return;
+    event.preventDefault();
+    void desktopLogEvent("desktop_same_origin_target_blank", url.pathname);
+    window.location.assign(url.href);
+  }};
+  if (typeof document !== "undefined") {{
+    document.addEventListener("click", redirectSameOriginTargetBlank, true);
+  }}
   const showDesktopShellFailure = (message) => {{
     if (document.getElementById("rts-desktop-shell-failure")) return;
     const panel = document.createElement("aside");
@@ -1160,8 +1186,13 @@ mod tests {
         assert!(navigation_allowed(&startup_url, None));
 
         let beta_url: tauri::Url = "https://rts-0-zvorygin-beta.fly.dev/rooms".parse().unwrap();
+        let beta_lab_url: tauri::Url =
+            "https://rts-0-zvorygin-beta.fly.dev/lab?room=default&map=Default"
+                .parse()
+                .unwrap();
         let mainline_url: tauri::Url = "https://rts-0-zvorygin.fly.dev/?room=test".parse().unwrap();
         assert!(navigation_allowed(&beta_url, None));
+        assert!(navigation_allowed(&beta_lab_url, None));
         assert!(navigation_allowed(&mainline_url, None));
 
         let developer_url: tauri::Url = "http://localhost:41231/".parse().unwrap();
@@ -1223,6 +1254,9 @@ mod tests {
         assert!(script.contains("__RTS_NATIVE_CURSOR"));
         assert!(script.contains("maccursor_start"));
         assert!(script.contains("desktop_log_client_event"));
+        assert!(script.contains("sameOriginTargetBlankUrl"));
+        assert!(script.contains("redirectSameOriginTargetBlank"));
+        assert!(script.contains("desktop_same_origin_target_blank"));
         assert!(script.contains("__TAURI__.core"));
         assert!(script.contains("capture-start-failed"));
         assert!(script.contains("native_cursor_capture_start_failed"));
