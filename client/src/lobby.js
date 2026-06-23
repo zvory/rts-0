@@ -199,6 +199,39 @@ export class Lobby {
     this._stopLobbyBrowserPolling();
   }
 
+  /**
+   * Return the controller to the pre-join lobby browser state after leaving a room.
+   * This is client-local UI state; the App/server own the actual room detach.
+   */
+  resetToBrowser({ status = "" } = {}) {
+    this._joined = false;
+    this._ready = false;
+    this._spectator = false;
+    this._hostId = null;
+    this._canStart = false;
+    this._teamPreset = "custom";
+    this._selectedMap = "";
+    this._availableMaps = [];
+    this._playerCount = 0;
+    this._browserActionPending = false;
+    this._pendingBrowserJoinRoom = "";
+    this._pendingReplayRoom = "";
+    this._promptReturnFocus = null;
+
+    this._stopLobbyBrowserPolling();
+    this._clearCountdown();
+    this._hideReplayPrompt(false);
+    if (this.elPlayers) this.elPlayers.innerHTML = "";
+    this._reflectSummary("", []);
+    this._reflectJoinedState(false);
+    this._reflectReadyButton();
+    this._reflectStartButton();
+    this._reflectMap();
+    this._reflectTeamPreset();
+    this._renderLobbyBrowser({ error: "" });
+    this.setStatus(status);
+  }
+
   // --- Public hook -----------------------------------------------------------
 
   /**
