@@ -23,8 +23,7 @@ full release workflow.
 - Produce an artifact name that includes version/SHA/architecture.
 - Include a minimal README beside the artifact covering:
   - how to open the unsigned app on macOS,
-  - beta/mainline/custom/local URL startup choices,
-  - local URL mode requires a separately running repo server,
+  - beta/mainline startup choices,
   - where logs live.
 - Confirm the artifact does not include `rts-server`, client assets, maps, lab scenarios, or other
   game runtime assets.
