@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bewegungskrieg Desktop</title>
+    <link rel="stylesheet" href="./startup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="selector" aria-labelledby="startup-title">
+        <div class="masthead">
+          <p class="eyebrow">Bewegungskrieg</p>
+          <h1 id="startup-title">Choose release channel</h1>
+        </div>
+
+        <div id="profile-list" class="profile-list" aria-label="Release channels"></div>
+        <p id="startup-status" class="status" role="status" aria-live="polite"></p>
+        <div id="diagnostics-actions" class="diagnostics-actions" hidden>
+          <button id="copy-log-path" class="diagnostics-action" type="button">Copy log path</button>
+          <button id="reveal-logs" class="diagnostics-action" type="button">Reveal logs</button>
+        </div>
+        <p id="log-path" class="log-path" hidden></p>
+      </section>
+    </main>
+
+    <script type="module" src="./startup.js"></script>
+  </body>
+</html>

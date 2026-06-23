@@ -373,7 +373,7 @@ fn in_range_smoke_launches_from_furthest_selected_carrier() {
         &mut entities,
         &mut players,
         &mut smokes,
-        vec![(
+        normal_pending(vec![(
             1,
             SimCommand::UseAbility {
                 ability: AbilityKind::Smoke,
@@ -382,7 +382,7 @@ fn in_range_smoke_launches_from_furthest_selected_carrier() {
                 y: Some(target.1),
                 queued: false,
             },
-        )],
+        )]),
     );
 
     assert_eq!(smokes.iter().count(), 0);
@@ -484,7 +484,7 @@ fn in_range_smoke_preserves_active_move_and_future_queue() {
         &mut entities,
         &mut players,
         &mut smokes,
-        vec![(
+        normal_pending(vec![(
             1,
             SimCommand::UseAbility {
                 ability: AbilityKind::Smoke,
@@ -493,7 +493,7 @@ fn in_range_smoke_preserves_active_move_and_future_queue() {
                 y: Some(target.1),
                 queued: false,
             },
-        )],
+        )]),
     );
 
     assert_eq!(smokes.iter().count(), 0);
@@ -692,7 +692,7 @@ fn smoke_launches_without_resource_cost() {
         &mut entities,
         &mut players,
         &mut smokes,
-        vec![(
+        normal_pending(vec![(
             1,
             SimCommand::UseAbility {
                 ability: AbilityKind::Smoke,
@@ -701,7 +701,7 @@ fn smoke_launches_without_resource_cost() {
                 y: Some(target.1),
                 queued: false,
             },
-        )],
+        )]),
     );
 
     assert_eq!(smokes.iter().count(), 0);

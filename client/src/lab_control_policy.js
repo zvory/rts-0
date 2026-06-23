@@ -1,12 +1,23 @@
 import { LAB_ROLE } from "./protocol.js";
+import {
+  COMMAND_BUDGET_OVERFLOW_NOTICE,
+  commandWithinBudget,
+} from "./command_budget.js";
 
 export function createLabControlPolicy({ labClient = null, metadata = null } = {}) {
   const policy = {
     kind: "lab",
     labClient,
     metadata,
+    ignoreCommandLimits: true,
     isOperator() {
       return currentRole(policy) === LAB_ROLE.OPERATOR;
+    },
+    ignoreCommandLimitsEnabled() {
+      return !!policy.ignoreCommandLimits;
+    },
+    setIgnoreCommandLimits(enabled) {
+      policy.ignoreCommandLimits = !!enabled;
     },
     canInspectEntity(entity) {
       return !!entity && Number(entity.owner) !== 0 && !entity.shotReveal && !entity.visionOnly;
@@ -54,13 +65,30 @@ export function createLabControlPolicy({ labClient = null, metadata = null } = {
       if (!command || typeof command !== "object") {
         return { ok: false, reason: "No gameplay command is selected." };
       }
+      if (!policy.ignoreCommandLimitsEnabled()) {
+        const budget = commandWithinBudget(state, command, { ownerId: owner });
+        if (!budget.ok) {
+          return {
+            ok: false,
+            reason: COMMAND_BUDGET_OVERFLOW_NOTICE,
+            blocked: "commandBudget",
+            budget,
+          };
+        }
+      }
       return { ok: true, playerId: owner };
     },
     issueCommand(command, { state = null, toast = null } = {}) {
       const decision = policy.canIssueGameplayCommand(command, state);
       if (!decision.ok) {
         toast?.(decision.reason);
-        return { sent: false, predicted: false, blocked: "labPolicy", reason: decision.reason };
+        return {
+          sent: false,
+          predicted: false,
+          blocked: decision.blocked || "labPolicy",
+          reason: decision.reason,
+          budget: decision.budget,
+        };
       }
       if (!policy.labClient || typeof policy.labClient.request !== "function") {
         const reason = "Lab controls are not connected.";
@@ -71,6 +99,7 @@ export function createLabControlPolicy({ labClient = null, metadata = null } = {
         op: "issueCommandAs",
         playerId: decision.playerId,
         cmd: command,
+        ignoreCommandLimits: policy.ignoreCommandLimitsEnabled(),
       }).then((result) => {
         if (!result.ok) toast?.(result.error || "Lab command rejected.");
         return { sent: result.ok, predicted: false, result, playerId: decision.playerId };
@@ -113,6 +142,10 @@ export function createDefaultControlPolicy() {
     issueAsOwnerForSelection() {
       return null;
     },
+    ignoreCommandLimitsEnabled() {
+      return false;
+    },
+    setIgnoreCommandLimits() {},
     canControlOwner(owner, state = null) {
       return typeof state?.isOwnOwner === "function"
         ? state.isOwnOwner(owner)

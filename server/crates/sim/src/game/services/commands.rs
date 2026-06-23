@@ -4,10 +4,10 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
+use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::command::SimCommand;
 use crate::game::entity::{
     EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, ResearchItem, WeaponSetup,
-    MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -41,14 +41,17 @@ const COMMAND_CAR_SUPPLY_CAP_BONUS: u32 = 20;
 /// Max submitted unit ids inspected per multi-unit command. Caps the per-id work a single command
 /// can force, so a repeated/huge id list can't be used to stall the tick loop.
 const MAX_UNITS_PER_COMMAND: usize = 256;
+const LAB_MAX_UNITS_PER_COMMAND: usize = 4096;
 const MAX_RALLY_STAGES: usize = 4;
 
 mod guards;
+mod planner_facts;
 
 use self::guards::{
     dedupe_cap_units, is_constructing, player_is_ai, rally_intent_for_map,
     unit_can_accept_player_command,
 };
+use self::planner_facts::{planner_config, planner_facts, AbilityFactInput};
 
 struct CommandExecutionContext<'a, 'pathing> {
     map: &'a Map,
@@ -65,9 +68,15 @@ struct CommandExecutionContext<'a, 'pathing> {
     tick: u32,
 }
 
+#[derive(Clone, Copy)]
+struct CommandAdmissionPolicy {
+    enforce_budget: bool,
+    max_units_per_command: usize,
+}
+
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn apply_commands(
+pub(in crate::game) fn apply_commands(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
@@ -78,7 +87,7 @@ pub(crate) fn apply_commands(
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
-    pending: Vec<(u32, SimCommand)>,
+    pending: Vec<PendingCommand>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
@@ -102,22 +111,46 @@ pub(crate) fn apply_commands(
         };
     }
     macro_rules! apply_planned {
-        ($player:expr, $facts:expr, $request:expr) => {{
+        ($player:expr, $facts:expr, $request:expr, $admission:expr) => {{
             let facts = $facts;
             let mut ctx = command_context!();
-            planned_actions::execute(&mut ctx, players, $player, &facts, $request);
+            planned_actions::execute(
+                &mut ctx,
+                players,
+                $player,
+                &facts,
+                $request,
+                $admission.max_units_per_command,
+            );
         }};
     }
-    for (player, cmd) in pending {
+    macro_rules! admission_facts {
+        ($player:expr, $faction_id:expr, $admission:expr, $units:expr, $ability:expr) => {
+            planner_facts(
+                entities,
+                $player,
+                $faction_id,
+                &$units,
+                $ability,
+                $admission.max_units_per_command,
+            )
+        };
+    }
+    for pending_command in pending {
+        let player = pending_command.player;
+        let cmd = pending_command.command;
         let faction_id = faction_id_for(
             players.iter().map(|p| (p.id, p.faction_id.as_str())),
             player,
         );
-        let enforce_command_budget = !player_is_ai(
-            players
-                .iter()
-                .map(|candidate| (candidate.id, candidate.is_ai)),
-            player,
+        let command_admission = command_admission_for(
+            pending_command.admission,
+            player_is_ai(
+                players
+                    .iter()
+                    .map(|candidate| (candidate.id, candidate.is_ai)),
+                player,
+            ),
         );
         match cmd {
             SimCommand::Move {
@@ -127,7 +160,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -140,8 +173,9 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, None),
-                    &request
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
                 );
             }
             SimCommand::AttackMove {
@@ -151,7 +185,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -164,8 +198,9 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, None),
-                    &request
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
                 );
             }
             SimCommand::Attack {
@@ -174,7 +209,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -190,8 +225,9 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, None),
-                    &request
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
                 );
             }
             SimCommand::Deconstruct {
@@ -200,7 +236,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -221,8 +257,9 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, None),
-                    &request
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
                 );
             }
             SimCommand::SetupAntiTankGuns {
@@ -232,7 +269,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -243,12 +280,12 @@ pub(crate) fn apply_commands(
                         face_toward: planner::Point::new(x, y),
                     },
                 };
-                let facts = planner_facts(entities, player, &faction_id, &units, None);
-                apply_planned!(player, facts, &request);
+                let facts = admission_facts!(player, &faction_id, command_admission, units, None);
+                apply_planned!(player, facts, &request, command_admission);
             }
             SimCommand::TearDownAntiTankGuns { units } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -285,7 +322,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -300,6 +337,7 @@ pub(crate) fn apply_commands(
                         x,
                         y,
                         queued,
+                        max_units_per_command: command_admission.max_units_per_command,
                     },
                 );
             }
@@ -310,7 +348,7 @@ pub(crate) fn apply_commands(
                 queued: _,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -333,7 +371,7 @@ pub(crate) fn apply_commands(
                 enabled,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -369,7 +407,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -381,8 +419,9 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, None),
-                    &request
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
                 );
             }
             SimCommand::Build {
@@ -393,7 +432,7 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -411,8 +450,9 @@ pub(crate) fn apply_commands(
                 };
                 apply_planned!(
                     player,
-                    planner_facts(entities, player, &faction_id, &units, None),
-                    &request
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
                 );
             }
             SimCommand::Train { building, unit } => {
@@ -495,7 +535,7 @@ pub(crate) fn apply_commands(
             }
             SimCommand::Stop { units } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -511,7 +551,7 @@ pub(crate) fn apply_commands(
             }
             SimCommand::HoldPosition { units } => {
                 let Some(units) =
-                    validate_command_units(entities, events, player, units, enforce_command_budget)
+                    validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
@@ -549,14 +589,30 @@ fn validate_command_units(
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     units: Vec<u32>,
-    enforce_budget: bool,
+    admission: CommandAdmissionPolicy,
 ) -> Option<Vec<u32>> {
-    let units = dedupe_cap_units(units);
-    if enforce_budget && guards::command_budget_exceeded(entities, player, &units) {
+    let units = dedupe_cap_units(units, admission.max_units_per_command);
+    if admission.enforce_budget && guards::command_budget_exceeded(entities, player, &units) {
         notice(events, player, "Command supply exceeded");
         return None;
     }
     Some(units)
+}
+
+fn command_admission_for(
+    admission: CommandAdmission,
+    player_is_ai: bool,
+) -> CommandAdmissionPolicy {
+    match admission {
+        CommandAdmission::Normal => CommandAdmissionPolicy {
+            enforce_budget: !player_is_ai,
+            max_units_per_command: MAX_UNITS_PER_COMMAND,
+        },
+        CommandAdmission::LabIgnoreCommandLimits => CommandAdmissionPolicy {
+            enforce_budget: false,
+            max_units_per_command: LAB_MAX_UNITS_PER_COMMAND,
+        },
+    }
 }
 
 fn issue_mode(queued: bool) -> planner::IssueMode {
@@ -585,119 +641,6 @@ fn build_target_center(building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, 
     )
 }
 
-fn planner_config() -> planner::PlannerConfig {
-    planner::PlannerConfig {
-        max_units_per_command: MAX_UNITS_PER_COMMAND,
-        max_queue_len: MAX_QUEUED_ORDERS,
-    }
-}
-
-fn planner_facts(
-    entities: &EntityStore,
-    player: u32,
-    faction_id: &str,
-    units: &[u32],
-    ability: Option<AbilityFactInput>,
-) -> Vec<planner::UnitFacts> {
-    dedupe_cap_units(units.to_vec())
-        .into_iter()
-        .filter_map(|id| {
-            let e = entities.get(id)?;
-            if !e.is_unit() || e.owner != player {
-                return None;
-            }
-            let mut facts = planner::UnitFacts::new(id);
-            facts.pos = planner::Point::new(e.pos_x, e.pos_y);
-            facts.queue_len = e.queued_orders().len();
-            facts.queue_terminal = e
-                .queued_orders()
-                .iter()
-                .any(|intent| matches!(intent, OrderIntent::PointFire(_)));
-            facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
-            facts.activity = match e.order() {
-                Order::Idle | Order::HoldPosition => planner::UnitActivity::Idle,
-                Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
-                    planner::UnitActivity::Moving
-                }
-                _ => planner::UnitActivity::Busy,
-            };
-            facts.can_attack = e.can_attack();
-            facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
-            facts.can_build = rules::faction::catalog_for(faction_id)
-                .is_some_and(|catalog| catalog.builders.contains(&e.kind));
-            facts.can_setup_anti_tank_gun =
-                matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
-            if let Some(ability) = ability {
-                if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
-                    && ability_orders::caster_allowed_by_faction(
-                        entities,
-                        faction_id,
-                        id,
-                        ability.kind,
-                    )
-                    && ability.tech_ready
-                {
-                    facts.abilities.push(planner::AbilityFacts {
-                        ability: ability.id,
-                        ready_at_issue: true,
-                        can_execute_without_interrupt: ability.target.is_some_and(|(x, y)| {
-                            world_ability_can_execute_without_interrupt(ability.kind)
-                                && ability_orders::caster_in_range(
-                                    ability.map,
-                                    entities,
-                                    id,
-                                    ability.kind,
-                                    x,
-                                    y,
-                                )
-                                && ability_orders::world_ability_current_facing_ready(
-                                    entities,
-                                    id,
-                                    ability.kind,
-                                    x,
-                                    y,
-                                )
-                        }),
-                        can_interrupt_active_order: world_ability_may_interrupt_active_order(
-                            ability.kind,
-                        ),
-                    });
-                }
-            }
-            Some(facts)
-        })
-        .collect()
-}
-
-#[derive(Clone, Copy)]
-struct AbilityFactInput<'a> {
-    kind: AbilityKind,
-    id: planner::AbilityId,
-    tech_ready: bool,
-    target: Option<(f32, f32)>,
-    map: &'a Map,
-}
-
-fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
-    matches!(
-        ability,
-        AbilityKind::Smoke
-            | AbilityKind::EkatTeleport
-            | AbilityKind::EkatLineShot
-            | AbilityKind::EkatMagicAnchor
-    )
-}
-
-fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
-    matches!(
-        ability,
-        AbilityKind::MortarFire
-            | AbilityKind::EkatTeleport
-            | AbilityKind::EkatLineShot
-            | AbilityKind::EkatMagicAnchor
-    )
-}
-
 mod planned_actions {
     use super::*;
 
@@ -707,6 +650,7 @@ mod planned_actions {
         player: u32,
         facts: &[planner::UnitFacts],
         request: &planner::OrderRequest,
+        max_units_per_command: usize,
     ) {
         let faction_id = faction_id_for(
             players.iter().map(|p| (p.id, p.faction_id.as_str())),
@@ -725,7 +669,7 @@ mod planned_actions {
         let events = &mut *ctx.events;
         let tick = ctx.tick;
 
-        let output = planner::plan_order(planner_config(), facts, request);
+        let output = planner::plan_order(planner_config(max_units_per_command), facts, request);
         let mut move_units = Vec::new();
         let mut attack_move_units = Vec::new();
         let mut move_goal = None;
@@ -1020,8 +964,9 @@ fn attack_target_valid(
     units: &[u32],
     target: u32,
 ) -> bool {
-    dedupe_cap_units(units.to_vec())
-        .into_iter()
+    units
+        .iter()
+        .copied()
         .any(|unit| attack_unit_can_target(entities, teams, fog, smokes, player, unit, target))
 }
 
@@ -1049,8 +994,9 @@ fn deconstruct_target_valid(
     units: &[u32],
     target: u32,
 ) -> bool {
-    dedupe_cap_units(units.to_vec())
-        .into_iter()
+    units
+        .iter()
+        .copied()
         .any(|unit| deconstruct_unit_can_target(entities, teams, fog, smokes, player, unit, target))
 }
 
@@ -1170,6 +1116,7 @@ struct AbilityUse {
     y: Option<f32>,
     units: Vec<u32>,
     queued: bool,
+    max_units_per_command: usize,
 }
 
 fn use_ability(
@@ -1205,7 +1152,7 @@ fn use_ability(
         let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
             return;
         };
-        for unit in dedupe_cap_units(request.units) {
+        for unit in dedupe_cap_units(request.units, request.max_units_per_command) {
             if !ability_orders::caster_allowed_by_faction(entities, &faction_id, unit, ability) {
                 continue;
             }
@@ -1274,7 +1221,8 @@ fn use_ability(
 
     let units = if !request.queued {
         if let Some((x, y)) = target_point {
-            let eligible: Vec<u32> = dedupe_cap_units(request.units.clone())
+            let eligible: Vec<u32> =
+                dedupe_cap_units(request.units.clone(), request.max_units_per_command)
                 .into_iter()
                 .filter(|id| caster_can_accept_order(entities, player, *id, ability))
                 .collect();
@@ -1301,6 +1249,7 @@ fn use_ability(
             target: target_point,
             map,
         }),
+        request.max_units_per_command,
     );
     let order = planner::OrderRequest {
         units,
@@ -1310,7 +1259,14 @@ fn use_ability(
             target,
         },
     };
-    planned_actions::execute(ctx, players, player, &facts, &order);
+    planned_actions::execute(
+        ctx,
+        players,
+        player,
+        &facts,
+        &order,
+        request.max_units_per_command,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]

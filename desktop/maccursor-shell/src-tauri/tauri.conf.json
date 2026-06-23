@@ -3,7 +3,9 @@
   "productName": "RTS Mac Cursor Shell",
   "version": "0.1.0",
   "identifier": "dev.bewegungskrieg.MacCursorShell",
-  "build": {},
+  "build": {
+    "frontendDist": "../ui"
+  },
   "app": {
     "withGlobalTauri": true,
     "windows": [

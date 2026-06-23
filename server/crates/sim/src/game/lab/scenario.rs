@@ -6,6 +6,13 @@ use crate::game::map::Map;
 
 use super::{validate_world_position, LabError};
 
+pub(super) const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
+pub(super) const LAB_SCENARIO_KIND: &str = "labScenario";
+pub(super) const MAX_LAB_SCENARIO_NAME_LEN: usize = 80;
+pub(super) const MAX_LAB_SCENARIO_PLAYERS: usize = 8;
+pub(super) const MAX_LAB_SCENARIO_ENTITIES: usize = 2000;
+pub(super) const MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER: usize = 32;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LabScenarioV1 {
@@ -82,6 +89,48 @@ pub struct LabScenarioEntity {
 pub struct LabScenarioPoint {
     pub x: f32,
     pub y: f32,
+}
+
+pub(super) fn validate_lab_scenario_shape(scenario: &LabScenarioV1) -> Result<(), LabError> {
+    if scenario.schema_version != LAB_SCENARIO_V1_SCHEMA_VERSION {
+        return Err(LabError::InvalidScenarioVersion {
+            version: scenario.schema_version,
+        });
+    }
+    if scenario.kind != LAB_SCENARIO_KIND {
+        return Err(LabError::InvalidScenario {
+            reason: "scenario kind must be labScenario".to_string(),
+        });
+    }
+    if scenario.name.trim().is_empty() || scenario.name.len() > MAX_LAB_SCENARIO_NAME_LEN {
+        return Err(LabError::InvalidScenario {
+            reason: "scenario name must be non-empty and at most 80 bytes".to_string(),
+        });
+    }
+    if scenario.players.is_empty() {
+        return Err(LabError::InvalidScenario {
+            reason: "scenario must contain at least one player".to_string(),
+        });
+    }
+    if scenario.players.len() > MAX_LAB_SCENARIO_PLAYERS {
+        return Err(LabError::InvalidScenario {
+            reason: format!(
+                "scenario has too many players: {} > {}",
+                scenario.players.len(),
+                MAX_LAB_SCENARIO_PLAYERS
+            ),
+        });
+    }
+    if scenario.entities.len() > MAX_LAB_SCENARIO_ENTITIES {
+        return Err(LabError::InvalidScenario {
+            reason: format!(
+                "scenario has too many entities: {} > {}",
+                scenario.entities.len(),
+                MAX_LAB_SCENARIO_ENTITIES
+            ),
+        });
+    }
+    Ok(())
 }
 
 pub(super) fn lab_entity_is_set_up(entity: &Entity) -> bool {

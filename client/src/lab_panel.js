@@ -80,41 +80,10 @@ export class LabPanel {
     this.addStatus(status, "Ops", String(this.state?.operationCount ?? 0));
     this.el.appendChild(status);
 
-    const controls = document.createElement("section");
-    controls.className = "lab-vision-controls";
-    controls.setAttribute("aria-label", "Lab vision");
-
-    const fullButton = this.button("Full", () => this.requestVision(labVision.fullWorld()));
-    controls.appendChild(fullButton);
-
-    for (const teamId of this.teamIds()) {
-      const button = this.button(`Team ${teamId}`, () => this.requestVision(labVision.team(teamId)));
-      controls.appendChild(button);
-    }
-
-    const union = document.createElement("div");
-    union.className = "lab-team-union";
-    for (const teamId of this.teamIds()) {
-      const label = document.createElement("label");
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.value = String(teamId);
-      input.checked = this.visionIncludesTeam(teamId);
-      const text = document.createElement("span");
-      text.textContent = `T${teamId}`;
-      this.teamInputs.set(teamId, input);
-      label.append(input, text);
-      union.appendChild(label);
-    }
-    if (this.teamInputs.size > 0) {
-      const apply = this.button("Apply teams", () => this.requestTeamUnion());
-      union.appendChild(apply);
-      controls.appendChild(union);
-    }
-    this.el.appendChild(controls);
+    this.el.appendChild(this.renderOptionsPanel());
 
     if (this.canOperate()) {
-      this.el.appendChild(this.renderSetupTools());
+      this.el.appendChild(this.renderToolsPanel());
     }
 
     const result = document.createElement("p");
@@ -130,41 +99,25 @@ export class LabPanel {
     this.el.appendChild(this.windowChrome.renderResizeHandle());
   }
 
-  renderSetupTools() {
-    const root = document.createElement("section");
-    root.className = "lab-tools";
-    root.setAttribute("aria-label", "Lab setup tools");
+  panelSection(title, className) {
+    const section = document.createElement("section");
+    section.className = `lab-panel-section ${className}`;
+    section.setAttribute("aria-label", title);
+    const heading = document.createElement("h3");
+    heading.className = "lab-panel-section-title";
+    heading.textContent = title;
+    section.appendChild(heading);
+    return section;
+  }
 
-    const selection = this.selectedEntities();
-    const selectedIds = selectedEntityIds(selection);
-    const issueOwner = singleOwner(selection);
-    const hasSelection = selectedIds.length > 0;
-    const selectedActionDisabled = !hasSelection;
-    const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
+  renderOptionsPanel() {
+    const root = this.panelSection("Options", "lab-options");
+    root.appendChild(this.renderVisionOptions());
 
-    root.appendChild(this.renderActiveToolStatus());
+    if (!this.canOperate()) return root;
+
+    root.appendChild(this.renderCommandOptions());
     root.appendChild(this.renderTargetPlayer());
-    root.appendChild(this.renderSpawnPalette());
-    root.appendChild(this.renderBuildingSpawnPalette());
-    root.appendChild(this.renderMapTools());
-
-    root.appendChild(this.fieldset("Selected", [
-      this.readout(`${selectedIds.length} selected`),
-      this.button("Move to point", () => this.armMoveSelectedTool(), {
-        disabled: selectedActionDisabled,
-        title: selectedActionTitle,
-        dataset: { active: this.activeLabTool()?.kind === "moveSelected" ? "true" : "false" },
-      }),
-      this.playerSelectField("set-owner", "Owner", {
-        value: issueOwner ?? undefined,
-        disabled: selectedActionDisabled,
-      }),
-      this.button("Set owner", () => this.setSelectedOwner(), {
-        disabled: selectedActionDisabled,
-        title: selectedActionTitle,
-      }),
-      this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
-    ]));
 
     this.normalizePlayerState();
     root.appendChild(this.fieldset("Player State", [
@@ -181,6 +134,9 @@ export class LabPanel {
       this.button("Set resources", () => this.setPlayerResources()),
       this.button("Give All", () => this.giveAllPlayerResources(), {
         title: "Give every player 99999 steel and 99999 oil",
+      }),
+      this.checkboxField("player-god-mode", "God mode", this.playerGodModeEnabled(), {
+        onChange: (enabled) => this.setPlayerGodMode(enabled),
       }),
       this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels(), {
         value: this.playerState.researchUpgrade,
@@ -201,12 +157,94 @@ export class LabPanel {
     return root;
   }
 
-  renderMapTools() {
+  renderVisionOptions() {
+    const controls = [];
+    controls.push(this.button("Full", () => this.requestVision(labVision.fullWorld())));
+
+    for (const teamId of this.teamIds()) {
+      controls.push(this.button(`Team ${teamId}`, () => this.requestVision(labVision.team(teamId))));
+    }
+
+    const union = document.createElement("div");
+    union.className = "lab-team-union";
+    for (const teamId of this.teamIds()) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = String(teamId);
+      input.checked = this.visionIncludesTeam(teamId);
+      const text = document.createElement("span");
+      text.textContent = `T${teamId}`;
+      this.teamInputs.set(teamId, input);
+      label.append(input, text);
+      union.appendChild(label);
+    }
+    if (this.teamInputs.size > 0) {
+      const apply = this.button("Apply teams", () => this.requestTeamUnion());
+      union.appendChild(apply);
+      controls.push(union);
+    }
+
+    return this.fieldset("Vision", controls, { className: "lab-tool-group lab-vision-group" });
+  }
+
+  renderToolsPanel() {
+    const root = this.panelSection("Tools", "lab-tools");
+
+    const selection = this.selectedEntities();
+    const selectedIds = selectedEntityIds(selection);
+    const issueOwner = singleOwner(selection);
+    const hasSelection = selectedIds.length > 0;
+    const selectedActionDisabled = !hasSelection;
+    const selectedActionTitle = selectedActionDisabled ? "Select an entity first" : "";
+
+    root.appendChild(this.renderActiveToolStatus());
+    root.appendChild(this.renderSpawnPalette());
+    root.appendChild(this.renderBuildingSpawnPalette());
+    root.appendChild(this.renderMapTools({
+      selectedIds,
+      issueOwner,
+      selectedActionDisabled,
+      selectedActionTitle,
+    }));
+
+    return root;
+  }
+
+  renderCommandOptions() {
+    return this.fieldset("Commands", [
+      this.checkboxField("ignore-command-limits", "Unlimited commands", this.ignoreCommandLimitsEnabled(), {
+        onChange: (enabled) => this.setIgnoreCommandLimits(enabled),
+      }),
+    ]);
+  }
+
+  renderMapTools({
+    selectedIds = [],
+    issueOwner = null,
+    selectedActionDisabled = true,
+    selectedActionTitle = "",
+  } = {}) {
     return this.fieldset("Map Tools", [
       this.button("Remove tool", () => this.armRemoveTool(), {
         title: "Click or drag over selectable units to delete them",
         dataset: { active: this.activeLabTool()?.kind === "removeSelectableUnits" ? "true" : "false" },
       }),
+      this.readout(`${selectedIds.length} selected`),
+      this.button("Move to point", () => this.armMoveSelectedTool(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+        dataset: { active: this.activeLabTool()?.kind === "moveSelected" ? "true" : "false" },
+      }),
+      this.playerSelectField("set-owner", "Owner", {
+        value: issueOwner ?? undefined,
+        disabled: selectedActionDisabled,
+      }),
+      this.button("Set owner", () => this.setSelectedOwner(), {
+        disabled: selectedActionDisabled,
+        title: selectedActionTitle,
+      }),
+      this.readout(issueOwner == null ? "Issue-as requires one owner" : `Issue-as P${issueOwner}`),
     ]);
   }
 
@@ -772,6 +810,31 @@ export class LabPanel {
       this.playerState.researchUpgrade,
       true,
     );
+  }
+
+  setPlayerGodMode(enabled) {
+    this.captureTargetPlayerField();
+    return this.labClient.setPlayerGodMode(this.targetPlayer(), enabled);
+  }
+
+  playerGodModeEnabled() {
+    const target = this.targetPlayer();
+    return (this.state?.godModePlayers || []).map(Number).includes(target);
+  }
+
+  setIgnoreCommandLimits(enabled) {
+    const policy = this.labControlPolicy();
+    policy?.setIgnoreCommandLimits?.(enabled);
+    const summary = enabled ? "Unlimited commands enabled." : "Command limit restored.";
+    return this.publishLocalResult("ignoreCommandLimits", true, summary);
+  }
+
+  ignoreCommandLimitsEnabled() {
+    return this.labControlPolicy()?.ignoreCommandLimitsEnabled?.() ?? true;
+  }
+
+  labControlPolicy() {
+    return this.match?.state?.controlPolicy || null;
   }
 
   armMoveSelectedTool() {

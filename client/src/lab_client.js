@@ -71,6 +71,10 @@ export class LabClient {
     return this.request({ op: "setPlayerResources", playerId, steel, oil });
   }
 
+  setPlayerGodMode(playerId, enabled) {
+    return this.request({ op: "setPlayerGodMode", playerId, enabled: !!enabled });
+  }
+
   setCompletedResearch(playerId, upgrade, completed) {
     return this.request({ op: "setCompletedResearch", playerId, upgrade, completed: !!completed });
   }
@@ -120,6 +124,7 @@ export class LabClient {
       operatorId: Number.isFinite(message?.operatorId) ? message.operatorId : null,
       role: message?.role || "",
       vision: message?.vision || null,
+      godModePlayers: normalizePlayerIds(message?.godModePlayers),
       dirty: !!message?.dirty,
       operationCount: Number.isFinite(message?.operationCount) ? message.operationCount : 0,
     };
@@ -176,3 +181,16 @@ export const labVision = Object.freeze({
   team: (teamId) => msg.labVisionTeam(teamId),
   teams: (teamIds) => msg.labVisionTeams(teamIds),
 });
+
+function normalizePlayerIds(ids) {
+  if (!Array.isArray(ids)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const value of ids) {
+    const id = Number(value);
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out.sort((a, b) => a - b);
+}

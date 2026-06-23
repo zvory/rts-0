@@ -36,7 +36,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
-        vec![(
+        normal_pending(vec![(
             1,
             SimCommand::Build {
                 units: vec![worker],
@@ -45,7 +45,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
                 tile_y: 4,
                 queued: false,
             },
-        )],
+        )]),
         &mut events,
         1,
     );
@@ -113,7 +113,7 @@ fn build_order_does_not_pull_worker_off_active_construction() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
-        vec![(
+        normal_pending(vec![(
             1,
             SimCommand::Build {
                 units: vec![worker],
@@ -122,7 +122,7 @@ fn build_order_does_not_pull_worker_off_active_construction() {
                 tile_y: 8,
                 queued: false,
             },
-        )],
+        )]),
         &mut events,
         1,
     );
@@ -185,7 +185,7 @@ fn build_order_accepts_resuming_owned_scaffold() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
-        vec![(
+        normal_pending(vec![(
             1,
             SimCommand::Build {
                 units: vec![worker],
@@ -194,7 +194,7 @@ fn build_order_accepts_resuming_owned_scaffold() {
                 tile_y: 4,
                 queued: false,
             },
-        )],
+        )]),
         &mut events,
         1,
     );
@@ -264,7 +264,7 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
         &mut ability_runtime,
         &mut mortar_shells,
         &mut artillery_shells,
-        vec![(
+        normal_pending(vec![(
             1,
             SimCommand::Build {
                 units: vec![worker],
@@ -273,7 +273,7 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
                 tile_y: 4,
                 queued: false,
             },
-        )],
+        )]),
         &mut events,
         1,
     );

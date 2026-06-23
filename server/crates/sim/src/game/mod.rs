@@ -152,7 +152,7 @@ pub struct Game {
     players: Vec<PlayerState>,
     /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
     /// issuing player so ownership can be validated on apply.
-    pending: Vec<(u32, SimCommand)>,
+    pending: Vec<commands::PendingCommand>,
     /// Authoritative commands stamped with the tick where they were applied. Includes AI commands
     /// because they are emitted into the same pending queue before command application.
     command_log: Vec<CommandLogEntry>,
@@ -182,6 +182,8 @@ pub struct Game {
     map_metadata: MapMetadata,
     /// Under-construction building ids that received authoritative build progress this tick.
     active_construction_sites: BTreeSet<u32>,
+    /// Lab-only player ids whose units ignore incoming damage.
+    lab_god_mode_players: BTreeSet<u32>,
     starting_loadout: StartingLoadout,
     pub(crate) rng: SmallRng,
 }
@@ -231,6 +233,9 @@ impl Game {
             self.record_commands_for_tick(&pending);
         });
         self.active_construction_sites.clear();
+        if !self.lab_god_mode_players.is_empty() {
+            self.sync_lab_god_mode_flags();
+        }
 
         // Run every per-tick system in order. `run_tick` takes split borrows of the map,
         // entity store, player economy, and the event buckets, so it can mutate resources and
@@ -476,6 +481,8 @@ impl Game {
 
 #[cfg(test)]
 mod ability_projection_tests;
+#[cfg(test)]
+mod lab_god_mode_tests;
 #[cfg(test)]
 mod phase7_privacy_tests;
 #[cfg(test)]

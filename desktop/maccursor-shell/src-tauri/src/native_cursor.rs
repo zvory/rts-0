@@ -4,6 +4,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::WebviewWindow;
 
+use crate::diagnostics::ShellDiagnostics;
+
 const BACKEND: &str = "native-macos";
 const VISUAL: &str = "dom-event-time";
 const DEFAULT_WIDTH: f64 = 1280.0;
@@ -12,6 +14,7 @@ const DEFAULT_HEIGHT: f64 = 820.0;
 #[derive(Clone, Default)]
 pub struct NativeCursorBackend {
     inner: Arc<Mutex<NativeCursorSession>>,
+    diagnostics: Option<ShellDiagnostics>,
 }
 
 #[derive(Debug)]
@@ -116,9 +119,16 @@ struct NativeCursorEventInput {
 }
 
 impl NativeCursorBackend {
+    pub fn with_diagnostics(diagnostics: ShellDiagnostics) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(NativeCursorSession::default())),
+            diagnostics: Some(diagnostics),
+        }
+    }
+
     pub fn install(&self, window: &WebviewWindow) {
         configure_window_for_mouse_motion(window);
-        install_native_event_monitor(self.inner.clone());
+        install_native_event_monitor(self.clone());
     }
 
     fn start(
@@ -140,6 +150,15 @@ impl NativeCursorBackend {
                 "maccursor-shell native capture start requested x={:.1} y={:.1} width={:.1} height={:.1}",
                 session.x, session.y, session.width, session.height
             );
+            self.log_event(
+                "native_cursor_capture_start_requested",
+                serde_json::json!({
+                    "x": session.x,
+                    "y": session.y,
+                    "width": session.width,
+                    "height": session.height,
+                }),
+            );
             match start_system_cursor_capture() {
                 Ok(capture) => {
                     session.cursor_hidden = capture.cursor_hidden;
@@ -148,11 +167,16 @@ impl NativeCursorBackend {
                     session.last_reason = "capture-start".to_string();
                     session.last_error = None;
                     eprintln!("maccursor-shell native capture started");
+                    self.log_event("native_cursor_capture_started", serde_json::json!({}));
                 }
                 Err(err) => {
                     session.last_reason = "capture-start-failed".to_string();
                     session.last_error = Some(err.clone());
                     eprintln!("maccursor-shell native capture failed: {err}");
+                    self.log_event(
+                        "native_cursor_capture_start_failed",
+                        serde_json::json!({ "message": err }),
+                    );
                     return Err(err);
                 }
             }
@@ -176,6 +200,10 @@ impl NativeCursorBackend {
             if was_active {
                 restore_system_cursor(session.cursor_hidden, session.cursor_disconnected);
                 eprintln!("maccursor-shell native capture stopped reason={reason}");
+                self.log_event(
+                    "native_cursor_capture_stopped",
+                    serde_json::json!({ "reason": reason }),
+                );
             }
             session.active = false;
             session.cursor_hidden = false;
@@ -268,8 +296,12 @@ impl NativeCursorBackend {
                 if let Err(err) = self.dispatch_to_js(&window, &event) {
                     if let Ok(mut session) = self.inner.lock() {
                         session.dropped_events = session.dropped_events.saturating_add(1);
-                        session.last_error = Some(err);
+                        session.last_error = Some(err.clone());
                     }
+                    self.log_event(
+                        "native_cursor_dispatch_failed",
+                        serde_json::json!({ "message": err }),
+                    );
                 }
             }
             None => {
@@ -278,6 +310,10 @@ impl NativeCursorBackend {
                     session.last_error =
                         Some("native cursor event had no WebView target".to_string());
                 }
+                self.log_event(
+                    "native_cursor_dispatch_failed",
+                    serde_json::json!({ "message": "native cursor event had no WebView target" }),
+                );
             }
         }
         true
@@ -302,6 +338,12 @@ impl NativeCursorBackend {
         self.inner
             .lock()
             .map_err(|_| "native cursor backend state is poisoned".to_string())
+    }
+
+    fn log_event(&self, event: &str, fields: serde_json::Value) {
+        if let Some(diagnostics) = &self.diagnostics {
+            diagnostics.log_event(event, fields);
+        }
     }
 }
 
@@ -470,14 +512,13 @@ fn configure_window_for_mouse_motion(window: &WebviewWindow) {
 fn configure_window_for_mouse_motion(_window: &WebviewWindow) {}
 
 #[cfg(target_os = "macos")]
-fn install_native_event_monitor(inner: Arc<Mutex<NativeCursorSession>>) {
+fn install_native_event_monitor(backend: NativeCursorBackend) {
     use std::ptr::NonNull;
 
     use block2::RcBlock;
     use objc2::runtime::AnyObject;
     use objc2_app_kit::{NSEvent, NSEventMask, NSEventModifierFlags, NSEventType};
 
-    let backend = NativeCursorBackend { inner };
     let block = RcBlock::new(move |event_ptr: NonNull<NSEvent>| -> *mut NSEvent {
         let event = unsafe { event_ptr.as_ref() };
         let input = native_event_input(event);
@@ -582,7 +623,7 @@ fn install_native_event_monitor(inner: Arc<Mutex<NativeCursorSession>>) {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn install_native_event_monitor(_inner: Arc<Mutex<NativeCursorSession>>) {}
+fn install_native_event_monitor(_backend: NativeCursorBackend) {}
 
 #[cfg(test)]
 mod tests {

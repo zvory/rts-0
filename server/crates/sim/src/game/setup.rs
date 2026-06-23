@@ -304,6 +304,7 @@ impl Game {
             starting_loadouts: resolved_starting_loadouts,
             map_metadata,
             active_construction_sites: BTreeSet::new(),
+            lab_god_mode_players: BTreeSet::new(),
             starting_loadout,
             rng,
         };

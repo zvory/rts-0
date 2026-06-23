@@ -883,9 +883,10 @@ default is the union of all replay players.
 { op: "moveEntity", entityId: u32, x: f32, y: f32 }
 { op: "setEntityOwner", entityId: u32, owner: u32 }
 { op: "setPlayerResources", playerId: u32, steel: u32, oil: u32 }
+{ op: "setPlayerGodMode", playerId: u32, enabled: bool }
 { op: "setCompletedResearch", playerId: u32, upgrade: string, completed: bool }
 { op: "setVision", vision: LabVisionMode }
-{ op: "issueCommandAs", playerId: u32, cmd: Command }
+{ op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
 { op: "exportScenario", name?: string }
 { op: "importScenario", scenario: LabScenarioV1 }
 ```
@@ -895,7 +896,12 @@ room task before snapshot projection; unknown, empty, or duplicate team selectio
 Lab vision is server-owned per operator, so one operator can inspect full world while another uses
 team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
-units belong to that player; mixed-owner selections are rejected instead of partitioned.
+units belong to that player; mixed-owner selections are rejected instead of partitioned. When
+`ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses
+the larger bounded lab command window instead of the ordinary live-player unit-id window.
+`setPlayerGodMode` is lab-only room state: enabled players' units ignore incoming damage, while
+buildings and resources keep normal damage behavior. The current enabled player ids are mirrored in
+`start.lab.godModePlayers` and `labState.godModePlayers`.
 
 `LabScenarioV1` is versioned setup JSON, not a saved snapshot:
 ```
@@ -934,11 +940,11 @@ Reliable lab server messages:
 
 | `t` | Fields | Meaning |
 |-----|--------|---------|
-| `labState` | `room`, `operatorId`, `role`, `vision`, `dirty`, `operationCount` | Recipient-scoped lab control metadata. World state still travels through `snapshot`. |
+| `labState` | `room`, `operatorId`, `role`, `vision`, `godModePlayers`, `dirty`, `operationCount` | Recipient-scoped lab control metadata plus room-scoped active god-mode player ids. World state still travels through `snapshot`. |
 | `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
 
-Lab protocol deliberately omits seek controls, lab simulation flags such as disabled damage or god
-mode, server-side public scenario storage, fine-grained multi-operator permissions, visual
+Lab protocol deliberately omits seek controls, broad lab simulation flags such as globally disabled
+damage, server-side public scenario storage, fine-grained multi-operator permissions, visual
 iteration hot reload, and `/dev/scenario` migration. Pause, speed, step, and room-local timeline
 metadata use the neutral room-time messages instead of overloading `LabClientOp`.
 Debug-style prebuilt setups should return later as explicit lab scenario/preset protocol, not as a

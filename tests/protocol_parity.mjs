@@ -367,7 +367,16 @@ assert(
 );
 assert(
   JSON.stringify(msg.labIssueCommandAs(13, 1, cmd.stop([7]))) ===
-    JSON.stringify({ t: "lab", requestId: 13, op: { op: "issueCommandAs", playerId: 1, cmd: { c: "stop", units: [7] } } }),
+    JSON.stringify({
+      t: "lab",
+      requestId: 13,
+      op: {
+        op: "issueCommandAs",
+        playerId: 1,
+        cmd: { c: "stop", units: [7] },
+        ignoreCommandLimits: false,
+      },
+    }),
   "lab issue-as builder must emit the exact wire shape",
 );
 assert(

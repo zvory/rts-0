@@ -7,7 +7,7 @@ import {
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
 } from "../../client/src/config.js";
-import { commandWithinBudget } from "../../client/src/command_budget.js";
+import { admitSelectionIds, commandWithinBudget } from "../../client/src/command_budget.js";
 import {
   KIND,
   STATE,
@@ -66,6 +66,29 @@ import {
       cmd.stop(legalInfantry.map((entity) => entity.id)),
     ).ok,
     "client command guard allows 24 one-supply units",
+  );
+
+  const labState = {
+    ...budgetState(tanks),
+    controlPolicy: {
+      kind: "lab",
+      ignoreCommandLimitsEnabled: () => false,
+    },
+  };
+  assert(
+    admitSelectionIds(labState, tanks.map((tank) => tank.id)).ids.length === tanks.length,
+    "lab selection is not changed by the command-limit option",
+  );
+  assert(
+    !commandWithinBudget(labState, cmd.move(tanks.map((tank) => tank.id), 100, 100), { ownerId: 1 }).ok,
+    "lab command guard can still apply command supply when limits are enabled",
+  );
+  assert(
+    commandWithinBudget(labState, cmd.move(tanks.map((tank) => tank.id), 100, 100), {
+      ownerId: 1,
+      ignoreCommandLimits: true,
+    }).ok,
+    "lab command guard can ignore command supply when command limits are disabled",
   );
 }
 

@@ -4,39 +4,38 @@
 
 ### Phase 1 - Startup Server Picker
 
-Replace immediate server launch with a shell-owned startup screen that lets players choose beta,
-mainline, local, or a custom server URL before the game loads. The default choices should include
-beta and mainline, while custom URLs are normalized, validated, persisted, and shown again on later
-launches. Remote servers must load with the same native cursor bridge and desktop runtime metadata
-that local mode uses today.
+Replace immediate server launch with a shell-owned startup screen that lets players choose beta or
+mainline before the game loads. The first-attempt MVP should not expose a local loopback profile or
+custom URL entry. The shell must load the selected release website and provide native cursor support
+without owning the game server or static assets.
 
-### Phase 2 - Packaged Local Runtime
+### Phase 2 - Thin Shell Runtime Boundary
 
-Make local mode work from a copied app bundle instead of requiring Cargo and a source checkout. The
-Tauri shell should launch a bundled optimized `rts-server` binary, point it at bundled client and map
-assets, and keep the current dev `cargo run` path only for source-tree development. This phase should
-turn the shell from a developer spike into an unsigned app bundle shape that can run on another Mac.
+Remove the shell's current server-spawning assumption from the shippable path. The app should never
+bundle or launch `rts-server`, `client/`, maps, or other game assets; those are fetched from the
+selected beta or mainline origin just like a browser would. Developer-only URL overrides may exist
+outside the packaged playtest flow, but they must not appear as local/custom options in the MVP UI.
 
 ### Phase 3 - Basic Logs And Failure Surfaces
 
-Add basic persistent logs for shell startup, selected server profile, local server stdout/stderr, and
-native cursor failures. Startup and connection failures should be visible inside the shell instead of
-only in a terminal, and the app should make the log location easy to find or copy. Keep this small:
-the goal is enough evidence for playtester support, not a full telemetry system.
+Add basic persistent logs for shell startup, selected server profile, navigation/connectivity
+failures, and native cursor failures. Startup and connection failures should be visible inside the
+shell instead of only in a terminal, and the app should make the log location easy to find or copy.
+Keep this small: the goal is enough evidence for playtester support, not a full telemetry system.
 
 ### Phase 4 - Unsigned Release Build Path
 
 Add a repeatable command that builds an unsigned macOS playtest artifact and records exactly what is
-inside it. The build should include the Tauri app, bundled local runtime resources, version/build
-metadata, and a minimal README covering how to open the unsigned app and where logs live. Do not add
-notarization, signing, auto-update, or tester-facing "what to test" notes in this phase.
+inside it. The build should include only the Tauri shell, version/build metadata, and a minimal
+README covering how to open the unsigned app, choose a server, and find logs. Do not add bundled game
+assets, notarization, signing, auto-update, or tester-facing "what to test" notes in this phase.
 
 ### Phase 5 - Final Manual Gate
 
-Run the delayed in-game plausibility gate only after the startup picker, packaging, and logging work
-has landed. The final pass should use the built app, verify beta/mainline/custom/local startup paths,
-then do the native cursor gameplay checks from the original maccursor Phase 4. Any small fixes found
-here can land in this phase, but do not start this phase until someone can actually test on macOS.
+Run the final built-artifact gate only after the startup picker, packaging, and logging work has
+landed. The final pass should use the built app, verify beta and mainline startup paths, then do the
+native cursor gameplay checks from the original maccursor Phase 4. Any small fixes found here can
+land in this phase, but do not start this phase until someone can actually test on macOS.
 
 ## Cross-Phase Constraints
 
@@ -45,16 +44,15 @@ here can land in this phase, but do not start this phase until someone can actua
   automation beyond a local unsigned artifact command.
 - Preserve normal browser play and the current browser Pointer Lock path.
 - Keep the desktop native cursor path feature-gated through the Tauri runtime bridge.
-- Remote server URLs must be explicit player choices. Allow `https://` for remote servers and allow
-  plain `http://` only for loopback/local development.
+- The MVP startup UI must offer only the built-in beta and mainline release channels.
+- The shipped shell must be thin. Do not bundle `rts-server`, `client/`, maps, lab scenarios, or
+  other game assets; load all game content from the selected website.
 - The startup selector should ship with beta and mainline defaults. Verify the exact URLs from repo
   deploy config or current deployment evidence during implementation.
-- Custom server entries should persist in the user's app config, not in repo files.
-- A remote custom URL is a trust boundary. Do not send secrets, local file paths, or elevated shell
-  capabilities to arbitrary sites; keep Tauri command access limited to the native cursor and
-  desktop-shell commands required by this app.
-- Local mode must not write match history unless the bundled server is explicitly configured to do
-  so; preserve the existing server env-gated behavior.
+- Do not add custom server URL entry, custom server persistence, or a local loopback profile for this
+  first playtest attempt.
+- Keep Tauri command access limited to the native cursor and desktop-shell commands required by this
+  app. Do not send secrets, local file paths, or unrelated shell capabilities to loaded sites.
 - Keep the final manual gate at the end. Earlier phases may include small smoke checks, but they
   should not depend on the user being home to do gameplay testing.
 - Each implementation phase must land on its own `zvorygin/` branch, be pushed as an owned PR with

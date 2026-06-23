@@ -32,15 +32,11 @@ pub use scenario::{
 };
 use scenario::{
     lab_entity_is_set_up, lab_entity_setup_target, restore_lab_entity_setup,
-    validate_lab_entity_setup_shape,
+    validate_lab_entity_setup_shape, validate_lab_scenario_shape,
+    LAB_SCENARIO_KIND, MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
 };
 
-pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
-const LAB_SCENARIO_KIND: &str = "labScenario";
-const MAX_LAB_SCENARIO_NAME_LEN: usize = 80;
-const MAX_LAB_SCENARIO_PLAYERS: usize = 8;
-const MAX_LAB_SCENARIO_ENTITIES: usize = 2000;
-const MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER: usize = 32;
+pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = scenario::LAB_SCENARIO_V1_SCHEMA_VERSION;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LabOp {
@@ -49,6 +45,7 @@ pub enum LabOp {
     MoveEntity(LabMoveEntity),
     SetEntityOwner(LabSetEntityOwner),
     SetPlayerResources(LabSetPlayerResources),
+    SetPlayerGodMode { player_id: u32, enabled: bool },
     SetCompletedResearch(LabSetCompletedResearch),
     RestoreScenario(Box<LabScenarioV1>),
 }
@@ -110,6 +107,10 @@ pub enum LabOpOutcome {
         player_id: u32,
         steel: u32,
         oil: u32,
+    },
+    PlayerGodModeSet {
+        player_id: u32,
+        enabled: bool,
     },
     CompletedResearchSet {
         player_id: u32,
@@ -175,6 +176,11 @@ pub enum LabError {
     },
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LabCommandOptions {
+    pub ignore_command_limits: bool,
+}
+
 impl Game {
     pub fn new_lab(players: &[PlayerInit], seed: u32, map: Map, map_metadata: MapMetadata) -> Game {
         Self::new_inner_with_map(
@@ -195,6 +201,9 @@ impl Game {
             LabOp::MoveEntity(input) => self.lab_move_entity(input),
             LabOp::SetEntityOwner(input) => self.lab_set_entity_owner(input),
             LabOp::SetPlayerResources(input) => self.lab_set_player_resources(input),
+            LabOp::SetPlayerGodMode { player_id, enabled } => {
+                self.lab_set_player_god_mode(player_id, enabled)
+            }
             LabOp::SetCompletedResearch(input) => self.lab_set_completed_research(input),
             LabOp::RestoreScenario(scenario) => self.restore_lab_scenario(*scenario),
         }
@@ -204,6 +213,7 @@ impl Game {
         &mut self,
         player_id: u32,
         command: Command,
+        options: LabCommandOptions,
     ) -> Result<(), LabError> {
         self.validate_owner(player_id)?;
         let authority_entities = command_authority_entities(&command);
@@ -227,7 +237,12 @@ impl Game {
                 });
             }
         }
-        self.enqueue(player_id, super::command::SimCommand::from_protocol(command));
+        let command = super::command::SimCommand::from_protocol(command);
+        if options.ignore_command_limits {
+            self.enqueue_lab_command_ignoring_limits(player_id, command);
+        } else {
+            self.enqueue(player_id, command);
+        }
         Ok(())
     }
 
@@ -293,48 +308,15 @@ impl Game {
         }
     }
 
+    pub fn lab_god_mode_players(&self) -> Vec<u32> {
+        self.lab_god_mode_players.iter().copied().collect()
+    }
+
     pub fn restore_lab_scenario(
         &mut self,
         scenario: LabScenarioV1,
     ) -> Result<LabOpOutcome, LabError> {
-        if scenario.schema_version != LAB_SCENARIO_V1_SCHEMA_VERSION {
-            return Err(LabError::InvalidScenarioVersion {
-                version: scenario.schema_version,
-            });
-        }
-        if scenario.kind != LAB_SCENARIO_KIND {
-            return Err(LabError::InvalidScenario {
-                reason: "scenario kind must be labScenario".to_string(),
-            });
-        }
-        if scenario.name.trim().is_empty() || scenario.name.len() > MAX_LAB_SCENARIO_NAME_LEN {
-            return Err(LabError::InvalidScenario {
-                reason: "scenario name must be non-empty and at most 80 bytes".to_string(),
-            });
-        }
-        if scenario.players.is_empty() {
-            return Err(LabError::InvalidScenario {
-                reason: "scenario must contain at least one player".to_string(),
-            });
-        }
-        if scenario.players.len() > MAX_LAB_SCENARIO_PLAYERS {
-            return Err(LabError::InvalidScenario {
-                reason: format!(
-                    "scenario has too many players: {} > {}",
-                    scenario.players.len(),
-                    MAX_LAB_SCENARIO_PLAYERS
-                ),
-            });
-        }
-        if scenario.entities.len() > MAX_LAB_SCENARIO_ENTITIES {
-            return Err(LabError::InvalidScenario {
-                reason: format!(
-                    "scenario has too many entities: {} > {}",
-                    scenario.entities.len(),
-                    MAX_LAB_SCENARIO_ENTITIES
-                ),
-            });
-        }
+        validate_lab_scenario_shape(&scenario)?;
 
         let mut seen_players = HashSet::new();
         let mut inits = Vec::with_capacity(scenario.players.len());
@@ -563,6 +545,24 @@ impl Game {
         })
     }
 
+    fn lab_set_player_god_mode(
+        &mut self,
+        player_id: u32,
+        enabled: bool,
+    ) -> Result<LabOpOutcome, LabError> {
+        self.validate_player(player_id)?;
+        if enabled {
+            self.lab_god_mode_players.insert(player_id);
+        } else {
+            self.lab_god_mode_players.remove(&player_id);
+        }
+        self.sync_lab_god_mode_flags();
+        Ok(LabOpOutcome::PlayerGodModeSet {
+            player_id,
+            enabled,
+        })
+    }
+
     fn lab_set_completed_research(
         &mut self,
         input: LabSetCompletedResearch,
@@ -684,10 +684,15 @@ impl Game {
         if owner == NEUTRAL {
             return Err(LabError::InvalidOwner { owner });
         }
-        if self.players.iter().any(|player| player.id == owner) {
+        self.validate_player(owner)
+            .map_err(|_| LabError::InvalidOwner { owner })
+    }
+
+    fn validate_player(&self, player_id: u32) -> Result<(), LabError> {
+        if self.players.iter().any(|player| player.id == player_id) {
             Ok(())
         } else {
-            Err(LabError::InvalidOwner { owner })
+            Err(LabError::InvalidPlayer { player_id })
         }
     }
 
@@ -755,6 +760,7 @@ impl Game {
 
     fn repair_lab_state(&mut self) {
         self.entities.clear_stale_miner_slots();
+        self.sync_lab_god_mode_flags();
         self.repair_mortar_autocast_state();
         systems::recompute_supply(&mut self.players, &self.entities);
         self.spatial = SpatialIndex::build(&self.entities, self.map.size);
@@ -773,6 +779,15 @@ impl Game {
                 player.id,
                 &player.upgrades,
             );
+        }
+    }
+
+    pub(crate) fn sync_lab_god_mode_flags(&mut self) {
+        let enabled_players = self.lab_god_mode_players.clone();
+        for entity_id in self.entities.ids() {
+            if let Some(entity) = self.entities.get_mut(entity_id) {
+                entity.set_invulnerable(entity.is_unit() && enabled_players.contains(&entity.owner));
+            }
         }
     }
 }

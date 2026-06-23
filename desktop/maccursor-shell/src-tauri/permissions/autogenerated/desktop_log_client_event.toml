@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-desktop-log-client-event"
+description = "Enables the desktop_log_client_event command without any pre-configured scope."
+commands.allow = ["desktop_log_client_event"]
+
+[[permission]]
+identifier = "deny-desktop-log-client-event"
+description = "Denies the desktop_log_client_event command without any pre-configured scope."
+commands.deny = ["desktop_log_client_event"]
