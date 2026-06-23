@@ -389,8 +389,20 @@ await withFakeDocument(async () => {
     "LabPanel exposes visible resize handles for both windows",
   );
   assert(
-    findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === "Collapse").length >= 2,
-    "LabPanel exposes collapse affordances for both windows",
+    findFakes(root, (el) => el.tagName === "BUTTON" && el.dataset?.labPanelCollapse === "true").length >= 2,
+    "LabPanel exposes collapse arrow affordances for both windows",
+  );
+  const headerKickers = findFakes(root, (el) => el.className === "lab-panel-kicker").map((el) => el.textContent);
+  assert(
+    headerKickers.includes("Options") &&
+      headerKickers.includes("Tools") &&
+      !headerKickers.some((text) => /^Lab /.test(text)),
+    "LabPanel window headers use compact Options and Tools labels",
+  );
+  assert(
+    findFakes(optionsPanel, (el) => el.tagName === "H2").length === 0 &&
+      findFakes(toolsPanel, (el) => el.tagName === "H2").length === 0,
+    "LabPanel window headers omit the room/map title",
   );
   assert(textWithin(root).includes("Operator"), "LabPanel renders role state");
   assert(buttonByText("Cancel tool").disabled, "LabPanel disables tool cancellation when no setup tool is armed");
@@ -715,7 +727,7 @@ await withFakeDocument(async () => {
   collapseButton.listeners.click();
   assert(
     el.dataset.collapsed === "true" &&
-      collapseButton.textContent === "Expand" &&
+      collapseButton.textContent === "▸" &&
       JSON.parse(storage.values.get("test.lab.panel.window")).collapsed === true,
     "LabPanelWindowChrome persists collapsed panel state",
   );

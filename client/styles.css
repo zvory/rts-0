@@ -1659,9 +1659,10 @@ input[type="text"]:focus {
   min-height: min(220px, calc(100vh - 24px));
 }
 .lab-panel[data-collapsed="true"] {
+  height: auto !important;
   min-height: 0;
   max-height: none;
-  overflow: visible;
+  overflow: hidden;
   padding-bottom: 10px;
 }
 .lab-panel[data-collapsed="true"] .lab-panel-body,
@@ -1746,6 +1747,13 @@ input[type="text"]:focus {
 .lab-panel-reset,
 .lab-panel-collapse {
   flex: 0 0 auto;
+}
+.lab-panel-collapse {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
 }
 .lab-panel-resize-handle {
   appearance: none;
