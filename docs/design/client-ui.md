@@ -585,7 +585,7 @@ export class ClientIntent {
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid,options?), endPlacement()
   commandTarget                          // null | "move" | "attack" | "setupAntiTankGuns" | ability target object
   beginCommandTarget(kind, options), issueCommandTarget(ev), endCommandTarget()
-  holdCommandTarget(kind, key, shiftKey), releaseCommandTargetKey(key, shiftKey)
+  holdCommandTarget(kind, key, shiftKey, options?), releaseCommandTargetKey(key, shiftKey)
   releaseCommandTargetShift()
   commandFeedback, addCommandFeedback(kind, x, y, append?, radiusTiles?, now?), liveCommandFeedback(now)
   resourceMiningPreview, updateResourceMiningPreview(preview)

@@ -44,6 +44,8 @@ export class CommandComposer {
       key,
       held: source === "hold",
       shiftPreserved: !!options.shiftKey,
+      preserveTapOnRelease: false,
+      issuedWhileHeld: false,
     };
     this._lastTap = source === "tap" ? { target: cloneTarget(target), at: now } : null;
     return { quickCast: !!sameTap, target: cloneTarget(target), queued: !!options.shiftKey };
@@ -53,7 +55,7 @@ export class CommandComposer {
    * Mark a physical key as held for the currently armed target.
    * @param {string|object} target
    * @param {string} key
-   * @param {{shiftKey?: boolean}} [options]
+   * @param {{shiftKey?: boolean, preserveTapOnRelease?: boolean}} [options]
    */
   hold(target, key, options = {}) {
     if (!this._armed || !targetsEqual(this._armed.target, target)) {
@@ -63,6 +65,8 @@ export class CommandComposer {
         key,
         held: true,
         shiftPreserved: !!options.shiftKey,
+        preserveTapOnRelease: false,
+        issuedWhileHeld: false,
       };
       return;
     }
@@ -70,6 +74,8 @@ export class CommandComposer {
     this._armed.key = key;
     this._armed.held = true;
     this._armed.shiftPreserved = this._armed.shiftPreserved || !!options.shiftKey;
+    this._armed.preserveTapOnRelease =
+      this._armed.preserveTapOnRelease || !!options.preserveTapOnRelease;
   }
 
   /**
@@ -81,8 +87,10 @@ export class CommandComposer {
     if (!this._armed) return { target: null, queued: !!options.shiftKey, keepArmed: false };
     const queued = !!options.shiftKey;
     if (queued) this._armed.shiftPreserved = true;
-    const keepArmed = this._armed.held || this._armed.shiftPreserved;
+    const held = this._armed.held;
+    const keepArmed = held || this._armed.shiftPreserved;
     const target = cloneTarget(this._armed.target);
+    if (held) this._armed.issuedWhileHeld = true;
     if (!keepArmed) this.cancel();
     return { target, queued, keepArmed };
   }
@@ -98,6 +106,9 @@ export class CommandComposer {
     this._armed.held = false;
     if (options.shiftKey || this._armed.shiftPreserved) {
       this._armed.shiftPreserved = true;
+      return true;
+    }
+    if (this._armed.preserveTapOnRelease && !this._armed.issuedWhileHeld) {
       return true;
     }
     this.cancel();

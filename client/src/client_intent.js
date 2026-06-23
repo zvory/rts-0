@@ -110,8 +110,8 @@ export class ClientIntent {
   }
 
   /** Mark a physical key as holding the current command target alive. */
-  holdCommandTarget(kind, key, shiftKey = false) {
-    this.commandComposer.hold(kind, key, { shiftKey });
+  holdCommandTarget(kind, key, shiftKey = false, options = {}) {
+    this.commandComposer.hold(kind, key, { ...options, shiftKey });
     this._syncCommandTargetFromComposer();
   }
 
