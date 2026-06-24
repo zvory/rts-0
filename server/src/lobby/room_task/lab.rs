@@ -788,7 +788,7 @@ impl RoomTask {
                 Some(LabSnapshotProjection::FullWorld { view_player_id }) => projection_policy
                     .live_snapshot_for(RecipientRole::Spectator, id, Some(*view_player_id), &[]),
                 Some(LabSnapshotProjection::PlayerUnion { player_ids }) => {
-                    projection_policy.replay_snapshot_for(player_ids.clone())
+                    projection_policy.selected_perspective_snapshot_for(player_ids.clone())
                 }
                 None => projection_policy.live_snapshot_for(
                     RecipientRole::Spectator,

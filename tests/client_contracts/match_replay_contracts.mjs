@@ -476,22 +476,22 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   speed2.className = "spd-btn";
   speed2.dataset.speed = "2";
   const speed0 = fakeEl("button");
-  speed0.className = "spd-btn dev-pause-btn";
+  speed0.className = "spd-btn room-time-pause-btn";
   speed0.dataset.speed = "0";
   const seekBack = fakeEl("button");
   seekBack.className = "spd-btn seek-btn";
   seekBack.dataset.seekBack = "90";
   const stepDev = fakeEl("button");
-  stepDev.className = "spd-btn dev-step-btn";
+  stepDev.className = "spd-btn room-time-step-btn";
   stepDev.dataset.stepRoomTime = "";
   const concluded = fakeEl("span");
-  concluded.id = "replay-concluded";
+  concluded.id = "room-time-concluded";
   replayControls.appendChild(speed2);
   replayControls.appendChild(speed0);
   replayControls.appendChild(seekBack);
   replayControls.appendChild(stepDev);
   replayControls.appendChild(concluded);
-  dom.replaySpeed = replayControls;
+  dom.roomTimeControls = replayControls;
   const replayNet = {
     speeds: [],
     seekBacks: [],
@@ -646,14 +646,14 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     ended: false,
   });
   assert(
-    replayControls.querySelectorAll(".replay-timeline-mark").length === 3,
+    replayControls.querySelectorAll(".room-time-timeline-mark").length === 3,
     "replay timeline renders server keyframe marks",
   );
-  const timelineTrack = replayControls.querySelector(".replay-timeline-track");
-  replayUi.onReplayTimelineClick({ currentTarget: timelineTrack, clientX: 100 });
+  const timelineTrack = replayControls.querySelector(".room-time-timeline-track");
+  replayUi.onRoomTimeTimelineClick({ currentTarget: timelineTrack, clientX: 100 });
   assert(replayNet.seekTargets.at(-1) === 500, "replay timeline click seeks to the clicked tick");
   assert(
-    replayControls.querySelector(".replay-tick-status").textContent.includes("Seeking 500"),
+    replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking 500"),
     "replay timeline shows a pending seek indicator",
   );
   replayUi.destroy();
@@ -664,14 +664,14 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(!replayControls.querySelector(".replay-pause-btn"), "destroy removes generated replay pause button");
   assert(!replayControls.querySelector(".replay-branch-btn"), "destroy removes generated replay branch button");
   assert(!replayControls.querySelector(".replay-vision-controls"), "destroy removes generated vision controls");
-  assert(!replayControls.querySelector(".replay-tick-status"), "destroy removes generated status");
-  assert(!replayControls.querySelector(".replay-timeline"), "destroy removes generated timeline");
+  assert(!replayControls.querySelector(".room-time-tick-status"), "destroy removes generated status");
+  assert(!replayControls.querySelector(".room-time-timeline"), "destroy removes generated timeline");
   assert(!replayControls.querySelector(".room-time-panel-drag-handle"), "destroy removes floating room-time panel chrome");
   assert(replayControls.children.includes(seekBack), "destroy unwraps static room-time controls back onto the root");
-  assert(replayControls._listeners.size === 0, "destroy removes replay speed click listener");
+  assert(replayControls._listeners.size === 0, "destroy removes room-time click listener");
 
   const replayVisionOnlyControls = fakeEl("div");
-  dom.replaySpeed = replayVisionOnlyControls;
+  dom.roomTimeControls = replayVisionOnlyControls;
   const replayVisionOnlyUi = new ReplayControls({
     net: replayNet,
     state: roomTimeState,
@@ -701,10 +701,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   scenarioSpeed2.className = "spd-btn";
   scenarioSpeed2.dataset.speed = "2";
   const scenarioSpeed0 = fakeEl("button");
-  scenarioSpeed0.className = "spd-btn dev-pause-btn";
+  scenarioSpeed0.className = "spd-btn room-time-pause-btn";
   scenarioSpeed0.dataset.speed = "0";
   const scenarioStep = fakeEl("button");
-  scenarioStep.className = "spd-btn dev-step-btn";
+  scenarioStep.className = "spd-btn room-time-step-btn";
   scenarioStep.dataset.stepRoomTime = "";
   const scenarioSeek = fakeEl("button");
   scenarioSeek.className = "spd-btn seek-btn";
@@ -713,7 +713,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   scenarioControls.appendChild(scenarioSpeed0);
   scenarioControls.appendChild(scenarioStep);
   scenarioControls.appendChild(scenarioSeek);
-  dom.replaySpeed = scenarioControls;
+  dom.roomTimeControls = scenarioControls;
   const scenarioUi = new RoomTimeControls({
     net: replayNet,
     state: roomTimeState,
@@ -749,10 +749,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   aiLiveSpeed4.className = "spd-btn";
   aiLiveSpeed4.dataset.speed = "4";
   const aiLivePause = fakeEl("button");
-  aiLivePause.className = "spd-btn dev-pause-btn";
+  aiLivePause.className = "spd-btn room-time-pause-btn";
   aiLivePause.dataset.speed = "0";
   const aiLiveStep = fakeEl("button");
-  aiLiveStep.className = "spd-btn dev-step-btn";
+  aiLiveStep.className = "spd-btn room-time-step-btn";
   aiLiveStep.dataset.stepRoomTime = "";
   const aiLiveSeek = fakeEl("button");
   aiLiveSeek.className = "spd-btn seek-btn";
@@ -761,7 +761,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   aiLiveControls.appendChild(aiLivePause);
   aiLiveControls.appendChild(aiLiveStep);
   aiLiveControls.appendChild(aiLiveSeek);
-  dom.replaySpeed = aiLiveControls;
+  dom.roomTimeControls = aiLiveControls;
   const aiLiveUi = new RoomTimeControls({
     net: replayNet,
     state: roomTimeState,
@@ -783,7 +783,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(!aiLivePause.hidden, "AI-only live controls show pause controls");
   assert(aiLiveStep.hidden, "AI-only live controls hide step without step capability");
   assert(aiLiveSeek.hidden, "AI-only live controls hide seek without seek capability");
-  assert(!aiLiveControls.querySelector(".replay-timeline"), "AI-only live controls do not build a timeline without seek");
+  assert(!aiLiveControls.querySelector(".room-time-timeline"), "AI-only live controls do not build a timeline without seek");
   aiLiveControls._listeners.get("click")({ target: aiLiveSpeed4 });
   assert(replayNet.speeds.at(-1) === 4, "AI-only live speed click sends net.setRoomTimeSpeed");
   aiLiveControls._listeners.get("click")({ target: aiLivePause });
@@ -806,10 +806,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   labSpeed2.className = "spd-btn";
   labSpeed2.dataset.speed = "2";
   const labPause = fakeEl("button");
-  labPause.className = "spd-btn dev-pause-btn";
+  labPause.className = "spd-btn room-time-pause-btn";
   labPause.dataset.speed = "0";
   const labStep = fakeEl("button");
-  labStep.className = "spd-btn dev-step-btn";
+  labStep.className = "spd-btn room-time-step-btn";
   labStep.dataset.stepRoomTime = "";
   const labSeek = fakeEl("button");
   labSeek.className = "spd-btn seek-btn";
@@ -818,7 +818,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   labControls.appendChild(labPause);
   labControls.appendChild(labStep);
   labControls.appendChild(labSeek);
-  dom.replaySpeed = labControls;
+  dom.roomTimeControls = labControls;
   const labUi = new RoomTimeControls({
     net: replayNet,
     state: roomTimeState,
@@ -857,16 +857,16 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     paused: false,
   });
   assert(
-    labControls.querySelectorAll(".replay-timeline-mark").length === 3,
+    labControls.querySelectorAll(".room-time-timeline-mark").length === 3,
     "lab timeline renders server keyframe marks through neutral room-time controls",
   );
   assert(
-    labControls.querySelector(".replay-tick-status").textContent.startsWith("Room time"),
+    labControls.querySelector(".room-time-tick-status").textContent.startsWith("Room time"),
     "lab room-time status uses neutral copy instead of replay copy",
   );
   labControls._listeners.get("click")({ target: labSeek });
   assert(replayNet.seekBacks.at(-1) === 30, "lab relative seek sends net.seekRoomTime through neutral controls");
-  const labTimelineTrack = labControls.querySelector(".replay-timeline-track");
+  const labTimelineTrack = labControls.querySelector(".room-time-timeline-track");
   labUi.onRoomTimeTimelineClick({ currentTarget: labTimelineTrack, clientX: 100 });
   assert(replayNet.seekTargets.at(-1) === 300, "lab timeline click sends an absolute room-time seek");
   labControls._listeners.get("click")({ target: labPause });
@@ -881,10 +881,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   stepOnlySpeed.className = "spd-btn";
   stepOnlySpeed.dataset.speed = "2";
   const stepOnlyPause = fakeEl("button");
-  stepOnlyPause.className = "spd-btn dev-pause-btn";
+  stepOnlyPause.className = "spd-btn room-time-pause-btn";
   stepOnlyPause.dataset.speed = "0";
   const stepOnlyStep = fakeEl("button");
-  stepOnlyStep.className = "spd-btn dev-step-btn";
+  stepOnlyStep.className = "spd-btn room-time-step-btn";
   stepOnlyStep.dataset.stepRoomTime = "";
   const stepOnlySeek = fakeEl("button");
   stepOnlySeek.className = "spd-btn seek-btn";
@@ -893,7 +893,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   stepOnlyControls.appendChild(stepOnlyPause);
   stepOnlyControls.appendChild(stepOnlyStep);
   stepOnlyControls.appendChild(stepOnlySeek);
-  dom.replaySpeed = stepOnlyControls;
+  dom.roomTimeControls = stepOnlyControls;
   const stepOnlyUi = new RoomTimeControls({
     net: replayNet,
     state: roomTimeState,
@@ -927,7 +927,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   stepOnlyUi.destroy();
 
   const noCapabilityControls = fakeEl("div");
-  dom.replaySpeed = noCapabilityControls;
+  dom.roomTimeControls = noCapabilityControls;
   const noCapabilityUi = new ReplayControls({
     net: replayNet,
     state: roomTimeState,

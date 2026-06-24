@@ -196,20 +196,20 @@
         </div>
 
         <!-- Room-time controls for replay, AI-only live, dev-watch, and lab rooms -->
-        <div id="replay-speed" hidden>
+        <div id="room-time-controls" hidden>
           <button class="spd-btn seek-btn" data-seek-back="2147483647" title="Restart from tick 0">⟲ Reset</button>
           <button class="spd-btn seek-btn" data-seek-back="600" title="Rewind 20 seconds">−20s</button>
           <button class="spd-btn seek-btn" data-seek-back="300" title="Rewind 10 seconds">−10s</button>
           <button class="spd-btn seek-btn" data-seek-back="150" title="Rewind 5 seconds">−5s</button>
-          <button class="spd-btn dev-pause-btn" data-speed="0" title="Pause room time">Pause</button>
-          <button class="spd-btn dev-step-btn" data-step-room-time="1" title="Advance one simulation tick">Step</button>
+          <button class="spd-btn room-time-pause-btn" data-speed="0" title="Pause room time">Pause</button>
+          <button class="spd-btn room-time-step-btn" data-step-room-time="1" title="Advance one simulation tick">Step</button>
           <span class="spd-sep"></span>
           <button class="spd-btn" data-speed="0.5">0.5×</button>
           <button class="spd-btn" data-speed="1">1×</button>
           <button class="spd-btn" data-speed="2">2×</button>
           <button class="spd-btn" data-speed="4">4×</button>
           <button class="spd-btn" data-speed="8">8×</button>
-          <span id="replay-concluded" class="replay-status" hidden>Replay Concluded</span>
+          <span id="room-time-concluded" class="room-time-status" hidden>Replay Concluded</span>
         </div>
 
         <!-- Game over overlay -->

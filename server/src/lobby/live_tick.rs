@@ -204,7 +204,7 @@ impl LiveTickDriver<'_> {
                     .live_snapshot_for(role, id, Some(*view_player_id), &spectator_visible_players),
                 Some(LabSnapshotProjection::PlayerUnion { player_ids }) => self
                     .projection_policy
-                    .replay_snapshot_for(player_ids.clone()),
+                    .selected_perspective_snapshot_for(player_ids.clone()),
                 None => self.projection_policy.live_snapshot_for(
                     role,
                     id,
@@ -227,7 +227,7 @@ impl LiveTickDriver<'_> {
 
     fn broadcast_observer_analysis(&self, game: &Game) {
         if self.projection_policy.observer_analysis_audience()
-            != ObserverAnalysisAudience::LiveSpectators
+            != ObserverAnalysisAudience::SpectatorRecipients
         {
             return;
         }

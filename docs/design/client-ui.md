@@ -385,6 +385,12 @@ speed-only room-time profile, so the same component renders no seek, step, or ti
 for those rooms. Replay fog-perspective controls and the replay-branch button remain gated by
 replay-specific visibility/action capabilities, not by lab or URL identity.
 
+The shared control surface is the `dom.roomTimeControls` root (`#room-time-controls`). Static
+pause/step controls use `.room-time-pause-btn` and `.room-time-step-btn`; generated room-time status
+and timeline markup use `.room-time-tick-status` and `.room-time-timeline*` selectors. The exported
+`ReplayControls` alias remains only for existing replay imports while composition should construct
+`RoomTimeControls` for any room that advertises room-time capabilities.
+
 `room_capabilities.js`
 ```js
 createRoomCapabilities({ startPayload })

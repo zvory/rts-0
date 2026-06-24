@@ -368,7 +368,9 @@ impl RoomTask {
         let tick_budget = self.current_tick_interval();
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
-        let projection = self.projection_policy().dev_snapshot_for(view_player_id);
+        let projection = self
+            .projection_policy()
+            .full_world_snapshot_for(view_player_id);
         SnapshotFanout::new(
             &self.room,
             scheduler_lag,

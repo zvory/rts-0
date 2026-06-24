@@ -1338,7 +1338,7 @@ input[type="text"]:focus {
 #game-screen.branch-background #selection-area,
 #game-screen.branch-background #command-card,
 #game-screen.branch-background .replay-analysis-overlay,
-#game-screen.branch-background #replay-speed {
+#game-screen.branch-background #room-time-controls {
   opacity: 0;
   pointer-events: none;
 }
@@ -3057,7 +3057,7 @@ input[type="text"]:focus {
 }
 
 /* --- Room-time controls --- */
-#replay-speed {
+#room-time-controls {
   position: absolute;
   top: 70px;
   left: 12px;
@@ -3076,18 +3076,18 @@ input[type="text"]:focus {
   color: var(--ink);
   pointer-events: auto;
 }
-#replay-speed.replay-viewer-controls {
+#room-time-controls.replay-viewer-controls {
   top: 70px;
 }
-#replay-speed[hidden] {
+#room-time-controls[hidden] {
   display: none;
 }
-#replay-speed.room-time-floating-panel {
+#room-time-controls.room-time-floating-panel {
   background: rgba(39, 37, 31, 0.94);
   border: 1px solid var(--panel-edge);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-#replay-speed.room-time-floating-panel[data-collapsed="true"] {
+#room-time-controls.room-time-floating-panel[data-collapsed="true"] {
   width: min(260px, calc(100vw - 24px));
   overflow: visible;
 }
@@ -3114,12 +3114,12 @@ input[type="text"]:focus {
 }
 .room-time-panel-drag-handle:hover,
 .room-time-panel-drag-handle:focus-visible,
-#replay-speed[data-panel-dragging="true"] .room-time-panel-drag-handle {
+#room-time-controls[data-panel-dragging="true"] .room-time-panel-drag-handle {
   background: rgba(17, 17, 15, 0.46);
   color: var(--ink);
   outline: none;
 }
-#replay-speed[data-panel-dragging="true"] .room-time-panel-drag-handle {
+#room-time-controls[data-panel-dragging="true"] .room-time-panel-drag-handle {
   cursor: grabbing;
 }
 .room-time-panel-grip {
@@ -3474,14 +3474,14 @@ input[type="text"]:focus {
   margin-bottom: 0;
 }
 
-.replay-timeline {
+.room-time-timeline {
   flex-basis: 100%;
   display: flex;
   justify-content: stretch;
   order: 10;
   margin-top: 3px;
 }
-.replay-timeline-track {
+.room-time-timeline-track {
   position: relative;
   width: 100%;
   min-width: min(240px, 100%);
@@ -3493,22 +3493,22 @@ input[type="text"]:focus {
   cursor: pointer;
   overflow: hidden;
 }
-.replay-timeline-track:hover {
+.room-time-timeline-track:hover {
   border-color: var(--accent);
 }
-.replay-timeline-progress {
+.room-time-timeline-progress {
   position: absolute;
   inset: 0 auto 0 0;
-  width: var(--room-time-progress, var(--replay-progress, 0%));
+  width: var(--room-time-progress, 0%);
   background: rgba(236, 199, 103, 0.24);
   pointer-events: none;
 }
-.replay-timeline-marks {
+.room-time-timeline-marks {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
-.replay-timeline-mark {
+.room-time-timeline-mark {
   position: absolute;
   top: 3px;
   bottom: 3px;
@@ -3575,7 +3575,7 @@ input[type="text"]:focus {
   background: var(--player-color, #aaa);
   transform: translateY(-50%);
 }
-.replay-status {
+.room-time-status {
   align-self: center;
   border: 1px solid rgba(236, 199, 103, 0.55);
   background: rgba(17, 17, 15, 0.92);

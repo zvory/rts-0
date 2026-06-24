@@ -205,7 +205,7 @@ impl RoomTask {
             return;
         };
         if self.projection_policy().observer_analysis_audience()
-            != ObserverAnalysisAudience::ReplayViewers
+            != ObserverAnalysisAudience::AllRecipients
         {
             return;
         }
@@ -225,7 +225,7 @@ impl RoomTask {
         session: &ReplaySession,
         projection_policy: ProjectionPolicy,
     ) {
-        if projection_policy.observer_analysis_audience() != ObserverAnalysisAudience::ReplayViewers
+        if projection_policy.observer_analysis_audience() != ObserverAnalysisAudience::AllRecipients
         {
             return;
         }
@@ -287,7 +287,7 @@ impl RoomTask {
         .send_to_recipients(&mut self.players, recipients, |id, _player| {
             let projection = context
                 .projection_policy
-                .replay_snapshot_for(session.vision_player_ids_for(id));
+                .selected_perspective_snapshot_for(session.vision_player_ids_for(id));
             let snapshot =
                 projection.snapshot_with_events(session.game(), &mut per_player_events, &[]);
             Some(SnapshotFanoutPayload::new(snapshot, true))
@@ -428,7 +428,7 @@ impl RoomTask {
 
     pub(super) fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
         let send_analysis = self.projection_policy().observer_analysis_audience()
-            == ObserverAnalysisAudience::ReplayViewers;
+            == ObserverAnalysisAudience::AllRecipients;
         if let Phase::ReplayViewer(session) = &mut self.phase {
             if !self.players.contains_key(&player_id) {
                 return;
@@ -491,7 +491,7 @@ impl RoomTask {
             Some(RoomTimeSource::DevScenario) | Some(RoomTimeSource::LiveGame) | None => return,
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
-            == ObserverAnalysisAudience::ReplayViewers;
+            == ObserverAnalysisAudience::AllRecipients;
         let start_stamp = self.replay_start_payload_stamp();
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
@@ -554,7 +554,7 @@ impl RoomTask {
             Some(RoomTimeSource::DevScenario) | Some(RoomTimeSource::LiveGame) | None => return,
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
-            == ObserverAnalysisAudience::ReplayViewers;
+            == ObserverAnalysisAudience::AllRecipients;
         let start_stamp = self.replay_start_payload_stamp();
         if let Phase::ReplayViewer(session) = &mut self.phase {
             let viewer_count = self.players.len();
