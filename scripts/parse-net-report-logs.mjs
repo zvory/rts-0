@@ -11,6 +11,8 @@ const METRICS = [
   ["rtt_max_ms", "RTT max"],
   ["snapshot_jitter_ms", "snapshot jitter"],
   ["snapshot_gap_max_ms", "snapshot gap"],
+  ["snapshot_late_frame_count", "late snapshot frames"],
+  ["predicted_snapshot_late_frame_count", "predicted while late"],
   ["snapshot_bytes_max", "payload bytes max"],
   ["snapshot_bytes_p95", "payload bytes p95"],
   ["snapshot_bytes_avg", "payload bytes avg"],
@@ -31,6 +33,9 @@ const METRICS = [
   ["renderer_max_ms", "renderer max"],
   ["renderer_p95_ms", "renderer p95"],
   ["fps_estimate", "FPS estimate", "min"],
+  ["commands_issued", "commands issued"],
+  ["command_burst_max", "command burst max"],
+  ["command_burst_frame_gap_max_ms", "command-burst frame gap"],
   ["ws_buffered_bytes", "WS buffered"],
   ["server_tick_ms", "server tick"],
   ["server_lag_ms", "server lag"],
@@ -48,7 +53,23 @@ const METRICS = [
   ["oldest_pending_command_age_ms", "oldest pending command"],
   ["max_pending_command_count", "max pending commands"],
   ["correction_distance_px", "prediction correction"],
+  ["prediction_disable_user_count", "prediction disabled/user"],
+  ["prediction_disable_replay_count", "prediction disabled/replay"],
+  ["prediction_disable_spectator_count", "prediction disabled/spectator"],
+  ["prediction_disable_compatibility_count", "prediction disabled/compat"],
+  ["prediction_disable_wasm_count", "prediction disabled/WASM"],
+  ["prediction_disable_other_count", "prediction disabled/other"],
   ["wasm_tick_ms", "WASM tick"],
+  ["prediction_replay_max_ms", "prediction replay max"],
+  ["prediction_replay_max_ticks", "prediction replay ticks max"],
+  ["prediction_replay_budget_exceeded_count", "prediction replay budget exceeded"],
+  ["server_command_receipts_accepted", "server accepted receipts"],
+  ["server_command_receipts_rejected", "server rejected receipts"],
+  ["server_reliable_drained_before_snapshot", "server reliable before snapshots"],
+  ["server_reliable_drained_before_snapshot_max", "server reliable before snapshot max"],
+  ["server_snapshot_waited_behind_reliable", "snapshots waited behind reliable"],
+  ["server_snapshot_send_age_max_ms", "server snapshot send age max"],
+  ["server_snapshot_slot_replaced", "server snapshot slot replaced"],
 ];
 
 const SUMMARY_FIELDS = [
@@ -56,6 +77,8 @@ const SUMMARY_FIELDS = [
   "rtt_max_ms",
   "snapshot_jitter_ms",
   "snapshot_gap_max_ms",
+  "snapshot_late_frame_count",
+  "predicted_snapshot_late_frame_count",
   "snapshot_bytes_max",
   "snapshot_bytes_p95",
   "snapshot_bytes_avg",
@@ -74,6 +97,11 @@ const SUMMARY_FIELDS = [
   "renderer_max_ms",
   "renderer_p95_ms",
   "fps_estimate",
+  "commands_issued",
+  "command_burst_bucket_ms",
+  "command_burst_max",
+  "command_burst_frame_gap_max_ms",
+  "command_burst_worst_frame_phase_ms",
   "server_tick_ms",
   "server_lag_ms",
   "slow_tick_count",
@@ -89,6 +117,27 @@ const SUMMARY_FIELDS = [
   "command_ack_snapshot_received_to_applied_p95_ms",
   "oldest_pending_command_age_ms",
   "max_pending_command_count",
+  "prediction_disable_user_count",
+  "prediction_disable_replay_count",
+  "prediction_disable_spectator_count",
+  "prediction_disable_compatibility_count",
+  "prediction_disable_wasm_count",
+  "prediction_disable_other_count",
+  "prediction_replay_max_ms",
+  "prediction_replay_max_ticks",
+  "prediction_replay_budget_exceeded_count",
+  "server_command_receipts_accepted",
+  "server_command_receipts_rejected",
+  "server_reliable_drained_before_snapshot",
+  "server_reliable_drained_before_snapshot_max",
+  "server_snapshot_waited_behind_reliable",
+  "server_snapshot_sent",
+  "server_snapshot_send_age_latest_ms",
+  "server_snapshot_send_age_max_ms",
+  "server_snapshot_send_age_avg_ms",
+  "server_snapshot_slot_stored",
+  "server_snapshot_slot_replaced",
+  "server_snapshot_slot_closed",
 ];
 
 const TRANSPORT_DIAGNOSTIC_FIELDS = [
@@ -113,8 +162,19 @@ const ISSUE_GROUPS = [
   },
   {
     id: "websocket_writer_send",
-    label: "WebSocket writer/send pressure",
-    fields: ["send_ms", "bytes", "ws_buffered_bytes", "head_of_line_count"],
+    label: "WebSocket writer/send and outbound snapshot pressure",
+    fields: [
+      "send_ms",
+      "bytes",
+      "ws_buffered_bytes",
+      "head_of_line_count",
+      "server_reliable_drained_before_snapshot",
+      "server_reliable_drained_before_snapshot_max",
+      "server_snapshot_waited_behind_reliable",
+      "server_snapshot_send_age_max_ms",
+      "server_snapshot_slot_replaced",
+      "server_snapshot_slot_closed",
+    ],
   },
   {
     id: "client_network_delivery",
@@ -125,6 +185,7 @@ const ISSUE_GROUPS = [
       "bad_rtt_samples",
       "snapshot_jitter_ms",
       "snapshot_gap_max_ms",
+      "snapshot_late_frame_count",
       "jitter_samples",
       "snapshot_tick_gap_max",
       "snapshot_burst_max",
@@ -143,8 +204,20 @@ const ISSUE_GROUPS = [
       "prediction_apply_max_ms",
       "frame_gap_max_ms",
       "frame_work_max_ms",
+      "command_burst_frame_gap_max_ms",
       "renderer_max_ms",
       "fps_estimate",
+    ],
+  },
+  {
+    id: "command_density",
+    label: "command density and receipt volume",
+    fields: [
+      "commands_issued",
+      "command_burst_max",
+      "server_command_receipts_accepted",
+      "server_command_receipts_rejected",
+      "command_rejected",
     ],
   },
   {
@@ -161,6 +234,23 @@ const ISSUE_GROUPS = [
       "command_rejected",
     ],
   },
+  {
+    id: "prediction_health",
+    label: "prediction disable/replay/late-snapshot coverage",
+    fields: [
+      "prediction_disable_user_count",
+      "prediction_disable_replay_count",
+      "prediction_disable_spectator_count",
+      "prediction_disable_compatibility_count",
+      "prediction_disable_wasm_count",
+      "prediction_disable_other_count",
+      "prediction_replay_max_ms",
+      "prediction_replay_max_ticks",
+      "prediction_replay_budget_exceeded_count",
+      "snapshot_late_frame_count",
+      "predicted_snapshot_late_frame_count",
+    ],
+  },
 ];
 
 const WARN_THRESHOLD = {
@@ -168,6 +258,8 @@ const WARN_THRESHOLD = {
   rtt_max_ms: 180,
   snapshot_jitter_ms: 20,
   snapshot_gap_max_ms: 100,
+  snapshot_late_frame_count: 1,
+  predicted_snapshot_late_frame_count: 1,
   snapshot_bytes_max: 256 * 1024,
   snapshot_bytes_p95: SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES + 1,
   snapshot_bytes_avg: 128 * 1024,
@@ -187,6 +279,9 @@ const WARN_THRESHOLD = {
   frame_work_p95_ms: 24,
   renderer_max_ms: 33,
   renderer_p95_ms: 16,
+  commands_issued: 20,
+  command_burst_max: 6,
+  command_burst_frame_gap_max_ms: 100,
   ws_buffered_bytes: 64 * 1024,
   server_tick_ms: 33,
   server_lag_ms: 33,
@@ -213,6 +308,23 @@ const WARN_THRESHOLD = {
   oldest_pending_command_age_ms: 180,
   max_pending_command_count: 8,
   command_rejected: 1,
+  prediction_disable_user_count: 1,
+  prediction_disable_replay_count: 1,
+  prediction_disable_spectator_count: 1,
+  prediction_disable_compatibility_count: 1,
+  prediction_disable_wasm_count: 1,
+  prediction_disable_other_count: 1,
+  prediction_replay_max_ms: 8,
+  prediction_replay_max_ticks: 8,
+  prediction_replay_budget_exceeded_count: 1,
+  server_command_receipts_accepted: 20,
+  server_command_receipts_rejected: 1,
+  server_reliable_drained_before_snapshot: 1,
+  server_reliable_drained_before_snapshot_max: 1,
+  server_snapshot_waited_behind_reliable: 1,
+  server_snapshot_send_age_max_ms: 100,
+  server_snapshot_slot_replaced: 1,
+  server_snapshot_slot_closed: 1,
 };
 
 function usage() {
@@ -849,6 +961,18 @@ function missingDiagnosticGroups(rows) {
   if (!fields.has("snapshot_codec") || !fields.has("snapshot_frame_kind")) {
     missing.push("snapshot codec/frame kind: no matching fields in input");
   }
+  if (!fields.has("command_burst_max")) {
+    missing.push("command burst density: no matching fields in input");
+  }
+  if (!fields.has("server_reliable_drained_before_snapshot")) {
+    missing.push("server reliable/snapshot outbound pressure: no matching fields in input");
+  }
+  if (!fields.has("prediction_disable_wasm_count") || !fields.has("prediction_replay_max_ms")) {
+    missing.push("prediction disable reason/replay budget detail: no matching fields in input");
+  }
+  if (!fields.has("predicted_snapshot_late_frame_count")) {
+    missing.push("predicted snapshot coverage during late snapshot frames: no matching fields in input");
+  }
   return missing;
 }
 
@@ -886,8 +1010,8 @@ function formatMarkdown(report) {
     lines.push(`- Transport diagnostics: ${formatTransportDiagnostics(match.transport)}`);
 
     lines.push("");
-    lines.push("| player | reports | primary issues | RTT max | snapshot gap max | jitter max | payload max | payload p95 | over budget | parse/decode/apply max | frame gap max | frame work max | renderer max | FPS min | command response max | server tick max | server lag max |");
-    lines.push("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    lines.push("| player | reports | primary issues | RTT max | snapshot gap max | jitter max | payload max | payload p95 | over budget | parse/decode/apply max | frame gap max | frame work max | renderer max | FPS min | cmds/burst | cmd response max | server outbound | server tick max | server lag max |");
+    lines.push("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | ---: |");
     for (const player of match.players) {
       lines.push(
         [
@@ -905,9 +1029,16 @@ function formatMarkdown(report) {
           metricMax(player, "frame_work_max_ms"),
           metricMax(player, "renderer_max_ms"),
           metricMin(player, "fps_estimate"),
+          `${metricMax(player, "commands_issued")}/${metricMax(player, "command_burst_max")}`,
           metricMax(player, "command_issue_to_sim_ack_max_ms") !== "n/a"
             ? metricMax(player, "command_issue_to_sim_ack_max_ms")
             : metricMax(player, "acknowledged_command_latency_ms"),
+          [
+            metricMax(player, "server_reliable_drained_before_snapshot"),
+            metricMax(player, "server_snapshot_waited_behind_reliable"),
+            metricMax(player, "server_snapshot_send_age_max_ms"),
+            metricMax(player, "server_snapshot_slot_replaced"),
+          ].join("/"),
           metricMax(player, "server_tick_ms"),
           metricMax(player, "server_lag_ms"),
         ].join(" | ").replace(/^/, "| ").replace(/$/, " |")

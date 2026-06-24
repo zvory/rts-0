@@ -62,6 +62,13 @@ import {
         snapshotGapMaxMs: 44,
         jitterSamples: 2,
         snapshots: 3,
+        snapshotLateFrameCount: 1,
+        predictedSnapshotLateFrameCount: 1,
+        commandBurstBucketMs: 250,
+        commandBurstMax: 3,
+        commandBurstFrameGapMaxMs: 24,
+        commandBurstWorstFramePhase: "match.input",
+        commandBurstWorstFramePhaseMs: 9,
         frameGapMaxMs: 25,
         frameCount: 2,
         frameTotalMs: 40,
@@ -117,6 +124,11 @@ import {
     assert(reports[0].matchTick === 77, "match net reporter reads the latest snapshot tick lazily");
     assert(reports[0].fpsEstimate === 50, "match net reporter derives fps estimate from frame stats");
     assert(reports[0].predictionMode === "predicting", "match net reporter merges prediction fields");
+    assert(reports[0].commandBurstMax === 3, "match net reporter includes command burst density");
+    assert(
+      reports[0].predictedSnapshotLateFrameCount === 1,
+      "match net reporter includes prediction coverage during late snapshot frames",
+    );
     assert(reports[0].hidden === true && reports[0].focused === false, "match net reporter includes document state");
     assert(resetStats === 1 && resetFrame === 1 && resetSnapshot === 1, "match net reporter resets report windows after upload");
     assert(
@@ -147,10 +159,18 @@ import {
         maxCorrectionDistance: 22,
         correctionCount: 3,
         disableCount: 1,
+        disableReasons: {
+          "user-disabled": 1,
+          "prediction-build-mismatch": 2,
+          "wasm-unavailable": 3,
+        },
       }),
       consumeCommandReportStats: () => ({
         commandsIssued: 9,
         commandIssueToServerReceiptMaxMs: 40,
+        predictionReplayMaxMs: 11,
+        predictionReplayMaxTicks: 7,
+        predictionReplayBudgetExceededCount: 1,
       }),
     },
     predictionAdapter: {
@@ -159,12 +179,23 @@ import {
         memoryBytes: 4096,
         lastReplayTicks: 5,
       }),
+      consumeReportStats: () => ({
+        predictionReplayMaxMs: 13,
+        predictionReplayMaxTicks: 8,
+        predictionReplayBudgetExceededCount: 2,
+      }),
     },
   });
   assert(fields.predictionMode === "predicting", "prediction net-report fields preserve controller mode");
   assert(fields.pendingCommandCount === 7, "prediction net-report fields include pending command count");
   assert(fields.commandsIssued === 9, "prediction net-report fields include command report counters");
+  assert(fields.predictionDisableUserCount === 1, "prediction net-report fields bucket user disables");
+  assert(fields.predictionDisableCompatibilityCount === 2, "prediction net-report fields bucket compatibility disables");
+  assert(fields.predictionDisableWasmCount === 3, "prediction net-report fields bucket WASM disables");
   assert(fields.wasmMemoryBytes === 4096, "prediction net-report fields include WASM diagnostics");
+  assert(fields.predictionReplayMaxMs === 13, "prediction net-report fields include replay max milliseconds");
+  assert(fields.predictionReplayMaxTicks === 8, "prediction net-report fields include replay max ticks");
+  assert(fields.predictionReplayBudgetExceededCount === 3, "prediction net-report fields include replay budget exceeds");
 }
 
 // Match combat-audio collaborator

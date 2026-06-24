@@ -1339,24 +1339,18 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
 
     let (mut sink, mut stream) = socket.split();
 
-    // Outbound path: room (and this task, for welcome/pong) -> writer task -> socket.
     let (conn_tx, writer_rx) = lobby::ConnectionSink::new();
 
-    // Writer task: serialize each ServerMessage and push it to the socket.
-    // Reliable messages stay object-shaped JSON; snapshots use the default snapshot codec.
-    // Reliable messages are FIFO and prioritized over snapshots. Snapshots are latest-only:
-    // while the socket is busy, newer snapshots replace older unsent snapshots.
     let writer = tokio::spawn(async move {
-        let lobby::ConnectionWriter {
-            mut reliable_rx,
-            snapshots,
-        } = writer_rx;
+        let (mut reliable_rx, snapshots, mut writer_stats) = writer_rx.into_parts();
         let mut reliable_closed = false;
 
         'write_loop: loop {
+            let snapshot_waiting = snapshots.has_pending();
             while !reliable_closed {
                 match reliable_rx.try_recv() {
                     Ok(msg) => {
+                        writer_stats.note_reliable_for_snapshot(snapshot_waiting, &snapshots);
                         if !send_server_message(player_id, &mut sink, msg).await {
                             break 'write_loop;
                         }
@@ -1369,13 +1363,13 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                 }
             }
 
-            if let Some(snapshot) = snapshots.take() {
-                if !send_server_message(player_id, &mut sink, ServerMessage::Snapshot(snapshot))
-                    .await
-                {
+            if let Some(snapshot_send) = snapshots.take_for_send(&mut writer_stats) {
+                let (snapshot, snapshot_stats) = snapshot_send.into_parts();
+                let msg = ServerMessage::Snapshot(snapshot);
+                if !send_server_message(player_id, &mut sink, msg).await {
                     break 'write_loop;
                 }
-                // Send at most one snapshot before checking reliable messages again.
+                writer_stats.record_snapshot_sent(snapshot_stats);
                 continue;
             }
 
@@ -1387,6 +1381,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                 maybe_msg = reliable_rx.recv() => {
                     match maybe_msg {
                         Some(msg) => {
+                            writer_stats.note_reliable_message(snapshots.has_pending());
                             if !send_server_message(player_id, &mut sink, msg).await {
                                 break 'write_loop;
                             }
@@ -1398,7 +1393,6 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
             }
         }
 
-        // Best-effort close; ignore errors since the socket may already be gone.
         let _ = sink.close().await;
     });
 
@@ -1848,7 +1842,13 @@ async fn handle_client_message(
             let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });
         }
         ClientMessage::NetReport { report } => {
-            structured_log::log_client_net_report(player_id, current_room_name.as_deref(), *report);
+            let outbound = conn_tx.consume_report_stats();
+            structured_log::log_client_net_report(
+                player_id,
+                current_room_name.as_deref(),
+                *report,
+                outbound,
+            );
         }
         ClientMessage::SetRoomTimeSpeed { speed } => {
             send_room_event(

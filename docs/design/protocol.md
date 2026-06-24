@@ -153,6 +153,8 @@ in a match:
   snapshotGapMaxMs: u16,    // largest observed interval between received snapshots
   jitterSamples: u32,       // jitter incidents in this report window
   snapshots: u32,           // snapshots received in this report window
+  snapshotLateFrameCount: u32, // frames where the latest snapshot was late by jitter threshold
+  predictedSnapshotLateFrameCount: u32, // late-snapshot frames with owned predicted overlay present
   snapshotBytesTotal: u32,   // total received snapshot application payload bytes
   snapshotBytesMax: u32,     // largest received snapshot application payload bytes
   snapshotBytesAvg: u32,     // average received snapshot application payload bytes
@@ -196,6 +198,11 @@ in a match:
   viewportWidth: u16,       // latest CSS viewport width context
   viewportHeight: u16,      // latest CSS viewport height context
   devicePixelRatioX100: u16, // latest devicePixelRatio multiplied by 100
+  commandBurstBucketMs: u16, // short command-density bucket width, currently 250 ms
+  commandBurstMax: u16,      // max commands issued in any commandBurstBucketMs window
+  commandBurstFrameGapMaxMs: u16, // max frame gap while a command burst was active
+  commandBurstWorstFramePhase: string, // bounded worst frame phase while a command burst was active
+  commandBurstWorstFramePhaseMs: u16,
   hidden: bool,             // document.hidden when the report was sent
   focused: bool,            // document.hasFocus() when available
   desktopRuntimePresent: bool, // true when the desktop shell runtime flag exists
@@ -237,27 +244,43 @@ in a match:
   correctionDistancePx: u16,         // largest correction observed by the client
   correctionCount: u32,
   predictionDisableCount: u32,
+  predictionDisableUserCount: u32,
+  predictionDisableReplayCount: u32, // replay-viewer or replay-budget reset reasons
+  predictionDisableSpectatorCount: u32,
+  predictionDisableCompatibilityCount: u32,
+  predictionDisableWasmCount: u32,
+  predictionDisableOtherCount: u32,
   wasmTickMs: u16,          // latest measured WASM prediction/replay work duration
   wasmMemoryBytes: u32,     // current WASM memory buffer size, when available
-  predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
+  predictionReplayTicks: u16, // latest local replay/advance ticks processed in one measured step
+  predictionReplayMaxMs: u16, // max WASM pending-command replay duration in report window
+  predictionReplayMaxTicks: u16, // max pending-command replay ticks in report window
+  predictionReplayBudgetExceededCount: u32
 }
 ```
 The snapshot payload, codec, parse, decode, apply, prediction-apply, cadence, command milestone, and
 desktop cursor runtime fields are report-window aggregates or bounded summaries only; raw snapshot
 payloads, raw timestamp arrays, entity ids, unit ids, target ids, positions, replay data, command
-payloads, and raw cursor input events are not uploaded. The canonical single-segment payload budget
-is 1280 bytes. It is intentionally below a common 1460-byte Ethernet TCP MSS because the measured
+payloads, and raw cursor input events are not uploaded. HUD `jit` and `snapshotJitterMs` mean
+snapshot arrival jitter, not JavaScript compiler/JIT time. The canonical single-segment payload
+budget is 1280 bytes. It is intentionally below a common 1460-byte Ethernet TCP MSS because the measured
 snapshot bytes are only WebSocket application payload bytes and exclude WebSocket framing plus TLS,
 TCP, and IP overhead. Command milestone timing splits local issue to receipt, receipt to sim
 acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to browser apply. The
 frame-work and renderer fields come from the browser's bounded frame-profiler report window; the
 local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
-recent frames are not uploaded. The server logs this message only when the aggregate contains
+recent frames are not uploaded. Command burst fields use a fixed 250 ms sliding bucket and only count
+commands accepted by the browser WebSocket send path after local command-budget checks. Prediction
+disable reason fields are stable buckets; detailed WASM loader errors stay local. The server logs
+this message only when the aggregate contains
 notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure, packet-budget
 pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
-backlog, server tick/scheduler pressure, command milestone delay/rejection, or prediction
+backlog, server tick/scheduler pressure, command density, command milestone delay/rejection, or prediction
 correction/fallback signals, alongside the connection's `player_id`, room name, and reported
-`match_run_id`. Values are advisory because clients are untrusted; use them to diagnose
+`match_run_id`. The same structured row also includes server-observed outbound counters for the
+report window, prefixed `server*`, such as command receipt counts, reliable messages drained while a
+snapshot was pending, snapshot send age, and latest-only snapshot slot stored/replaced/closed counts.
+Those server-only log fields are not client protocol fields. Values are advisory because clients are untrusted; use them to diagnose
 transport/browser/prediction/render behavior, not as gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)

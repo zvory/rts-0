@@ -171,6 +171,10 @@ pub struct ClientNetReport {
     pub jitter_samples: u32,
     pub snapshots: u32,
     #[serde(default)]
+    pub snapshot_late_frame_count: u32,
+    #[serde(default)]
+    pub predicted_snapshot_late_frame_count: u32,
+    #[serde(default)]
     pub snapshot_bytes_total: u32,
     #[serde(default)]
     pub snapshot_bytes_max: u32,
@@ -254,6 +258,16 @@ pub struct ClientNetReport {
     pub viewport_height: u16,
     #[serde(default)]
     pub device_pixel_ratio_x100: u16,
+    #[serde(default)]
+    pub command_burst_bucket_ms: u16,
+    #[serde(default)]
+    pub command_burst_max: u16,
+    #[serde(default)]
+    pub command_burst_frame_gap_max_ms: u16,
+    #[serde(default)]
+    pub command_burst_worst_frame_phase: String,
+    #[serde(default)]
+    pub command_burst_worst_frame_phase_ms: u16,
     pub hidden: bool,
     pub focused: bool,
     #[serde(default)]
@@ -330,11 +344,29 @@ pub struct ClientNetReport {
     #[serde(default)]
     pub prediction_disable_count: u32,
     #[serde(default)]
+    pub prediction_disable_user_count: u32,
+    #[serde(default)]
+    pub prediction_disable_replay_count: u32,
+    #[serde(default)]
+    pub prediction_disable_spectator_count: u32,
+    #[serde(default)]
+    pub prediction_disable_compatibility_count: u32,
+    #[serde(default)]
+    pub prediction_disable_wasm_count: u32,
+    #[serde(default)]
+    pub prediction_disable_other_count: u32,
+    #[serde(default)]
     pub wasm_tick_ms: u16,
     #[serde(default)]
     pub wasm_memory_bytes: u32,
     #[serde(default)]
     pub prediction_replay_ticks: u16,
+    #[serde(default)]
+    pub prediction_replay_max_ms: u16,
+    #[serde(default)]
+    pub prediction_replay_max_ticks: u16,
+    #[serde(default)]
+    pub prediction_replay_budget_exceeded_count: u32,
 }
 
 /// A gameplay command. Validated when applied, not when received.
@@ -994,6 +1026,8 @@ mod tests {
                 "snapshotGapMaxMs":420,
                 "jitterSamples":12,
                 "snapshots":289,
+                "snapshotLateFrameCount":6,
+                "predictedSnapshotLateFrameCount":4,
                 "snapshotBytesTotal":18496000,
                 "snapshotBytesMax":92000,
                 "snapshotBytesAvg":64000,
@@ -1037,6 +1071,11 @@ mod tests {
                 "viewportWidth":1440,
                 "viewportHeight":900,
                 "devicePixelRatioX100":200,
+                "commandBurstBucketMs":250,
+                "commandBurstMax":7,
+                "commandBurstFrameGapMaxMs":37,
+                "commandBurstWorstFramePhase":"match.input",
+                "commandBurstWorstFramePhaseMs":18,
                 "hidden":false,
                 "focused":true,
                 "wsBufferedBytes":0,
@@ -1062,7 +1101,16 @@ mod tests {
                 "commandAckSnapshotReceivedToAppliedMaxMs":9,
                 "commandAckSnapshotReceivedToAppliedP95Ms":8,
                 "oldestPendingCommandAgeMs":250,
-                "maxPendingCommandCount":5
+                "maxPendingCommandCount":5,
+                "predictionDisableUserCount":1,
+                "predictionDisableReplayCount":2,
+                "predictionDisableSpectatorCount":3,
+                "predictionDisableCompatibilityCount":4,
+                "predictionDisableWasmCount":5,
+                "predictionDisableOtherCount":6,
+                "predictionReplayMaxMs":9,
+                "predictionReplayMaxTicks":8,
+                "predictionReplayBudgetExceededCount":7
             }
         }"#;
         let msg: ClientMessage = serde_json::from_str(raw).unwrap();
@@ -1071,6 +1119,8 @@ mod tests {
                 assert_eq!(report.schema_version, 1);
                 assert_eq!(report.match_run_id, "main-123");
                 assert_eq!(report.snapshot_gap_max_ms, 420);
+                assert_eq!(report.snapshot_late_frame_count, 6);
+                assert_eq!(report.predicted_snapshot_late_frame_count, 4);
                 assert_eq!(report.snapshot_bytes_max, 92_000);
                 assert_eq!(
                     report.snapshot_byte_source,
@@ -1094,6 +1144,11 @@ mod tests {
                 assert_eq!(report.worst_frame_phase, "match.renderer");
                 assert_eq!(report.entity_count, 325);
                 assert_eq!(report.device_pixel_ratio_x100, 200);
+                assert_eq!(report.command_burst_bucket_ms, 250);
+                assert_eq!(report.command_burst_max, 7);
+                assert_eq!(report.command_burst_frame_gap_max_ms, 37);
+                assert_eq!(report.command_burst_worst_frame_phase, "match.input");
+                assert_eq!(report.command_burst_worst_frame_phase_ms, 18);
                 assert_eq!(report.head_of_line_count, 7);
                 assert_eq!(report.commands_issued, 4);
                 assert_eq!(report.command_server_received, 3);
@@ -1101,6 +1156,15 @@ mod tests {
                 assert_eq!(report.command_issue_to_sim_ack_max_ms, 180);
                 assert_eq!(report.oldest_pending_command_age_ms, 250);
                 assert_eq!(report.max_pending_command_count, 5);
+                assert_eq!(report.prediction_disable_user_count, 1);
+                assert_eq!(report.prediction_disable_replay_count, 2);
+                assert_eq!(report.prediction_disable_spectator_count, 3);
+                assert_eq!(report.prediction_disable_compatibility_count, 4);
+                assert_eq!(report.prediction_disable_wasm_count, 5);
+                assert_eq!(report.prediction_disable_other_count, 6);
+                assert_eq!(report.prediction_replay_max_ms, 9);
+                assert_eq!(report.prediction_replay_max_ticks, 8);
+                assert_eq!(report.prediction_replay_budget_exceeded_count, 7);
             }
             other => panic!("expected net report, got {other:?}"),
         }
@@ -1153,8 +1217,12 @@ mod tests {
                 assert_eq!(report.websocket_compression, "");
                 assert_eq!(report.snapshot_tick_gap_max, 0);
                 assert_eq!(report.match_run_id, "");
+                assert_eq!(report.command_burst_max, 0);
                 assert_eq!(report.command_issue_to_server_receipt_max_ms, 0);
                 assert_eq!(report.max_pending_command_count, 0);
+                assert_eq!(report.prediction_disable_wasm_count, 0);
+                assert_eq!(report.prediction_replay_max_ms, 0);
+                assert_eq!(report.prediction_replay_budget_exceeded_count, 0);
             }
             other => panic!("expected net report, got {other:?}"),
         }

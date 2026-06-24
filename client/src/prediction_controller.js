@@ -489,6 +489,9 @@ export class PredictionController {
       commandSimAcknowledged: 0,
       commandRejected: 0,
       maxPendingCommandCount: this.commandDiagnosticPending?.length || 0,
+      predictionReplayMaxMs: 0,
+      predictionReplayMaxTicks: 0,
+      predictionReplayBudgetExceededCount: 0,
     };
     this.commandTimings = {
       issueToServerReceipt: new ReportWindowAggregate(),
@@ -558,6 +561,25 @@ export class PredictionController {
     this.commandTimings[kind].add(number);
   }
 
+  recordReplayBudgetExceeded({ elapsedMs = 0, replayTicks = 0 } = {}) {
+    const elapsed = Number(elapsedMs);
+    if (Number.isFinite(elapsed) && elapsed >= 0) {
+      this.commandReport.predictionReplayMaxMs = Math.max(
+        this.commandReport.predictionReplayMaxMs,
+        elapsed,
+      );
+    }
+    const ticks = Number(replayTicks);
+    if (Number.isFinite(ticks) && ticks >= 0) {
+      this.commandReport.predictionReplayMaxTicks = Math.max(
+        this.commandReport.predictionReplayMaxTicks,
+        Math.trunc(ticks),
+      );
+    }
+    this.commandReport.predictionReplayBudgetExceededCount += 1;
+    this.recordDisableReason("replay-budget-exceeded");
+  }
+
   consumeCommandReportStats(now = this.now()) {
     const out = this.peekCommandReportStats(now);
     this.resetCommandReportWindow();
@@ -589,6 +611,9 @@ export class PredictionController {
       commandAckSnapshotReceivedToAppliedP95Ms: ackApply.p95,
       oldestPendingCommandAgeMs: oldestPendingAge(this.commandDiagnosticPending, now),
       maxPendingCommandCount: this.commandReport.maxPendingCommandCount,
+      predictionReplayMaxMs: this.commandReport.predictionReplayMaxMs,
+      predictionReplayMaxTicks: this.commandReport.predictionReplayMaxTicks,
+      predictionReplayBudgetExceededCount: this.commandReport.predictionReplayBudgetExceededCount,
     };
   }
 

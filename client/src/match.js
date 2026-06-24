@@ -149,6 +149,11 @@ export class Match {
           return { clientSeq: null, sent: false, predicted: false, blocked: "commandBudget", budget };
         }
         const issued = this.prediction.issueCommand(command, options);
+        if (issued?.sent) {
+          const issuedAt = this.frameProfiler?.now?.() ?? performance.now();
+          this.health.noteCommandIssued(issuedAt);
+          this.frameProfiler?.recordDiagnosticCounter?.("commands.issued");
+        }
         this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
         return issued;
       },
@@ -401,6 +406,10 @@ export class Match {
 
   disablePredictionForReplayBudget(diagnostics) {
     if (!this.prediction.enabled || !(diagnostics?.budgetExceededCount > 0)) return false;
+    this.prediction.recordReplayBudgetExceeded({
+      elapsedMs: diagnostics.lastTickMs,
+      replayTicks: diagnostics.lastReplayTicks,
+    });
     this.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
     this.resetPredictionAdapter();
     this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
@@ -479,7 +488,7 @@ export class Match {
       }
       if (ready) this.logPredictionStatus("ready");
       else {
-        this.prediction.recordDisableReason(adapter.disabledReason || "wasm-unavailable");
+        this.prediction.recordDisableReason("wasm-unavailable");
         this.logPredictionStatus("disabled");
       }
       if (remountSettings) this.mountSettings({ keepOpen: true });

@@ -2,6 +2,7 @@ const LATENCY_ISSUE_MS = 180;
 const JITTER_ISSUE_MS = 20;
 const JITTER_WINDOW = 8;
 const FPS_WINDOW_MS = 60_000;
+const COMMAND_BURST_BUCKET_MS = 250;
 
 export class MatchHealth {
   constructor({ net, statusBadge, snapshotMs }) {
@@ -13,6 +14,8 @@ export class MatchHealth {
     this.lastSnapshotArrivedAt = null;
     this.lastSnapshotTickForCadence = null;
     this.snapshotsThisFrame = 0;
+    this.commandIssueWindow = [];
+    this.lastCommandIssuedAt = null;
     this.reportStartedAt = performance.now();
     this.reportStats = this.createReportStats();
     this.frameSamples = [];
@@ -46,6 +49,13 @@ export class MatchHealth {
       skippedSnapshotCount: 0,
       snapshotBurstCount: 0,
       snapshotBurstMax: 0,
+      commandBurstBucketMs: COMMAND_BURST_BUCKET_MS,
+      commandBurstMax: 0,
+      commandBurstFrameGapMaxMs: 0,
+      commandBurstWorstFramePhase: "",
+      commandBurstWorstFramePhaseMs: 0,
+      snapshotLateFrameCount: 0,
+      predictedSnapshotLateFrameCount: 0,
       frameGapMaxMs: 0,
       frameCount: 0,
       frameTotalMs: 0,
@@ -55,6 +65,8 @@ export class MatchHealth {
   resetReportStats(now = performance.now()) {
     this.reportStartedAt = now;
     this.reportStats = this.createReportStats();
+    this.commandIssueWindow = [];
+    this.lastCommandIssuedAt = null;
   }
 
   noteFrameGap(frameGapMs, now = performance.now()) {
@@ -71,6 +83,61 @@ export class MatchHealth {
     this.health.fpsOneMinute = this.frameWindowTotalMs > 0
       ? this.frameSamples.length * 1000 / this.frameWindowTotalMs
       : null;
+  }
+
+  noteCommandIssued(now = performance.now()) {
+    if (!Number.isFinite(now) || now < 0) return;
+    this.lastCommandIssuedAt = now;
+    this.commandIssueWindow.push(now);
+    this.pruneCommandIssueWindow(now);
+    this.reportStats.commandBurstMax = Math.max(
+      this.reportStats.commandBurstMax,
+      this.commandIssueWindow.length,
+    );
+  }
+
+  noteFrameSummary(summary, { predictedSnapshotPresent = false } = {}) {
+    if (!summary || typeof summary !== "object") return;
+    const now = finiteNumber(summary.at);
+    if (now == null) return;
+
+    if (this.lastCommandIssuedAt != null && now - this.lastCommandIssuedAt <= COMMAND_BURST_BUCKET_MS) {
+      const frameGapMs = finiteNumber(summary.frameGapMs);
+      if (frameGapMs != null) {
+        this.reportStats.commandBurstFrameGapMaxMs = Math.max(
+          this.reportStats.commandBurstFrameGapMaxMs,
+          frameGapMs,
+        );
+      }
+      const worstMs = finiteNumber(summary.worstPhaseMs);
+      if (worstMs != null && worstMs >= this.reportStats.commandBurstWorstFramePhaseMs) {
+        this.reportStats.commandBurstWorstFramePhaseMs = worstMs;
+        this.reportStats.commandBurstWorstFramePhase = typeof summary.worstPhase === "string"
+          ? summary.worstPhase
+          : "";
+      }
+    }
+
+    const documentHidden = summary.context?.hidden === true;
+    if (
+      !documentHidden &&
+      this.lastSnapshotArrivedAt != null &&
+      now - this.lastSnapshotArrivedAt >= this.snapshotMs + JITTER_ISSUE_MS
+    ) {
+      this.reportStats.snapshotLateFrameCount += 1;
+      if (predictedSnapshotPresent) {
+        this.reportStats.predictedSnapshotLateFrameCount += 1;
+      }
+    }
+  }
+
+  pruneCommandIssueWindow(now) {
+    const cutoff = now - COMMAND_BURST_BUCKET_MS;
+    let removeCount = 0;
+    while (removeCount < this.commandIssueWindow.length && this.commandIssueWindow[removeCount] < cutoff) {
+      removeCount += 1;
+    }
+    if (removeCount > 0) this.commandIssueWindow.splice(0, removeCount);
   }
 
   pruneFrameSamples(now) {
@@ -175,4 +242,9 @@ function finiteU32(value) {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 0 || n > 0xffffffff) return null;
   return n;
+}
+
+function finiteNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
