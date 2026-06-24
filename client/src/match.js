@@ -297,7 +297,7 @@ export class Match {
     this.net.on(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.LIVE_PAUSE_STATE, this.onLivePauseState);
-    this.net.on(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
+    this.net.on(S.OBSERVER_ANALYSIS, this.onObserverAnalysis);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
     if (!this.replayViewer) {
@@ -1178,7 +1178,7 @@ export class Match {
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.LIVE_PAUSE_STATE, this.onLivePauseState);
-    this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
+    this.net.off(S.OBSERVER_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     this.roomTimeControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
@@ -1218,7 +1218,7 @@ export class Match {
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.LIVE_PAUSE_STATE, this.onLivePauseState);
-    this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
+    this.net.off(S.OBSERVER_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     if (!this.replayViewer) {

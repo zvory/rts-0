@@ -351,11 +351,11 @@ export class Net {
   }
 
   /**
-   * Select replay vision for this viewer only.
-   * @param {object} vision replay vision payload from protocol.js builders/constants
+   * Select replay fog perspective for this viewer only.
+   * @param {object} selection vision selection payload from protocol.js builders/constants
    */
-  setReplayVision(vision) {
-    this._send(msg.setReplayVision(vision));
+  setVisionSelection(selection) {
+    this._send(msg.setVisionSelection(selection));
   }
 
   /**
@@ -369,8 +369,8 @@ export class Net {
   }
 
   /** Request a practice branch room from the current authoritative replay tick. */
-  requestReplayBranch() {
-    this._send(msg.requestReplayBranch());
+  requestBranchFromTick() {
+    this._send(msg.requestBranchFromTick());
   }
 
   /** Claim an original replay player seat in branch staging. */

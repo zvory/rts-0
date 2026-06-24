@@ -54,9 +54,9 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assertHasMethod(net, "stepRoomTime", "Net");
   assertHasMethod(net, "seekRoomTime", "Net");
   assertHasMethod(net, "seekRoomTimeTo", "Net");
-  assertHasMethod(net, "setReplayVision", "Net");
+  assertHasMethod(net, "setVisionSelection", "Net");
   assertHasMethod(net, "lab", "Net");
-  assertHasMethod(net, "requestReplayBranch", "Net");
+  assertHasMethod(net, "requestBranchFromTick", "Net");
   assertHasMethod(net, "claimBranchSeat", "Net");
   assertHasMethod(net, "releaseBranchSeat", "Net");
   assertHasMethod(net, "startBranch", "Net");
@@ -208,18 +208,18 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     msg.addAi(2, DEFAULT_AI_PROFILE_ID).aiProfileId === DEFAULT_AI_PROFILE_ID,
     "addAi builder can include default aiProfileId",
   );
-  assert(msg.requestReplayBranch().t === "requestReplayBranch", "replay branch builder tag");
+  assert(msg.requestBranchFromTick().t === "requestBranchFromTick", "replay branch builder tag");
   assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");
   assert(msg.releaseBranchSeat(7).t === "releaseBranchSeat", "branch seat release builder tag");
   assert(msg.startBranch().t === "startBranch", "branch start builder tag");
-  assert(msg.replayVisionAll().t === "setReplayVision", "replay all-vision builder tag");
-  assert(msg.replayVisionAll().vision.mode === "all", "replay all-vision builder payload");
+  assert(msg.visionSelectionAll().t === "setVisionSelection", "replay all-vision builder tag");
+  assert(msg.visionSelectionAll().selection.mode === "all", "replay all-vision builder payload");
   assert(
-    msg.replayVisionPlayer(7).vision.playerId === 7,
+    msg.visionSelectionPlayer(7).selection.playerId === 7,
     "replay single-player vision builder payload",
   );
   assert(
-    msg.replayVisionPlayers([1, 2]).vision.playerIds.join(",") === "1,2",
+    msg.visionSelectionPlayers([1, 2]).selection.playerIds.join(",") === "1,2",
     "replay subset vision builder payload",
   );
 }

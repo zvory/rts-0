@@ -114,12 +114,12 @@ impl MatchControlCapabilities {
 #[serde(rename_all = "camelCase")]
 pub struct VisibilityCapabilities {
     #[serde(default, skip_serializing_if = "is_false")]
-    pub replay_vision: bool,
+    pub vision_selection: bool,
 }
 
 impl VisibilityCapabilities {
     pub fn is_empty(&self) -> bool {
-        !self.replay_vision
+        !self.vision_selection
     }
 }
 
@@ -140,12 +140,12 @@ impl CommandCapabilities {
 #[serde(rename_all = "camelCase")]
 pub struct ActionCapabilities {
     #[serde(default, skip_serializing_if = "is_false")]
-    pub replay_branch: bool,
+    pub branch_from_tick: bool,
 }
 
 impl ActionCapabilities {
     pub fn is_empty(&self) -> bool {
-        !self.replay_branch
+        !self.branch_from_tick
     }
 }
 

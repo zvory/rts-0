@@ -109,9 +109,9 @@ export class Net {
   stepRoomTime()                         // paused dev-scenario/lab room time
   seekRoomTime(ticksBack)                // room-controlled replay/lab time; pass huge N for full reset
   seekRoomTimeTo(tick)
-  setReplayVision(vision)
+  setVisionSelection(selection)
   lab(requestId, op)                     // lab rooms only; request id allocated by LabClient
-  requestReplayBranch()
+  requestBranchFromTick()
   claimBranchSeat(playerId)
   releaseBranchSeat(playerId)
   startBranch()
@@ -322,7 +322,7 @@ seek-triggered `start` messages and spectator rematches. Preferences are stored 
 `rts.observerAnalysisOverlay`; clients still read the old `rts.replayAnalysisOverlay` key for
 compatibility. The overlay owns its generated DOM and is read-only. The Army Value tab is
 client-side and viewport-specific; Production, Units, Units Lost, and Resources Lost render the
-latest server-authored `replayAnalysis` payload. Resources Lost follows the protocol's narrow
+latest server-authored `observerAnalysis` payload. Resources Lost follows the protocol's narrow
 definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
 harvesting, refunds, and cancelled queues.
 
@@ -397,7 +397,7 @@ createRoomCapabilities({ startPayload })
 ```
 `Match` and app-shell controls consume this parsed `startPayload.capabilities` and
 `startPayload.diagnostics` record for room-time controls, diagnostic settings, observer analysis,
-vision controls, live pause controls, replay branch actions, and read-only/gameplay command
+vision-selection controls, live pause controls, replay branch actions, and read-only/gameplay command
 affordances. Product shells may still use product metadata for launch/routing and owned controls
 such as lab scenario tools, but shared affordances must not be inferred from replay/dev/lab
 identity.

@@ -39,8 +39,8 @@ fn dev_scenario_start_payload_is_read_only_viewer_payload() {
     assert!(!payload.capabilities.room_time.timeline);
     assert!(!payload.capabilities.commands.gameplay);
     assert!(!payload.capabilities.match_controls.pause);
-    assert!(!payload.capabilities.visibility.replay_vision);
-    assert!(!payload.capabilities.actions.replay_branch);
+    assert!(!payload.capabilities.visibility.vision_selection);
+    assert!(!payload.capabilities.actions.branch_from_tick);
     assert_eq!(
         payload.diagnostics.movement_paths,
         MovementPathDiagnosticScope::All

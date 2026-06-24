@@ -1,7 +1,7 @@
 use super::replay_validation;
 use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
 use crate::protocol::{
-    Event, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest, RoomTimeState,
+    Event, ReplayBranchSeat, ReplayStartMetadata, RoomTimeState, VisionSelectionRequest,
 };
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
@@ -11,53 +11,51 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant as StdInstant};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum ReplayVisionSelection {
+enum VisionSelection {
     All,
     Players(Vec<u32>),
 }
 
-impl ReplayVisionSelection {
-    fn from_request(request: ReplayVisionRequest) -> Self {
+impl VisionSelection {
+    fn from_request(request: VisionSelectionRequest) -> Self {
         match request {
-            ReplayVisionRequest::All => ReplayVisionSelection::All,
-            ReplayVisionRequest::Player { player_id } => {
-                ReplayVisionSelection::Players(vec![player_id])
+            VisionSelectionRequest::All => VisionSelection::All,
+            VisionSelectionRequest::Player { player_id } => {
+                VisionSelection::Players(vec![player_id])
             }
-            ReplayVisionRequest::Players { player_ids } => {
-                ReplayVisionSelection::Players(player_ids)
-            }
+            VisionSelectionRequest::Players { player_ids } => VisionSelection::Players(player_ids),
         }
     }
 
     fn player_ids(&self, all_players: &[u32]) -> Vec<u32> {
         match self {
-            ReplayVisionSelection::All => all_players.to_vec(),
-            ReplayVisionSelection::Players(ids) => ids.clone(),
+            VisionSelection::All => all_players.to_vec(),
+            VisionSelection::Players(ids) => ids.clone(),
         }
     }
 }
 
-pub(super) fn validate_replay_vision_request(
-    vision: &ReplayVisionRequest,
+pub(super) fn validate_vision_selection_request(
+    vision: &VisionSelectionRequest,
     valid_player_ids: &[u32],
 ) -> Result<(), &'static str> {
     let valid: HashSet<u32> = valid_player_ids.iter().copied().collect();
     match vision {
-        ReplayVisionRequest::All => {
+        VisionSelectionRequest::All => {
             if valid.is_empty() {
                 Err("no replay players")
             } else {
                 Ok(())
             }
         }
-        ReplayVisionRequest::Player { player_id } => {
+        VisionSelectionRequest::Player { player_id } => {
             if valid.contains(player_id) {
                 Ok(())
             } else {
                 Err("unknown replay player")
             }
         }
-        ReplayVisionRequest::Players { player_ids } => {
+        VisionSelectionRequest::Players { player_ids } => {
             if player_ids.is_empty() {
                 return Err("empty replay player subset");
             }
@@ -84,7 +82,7 @@ pub(super) struct ReplaySession {
     pub(super) keyframes: Vec<ReplayKeyframe>,
     pub(super) duration_ticks: u32,
     speed: f32,
-    viewer_vision: HashMap<u32, ReplayVisionSelection>,
+    viewer_selection: HashMap<u32, VisionSelection>,
     last_controller_id: Option<u32>,
     last_seek_at: Option<StdInstant>,
 }
@@ -132,7 +130,7 @@ impl ReplaySession {
             keyframes,
             duration_ticks,
             speed: Self::DEFAULT_SPEED,
-            viewer_vision: HashMap::new(),
+            viewer_selection: HashMap::new(),
             last_controller_id: None,
             last_seek_at: None,
         })
@@ -275,7 +273,7 @@ impl ReplaySession {
     }
 
     pub(super) fn remove_viewer(&mut self, viewer_id: u32) {
-        self.viewer_vision.remove(&viewer_id);
+        self.viewer_selection.remove(&viewer_id);
     }
 
     pub(super) fn can_create_replay_branch(&self) -> bool {
@@ -317,16 +315,16 @@ impl ReplaySession {
         self.last_controller_id = Some(controller_id);
     }
 
-    pub(super) fn set_vision(&mut self, viewer_id: u32, vision: ReplayVisionRequest) {
-        self.viewer_vision
-            .insert(viewer_id, ReplayVisionSelection::from_request(vision));
+    pub(super) fn set_vision(&mut self, viewer_id: u32, vision: VisionSelectionRequest) {
+        self.viewer_selection
+            .insert(viewer_id, VisionSelection::from_request(vision));
     }
 
     pub(super) fn vision_player_ids_for(&self, viewer_id: u32) -> Vec<u32> {
         let all_players = self.active_player_ids();
-        self.viewer_vision
+        self.viewer_selection
             .get(&viewer_id)
-            .unwrap_or(&ReplayVisionSelection::All)
+            .unwrap_or(&VisionSelection::All)
             .player_ids(&all_players)
     }
 
@@ -497,42 +495,42 @@ mod tests {
     }
 
     #[test]
-    fn replay_vision_validation_rejects_unknown_and_empty_subsets() {
+    fn vision_selection_validation_rejects_unknown_and_empty_subsets() {
         let valid = [1, 2, 3];
 
-        assert!(validate_replay_vision_request(&ReplayVisionRequest::All, &valid).is_ok());
-        assert!(validate_replay_vision_request(
-            &ReplayVisionRequest::Player { player_id: 2 },
+        assert!(validate_vision_selection_request(&VisionSelectionRequest::All, &valid).is_ok());
+        assert!(validate_vision_selection_request(
+            &VisionSelectionRequest::Player { player_id: 2 },
             &valid,
         )
         .is_ok());
-        assert!(validate_replay_vision_request(
-            &ReplayVisionRequest::Players {
+        assert!(validate_vision_selection_request(
+            &VisionSelectionRequest::Players {
                 player_ids: vec![1, 3],
             },
             &valid,
         )
         .is_ok());
 
-        assert!(validate_replay_vision_request(
-            &ReplayVisionRequest::Player { player_id: 99 },
+        assert!(validate_vision_selection_request(
+            &VisionSelectionRequest::Player { player_id: 99 },
             &valid,
         )
         .is_err());
-        assert!(validate_replay_vision_request(
-            &ReplayVisionRequest::Players { player_ids: vec![] },
+        assert!(validate_vision_selection_request(
+            &VisionSelectionRequest::Players { player_ids: vec![] },
             &valid,
         )
         .is_err());
-        assert!(validate_replay_vision_request(
-            &ReplayVisionRequest::Players {
+        assert!(validate_vision_selection_request(
+            &VisionSelectionRequest::Players {
                 player_ids: vec![1, 99],
             },
             &valid,
         )
         .is_err());
-        assert!(validate_replay_vision_request(
-            &ReplayVisionRequest::Players {
+        assert!(validate_vision_selection_request(
+            &VisionSelectionRequest::Players {
                 player_ids: vec![1, 1],
             },
             &valid,
@@ -645,20 +643,20 @@ mod tests {
     }
 
     #[test]
-    fn replay_vision_selection_is_per_viewer() {
+    fn vision_selection_is_per_viewer() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 0);
         let mut replay = ReplaySession::new(artifact).unwrap();
 
         replay.set_vision(
             100,
-            ReplayVisionRequest::Player {
+            VisionSelectionRequest::Player {
                 player_id: players[0].id,
             },
         );
         replay.set_vision(
             101,
-            ReplayVisionRequest::Player {
+            VisionSelectionRequest::Player {
                 player_id: players[1].id,
             },
         );

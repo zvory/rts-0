@@ -666,7 +666,7 @@ impl SessionPolicy {
                     ),
             },
             visibility: VisibilityCapabilities {
-                replay_vision: self.visibility == VisibilityPolicy::SelectablePerspective,
+                vision_selection: self.visibility == VisibilityPolicy::SelectablePerspective,
             },
             commands: CommandCapabilities {
                 gameplay: gameplay_commands
@@ -1020,7 +1020,7 @@ mod tests {
         assert!(replay_caps.room_time.seek_relative);
         assert!(replay_caps.room_time.seek_absolute);
         assert!(replay_caps.room_time.timeline);
-        assert!(replay_caps.visibility.replay_vision);
+        assert!(replay_caps.visibility.vision_selection);
         assert!(!replay_caps.commands.gameplay);
         assert!(!replay_caps.match_controls.pause);
 
@@ -1032,7 +1032,7 @@ mod tests {
         assert!(dev_caps.room_time.step);
         assert!(!dev_caps.room_time.seek_relative);
         assert!(!dev_caps.room_time.seek_absolute);
-        assert!(!dev_caps.visibility.replay_vision);
+        assert!(!dev_caps.visibility.vision_selection);
         assert!(!dev_caps.match_controls.pause);
 
         let branch = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);

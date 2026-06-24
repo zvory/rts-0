@@ -1,6 +1,6 @@
 # Phase 2 - Protocol Capability Names
 
-Status: planned.
+Status: done.
 
 ## Goal
 

@@ -33,8 +33,8 @@ use tokio::time::{interval, MissedTickBehavior};
 use crate::config;
 use crate::db::Db;
 use crate::protocol::{
-    Event, LabClientOp, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest, ResourceDelta,
-    ServerMessage, Snapshot, TeamId,
+    Event, LabClientOp, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ServerMessage,
+    Snapshot, TeamId, VisionSelectionRequest,
 };
 use rts_ai::selfplay::is_safe_artifact_name;
 use rts_sim::game::command::SimCommand;
@@ -246,10 +246,10 @@ pub enum RoomEvent {
     SeekRoomTime { player_id: u32, ticks_back: u32 },
     /// Seek room-controlled time to an absolute tick where the clock allows absolute seek.
     SeekRoomTimeTo { player_id: u32, tick: u32 },
-    /// Select replay vision for this viewer only. Ignored outside replay rooms in phase 1.
-    SetReplayVision {
+    /// Select replay fog perspective for this viewer only. Ignored outside replay rooms.
+    SetVisionSelection {
         player_id: u32,
-        vision: ReplayVisionRequest,
+        selection: VisionSelectionRequest,
     },
     /// Privileged lab request routed only by lab rooms.
     Lab {
@@ -258,7 +258,7 @@ pub enum RoomEvent {
         op: LabClientOp,
     },
     /// A replay viewer requested a frozen practice branch seed from the current replay tick.
-    RequestReplayBranch {
+    RequestBranchFromTick {
         player_id: u32,
         reply: tokio::sync::oneshot::Sender<Result<ReplayBranchSeed, String>>,
     },
@@ -269,7 +269,7 @@ pub enum RoomEvent {
     /// Host asks to launch the branch from staging.
     StartBranch { player_id: u32 },
     /// Announce a successfully-created branch room to all current replay viewers.
-    AnnounceReplayBranch {
+    AnnounceBranchFromTick {
         branch_room: String,
         source_tick: u32,
         seats: Vec<ReplayBranchSeat>,

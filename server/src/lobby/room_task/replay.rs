@@ -8,7 +8,7 @@ use super::super::crash_replay::{dump_crash_replay, panic_reason};
 use super::super::dev_replay::load_replay_artifact;
 use super::super::launch::{LaunchPrediction, StartPayloadBuilder, StartPayloadRecipient};
 use super::super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
-use super::super::replay_session::{validate_replay_vision_request, ReplaySession};
+use super::super::replay_session::{validate_vision_selection_request, ReplaySession};
 use super::super::session_policy::{RoomTimeOperation, RoomTimeSource, SessionPhase};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::tick_control::{RoomTimeSpeed, TickControl};
@@ -17,7 +17,7 @@ use super::types::{
     LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickContext, RoomMode, RoomPlayer,
 };
 use super::RoomTask;
-use crate::protocol::{Event, ReplayVisionRequest, RoomTimeState, ServerMessage, StartPayload};
+use crate::protocol::{Event, RoomTimeState, ServerMessage, StartPayload, VisionSelectionRequest};
 use rts_sim::game::Game;
 
 impl RoomTask {
@@ -426,7 +426,11 @@ impl RoomTask {
         }
     }
 
-    pub(super) fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
+    pub(super) fn on_set_vision_selection(
+        &mut self,
+        player_id: u32,
+        selection: VisionSelectionRequest,
+    ) {
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::AllRecipients;
         if let Phase::ReplayViewer(session) = &mut self.phase {
@@ -434,20 +438,20 @@ impl RoomTask {
                 return;
             }
             let valid_ids = session.active_player_ids();
-            if validate_replay_vision_request(&vision, &valid_ids).is_err() {
+            if validate_vision_selection_request(&selection, &valid_ids).is_err() {
                 if let Some(player) = self.players.get(&player_id) {
                     send_or_log(
                         &self.room,
                         player_id,
                         &player.msg_tx,
                         ServerMessage::Error {
-                            msg: "Invalid replay vision selection".to_string(),
+                            msg: "Invalid vision selection".to_string(),
                         },
                     );
                 }
                 return;
             }
-            session.set_vision(player_id, vision);
+            session.set_vision(player_id, selection);
             let analysis = send_analysis.then(|| session.game().observer_analysis());
             if let (Some(analysis), Some(player)) = (analysis, self.players.get(&player_id)) {
                 send_or_log(
@@ -460,7 +464,7 @@ impl RoomTask {
         }
     }
 
-    pub(super) fn on_request_replay_branch(
+    pub(super) fn on_request_branch_from_tick(
         &self,
         player_id: u32,
     ) -> Result<ReplayBranchSeed, String> {

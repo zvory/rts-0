@@ -11,7 +11,7 @@ fn replay_branch_request_rejects_outside_replay_viewer() {
     );
     let _writer = add_test_room_player(&mut task, 99, true);
 
-    let err = match task.on_request_replay_branch(99) {
+    let err = match task.on_request_branch_from_tick(99) {
         Ok(_) => panic!("branch request outside replay should fail"),
         Err(err) => err,
     };
@@ -42,7 +42,7 @@ fn replay_branch_seed_captures_current_authoritative_tick() {
     let _writer = add_test_room_player(&mut task, 99, true);
     task.phase = Phase::ReplayViewer(Box::new(replay));
 
-    let seed = task.on_request_replay_branch(99).unwrap();
+    let seed = task.on_request_branch_from_tick(99).unwrap();
 
     assert_eq!(seed.source_tick, 3);
     assert_eq!(seed.game.tick_count(), 3);
@@ -110,7 +110,7 @@ fn replay_branch_request_keeps_source_replay_session_intact() {
     let _writer = add_test_room_player(&mut task, 99, true);
     task.phase = Phase::ReplayViewer(Box::new(replay));
 
-    let seed = task.on_request_replay_branch(99).unwrap();
+    let seed = task.on_request_branch_from_tick(99).unwrap();
     let Phase::ReplayViewer(session) = &task.phase else {
         panic!("source room should remain a replay viewer");
     };
@@ -138,7 +138,7 @@ fn replay_branch_request_rejects_ai_seats_without_creating_seed() {
     task.phase = Phase::ReplayViewer(Box::new(replay));
     task.send_replay_start_to(99);
 
-    let err = match task.on_request_replay_branch(99) {
+    let err = match task.on_request_branch_from_tick(99) {
         Ok(_) => panic!("branch request with AI seats should fail"),
         Err(err) => err,
     };
@@ -147,7 +147,7 @@ fn replay_branch_request_rejects_ai_seats_without_creating_seed() {
         .expect("AI replay viewer should receive a replay start payload");
 
     assert!(err.contains("AI seats"), "unexpected branch reject: {err}");
-    assert!(!payload.capabilities.actions.replay_branch);
+    assert!(!payload.capabilities.actions.branch_from_tick);
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
 }
 
@@ -167,7 +167,7 @@ fn replay_branch_announcement_broadcasts_to_all_viewers() {
     let mut writer_b = add_test_room_player(&mut task, 101, true);
     task.phase = Phase::ReplayViewer(Box::new(replay));
 
-    task.on_announce_replay_branch(
+    task.on_announce_branch_from_tick(
         "__replay_branch__:00000001".to_string(),
         12,
         vec![ReplayBranchSeat {
@@ -184,7 +184,7 @@ fn replay_branch_announcement_broadcasts_to_all_viewers() {
         let msg = writer.reliable_rx.try_recv().expect("branch message");
         assert!(matches!(
             msg,
-            ServerMessage::ReplayBranchCreated {
+            ServerMessage::BranchFromTickCreated {
                 branch_room,
                 source_tick: 12,
                 seats
@@ -455,7 +455,7 @@ fn branch_launch_countdown_promotes_to_live_start_payloads() {
     assert!(start_b.capabilities.commands.gameplay);
     assert!(start_b.capabilities.match_controls.pause);
     assert!(!start_b.capabilities.room_time.available);
-    assert!(!start_b.capabilities.actions.replay_branch);
+    assert!(!start_b.capabilities.actions.branch_from_tick);
     assert!(start_b
         .players
         .iter()

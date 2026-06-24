@@ -3550,7 +3550,7 @@ input[type="text"]:focus {
 .seek-btn {
   color: var(--ink);
 }
-.replay-vision-controls {
+.vision-selection-controls {
   display: flex;
   align-items: center;
   gap: 4px;

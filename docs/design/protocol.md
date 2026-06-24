@@ -82,9 +82,9 @@ lobby/config dump replaces the source scrape.
 | `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms and paused lab rooms. |
 | `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted in replay and lab rooms. |
 | `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Lab rooms use room-local keyframes and recorded accepted lab operations/issue-as commands the same way, then re-send lab `start`, `roomTimeState`, `labState`, and a fresh snapshot. Replay and lab keyframes are recorded every 2,000 ticks while their authoritative time advances. |
-| `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
+| `setVisionSelection` | `selection: VisionSelectionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
 | `lab` | `requestId: u32`, `op: LabClientOp` | Privileged lab request envelope. `requestId` must be nonzero. Ignored before join; rejected outside lab rooms and from non-operator roles with `labResult`. Accepted setup mutations and issue-as commands are room-local; `setVision` changes only the requesting operator's projection. Accepted lab requests append to the lab operation log with the requesting connection id. |
-| `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
+| `requestBranchFromTick` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `branchFromTickCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
 | `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server rejects launch until every original active seat is claimed; live promotion is handled by the branch promotion phase. |
@@ -294,9 +294,9 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
 | `livePauseState` | `Live match pause state` (see 2.6). |
-| `replayAnalysis` | `Observer analysis state` (see 2.7). |
+| `observerAnalysis` | `Observer analysis state` (see 2.7). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
-| `replayBranchCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
+| `branchFromTickCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
@@ -367,9 +367,9 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
       timeline?: bool
     },
     matchControls?: { pause?: bool },
-    visibility?: { replayVision?: bool },
+    visibility?: { visionSelection?: bool },
     commands?: { gameplay?: bool },
-    actions?: { replayBranch?: bool }
+    actions?: { branchFromTick?: bool }
   },
   diagnostics?: {                // explicit recipient-scoped diagnostic affordances
     movementPaths?: "ownerOnly"|"all",
@@ -420,11 +420,11 @@ controls, but no step, relative seek, absolute seek, or timeline capability.
 Replay branch live players also receive pause capability only
 when their connection is mapped to an original active seat through the branch-live seat alias path.
 Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
-`visibility.replayVision: true`. Replay branch creation is advertised separately with
-`actions.replayBranch: true` only when the current replay can accept a branch request. Dev scenario
+`visibility.visionSelection: true`. Replay branch creation is advertised separately with
+`actions.branchFromTick: true` only when the current replay can accept a branch request. Dev scenario
 watch rooms advertise speed/pause/step room-time controls without seek. Lab rooms advertise
 speed/pause/step/relative seek/absolute seek/timeline controls, but still do not advertise
-replay-vision or replay-branch controls. Clients must not infer these shared affordances
+vision-selection or branch-from-tick controls. Clients must not infer these shared affordances
 from `replay`, `lab`, URL-local dev-watch state, or legacy debug flags.
 The browser's shared room-time controls render lab seek and keyframe metadata from these
 capabilities and `roomTimeState`; per-operator lab vision remains a separate lab-control state.
@@ -633,7 +633,7 @@ change the wire shape or compact snapshot version.
 | `terrain` codes | `server/crates/protocol/src/contract_metadata.rs` `terrain`, re-exported by `lib.rs`; adapter test checks rules terrain constants | `client/src/protocol_constants.js` `TERRAIN` and `PASSABLE`, re-exported by `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
 | `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/contract_metadata.rs` `kinds`, re-exported by `lib.rs`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol_constants.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, re-exported by `client/src/protocol.js` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
 | `server/src/protocol.rs` and `server/crates/sim/src/protocol.rs` kind conversion | Rules/sim-aware adapter modules | No direct JS mirror beyond the protocol kind strings | domain adapter mapping | Rust adapter tests in both modules | One shared rules-aware adapter path with a single round-trip test | Not client data | No compact impact unless output kind strings/codes change |
-| `states`, `SETUP`, `NOTICE_SEVERITY`, `REPLAY_VISION`, and event discriminators | `server/crates/protocol/src/contract_metadata.rs` string vocabulary; compact event serialization lives in `server/crates/protocol/src/compact_snapshot.rs` | `client/src/protocol_constants.js` constants, re-exported by `client/src/protocol.js`; compact decoder lives in `client/src/protocol_snapshot.js` behind `decodeServerMessage` | wire DTO / compact transport code | `tests/protocol_parity.mjs` checks state, setup, notice severity, and event compact codes; selected decoder fixtures | Structured protocol constants and compact event-shape dump | None | Bump when compact event/entity slots change |
+| `states`, `SETUP`, `NOTICE_SEVERITY`, `VISION_SELECTION`, and event discriminators | `server/crates/protocol/src/contract_metadata.rs` string vocabulary; compact event serialization lives in `server/crates/protocol/src/compact_snapshot.rs` | `client/src/protocol_constants.js` constants, re-exported by `client/src/protocol.js`; compact decoder lives in `client/src/protocol_snapshot.js` behind `decodeServerMessage` | wire DTO / compact transport code | `tests/protocol_parity.mjs` checks state, setup, notice severity, and event compact codes; selected decoder fixtures | Structured protocol constants and compact event-shape dump | None | Bump when compact event/entity slots change |
 | `COMPACT_SNAPSHOT_VERSION`, `PREDICTION_PROTOCOL_VERSION`, compact top-level keys, optional entity slots, limits, and net status slots | `server/crates/protocol/src/contract_metadata.rs` owns versions and slot metadata; `server/crates/protocol/src/compact_snapshot.rs` compact serializer; `server/crates/protocol/src/messagepack_frame.rs` frame writer | `client/src/protocol_constants.js` `COMPACT_SNAPSHOT_VERSION` and `MAX_COMPACT_*` limits; `client/src/protocol_snapshot.js` compact decoder; `client/src/protocol_frame.js` binary frame parser | compact transport code | `tests/protocol_parity.mjs` source-text version checks and fixture decode | Structured compact schema dump including slot names, order, caps, and version | None | Direct owner of compact version; slot/order changes require bump unless strictly optional trailing additions preserve decoder compatibility by explicit decision |
 | Compact code tables for kind, state, setup, order stage, ability, ability object kind, upgrade, notice severity, and event records | `server/crates/protocol/src/contract_metadata.rs` code tables and code functions; compact event serializer lives in `server/crates/protocol/src/compact_snapshot.rs` | `client/src/protocol_constants.js` `*_CODE` and reverse-code maps, re-exported through `client/src/protocol.js` where public; compact record decoder lives in `client/src/protocol_snapshot.js` | compact transport code | `tests/protocol_parity.mjs` extracts Rust functions/events and rejects duplicate or `255` real codes | Structured protocol constants dump generated from Rust instead of source scraping | None | `255` remains unknown/sentinel; real codes must not use it. New codes should append without reusing old values; incompatible reorder/removal requires compact version bump |
 | Ability and upgrade ids in command/research/snapshot payloads | Protocol string modules in `server/crates/protocol/src/contract_metadata.rs`; catalog facts in `server/crates/rules/src/faction.rs` | `client/src/protocol_constants.js` `ABILITY`, `UPGRADE`, `ABILITY_CODE`, `UPGRADE_CODE`, re-exported by `client/src/protocol.js`; command-card descriptors in `client/src/config.js` | wire DTO, compact transport code, faction catalog fact | `tests/protocol_parity.mjs` checks protocol ids/codes; `scripts/check-faction-catalog-parity.mjs` checks catalog-exposed ability codes and descriptors | Structured protocol dump plus complete faction catalog dump | None where mirrored from Rust; catalog descriptors are not UI-only when exported by Rust | Code/order changes can require compact bump; descriptor-only changes do not |
@@ -840,7 +840,7 @@ friendly-fire attribution rule as mortar splash: owned and allied entities in th
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
-### 2.6 Room time state and replay vision
+### 2.6 Room time state and vision selection
 
 `roomTimeState` is a reliable server message that carries the shared room-controlled time
 cursor/state. Replay rooms send it for playback cursor changes; dev scenario watch rooms and lab
@@ -891,7 +891,7 @@ still run. Room-owned recipient notices queued during pause, such as late-specta
 are delivered on the next emitted live snapshot after unpause rather than through a separate
 reliable message.
 
-`ReplayVisionRequest` selects fog/vision per viewer:
+`VisionSelectionRequest` selects fog/vision per viewer:
 ```
 { mode: "all" }
 { mode: "player", playerId: u32 }
@@ -982,17 +982,17 @@ hidden normal-lobby command.
 
 ### 2.7 Observer analysis state
 
-`replayAnalysis` is the compatibility wire tag for reliable observer analysis overlay/tab data that
+`observerAnalysis` is the wire tag for reliable observer analysis overlay/tab data that
 cannot be derived safely from the browser's current projected snapshot. In replay playback it is
-sent to replay viewers after replay `start`/`roomTimeState`, after accepted seeks, after replay
-vision changes, and during replay playback ticks. Live matches send the same payload every server
+sent to replay viewers after replay `start`/`roomTimeState`, after accepted seeks, after vision
+selection changes, and during replay playback ticks. Live matches send the same payload every server
 tick, at the normal snapshot cadence, only when at least one spectator connection is present. The
 server computes the live payload once per tick and sends it only to connections whose room player
 state is `spectator: true`; active-player connections, including claimed branch-live seats, must
 not receive this message.
 ```
 {
-  t: "replayAnalysis",
+  t: "observerAnalysis",
   tick: u32,
   players: [
     {
@@ -1022,7 +1022,7 @@ costs. `unitsLost` is the authoritative unit-death count by kind. `resourcesLost
 narrow: the spent steel/oil value of units that died, matching `unitsLost`; it does not include
 buildings, current spending, cancelled production, refunds, harvesting, or stockpile deltas.
 
-Observer analysis uses an all-player spectator policy independent of each viewer's replay vision
+Observer analysis uses an all-player spectator policy independent of each viewer's vision selection
 selection. It is observer-only data for analysis overlays, not an active-player information surface.
 Replay playback recomputes the payload from the current authoritative replay `Game` state after
 normal playback ticks and after `ReplaySession::rebuild_to()` restores a keyframe and fast-forwards

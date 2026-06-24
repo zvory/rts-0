@@ -85,14 +85,14 @@ const WORKLOADS = Object.freeze([
     source: MATT_ALEX_SOURCE,
     url: `/dev/replay-artifact?replay=${MATT_ALEX_ARTIFACT_NAME}`,
     setup: {
-      replayVisionPlayerIndex: 1,
+      visionSelectionPlayerIndex: 1,
       setRoomTimeSpeed: 8,
       waitRoomTimeTo: 1800,
       roomTimeWaitTimeoutMs: 20000,
       waitForMinEntities: 20,
       selectFirstEntities: 12,
       selectUnitKindsOnly: true,
-      selectReplayVisionPlayer: true,
+      selectVisionSelectionPlayer: true,
       minSelectedCount: 4,
       focusSelectedEntities: true,
     },
@@ -1297,20 +1297,20 @@ async function applyWorkloadSetup(page, workload) {
   if (!setup) return null;
   const result = { actions: [] };
 
-  if (setup.replayVisionPlayerIndex != null || setup.replayVisionPlayerId != null) {
+  if (setup.visionSelectionPlayerIndex != null || setup.visionSelectionPlayerId != null) {
     const action = await page.evaluate((replaySetup) => {
       const match = window.__rts?.match;
       const players = Array.isArray(match?.predictionStartInfo?.players)
         ? match.predictionStartInfo.players
         : [];
-      const explicitId = Number(replaySetup.replayVisionPlayerId);
-      const playerFromIndex = players[Number(replaySetup.replayVisionPlayerIndex)]?.id;
+      const explicitId = Number(replaySetup.visionSelectionPlayerId);
+      const playerFromIndex = players[Number(replaySetup.visionSelectionPlayerIndex)]?.id;
       const playerId = Number.isFinite(explicitId) && explicitId > 0 ? explicitId : Number(playerFromIndex);
-      if (!Number.isFinite(playerId) || playerId <= 0 || typeof match?.net?.setReplayVision !== "function") {
-        return { action: "setReplayVision", error: "replay player id or net control unavailable" };
+      if (!Number.isFinite(playerId) || playerId <= 0 || typeof match?.net?.setVisionSelection !== "function") {
+        return { action: "setVisionSelection", error: "vision selection player id or net control unavailable" };
       }
-      match.net.setReplayVision({ mode: "player", playerId });
-      return { action: "setReplayVision", playerId };
+      match.net.setVisionSelection({ mode: "player", playerId });
+      return { action: "setVisionSelection", playerId };
     }, setup);
     result.actions.push(action);
     if (action.error) result.error = action.error;
@@ -1447,12 +1447,12 @@ async function applyWorkloadSetup(page, workload) {
     const players = Array.isArray(window.__rts?.match?.predictionStartInfo?.players)
       ? window.__rts.match.predictionStartInfo.players
       : [];
-    const ownerFromReplayVision = players[Number(selectionSetup.replayVisionPlayerIndex)]?.id;
+    const ownerFromVisionSelection = players[Number(selectionSetup.visionSelectionPlayerIndex)]?.id;
     const requestedOwner = Number(selectionSetup.selectOwnerId);
     const ownerId = Number.isFinite(requestedOwner) && requestedOwner > 0
       ? requestedOwner
-      : selectionSetup.selectReplayVisionPlayer
-        ? Number(ownerFromReplayVision)
+      : selectionSetup.selectVisionSelectionPlayer
+        ? Number(ownerFromVisionSelection)
         : null;
     const entities = Array.from(state?._curById?.values?.() || [])
       .filter((entity) => {

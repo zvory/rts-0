@@ -42,8 +42,8 @@ fn lab_start_payload_initial_operator_uses_policy_metadata() {
     assert!(payload.capabilities.room_time.seek_relative);
     assert!(payload.capabilities.room_time.seek_absolute);
     assert!(payload.capabilities.room_time.timeline);
-    assert!(!payload.capabilities.visibility.replay_vision);
-    assert!(!payload.capabilities.actions.replay_branch);
+    assert!(!payload.capabilities.visibility.vision_selection);
+    assert!(!payload.capabilities.actions.branch_from_tick);
     assert!(payload.diagnostics.is_empty());
     assert!(payload.replay.is_none());
     assert_eq!(payload.players.len(), 2);

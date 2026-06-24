@@ -262,7 +262,7 @@ alive.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
   `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
-  `SeekRoomTime`, `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer
+  `SeekRoomTime`, `SeekRoomTimeTo`, `SetVisionSelection`, `Lab`). The room task is the single writer
   of game state — no locks around `Game`.
 - Room-mode, phase, and match-composition dependent lobby checks use a lobby-local `SessionPolicy`
   descriptor for the current room mode and phase matrix, including dev-watch, replay-room,
@@ -397,7 +397,7 @@ branch seed.
   after a past seek plus a new accepted lab operation or issue-as command.
 - `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
-  selected perspective from replay vision, lab viewers get their room-owned per-operator lab vision,
+  selected perspective from vision selection, lab viewers get their room-owned per-operator lab vision,
   branch-live active players use original-seat aliases, and dev-watch viewers get full-world
   scenario snapshots.
 - `launch.rs` owns the lobby start-payload builder and send loop for live, replay-branch-live,
@@ -410,7 +410,7 @@ branch seed.
 - `live_tick.rs` runs one live simulation tick around the existing `Game` seam: AI command enqueue,
   `Game::tick`, recipient-specific room notice injection after projection, snapshot fanout,
   observer analysis, defeat/game-over checks, and panic replay capture.
-- `replay_session.rs` owns replay playback state, seek/keyframe policy, per-viewer replay vision,
+- `replay_session.rs` owns replay playback state, seek/keyframe policy, per-viewer vision selection,
   and post-match/dedicated replay start payloads.
 - `replay_branch.rs` owns branch staging state, original replay-seat claim/release policy, and
   branch live-launch preparation while `room_task.rs` still owns connected members and final phase

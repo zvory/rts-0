@@ -496,7 +496,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     speeds: [],
     seekBacks: [],
     seekTargets: [],
-    visions: [],
+    selections: [],
     branches: 0,
     steps: 0,
     setRoomTimeSpeed(speed) {
@@ -508,10 +508,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     seekRoomTimeTo(tick) {
       this.seekTargets.push(tick);
     },
-    setReplayVision(vision) {
-      this.visions.push(vision);
+    setVisionSelection(selection) {
+      this.selections.push(selection);
     },
-    requestReplayBranch() {
+    requestBranchFromTick() {
       this.branches += 1;
     },
     stepRoomTime() {
@@ -540,8 +540,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
             seekAbsolute: true,
             timeline: true,
           },
-          visibility: { replayVision: true },
-          actions: { replayBranch: true },
+          visibility: { visionSelection: true },
+          actions: { branchFromTick: true },
         },
       },
     }),
@@ -623,20 +623,20 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekRoomTime");
   const visionButtons = replayControls.querySelectorAll(".vision-btn");
   assert(visionButtons.length === 3, "replay viewer builds all-player and per-player fog controls");
-  replayUi.onReplayVisionClick({ target: visionButtons[1], shiftKey: false });
+  replayUi.onVisionSelectionClick({ target: visionButtons[1], shiftKey: false });
   assert(
-    replayNet.visions.at(-1).mode === "player" &&
-      replayNet.visions.at(-1).playerId === 1,
+    replayNet.selections.at(-1).mode === "player" &&
+      replayNet.selections.at(-1).playerId === 1,
     "single replay fog click sends a per-viewer player vision request",
   );
-  replayUi.onReplayVisionClick({ target: visionButtons[2], shiftKey: true });
+  replayUi.onVisionSelectionClick({ target: visionButtons[2], shiftKey: true });
   assert(
-    replayNet.visions.at(-1).mode === "players" &&
-      replayNet.visions.at(-1).playerIds.join(",") === "1,2",
+    replayNet.selections.at(-1).mode === "players" &&
+      replayNet.selections.at(-1).playerIds.join(",") === "1,2",
     "shift-click replay fog controls send a selected-players request",
   );
-  replayUi.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
-  assert(replayNet.visions.at(-1).mode === "all", "all replay fog control restores union vision");
+  replayUi.onVisionSelectionClick({ target: visionButtons[0], shiftKey: false });
+  assert(replayNet.selections.at(-1).mode === "all", "all replay fog control restores union vision");
   replayUi.applyRoomTimeState({
     currentTick: 100,
     durationTicks: 1_000,
@@ -663,16 +663,16 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(stepDev.hidden, "destroy restores scenario step controls hidden");
   assert(!replayControls.querySelector(".replay-pause-btn"), "destroy removes generated replay pause button");
   assert(!replayControls.querySelector(".replay-branch-btn"), "destroy removes generated replay branch button");
-  assert(!replayControls.querySelector(".replay-vision-controls"), "destroy removes generated vision controls");
+  assert(!replayControls.querySelector(".vision-selection-controls"), "destroy removes generated vision controls");
   assert(!replayControls.querySelector(".room-time-tick-status"), "destroy removes generated status");
   assert(!replayControls.querySelector(".room-time-timeline"), "destroy removes generated timeline");
   assert(!replayControls.querySelector(".room-time-panel-drag-handle"), "destroy removes floating room-time panel chrome");
   assert(replayControls.children.includes(seekBack), "destroy unwraps static room-time controls back onto the root");
   assert(replayControls._listeners.size === 0, "destroy removes room-time click listener");
 
-  const replayVisionOnlyControls = fakeEl("div");
-  dom.roomTimeControls = replayVisionOnlyControls;
-  const replayVisionOnlyUi = new ReplayControls({
+  const visionSelectionOnlyControls = fakeEl("div");
+  dom.roomTimeControls = visionSelectionOnlyControls;
+  const visionSelectionOnlyUi = new ReplayControls({
     net: replayNet,
     state: roomTimeState,
     replayViewer: true,
@@ -681,20 +681,20 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
         replay: { durationTicks: 1_000 },
         capabilities: {
           roomTime: { available: true },
-          visibility: { replayVision: true },
+          visibility: { visionSelection: true },
         },
       },
     }),
   });
   assert(
-    replayVisionOnlyControls.querySelector(".replay-vision-controls"),
-    "replay vision capability still builds replay fog controls",
+    visionSelectionOnlyControls.querySelector(".vision-selection-controls"),
+    "vision selection capability still builds replay fog controls",
   );
   assert(
-    !replayVisionOnlyControls.querySelector(".replay-branch-btn"),
-    "replay vision alone does not build a replay branch button",
+    !visionSelectionOnlyControls.querySelector(".replay-branch-btn"),
+    "vision selection alone does not build a replay branch button",
   );
-  replayVisionOnlyUi.destroy();
+  visionSelectionOnlyUi.destroy();
 
   const scenarioControls = fakeEl("div");
   const scenarioSpeed2 = fakeEl("button");
@@ -845,7 +845,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(!labPause.hidden, "lab mode shows pause controls when pause is advertised");
   assert(!labStep.hidden, "lab mode shows step controls when step is advertised");
   assert(!labSeek.hidden, "lab mode shows relative seek controls when seekRelative is advertised");
-  assert(!labControls.querySelector(".replay-vision-controls"), "lab room-time controls do not create replay vision controls");
+  assert(!labControls.querySelector(".vision-selection-controls"), "lab room-time controls do not create vision selection controls");
   assert(!labControls.querySelector(".replay-branch-btn"), "lab room-time controls do not create replay branch controls");
   labControls._listeners.get("click")({ target: labStep });
   assert(replayNet.steps === 2, "lab step sends net.stepRoomTime through neutral controls");
@@ -936,8 +936,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   });
   assert(!noCapabilityControls._listeners.has("click"), "room-time controls need an advertised capability");
   assert(
-    !noCapabilityControls.querySelector(".replay-vision-controls"),
-    "replay identity alone does not build replay vision controls",
+    !noCapabilityControls.querySelector(".vision-selection-controls"),
+    "replay identity alone does not build vision selection controls",
   );
   noCapabilityUi.destroy();
 

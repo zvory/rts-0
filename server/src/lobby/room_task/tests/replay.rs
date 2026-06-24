@@ -85,8 +85,8 @@ fn replay_start_payload_capabilities_survive_initial_and_seek_resends() {
         assert!(payload.capabilities.room_time.seek_relative);
         assert!(payload.capabilities.room_time.seek_absolute);
         assert!(payload.capabilities.room_time.timeline);
-        assert!(payload.capabilities.visibility.replay_vision);
-        assert!(payload.capabilities.actions.replay_branch);
+        assert!(payload.capabilities.visibility.vision_selection);
+        assert!(payload.capabilities.actions.branch_from_tick);
         assert!(!payload.capabilities.commands.gameplay);
         assert!(!payload.capabilities.match_controls.pause);
         assert!(payload.diagnostics.observer_analysis);
@@ -129,7 +129,7 @@ fn replay_room_rejects_rapid_seek_without_resetting_viewers() {
         ServerMessage::Start(payload)
             if payload.capabilities.room_time.seek_relative
                 && payload.capabilities.room_time.seek_absolute
-                && payload.capabilities.visibility.replay_vision
+                && payload.capabilities.visibility.vision_selection
     )));
     assert!(first_seek_messages
         .iter()
@@ -181,7 +181,7 @@ fn replay_join_and_seek_emit_authoritative_analysis() {
         ServerMessage::Start(payload)
             if payload.capabilities.room_time.seek_relative
                 && payload.capabilities.room_time.seek_absolute
-                && payload.capabilities.visibility.replay_vision
+                && payload.capabilities.visibility.vision_selection
     )));
     assert!(seek_messages.iter().any(|msg| matches!(
         msg,
@@ -190,12 +190,12 @@ fn replay_join_and_seek_emit_authoritative_analysis() {
 }
 
 #[test]
-fn rapid_replay_vision_changes_remain_per_viewer() {
+fn rapid_vision_selection_changes_remain_per_viewer() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 1);
     let replay = ReplaySession::new(artifact).unwrap();
     let mut task = RoomTask::new(
-        "replay-vision-stress-test".to_string(),
+        "vision-selection-stress-test".to_string(),
         RoomMode::Normal,
         None,
         false,
@@ -206,15 +206,15 @@ fn rapid_replay_vision_changes_remain_per_viewer() {
     task.phase = Phase::ReplayViewer(Box::new(replay));
 
     for _ in 0..8 {
-        task.on_set_replay_vision(
+        task.on_set_vision_selection(
             100,
-            ReplayVisionRequest::Player {
+            VisionSelectionRequest::Player {
                 player_id: players[0].id,
             },
         );
-        task.on_set_replay_vision(
+        task.on_set_vision_selection(
             101,
-            ReplayVisionRequest::Player {
+            VisionSelectionRequest::Player {
                 player_id: players[1].id,
             },
         );

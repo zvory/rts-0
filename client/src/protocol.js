@@ -28,7 +28,7 @@ import {
   ORDER_STAGE_CODE,
   PASSABLE,
   PREDICTION_PROTOCOL_VERSION,
-  REPLAY_VISION,
+  VISION_SELECTION,
   RESOURCE_KINDS,
   S,
   SETUP,
@@ -71,7 +71,7 @@ export {
   ORDER_STAGE_CODE,
   PASSABLE,
   PREDICTION_PROTOCOL_VERSION,
-  REPLAY_VISION,
+  VISION_SELECTION,
   RESOURCE_KINDS,
   S,
   SETUP,
@@ -158,7 +158,7 @@ export const msg = Object.freeze({
   stepRoomTime: () => ({ t: C.STEP_ROOM_TIME }),
   seekRoomTime: (ticksBack) => ({ t: C.SEEK_ROOM_TIME, ticksBack }),
   seekRoomTimeTo: (tick) => ({ t: C.SEEK_ROOM_TIME_TO, tick }),
-  setReplayVision: (vision) => ({ t: C.SET_REPLAY_VISION, vision }),
+  setVisionSelection: (selection) => ({ t: C.SET_VISION_SELECTION, selection }),
   lab: (requestId, op) => ({ t: C.LAB, requestId, op }),
   labExportScenario: (requestId, name = undefined) => {
     const op = { op: "exportScenario" };
@@ -207,18 +207,18 @@ export const msg = Object.freeze({
     requestId,
     op: { op: "issueCommandAs", playerId, cmd: command, ignoreCommandLimits: !!ignoreCommandLimits },
   }),
-  requestReplayBranch: () => ({ t: C.REQUEST_REPLAY_BRANCH }),
+  requestBranchFromTick: () => ({ t: C.REQUEST_BRANCH_FROM_TICK }),
   claimBranchSeat: (playerId) => ({ t: C.CLAIM_BRANCH_SEAT, playerId }),
   releaseBranchSeat: (playerId) => ({ t: C.RELEASE_BRANCH_SEAT, playerId }),
   startBranch: () => ({ t: C.START_BRANCH }),
-  replayVisionAll: () => ({ t: C.SET_REPLAY_VISION, vision: { mode: REPLAY_VISION.ALL } }),
-  replayVisionPlayer: (playerId) => ({
-    t: C.SET_REPLAY_VISION,
-    vision: { mode: REPLAY_VISION.PLAYER, playerId },
+  visionSelectionAll: () => ({ t: C.SET_VISION_SELECTION, selection: { mode: VISION_SELECTION.ALL } }),
+  visionSelectionPlayer: (playerId) => ({
+    t: C.SET_VISION_SELECTION,
+    selection: { mode: VISION_SELECTION.PLAYER, playerId },
   }),
-  replayVisionPlayers: (playerIds) => ({
-    t: C.SET_REPLAY_VISION,
-    vision: { mode: REPLAY_VISION.PLAYERS, playerIds },
+  visionSelectionPlayers: (playerIds) => ({
+    t: C.SET_VISION_SELECTION,
+    selection: { mode: VISION_SELECTION.PLAYERS, playerIds },
   }),
   labVisionFullWorld: () => ({ mode: LAB_VISION.FULL_WORLD }),
   labVisionTeam: (teamId) => ({ mode: LAB_VISION.TEAM, teamId }),

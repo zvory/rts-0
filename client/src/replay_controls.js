@@ -1,5 +1,5 @@
 import { dom } from "./bootstrap.js";
-import { REPLAY_VISION } from "./protocol.js";
+import { VISION_SELECTION } from "./protocol.js";
 import { FloatingRoomTimePanel } from "./room_time_panel.js";
 
 export class RoomTimeControls {
@@ -12,7 +12,7 @@ export class RoomTimeControls {
     this.visibility = this.capabilities.visibility || {};
     this.actions = this.capabilities.actions || {};
     this.label = label || (this.replayViewer ? "Replay" : "Room time");
-    this.replayVisionSelection = new Set();
+    this.visionSelection = new Set();
     this.roomTimeState = null;
     this.roomTimeSeekPending = false;
     this.roomTimeSeekTargetTick = null;
@@ -45,8 +45,8 @@ export class RoomTimeControls {
     dom.roomTimeControls.addEventListener("click", this.roomTimeHandler);
     this.setRoomTimeSpeedActive(this.replayViewer ? 2 : null);
     if (this.replayViewer && this.roomTime.pause) this.buildReplayPauseControl();
-    if (this.replayViewer && this.actions.replayBranch) this.buildReplayBranchControl();
-    if (this.visibility.replayVision) this.buildReplayVisionControls();
+    if (this.replayViewer && this.actions.branchFromTick) this.buildBranchFromTickControl();
+    if (this.visibility.visionSelection) this.buildVisionSelectionControls();
     this.buildRoomTimeStatus();
     if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
     this.updateRoomTimePauseButton();
@@ -166,7 +166,7 @@ export class RoomTimeControls {
     surface.appendChild(pause);
   }
 
-  buildReplayBranchControl() {
+  buildBranchFromTickControl() {
     if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".replay-branch-btn")) return;
     const surface = this.roomTimeControlSurface();
     if (!surface) return;
@@ -175,17 +175,17 @@ export class RoomTimeControls {
     resume.className = "spd-btn replay-branch-btn";
     resume.textContent = "Resume play from here";
     resume.title = "Create a practice branch from the current replay tick.";
-    resume.addEventListener("click", () => this.net.requestReplayBranch());
+    resume.addEventListener("click", () => this.net.requestBranchFromTick());
     surface.appendChild(resume);
   }
 
-  buildReplayVisionControls() {
-    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".replay-vision-controls")) return;
+  buildVisionSelectionControls() {
+    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".vision-selection-controls")) return;
     const surface = this.roomTimeControlSurface();
     if (!surface) return;
 
     const group = document.createElement("div");
-    group.className = "replay-vision-controls";
+    group.className = "vision-selection-controls";
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", "Replay fog perspective");
 
@@ -194,7 +194,7 @@ export class RoomTimeControls {
     all.className = "spd-btn vision-btn active";
     all.dataset.vision = "all";
     all.textContent = "All vision";
-    all.title = "Show the union of all players' replay vision.";
+    all.title = "Show the union of all players' fog perspectives.";
     group.appendChild(all);
 
     for (const player of this.state.players) {
@@ -208,7 +208,7 @@ export class RoomTimeControls {
       group.appendChild(btn);
     }
 
-    group.addEventListener("click", (ev) => this.onReplayVisionClick(ev));
+    group.addEventListener("click", (ev) => this.onVisionSelectionClick(ev));
     surface.appendChild(group);
   }
 
@@ -301,51 +301,51 @@ export class RoomTimeControls {
     }
   }
 
-  onReplayVisionClick(ev) {
+  onVisionSelectionClick(ev) {
     const btn = ev.target.closest(".vision-btn");
     if (!btn) return;
     if (btn.dataset.vision === "all") {
-      this.replayVisionSelection.clear();
-      this.net.setReplayVision({ mode: REPLAY_VISION.ALL });
-      this.syncReplayVisionButtons();
+      this.visionSelection.clear();
+      this.net.setVisionSelection({ mode: VISION_SELECTION.ALL });
+      this.syncVisionSelectionButtons();
       return;
     }
 
     const id = Number(btn.dataset.playerId);
     if (!Number.isFinite(id)) return;
     if (ev.shiftKey || ev.metaKey || ev.ctrlKey) {
-      if (this.replayVisionSelection.has(id)) this.replayVisionSelection.delete(id);
-      else this.replayVisionSelection.add(id);
+      if (this.visionSelection.has(id)) this.visionSelection.delete(id);
+      else this.visionSelection.add(id);
     } else {
-      this.replayVisionSelection.clear();
-      this.replayVisionSelection.add(id);
+      this.visionSelection.clear();
+      this.visionSelection.add(id);
     }
-    if (this.replayVisionSelection.size === 0) {
-      this.net.setReplayVision({ mode: REPLAY_VISION.ALL });
-    } else if (this.replayVisionSelection.size === 1) {
-      this.net.setReplayVision({
-        mode: REPLAY_VISION.PLAYER,
-        playerId: [...this.replayVisionSelection][0],
+    if (this.visionSelection.size === 0) {
+      this.net.setVisionSelection({ mode: VISION_SELECTION.ALL });
+    } else if (this.visionSelection.size === 1) {
+      this.net.setVisionSelection({
+        mode: VISION_SELECTION.PLAYER,
+        playerId: [...this.visionSelection][0],
       });
     } else {
-      this.net.setReplayVision({
-        mode: REPLAY_VISION.PLAYERS,
-        playerIds: [...this.replayVisionSelection].sort((a, b) => a - b),
+      this.net.setVisionSelection({
+        mode: VISION_SELECTION.PLAYERS,
+        playerIds: [...this.visionSelection].sort((a, b) => a - b),
       });
     }
-    this.syncReplayVisionButtons();
+    this.syncVisionSelectionButtons();
   }
 
-  syncReplayVisionButtons() {
+  syncVisionSelectionButtons() {
     if (!dom.roomTimeControls) return;
-    const allActive = this.replayVisionSelection.size === 0;
+    const allActive = this.visionSelection.size === 0;
     for (const btn of dom.roomTimeControls.querySelectorAll(".vision-btn")) {
       if (btn.dataset.vision === "all") {
         btn.classList.toggle("active", allActive);
         continue;
       }
       const id = Number(btn.dataset.playerId);
-      btn.classList.toggle("active", this.replayVisionSelection.has(id));
+      btn.classList.toggle("active", this.visionSelection.has(id));
     }
   }
 
@@ -387,7 +387,7 @@ export class RoomTimeControls {
     dom.roomTimeControls.removeAttribute?.("aria-label");
     dom.roomTimeControls.querySelector(".replay-pause-btn")?.remove();
     dom.roomTimeControls.querySelector(".replay-branch-btn")?.remove();
-    dom.roomTimeControls.querySelector(".replay-vision-controls")?.remove();
+    dom.roomTimeControls.querySelector(".vision-selection-controls")?.remove();
     dom.roomTimeControls.querySelector(".room-time-tick-status")?.remove();
     dom.roomTimeControls.querySelector(".room-time-timeline")?.remove();
     this.floatingPanel?.destroy();
