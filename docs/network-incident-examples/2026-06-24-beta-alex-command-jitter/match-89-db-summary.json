@@ -1,0 +1,23 @@
+[
+  {
+    "id": "89",
+    "started_at": "2026-06-24T00:24:35.313Z",
+    "ended_at": "2026-06-24T00:25:48.617Z",
+    "duration_ms": 73304,
+    "map_name": "Default",
+    "winner_name": "alex",
+    "outcome": "win",
+    "participants": [
+      "alex",
+      "alex"
+    ],
+    "human_count": 2,
+    "debug_mode": false,
+    "local_only": false,
+    "artifact_schema_version": 2,
+    "build_sha": "fb3abd0b3fcc",
+    "map_schema_version": 2,
+    "map_hash": "13ac64aab0be91a8",
+    "duration_ticks": 2221
+  }
+]

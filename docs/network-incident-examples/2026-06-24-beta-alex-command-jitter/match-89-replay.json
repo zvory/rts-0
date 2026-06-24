@@ -1,0 +1,1963 @@
+{
+  "seed": 824189247,
+  "mapName": "Default",
+  "players": [
+    {
+      "id": 4,
+      "name": "alex",
+      "color": "#0072b2",
+      "is_ai": false,
+      "team_id": 1,
+      "faction_id": "kriegsia"
+    },
+    {
+      "id": 5,
+      "name": "alex",
+      "color": "#d55e00",
+      "is_ai": false,
+      "team_id": 2,
+      "faction_id": "kriegsia"
+    }
+  ],
+  "winnerId": 5,
+  "commandLog": [
+    {
+      "tick": 175,
+      "command": {
+        "c": "move",
+        "x": 3602,
+        "y": 3415,
+        "units": [
+          24,
+          23,
+          25,
+          22
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 181,
+      "command": {
+        "c": "move",
+        "x": 3342,
+        "y": 3386,
+        "units": [
+          24,
+          23,
+          25,
+          22
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 223,
+      "command": {
+        "c": "move",
+        "x": 3247,
+        "y": 450,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 228,
+      "command": {
+        "c": "move",
+        "x": 3165,
+        "y": 470,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 437,
+      "command": {
+        "c": "move",
+        "x": 3749,
+        "y": 3372,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 448,
+      "command": {
+        "c": "move",
+        "x": 3807,
+        "y": 3467,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 448,
+      "command": {
+        "c": "move",
+        "x": 3829,
+        "y": 3558,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 453,
+      "command": {
+        "c": "move",
+        "x": 3830,
+        "y": 3622,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 465,
+      "command": {
+        "c": "move",
+        "x": 3772,
+        "y": 3744,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 475,
+      "command": {
+        "c": "move",
+        "x": 3653,
+        "y": 3799,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 480,
+      "command": {
+        "c": "move",
+        "x": 3491,
+        "y": 3833,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 487,
+      "command": {
+        "c": "move",
+        "x": 3237,
+        "y": 3817,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 493,
+      "command": {
+        "c": "move",
+        "x": 3164,
+        "y": 3716,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 499,
+      "command": {
+        "c": "move",
+        "x": 3165,
+        "y": 3512,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 504,
+      "command": {
+        "c": "move",
+        "x": 3238,
+        "y": 3410,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 510,
+      "command": {
+        "c": "move",
+        "x": 3414,
+        "y": 3316,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 518,
+      "command": {
+        "c": "move",
+        "x": 3600,
+        "y": 3314,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 522,
+      "command": {
+        "c": "move",
+        "x": 3758,
+        "y": 3353,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 528,
+      "command": {
+        "c": "move",
+        "x": 3821,
+        "y": 3447,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 537,
+      "command": {
+        "c": "move",
+        "x": 3850,
+        "y": 3582,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 539,
+      "command": {
+        "c": "move",
+        "x": 3790,
+        "y": 3716,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 544,
+      "command": {
+        "c": "move",
+        "x": 3691,
+        "y": 3784,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 550,
+      "command": {
+        "c": "move",
+        "x": 3450,
+        "y": 3797,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 556,
+      "command": {
+        "c": "move",
+        "x": 3305,
+        "y": 3694,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 561,
+      "command": {
+        "c": "move",
+        "x": 3267,
+        "y": 3525,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 568,
+      "command": {
+        "c": "move",
+        "x": 3408,
+        "y": 3423,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 575,
+      "command": {
+        "c": "move",
+        "x": 3628,
+        "y": 3394,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 580,
+      "command": {
+        "c": "move",
+        "x": 3767,
+        "y": 3435,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 585,
+      "command": {
+        "c": "move",
+        "x": 3811,
+        "y": 3491,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 590,
+      "command": {
+        "c": "move",
+        "x": 3822,
+        "y": 3544,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 596,
+      "command": {
+        "c": "move",
+        "x": 3820,
+        "y": 3626,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 601,
+      "command": {
+        "c": "move",
+        "x": 3775,
+        "y": 3669,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 608,
+      "command": {
+        "c": "move",
+        "x": 3676,
+        "y": 3761,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 622,
+      "command": {
+        "c": "move",
+        "x": 3405,
+        "y": 3787,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 622,
+      "command": {
+        "c": "move",
+        "x": 3196,
+        "y": 3589,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 625,
+      "command": {
+        "c": "move",
+        "x": 3151,
+        "y": 3466,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 632,
+      "command": {
+        "c": "move",
+        "x": 3161,
+        "y": 3385,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 642,
+      "command": {
+        "c": "move",
+        "x": 3276,
+        "y": 3324,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 644,
+      "command": {
+        "c": "move",
+        "x": 3526,
+        "y": 3291,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 651,
+      "command": {
+        "c": "move",
+        "x": 3745,
+        "y": 3290,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 658,
+      "command": {
+        "c": "move",
+        "x": 3849,
+        "y": 3348,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 664,
+      "command": {
+        "c": "move",
+        "x": 3848,
+        "y": 3457,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 670,
+      "command": {
+        "c": "move",
+        "x": 3818,
+        "y": 3549,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 676,
+      "command": {
+        "c": "move",
+        "x": 3760,
+        "y": 3642,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 681,
+      "command": {
+        "c": "move",
+        "x": 3684,
+        "y": 3716,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 687,
+      "command": {
+        "c": "move",
+        "x": 3510,
+        "y": 3762,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 702,
+      "command": {
+        "c": "move",
+        "x": 3328,
+        "y": 3685,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 702,
+      "command": {
+        "c": "move",
+        "x": 3305,
+        "y": 3518,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 706,
+      "command": {
+        "c": "move",
+        "x": 3405,
+        "y": 3416,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 715,
+      "command": {
+        "c": "move",
+        "x": 3510,
+        "y": 3315,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 717,
+      "command": {
+        "c": "move",
+        "x": 3639,
+        "y": 3270,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1564,
+      "command": {
+        "c": "move",
+        "x": 3696,
+        "y": 3288,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1570,
+      "command": {
+        "c": "move",
+        "x": 3258,
+        "y": 3504,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1585,
+      "command": {
+        "c": "move",
+        "x": 3384,
+        "y": 3731,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1585,
+      "command": {
+        "c": "move",
+        "x": 3807,
+        "y": 3783,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1587,
+      "command": {
+        "c": "move",
+        "x": 3824,
+        "y": 3383,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1592,
+      "command": {
+        "c": "move",
+        "x": 3541,
+        "y": 3223,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1598,
+      "command": {
+        "c": "move",
+        "x": 3164,
+        "y": 3327,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1604,
+      "command": {
+        "c": "move",
+        "x": 3219,
+        "y": 3577,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1609,
+      "command": {
+        "c": "move",
+        "x": 3687,
+        "y": 3701,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1616,
+      "command": {
+        "c": "move",
+        "x": 3867,
+        "y": 3565,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1622,
+      "command": {
+        "c": "move",
+        "x": 3755,
+        "y": 3326,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1629,
+      "command": {
+        "c": "move",
+        "x": 3276,
+        "y": 3315,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1634,
+      "command": {
+        "c": "move",
+        "x": 3088,
+        "y": 3464,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1641,
+      "command": {
+        "c": "move",
+        "x": 3326,
+        "y": 3727,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1646,
+      "command": {
+        "c": "move",
+        "x": 3784,
+        "y": 3556,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1652,
+      "command": {
+        "c": "move",
+        "x": 3739,
+        "y": 3286,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1658,
+      "command": {
+        "c": "move",
+        "x": 3266,
+        "y": 3242,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1666,
+      "command": {
+        "c": "move",
+        "x": 2997,
+        "y": 3384,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1673,
+      "command": {
+        "c": "move",
+        "x": 3063,
+        "y": 3722,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1679,
+      "command": {
+        "c": "move",
+        "x": 3404,
+        "y": 3800,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1691,
+      "command": {
+        "c": "move",
+        "x": 3721,
+        "y": 3748,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1691,
+      "command": {
+        "c": "move",
+        "x": 3845,
+        "y": 3470,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1697,
+      "command": {
+        "c": "move",
+        "x": 3746,
+        "y": 3283,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1703,
+      "command": {
+        "c": "move",
+        "x": 3400,
+        "y": 3257,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1710,
+      "command": {
+        "c": "move",
+        "x": 3214,
+        "y": 3331,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1716,
+      "command": {
+        "c": "move",
+        "x": 3154,
+        "y": 3504,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1721,
+      "command": {
+        "c": "move",
+        "x": 3240,
+        "y": 3650,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1727,
+      "command": {
+        "c": "move",
+        "x": 3506,
+        "y": 3760,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1732,
+      "command": {
+        "c": "move",
+        "x": 3699,
+        "y": 3772,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1737,
+      "command": {
+        "c": "move",
+        "x": 3761,
+        "y": 3664,
+        "units": [
+          23,
+          24,
+          22,
+          25
+        ]
+      },
+      "playerId": 5
+    },
+    {
+      "tick": 1789,
+      "command": {
+        "c": "move",
+        "x": 3551,
+        "y": 141,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1795,
+      "command": {
+        "c": "move",
+        "x": 3691,
+        "y": 119,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1800,
+      "command": {
+        "c": "move",
+        "x": 3797,
+        "y": 397,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1806,
+      "command": {
+        "c": "move",
+        "x": 3465,
+        "y": 661,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1812,
+      "command": {
+        "c": "move",
+        "x": 3196,
+        "y": 717,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1817,
+      "command": {
+        "c": "move",
+        "x": 2976,
+        "y": 607,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1823,
+      "command": {
+        "c": "move",
+        "x": 2876,
+        "y": 303,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1829,
+      "command": {
+        "c": "move",
+        "x": 3108,
+        "y": 175,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1835,
+      "command": {
+        "c": "move",
+        "x": 3530,
+        "y": 168,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1842,
+      "command": {
+        "c": "move",
+        "x": 3792,
+        "y": 266,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1848,
+      "command": {
+        "c": "move",
+        "x": 3856,
+        "y": 516,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1854,
+      "command": {
+        "c": "move",
+        "x": 3725,
+        "y": 668,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1860,
+      "command": {
+        "c": "move",
+        "x": 3394,
+        "y": 758,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1867,
+      "command": {
+        "c": "move",
+        "x": 3062,
+        "y": 717,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1873,
+      "command": {
+        "c": "move",
+        "x": 2854,
+        "y": 467,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1878,
+      "command": {
+        "c": "move",
+        "x": 2883,
+        "y": 288,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1886,
+      "command": {
+        "c": "move",
+        "x": 3143,
+        "y": 123,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1893,
+      "command": {
+        "c": "move",
+        "x": 3562,
+        "y": 114,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1899,
+      "command": {
+        "c": "move",
+        "x": 3798,
+        "y": 149,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1906,
+      "command": {
+        "c": "move",
+        "x": 3888,
+        "y": 291,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1912,
+      "command": {
+        "c": "move",
+        "x": 3818,
+        "y": 512,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1927,
+      "command": {
+        "c": "move",
+        "x": 3538,
+        "y": 650,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1927,
+      "command": {
+        "c": "move",
+        "x": 3128,
+        "y": 631,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1931,
+      "command": {
+        "c": "move",
+        "x": 2989,
+        "y": 474,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1937,
+      "command": {
+        "c": "move",
+        "x": 2998,
+        "y": 264,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1943,
+      "command": {
+        "c": "move",
+        "x": 3258,
+        "y": 151,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1950,
+      "command": {
+        "c": "move",
+        "x": 3569,
+        "y": 159,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1956,
+      "command": {
+        "c": "move",
+        "x": 3775,
+        "y": 224,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1961,
+      "command": {
+        "c": "move",
+        "x": 3869,
+        "y": 318,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1967,
+      "command": {
+        "c": "move",
+        "x": 3850,
+        "y": 442,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1973,
+      "command": {
+        "c": "move",
+        "x": 3802,
+        "y": 566,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1979,
+      "command": {
+        "c": "move",
+        "x": 3583,
+        "y": 660,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1986,
+      "command": {
+        "c": "move",
+        "x": 3227,
+        "y": 627,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1991,
+      "command": {
+        "c": "move",
+        "x": 3108,
+        "y": 468,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 1998,
+      "command": {
+        "c": "move",
+        "x": 3180,
+        "y": 267,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2014,
+      "command": {
+        "c": "move",
+        "x": 3479,
+        "y": 187,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2014,
+      "command": {
+        "c": "move",
+        "x": 3746,
+        "y": 198,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2017,
+      "command": {
+        "c": "move",
+        "x": 3838,
+        "y": 288,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2023,
+      "command": {
+        "c": "move",
+        "x": 3861,
+        "y": 408,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2029,
+      "command": {
+        "c": "move",
+        "x": 3786,
+        "y": 565,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2039,
+      "command": {
+        "c": "move",
+        "x": 3465,
+        "y": 622,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2044,
+      "command": {
+        "c": "move",
+        "x": 3356,
+        "y": 558,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2056,
+      "command": {
+        "c": "move",
+        "x": 3270,
+        "y": 322,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2069,
+      "command": {
+        "c": "move",
+        "x": 3374,
+        "y": 218,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    },
+    {
+      "tick": 2069,
+      "command": {
+        "c": "move",
+        "x": 3602,
+        "y": 200,
+        "units": [
+          4,
+          3,
+          5,
+          2
+        ]
+      },
+      "playerId": 4
+    }
+  ],
+  "finalScores": [
+    {
+      "id": 4,
+      "name": "alex",
+      "color": "#0072b2",
+      "teamId": 1,
+      "unitScore": 200,
+      "unitsLost": 4,
+      "unitsKilled": 0,
+      "buildingsLost": 1,
+      "structureScore": 225,
+      "buildingsKilled": 0
+    },
+    {
+      "id": 5,
+      "name": "alex",
+      "color": "#d55e00",
+      "teamId": 2,
+      "unitScore": 200,
+      "unitsLost": 0,
+      "unitsKilled": 0,
+      "buildingsLost": 0,
+      "structureScore": 225,
+      "buildingsKilled": 0
+    }
+  ],
+  "winnerTeamId": 2,
+  "durationTicks": 2221,
+  "mapContentHash": "13ac64aab0be91a8",
+  "playerLoadouts": [
+    {
+      "playerId": 4,
+      "factionId": "kriegsia",
+      "loadoutId": "kriegsia.standard",
+      "startingOil": 0,
+      "startingSteel": 75
+    },
+    {
+      "playerId": 5,
+      "factionId": "kriegsia",
+      "loadoutId": "kriegsia.standard",
+      "startingOil": 0,
+      "startingSteel": 75
+    }
+  ],
+  "serverBuildSha": "fb3abd0b3fcc",
+  "mapSchemaVersion": 2,
+  "artifactSchemaVersion": 2
+}
