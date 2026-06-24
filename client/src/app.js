@@ -50,12 +50,20 @@ import { buildSettingsTabs } from "./settings_panels.js";
  */
 const HEARTBEAT_MS = 15000;
 
+export function isLivePlayerMatch(match) {
+  return !!match &&
+    !!match.state &&
+    match.running !== false &&
+    !match.state.spectator &&
+    !match.replayViewer &&
+    !match.labMetadata;
+}
+
 export function shouldWarnBeforeUnload({
   match = null,
-  inReplayPlayback = false,
   allowUnloadWithoutWarning = false,
 } = {}) {
-  return !allowUnloadWithoutWarning && (!!match || !!inReplayPlayback);
+  return !allowUnloadWithoutWarning && isLivePlayerMatch(match);
 }
 
 /**
