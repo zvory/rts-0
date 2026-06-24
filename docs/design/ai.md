@@ -103,9 +103,11 @@ that keeps the same
 expansion timing, Tank tech path, Methamphetamines-before-Tanks gate, and Tank-required
 frontal-wave posture, but launches its first Tank-era wave as soon as one Tank is ready. It removes
 Scout Car production and harassment, caps ordinary Barracks growth at one, trains a bounded
-defensive Machine Gunner group, pushes toward full two-base steel saturation, and can add a second
-Factory once Tank production is active. Vehicle Works and Gun Works placement uses an expanded
-center-facing search band so support and vehicle production do not pile up behind the base. Its
+defensive Machine Gunner group, pushes toward full two-base steel saturation, and stays capped at
+one Factory. Vehicle Works and Gun Works placement uses a modest expanded center-facing search band
+so support and vehicle production do not pile up behind the base. Worker queues reserve economy
+before normal tech, production, or combat spending while below the main-plus-natural saturation
+target, except during defensive panic or supply-depot handling. Its
 Tank-era production and frontal-wave composition are Tank-only, so Riflemen remain an
 opening/defensive Barracks output rather than a continuing mid-game spend. It reserves up to four
 ready Machine Gunners before frontal-wave readiness is calculated, so those MGs do not satisfy Tank

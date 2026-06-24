@@ -406,6 +406,31 @@ where
     let save_for_unplanned_expansion =
         save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
 
+    let economy_plan = plan_economy(
+        observation,
+        &facts,
+        profile,
+        recovery_active,
+        panic_plan.map(|plan| plan.oil_workers),
+    );
+    let save_worker_training_for_tech = defensive_panic.active;
+    for trained in actions::train_units(
+        &mut actions,
+        TrainUnitsRequest {
+            buildings: facts.production_buildings(EntityKind::CityCentre),
+            unit_priorities: &[EntityKind::Worker],
+            completed_building_kinds: facts.complete_building_kinds(),
+            completed_upgrades: facts.completed_upgrades(),
+            max_queue_depth: 1,
+            save_for_tech: save_worker_training_for_tech,
+            current_counts: &[(EntityKind::Worker, facts.worker_count)],
+            max_counts: &[(EntityKind::Worker, economy_plan.target_workers)],
+            balance_unit_priorities: false,
+        },
+    ) {
+        intents.push(AiIntent::Train { kind: trained.unit });
+    }
+
     for kind in required_tech_path {
         if proxy_barracks_active && *kind == EntityKind::Barracks {
             continue;
@@ -432,13 +457,6 @@ where
         }
     }
 
-    let economy_plan = plan_economy(
-        observation,
-        &facts,
-        profile,
-        recovery_active,
-        panic_plan.map(|plan| plan.oil_workers),
-    );
     let target_barracks = if defensive_panic.active {
         defensive_panic_barracks_target(defensive_panic)
     } else {
@@ -498,27 +516,6 @@ where
     }
 
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
-    let save_worker_training_for_tech = defensive_panic.active
-        || save_for_unplanned_expansion
-        || save_for_first_tech_unit
-        || (save_for_required_tech_building && facts.worker_count >= economy_plan.target_workers);
-    for trained in actions::train_units(
-        &mut actions,
-        TrainUnitsRequest {
-            buildings: facts.production_buildings(EntityKind::CityCentre),
-            unit_priorities: &[EntityKind::Worker],
-            completed_building_kinds: facts.complete_building_kinds(),
-            completed_upgrades: facts.completed_upgrades(),
-            max_queue_depth: 1,
-            save_for_tech: save_worker_training_for_tech,
-            current_counts: &[(EntityKind::Worker, facts.worker_count)],
-            max_counts: &[(EntityKind::Worker, economy_plan.target_workers)],
-            balance_unit_priorities: false,
-        },
-    ) {
-        intents.push(AiIntent::Train { kind: trained.unit });
-    }
-
     let tank_methamphetamines_pending = production_policy
         .unit_priorities
         .contains(&EntityKind::Tank)
@@ -947,3 +944,5 @@ fn queue_required_unit_unlocks(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod vehicle_worker_tests;
