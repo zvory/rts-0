@@ -334,6 +334,8 @@ export class HUD {
   }
 
   _commandDescriptorContext(frameViews = null) {
+    const selection = frameSelectedEntities(this.state, frameViews);
+    const commandOwner = this._commandOwnerForSelection(selection);
     this._recordHudDiagnostic(
       Array.isArray(frameViews?.selectedEntities)
         ? "entityViews.cache.hit.hud.selected"
@@ -348,17 +350,18 @@ export class HUD {
       spectator: this.state.spectator,
       commandSurfaceEnabled: this._canUseCommandSurface(),
       state: this.state,
-      playerId: this.state.playerId,
-      factionId: this.state.localFactionId,
-      selection: frameSelectedEntities(this.state, frameViews),
-      resources: this.state.resources || { steel: 0, oil: 0 },
+      playerId: commandOwner ?? this.state.playerId,
+      commandOwner,
+      factionId: this._commandFactionId(commandOwner),
+      selection,
+      resources: this._commandResources(commandOwner),
       optimisticProduction: this.state.optimisticProduction || [],
-      upgrades: this.state.upgrades || [],
+      upgrades: this._commandUpgrades(commandOwner),
       commandCardMode: this._intent()?.commandCardMode,
       commandTarget: this._intent()?.commandTarget,
       controlPolicy: this.controlPolicy,
       groupCooldownClocks,
-      playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind, frameViews),
+      playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind, frameViews, commandOwner),
     };
   }
 
@@ -520,7 +523,7 @@ export class HUD {
     const carriers = Array.isArray(definition?.carriers) ? definition.carriers : [];
     return (this.state.selectedEntities() || [])
       .filter((e) =>
-        e.owner === this.state.playerId &&
+        this._isOwn(e) &&
         carriers.includes(e.kind) &&
         e.buildProgress == null)
       .map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y }));
@@ -554,6 +557,8 @@ export class HUD {
   }
 
   _isOwn(e) {
+    const owner = this._commandOwnerForSelection();
+    if (owner != null) return e && Number(e.owner) === owner;
     return e && e.owner === this.state.playerId;
   }
 
@@ -666,19 +671,16 @@ export class HUD {
     return steel >= (cost.steel ?? 0) && oil >= (cost.oil ?? 0);
   }
 
-  _missingResourceSoundId(
-    cost,
-    res = this.state.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 },
-    supply = null,
-  ) {
+  _missingResourceSoundId(cost, res = null, supply = null) {
     if (!cost) return null;
-    const steelShort = (res.steel ?? 0) < (cost.steel ?? 0);
-    const oilShort = (res.oil ?? 0) < (cost.oil ?? 0);
+    const resources = res || this._commandResources();
+    const steelShort = (resources.steel ?? 0) < (cost.steel ?? 0);
+    const oilShort = (resources.oil ?? 0) < (cost.oil ?? 0);
     if (steelShort) return "notice_steel";
     if (oilShort) return "notice_oil";
     if (Number.isFinite(supply) && supply > 0) {
-      const used = res.supplyUsed ?? 0;
-      const cap = res.supplyCap ?? 0;
+      const used = resources.supplyUsed ?? 0;
+      const cap = resources.supplyCap ?? 0;
       if (used + supply > cap) return "notice_supply";
     }
     return null;
@@ -741,10 +743,50 @@ export class HUD {
   }
 
   /** True if the player owns at least one completed entity of `kind`. */
-  _playerHasCompleteKind(kind, frameViews = null) {
+  _playerHasCompleteKind(kind, frameViews = null, owner = null) {
     // currentEntities reflects the latest snapshot positions but, more
     // importantly here, the latest set of entities.
-    return playerHasCompletedKind(frameCurrentEntities(this.state, frameViews), this.state.playerId, kind);
+    return playerHasCompletedKind(
+      frameCurrentEntities(this.state, frameViews),
+      owner ?? this.state.playerId,
+      kind,
+    );
+  }
+
+  _commandOwnerForSelection(selection = null) {
+    const policy = this.controlPolicy || this.state?.controlPolicy;
+    const selected = selection || (typeof this.state?.selectedEntities === "function" ? this.state.selectedEntities() || [] : []);
+    const owner = typeof policy?.commandOwnerForSelection === "function"
+      ? policy.commandOwnerForSelection(selected, this.state)
+      : typeof policy?.commandOwner === "function"
+        ? policy.commandOwner(this.state)
+        : this.state?.playerId;
+    const ownerId = Number(owner);
+    return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
+  }
+
+  _commandResources(owner = this._commandOwnerForSelection()) {
+    const policy = this.controlPolicy || this.state?.controlPolicy;
+    if (typeof policy?.commandResources === "function") {
+      return policy.commandResources(this.state, owner);
+    }
+    return this.state.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+  }
+
+  _commandFactionId(owner = this._commandOwnerForSelection()) {
+    const policy = this.controlPolicy || this.state?.controlPolicy;
+    if (typeof policy?.commandFactionId === "function") {
+      return policy.commandFactionId(this.state, owner);
+    }
+    return this.state.localFactionId;
+  }
+
+  _commandUpgrades(owner = this._commandOwnerForSelection()) {
+    const policy = this.controlPolicy || this.state?.controlPolicy;
+    if (typeof policy?.commandUpgrades === "function") {
+      return policy.commandUpgrades(this.state, owner);
+    }
+    return this.state.upgrades || [];
   }
 
   /**

@@ -404,6 +404,9 @@ export function _nearestOwnCompletedCityCentre(x, y) {
 
 function ownOwner(state, owner) {
   if (state?.controlPolicy?.kind === "lab") {
+    if (typeof state.controlPolicy.isCommandOwner === "function") {
+      return state.controlPolicy.isCommandOwner(owner, state);
+    }
     return state.controlPolicy.canControlOwner(owner, state);
   }
   return typeof state?.isOwnOwner === "function"
@@ -412,9 +415,27 @@ function ownOwner(state, owner) {
 }
 
 function enemyOwner(state, owner) {
+  if (state?.controlPolicy?.kind === "lab") {
+    if (typeof state.controlPolicy.isCommandEnemyOwner === "function") {
+      return state.controlPolicy.isCommandEnemyOwner(owner, state);
+    }
+    const commandOwner = typeof state.controlPolicy.commandOwner === "function"
+      ? state.controlPolicy.commandOwner(state)
+      : state.controlPolicy.issueAsOwnerForSelection?.(state.selectedEntities?.() || []);
+    return fallbackEnemyOwner(commandOwner, owner);
+  }
   if (typeof state?.isEnemyOwner === "function") return state.isEnemyOwner(owner);
+  return fallbackEnemyOwner(state?.playerId, owner);
+}
+
+function fallbackEnemyOwner(commandOwner, owner) {
+  const commandOwnerId = Number(commandOwner);
   const ownerId = Number(owner);
-  return Number.isInteger(ownerId) && ownerId !== 0 && ownerId !== state?.playerId;
+  return Number.isInteger(commandOwnerId) &&
+    commandOwnerId > 0 &&
+    Number.isInteger(ownerId) &&
+    ownerId > 0 &&
+    ownerId !== commandOwnerId;
 }
 
 export function _activateCommandHotkey(ev) {

@@ -34,6 +34,7 @@ import {
   ABILITY_OBJECT_KIND,
   EVENT,
   KIND,
+  LAB_ROLE,
   MOVEMENT_PATH_DIAGNOSTICS,
   SETUP,
   STATE,
@@ -57,6 +58,7 @@ import {
 } from "../../client/src/input/tank_trap_line.js";
 import { armPostQuickCastSelectionGuard } from "../../client/src/input/quick_cast_selection_guard.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
+import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { Minimap } from "../../client/src/minimap.js";
 import { _drawBuilding } from "../../client/src/renderer/buildings.js";
 import {
@@ -812,6 +814,48 @@ function buttonByLabel(card, label) {
       alliedRightClickCommands[0].c === "move" &&
       alliedRightClickCommands[0].units.join(",") === String(ownWorker.id),
     "right-clicking an allied entity with own units selected sends move, not attack",
+  );
+  const labP2Unit = { id: 211, owner: 2, kind: KIND.RIFLEMAN, x: 64, y: 96, hp: 45, maxHp: 45, state: STATE.IDLE };
+  const labP1Target = { id: 212, owner: 1, kind: KIND.RIFLEMAN, x: 96, y: 96, hp: 45, maxHp: 45, state: STATE.IDLE };
+  const labP2Target = { id: 213, owner: 2, kind: KIND.RIFLEMAN, x: 128, y: 96, hp: 45, maxHp: 45, state: STATE.IDLE };
+  const labPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
+  const labOwnerRightClickCommands = [];
+  const labOwnerRightClickInput = Object.create(Input.prototype);
+  labOwnerRightClickInput.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    players: [
+      { id: 1, teamId: 1 },
+      { id: 2, teamId: 2 },
+    ],
+    controlPolicy: labPolicy,
+    selectedEntities() {
+      return [labP2Unit];
+    },
+    entitiesInterpolated() {
+      return [labP2Unit, labP1Target, labP2Target];
+    },
+  };
+  labOwnerRightClickInput._worldAt = (x, y) => ({ x, y });
+  labOwnerRightClickInput._entityAtWorld = Input.prototype._entityAtWorld;
+  labOwnerRightClickInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
+  labOwnerRightClickInput._resourceAtWorld = Input.prototype._resourceAtWorld;
+  labOwnerRightClickInput._selectedOwnUnitIds = Input.prototype._selectedOwnUnitIds;
+  labOwnerRightClickInput._selectedWorkerIds = Input.prototype._selectedWorkerIds;
+  labOwnerRightClickInput._selectedProducerBuildingIds = Input.prototype._selectedProducerBuildingIds;
+  labOwnerRightClickInput._issueCommand = (command) => labOwnerRightClickCommands.push(command);
+  labOwnerRightClickInput._onRightClick({ x: labP1Target.x, y: labP1Target.y });
+  assert(
+    labOwnerRightClickCommands.at(-1)?.c === "attack" &&
+      labOwnerRightClickCommands.at(-1)?.units.join(",") === String(labP2Unit.id) &&
+      labOwnerRightClickCommands.at(-1)?.target === labP1Target.id,
+    "lab P2 right-clicking a P1 unit classifies the target as an enemy",
+  );
+  labOwnerRightClickInput._onRightClick({ x: labP2Target.x, y: labP2Target.y });
+  assert(
+    labOwnerRightClickCommands.at(-1)?.c === "move" &&
+      labOwnerRightClickCommands.at(-1)?.units.join(",") === String(labP2Unit.id),
+    "lab P2 right-clicking a P2 unit does not classify the selected owner as hostile",
   );
   const minimapLike = Object.create(Minimap.prototype);
   minimapLike.state = teamSelectionState;

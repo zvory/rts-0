@@ -896,6 +896,9 @@ function commandFeedbackOwner(state) {
 
 function controllableOwner(state, owner) {
   if (state?.controlPolicy?.kind === "lab") {
+    if (typeof state.controlPolicy.isCommandOwner === "function") {
+      return !!state.controlPolicy.isCommandOwner(owner, state);
+    }
     return !!state.controlPolicy.canControlOwner?.(owner, state);
   }
   return typeof state?.isOwnOwner === "function"

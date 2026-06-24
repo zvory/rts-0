@@ -1,6 +1,6 @@
 # Phase 2 - Lab Command Ownership
 
-Status: planned.
+Status: done.
 
 ## Goal
 
