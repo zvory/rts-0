@@ -12,7 +12,13 @@ or custom URL entry. The shell does not start `rts-server` and does not serve or
 bundle game assets; the selected release website provides the client, maps, and
 WebSocket endpoint.
 
-Run it from this directory on macOS:
+Run it from the repo root on macOS:
+
+```bash
+scripts/open-tauri-game.sh
+```
+
+Or run it from this directory:
 
 ```bash
 ./run.sh
