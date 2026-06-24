@@ -58,6 +58,7 @@ pub(super) enum RoomTimeSource {
     ReplayPlayback,
     DevScenario,
     Lab,
+    LiveAiOnly,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +106,13 @@ impl RoomTimeOperations {
         seek_absolute: true,
     };
 
+    pub(super) const LIVE_AI_ONLY: Self = Self {
+        set_speed: true,
+        step: false,
+        seek_relative: false,
+        seek_absolute: false,
+    };
+
     pub(super) fn allows(self, operation: RoomTimeOperation) -> bool {
         match operation {
             RoomTimeOperation::SetSpeed => self.set_speed,
@@ -142,6 +150,10 @@ impl ClockCapability {
     pub(super) const LAB: Self = Self::RoomControlled(RoomTimeCapability {
         source: RoomTimeSource::Lab,
         operations: RoomTimeOperations::LAB,
+    });
+    pub(super) const LIVE_AI_ONLY: Self = Self::RoomControlled(RoomTimeCapability {
+        source: RoomTimeSource::LiveAiOnly,
+        operations: RoomTimeOperations::LIVE_AI_ONLY,
     });
 
     pub(super) fn room_time_source(self) -> Option<RoomTimeSource> {
@@ -363,6 +375,11 @@ pub(super) struct SessionPolicy {
     pub(super) countdown_eligible: bool,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct SessionPolicyContext {
+    pub(super) ai_only_live_match: bool,
+}
+
 impl SessionPolicy {
     pub(super) fn new(mode: SessionMode, phase: SessionPhase) -> Self {
         let mut policy = match phase {
@@ -553,7 +570,25 @@ impl SessionPolicy {
     }
 
     pub(super) fn for_room(mode: &RoomMode, phase: SessionPhase) -> Self {
-        Self::new(SessionMode::from(mode), phase)
+        Self::for_room_with_context(mode, phase, SessionPolicyContext::default())
+    }
+
+    pub(super) fn for_room_with_context(
+        mode: &RoomMode,
+        phase: SessionPhase,
+        context: SessionPolicyContext,
+    ) -> Self {
+        Self::new(SessionMode::from(mode), phase).with_context(context)
+    }
+
+    pub(super) fn with_context(mut self, context: SessionPolicyContext) -> Self {
+        if context.ai_only_live_match
+            && self.mode == SessionMode::Normal
+            && self.phase == SessionPhase::LiveMatch
+        {
+            self.clock = ClockCapability::LIVE_AI_ONLY;
+        }
+        self
     }
 
     pub(super) fn is_dev_watch(self) -> bool {
@@ -959,6 +994,21 @@ mod tests {
         assert!(!live.start_capabilities(false).commands.gameplay);
         assert!(!live.start_capabilities(false).match_controls.pause);
         assert!(!live.start_capabilities(true).room_time.available);
+
+        let ai_only_live = live.with_context(SessionPolicyContext {
+            ai_only_live_match: true,
+        });
+        let ai_only_caps = ai_only_live.start_capabilities(false);
+        assert_eq!(ai_only_live.clock, ClockCapability::LIVE_AI_ONLY);
+        assert!(ai_only_caps.room_time.available);
+        assert!(ai_only_caps.room_time.set_speed);
+        assert!(ai_only_caps.room_time.pause);
+        assert!(!ai_only_caps.room_time.step);
+        assert!(!ai_only_caps.room_time.seek_relative);
+        assert!(!ai_only_caps.room_time.seek_absolute);
+        assert!(!ai_only_caps.room_time.timeline);
+        assert!(!ai_only_caps.commands.gameplay);
+        assert!(!ai_only_caps.match_controls.pause);
 
         let replay = SessionPolicy::new(SessionMode::Normal, SessionPhase::ReplayViewer);
         let replay_caps = replay.start_capabilities(false);

@@ -232,6 +232,37 @@ mod tests {
         assert_eq!(paused_lab.scheduled_action(), ScheduledTickAction::Noop);
         assert!(paused_lab.can_step_room_time(true));
 
+        let live_ai = TickControl::new(
+            ClockCapability::LIVE_AI_ONLY,
+            Some(RoomTimeClock {
+                speed: 4.0,
+                paused: false,
+            }),
+            1.0,
+            false,
+        );
+        assert_duration_close(live_ai.tick_interval(base), Duration::from_micros(22_500));
+        assert_eq!(
+            live_ai.scheduled_action(),
+            ScheduledTickAction::RoomControlled(RoomTimeSource::LiveAiOnly)
+        );
+        assert!(live_ai.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
+        assert!(!live_ai.allows_room_time_operation(RoomTimeOperation::Step, true));
+        assert!(!live_ai.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
+        assert!(!live_ai.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
+
+        let paused_live_ai = TickControl::new(
+            ClockCapability::LIVE_AI_ONLY,
+            Some(RoomTimeClock {
+                speed: 4.0,
+                paused: true,
+            }),
+            1.0,
+            false,
+        );
+        assert_eq!(paused_live_ai.scheduled_action(), ScheduledTickAction::Noop);
+        assert!(!paused_live_ai.can_step_room_time(true));
+
         let branch_staging = TickControl::new(ClockCapability::BRANCH_STAGING, None, 3.0, false);
         assert_duration_close(
             branch_staging.tick_interval(base),

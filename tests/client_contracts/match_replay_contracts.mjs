@@ -738,6 +738,63 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
   scenarioUi.destroy();
 
+  const aiLiveControls = fakeEl("div");
+  const aiLiveSpeed4 = fakeEl("button");
+  aiLiveSpeed4.className = "spd-btn";
+  aiLiveSpeed4.dataset.speed = "4";
+  const aiLivePause = fakeEl("button");
+  aiLivePause.className = "spd-btn dev-pause-btn";
+  aiLivePause.dataset.speed = "0";
+  const aiLiveStep = fakeEl("button");
+  aiLiveStep.className = "spd-btn dev-step-btn";
+  aiLiveStep.dataset.stepRoomTime = "";
+  const aiLiveSeek = fakeEl("button");
+  aiLiveSeek.className = "spd-btn seek-btn";
+  aiLiveSeek.dataset.seekBack = "30";
+  aiLiveControls.appendChild(aiLiveSpeed4);
+  aiLiveControls.appendChild(aiLivePause);
+  aiLiveControls.appendChild(aiLiveStep);
+  aiLiveControls.appendChild(aiLiveSeek);
+  dom.replaySpeed = aiLiveControls;
+  const aiLiveUi = new RoomTimeControls({
+    net: replayNet,
+    state: roomTimeState,
+    replayViewer: false,
+    capabilities: createRoomCapabilities({
+      startPayload: {
+        spectator: true,
+        capabilities: {
+          roomTime: {
+            available: true,
+            setSpeed: true,
+            pause: true,
+          },
+        },
+      },
+    }),
+  });
+  assert(!aiLiveSpeed4.hidden, "AI-only live controls show positive speed controls");
+  assert(!aiLivePause.hidden, "AI-only live controls show pause controls");
+  assert(aiLiveStep.hidden, "AI-only live controls hide step without step capability");
+  assert(aiLiveSeek.hidden, "AI-only live controls hide seek without seek capability");
+  assert(!aiLiveControls.querySelector(".replay-timeline"), "AI-only live controls do not build a timeline without seek");
+  aiLiveControls._listeners.get("click")({ target: aiLiveSpeed4 });
+  assert(replayNet.speeds.at(-1) === 4, "AI-only live speed click sends net.setRoomTimeSpeed");
+  aiLiveControls._listeners.get("click")({ target: aiLivePause });
+  assert(replayNet.speeds.at(-1) === 0, "AI-only live pause sends zero room-time speed");
+  assert(aiLivePause.textContent === "Resume", "paused AI-only live control switches to resume");
+  aiLiveControls._listeners.get("click")({ target: aiLivePause });
+  assert(replayNet.speeds.at(-1) === 4, "AI-only live resume restores the last selected speed");
+  const aiLiveSpeedsBeforeHiddenClicks = replayNet.speeds.length;
+  const aiLiveSeeksBeforeHiddenClicks = replayNet.seekBacks.length;
+  const aiLiveStepsBeforeHiddenClicks = replayNet.steps;
+  aiLiveControls._listeners.get("click")({ target: aiLiveStep });
+  aiLiveControls._listeners.get("click")({ target: aiLiveSeek });
+  assert(replayNet.speeds.length === aiLiveSpeedsBeforeHiddenClicks, "AI-only live hidden step control is inert");
+  assert(replayNet.seekBacks.length === aiLiveSeeksBeforeHiddenClicks, "AI-only live hidden seek control is inert");
+  assert(replayNet.steps === aiLiveStepsBeforeHiddenClicks, "AI-only live hidden step does not send");
+  aiLiveUi.destroy();
+
   const labControls = fakeEl("div");
   const labSpeed2 = fakeEl("button");
   labSpeed2.className = "spd-btn";

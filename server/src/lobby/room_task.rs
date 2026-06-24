@@ -1,7 +1,7 @@
 use super::connection::send_or_log;
 use super::lab_timeline::LabTimeline;
 use super::projection::ProjectionPolicy;
-use super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
+use super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy, SessionPolicyContext};
 use super::tick_control::{RoomTimeClock, TickControl};
 use super::*;
 #[cfg(test)]
@@ -260,6 +260,10 @@ impl RoomTask {
                 speed: self.room_time_speed,
                 paused: self.room_time_paused,
             }),
+            (_, Some(RoomTimeSource::LiveAiOnly)) => Some(RoomTimeClock {
+                speed: self.room_time_speed,
+                paused: self.room_time_paused,
+            }),
             _ => None,
         };
         TickControl::new(
@@ -280,7 +284,24 @@ impl RoomTask {
     }
 
     fn session_policy(&self) -> SessionPolicy {
-        SessionPolicy::for_room(&self.mode, self.session_phase())
+        self.session_policy_for_phase(self.session_phase())
+    }
+
+    fn session_policy_for_phase(&self, phase: SessionPhase) -> SessionPolicy {
+        SessionPolicy::for_room_with_context(
+            &self.mode,
+            phase,
+            self.session_policy_context_for_phase(phase),
+        )
+    }
+
+    fn session_policy_context_for_phase(&self, phase: SessionPhase) -> SessionPolicyContext {
+        SessionPolicyContext {
+            ai_only_live_match: phase == SessionPhase::LiveMatch
+                && matches!(self.mode, RoomMode::Normal)
+                && self.match_player_count > 0
+                && self.match_human_count == 0,
+        }
     }
 
     fn projection_policy(&self) -> ProjectionPolicy {
@@ -288,12 +309,7 @@ impl RoomTask {
     }
 
     fn projection_policy_for_phase(&self, phase: SessionPhase) -> ProjectionPolicy {
-        let policy = self.session_policy();
-        let policy = if policy.phase == phase {
-            policy
-        } else {
-            SessionPolicy::for_room(&self.mode, phase)
-        };
+        let policy = self.session_policy_for_phase(phase);
         ProjectionPolicy::new(policy.visibility, policy.diagnostics)
     }
 
@@ -302,7 +318,7 @@ impl RoomTask {
     }
 
     fn live_session_policy(&self) -> SessionPolicy {
-        SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch)
+        self.session_policy_for_phase(SessionPhase::LiveMatch)
     }
 
     // -- Event handling ------------------------------------------------------

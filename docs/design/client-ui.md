@@ -105,7 +105,7 @@ export class Net {
   createSnapshotReportStats()
   consumeSnapshotReportStats()
   noteSnapshotFrame({bytes, parseMs, decodeMs, snapshotCodec, snapshotCodecVersion, frameKind})
-  setRoomTimeSpeed(speed)                // room-controlled replay/dev-scenario/lab time
+  setRoomTimeSpeed(speed)                // room-controlled replay/AI-only live/dev-scenario/lab time
   stepRoomTime()                         // paused dev-scenario/lab room time
   seekRoomTime(ticksBack)                // room-controlled replay/lab time; pass huge N for full reset
   seekRoomTimeTo(tick)
@@ -380,9 +380,10 @@ export class RoomTimeControls {
 export class ReplayControls extends RoomTimeControls
 ```
 `RoomTimeControls` renders pause/resume, speed, step, relative seek, absolute timeline seek, tick
-status, and keyframe marks only from `capabilities.roomTime`. Replay fog-perspective controls and
-the replay-branch button remain gated by replay-specific visibility/action capabilities, not by lab
-or URL identity.
+status, and keyframe marks only from `capabilities.roomTime`. AI-only live matches advertise only
+speed/pause room-time controls, so the same component renders no seek, step, or timeline affordance
+for them. Replay fog-perspective controls and the replay-branch button remain gated by
+replay-specific visibility/action capabilities, not by lab or URL identity.
 
 `room_capabilities.js`
 ```js

@@ -7,12 +7,14 @@ use super::super::dev_replay::match_seed;
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
 use super::super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::super::projection::RecipientRole;
-use super::super::session_policy::{SessionPhase, SessionPolicy};
+use super::super::session_policy::{RoomTimeSource, SessionPhase};
 use super::super::{normalize_start_team_id, PlayerInit};
 use super::helpers::{late_spectator_notice_name, live_ai_controllers, LIVE_PAUSE_LIMIT};
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
 use super::RoomTask;
-use crate::protocol::{Event, LivePauseState, NoticeSeverity, PlayerScore, ServerMessage, TeamId};
+use crate::protocol::{
+    Event, LivePauseState, NoticeSeverity, PlayerScore, RoomTimeState, ServerMessage, TeamId,
+};
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
@@ -71,7 +73,7 @@ impl RoomTask {
         self.enqueue_late_spectator_join_notice(notice_recipients, notice_name);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
-        let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
+        let start_policy = self.live_session_policy();
         let Some(player) = self.players.get(&player_id) else {
             return;
         };
@@ -94,6 +96,7 @@ impl RoomTask {
         if self.live_pause_controls_available() {
             self.send_live_pause_state_to(player_id);
         }
+        self.send_live_ai_room_time_state_to(player_id);
     }
 
     fn insert_human_spectator(&mut self, player_id: u32, name: String, msg_tx: ConnectionSink) {
@@ -458,7 +461,7 @@ impl RoomTask {
         self.ai_controllers = live_ai_controllers(&inits, &self.ai_players, seed);
 
         let projection_policy = self.projection_policy_for_phase(SessionPhase::LiveMatch);
-        let start_policy = SessionPolicy::for_room(&self.mode, SessionPhase::LiveMatch);
+        let start_policy = self.live_session_policy();
         let recipients: Vec<_> = self
             .order
             .iter()
@@ -502,7 +505,40 @@ impl RoomTask {
         });
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
+        self.broadcast_live_ai_room_time_state();
         self.broadcast_live_pause_state();
+    }
+
+    fn live_ai_room_time_state(&self) -> Option<RoomTimeState> {
+        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::LiveAiOnly) {
+            return None;
+        }
+        let Phase::InGame(game) = &self.phase else {
+            return None;
+        };
+        Some(self.room_time_state_for_live_game(game, None))
+    }
+
+    pub(super) fn send_live_ai_room_time_state_to(&self, player_id: u32) {
+        let Some(state) = self.live_ai_room_time_state() else {
+            return;
+        };
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            player_id,
+            &player.msg_tx,
+            ServerMessage::RoomTimeState(state),
+        );
+    }
+
+    pub(super) fn broadcast_live_ai_room_time_state(&self) {
+        let Some(state) = self.live_ai_room_time_state() else {
+            return;
+        };
+        self.broadcast(&ServerMessage::RoomTimeState(state));
     }
 
     pub(super) fn on_tick_live_game(&mut self, scheduled: TokioInstant) {

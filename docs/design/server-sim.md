@@ -263,9 +263,10 @@ alive.
   `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
   `SeekRoomTime`, `SeekRoomTimeTo`, `SetReplayVision`, `Lab`). The room task is the single writer
   of game state — no locks around `Game`.
-- Room-mode and phase-dependent lobby checks use a lobby-local `SessionPolicy` descriptor for the
-  current room mode and phase matrix, including dev-watch, replay-room, branch-staging, countdown,
-  speed-source, and match-history decisions. Live-match handlers live in `room_task/live.rs`,
+- Room-mode, phase, and match-composition dependent lobby checks use a lobby-local `SessionPolicy`
+  descriptor for the current room mode and phase matrix, including dev-watch, replay-room,
+  branch-staging, AI-only live speed controls, countdown, speed-source, and match-history
+  decisions. Live-match handlers live in `room_task/live.rs`,
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
   bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
@@ -346,9 +347,9 @@ split into focused room-local modules:
 - `room_task/lobby.rs` owns ordinary public lobby behavior: summaries, joins/leaves, readiness,
   host fallback, team and faction selection, AI seats, spectator flags, selected map, quickstart,
   countdown entry, and lobby broadcasts.
-- `room_task/live.rs` owns live-match room controls: command routing, command receipts, pause and
-  unpause, give-up, late spectator attach, live start-payload glue, pending recipient notices, and
-  live snapshot notice plumbing.
+- `room_task/live.rs` owns live-match room controls: command routing, command receipts, active
+  player pause and unpause, AI-only live room-time speed/pause state, give-up, late spectator
+  attach, live start-payload glue, pending recipient notices, and live snapshot notice plumbing.
 - `room_task/lab.rs` owns lab sessions: first-join launch, lab role/vision metadata, request
   authorization, mutation and issue-as routing, result delivery, dirty state, operation logging,
   state broadcasts, room-time controls, and scenario export/import.
