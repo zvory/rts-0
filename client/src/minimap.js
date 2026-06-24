@@ -815,7 +815,15 @@ export class Minimap {
   }
 
   _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
-    return this._intent()?.addCommandFeedback?.(kind, x, y, append, radiusTiles, performance.now());
+    return this._intent()?.addCommandFeedback?.(
+      kind,
+      x,
+      y,
+      append,
+      radiusTiles,
+      performance.now(),
+      commandFeedbackOwner(this.state),
+    );
   }
 
   updateCommandTargetPreview() {
@@ -1085,6 +1093,20 @@ function ownOwner(state, owner) {
 
 function allyOwner(state, owner) {
   return typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner);
+}
+
+function commandFeedbackOwner(state) {
+  if (state?.controlPolicy?.kind === "lab") {
+    const owner = typeof state.controlPolicy.feedbackOwner === "function"
+      ? state.controlPolicy.feedbackOwner(state)
+      : typeof state.controlPolicy.issueAsOwnerForSelection === "function"
+        ? state.controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
+        : null;
+    const ownerId = Number(owner);
+    return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
+  }
+  const ownerId = Number(state?.playerId);
+  return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
 }
 
 function issueGameplayCommand(sender, command) {

@@ -325,7 +325,15 @@ export class Input {
         (p) => now - p.createdAt <= 700,
       );
     }
-    return this._intent()?.addCommandFeedback?.(kind, x, y, append, radiusTiles, now);
+    return this._intent()?.addCommandFeedback?.(
+      kind,
+      x,
+      y,
+      append,
+      radiusTiles,
+      now,
+      commandFeedbackOwner(this.state),
+    );
   }
 
   /**
@@ -757,9 +765,7 @@ export class Input {
     const world = this._worldAt(p.x, p.y);
     const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
     if (!hit) return false;
-    const own = typeof this.state?.isOwnOwner === "function"
-      ? this.state.isOwnOwner(hit.owner)
-      : hit.owner === this.state.playerId;
+    const own = controllableOwner(this.state, hit.owner);
     if (!own) return false;
     if (!isUnit(hit.kind) && !isBuilding(hit.kind)) return false;
 
@@ -872,6 +878,29 @@ function issueGameplayCommand(sender, command) {
     return sender.command(command);
   }
   return false;
+}
+
+function commandFeedbackOwner(state) {
+  if (state?.controlPolicy?.kind === "lab") {
+    const owner = typeof state.controlPolicy.feedbackOwner === "function"
+      ? state.controlPolicy.feedbackOwner(state)
+      : typeof state.controlPolicy.issueAsOwnerForSelection === "function"
+        ? state.controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
+        : null;
+    const ownerId = Number(owner);
+    return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
+  }
+  const ownerId = Number(state?.playerId);
+  return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
+}
+
+function controllableOwner(state, owner) {
+  if (state?.controlPolicy?.kind === "lab") {
+    return !!state.controlPolicy.canControlOwner?.(owner, state);
+  }
+  return typeof state?.isOwnOwner === "function"
+    ? state.isOwnOwner(owner)
+    : Number(owner) === state?.playerId;
 }
 
 Object.assign(Input.prototype, {

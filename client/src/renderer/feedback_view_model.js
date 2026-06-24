@@ -22,6 +22,7 @@ export function buildRendererFeedbackView(
     : EMPTY_ARRAY;
   const entityLookup = buildEntityLookup(entities, selected);
   const intent = clientIntent || null;
+  const controlOwner = buildControlOwnerReadModel(state, selected);
 
   const commandFeedback = liveArray(intent, "liveCommandFeedback", now);
   const smokeCanisters = liveArray(state, "liveSmokeCanisters", now);
@@ -36,6 +37,8 @@ export function buildRendererFeedbackView(
 
   return {
     playerId: state?.playerId,
+    feedbackOwnerId: controlOwner.feedbackOwnerId,
+    issueAsOwnerId: controlOwner.issueAsOwnerId,
     map: state?.map || null,
     placement: intent?.placement || null,
     commandFeedback,
@@ -69,13 +72,47 @@ export function buildRendererFeedbackView(
     entityById(id) {
       return entityLookup.get(id);
     },
+    canControlOwner(owner) {
+      return controlOwner.canControlOwner(owner);
+    },
+    isFeedbackOwner(owner) {
+      return controlOwner.isFeedbackOwner(owner);
+    },
     isOwnOwner(owner) {
-      if (typeof state?.isOwnOwner === "function") return state.isOwnOwner(owner);
-      return Number(owner) === state?.playerId;
+      return controlOwner.isFeedbackOwner(owner);
     },
     isAllyOwner(owner) {
+      if (controlOwner.feedbackOwnerId != null) {
+        return isAllyForPlayer(state?.players, controlOwner.feedbackOwnerId, owner);
+      }
       if (typeof state?.isAllyOwner === "function") return state.isAllyOwner(owner);
       return false;
+    },
+  };
+}
+
+function buildControlOwnerReadModel(state, selected) {
+  const policy = state?.controlPolicy || null;
+  const issueAsOwnerId = typeof policy?.issueAsOwnerForSelection === "function"
+    ? normalizeOwner(policy.issueAsOwnerForSelection(selected))
+    : null;
+  const policyFeedbackOwner = typeof policy?.feedbackOwnerForSelection === "function"
+    ? normalizeOwner(policy.feedbackOwnerForSelection(selected, state))
+    : typeof policy?.feedbackOwner === "function"
+      ? normalizeOwner(policy.feedbackOwner(state))
+      : null;
+  const fallbackOwner = defaultFeedbackOwner(state);
+  const feedbackOwnerId = policyFeedbackOwner ?? fallbackOwner;
+
+  return {
+    feedbackOwnerId,
+    issueAsOwnerId,
+    canControlOwner(owner) {
+      if (typeof policy?.canControlOwner === "function") return !!policy.canControlOwner(owner, state);
+      return feedbackOwnerId != null && Number(owner) === feedbackOwnerId;
+    },
+    isFeedbackOwner(owner) {
+      return feedbackOwnerId != null && Number(owner) === feedbackOwnerId;
     },
   };
 }
@@ -100,6 +137,30 @@ function addEntities(lookup, entities) {
   for (const entity of entities) {
     if (entity && entity.id != null) lookup.set(entity.id, entity);
   }
+}
+
+function normalizeOwner(owner) {
+  const value = Number(owner);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function defaultFeedbackOwner(state) {
+  if (state?.spectator) return null;
+  return normalizeOwner(state?.playerId);
+}
+
+function isAllyForPlayer(players, playerId, owner) {
+  const ownerId = Number(owner);
+  if (!Array.isArray(players) || !Number.isInteger(ownerId) || ownerId === 0 || ownerId === playerId) {
+    return false;
+  }
+  const ownTeam = teamIdForPlayer(players, playerId);
+  const ownerTeam = teamIdForPlayer(players, ownerId);
+  return ownTeam != null && ownerTeam != null && ownTeam !== 0 && ownTeam === ownerTeam;
+}
+
+function teamIdForPlayer(players, id) {
+  return players.find((player) => Number(player?.id) === Number(id))?.teamId ?? null;
 }
 
 function defaultNow() {

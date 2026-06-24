@@ -235,6 +235,33 @@ import {
   combatAudio.playPointFireSound({ e: EVENT.MORTAR_LAUNCH, fromX: 12, fromY: 24 });
   assert(plays.at(-1).id === "combat_mortar_launch_04", "match combat audio routes mortar launches");
   assert(plays.at(-1).opts.x === 12 && plays.at(-1).opts.y === 24, "match combat audio preserves point-fire source position");
+
+  const labPlays = [];
+  const labEntities = new Map([
+    [2, { id: 2, kind: KIND.RIFLEMAN, owner: 2, x: 140, y: 180 }],
+  ]);
+  const labCombatAudio = new MatchCombatAudio({
+    state: {
+      playerId: 1,
+      controlPolicy: {
+        kind: "lab",
+        feedbackOwner() {
+          return 2;
+        },
+      },
+      entityById: (id) => labEntities.get(id) || null,
+    },
+    audio: {
+      pickVariant: (ids) => ids[0],
+      play(id, opts) {
+        labPlays.push({ id, opts });
+        return true;
+      },
+      stopByKey() {},
+    },
+  });
+  labCombatAudio.playAttackSound({ e: EVENT.ATTACK, from: 2 });
+  assert(labPlays[0].opts.category === "combat_self", "lab combat audio uses selected issue-as owner for self fire");
 }
 
 // Match settings context collaborator

@@ -26,7 +26,7 @@ export function _controlGroupSaveModifierActive(ev, runtime = {}) {
 
 export function _handleControlGroupHotkey(ev) {
   const slot = this._controlGroupSlotFromKey(ev);
-  if (slot == null || this.state.spectator) return false;
+  if (slot == null || !controlGroupsEnabled(this.state)) return false;
 
   const save = _controlGroupSaveModifierActive(ev, {
     isInstalledApp: typeof this.installedAppRuntime === "function" && this.installedAppRuntime(),
@@ -64,6 +64,13 @@ export function _handleControlGroupHotkey(ev) {
     this._lastControlGroupTap = { slot, t: now };
   }
   return true;
+}
+
+function controlGroupsEnabled(state) {
+  if (state?.controlPolicy?.kind === "lab") {
+    return !!state.controlPolicy.canUseCommandSurface?.(state);
+  }
+  return !state?.spectator;
 }
 
 export function _jumpToControlGroupCluster(slot) {

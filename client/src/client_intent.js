@@ -21,7 +21,7 @@ export class ClientIntent {
     this._nextLabToolId = 1;
     /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
     this.lastCommandTargetArm = null;
-    /** @type {Array<{kind:string,x:number,y:number,append:boolean,radiusTiles:number|null,createdAt:number}>} */
+    /** @type {Array<{kind:string,x:number,y:number,append:boolean,radiusTiles:number|null,createdAt:number,ownerId:number|null}>} */
     this.commandFeedback = [];
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
@@ -152,8 +152,9 @@ export class ClientIntent {
    * @param {boolean=} append
    * @param {number|null=} radiusTiles
    * @param {number=} now
+   * @param {number|null=} ownerId
    */
-  addCommandFeedback(kind, x, y, append = false, radiusTiles = null, now = this._now()) {
+  addCommandFeedback(kind, x, y, append = false, radiusTiles = null, now = this._now(), ownerId = null) {
     this.commandFeedback.push({
       kind,
       x,
@@ -161,6 +162,7 @@ export class ClientIntent {
       append: !!append,
       radiusTiles,
       createdAt: now,
+      ownerId: normalizeOwnerId(ownerId),
     });
     if (this.commandFeedback.length > 12) {
       this.commandFeedback.splice(0, this.commandFeedback.length - 12);
@@ -170,7 +172,7 @@ export class ClientIntent {
   /**
    * Return live command feedback markers, pruning expired ones.
    * @param {number} now
-   * @returns {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>}
+   * @returns {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number,ownerId:number|null}>}
    */
   liveCommandFeedback(now) {
     const ttlMs = 650;
@@ -243,4 +245,9 @@ function defaultNow() {
   return typeof performance !== "undefined" && typeof performance.now === "function"
     ? performance.now()
     : Date.now();
+}
+
+function normalizeOwnerId(ownerId) {
+  const value = Number(ownerId);
+  return Number.isInteger(value) && value > 0 ? value : null;
 }

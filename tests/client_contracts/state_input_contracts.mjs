@@ -34,12 +34,14 @@ import {
   ABILITY_OBJECT_KIND,
   EVENT,
   KIND,
+  LAB_ROLE,
   MOVEMENT_PATH_DIAGNOSTICS,
   SETUP,
   STATE,
   TERRAIN,
   cmd,
 } from "../../client/src/protocol.js";
+import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import {
   Input,
   footprintValidAgainstEntities,
@@ -694,6 +696,47 @@ function buttonByLabel(card, label) {
     teamSelectionState.controlGroups[2].join(",") === String(ownWorker.id),
     "mixed own/allied selections save only own entities into control groups",
   );
+  const labControlGroupState = new GameState({
+    ...start,
+    spectator: true,
+    map: { ...start.map, width: 12, height: 12, resources: [] },
+    players: [
+      { id: 1, teamId: 1, name: "A", color: "#ff0000", startTileX: 1, startTileY: 1 },
+      { id: 2, teamId: 2, name: "B", color: "#00ff00", startTileX: 2, startTileY: 2 },
+    ],
+  });
+  labControlGroupState.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
+  const labP2Worker = { id: 301, owner: 2, kind: KIND.WORKER, x: 32, y: 96, hp: 40, maxHp: 40, state: STATE.IDLE };
+  const labP2Rifle = { id: 302, owner: 2, kind: KIND.RIFLEMAN, x: 64, y: 96, hp: 45, maxHp: 45, state: STATE.IDLE };
+  const labP1Worker = { id: 303, owner: 1, kind: KIND.WORKER, x: 96, y: 96, hp: 40, maxHp: 40, state: STATE.IDLE };
+  labControlGroupState.applySnapshot({
+    tick: 0,
+    steel: 100,
+    oil: 100,
+    supplyUsed: 0,
+    supplyCap: 20,
+    entities: [labP2Worker, labP2Rifle, labP1Worker],
+    events: [],
+  });
+  labControlGroupState.setSelection([labP2Worker.id, labP2Rifle.id]);
+  labControlGroupState.setControlGroup(3, labControlGroupState.selection);
+  assert(
+    labControlGroupState.controlGroups[3].join(",") === "301,302",
+    "lab control groups save selected P2 controllables even though the start payload is spectator-shaped",
+  );
+  labControlGroupState.setSelection([labP1Worker.id]);
+  labControlGroupState.selectControlGroup(3);
+  assert(
+    Array.from(labControlGroupState.selection).join(",") === "301,302",
+    "lab control-group recall switches back to the saved controlled owner",
+  );
+  labControlGroupState.addToControlGroup(3, [labP1Worker.id]);
+  assert(
+    labControlGroupState.controlGroups[3].join(",") === "301,302",
+    "lab control groups reject adding a second owner to an existing group",
+  );
+  labControlGroupState.setControlGroup(4, [labP2Worker.id, labP1Worker.id]);
+  assert(labControlGroupState.controlGroups[4].length === 0, "lab control groups reject mixed-owner saves");
   const allyOnlyCard = buildCommandCardDescriptors(commandCardCtx({
     playerId: 1,
     selection: [allyWorker],
@@ -1286,6 +1329,34 @@ function buttonByLabel(card, label) {
   assert(
     hotkeyCalls.map((c) => c.type).join(",") === "set,add,select,select,jump",
     "plain number recalls, and double-tap recalls then jumps",
+  );
+  const labHotkeyCalls = [];
+  const labHotkeyInput = Object.create(Input.prototype);
+  labHotkeyInput.state = {
+    spectator: true,
+    selection: new Set([301, 302]),
+    controlPolicy: {
+      kind: "lab",
+      canUseCommandSurface() {
+        return true;
+      },
+    },
+    setControlGroup(slot, ids) {
+      labHotkeyCalls.push({ type: "set", slot, ids: Array.from(ids) });
+      return Array.from(ids);
+    },
+    addToControlGroup() {
+      return [];
+    },
+    selectControlGroup() {
+      return [];
+    },
+  };
+  labHotkeyInput._lastControlGroupTap = null;
+  assert(
+    labHotkeyInput._handleControlGroupHotkey(keyEvent("Digit4", { altKey: true })) === true &&
+      labHotkeyCalls[0]?.ids.join(",") === "301,302",
+    "lab operator control-group hotkeys work in spectator-shaped lab matches",
   );
 
   const repeatHotkeyInput = Object.create(Input.prototype);

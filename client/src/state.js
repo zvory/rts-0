@@ -8,6 +8,7 @@
 import { admitSelectionIds } from "./command_budget.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
+import { admitControlGroupIds } from "./state_control_groups.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
 import {
   isAllyOwner as queryIsAllyOwner,
@@ -811,24 +812,8 @@ export class GameState {
     return Number.isInteger(slot) && slot >= 0 && slot < this.controlGroups.length;
   }
 
-  _ownControllableIds(ids) {
-    const out = [];
-    const seen = new Set();
-    for (const id of ids || []) {
-      if (seen.has(id)) continue;
-      const e = this._curById.get(id);
-      if (!e || e.owner !== this.playerId) continue;
-      if (!isUnit(e.kind) && !isBuilding(e.kind)) continue;
-      out.push(id);
-      seen.add(id);
-    }
-    return out;
-  }
-
   _admitControlGroupIds(ids, { baseIds = [] } = {}) {
-    const base = this._ownControllableIds(baseIds);
-    const candidates = this._ownControllableIds(ids);
-    return admitSelectionIds(this, candidates, { baseIds: base });
+    return admitControlGroupIds(this, ids, { baseIds });
   }
 
   _pruneControlGroups() {
