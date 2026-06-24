@@ -269,17 +269,20 @@ TCP, and IP overhead. Command milestone timing splits local issue to receipt, re
 acknowledgement, issue to sim acknowledgement, and ack snapshot receipt to browser apply. The
 frame-work and renderer fields come from the browser's bounded frame-profiler report window; the
 local debug surface may keep richer cumulative phase tables, but those raw arrays and detailed
-recent frames are not uploaded. Command burst fields use a fixed 250 ms sliding bucket and only count
-commands accepted by the browser WebSocket send path after local command-budget checks. Prediction
+recent frames are not uploaded. `commandsIssued` is the report-window total and catches sustained
+rapid input that may not reach the fixed 250 ms `commandBurstMax` threshold. Command burst fields
+only count commands accepted by the browser WebSocket send path after local command-budget checks. Prediction
 disable reason fields are stable buckets; detailed WASM loader errors stay local. The server logs
 this message only when the aggregate contains
 notable lag, jitter, browser frame stalls, local JS frame work, large-payload pressure, packet-budget
 pressure, snapshot parse/decode/apply cost, snapshot cadence/burst issues, renderer cost, WebSocket
-backlog, server tick/scheduler pressure, command density, command milestone delay/rejection, or prediction
+backlog, server tick/scheduler pressure, sustained or bursty command density, command milestone delay/rejection, or prediction
 correction/fallback signals, alongside the connection's `player_id`, room name, and reported
 `match_run_id`. The same structured row also includes server-observed outbound counters for the
 report window, prefixed `server*`, such as command receipt counts, reliable messages drained while a
 snapshot was pending, snapshot send age, and latest-only snapshot slot stored/replaced/closed counts.
+One reliable message before a snapshot with no send age or slot replacement is normal ordering, not
+outbound pressure.
 Those server-only log fields are not client protocol fields. Values are advisory because clients are untrusted; use them to diagnose
 transport/browser/prediction/render behavior, not as gameplay authority.
 
