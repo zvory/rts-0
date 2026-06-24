@@ -137,7 +137,8 @@ impl Game {
     /// owner-only movement paths. The default `snapshot_for` includes no movement diagnostics.
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot;
 
-    /// Build a spectator snapshot from the union of all active players' current fog.
+    /// Build a spectator snapshot from the union of the selected players' current fog, stale
+    /// building memory, and resource rows.
     pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot;
 
     /// Same projection as `snapshot_for_spectator`, with explicit room-projection diagnostic options.
@@ -301,9 +302,11 @@ alive.
   clear pause counters and paused state.
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
   read-only live spectator attach. Spectators receive `StartPayload.spectator = true` and live
-  `game.snapshot_for_spectator(active_player_ids)` snapshots, but are not included in `PlayerInit`,
-  command routing, elimination, pause authority, or match-player counts. `RoomTask` captures the
-  existing connected recipient ids before inserting a late spectator and queues a room-owned
+  `game.snapshot_for_spectator(active_player_ids)` snapshots plus event unions for those active
+  player buckets, with per-player position-free non-alert notices filtered out, but are not
+  included in `PlayerInit`, command routing, elimination, pause authority, or match-player counts.
+  `RoomTask` captures the existing connected recipient ids before inserting a late spectator and
+  queues a room-owned
   position-free info notice for those recipients only: `<name> has joined the match as a
   spectator`, with `Commander` used for empty/control-only names. The queue is keyed by connection
   id and appended after normal live projection in `LiveTickDriver`, then cleared for each recipient
@@ -332,7 +335,8 @@ alive.
 - Replay viewer rooms use `Phase::ReplayViewer`, which owns a lobby-local
   `replay_session::ReplaySession`: the immutable `ReplayArtifactV1`, rebuilt `Game`, command
   cursor, shared playback speed, and per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
-  so viewers see authoritative union-fog or single-player fog, never full-world state.
+  so viewers see authoritative union-fog or single-player fog, selected-player resource rows, and
+  selected-player remembered building memory, never full-world state.
 
 Lobby-owned runtime boundaries stay in `server/src/lobby/`; none of these helpers move transport,
 AI controllers, or Tokio coordination into `rts-sim`. `RoomTask` remains the single Tokio owner of

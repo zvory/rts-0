@@ -1,6 +1,6 @@
 # Phase 4 - Union Vision Semantics
 
-Status: planned.
+Status: done.
 
 ## Goal
 

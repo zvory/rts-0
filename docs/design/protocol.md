@@ -512,10 +512,10 @@ transport decode:
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   abilityObjects?: AbilityObject[], // active ability world objects visible to this recipient; omitted when empty
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
-  rememberedBuildings?: RememberedBuilding[], // recipient-only stale enemy building intel
+  rememberedBuildings?: RememberedBuilding[], // stale enemy building intel for projected players
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
-  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // all players; spectator/replay mode only
+  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // projected players; observer modes only
   netStatus: {                // per-recipient server-side health for the current match
     serverLagMs: u16,         // how late this room started the tick vs its scheduled time
     tickMs: u16,              // elapsed room-tick work so far when this snapshot was built
@@ -531,9 +531,12 @@ transport decode:
 ```
 
 Steel, Oil, and Supply are fixed protocol fields for this faction plan. Normal snapshots,
-spectator/replay `playerResources`, compact `"s"`, compact `"pr"`, start-map resources, score
-values, and observer analysis remain on the current Steel/Oil/Supply schema; faction-specific or
-arbitrary resource vectors are deferred to a separate generic-resource migration.
+observer `playerResources`, compact `"s"`, compact `"pr"`, start-map resources, score values, and
+observer analysis remain on the current Steel/Oil/Supply schema; faction-specific or arbitrary
+resource vectors are deferred to a separate generic-resource migration. Replay, live spectator, and
+lab team/all-team snapshots include `playerResources` rows only for the real player ids selected by
+that view; all-player replay/live-spectator and full-world lab/dev projections therefore expose all
+active player rows, while one-player replay and lab team vision expose only that player/team.
 
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
@@ -601,7 +604,7 @@ adds an explicit application compression envelope.
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
-  "pr": [[id, steel, oil, supplyUsed, supplyCap]], // omitted in normal play; present in spectator/replay
+  "pr": [[id, steel, oil, supplyUsed, supplyCap]], // projected observer playerResources; omitted when empty
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,
         predictionVersion?, lastSimConsumedClientSeq?, lastSimConsumedClientTick?]
 }
@@ -702,7 +705,11 @@ must not make them selectable live entities or issue entity-targeted commands ag
 `footprint` is an array of `[tileX, tileY]` cells from the last visible state. The record
 intentionally omits hidden live HP, current build progress, and destruction state. Artillery
 `pointFire` remains a world-coordinate ability; remembered buildings help the player know where to
-aim but do not become target ids.
+aim but do not become target ids. Union views build remembered buildings from the selected real
+players' memory stores. If more than one selected player has stale memory for the same building id,
+the server sends one record: the newest `observedTick` wins, with selected-player order as the
+deterministic tie-breaker. This avoids adding a memory-source wire field while keeping one-player
+replay vision isolated to that player's memory.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
@@ -803,8 +810,11 @@ only the damaged entity id and do not imply a separate fired shot, muzzle flash,
 reveal, weapon recoil, or attack sound.
 Full-world room projections, including dev watch and full-world lab vision, attach a deterministic
 deduplicated union of the per-player event buckets so transient effects match the exposed world
-state. Normal active-player views keep player-only event delivery, and selected player/team replay
-or lab views union only the selected real-player buckets.
+state. Normal active-player views keep player-only event delivery. Live spectators and selected
+player/team replay or lab views union only the real-player buckets selected by the view. Live
+spectator event unions filter per-player, position-free, non-alert notices such as command
+rejections or economy toasts; room-owned recipient notices, including late-spectator joins, are
+appended separately after projection.
 
 When a normal live match accepts a mid-match spectator attach, the server queues a position-free
 info notice for every already-connected active player and spectator: `<name> has joined the match as
@@ -904,7 +914,8 @@ reliable message.
 The server rejects unknown player ids, empty subsets, and duplicate subset ids. Vision selection is
 not shared between viewers unless a later protocol explicitly adds shared-view control. Replay
 snapshots are spectator-style authoritative fog snapshots from the selected real player ids; the
-default is the union of all replay players.
+default is the union of all replay players. Replay `rememberedBuildings`, `playerResources`, and
+event unions follow the same selected real player ids as the snapshot body.
 
 `LabClientOp` is tagged by `op`:
 ```
@@ -928,7 +939,8 @@ team fog in the same room. `labState.vision` and `start.lab.vision` are stamped 
 Lab snapshot projection keeps snapshot body visibility and transient event visibility aligned but
 separate: full-world lab vision receives the full-world snapshot body plus the union of event
 buckets for all active lab players, while team and teams lab vision receive spectator-style snapshot
-bodies and event unions for only the selected real players.
+bodies, event unions, remembered building memory, and `playerResources` rows for only the selected
+real players.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned. When
 `ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses

@@ -115,6 +115,51 @@ fn normal_live_player_commands_use_connection_authority_and_ack_sequence() {
 }
 
 #[test]
+fn live_spectator_union_filters_owner_private_command_notices() {
+    let mut task = RoomTask::new(
+        "live-spectator-private-notice-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer_a = add_test_room_player(&mut task, 1, true);
+    let mut writer_b = add_test_room_player(&mut task, 2, true);
+    let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+
+    task.start_match();
+    while writer_a.reliable_rx.try_recv().is_ok() {}
+    while writer_b.reliable_rx.try_recv().is_ok() {}
+    while writer_spectator.reliable_rx.try_recv().is_ok() {}
+
+    task.on_command(
+        1,
+        1,
+        SimCommand::Rejected {
+            reason: rts_sim::game::command::CommandRejection::Unit,
+        },
+    );
+    task.on_tick(TokioInstant::now());
+
+    let active_notices = snapshot_notice_events(&mut writer_a);
+    assert!(active_notices
+        .iter()
+        .any(|event| { matches!(event, Event::Notice { msg, .. } if msg == "Unknown unit") }));
+    assert!(
+        snapshot_notice_events(&mut writer_b)
+            .iter()
+            .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "Unknown unit")),
+        "other active players should not receive owner-private command notices"
+    );
+    assert!(
+        snapshot_notice_events(&mut writer_spectator)
+            .iter()
+            .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "Unknown unit")),
+        "normal live spectators should not receive owner-private command notices"
+    );
+}
+
+#[test]
 fn live_pause_authorizes_active_players_and_tracks_limit() {
     let mut task = RoomTask::new(
         "live-pause-authority-test".to_string(),

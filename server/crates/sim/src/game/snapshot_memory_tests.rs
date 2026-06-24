@@ -24,8 +24,41 @@ fn players() -> [PlayerInit; 2] {
     ]
 }
 
+fn three_players() -> [PlayerInit; 3] {
+    [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".to_string(),
+            name: "Two".into(),
+            color: "#bbb".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            faction_id: "kriegsia".to_string(),
+            name: "Three".into(),
+            color: "#000".into(),
+            is_ai: true,
+        },
+    ]
+}
+
 fn empty_flat_game() -> Game {
-    let mut game = Game::new_for_replay(&players(), 0x1234_5678);
+    empty_flat_game_with_players(&players())
+}
+
+fn empty_flat_game_with_players(players: &[PlayerInit]) -> Game {
+    let mut game = Game::new_for_replay(players, 0x1234_5678);
     for tile in &mut game.map.terrain {
         *tile = terrain::GRASS;
     }
@@ -177,6 +210,65 @@ fn remembered_buildings_use_team_visible_observations() {
             .any(|building| building.id == depot),
         "player 1 should receive stale memory from player 2's team-visible observation"
     );
+}
+
+#[test]
+fn spectator_remembered_buildings_follow_selected_player_union() {
+    let mut game = empty_flat_game_with_players(&three_players());
+    let p1_scout_pos = game.map.tile_center(20, 20);
+    let p2_scout_pos = game.map.tile_center(20, 20);
+    let depot_pos = game.map.tile_center(22, 20);
+    let p1_scout = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, p1_scout_pos.0, p1_scout_pos.1)
+        .expect("p1 scout should spawn");
+    let depot = game
+        .entities
+        .spawn_building(3, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
+        .expect("enemy depot should spawn");
+    game.tick();
+
+    game.entities.remove(p1_scout);
+    let p2_scout = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, p2_scout_pos.0, p2_scout_pos.1)
+        .expect("p2 scout should spawn");
+    game.tick();
+
+    game.entities.remove(p2_scout);
+    game.tick();
+
+    let p1_view = game.snapshot_for_spectator(&[1]);
+    let p2_view = game.snapshot_for_spectator(&[2]);
+    let union_view = game.snapshot_for_spectator(&[1, 2]);
+
+    let p1_memory = p1_view
+        .remembered_buildings
+        .iter()
+        .find(|building| building.id == depot)
+        .expect("p1 memory should be projected into p1 replay vision");
+    let p2_memory = p2_view
+        .remembered_buildings
+        .iter()
+        .find(|building| building.id == depot)
+        .expect("p2 memory should be projected into p2 replay vision");
+    assert!(
+        p2_memory.observed_tick > p1_memory.observed_tick,
+        "test setup should create a newer p2 observation"
+    );
+
+    let union_memories = union_view
+        .remembered_buildings
+        .iter()
+        .filter(|building| building.id == depot)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        union_memories.len(),
+        1,
+        "union projection should dedupe same-building memories"
+    );
+    assert_eq!(union_memories[0].observed_tick, p2_memory.observed_tick);
+    assert_eq!(union_memories[0].owner, 3);
 }
 
 #[test]
