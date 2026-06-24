@@ -2,6 +2,7 @@
 // Domain contract assertions imported by ../client_contracts.mjs.
 
 import { assert } from "./assertions.mjs";
+import { ClientIntent } from "../../client/src/client_intent.js";
 import { HUD } from "../../client/src/hud.js";
 import { Input } from "../../client/src/input/index.js";
 import { CameraNavigationInput } from "../../client/src/input/camera_navigation.js";
@@ -539,6 +540,35 @@ import {
   assert(await rawSuccessInput._requestBrowserPointerLock(), "Pointer Lock succeeds with raw input");
   assert(rawSuccessRequests.length === 1, "raw Pointer Lock success does not make a fallback request");
   assert(rawSuccessInput._lastPointerLockRequest.rawInputRequested === true, "raw request is recorded for diagnostics");
+}
+
+{
+  const lockedEscapeInput = Object.create(Input.prototype);
+  let exits = 0;
+  let selectionCleared = 0;
+  lockedEscapeInput.pointerLocked = true;
+  lockedEscapeInput.state = {
+    clearSelection() {
+      selectionCleared += 1;
+    },
+  };
+  lockedEscapeInput.clientIntent = new ClientIntent();
+  lockedEscapeInput.clientIntent.beginCommandTarget("move");
+  lockedEscapeInput.exitPointerLock = () => {
+    exits += 1;
+    return Promise.resolve(true);
+  };
+  const ev = {
+    code: "Escape",
+    preventDefault() {
+      this.prevented = true;
+    },
+  };
+  lockedEscapeInput._handleKeyDown(ev);
+  assert(exits === 0, "Esc does not unlock cursor lock");
+  assert(lockedEscapeInput.clientIntent.commandTarget === null, "Esc still cancels command targeting while cursor-locked");
+  assert(selectionCleared === 0, "cursor-locked targeting cancel does not fall through to selection clear");
+  assert(ev.prevented, "cursor-locked Esc still prevents browser handling after gameplay cancel");
 }
 
 {

@@ -9,12 +9,6 @@ export function _handleKeyDown(ev) {
     this._shiftKeyDown = true;
   }
 
-  if (ev.code === "Escape" && this.pointerLocked) {
-    this.exitPointerLock();
-    ev.preventDefault();
-    return;
-  }
-
   switch (ev.code) {
     case "ArrowUp":
     case "ArrowDown":
@@ -25,6 +19,7 @@ export function _handleKeyDown(ev) {
       ev.preventDefault();
       return;
     case "Escape":
+      // Cursor lock should not steal Esc from the normal gameplay/UI cancel stack.
       this._cancel();
       ev.preventDefault();
       return;

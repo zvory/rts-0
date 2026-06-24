@@ -131,7 +131,7 @@ function renderPointerLockControl(root, pointerLock) {
     button.hidden = !!state.hidden;
     button.disabled = !supported;
     button.setAttribute("aria-checked", String(enabled));
-    button.textContent = locked ? "Cursor locked (Esc)" : "Lock cursor pan";
+    button.textContent = locked ? "Cursor locked" : "Lock cursor pan";
     button.title = supported
       ? "Trap the cursor in the game view for multi-monitor edge panning."
       : "Cursor lock is not supported by this browser.";
