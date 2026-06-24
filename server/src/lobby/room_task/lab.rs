@@ -23,7 +23,7 @@ use super::super::{normalize_start_team_id, PLAYER_PALETTE};
 use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
 use super::types::{LabRoomConfig, LabSeekTarget, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
-use crate::lab_scenarios::load_lab_scenario_by_id;
+use crate::lab_scenarios::{load_lab_scenario_by_id, validate_lab_scenario_authoring};
 use crate::protocol::{
     Command, Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
     LabState, LabVisionMode, RoomTimeState, ServerMessage, TeamId, DEFAULT_FACTION_ID,
@@ -161,6 +161,7 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
     match op {
         LabClientOp::ExportScenario { .. } => "exportScenario",
         LabClientOp::ImportScenario { .. } => "importScenario",
+        LabClientOp::ValidateScenario { .. } => "validateScenario",
         LabClientOp::SpawnEntity { .. } => "spawnEntity",
         LabClientOp::DeleteEntity { .. } => "deleteEntity",
         LabClientOp::MoveEntity { .. } => "moveEntity",
@@ -237,6 +238,7 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
             }))
         }
         LabClientOp::ExportScenario { .. }
+        | LabClientOp::ValidateScenario { .. }
         | LabClientOp::SetVision { .. }
         | LabClientOp::IssueCommandAs { .. } => Err("not a lab mutation".to_string()),
     }
@@ -842,7 +844,9 @@ impl RoomTask {
         }
         if matches!(
             op,
-            LabClientOp::ExportScenario { .. } | LabClientOp::ImportScenario { .. }
+            LabClientOp::ExportScenario { .. }
+                | LabClientOp::ImportScenario { .. }
+                | LabClientOp::ValidateScenario { .. }
         ) && !policy.allows_lab_scenario_io()
         {
             self.send_lab_result_to(
@@ -884,6 +888,9 @@ impl RoomTask {
             }
             LabClientOp::ExportScenario { name } => {
                 self.export_lab_scenario(player_id, request_id, name)
+            }
+            LabClientOp::ValidateScenario { metadata } => {
+                self.validate_lab_scenario(player_id, request_id, metadata)
             }
             LabClientOp::IssueCommandAs {
                 player_id: command_player_id,
@@ -1011,41 +1018,12 @@ impl RoomTask {
         if !self.session_policy().allows_lab_scenario_io() {
             return lab_result_error(request_id, op, "lab scenario export is not enabled");
         }
-        let Some(game) = self.live_game() else {
-            return lab_result_error(request_id, op, "lab game is not running");
-        };
-        let Some(session) = &self.lab_session else {
-            return lab_result_error(request_id, op, "lab session is not running");
-        };
-        let mut scenario = match serde_json::to_value(game.export_lab_scenario()) {
+        let scenario = match self.export_lab_scenario_value(operator_id, name.as_deref()) {
             Ok(value) => value,
             Err(err) => {
-                return lab_result_error(request_id, op, &format!("scenario export failed: {err}"));
+                return lab_result_error(request_id, op, &err);
             }
         };
-        if let Some(object) = scenario.as_object_mut() {
-            let scenario_name = name
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .unwrap_or("Untitled lab scenario");
-            object.insert(
-                "name".to_string(),
-                serde_json::Value::String(truncate_lab_scenario_name(scenario_name)),
-            );
-            if let Some(metadata) = object
-                .get_mut("metadata")
-                .and_then(|value| value.as_object_mut())
-            {
-                metadata.insert(
-                    "lab".to_string(),
-                    serde_json::to_value(LabScenarioLabMetadata {
-                        vision: session.vision_for(operator_id),
-                    })
-                    .unwrap_or_else(|_| serde_json::json!({ "vision": { "mode": "fullWorld" } })),
-                );
-            }
-        }
         LabResult {
             request_id,
             ok: true,
@@ -1053,6 +1031,84 @@ impl RoomTask {
             error: None,
             outcome: Some(serde_json::json!({ "scenario": scenario })),
         }
+    }
+
+    fn validate_lab_scenario(
+        &self,
+        operator_id: u32,
+        request_id: u32,
+        metadata: crate::protocol::LabScenarioAuthoringMetadata,
+    ) -> LabResult {
+        let op = "validateScenario".to_string();
+        if !self.session_policy().allows_lab_scenario_io() {
+            return lab_result_error(request_id, op, "lab scenario validation is not enabled");
+        }
+        let scenario_value = match self.export_lab_scenario_value(operator_id, None) {
+            Ok(value) => value,
+            Err(err) => return lab_result_error(request_id, op, &err),
+        };
+        let scenario = match serde_json::from_value(scenario_value) {
+            Ok(scenario) => scenario,
+            Err(err) => {
+                return lab_result_error(
+                    request_id,
+                    op,
+                    &format!("scenario export did not produce LabScenarioV1: {err}"),
+                );
+            }
+        };
+        let preview = match validate_lab_scenario_authoring(metadata, scenario) {
+            Ok(preview) => preview,
+            Err(err) => return lab_result_error(request_id, op, &err),
+        };
+        LabResult {
+            request_id,
+            ok: true,
+            op,
+            error: None,
+            outcome: Some(serde_json::json!({
+                "summary": preview.summary,
+                "preview": preview,
+            })),
+        }
+    }
+
+    fn export_lab_scenario_value(
+        &self,
+        operator_id: u32,
+        name: Option<&str>,
+    ) -> Result<serde_json::Value, String> {
+        let Some(game) = self.live_game() else {
+            return Err("lab game is not running".to_string());
+        };
+        let Some(session) = &self.lab_session else {
+            return Err("lab session is not running".to_string());
+        };
+        let mut scenario = serde_json::to_value(game.export_lab_scenario())
+            .map_err(|err| format!("scenario export failed: {err}"))?;
+        let Some(object) = scenario.as_object_mut() else {
+            return Err("scenario export did not produce a JSON object".to_string());
+        };
+        if let Some(scenario_name) = name.map(str::trim).filter(|value| !value.is_empty()) {
+            object.insert(
+                "name".to_string(),
+                serde_json::Value::String(truncate_lab_scenario_name(scenario_name)),
+            );
+        }
+        let Some(metadata) = object
+            .get_mut("metadata")
+            .and_then(|value| value.as_object_mut())
+        else {
+            return Err("scenario export did not produce metadata".to_string());
+        };
+        metadata.insert(
+            "lab".to_string(),
+            serde_json::to_value(LabScenarioLabMetadata {
+                vision: session.vision_for(operator_id),
+            })
+            .unwrap_or_else(|_| serde_json::json!({ "vision": { "mode": "fullWorld" } })),
+        );
+        Ok(scenario)
     }
 
     fn apply_lab_mutation(

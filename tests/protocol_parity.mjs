@@ -390,8 +390,21 @@ assert(
   "lab scenario import builder must emit the exact wire shape",
 );
 assert(
+  JSON.stringify(msg.labValidateScenario(16, { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] })) ===
+    JSON.stringify({
+      t: "lab",
+      requestId: 16,
+      op: {
+        op: "validateScenario",
+        metadata: { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] },
+      },
+    }),
+  "lab scenario validation builder must emit the exact wire shape",
+);
+assert(
   rust.includes("ExportScenario") &&
     rust.includes("ImportScenario") &&
+    rust.includes("ValidateScenario") &&
     rust.includes("LabScenarioV1") &&
     rust.includes("set_up") &&
     rust.includes("weapon_facing") &&
@@ -403,7 +416,8 @@ assert(
     protocolDoc.includes("facing") &&
     protocolDoc.includes("weaponFacing") &&
     protocolDoc.includes("setupFacing") &&
-    protocolDoc.includes("setupTarget"),
+    protocolDoc.includes("setupTarget") &&
+    protocolDoc.includes("validateScenario"),
   "lab scenario import/export protocol surface must be documented and mirrored",
 );
 assert(

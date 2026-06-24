@@ -40,6 +40,10 @@ import {
   labSpawnFactionOptions,
   labSpawnUnitKindsForFaction,
 } from "../../client/src/lab_panel.js";
+import {
+  slugifyLabScenario,
+  validateLabScenarioAuthoringState,
+} from "../../client/src/lab_scenario_authoring.js";
 import { LabPanelWindowChrome } from "../../client/src/lab_panel_window.js";
 
 import { textWithin } from "./dom_text.mjs";
@@ -59,6 +63,33 @@ import { textWithin } from "./dom_text.mjs";
   assert(normalized.id === "lategame", "lab catalog entry keeps stable scenario id");
   assert(normalized.playerCount === 2, "lab catalog entry keeps bounded player count metadata");
   assert(!("scenario" in normalized), "lab catalog entry normalization keeps full scenario JSON out of the listing model");
+}
+
+{
+  assert(slugifyLabScenario("Two Player Test!") === "two-player-test", "lab scenario authoring generates stable slugs from titles");
+  const valid = validateLabScenarioAuthoringState({
+    slug: "two-player-test",
+    name: "Two Player Test",
+    title: "Two Player Test",
+    description: "Small deterministic setup.",
+    tags: "two-player, test",
+    reviewNotes: "ready for review",
+  });
+  assert(valid.ok && valid.metadata.tags.length === 2, "lab scenario authoring accepts catalog-ready metadata");
+  const invalid = validateLabScenarioAuthoringState({
+    slug: "bad slug",
+    name: "",
+    title: "Bad",
+    description: "",
+    tags: "bad tag",
+  });
+  assert(
+    !invalid.ok &&
+      invalid.errors.some((error) => error.includes("Slug")) &&
+      invalid.errors.some((error) => error.includes("Name")) &&
+      invalid.errors.some((error) => error.includes("Tag")),
+    "lab scenario authoring reports blocking metadata errors before server validation",
+  );
 }
 
 await withFakeDocument(async () => {
@@ -164,6 +195,19 @@ await withFakeDocument(async () => {
       sent.at(-1).op.scenario.kind === LAB_SCENARIO.KIND &&
       sent.at(-1).op.scenario.entities[0].setupFacing === 0.75,
     "LabClient sends scenario import requests with orientation setup fields",
+  );
+  void labClient.validateScenario({
+    slug: "saved-setup",
+    name: "Saved setup",
+    title: "Saved setup",
+    description: "Ready to review.",
+    tags: ["test"],
+  });
+  assert(
+    sent.at(-1).op.op === "validateScenario" &&
+      sent.at(-1).op.metadata.slug === "saved-setup" &&
+      sent.at(-1).op.metadata.tags[0] === "test",
+    "LabClient sends scenario authoring validation requests with metadata",
   );
   labClient.resetScenario();
   assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabClient resets scenarios by seeking lab room time to tick zero");
@@ -808,6 +852,52 @@ await withFakeDocument(async () => {
     buttonByText("Tank Production")?.dataset.researched === "false" &&
       buttonByText("Tank Production")?.["aria-pressed"] === "false",
     "LabPanel raises research buttons again after clearing completed research",
+  );
+  panel.fields.get("scenario-title").value = "Saved Setup";
+  panel.fields.get("scenario-title").listeners.input();
+  assert(panel.fields.get("scenario-slug").value === "saved-setup", "LabPanel generates an authoring slug from the scenario title");
+  panel.fields.get("scenario-slug").value = "manual_slug";
+  panel.fields.get("scenario-slug").listeners.input();
+  panel.fields.get("scenario-title").value = "Changed Setup";
+  panel.fields.get("scenario-title").listeners.input();
+  assert(panel.fields.get("scenario-slug").value === "manual_slug", "LabPanel preserves manually edited authoring slugs");
+  panel.fields.get("scenario-name").value = "saved setup";
+  panel.fields.get("scenario-title").value = "Saved Setup";
+  panel.fields.get("scenario-slug").value = "saved-setup";
+  panel.fields.get("scenario-description").value = "A repo-ready saved setup.";
+  panel.fields.get("scenario-tags").value = "two-player, test";
+  const validatePromise = buttonByText("Validate scenario").listeners.click();
+  assert(
+    sent.at(-1).op.op === "validateScenario" &&
+      sent.at(-1).op.metadata.slug === "saved-setup" &&
+      sent.at(-1).op.metadata.description === "A repo-ready saved setup." &&
+      sent.at(-1).op.metadata.tags.length === 2,
+    "LabPanel validates authoring metadata through LabClient",
+  );
+  resolveLastLabResult({
+    outcome: {
+      summary: "Scenario ready.",
+      preview: {
+        slug: "saved-setup",
+        scenarioPath: "server/assets/lab-scenarios/saved-setup.json",
+        manifestEntry: { id: "saved-setup", title: "Saved Setup" },
+        scenarioJson: "{\n  \"kind\": \"labScenario\"\n}\n",
+      },
+    },
+  });
+  await validatePromise;
+  assert(
+    panel.fields.get("scenario-json").value.includes("\"kind\": \"labScenario\"") &&
+      textWithin(root).includes("server/assets/lab-scenarios/saved-setup.json"),
+    "LabPanel shows the dry-run scenario JSON and target file preview",
+  );
+  panel.fields.get("scenario-slug").value = "bad slug";
+  const beforeInvalidValidate = sent.length;
+  await buttonByText("Validate scenario").listeners.click();
+  assert(
+    sent.length === beforeInvalidValidate &&
+      textWithin(root).includes("Slug must be"),
+    "LabPanel blocks invalid authoring metadata before sending validation",
   );
   panel.fields.get("scenario-name").value = "saved setup";
   void labClient.exportScenario(panel.value("scenario-name"));
