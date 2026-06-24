@@ -20,7 +20,9 @@ import {
   BREAKTHROUGH_COOLDOWN_TICKS,
   BREAKTHROUGH_DURATION_TICKS,
   BREAKTHROUGH_RADIUS_TILES,
+  BASE_COMMAND_SUPPLY_CAP,
   COMMAND_CAR_BODY,
+  COMMAND_CAR_SUPPLY_CAP_BONUS,
   EKAT_LINE_SHOT_COOLDOWN_TICKS,
   EKAT_LINE_SHOT_DAMAGE,
   EKAT_LINE_SHOT_RANGE_TILES,
@@ -109,6 +111,20 @@ const allRustCatalogs = JSON.parse(execFileSync("cargo", [
   encoding: "utf8",
 }));
 
+const rustCommandBudget = JSON.parse(execFileSync("cargo", [
+  "run",
+  "--manifest-path",
+  "server/Cargo.toml",
+  "-p",
+  "rts-sim",
+  "--bin",
+  "dump-command-budget",
+  "--quiet",
+], {
+  cwd: repoRoot,
+  encoding: "utf8",
+}));
+
 const kindByStableId = new Map(Object.entries(KIND).map(([, value]) => [value, value]));
 const upgradeByStableId = new Map(Object.entries(UPGRADE).map(([, value]) => [value, value]));
 const abilityByStableId = new Map(Object.entries(ABILITY).map(([, value]) => [value, value]));
@@ -170,6 +186,10 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "smokeCloudRadiusTiles",
   "smokeLaunchMaxDelayMs",
   "tickHz",
+]);
+const EXPECTED_COMMAND_BUDGET_KEYS = Object.freeze([
+  "baseCommandSupplyCap",
+  "commandCarSupplyCapBonus",
 ]);
 const EXPECTED_UNIT_STAT_FIELDS = Object.freeze([
   "buildTicks",
@@ -491,6 +511,20 @@ assertClientObjectFields(
   clientConstants,
   rustClientConfig.constants,
   "client config constant mirrors Rust rules",
+);
+
+assertSortedObjectKeys(
+  rustCommandBudget,
+  EXPECTED_COMMAND_BUDGET_KEYS,
+  "sim command-budget dump fields remain explicit",
+);
+assertClientObjectFields(
+  {
+    baseCommandSupplyCap: BASE_COMMAND_SUPPLY_CAP,
+    commandCarSupplyCapBonus: COMMAND_CAR_SUPPLY_CAP_BONUS,
+  },
+  rustCommandBudget,
+  "client command-budget constants mirror sim command admission policy",
 );
 
 assertSortedObjectKeys(

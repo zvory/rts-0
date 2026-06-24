@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
+use crate::command_budget::{BASE_COMMAND_SUPPLY_CAP, COMMAND_CAR_SUPPLY_CAP_BONUS};
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
-use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::command::SimCommand;
+use crate::game::commands::{CommandAdmission, PendingCommand};
 use crate::game::entity::{
     EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, ResearchItem, WeaponSetup,
 };
@@ -35,9 +36,6 @@ use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules;
-
-const BASE_COMMAND_SUPPLY_CAP: u32 = 24;
-const COMMAND_CAR_SUPPLY_CAP_BONUS: u32 = 20;
 /// Max submitted unit ids inspected per multi-unit command. Caps the per-id work a single command
 /// can force, so a repeated/huge id list can't be used to stall the tick loop.
 const MAX_UNITS_PER_COMMAND: usize = 256;

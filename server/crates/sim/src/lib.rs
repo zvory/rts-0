@@ -8,5 +8,6 @@ pub mod game;
 pub mod perf;
 pub mod protocol;
 
+mod command_budget;
 pub(crate) mod config;
 pub(crate) mod rules;
