@@ -2,7 +2,19 @@ import { PLAYABLE_FACTIONS } from "./lobby_view.js";
 import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
 import { factionCatalog, PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
-import { createLabScenarioAuthoringState, LAB_SCENARIO_AUTHORING_LIMITS, labScenarioPreviewLabel, slugifyLabScenario, validateLabScenarioAuthoringState } from "./lab_scenario_authoring.js";
+import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
+import {
+  captureLabScenarioAuthoringFields,
+  createLabScenarioSubmissionState,
+  defaultLabScenarioSubmissionWindow,
+  destroyLabScenarioSubmission,
+  labScenarioSubmissionDisabledReason,
+  renderLabScenarioOptions,
+  setLabScenarioSubmissionCapability,
+  submitLabScenario,
+  updateLabScenarioTitle,
+  validateLabScenario,
+} from "./lab_scenario_submission_flow.js";
 
 const labVision = Object.freeze({
   fullWorld: () => msg.labVisionFullWorld(),
@@ -14,12 +26,22 @@ const OPTIONS_PANEL_STORAGE_KEY = "rts.labPanel.options.window.v1";
 const TOOLS_PANEL_STORAGE_KEY = "rts.labPanel.tools.window.v1";
 
 export class LabPanel {
-  constructor({ root, labClient, launch = null, startPayload = null, match = null }) {
+  constructor({
+    root,
+    labClient,
+    launch = null,
+    startPayload = null,
+    match = null,
+    submissionCapability = null,
+    openWindow = defaultLabScenarioSubmissionWindow,
+  }) {
     this.root = root;
     this.labClient = labClient;
     this.launch = launch;
     this.startPayload = startPayload;
     this.match = match;
+    this.openWindow = openWindow;
+    this.destroyed = false;
     this.state = labClient?.state || startPayload?.lab || null;
     this.lastResult = labClient?.lastResult || null;
     this.targetPlayerId = null;
@@ -40,6 +62,8 @@ export class LabPanel {
     this.authoring = createLabScenarioAuthoringState({ defaultName: this.defaultScenarioName() });
     this.authoringSlugEdited = false;
     this.authoringValidation = { errors: [], preview: null };
+    this.submission = createLabScenarioSubmissionState();
+    this.setSubmissionCapability(submissionCapability);
     this.teamInputs = new Map();
     this.playerButtons = new Map();
     this.spawnPanels = new Map();
@@ -76,7 +100,12 @@ export class LabPanel {
     return el;
   }
 
+  setSubmissionCapability(source) {
+    setLabScenarioSubmissionCapability(this, source);
+  }
+
   render() {
+    if (this.destroyed) return;
     this.removeListeners();
     this.optionsWindowChrome.clearRenderListeners();
     this.toolsWindowChrome.clearRenderListeners();
@@ -232,59 +261,7 @@ export class LabPanel {
   }
 
   renderScenarioOptions() {
-    const limits = LAB_SCENARIO_AUTHORING_LIMITS;
-    const setAuthoring = (key) => (value) => {
-      this.authoring[key] = value;
-    };
-    return this.fieldset("Scenario", [
-      this.inputField("scenario-name", "Name", "text", this.authoring.name, {
-        maxLength: limits.name,
-        onChange: (value) => { this.authoring.name = value; if (!this.authoring.title) this.authoring.title = value; },
-      }),
-      this.inputField("scenario-title", "Title", "text", this.authoring.title, {
-        maxLength: limits.title,
-        onChange: (value) => this.updateScenarioTitle(value),
-      }),
-      this.inputField("scenario-slug", "Slug", "text", this.authoring.slug, {
-        maxLength: limits.slug,
-        onChange: (value) => { this.authoring.slug = value; this.authoringSlugEdited = true; },
-      }),
-      this.inputField("scenario-tags", "Tags", "text", this.authoring.tags, {
-        maxLength: (limits.tag + 1) * limits.tags,
-        onChange: setAuthoring("tags"),
-      }),
-      this.textAreaField("scenario-description", "Description", this.authoring.description, {
-        maxLength: limits.description,
-        rows: 3,
-        wide: true,
-        onChange: setAuthoring("description"),
-      }),
-      this.textAreaField("scenario-review-notes", "Review notes", this.authoring.reviewNotes, {
-        maxLength: limits.reviewNotes,
-        rows: 3,
-        wide: true,
-        onChange: setAuthoring("reviewNotes"),
-      }),
-      this.textAreaField("scenario-json", "JSON", this.authoring.scenarioJson, {
-        rows: 7,
-        wide: true,
-        onChange: setAuthoring("scenarioJson"),
-      }),
-      this.renderAuthoringFeedback(),
-      this.button("Validate scenario", () => this.validateScenario()),
-      this.button("Export JSON", () => this.exportScenario()),
-      this.button("Import JSON", () => this.importScenario()),
-      this.button("Reset scenario", () => this.resetScenario()),
-    ]);
-  }
-
-  renderAuthoringFeedback() {
-    const errors = this.authoringValidation.errors || [];
-    const label = errors.length ? errors.join(" ") : labScenarioPreviewLabel(this.authoringValidation.preview);
-    const node = this.readout(label);
-    node.className = "lab-readout lab-authoring-feedback";
-    node.dataset.state = errors.length ? "error" : (label ? "ok" : "idle");
-    return node;
+    return renderLabScenarioOptions(this);
   }
 
   renderPlayerStatePanel() {
@@ -947,40 +924,23 @@ export class LabPanel {
   }
 
   updateScenarioTitle(value) {
-    this.authoring.title = value;
-    if (!this.authoringSlugEdited) {
-      this.authoring.slug = slugifyLabScenario(value);
-      const slugField = this.fields.get("scenario-slug");
-      if (slugField) slugField.value = this.authoring.slug;
-    }
+    updateLabScenarioTitle(this, value);
   }
 
   captureAuthoringFields() {
-    for (const [key, id] of [["name", "scenario-name"], ["title", "scenario-title"], ["slug", "scenario-slug"], ["tags", "scenario-tags"], ["description", "scenario-description"], ["reviewNotes", "scenario-review-notes"], ["scenarioJson", "scenario-json"]]) {
-      this.authoring[key] = this.value(id);
-    }
+    captureLabScenarioAuthoringFields(this);
   }
 
-  async validateScenario() {
-    this.captureAuthoringFields();
-    const validation = validateLabScenarioAuthoringState(this.authoring);
-    if (!validation.ok) {
-      this.authoringValidation = { errors: validation.errors, preview: null };
-      return this.publishLocalResult("validateScenario", false, validation.errors.join(" "));
-    }
-    this.authoringValidation = { errors: [], preview: null };
-    const result = await this.labClient.validateScenario(validation.metadata);
-    const preview = result?.ok ? (result.outcome?.preview || null) : null;
-    this.authoringValidation = result?.ok
-      ? { errors: [], preview }
-      : { errors: [result?.error || "Scenario validation failed."], preview: null };
-    if (typeof preview?.scenarioJson === "string") {
-      this.authoring.scenarioJson = preview.scenarioJson;
-      const field = this.fields.get("scenario-json");
-      if (field) field.value = preview.scenarioJson;
-    }
-    this.render();
-    return result;
+  submitScenarioDisabledReason() {
+    return labScenarioSubmissionDisabledReason(this);
+  }
+
+  validateScenario() {
+    return validateLabScenario(this);
+  }
+
+  submitScenario() {
+    return submitLabScenario(this);
   }
 
   ignoreCommandLimitsEnabled() {
@@ -1286,6 +1246,8 @@ export class LabPanel {
   }
 
   destroy() {
+    this.destroyed = true;
+    destroyLabScenarioSubmission(this);
     this.match?.cancelLabTool?.("panelDestroy");
     this.unsubscribeState?.();
     this.unsubscribeResult?.();
