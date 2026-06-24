@@ -813,7 +813,7 @@ export class Match {
       this.toast(
         this.desktopCursorAutoLockEnabled
           ? "Cursor locked. Alt-Tab to leave the game."
-          : "Cursor locked. Press Esc to unlock.",
+          : "Cursor locked. Toggle cursor lock in settings to unlock.",
       );
     } else {
       this.scheduleDesktopCursorAutoLock("cursor-unlocked", DESKTOP_CURSOR_AUTOLOCK_FOCUS_DELAY_MS);
