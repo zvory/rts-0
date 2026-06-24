@@ -115,6 +115,10 @@ import { textWithin } from "./dom_text.mjs";
   };
   assert(policy.canControlOwner(2, state), "lab control policy controls a single selected owner");
   assert(!policy.canControlOwner(1, state), "lab control policy rejects non-selected owners");
+  assert(policy.feedbackOwner(state) === 2, "lab control policy exposes the selected feedback owner");
+  assert(policy.feedbackOwnerForSelection(state.selectedEntities()) === 2, "lab control policy resolves feedback owner from a selection read model");
+  assert(policy.isFeedbackOwner(2, state), "lab control policy identifies the feedback owner");
+  assert(!policy.isFeedbackOwner(1, state), "lab control policy does not treat the raw local player id as feedback owner");
   assert(policy.canUseCommandSurface(state), "lab operator can use the command surface");
   const issued = await policy.issueCommand(cmd.move([11], 20, 30), { state });
   assert(
@@ -149,7 +153,12 @@ import { textWithin } from "./dom_text.mjs";
     !createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }).canUseCommandSurface(state),
     "read-only lab viewers cannot use the command surface",
   );
+  assert(
+    createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } }).feedbackOwner(state) === null,
+    "read-only lab viewers do not get a feedback owner",
+  );
   assert(!createDefaultControlPolicy().canUseCommandSurface({ spectator: true }), "default spectators cannot use the command surface");
+  assert(createDefaultControlPolicy().isFeedbackOwner(1, { playerId: 1 }), "default control policy keeps local-player feedback ownership");
   assert(!createDefaultControlPolicy().canIssueAs(1), "default control policy does not issue-as");
 }
 

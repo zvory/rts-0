@@ -1,6 +1,6 @@
 # Phase 1 - Lab Control Feedback
 
-Status: planned.
+Status: done.
 
 ## Goal
 

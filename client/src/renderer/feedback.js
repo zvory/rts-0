@@ -33,6 +33,7 @@ import {
   ZERO_OFFSET,
 } from "./palette.js";
 import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
+import { feedbackOwner, ownOrAllyOwner } from "./feedback_ownership.js";
 import {
   angleDelta,
   clamp01,
@@ -142,6 +143,9 @@ export function _drawCommandFeedback(view) {
 
   const now = performance.now();
   for (const f of view.liveCommandFeedback(now)) {
+    if (f.ownerId != null && typeof view.isFeedbackOwner === "function" && !view.isFeedbackOwner(f.ownerId)) {
+      continue;
+    }
     const age = now - f.createdAt;
     const t = clamp01(age / 650);
     const alpha = (1 - t) * 0.95;
@@ -201,7 +205,7 @@ export function _drawOrderPlan(state) {
   const attackColor = COLORS.selectEnemy;
 
   for (const e of state.selectedEntities()) {
-    if (e.owner !== state.playerId || !isUnit(e.kind)) continue;
+    if (!feedbackOwner(state, e.owner) || !isUnit(e.kind)) continue;
     const markers = Array.isArray(e.orderPlan)
       ? e.orderPlan.filter((m) => Number.isFinite(m?.x) && Number.isFinite(m?.y))
       : [];
@@ -247,7 +251,7 @@ export function _drawDebugPathOverlay(state, entities = null) {
     : state.selectedEntities();
 
   for (const e of candidates) {
-    if (e.owner !== state.playerId || !isUnit(e.kind) || e.state !== STATE.MOVE) continue;
+    if (!feedbackOwner(state, e.owner) || !isUnit(e.kind) || e.state !== STATE.MOVE) continue;
     const debugPath = e.debugPath;
     const waypoints = Array.isArray(debugPath?.waypoints)
       ? debugPath.waypoints.filter((p) => finiteNumber(p?.x) && finiteNumber(p?.y))
@@ -298,7 +302,7 @@ export function _drawAntiTankGunSetupPreview(view) {
     : null;
 
   for (const e of view.selectedEntities()) {
-    if (e.owner !== view.playerId || (e.kind !== KIND.ANTI_TANK_GUN && e.kind !== KIND.ARTILLERY)) continue;
+    if (!feedbackOwner(view, e.owner) || (e.kind !== KIND.ANTI_TANK_GUN && e.kind !== KIND.ARTILLERY)) continue;
     if (e.setupState !== SETUP.DEPLOYED) continue;
     const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
     if (facing == null) continue;
@@ -479,12 +483,6 @@ function breakthroughAuraExpiresIn(entity) {
   return Number.isFinite(ability?.expiresIn) ? ability.expiresIn : 0;
 }
 
-function ownOrAllyOwner(state, owner) {
-  if (typeof state?.isOwnOwner === "function" && state.isOwnOwner(owner)) return true;
-  if (typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner)) return true;
-  return Number(owner) === state?.playerId;
-}
-
 export function _drawAbilityObjects(state) {
   const objects = state?.abilityObjects;
   if (!Array.isArray(objects) || objects.length === 0) {
@@ -617,7 +615,7 @@ export function _drawSelectedMortarRanges(state) {
   const radius = rangeTiles * tileSize;
 
   for (const e of state.selectedEntities()) {
-    if (e.owner !== state.playerId || e.kind !== KIND.MORTAR_TEAM) continue;
+    if (!feedbackOwner(state, e.owner) || e.kind !== KIND.MORTAR_TEAM) continue;
     if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
     g.lineStyle(1.4, 0x6fa3ff, 0.7);
     dashedCircle(g, e.x, e.y, radius, 64);
@@ -1089,7 +1087,7 @@ export function _drawRallyPoints(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   for (const e of state.selectedEntities()) {
-    if (e.owner !== state.playerId) continue;
+    if (!feedbackOwner(state, e.owner)) continue;
     if (!isBuilding(e.kind) || !isProducerBuilding(e.kind)) continue;
     const color = e.optimisticRally ? 0x7ee7ff : COLORS.selectOwn;
     const plan = Array.isArray(e.rallyPlan) && e.rallyPlan.length > 0

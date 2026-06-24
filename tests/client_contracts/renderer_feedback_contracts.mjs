@@ -7,18 +7,27 @@ import {
   ABILITY,
   ABILITY_OBJECT_KIND,
   KIND,
+  LAB_ROLE,
+  ORDER_STAGE,
   SETUP,
+  STATE,
 } from "../../client/src/protocol.js";
+import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { buildRendererFeedbackView } from "../../client/src/renderer/feedback_view_model.js";
+import { _drawSelectionAndHp } from "../../client/src/renderer/entities.js";
 import {
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
   _drawCommandFeedback,
+  _drawDebugPathOverlay,
   _drawMortarImpacts,
   _drawMortarShells,
+  _drawOrderPlan,
   _drawPlacement,
+  _drawRallyPoints,
   _drawResourceMiningPreview,
+  _drawSelectedMortarRanges,
 } from "../../client/src/renderer/feedback.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
@@ -159,6 +168,140 @@ function polygonCenter(points) {
   assert(feedbackGfx.calls.some((call) => call[0] === "lineTo"), "renderer feedback reads resource mining preview through the feedback view");
   assert(feedbackGfx.calls.some((call) => call[0] === "drawPolygon"), "renderer feedback draws live mortar impacts without missing helper references");
   assert(abilityObjectGfx.calls.some((call) => call[0] === "drawCircle"), "renderer feedback reads ability objects through the feedback view");
+}
+
+{
+  const now = performance.now();
+  const selected = [
+    {
+      id: 71,
+      owner: 2,
+      kind: KIND.MORTAR_TEAM,
+      x: 96,
+      y: 96,
+      hp: 70,
+      maxHp: 70,
+      state: STATE.MOVE,
+      orderPlan: [{ kind: ORDER_STAGE.MOVE, x: 140, y: 128 }],
+      debugPath: {
+        waypoints: [{ x: 110, y: 100 }, { x: 128, y: 116 }],
+        goal: { x: 140, y: 128 },
+      },
+    },
+    {
+      id: 72,
+      owner: 2,
+      kind: KIND.ARTILLERY,
+      x: 160,
+      y: 96,
+      hp: 200,
+      maxHp: 200,
+      setupState: SETUP.DEPLOYED,
+      setupFacing: 0,
+    },
+    {
+      id: 73,
+      owner: 2,
+      kind: KIND.BARRACKS,
+      x: 128,
+      y: 160,
+      hp: 500,
+      maxHp: 500,
+      rallyPlan: [{ kind: "move", x: 190, y: 180 }],
+    },
+  ];
+  const feedbackState = {
+    playerId: 1,
+    spectator: true,
+    players: [
+      { id: 1, teamId: 1 },
+      { id: 2, teamId: 2 },
+    ],
+    controlPolicy: createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } }),
+    debugPathOverlaysEnabled: true,
+    showAllDebugPathOverlays: false,
+    selectedEntities() {
+      return selected;
+    },
+    liveSmokeCanisters() { return []; },
+    liveMortarLaunches() { return []; },
+    liveMortarShells() { return []; },
+    liveMortarTargets() { return []; },
+    liveMortarImpacts() { return []; },
+    liveArtilleryTargets() { return []; },
+    liveArtilleryLaunches() { return []; },
+    liveArtilleryImpacts() { return []; },
+    liveMuzzleFlashes() { return []; },
+    isOwnOwner(owner) {
+      return owner === 1;
+    },
+    isAllyOwner() {
+      return false;
+    },
+  };
+  const feedbackView = buildRendererFeedbackView(feedbackState, {
+    selectedEntities: selected,
+    clientIntent: {
+      liveCommandFeedback() {
+        return [
+          { kind: "move", x: 210, y: 220, append: false, createdAt: now - 10, ownerId: 2 },
+          { kind: "move", x: 240, y: 220, append: false, createdAt: now - 10, ownerId: 1 },
+        ];
+      },
+    },
+    now,
+  });
+  assert(feedbackView.issueAsOwnerId === 2, "lab renderer feedback resolves the selected issue-as owner");
+  assert(feedbackView.feedbackOwnerId === 2, "lab renderer feedback resolves the current feedback owner");
+  assert(feedbackView.isFeedbackOwner(2), "lab renderer feedback treats selected P2 as feedback owner");
+  assert(!feedbackView.isFeedbackOwner(1), "lab renderer feedback does not treat raw playerId as feedback owner");
+
+  const commandGfx = new RecordingGraphics();
+  _drawCommandFeedback.call({ _feedbackGfx: commandGfx }, feedbackView);
+  assert(
+    commandGfx.calls.filter((call) => call[0] === "drawCircle").length === 1,
+    "lab command feedback filters markers to the controlled owner",
+  );
+
+  const rangeGfx = new RecordingGraphics();
+  _drawSelectedMortarRanges.call({ _feedbackGfx: rangeGfx, _map: { tileSize: 32 } }, feedbackView);
+  assert(rangeGfx.calls.some((call) => call[0] === "lineTo"), "lab P2 mortar selection draws range rings");
+
+  const setupGfx = new RecordingGraphics();
+  _drawAntiTankGunSetupPreview.call({ _feedbackGfx: setupGfx, _map: { tileSize: 32 } }, feedbackView);
+  assert(setupGfx.calls.some((call) => call[0] === "arc"), "lab P2 support weapons draw setup wedges");
+
+  const orderGfx = new RecordingGraphics();
+  _drawOrderPlan.call({ _feedbackGfx: orderGfx }, feedbackView);
+  assert(orderGfx.calls.some((call) => call[0] === "lineTo"), "lab P2 selected units draw accepted order plans");
+
+  const debugGfx = new RecordingGraphics();
+  _drawDebugPathOverlay.call({ _feedbackGfx: debugGfx }, feedbackView);
+  assert(debugGfx.calls.some((call) => call[0] === "drawCircle"), "lab P2 selected units draw debug path overlays");
+
+  const rallyGfx = new RecordingGraphics();
+  _drawRallyPoints.call({ _feedbackGfx: rallyGfx }, feedbackView);
+  assert(rallyGfx.calls.some((call) => call[0] === "drawPolygon"), "lab P2 selected producers draw rally lines");
+
+  const ringGfx = new RecordingGraphics();
+  _drawSelectionAndHp.call(
+    {
+      _slot() {
+        return ringGfx;
+      },
+      _ringRadius() {
+        return { rx: 12, ry: 8, cy: 0 };
+      },
+      _hpBar() {},
+    },
+    selected[0],
+    new Set([selected[0].id]),
+    feedbackState,
+  );
+  assert(
+    ringGfx.calls.some((call) => call[0] === "lineStyle" && call[2] === COLORS.selectOwn),
+    "lab P2 selected entities use own selection-ring color",
+  );
 }
 
 {

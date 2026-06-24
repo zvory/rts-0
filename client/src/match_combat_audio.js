@@ -78,7 +78,7 @@ export class MatchCombatAudio {
     }
     const id = this.audio.pickVariant(spec.ids);
     if (!id) return;
-    const category = from && from.owner === this.state.playerId ? "combat_self" : "combat_other";
+    const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
     const key =
       kind === KIND.MACHINE_GUNNER && typeof ev.from === "number"
         ? machineGunSoundKey(ev.from)
@@ -107,7 +107,7 @@ export class MatchCombatAudio {
     }
     if (!pos) return;
     const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
-    const category = from && from.owner === this.state.playerId ? "combat_self" : "combat_other";
+    const category = from && audioSelfOwner(this.state, from.owner) ? "combat_self" : "combat_other";
     this.audio.play(spec.id, {
       x: pos.x,
       y: pos.y,
@@ -136,4 +136,18 @@ export class MatchCombatAudio {
     }
     this.activeMachineGunSoundKeys.clear();
   }
+}
+
+function audioSelfOwner(state, owner) {
+  if (state?.controlPolicy?.kind === "lab") {
+    const feedbackOwner = typeof state.controlPolicy.feedbackOwner === "function"
+      ? state.controlPolicy.feedbackOwner(state)
+      : typeof state.controlPolicy.issueAsOwnerForSelection === "function"
+        ? state.controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
+        : null;
+    const ownerId = Number(feedbackOwner);
+    if (Number.isInteger(ownerId) && ownerId > 0) return Number(owner) === ownerId;
+  }
+  if (typeof state?.isOwnOwner === "function") return state.isOwnOwner(owner);
+  return Number(owner) === state?.playerId;
 }

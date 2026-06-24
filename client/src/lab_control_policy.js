@@ -46,6 +46,17 @@ export function createLabControlPolicy({ labClient = null, metadata = null } = {
       const owners = policy.selectedOwners(selection);
       return owners.length === 1 ? owners[0] : null;
     },
+    feedbackOwnerForSelection(selection) {
+      const owner = policy.issueAsOwnerForSelection(selection);
+      return policy.canIssueAs(owner) ? owner : null;
+    },
+    feedbackOwner(state = null) {
+      return policy.feedbackOwnerForSelection(selectedEntitiesForPolicy(state));
+    },
+    isFeedbackOwner(owner, state = null) {
+      const feedbackOwner = policy.feedbackOwner(state);
+      return feedbackOwner != null && Number(owner) === feedbackOwner;
+    },
     canControlOwner(owner, state = null) {
       const ownerId = Number(owner);
       if (!Number.isInteger(ownerId) || ownerId === 0) return false;
@@ -142,6 +153,17 @@ export function createDefaultControlPolicy() {
     issueAsOwnerForSelection() {
       return null;
     },
+    feedbackOwnerForSelection(_selection, state = null) {
+      return defaultFeedbackOwner(state);
+    },
+    feedbackOwner(state = null) {
+      return defaultFeedbackOwner(state);
+    },
+    isFeedbackOwner(owner, state = null) {
+      return typeof state?.isOwnOwner === "function"
+        ? state.isOwnOwner(owner)
+        : Number(owner) === defaultFeedbackOwner(state);
+    },
     ignoreCommandLimitsEnabled() {
       return false;
     },
@@ -159,4 +181,13 @@ export function createDefaultControlPolicy() {
     },
     destroy() {},
   };
+}
+
+function selectedEntitiesForPolicy(state) {
+  return typeof state?.selectedEntities === "function" ? state.selectedEntities() : [];
+}
+
+function defaultFeedbackOwner(state) {
+  const owner = Number(state?.playerId);
+  return Number.isInteger(owner) && owner > 0 ? owner : null;
 }
