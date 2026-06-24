@@ -59,6 +59,7 @@ src/
   lab_catalog.js # LabCatalogScreen: app-owned `/lab` scenario/blank selector
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_scenario_authoring.js # pure lab scenario metadata defaults, slugging, and local validation
+  lab_scenario_submission_flow.js # LabPanel scenario validation/submission orchestration
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
   lab_control_policy.js # Lab control collaborator placeholder injected into Match
@@ -415,6 +416,7 @@ export class LabClient {
   setVision(vision)                      // sends {op:"setVision", vision} for this operator only
   setPlayerGodMode(playerId, enabled)    // sends {op:"setPlayerGodMode", playerId, enabled}
   validateScenario(metadata)             // sends {op:"validateScenario", metadata}
+  submitScenario(metadata, options?)      // sends {op:"submitScenario", metadata}
   resetScenario()                        // seeks lab room time to the current scenario baseline
   request(op, options?)                  // allocates requestId, resolves with labResult/timeout
   destroy()
@@ -452,6 +454,23 @@ authoring field values, slug generation, client-side metadata limits that mirror
 limits, comma-separated tag parsing, and local blocking errors before the panel sends a server
 dry-run validation request.
 
+`lab_scenario_submission_flow.js`
+```js
+export function createLabScenarioSubmissionState()
+export function defaultLabScenarioSubmissionWindow(url)
+export function setLabScenarioSubmissionCapability(panel, source)
+export function updateLabScenarioTitle(panel, value)
+export function captureLabScenarioAuthoringFields(panel)
+export function renderLabScenarioOptions(panel)
+export function labScenarioSubmissionDisabledReason(panel)
+export function validateLabScenario(panel)
+export function submitLabScenario(panel)
+export function destroyLabScenarioSubmission(panel)
+```
+`lab_scenario_submission_flow.js` is the LabPanel-owned UI helper for scenario dry-run validation,
+submission capability normalization, duplicate-click guarding, draft PR progress/result rendering,
+and teardown of pending submission state.
+
 `lab_panel.js`
 ```js
 export function labSpawnFactionOptions()
@@ -459,19 +478,22 @@ export function labSpawnUnitKindsForFaction(factionId)
 export function labBuildingSpawnFactionOptions()
 export function labSpawnBuildingKindsForFaction(factionId)
 export class LabPanel {
-  constructor({ root, labClient, launch, startPayload, match? })
+  constructor({ root, labClient, launch, startPayload, match?, submissionCapability?, openWindow? })
   applyLabToolChange(change)             // syncs active/cancelled tool status from Match callbacks
   armSpawnPaletteTool(kind?)             // arms a Match-owned completed spawnEntity world-click tool
   armBuildingSpawnPaletteTool(kind?)     // arms a Match-owned completed building spawnEntity tool
   cancelActiveTool()
-  validateScenario(), exportScenario(), importScenario()
+  validateScenario(), submitScenario(), exportScenario(), importScenario()
   destroy()
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
-status, lab vision, command-limit policy, scenario authoring metadata, validation, import/export/reset,
-and result status; Tools owns target player, player state, spawn palettes, active tool status, and
-the remove setup tool.
+status, lab vision, command-limit policy, scenario authoring metadata, validation, PR submission,
+import/export/reset, and result status; Tools owns target player, player state, spawn palettes,
+active tool status, and the remove setup tool. App passes the HTTP
+`/api/lab-scenarios/submission` capability probe into the panel; unavailable deployments keep the
+submit action disabled and leave local JSON export visible. Successful submissions open the draft PR
+when allowed and always render the PR URL in-panel so popup blocking does not hide the review link.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.
@@ -1164,7 +1186,7 @@ Current areas:
   `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, lab scenario authoring helper, settings. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
+  staging, lab panel, lab scenario authoring/submission helpers, settings. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
   in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
   Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match

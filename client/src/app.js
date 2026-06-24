@@ -52,6 +52,7 @@ import { buildSettingsTabs } from "./settings_panels.js";
  * so we ping well inside that window to keep a healthy connection alive.
  */
 const HEARTBEAT_MS = 15000;
+const LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH = "/api/lab-scenarios/submission";
 
 export function isLivePlayerMatch(match) {
   return !!match &&
@@ -362,9 +363,31 @@ export class App {
         launch: this.labLaunch,
         startPayload: payload,
         match: this.match,
+        submissionCapability: this.fetchLabScenarioSubmissionCapability(),
+        openWindow: (url) => window.open(url, "_blank", "noopener,noreferrer"),
       });
     }
     diagnostics.mark("app.onStart.end");
+  }
+
+  async fetchLabScenarioSubmissionCapability() {
+    try {
+      const response = await fetch(LAB_SCENARIO_SUBMISSION_CAPABILITY_PATH, { cache: "no-store" });
+      if (!response.ok) {
+        return {
+          available: false,
+          unavailableCode: "capabilityCheckFailed",
+          unavailableReason: `Scenario PR submission capability check failed (${response.status}).`,
+        };
+      }
+      return await response.json();
+    } catch (err) {
+      return {
+        available: false,
+        unavailableCode: "capabilityCheckFailed",
+        unavailableReason: `Scenario PR submission capability check failed: ${err?.message || err}`,
+      };
+    }
   }
 
   onBranchFromTickCreated(m) {

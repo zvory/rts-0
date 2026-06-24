@@ -209,6 +209,18 @@ await withFakeDocument(async () => {
       sent.at(-1).op.metadata.tags[0] === "test",
     "LabClient sends scenario authoring validation requests with metadata",
   );
+  void labClient.submitScenario({
+    slug: "saved-setup",
+    name: "Saved setup",
+    title: "Saved setup",
+    description: "Ready to review.",
+    tags: ["test"],
+  }, { timeoutMs: 25000 });
+  assert(
+    sent.at(-1).op.op === "submitScenario" &&
+      sent.at(-1).op.metadata.slug === "saved-setup",
+    "LabClient sends scenario authoring submission requests with metadata",
+  );
   labClient.resetScenario();
   assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabClient resets scenarios by seeking lab room time to tick zero");
   assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
@@ -342,6 +354,53 @@ await withFakeDocument(async () => {
 }
 
 await withFakeDocument(async () => {
+  const net = new Net("ws://example.test/ws");
+  const labClient = new LabClient(net);
+  labClient.setInitialState({
+    room: "__lab__:sandbox:map=Default",
+    operatorId: 1,
+    role: LAB_ROLE.OPERATOR,
+    vision: labVision.fullWorld(),
+    dirty: false,
+    operationCount: 0,
+  });
+  const root = document.createElement("div");
+  const panel = new LabPanel({
+    root,
+    labClient,
+    startPayload: {
+      map: { name: "Default" },
+      players: [{ id: 1, teamId: 1, color: "#2255aa" }],
+    },
+    match: {
+      state: {
+        map: { width: 64, height: 64 },
+        playerResources: [],
+        selectedEntities() {
+          return [];
+        },
+      },
+      clientIntent: new ClientIntent(),
+    },
+    submissionCapability: {
+      available: false,
+      unavailableReason: "Scenario PR submission is disabled.",
+    },
+  });
+  const submitButton = findFakes(root, (el) => (
+    el.tagName === "BUTTON" && el.textContent === "Submit scenario PR"
+  ))[0];
+  assert(submitButton.disabled, "LabPanel disables scenario PR submission when the backend is unavailable");
+  assert(
+    textWithin(root).includes("Scenario PR submission disabled") &&
+      textWithin(root).includes("Export JSON remains available"),
+    "LabPanel explains disabled submission and keeps local JSON fallback visible",
+  );
+  panel.destroy();
+  labClient.destroy();
+});
+
+await withFakeDocument(async () => {
   const buildLabClient = (role) => {
     const net = new Net("ws://example.test/ws");
     const labClient = new LabClient(net);
@@ -438,6 +497,7 @@ await withFakeDocument(async () => {
   let selectedEntities = [];
   let ignoreCommandLimits = true;
   let panel = null;
+  const openedPrUrls = [];
   const match = {
     clientIntent: new ClientIntent(),
     camera: { x: 320, y: 352 },
@@ -506,6 +566,13 @@ await withFakeDocument(async () => {
       ],
     },
     match,
+    submissionCapability: {
+      available: true,
+      branchPrefix: "zvorygin/lab-scenario-",
+      scenarioPathPrefix: "server/assets/lab-scenarios/",
+      manifestPath: "server/assets/lab-scenarios/manifest.json",
+    },
+    openWindow: (url) => openedPrUrls.push(url),
   });
   const buttonByText = (label) => findFakes(root, (el) => el.tagName === "BUTTON" && el.textContent === label)[0];
   const playerButtonById = (id) => findFakes(root, (el) => (
@@ -899,6 +966,98 @@ await withFakeDocument(async () => {
       textWithin(root).includes("Slug must be"),
     "LabPanel blocks invalid authoring metadata before sending validation",
   );
+  const beforeInvalidSubmit = sent.length;
+  await buttonByText("Submit scenario PR").listeners.click();
+  assert(
+    sent.length === beforeInvalidSubmit &&
+      textWithin(root).includes("Slug must be"),
+    "LabPanel blocks invalid authoring metadata before sending scenario PR submissions",
+  );
+  panel.fields.get("scenario-name").value = "submitted setup";
+  panel.fields.get("scenario-title").value = "Submitted Setup";
+  panel.fields.get("scenario-slug").value = "submitted-setup";
+  panel.fields.get("scenario-description").value = "A repo-ready submitted setup.";
+  panel.fields.get("scenario-tags").value = "two-player, submit";
+  const submitPromise = buttonByText("Submit scenario PR").listeners.click();
+  assert(
+    sent.at(-1).op.op === "validateScenario" &&
+      sent.at(-1).op.metadata.slug === "submitted-setup",
+    "LabPanel validates authoritative lab state before submitting a scenario PR",
+  );
+  assert(buttonByText("Submit scenario PR").disabled, "LabPanel disables duplicate scenario PR clicks while validation is pending");
+  const pendingRequestCount = sent.length;
+  void buttonByText("Submit scenario PR").listeners.click();
+  assert(sent.length === pendingRequestCount, "LabPanel ignores duplicate scenario PR clicks while a submission is pending");
+  resolveLastLabResult({
+    outcome: {
+      summary: "Scenario ready.",
+      preview: {
+        slug: "submitted-setup",
+        scenarioPath: "server/assets/lab-scenarios/submitted-setup.json",
+        manifestEntry: { id: "submitted-setup", title: "Submitted Setup" },
+        scenarioJson: "{\n  \"kind\": \"labScenario\"\n}\n",
+      },
+    },
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert(
+    sent.at(-1).op.op === "submitScenario" &&
+      sent.at(-1).op.metadata.slug === "submitted-setup",
+    "LabPanel submits catalog-ready metadata through the lab submission contract",
+  );
+  assert(
+    buttonByText("Submit scenario PR").disabled &&
+      textWithin(root).includes("Submitting draft PR"),
+    "LabPanel keeps the submit action disabled while the draft PR job is pending",
+  );
+  resolveLastLabResult({
+    outcome: {
+      status: "submitted",
+      prUrl: "https://github.com/example/rts/pull/17",
+      branchName: "zvorygin/lab-scenario-submitted-setup",
+      scenarioPath: "server/assets/lab-scenarios/submitted-setup.json",
+      manifestPath: "server/assets/lab-scenarios/manifest.json",
+    },
+  });
+  await submitPromise;
+  assert(
+    openedPrUrls[0] === "https://github.com/example/rts/pull/17" &&
+      textWithin(root).includes("https://github.com/example/rts/pull/17") &&
+      panel.fields.get("scenario-pr-link").value === "https://github.com/example/rts/pull/17",
+    "LabPanel opens and renders a copyable draft PR link after successful submission",
+  );
+  panel.fields.get("scenario-name").value = "failed setup";
+  panel.fields.get("scenario-title").value = "Failed Setup";
+  panel.fields.get("scenario-slug").value = "failed-setup";
+  panel.fields.get("scenario-description").value = "A setup that will fail submission.";
+  panel.fields.get("scenario-tags").value = "failure";
+  const failurePromise = buttonByText("Submit scenario PR").listeners.click();
+  assert(sent.at(-1).op.op === "validateScenario", "LabPanel revalidates before a later submission attempt");
+  resolveLastLabResult({
+    outcome: {
+      summary: "Scenario ready.",
+      preview: {
+        slug: "failed-setup",
+        scenarioPath: "server/assets/lab-scenarios/failed-setup.json",
+        manifestEntry: { id: "failed-setup", title: "Failed Setup" },
+        scenarioJson: "{\n  \"kind\": \"labScenario\"\n}\n",
+      },
+    },
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  resolveLastLabResult({
+    ok: false,
+    error: "GitHub refused the draft PR.",
+    outcome: { code: "githubApiError" },
+  });
+  await failurePromise;
+  assert(
+    textWithin(root).includes("[githubApiError] GitHub refused the draft PR.") &&
+      textWithin(root).includes("Export JSON remains available"),
+    "LabPanel shows structured submission failures and preserves the JSON fallback",
+  );
   panel.fields.get("scenario-name").value = "saved setup";
   void labClient.exportScenario(panel.value("scenario-name"));
   assert(sent.at(-1).op.op === "exportScenario" && sent.at(-1).op.name === "saved setup", "LabPanel scenario name feeds export requests");
@@ -913,8 +1072,16 @@ await withFakeDocument(async () => {
   buttonByText("Reset scenario").listeners.click();
   assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabPanel reset scenario seeks the lab timeline to the scenario start");
   assert(textWithin(root).includes("Scenario reset requested."), "LabPanel surfaces reset scenario requests locally");
+  panel.fields.get("scenario-name").value = "teardown setup";
+  panel.fields.get("scenario-title").value = "Teardown Setup";
+  panel.fields.get("scenario-slug").value = "teardown-setup";
+  panel.fields.get("scenario-description").value = "A setup used to test teardown.";
+  panel.fields.get("scenario-tags").value = "teardown";
+  const teardownSubmitPromise = buttonByText("Submit scenario PR").listeners.click();
+  assert(sent.at(-1).op.op === "validateScenario", "LabPanel can have a submission request in flight during teardown");
   panel.destroy();
   labClient.destroy();
+  await teardownSubmitPromise;
   assert(cancelledToolReason === "panelDestroy", "LabPanel cancels an active lab tool on teardown");
   assert(root.children.every((child) => child.removed === true), "LabPanel destroy removes both DOM roots");
 });

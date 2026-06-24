@@ -16,8 +16,10 @@ export class LabClient {
     this.resultSubscribers = new Set();
     this.onState = this.onState.bind(this);
     this.onResult = this.onResult.bind(this);
+    this.onClose = this.onClose.bind(this);
     this.net.on(S.LAB_STATE, this.onState);
     this.net.on(S.LAB_RESULT, this.onResult);
+    this.net.on("close", this.onClose);
   }
 
   subscribeState(handler) {
@@ -53,6 +55,10 @@ export class LabClient {
 
   validateScenario(metadata) {
     return this.request({ op: "validateScenario", metadata });
+  }
+
+  submitScenario(metadata, options = {}) {
+    return this.request({ op: "submitScenario", metadata }, options);
   }
 
   resetScenario() {
@@ -104,18 +110,9 @@ export class LabClient {
 
     return new Promise((resolve) => {
       const timeout = this.timers.setTimeout?.(() => {
-        if (!this.pending.has(requestId)) return;
-        this.pending.delete(requestId);
-        const result = {
-          requestId,
-          ok: false,
-          op: opName,
-          error: "Lab request timed out.",
-        };
-        this.onResult({ t: S.LAB_RESULT, ...result });
-        resolve(result);
+        this.completeLocalRequest(requestId, opName, "Lab request timed out.");
       }, timeoutMs);
-      this.pending.set(requestId, { resolve, timeout });
+      this.pending.set(requestId, { resolve, timeout, opName });
     });
   }
 
@@ -158,9 +155,31 @@ export class LabClient {
     pending?.resolve(this.lastResult);
   }
 
+  onClose() {
+    for (const [requestId, pending] of Array.from(this.pending.entries())) {
+      this.completeLocalRequest(
+        requestId,
+        pending.opName || "",
+        "Lab request could not complete; the socket disconnected.",
+      );
+    }
+  }
+
+  completeLocalRequest(requestId, opName, error) {
+    if (!this.pending.has(requestId)) return;
+    this.onResult({
+      t: S.LAB_RESULT,
+      requestId,
+      ok: false,
+      op: opName,
+      error,
+    });
+  }
+
   destroy() {
     this.net.off(S.LAB_STATE, this.onState);
     this.net.off(S.LAB_RESULT, this.onResult);
+    this.net.off("close", this.onClose);
     for (const [requestId, pending] of this.pending) {
       if (pending.timeout != null) this.timers.clearTimeout?.(pending.timeout);
       pending.resolve({
