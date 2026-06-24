@@ -57,10 +57,15 @@ The server treats every client as potentially hostile. Limits live next to the c
   validated authoring metadata, and write only `server/assets/lab-scenarios/<slug>.json` plus
   `server/assets/lab-scenarios/manifest.json` through a background job. The client never supplies
   credentials, repository paths, branch names, commit text, or scenario snapshots as authority.
-  Duplicate catalog ids/filenames, path traversal, unsafe branch prefixes, branch collisions,
-  missing credentials, and GitHub failures return structured errors; each lab room can start at
-  most one PR submission job. Live submission currently shells out to `git` and GitHub CLI (`gh`)
-  on the server host; missing tools fail the job instead of falling back to browser credentials.
+  Catalog manifests are capped, scenario filenames must match their safe ids, authoring previews are
+  capped by entity count and formatted JSON bytes, and PR requests must contain exactly one scenario
+  JSON plus the manifest. Duplicate catalog ids/filenames, path traversal, unsafe branch prefixes,
+  branch collisions, missing credentials, rate limits, and GitHub failures return structured errors;
+  each lab room can start at most one PR submission job. Operators enable the service with
+  `RTS_SCENARIO_PR_ENABLED=1`, `RTS_SCENARIO_PR_GITHUB_TOKEN`, `RTS_SCENARIO_PR_REPO`, optional
+  `RTS_SCENARIO_PR_BASE_BRANCH`, and optional `RTS_SCENARIO_PR_BRANCH_PREFIX`. Live submission
+  currently shells out to `git` and GitHub CLI (`gh`) on the server host; missing tools fail the job
+  instead of falling back to browser credentials.
 - **Deploy drain**: SIGTERM/Ctrl-C starts a server drain instead of immediately shutting down.
   The lobby flips into a draining state, existing room tasks continue ticking active normal
   matches, and new match starts are rejected while lobby clients see `can_start: false`. The

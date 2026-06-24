@@ -1011,9 +1011,10 @@ player/team/resource/research/entity fields, restores through the public lab `Ga
 scenario vision to the requester and future join default without overwriting already connected
 collaborators, and returns an entity id remap in `outcome.entityIdMap`.
 `validateScenario` exports the current authoritative lab `Game`, applies authoring metadata, pretty
-formats the scenario JSON, checks duplicate catalog ids/filenames and manifest limits, validates map
-metadata, and restores through the same lab `Game` API without mutating the room or creating any Git
-branch. `LabScenarioAuthoringMetadata` is:
+formats the scenario JSON, checks duplicate catalog ids/filenames, id-matched filenames, manifest
+limits, scenario entity count, and scenario JSON byte limits, validates map metadata, and restores
+through the same lab `Game` API without mutating the room or creating any Git branch.
+`LabScenarioAuthoringMetadata` is:
 ```
 {
   slug: string,        // future catalog id and filename stem, max 48 catalog-safe bytes
@@ -1035,7 +1036,9 @@ final async `labResult` for the request: success has
 `outcome.code` using one of `credentialsMissing`, `configurationError`, `validationFailure`,
 `duplicateSlug`, `branchCollision`, `githubApiError`, `rateLimit`, or `ioError`. Each lab room can
 start at most one PR submission job so a bad client cannot spam repository writes; failed
-credential/capability checks happen before a job is counted.
+credential/capability checks happen before a job is counted. Generated draft PR bodies include
+scenario metadata, validation summary, author notes, and a reviewer checklist for scenario name,
+map, player/faction setup, entity count, intended use, and manual lab smoke after merge.
 `facing` serializes unit body orientation, and `weaponFacing` serializes stable combat
 weapon/turret orientation for entities with combat state. `setUp` serializes only stable deployed
 support-weapon state for machine gunners, anti-tank guns, mortar teams, and artillery; omitted

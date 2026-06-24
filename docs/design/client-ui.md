@@ -494,6 +494,13 @@ active tool status, and the remove setup tool. App passes the HTTP
 `/api/lab-scenarios/submission` capability probe into the panel; unavailable deployments keep the
 submit action disabled and leave local JSON export visible. Successful submissions open the draft PR
 when allowed and always render the PR URL in-panel so popup blocking does not hide the review link.
+The supported author workflow starts at `/lab`: choose a bundled catalog scenario or blank setup,
+edit authoritative state with lab tools, fill in scenario name/title/slug/description/tags/review
+notes, run validation, then submit a draft PR when the backend capability is available. After human
+review and merge, the merged scenario becomes selectable from the catalog on the next deployed build
+or local server restart that includes the new manifest entry. The browser never supplies scenario
+JSON, target paths, branch names, credentials, or commit text for PR submission; local JSON
+export/import remains the fallback for iteration and for deployments with submission disabled.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.

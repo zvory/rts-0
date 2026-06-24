@@ -5,6 +5,7 @@
 //! hands a validated preview here. The service is disabled unless explicitly configured with
 //! server-side credentials.
 
+use std::collections::HashSet;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -520,6 +521,7 @@ fn scenario_pr_body(
     artifacts: &LabScenarioSubmissionArtifacts,
     config: &LabScenarioSubmissionConfig,
 ) -> String {
+    let entity_count = scenario_entity_count(preview);
     let tags = if preview.manifest_entry.tags.is_empty() {
         "(none)".to_string()
     } else {
@@ -540,13 +542,14 @@ fn scenario_pr_body(
 - Tags: {}
 - Map: {}
 - Players: {}
+- Entities: {}
 - Scenario path: `{}`
 - Manifest path: `{}`
 - Base branch: `{}`
 
 ## Validation
 
-Server validation exported the current authoritative lab game, applied authoring metadata, formatted deterministic JSON, checked catalog duplicate/path limits, verified bundled map metadata, and restored the scenario through the lab `Game` API.
+Server validation exported the current authoritative lab game, applied authoring metadata, formatted deterministic JSON, checked catalog duplicate/path/size/entity limits, verified bundled map metadata, and restored the scenario through the lab `Game` API.
 
 ## Author Notes
 
@@ -554,8 +557,13 @@ Server validation exported the current authoritative lab game, applied authoring
 
 ## Manual Review Checklist
 
+- Confirm the scenario name, catalog title, and description are review-ready.
+- Confirm the map is the intended bundled map.
+- Confirm player/faction setup, teams, resources, and completed research are correct.
+- Confirm entity count ({}) and entity placement match the author intent.
+- Confirm the intended use is clear from the description or author notes.
 - Confirm the scenario loads from the lab catalog after merge.
-- Confirm player starts, resources, tech, and entity placement match the author intent.
+- Run manual lab smoke from `/lab`: launch the scenario, inspect setup, validate controls, and export JSON if needed.
 - Let normal CI and human scenario review pass before merge.
 ",
         preview.slug,
@@ -564,24 +572,32 @@ Server validation exported the current authoritative lab game, applied authoring
         tags,
         preview.manifest_entry.map,
         preview.manifest_entry.player_count,
+        entity_count,
         artifacts.scenario_path,
         artifacts.manifest_path,
         config.base_branch,
-        notes
+        notes,
+        entity_count
     )
+}
+
+fn scenario_entity_count(preview: &LabScenarioAuthoringPreview) -> String {
+    serde_json::from_str::<serde_json::Value>(&preview.scenario_json)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("entities")
+                .and_then(serde_json::Value::as_array)
+                .map(Vec::len)
+        })
+        .map(|count| count.to_string())
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 async fn create_draft_pr_with_git_and_gh(
     request: LabScenarioPrRequest,
 ) -> Result<LabScenarioSubmissionSuccess, LabScenarioSubmissionError> {
-    for file in &request.files {
-        if !allowed_submission_path(&file.path) {
-            return Err(LabScenarioSubmissionError::validation(format!(
-                "refusing to write non-allowlisted path {:?}",
-                file.path
-            )));
-        }
-    }
+    validate_pr_request_files(&request.files)?;
 
     let repo_url = format!("https://github.com/{}.git", request.repo);
     if remote_branch_exists(&repo_url, &request.branch_name, &request.token).await? {
@@ -714,6 +730,46 @@ async fn create_draft_pr_with_git_and_gh(
         scenario_path,
         manifest_path: LAB_SCENARIO_SUBMISSION_MANIFEST_PATH.to_string(),
     })
+}
+
+fn validate_pr_request_files(
+    files: &[LabScenarioPrFile],
+) -> Result<(), LabScenarioSubmissionError> {
+    if files.len() != 2 {
+        return Err(LabScenarioSubmissionError::validation(
+            "scenario PR requests must write exactly one scenario file and the manifest",
+        ));
+    }
+
+    let mut seen = HashSet::new();
+    let mut scenario_files = 0;
+    let mut manifest_files = 0;
+    for file in files {
+        if !allowed_submission_path(&file.path) {
+            return Err(LabScenarioSubmissionError::validation(format!(
+                "refusing to write non-allowlisted path {:?}",
+                file.path
+            )));
+        }
+        if !seen.insert(file.path.as_str()) {
+            return Err(LabScenarioSubmissionError::validation(format!(
+                "duplicate scenario PR file path {:?}",
+                file.path
+            )));
+        }
+        if file.path == LAB_SCENARIO_SUBMISSION_MANIFEST_PATH {
+            manifest_files += 1;
+        } else {
+            scenario_files += 1;
+        }
+    }
+
+    if scenario_files != 1 || manifest_files != 1 {
+        return Err(LabScenarioSubmissionError::validation(
+            "scenario PR requests must include one scenario JSON file and one manifest file",
+        ));
+    }
+    Ok(())
 }
 
 async fn remote_branch_exists(
@@ -1023,6 +1079,33 @@ mod tests {
     }
 
     #[test]
+    fn pr_request_files_must_be_exact_scenario_and_manifest_pair() {
+        let preview = preview_for("file-pair-test");
+        let artifacts = build_submission_artifacts(&preview).expect("artifacts should build");
+        let files = artifacts.files();
+        validate_pr_request_files(&files).expect("valid scenario plus manifest pair should pass");
+
+        let mut duplicate = files.clone();
+        duplicate[1] = duplicate[0].clone();
+        let err = validate_pr_request_files(&duplicate).expect_err("duplicate path should reject");
+        assert_eq!(err.code, LabScenarioSubmissionErrorCode::ValidationFailure);
+
+        let err = validate_pr_request_files(&[files[0].clone()])
+            .expect_err("missing manifest should reject");
+        assert_eq!(err.code, LabScenarioSubmissionErrorCode::ValidationFailure);
+
+        let err = validate_pr_request_files(&[
+            files[0].clone(),
+            LabScenarioPrFile {
+                path: "client/src/main.js".to_string(),
+                contents: String::new(),
+            },
+        ])
+        .expect_err("non-allowlisted path should reject");
+        assert_eq!(err.code, LabScenarioSubmissionErrorCode::ValidationFailure);
+    }
+
+    #[test]
     fn submission_artifacts_reject_tampered_preview_paths() {
         let mut preview = preview_for("tampered-path-test");
         preview.scenario_path =
@@ -1030,6 +1113,15 @@ mod tests {
 
         let err = build_submission_artifacts(&preview).expect_err("tampered path should reject");
         assert_eq!(err.code, LabScenarioSubmissionErrorCode::ValidationFailure);
+    }
+
+    #[test]
+    fn submission_artifacts_recheck_duplicate_catalog_slug() {
+        let mut preview = preview_for("duplicate-race-test");
+        preview.manifest_entry.id = "lategame".to_string();
+
+        let err = build_submission_artifacts(&preview).expect_err("duplicate id should reject");
+        assert_eq!(err.code, LabScenarioSubmissionErrorCode::DuplicateSlug);
     }
 
     #[test]
@@ -1058,8 +1150,15 @@ mod tests {
         );
 
         assert!(body.contains("ID: `body-test`"));
+        assert!(body.contains("Entities: 227"));
         assert!(body.contains("Check the generated PR body."));
         assert!(body.contains("Manual Review Checklist"));
+        assert!(body.contains("scenario name"));
+        assert!(body.contains("map is the intended bundled map"));
+        assert!(body.contains("player/faction setup"));
+        assert!(body.contains("entity count (227)"));
+        assert!(body.contains("intended use"));
+        assert!(body.contains("manual lab smoke"));
         assert!(body.contains("server/assets/lab-scenarios/body-test.json"));
     }
 

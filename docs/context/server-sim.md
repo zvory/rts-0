@@ -27,6 +27,8 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/lobby/room_task.rs` plus `room_task/{types,lobby,live,lab,dev,replay,branch,lifecycle,helpers}.rs` —
   the single room actor, room-owned state/types, event dispatch, mode-specific room handlers,
   start/end/reset bookkeeping, public lobby-browser summaries, and room-local send helpers.
+- `server/src/lab_scenarios.rs` and `server/src/lab_scenario_submission.rs` — bundled lab scenario
+  catalog/authoring validation and disabled-by-default draft PR submission guardrails.
 - `server/src/lobby/session_policy.rs`, `participants.rs`, `tick_control.rs`, and
   `lab_timeline.rs` — lifecycle policy, seat/issuer resolution, room-time scheduling, and
   room-local lab rewind recording/rebuild.
