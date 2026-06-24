@@ -11,6 +11,7 @@ LIFECYCLE_MODE="normal"
 FOCUSED_VERIFICATION=""
 BODY_FILE=""
 EXTRA_BODY=""
+EXTRA_LABELS=()
 AUTO_MERGE=1
 DRY_RUN=0
 DRAFT_FLAG=0
@@ -30,13 +31,14 @@ Options:
   --lifecycle MODE           Lifecycle mode, default: normal.
   --verification TEXT        Focused local verification summary.
   --body-file FILE           Extra body text to append after ownership metadata.
+  --label LABEL              Extra PR label to apply. Repeatable.
   --draft                    Create the PR as a draft when opening it.
   --no-auto-merge            Do not arm auto-merge; marks the PR needs-human.
   --dry-run                  Print actions without changing GitHub state.
   -h, --help                 Show this help.
 
 Expected agent labels:
-  agent-owned, automerge, ci-failed, needs-human
+  agent-owned, automerge, ci-failed, needs-human, docdrift-sweep
 EOF
 }
 
@@ -49,6 +51,7 @@ while [ "$#" -gt 0 ]; do
     --lifecycle) LIFECYCLE_MODE="${2:?missing --lifecycle value}"; shift ;;
     --verification) FOCUSED_VERIFICATION="${2:?missing --verification value}"; shift ;;
     --body-file) BODY_FILE="${2:?missing --body-file value}"; shift ;;
+    --label) EXTRA_LABELS+=("${2:?missing --label value}"); shift ;;
     --draft) DRAFT_FLAG=1 ;;
     --no-auto-merge) AUTO_MERGE=0 ;;
     --dry-run) DRY_RUN=1 ;;
@@ -143,6 +146,7 @@ ensure_label "agent-owned" "0E8A16" "Owned by an automated agent with PR body me
 ensure_label "automerge" "5319E7" "Auto-merge should be armed when checks pass"
 ensure_label "ci-failed" "D73A4A" "CI failed and needs an agent or human decision"
 ensure_label "needs-human" "FBCA04" "Human review or decision is required before merge"
+ensure_label "docdrift-sweep" "1D76DB" "Generated documentation drift sweep PR"
 
 existing_pr_json=""
 if [ "$DRY_RUN" != "1" ]; then
@@ -160,6 +164,11 @@ if [ "$AUTO_MERGE" = "1" ]; then
 else
   label_args+=(--add-label needs-human)
 fi
+if [ "${#EXTRA_LABELS[@]}" -gt 0 ]; then
+  for extra_label in "${EXTRA_LABELS[@]}"; do
+    label_args+=(--add-label "$extra_label")
+  done
+fi
 
 pr_number=""
 pr_url=""
@@ -173,6 +182,11 @@ else
     create_args+=(--label automerge)
   else
     create_args+=(--label needs-human)
+  fi
+  if [ "${#EXTRA_LABELS[@]}" -gt 0 ]; then
+    for extra_label in "${EXTRA_LABELS[@]}"; do
+      create_args+=(--label "$extra_label")
+    done
   fi
   if [ "$DRAFT_FLAG" = "1" ]; then
     create_args+=(--draft)

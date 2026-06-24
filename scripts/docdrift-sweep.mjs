@@ -1766,7 +1766,7 @@ function plannedFullLifecycle(options) {
     {
       status: "planned",
       name: "open or update owned PR",
-      command: commandLine("scripts/agent-pr.sh", ["--title", options.prTitle, "--verification", "docdrift full sweep"]),
+      command: commandLine("scripts/agent-pr.sh", ["--title", options.prTitle, "--verification", "docdrift full sweep", "--label", "docdrift-sweep"]),
       note: "Arms auto-merge through the standard PR helper.",
     },
     {
@@ -1911,8 +1911,7 @@ export function runFullSweep(options) {
     options.prTitle,
     "--verification",
     `node scripts/docdrift-sweep.mjs --generate-docs report ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
-    "--body-file",
-    bodyPath,
+    "--label", "docdrift-sweep", "--body-file", bodyPath,
   ]);
   const pr = parseAgentPrOutput(agentOutput);
   runLifecycleCommand(lifecycle, worktreePath, "wait for PR merge", path.join(worktreePath, "scripts", "wait-pr.sh"), [String(pr.number)]);

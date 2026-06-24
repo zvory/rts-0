@@ -324,6 +324,8 @@ pushes the sweep branch, opens or updates the owned PR through `scripts/agent-pr
 or after `wait-pr.sh` confirms the sweep PR head is reachable from `origin/main`; failed checks,
 closed PRs, stale branches, dirty sweep worktrees, and fatal classifier/lifecycle failures leave the
 checkpoint unchanged.
+Generated sweep PRs carry the `docdrift-sweep` label so effectiveness audits can list sweep output
+separately from PRs that merely change the sweeper tooling.
 Per-decision doc-patch skips do not block checkpoint advancement: once any generated docs PR merges,
 or once a run has no docs changes to PR, the checkpoint advances to the processed head. This keeps
 the nightly gardener from retrying the same stale patch indefinitely. Lifecycle failures such as
