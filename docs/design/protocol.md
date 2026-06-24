@@ -78,7 +78,7 @@ lobby/config dump replaces the source scrape.
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
-| `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback, dev scenario watch rooms, and lab rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
+| `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room clock capability allows speed control. `0` pauses replay playback, AI-only live matches, dev scenario watch rooms, and lab rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
 | `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms and paused lab rooms. |
 | `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted in replay and lab rooms. |
 | `seekRoomTimeTo` | `tick: u32` | Seek room-controlled time to an absolute simulation tick where the current room clock capability allows absolute seek. Replay rooms clamp to duration, rate-limit accepted seeks, restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `roomTimeState`. Lab rooms use room-local keyframes and recorded accepted lab operations/issue-as commands the same way, then re-send lab `start`, `roomTimeState`, `labState`, and a fresh snapshot. Replay and lab keyframes are recorded every 2,000 ticks while their authoritative time advances. |
@@ -391,7 +391,9 @@ intentionally use full-world diagnostic projection. Replay viewers and live spec
 when room projection policy will send observer-analysis payloads to that recipient.
 `capabilities` is the neutral control/affordance contract. Live active players receive
 `commands.gameplay: true` and `matchControls.pause: true`; spectators, replay viewers, dev-watch
-viewers, and lab viewers do not. Replay branch live players also receive pause capability only
+viewers, and lab viewers do not. AI-only live matches are the live exception: connected spectators
+receive room-time speed/pause controls, but no step, relative seek, absolute seek, or timeline
+capability. Replay branch live players also receive pause capability only
 when their connection is mapped to an original active seat through the branch-live seat alias path.
 Replay playback advertises room-time speed/pause/relative seek/absolute seek/timeline controls plus
 `visibility.replayVision: true`. Replay branch creation is advertised separately with

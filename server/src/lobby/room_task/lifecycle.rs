@@ -90,6 +90,7 @@ impl RoomTask {
                 self.on_tick_dev_watch(scheduled);
             }
             ScheduledTickAction::RoomControlled(RoomTimeSource::Lab)
+            | ScheduledTickAction::RoomControlled(RoomTimeSource::LiveAiOnly)
             | ScheduledTickAction::LiveMatch => {
                 self.on_tick_live_game(scheduled);
             }

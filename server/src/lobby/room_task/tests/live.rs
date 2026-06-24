@@ -322,6 +322,117 @@ fn normal_live_start_payloads_stamp_active_players_and_spectators() {
 }
 
 #[test]
+fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
+    let mut task = RoomTask::new(
+        "ai-only-live-speed-start-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_spectator(&mut task, 1);
+    task.host_id = Some(1);
+    task.on_add_ai(1, Some(1), None);
+    task.on_add_ai(1, Some(2), None);
+    while writer.reliable_rx.try_recv().is_ok() {}
+
+    task.start_match();
+
+    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    let payload = messages
+        .iter()
+        .find_map(|msg| match msg {
+            ServerMessage::Start(payload) => Some(payload),
+            _ => None,
+        })
+        .expect("AI-only live start payload");
+    assert!(payload.spectator);
+    assert!(payload.prediction_build_id.is_none());
+    assert_eq!(payload.prediction_version, 0);
+    assert!(!payload.capabilities.commands.gameplay);
+    assert!(!payload.capabilities.match_controls.pause);
+    assert!(payload.capabilities.room_time.available);
+    assert!(payload.capabilities.room_time.set_speed);
+    assert!(payload.capabilities.room_time.pause);
+    assert!(!payload.capabilities.room_time.step);
+    assert!(!payload.capabilities.room_time.seek_relative);
+    assert!(!payload.capabilities.room_time.seek_absolute);
+    assert!(!payload.capabilities.room_time.timeline);
+    assert_eq!(
+        payload.diagnostics.movement_paths,
+        MovementPathDiagnosticScope::None
+    );
+    assert!(payload.diagnostics.observer_analysis);
+
+    let state = messages
+        .iter()
+        .find_map(|msg| match msg {
+            ServerMessage::RoomTimeState(state) => Some(state),
+            _ => None,
+        })
+        .expect("AI-only live room-time state");
+    assert_eq!(state.current_tick, 0);
+    assert_eq!(state.duration_ticks, 0);
+    assert!(state.keyframe_ticks.is_empty());
+    assert_eq!(state.speed, 1.0);
+    assert!(!state.paused);
+    assert!(!state.ended);
+}
+
+#[test]
+fn ai_only_live_room_time_speed_and_pause_control_tick_rate_without_seek() {
+    let mut task = RoomTask::new(
+        "ai-only-live-speed-control-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_spectator(&mut task, 1);
+    task.host_id = Some(1);
+    task.on_add_ai(1, Some(1), None);
+    task.on_add_ai(1, Some(2), None);
+    while writer.reliable_rx.try_recv().is_ok() {}
+    task.start_match();
+    while writer.reliable_rx.try_recv().is_ok() {}
+
+    task.on_set_room_time_speed(1, 4.0);
+    assert_eq!(
+        task.current_tick_interval(),
+        Duration::from_millis(config::TICK_MS).div_f32(4.0)
+    );
+    let speed_states = room_time_states(&mut writer);
+    let speed_state = speed_states.last().expect("speed state");
+    assert_eq!(speed_state.speed, 4.0);
+    assert!(!speed_state.paused);
+
+    task.on_tick(TokioInstant::now());
+    assert_eq!(in_game_tick(&task), 1);
+
+    task.on_set_room_time_speed(1, 0.0);
+    let paused_states = room_time_states(&mut writer);
+    let paused_state = paused_states.last().expect("paused state");
+    assert_eq!(paused_state.current_tick, 1);
+    assert_eq!(paused_state.speed, 0.0);
+    assert!(paused_state.paused);
+    task.on_tick(TokioInstant::now());
+    assert_eq!(in_game_tick(&task), 1);
+
+    task.on_step_room_time(1);
+    task.on_seek_room_time(1, u32::MAX);
+    task.on_seek_room_time_to(1, 0);
+    assert_eq!(
+        in_game_tick(&task),
+        1,
+        "AI-only live exposes speed/pause but not step or seek"
+    );
+
+    task.on_set_room_time_speed(1, 2.0);
+    task.on_tick(TokioInstant::now());
+    assert_eq!(in_game_tick(&task), 2);
+}
+
+#[test]
 fn normal_live_spectator_start_payload_is_read_only() {
     let mut task = RoomTask::new(
         "live-spectator-readonly-test".to_string(),
