@@ -170,6 +170,11 @@ export const msg = Object.freeze({
     requestId,
     op: { op: "importScenario", scenario },
   }),
+  labValidateScenario: (requestId, metadata) => ({
+    t: C.LAB,
+    requestId,
+    op: { op: "validateScenario", metadata },
+  }),
   labSpawnEntity: (requestId, { owner, kind, x, y, completed = false }) => ({
     t: C.LAB,
     requestId,

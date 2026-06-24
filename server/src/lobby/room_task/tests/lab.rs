@@ -124,6 +124,58 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
 }
 
 #[test]
+fn lab_authoring_validation_returns_repo_preview_without_mutating_lab() {
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default".to_string(),
+        RoomMode::Lab(lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+    drain_reliable_messages(&mut writer);
+
+    task.on_lab_request(
+        99,
+        7,
+        LabClientOp::ValidateScenario {
+            metadata: crate::protocol::LabScenarioAuthoringMetadata {
+                slug: "room-dry-run".to_string(),
+                name: "Room Dry Run".to_string(),
+                title: "Room Dry Run".to_string(),
+                description: "Dry-run validation from the authoritative lab game.".to_string(),
+                tags: vec!["test".to_string()],
+                review_notes: Some("No branch should be created in phase two.".to_string()),
+            },
+        },
+    );
+
+    let result = lab_results(&mut writer).pop().expect("validation result");
+    assert!(result.ok, "validation should succeed: {result:?}");
+    assert_eq!(result.op, "validateScenario");
+    let preview = result
+        .outcome
+        .as_ref()
+        .and_then(|outcome| outcome.get("preview"))
+        .expect("validation preview");
+    assert_eq!(
+        preview
+            .get("scenarioPath")
+            .and_then(serde_json::Value::as_str),
+        Some("server/assets/lab-scenarios/room-dry-run.json")
+    );
+    assert!(preview
+        .get("scenarioJson")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|json| json.contains("\"name\": \"Room Dry Run\"")));
+    let session = task.lab_session.as_ref().expect("lab session");
+    assert!(!session.dirty);
+    assert!(session.operation_log.is_empty());
+}
+
+#[test]
 fn lab_room_first_join_during_drain_is_rejected_without_starting_session() {
     let drain = DrainHandle::default();
     drain.begin_draining(Duration::from_secs(295));

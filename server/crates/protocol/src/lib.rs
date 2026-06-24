@@ -501,6 +501,9 @@ pub enum LabClientOp {
     ImportScenario {
         scenario: LabScenarioV1,
     },
+    ValidateScenario {
+        metadata: LabScenarioAuthoringMetadata,
+    },
     SpawnEntity {
         owner: u32,
         kind: String,
@@ -544,6 +547,19 @@ pub enum LabClientOp {
         #[serde(default, skip_serializing_if = "is_false")]
         ignore_command_limits: bool,
     },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioAuthoringMetadata {
+    pub slug: String,
+    pub name: String,
+    pub title: String,
+    pub description: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_notes: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

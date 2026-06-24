@@ -15,7 +15,7 @@ use rts_sim::game::map::Map;
 use rts_sim::game::{Game, PlayerInit};
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::{LabScenarioV1, LabVisionMode, TeamId};
+use crate::protocol::{LabScenarioAuthoringMetadata, LabScenarioV1, LabVisionMode, TeamId};
 
 const LAB_SCENARIO_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/lab-scenarios");
 const LAB_SCENARIO_MANIFEST: &str = "manifest.json";
@@ -26,6 +26,8 @@ const MAX_SCENARIO_TITLE_LEN: usize = 96;
 const MAX_SCENARIO_DESCRIPTION_LEN: usize = 320;
 const MAX_SCENARIO_TAGS: usize = 8;
 const MAX_SCENARIO_TAG_LEN: usize = 32;
+const MAX_SCENARIO_NAME_LEN: usize = 80;
+const MAX_REVIEW_NOTES_LEN: usize = 2000;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +39,19 @@ pub struct LabScenarioCatalogEntry {
     pub map: String,
     pub player_count: usize,
     pub filename: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LabScenarioAuthoringPreview {
+    pub slug: String,
+    pub filename: String,
+    pub scenario_path: String,
+    pub manifest_path: String,
+    pub manifest_entry: LabScenarioCatalogEntry,
+    pub scenario_json: String,
+    pub review_notes: String,
+    pub summary: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +116,90 @@ pub fn lab_scenario_exists(id: &str) -> bool {
         && load_lab_scenario_manifest_entries_from_dir(&default_lab_scenario_dir())
             .map(|entries| entries.iter().any(|entry| entry.id == id))
             .unwrap_or(false)
+}
+
+pub fn validate_lab_scenario_authoring(
+    metadata: LabScenarioAuthoringMetadata,
+    mut scenario: LabScenarioV1,
+) -> Result<LabScenarioAuthoringPreview, String> {
+    let slug = metadata.slug.trim().to_string();
+    let name = metadata.name.trim().to_string();
+    let title = metadata.title.trim().to_string();
+    let description = metadata.description.trim().to_string();
+    let tags: Vec<_> = metadata
+        .tags
+        .into_iter()
+        .map(|tag| tag.trim().to_string())
+        .filter(|tag| !tag.is_empty())
+        .collect();
+    let review_notes = metadata.review_notes.unwrap_or_default().trim().to_string();
+
+    if name.is_empty() || name.len() > MAX_SCENARIO_NAME_LEN {
+        return Err(format!(
+            "scenario name must be non-empty and at most {MAX_SCENARIO_NAME_LEN} bytes"
+        ));
+    }
+    if review_notes.len() > MAX_REVIEW_NOTES_LEN {
+        return Err(format!(
+            "review notes must be at most {MAX_REVIEW_NOTES_LEN} bytes"
+        ));
+    }
+
+    scenario.name = name;
+    let filename = format!("{slug}.json");
+    let entry = LabScenarioCatalogEntry {
+        id: slug.clone(),
+        title,
+        description,
+        tags,
+        map: scenario.map.name.clone(),
+        player_count: scenario.players.len(),
+        filename: filename.clone(),
+    };
+    validate_manifest_entry(&entry)?;
+
+    let root = default_lab_scenario_dir();
+    let existing_entries = load_lab_scenario_manifest_entries_from_dir(&root)?;
+    if existing_entries
+        .iter()
+        .any(|existing| existing.id == entry.id)
+    {
+        return Err(format!("duplicate lab scenario id {:?}", entry.id));
+    }
+    if existing_entries
+        .iter()
+        .any(|existing| existing.filename == entry.filename)
+    {
+        return Err(format!(
+            "duplicate lab scenario filename {:?}",
+            entry.filename
+        ));
+    }
+
+    validate_entry_matches_scenario(&entry, &scenario)?;
+    validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
+    let sim_scenario = protocol_scenario_to_sim(&scenario)
+        .map_err(|err| format!("invalid lab scenario payload: {err}"))?;
+    build_game_from_scenario(&scenario, sim_scenario).map_err(|err| {
+        format!(
+            "lab scenario {:?} does not restore through Game lab APIs: {err}",
+            entry.id
+        )
+    })?;
+    let scenario_json = serde_json::to_string_pretty(&scenario)
+        .map_err(|err| format!("failed to format lab scenario JSON: {err}"))?
+        + "\n";
+
+    Ok(LabScenarioAuthoringPreview {
+        slug,
+        filename: filename.clone(),
+        scenario_path: format!("server/assets/lab-scenarios/{filename}"),
+        manifest_path: "server/assets/lab-scenarios/manifest.json".to_string(),
+        manifest_entry: entry,
+        scenario_json,
+        review_notes,
+        summary: format!("Scenario ready for server/assets/lab-scenarios/{filename}."),
+    })
 }
 
 fn default_lab_scenario_dir() -> PathBuf {
@@ -416,6 +515,78 @@ mod tests {
         assert_eq!(scenario.seed, 3_566_641_871);
         assert_eq!(scenario.players.len(), 2);
         assert_eq!(scenario.entities.len(), 227);
+    }
+
+    #[test]
+    fn lab_scenario_authoring_validation_accepts_repo_ready_metadata() {
+        let loaded =
+            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
+        let preview = validate_lab_scenario_authoring(
+            LabScenarioAuthoringMetadata {
+                slug: "fresh-lab-scenario".to_string(),
+                name: "Fresh Lab Scenario".to_string(),
+                title: "Fresh Lab Scenario".to_string(),
+                description: "A deterministic lab setup ready for catalog review.".to_string(),
+                tags: vec!["two-player".to_string(), "test".to_string()],
+                review_notes: Some("Check army positioning before merge.".to_string()),
+            },
+            loaded.scenario,
+        )
+        .expect("authoring metadata should validate");
+
+        assert_eq!(preview.filename, "fresh-lab-scenario.json");
+        assert_eq!(preview.manifest_entry.id, "fresh-lab-scenario");
+        assert_eq!(preview.manifest_entry.map, "Default");
+        assert_eq!(preview.manifest_entry.player_count, 2);
+        assert!(preview
+            .scenario_json
+            .contains("\"name\": \"Fresh Lab Scenario\""));
+        assert!(preview
+            .summary
+            .contains("server/assets/lab-scenarios/fresh-lab-scenario.json"));
+    }
+
+    #[test]
+    fn lab_scenario_authoring_validation_rejects_duplicate_id() {
+        let loaded =
+            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
+        let err = validate_lab_scenario_authoring(
+            LabScenarioAuthoringMetadata {
+                slug: "lategame".to_string(),
+                name: "Duplicate".to_string(),
+                title: "Duplicate".to_string(),
+                description: "Duplicates the bundled lategame scenario id.".to_string(),
+                tags: vec!["test".to_string()],
+                review_notes: None,
+            },
+            loaded.scenario,
+        )
+        .expect_err("duplicate ids should be rejected");
+
+        assert!(
+            err.contains("duplicate lab scenario id"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn lab_scenario_authoring_validation_rejects_malformed_tags() {
+        let loaded =
+            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
+        let err = validate_lab_scenario_authoring(
+            LabScenarioAuthoringMetadata {
+                slug: "bad-tag-scenario".to_string(),
+                name: "Bad Tag Scenario".to_string(),
+                title: "Bad Tag Scenario".to_string(),
+                description: "Uses malformed authoring tags.".to_string(),
+                tags: vec!["bad tag".to_string()],
+                review_notes: None,
+            },
+            loaded.scenario,
+        )
+        .expect_err("malformed tags should be rejected");
+
+        assert!(err.contains("invalid tag"), "unexpected error: {err}");
     }
 
     #[test]

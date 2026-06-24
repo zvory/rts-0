@@ -2,6 +2,7 @@ import { PLAYABLE_FACTIONS } from "./lobby_view.js";
 import { DEFAULT_FACTION_ID, LAB_ROLE, msg } from "./protocol.js";
 import { factionCatalog, PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
+import { createLabScenarioAuthoringState, LAB_SCENARIO_AUTHORING_LIMITS, labScenarioPreviewLabel, slugifyLabScenario, validateLabScenarioAuthoringState } from "./lab_scenario_authoring.js";
 
 const labVision = Object.freeze({
   fullWorld: () => msg.labVisionFullWorld(),
@@ -36,6 +37,9 @@ export class LabPanel {
       factionId: DEFAULT_FACTION_ID,
       kind: "",
     };
+    this.authoring = createLabScenarioAuthoringState({ defaultName: this.defaultScenarioName() });
+    this.authoringSlugEdited = false;
+    this.authoringValidation = { errors: [], preview: null };
     this.teamInputs = new Map();
     this.playerButtons = new Map();
     this.spawnPanels = new Map();
@@ -168,13 +172,7 @@ export class LabPanel {
 
     root.appendChild(this.renderCommandOptions());
 
-    root.appendChild(this.fieldset("Scenario", [
-      this.inputField("scenario-name", "Name", "text", this.defaultScenarioName()),
-      this.textAreaField("scenario-json", "JSON", ""),
-      this.button("Export JSON", () => this.exportScenario()),
-      this.button("Import JSON", () => this.importScenario()),
-      this.button("Reset scenario", () => this.resetScenario()),
-    ]));
+    root.appendChild(this.renderScenarioOptions());
 
     return root;
   }
@@ -231,6 +229,62 @@ export class LabPanel {
         onChange: (enabled) => this.setIgnoreCommandLimits(enabled),
       }),
     ]);
+  }
+
+  renderScenarioOptions() {
+    const limits = LAB_SCENARIO_AUTHORING_LIMITS;
+    const setAuthoring = (key) => (value) => {
+      this.authoring[key] = value;
+    };
+    return this.fieldset("Scenario", [
+      this.inputField("scenario-name", "Name", "text", this.authoring.name, {
+        maxLength: limits.name,
+        onChange: (value) => { this.authoring.name = value; if (!this.authoring.title) this.authoring.title = value; },
+      }),
+      this.inputField("scenario-title", "Title", "text", this.authoring.title, {
+        maxLength: limits.title,
+        onChange: (value) => this.updateScenarioTitle(value),
+      }),
+      this.inputField("scenario-slug", "Slug", "text", this.authoring.slug, {
+        maxLength: limits.slug,
+        onChange: (value) => { this.authoring.slug = value; this.authoringSlugEdited = true; },
+      }),
+      this.inputField("scenario-tags", "Tags", "text", this.authoring.tags, {
+        maxLength: (limits.tag + 1) * limits.tags,
+        onChange: setAuthoring("tags"),
+      }),
+      this.textAreaField("scenario-description", "Description", this.authoring.description, {
+        maxLength: limits.description,
+        rows: 3,
+        wide: true,
+        onChange: setAuthoring("description"),
+      }),
+      this.textAreaField("scenario-review-notes", "Review notes", this.authoring.reviewNotes, {
+        maxLength: limits.reviewNotes,
+        rows: 3,
+        wide: true,
+        onChange: setAuthoring("reviewNotes"),
+      }),
+      this.textAreaField("scenario-json", "JSON", this.authoring.scenarioJson, {
+        rows: 7,
+        wide: true,
+        onChange: setAuthoring("scenarioJson"),
+      }),
+      this.renderAuthoringFeedback(),
+      this.button("Validate scenario", () => this.validateScenario()),
+      this.button("Export JSON", () => this.exportScenario()),
+      this.button("Import JSON", () => this.importScenario()),
+      this.button("Reset scenario", () => this.resetScenario()),
+    ]);
+  }
+
+  renderAuthoringFeedback() {
+    const errors = this.authoringValidation.errors || [];
+    const label = errors.length ? errors.join(" ") : labScenarioPreviewLabel(this.authoringValidation.preview);
+    const node = this.readout(label);
+    node.className = "lab-readout lab-authoring-feedback";
+    node.dataset.state = errors.length ? "error" : (label ? "ok" : "idle");
+    return node;
   }
 
   renderPlayerStatePanel() {
@@ -414,10 +468,11 @@ export class LabPanel {
   }
 
   inputField(id, label, type, value, options = {}) {
-    const wrap = this.fieldWrap(label);
+    const wrap = this.fieldWrap(label, options);
     const input = document.createElement("input");
     input.type = type;
     input.value = String(value ?? "");
+    if (Number.isFinite(options.maxLength)) input.maxLength = options.maxLength;
     if (options.disabled) input.disabled = true;
     if (typeof options.onChange === "function") {
       const handleChange = () => options.onChange(input.value);
@@ -429,18 +484,25 @@ export class LabPanel {
     return wrap;
   }
 
-  textAreaField(id, label, value) {
-    const wrap = this.fieldWrap(label);
+  textAreaField(id, label, value, options = {}) {
+    const wrap = this.fieldWrap(label, options);
     const input = document.createElement("textarea");
     input.value = String(value ?? "");
-    input.rows = 5;
+    input.rows = Number.isFinite(options.rows) ? options.rows : 5;
+    if (Number.isFinite(options.maxLength)) input.maxLength = options.maxLength;
+    if (options.readOnly) input.readOnly = true;
+    if (typeof options.onChange === "function") {
+      const handleChange = () => options.onChange(input.value);
+      this.listen(input, "input", handleChange);
+      this.listen(input, "change", handleChange);
+    }
     this.fields.set(id, input);
     wrap.appendChild(input);
     return wrap;
   }
 
   selectField(id, label, values, labels = {}, options = {}) {
-    const wrap = this.fieldWrap(label);
+    const wrap = this.fieldWrap(label, options);
     const select = document.createElement("select");
     for (const value of values) {
       const option = document.createElement("option");
@@ -469,9 +531,10 @@ export class LabPanel {
     return this.selectField(id, label, values, labels, options);
   }
 
-  fieldWrap(labelText) {
+  fieldWrap(labelText, options = {}) {
     const label = document.createElement("label");
     label.className = "lab-field";
+    if (options.wide) label.dataset.wide = "true";
     const span = document.createElement("span");
     span.textContent = labelText;
     label.appendChild(span);
@@ -883,6 +946,43 @@ export class LabPanel {
     return this.publishLocalResult("ignoreCommandLimits", true, summary);
   }
 
+  updateScenarioTitle(value) {
+    this.authoring.title = value;
+    if (!this.authoringSlugEdited) {
+      this.authoring.slug = slugifyLabScenario(value);
+      const slugField = this.fields.get("scenario-slug");
+      if (slugField) slugField.value = this.authoring.slug;
+    }
+  }
+
+  captureAuthoringFields() {
+    for (const [key, id] of [["name", "scenario-name"], ["title", "scenario-title"], ["slug", "scenario-slug"], ["tags", "scenario-tags"], ["description", "scenario-description"], ["reviewNotes", "scenario-review-notes"], ["scenarioJson", "scenario-json"]]) {
+      this.authoring[key] = this.value(id);
+    }
+  }
+
+  async validateScenario() {
+    this.captureAuthoringFields();
+    const validation = validateLabScenarioAuthoringState(this.authoring);
+    if (!validation.ok) {
+      this.authoringValidation = { errors: validation.errors, preview: null };
+      return this.publishLocalResult("validateScenario", false, validation.errors.join(" "));
+    }
+    this.authoringValidation = { errors: [], preview: null };
+    const result = await this.labClient.validateScenario(validation.metadata);
+    const preview = result?.ok ? (result.outcome?.preview || null) : null;
+    this.authoringValidation = result?.ok
+      ? { errors: [], preview }
+      : { errors: [result?.error || "Scenario validation failed."], preview: null };
+    if (typeof preview?.scenarioJson === "string") {
+      this.authoring.scenarioJson = preview.scenarioJson;
+      const field = this.fields.get("scenario-json");
+      if (field) field.value = preview.scenarioJson;
+    }
+    this.render();
+    return result;
+  }
+
   ignoreCommandLimitsEnabled() {
     return this.labControlPolicy()?.ignoreCommandLimitsEnabled?.() ?? true;
   }
@@ -1007,10 +1107,12 @@ export class LabPanel {
   }
 
   async exportScenario() {
-    const result = await this.labClient.exportScenario(this.value("scenario-name"));
+    this.captureAuthoringFields();
+    const result = await this.labClient.exportScenario(this.authoring.name);
     const scenario = result?.outcome?.scenario;
     if (!result?.ok || !scenario) return result;
     const text = `${JSON.stringify(scenario, null, 2)}\n`;
+    this.authoring.scenarioJson = text;
     const field = this.fields.get("scenario-json");
     if (field) field.value = text;
     this.downloadScenarioJson(scenario, text);
@@ -1018,6 +1120,7 @@ export class LabPanel {
   }
 
   importScenario() {
+    this.captureAuthoringFields();
     const text = this.value("scenario-json").trim();
     if (!text) return Promise.resolve(null);
     let scenario;
@@ -1177,7 +1280,7 @@ export class LabPanel {
     if (typeof anchor.click !== "function") return;
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
     anchor.href = url;
-    anchor.download = `${slugifyScenarioName(scenario?.name || "lab-scenario")}.json`;
+    anchor.download = `${slugifyLabScenario(scenario?.name || "lab-scenario")}.json`;
     anchor.click();
     URL.revokeObjectURL?.(url);
   }
@@ -1390,12 +1493,4 @@ function labVisionLabel(vision) {
   if (vision.mode === "team") return `Team ${vision.teamId}`;
   if (vision.mode === "teams") return `Teams ${(vision.teamIds || []).join(", ")}`;
   return String(vision.mode || "-");
-}
-
-function slugifyScenarioName(name) {
-  const slug = String(name || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "lab-scenario";
 }

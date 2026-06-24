@@ -962,6 +962,7 @@ event unions follow the same selected real player ids as the snapshot body.
 { op: "issueCommandAs", playerId: u32, cmd: Command, ignoreCommandLimits?: bool }
 { op: "exportScenario", name?: string }
 { op: "importScenario", scenario: LabScenarioV1 }
+{ op: "validateScenario", metadata: LabScenarioAuthoringMetadata }
 ```
 `LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
 `{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
@@ -1008,6 +1009,23 @@ current lab vision in `metadata.lab.vision`. Import validates the schema, map me
 player/team/resource/research/entity fields, restores through the public lab `Game` API, applies
 scenario vision to the requester and future join default without overwriting already connected
 collaborators, and returns an entity id remap in `outcome.entityIdMap`.
+`validateScenario` exports the current authoritative lab `Game`, applies authoring metadata, pretty
+formats the scenario JSON, checks duplicate catalog ids/filenames and manifest limits, validates map
+metadata, and restores through the same lab `Game` API without mutating the room or creating any Git
+branch. `LabScenarioAuthoringMetadata` is:
+```
+{
+  slug: string,        // future catalog id and filename stem, max 48 catalog-safe bytes
+  name: string,        // LabScenarioV1.name, max 80 bytes
+  title: string,       // catalog title, max 96 bytes
+  description: string, // catalog description, max 320 bytes
+  tags?: string[],     // up to 8 catalog-safe tags, max 32 bytes each
+  reviewNotes?: string // PR/reviewer context, max 2000 bytes
+}
+```
+Accepted validation returns `{ summary, preview }` in `labResult.outcome`; `preview` includes
+`manifestEntry`, `manifestPath`, `scenarioPath`, deterministic `scenarioJson`, and `reviewNotes`
+for the future server-side PR submission flow.
 `facing` serializes unit body orientation, and `weaponFacing` serializes stable combat
 weapon/turret orientation for entities with combat state. `setUp` serializes only stable deployed
 support-weapon state for machine gunners, anti-tank guns, mortar teams, and artillery; omitted
