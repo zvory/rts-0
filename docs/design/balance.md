@@ -215,6 +215,8 @@ activation/autocast policy instead of being folded into default targeting.
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
+  Mortar facing uses sim-local `mortar::TURN_RATE_RAD_PER_TICK = PI / 6`, so a 180-degree turn
+  takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
   The inner radius is fully armor-piercing against armored targets; the outer radius keeps
   semi-armor-piercing damage against armored targets. Manual Fire uses hotkey `X`; autocast
   uses normal idle/attack-move acquisition after Mortar Autocast research completes. Mortar impacts

@@ -12,6 +12,9 @@ use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
 
 pub(crate) const FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
+pub(crate) const HALF_TURN_TICKS: u32 = config::TICK_HZ / 5;
+pub(crate) const TURN_RATE_RAD_PER_TICK: f32 =
+    std::f32::consts::PI / HALF_TURN_TICKS as f32;
 
 #[derive(Debug, Clone)]
 struct MortarShell {
@@ -32,9 +35,16 @@ pub(crate) fn rotate_mortar_for_fire(e: &mut Entity, target_angle: f32) -> bool 
         return false;
     }
     e.set_desired_weapon_facing(target_angle);
-    e.set_facing(target_angle);
-    e.set_weapon_facing(target_angle);
-    true
+    let current = e
+        .weapon_facing()
+        .filter(|facing| facing.is_finite())
+        .unwrap_or_else(|| e.facing());
+    let rotated = rotate_toward(current, target_angle, TURN_RATE_RAD_PER_TICK);
+    if rotated.is_finite() {
+        e.set_facing(rotated);
+        e.set_weapon_facing(rotated);
+    }
+    angle_delta(rotated, target_angle).abs() <= FIRE_TOLERANCE_RAD
 }
 
 pub(crate) fn mortar_current_facing_ready(e: &Entity, target_angle: f32) -> bool {
@@ -49,6 +59,21 @@ pub(crate) fn mortar_current_facing_ready(e: &Entity, target_angle: f32) -> bool
 
 fn angle_delta(from: f32, to: f32) -> f32 {
     (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+}
+
+fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
+    if !desired.is_finite() || !max_delta.is_finite() {
+        return current;
+    }
+    if !current.is_finite() {
+        return desired;
+    }
+    let delta = angle_delta(current, desired);
+    if delta.abs() <= max_delta {
+        desired
+    } else {
+        current + delta.signum() * max_delta
+    }
 }
 
 impl MortarShellStore {
@@ -338,6 +363,47 @@ mod tests {
                 .iter()
                 .any(|event| matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack"))
         })
+    }
+
+    #[test]
+    fn half_turn_completes_in_two_hundred_ms() {
+        assert_eq!(
+            HALF_TURN_TICKS * 1000 / config::TICK_HZ,
+            200,
+            "mortar half-turn timing should stay at 200 ms"
+        );
+
+        let mut entities = EntityStore::new();
+        let mortar_id = entities
+            .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+            .expect("mortar should spawn");
+        if let Some(mortar) = entities.get_mut(mortar_id) {
+            mortar.set_facing(0.0);
+            mortar.set_weapon_facing(0.0);
+        }
+
+        let target_angle = std::f32::consts::PI;
+        for tick in 1..=HALF_TURN_TICKS {
+            let ready = {
+                let mortar = entities.get_mut(mortar_id).expect("mortar should exist");
+                rotate_mortar_for_fire(mortar, target_angle)
+            };
+            if tick < HALF_TURN_TICKS {
+                assert!(
+                    !ready,
+                    "mortar should still be rotating on half-turn tick {tick}"
+                );
+            } else {
+                assert!(ready, "mortar should complete a 180-degree turn in 200 ms");
+            }
+        }
+
+        let mortar = entities.get(mortar_id).expect("mortar should exist");
+        assert!(
+            angle_delta(mortar.facing(), target_angle).abs() <= FIRE_TOLERANCE_RAD + 0.001,
+            "mortar should finish the half-turn aligned with the target, got {:.4}",
+            mortar.facing()
+        );
     }
 
     #[test]
