@@ -238,6 +238,7 @@ import {
   }));
 
   assert(!router.pointerDown({ clientX: 100, clientY: 100, button: 0, source: "locked" }), "DOM zone ignores viewport hits so terrain input still receives clicks");
+  assert(!router.pointerMove({ clientX: 520, clientY: 80, button: 0, source: "dom" }), "DOM zone ignores ordinary browser DOM events to avoid redispatch recursion");
   assert(router.pointerDown({ clientX: 520, clientY: 80, button: 0, source: "locked" }), "DOM zone consumes arbitrary overlay pointerDown");
   assert(router.pointerMove({ clientX: 530, clientY: 90, button: 0, source: "locked" }), "DOM zone forwards arbitrary overlay pointerMove");
   assert(router.pointerUp({ clientX: 530, clientY: 90, button: 0, source: "locked" }), "DOM zone consumes arbitrary overlay pointerUp");

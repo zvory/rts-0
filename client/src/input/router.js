@@ -156,10 +156,12 @@ export class DomClickInputZone {
   }
 
   contains(ev) {
+    if (!this._syntheticSource(ev)) return false;
     return !!this._hitAt(ev.clientX, ev.clientY);
   }
 
   pointerDown(ev) {
+    if (!this._syntheticSource(ev)) return false;
     const hit = this._hitAt(ev.clientX, ev.clientY);
     if (!hit) return false;
     this.activeRoot = hit.root;
@@ -177,6 +179,7 @@ export class DomClickInputZone {
   }
 
   pointerMove(ev) {
+    if (!this._syntheticSource(ev)) return false;
     const target = this.activeTarget || this._hitAt(ev.clientX, ev.clientY)?.target;
     if (!target) return false;
     if (this.activeRange) this._setRangeFromPoint(this.activeRange, ev.clientX);
@@ -187,6 +190,7 @@ export class DomClickInputZone {
   }
 
   pointerUp(ev) {
+    if (!this._syntheticSource(ev)) return false;
     const root = this.activeRoot || this._hitAt(ev.clientX, ev.clientY)?.root;
     const target = this.activeTarget;
     const clickTarget = this.activeClickTarget;
@@ -214,6 +218,7 @@ export class DomClickInputZone {
   }
 
   wheel(ev) {
+    if (!this._syntheticSource(ev)) return false;
     const hit = this._hitAt(ev.clientX, ev.clientY);
     if (!hit) return false;
     const dispatched = this._dispatchWheelEvent(hit.target, ev);
@@ -221,6 +226,10 @@ export class DomClickInputZone {
     ev.originalEvent?.preventDefault();
     ev.preventDefault?.();
     return true;
+  }
+
+  _syntheticSource(ev) {
+    return ev?.source === "locked";
   }
 
   _hitAt(clientX, clientY) {
