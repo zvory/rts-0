@@ -504,6 +504,9 @@ pub enum LabClientOp {
     ValidateScenario {
         metadata: LabScenarioAuthoringMetadata,
     },
+    SubmitScenario {
+        metadata: LabScenarioAuthoringMetadata,
+    },
     SpawnEntity {
         owner: u32,
         kind: String,

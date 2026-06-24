@@ -963,6 +963,7 @@ event unions follow the same selected real player ids as the snapshot body.
 { op: "exportScenario", name?: string }
 { op: "importScenario", scenario: LabScenarioV1 }
 { op: "validateScenario", metadata: LabScenarioAuthoringMetadata }
+{ op: "submitScenario", metadata: LabScenarioAuthoringMetadata }
 ```
 `LabVisionMode` is `{ mode: "fullWorld" }`, `{ mode: "team", teamId }`, or
 `{ mode: "teams", teamIds }`. Team selections are translated to current real player ids by the
@@ -1026,6 +1027,15 @@ branch. `LabScenarioAuthoringMetadata` is:
 Accepted validation returns `{ summary, preview }` in `labResult.outcome`; `preview` includes
 `manifestEntry`, `manifestPath`, `scenarioPath`, deterministic `scenarioJson`, and `reviewNotes`
 for the future server-side PR submission flow.
+`submitScenario` uses the same authoritative export and validation path, then hands the validated
+preview to the disabled-by-default server-side PR submission service. It does not accept browser
+supplied scenario JSON, branch names, paths, commit content, or credentials. The room returns one
+final async `labResult` for the request: success has
+`{ status: "submitted", prUrl, branchName, scenarioPath, manifestPath }`; failure has `error` plus
+`outcome.code` using one of `credentialsMissing`, `configurationError`, `validationFailure`,
+`duplicateSlug`, `branchCollision`, `githubApiError`, `rateLimit`, or `ioError`. Each lab room can
+start at most one PR submission job so a bad client cannot spam repository writes; failed
+credential/capability checks happen before a job is counted.
 `facing` serializes unit body orientation, and `weaponFacing` serializes stable combat
 weapon/turret orientation for entities with combat state. `setUp` serializes only stable deployed
 support-weapon state for machine gunners, anti-tank guns, mortar teams, and artillery; omitted
@@ -1052,6 +1062,20 @@ iteration hot reload, and `/dev/scenario` migration. Bundled prebuilt setups are
 join through the HTTP lab scenario catalog and direct lab URL `scenario=<id>` tokens, not through a
 normal-lobby command or a lab client op. Pause, speed, step, and room-local timeline metadata use
 the neutral room-time messages instead of overloading `LabClientOp`.
+
+`GET /api/lab-scenarios/submission` is the HTTP capability probe for the PR service:
+```
+{
+  available: bool,
+  unavailableCode?: string,
+  unavailableReason?: string,
+  branchPrefix: string,
+  scenarioPathPrefix: "server/assets/lab-scenarios/",
+  manifestPath: "server/assets/lab-scenarios/manifest.json"
+}
+```
+The endpoint never exposes GitHub tokens or repository credentials. When unavailable, local lab
+scenario import/export and validation remain usable.
 
 ### 2.7 Observer analysis state
 

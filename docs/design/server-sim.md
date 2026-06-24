@@ -331,8 +331,11 @@ alive.
   which rejects mixed-owner selections before queuing a normal command. Lab state, dirty flags,
   viewer roles, per-operator selected vision, the future-join vision default, shared room-time
   speed/pause/controller state, and append-only operation log records stay in the room task rather
-  than in `Game`. Paused lab room-time suppresses scheduled ticks; one-tick lab steps and running
-  lab ticks use the same `LiveTickDriver` path as ordinary live simulation.
+  than in `Game`. Scenario PR submission also starts in `room_task/lab.rs`: the room exports the
+  authoritative lab `Game`, validates authoring metadata, rate-limits the room to one PR job, and
+  then hands the already-validated preview to a bounded background service so GitHub or git work
+  never runs on the room tick path. Paused lab room-time suppresses scheduled ticks; one-tick lab
+  steps and running lab ticks use the same `LiveTickDriver` path as ordinary live simulation.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view
@@ -364,7 +367,8 @@ split into focused room-local modules:
   attach, live start-payload glue, pending recipient notices, and live snapshot notice plumbing.
 - `room_task/lab.rs` owns lab sessions: first-join launch, lab role/vision metadata, request
   authorization, mutation and issue-as routing, result delivery, dirty state, operation logging,
-  state broadcasts, room-time controls, and scenario export/import.
+  state broadcasts, room-time controls, scenario export/import, and authoritative scenario PR
+  submission dispatch.
 - `room_task/dev.rs` owns dev-watch and authored scenario rooms: dev joins, scenario launch, script
   driver glue, room-time controls, and dev start-payload sends.
 - `room_task/replay.rs` owns replay viewer rooms: replay joins and prompts, replay start-payload

@@ -32,6 +32,7 @@ use tokio::time::{interval, MissedTickBehavior};
 
 use crate::config;
 use crate::db::Db;
+use crate::lab_scenario_submission::LabScenarioSubmissionService;
 use crate::protocol::{
     Event, LabClientOp, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ServerMessage,
     Snapshot, TeamId, VisionSelectionRequest,
@@ -480,6 +481,7 @@ pub struct Lobby {
     db: Option<Arc<Db>>,
     match_history_local_only: bool,
     drain: DrainHandle,
+    lab_scenario_submission: LabScenarioSubmissionService,
 }
 
 impl Lobby {
@@ -494,6 +496,7 @@ impl Lobby {
             db: None,
             match_history_local_only: false,
             drain: DrainHandle::default(),
+            lab_scenario_submission: LabScenarioSubmissionService::disabled(),
         }
     }
 
@@ -510,6 +513,11 @@ impl Lobby {
     pub fn with_match_history(mut self, db: Option<Arc<Db>>, local_only: bool) -> Self {
         self.db = db;
         self.match_history_local_only = local_only;
+        self
+    }
+
+    pub fn with_lab_scenario_submission(mut self, service: LabScenarioSubmissionService) -> Self {
+        self.lab_scenario_submission = service;
         self
     }
 
@@ -625,6 +633,7 @@ impl Lobby {
         let db = self.db.clone();
         let match_history_local_only = self.match_history_local_only;
         let drain = self.drain.clone();
+        let lab_scenario_submission = self.lab_scenario_submission.clone();
         let lifecycle = RoomLifecycle::new(name.clone(), identity, self.disposal_tx.clone());
         tokio::spawn(async move {
             let mut task = RoomTask::new_with_lifecycle(
@@ -634,7 +643,8 @@ impl Lobby {
                 match_history_local_only,
                 drain,
                 lifecycle,
-            );
+            )
+            .with_lab_scenario_submission(lab_scenario_submission);
             task.run(event_rx, shutdown_rx).await;
             crate::log_info!(room = %name, "room task exited");
         });

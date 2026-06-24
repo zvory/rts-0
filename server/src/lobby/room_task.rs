@@ -4,6 +4,7 @@ use super::projection::ProjectionPolicy;
 use super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy, SessionPolicyContext};
 use super::tick_control::{RoomTimeClock, TickControl};
 use super::*;
+use crate::lab_scenario_submission::LabScenarioSubmissionService;
 #[cfg(test)]
 use crate::protocol::{
     Command, LabClientOp, LabResult, LabStartRole, LabVisionMode, MovementPathDiagnosticScope,
@@ -81,6 +82,7 @@ pub(super) struct RoomTask {
     live_pause_counts: HashMap<u32, u8>,
     lab_session: Option<LabSession>,
     lab_timeline: Option<LabTimeline>,
+    lab_scenario_submission: LabScenarioSubmissionService,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
     ai_controllers: Vec<AiController>,
@@ -144,6 +146,7 @@ impl RoomTask {
             live_pause_counts: HashMap::new(),
             lab_session: None,
             lab_timeline: None,
+            lab_scenario_submission: LabScenarioSubmissionService::disabled(),
             dev_driver: None,
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
@@ -177,6 +180,14 @@ impl RoomTask {
         let mut task = Self::new(room, mode, db, match_history_local_only, drain);
         task.lifecycle = Some(lifecycle);
         task
+    }
+
+    pub(super) fn with_lab_scenario_submission(
+        mut self,
+        service: LabScenarioSubmissionService,
+    ) -> Self {
+        self.lab_scenario_submission = service;
+        self
     }
 
     /// Main loop: multiplex the fixed-rate tick against the inbound event stream. Returns (and
