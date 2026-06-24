@@ -13,7 +13,7 @@ pub(super) enum RecipientRole {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum SnapshotProjection {
+enum SnapshotBodyProjection {
     PlayerFog {
         player_id: u32,
         options: SnapshotOptions,
@@ -32,41 +32,92 @@ pub(super) enum SnapshotProjection {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum EventProjection {
+    PlayerOnly { player_id: u32 },
+    FullVision,
+    PlayerUnion { player_ids: Vec<u32> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SnapshotProjection {
+    body: SnapshotBodyProjection,
+    events: EventProjection,
+}
+
 impl SnapshotProjection {
+    fn player_fog(player_id: u32, options: SnapshotOptions) -> Self {
+        Self {
+            body: SnapshotBodyProjection::PlayerFog { player_id, options },
+            events: EventProjection::PlayerOnly { player_id },
+        }
+    }
+
+    fn spectator_union(player_ids: Vec<u32>, options: SnapshotOptions) -> Self {
+        Self {
+            body: SnapshotBodyProjection::SpectatorUnion {
+                player_ids,
+                options,
+            },
+            events: EventProjection::FullVision,
+        }
+    }
+
+    fn selected_perspective(player_ids: Vec<u32>, options: SnapshotOptions) -> Self {
+        Self {
+            body: SnapshotBodyProjection::SelectablePerspective {
+                player_ids: player_ids.clone(),
+                options,
+            },
+            events: EventProjection::PlayerUnion { player_ids },
+        }
+    }
+
+    fn full_world(player_id: u32, options: SnapshotOptions) -> Self {
+        Self {
+            body: SnapshotBodyProjection::FullWorld { player_id, options },
+            events: EventProjection::PlayerOnly { player_id },
+        }
+    }
+
+    pub(super) fn with_event_projection(mut self, events: EventProjection) -> Self {
+        self.events = events;
+        self
+    }
+
     pub(super) fn snapshot_with_events(
         &self,
         game: &Game,
         per_player_events: &mut HashMap<u32, Vec<Event>>,
         full_vision_events: &[Event],
     ) -> Snapshot {
-        let mut snapshot = match self {
-            SnapshotProjection::PlayerFog { player_id, options } => {
+        let mut snapshot = match &self.body {
+            SnapshotBodyProjection::PlayerFog { player_id, options } => {
                 game.snapshot_for_with_options(*player_id, *options)
             }
-            SnapshotProjection::SpectatorUnion {
+            SnapshotBodyProjection::SpectatorUnion {
                 player_ids,
                 options,
             }
-            | SnapshotProjection::SelectablePerspective {
+            | SnapshotBodyProjection::SelectablePerspective {
                 player_ids,
                 options,
             } => game.snapshot_for_spectator_with_options(player_ids, *options),
-            SnapshotProjection::FullWorld { player_id, options } => {
+            SnapshotBodyProjection::FullWorld { player_id, options } => {
                 game.snapshot_full_for_with_options(*player_id, *options)
             }
         };
 
-        match self {
-            SnapshotProjection::PlayerFog { player_id, .. }
-            | SnapshotProjection::FullWorld { player_id, .. } => {
+        match &self.events {
+            EventProjection::PlayerOnly { player_id } => {
                 if let Some(mut events) = per_player_events.remove(player_id) {
                     snapshot.events.append(&mut events);
                 }
             }
-            SnapshotProjection::SpectatorUnion { .. } => {
+            EventProjection::FullVision => {
                 snapshot.events.extend(full_vision_events.to_vec());
             }
-            SnapshotProjection::SelectablePerspective { player_ids, .. } => {
+            EventProjection::PlayerUnion { player_ids } => {
                 snapshot.events.extend(union_events(
                     player_ids
                         .iter()
@@ -108,20 +159,20 @@ impl ProjectionPolicy {
         spectator_visible_player_ids: &[u32],
     ) -> SnapshotProjection {
         if self.visibility == VisibilityPolicy::FullWorldProjection {
-            return SnapshotProjection::FullWorld {
-                player_id: seat_id.unwrap_or(connection_id),
-                options: self.snapshot_options_for(role),
-            };
+            return SnapshotProjection::full_world(
+                seat_id.unwrap_or(connection_id),
+                self.snapshot_options_for(role),
+            );
         }
         match role {
-            RecipientRole::ActivePlayer => SnapshotProjection::PlayerFog {
-                player_id: seat_id.unwrap_or(connection_id),
-                options: self.snapshot_options_for(role),
-            },
-            RecipientRole::Spectator => SnapshotProjection::SpectatorUnion {
-                player_ids: spectator_visible_player_ids.to_vec(),
-                options: self.snapshot_options_for(role),
-            },
+            RecipientRole::ActivePlayer => SnapshotProjection::player_fog(
+                seat_id.unwrap_or(connection_id),
+                self.snapshot_options_for(role),
+            ),
+            RecipientRole::Spectator => SnapshotProjection::spectator_union(
+                spectator_visible_player_ids.to_vec(),
+                self.snapshot_options_for(role),
+            ),
         }
     }
 
@@ -129,17 +180,17 @@ impl ProjectionPolicy {
         self,
         visible_player_ids: Vec<u32>,
     ) -> SnapshotProjection {
-        SnapshotProjection::SelectablePerspective {
-            player_ids: visible_player_ids,
-            options: self.snapshot_options_for(RecipientRole::Spectator),
-        }
+        SnapshotProjection::selected_perspective(
+            visible_player_ids,
+            self.snapshot_options_for(RecipientRole::Spectator),
+        )
     }
 
     pub(super) fn full_world_snapshot_for(self, view_player_id: u32) -> SnapshotProjection {
-        SnapshotProjection::FullWorld {
-            player_id: view_player_id,
-            options: self.snapshot_options_for(RecipientRole::Spectator),
-        }
+        SnapshotProjection::full_world(
+            view_player_id,
+            self.snapshot_options_for(RecipientRole::Spectator),
+        )
     }
 
     pub(super) fn observer_analysis_audience(self) -> ObserverAnalysisAudience {
@@ -200,24 +251,15 @@ mod tests {
 
         assert_eq!(
             policy.live_snapshot_for(RecipientRole::ActivePlayer, 10, None, &[1, 2]),
-            SnapshotProjection::PlayerFog {
-                player_id: 10,
-                options: SnapshotOptions::default()
-            }
+            SnapshotProjection::player_fog(10, SnapshotOptions::default())
         );
         assert_eq!(
             policy.live_snapshot_for(RecipientRole::ActivePlayer, 100, Some(1), &[1, 2]),
-            SnapshotProjection::PlayerFog {
-                player_id: 1,
-                options: SnapshotOptions::default()
-            }
+            SnapshotProjection::player_fog(1, SnapshotOptions::default())
         );
         assert_eq!(
             policy.live_snapshot_for(RecipientRole::Spectator, 102, None, &[1, 2]),
-            SnapshotProjection::SpectatorUnion {
-                player_ids: vec![1, 2],
-                options: SnapshotOptions::default()
-            }
+            SnapshotProjection::spectator_union(vec![1, 2], SnapshotOptions::default())
         );
         assert_eq!(
             policy.observer_analysis_audience(),
@@ -243,10 +285,7 @@ mod tests {
         );
         assert_eq!(
             replay.selected_perspective_snapshot_for(vec![2]),
-            SnapshotProjection::SelectablePerspective {
-                player_ids: vec![2],
-                options: SnapshotOptions::default()
-            }
+            SnapshotProjection::selected_perspective(vec![2], SnapshotOptions::default())
         );
         assert_eq!(
             replay.observer_analysis_audience(),
@@ -259,13 +298,13 @@ mod tests {
         );
         assert_eq!(
             dev.full_world_snapshot_for(7),
-            SnapshotProjection::FullWorld {
-                player_id: 7,
-                options: SnapshotOptions {
+            SnapshotProjection::full_world(
+                7,
+                SnapshotOptions {
                     include_movement_paths: true,
                     movement_paths_for_all_projected: true,
-                }
-            }
+                },
+            )
         );
         assert_eq!(
             dev.observer_analysis_audience(),
@@ -286,17 +325,11 @@ mod tests {
         );
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::Spectator, 99, Some(1), &[1, 2]),
-            SnapshotProjection::FullWorld {
-                player_id: 1,
-                options: SnapshotOptions::default()
-            }
+            SnapshotProjection::full_world(1, SnapshotOptions::default())
         );
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::ActivePlayer, 99, None, &[1, 2]),
-            SnapshotProjection::FullWorld {
-                player_id: 99,
-                options: SnapshotOptions::default()
-            }
+            SnapshotProjection::full_world(99, SnapshotOptions::default())
         );
         assert_eq!(
             lab.observer_analysis_audience(),

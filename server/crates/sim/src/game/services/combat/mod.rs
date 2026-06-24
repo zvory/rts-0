@@ -196,14 +196,13 @@ pub(crate) fn combat_system(
         let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
             occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
         };
-        let prefer_safe_mortar_autocast_targets = is_mortar_team
+        let require_safe_mortar_autocast_target = is_mortar_team
             && matches!(
                 entities
                     .get(id)
                     .and_then(|e| e.autocast_enabled(AbilityKind::MortarFire)),
                 Some(true)
             )
-            && matches!(entities.get(id), Some(e) if e.attack_cd() == 0)
             && mortar_autocast_researched(owner);
         let target = resolve_target_with_obstruction(
             map,
@@ -221,7 +220,7 @@ pub(crate) fn combat_system(
             acquire_px,
             mode,
             &|target_id| {
-                !prefer_safe_mortar_autocast_targets
+                !require_safe_mortar_autocast_target
                     || mortar_autocast_target_safe(entities, teams, spatial, owner, target_id, tick)
             },
         );

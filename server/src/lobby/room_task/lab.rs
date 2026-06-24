@@ -16,7 +16,7 @@ use super::super::dev_replay::match_seed;
 use super::super::lab_timeline::{LabTimeline, LabTimelineEntry, LabTimelineEntryKind};
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
 use super::super::live_tick::LabSnapshotProjection;
-use super::super::projection::RecipientRole;
+use super::super::projection::{EventProjection, RecipientRole};
 use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::{normalize_start_team_id, PLAYER_PALETTE};
@@ -153,6 +153,14 @@ fn players_on_teams(game: &Game, team_ids: impl IntoIterator<Item = TeamId>) -> 
         .players
         .into_iter()
         .filter(|player| teams.contains(&player.team_id))
+        .map(|player| player.id)
+        .collect()
+}
+
+fn active_lab_player_ids(game: &Game) -> Vec<u32> {
+    game.start_payload()
+        .players
+        .into_iter()
         .map(|player| player.id)
         .collect()
 }
@@ -745,6 +753,7 @@ impl RoomTask {
             let projection = match session.vision_for(id) {
                 LabVisionMode::FullWorld => LabSnapshotProjection::FullWorld {
                     view_player_id: session.view_player_id,
+                    event_player_ids: active_lab_player_ids(game),
                 },
                 LabVisionMode::Team { team_id } => LabSnapshotProjection::PlayerUnion {
                     player_ids: players_on_teams(game, std::iter::once(team_id)),
@@ -785,8 +794,14 @@ impl RoomTask {
         )
         .send_to_recipients(&mut self.players, recipients, |id, player| {
             let projection = match lab_snapshot_projections.get(&id) {
-                Some(LabSnapshotProjection::FullWorld { view_player_id }) => projection_policy
-                    .live_snapshot_for(RecipientRole::Spectator, id, Some(*view_player_id), &[]),
+                Some(LabSnapshotProjection::FullWorld {
+                    view_player_id,
+                    event_player_ids,
+                }) => projection_policy
+                    .live_snapshot_for(RecipientRole::Spectator, id, Some(*view_player_id), &[])
+                    .with_event_projection(EventProjection::PlayerUnion {
+                        player_ids: event_player_ids.clone(),
+                    }),
                 Some(LabSnapshotProjection::PlayerUnion { player_ids }) => {
                     projection_policy.selected_perspective_snapshot_for(player_ids.clone())
                 }

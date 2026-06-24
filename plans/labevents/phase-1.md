@@ -1,6 +1,6 @@
 # Phase 1 - Server Event Projection Contract
 
-Status: planned.
+Status: done.
 
 ## Goal
 
