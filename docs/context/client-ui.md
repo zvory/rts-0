@@ -18,7 +18,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`, `command_budget.js`,
   `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
-- `rules-mirror`: `config.js`/`config/`.
+- `rules-mirror`: `config.js` facade + `config/`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, resource icons, scoreboard, status badge, minimap,
   branch staging, lab panel, and settings. The lobby browser polls `GET /api/lobbies` and preflights

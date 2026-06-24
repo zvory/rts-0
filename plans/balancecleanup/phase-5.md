@@ -1,6 +1,6 @@
 # Phase 5 - Cleanup Closeout
 
-Status: planned.
+Status: done.
 
 ## Goal
 

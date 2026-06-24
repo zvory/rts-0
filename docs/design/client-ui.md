@@ -13,7 +13,7 @@ assets/decals/    # SVG alpha-mask sources for client-only permanent ground deca
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
   config.js       # PINNED — stable public facade for render/UI constants and balance mirrors
-  config/         # internal config modules: presentation, timing, rules mirror data, factions
+  config/         # timing.js, presentation.js, rules_mirror.js, factions.js
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
@@ -1144,7 +1144,8 @@ Current areas:
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
   `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
-- `rules-mirror`: `config.js` plus internal `config/` modules.
+- `rules-mirror`: `config.js` plus `config/timing.js`, `config/presentation.js`,
+  `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
   staging, lab panel, settings. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up

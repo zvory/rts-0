@@ -8,8 +8,12 @@ starting resources, supply caps, mining amounts, support-weapon constants, body 
 and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules
 group those Rust-owned values by domain, and its `unit_stats(kind)` and `building_stats(kind)`
 helpers read the defs table.
-`client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight, sizes,
-colors, and command-card descriptors). Keep both in sync; run
+`client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
+supply, sight, sizes, colors, and command-card descriptors). Its internal
+`client/src/config/timing.js`, `client/src/config/rules_mirror.js`, and
+`client/src/config/factions.js` modules hold Rust-owned mirror data and helpers; its
+`client/src/config/presentation.js` module holds client-owned presentation data. Keep both sides in
+sync; run
 `node scripts/check-faction-catalog-parity.mjs` to mechanically compare the Rust-authoritative
 default faction catalog to the client descriptors.
 The server wiki's `/wiki/stats` page is generated from the same Rust definitions and faction
@@ -45,12 +49,15 @@ them beside `rts-sim` movement should be a later API/design migration rather tha
 source shuffle.
 
 `client/src/config.js` mirrors only the subset needed by UI, rendering, fog previews, and command
-cards. Rust-owned mirrored values include gameplay-visible costs, supply, sight, footprints, body
-dimensions, client-visible timing/range/duration constants, faction legality, upgrade metadata,
-ability descriptors exported by the Rust faction catalog, ability effect fields exported in the
-rules dump, and resource starting amounts. Client-owned values include render colors, camera
-defaults, fog overlay alpha, command-card layout hints, local presentation labels/icons that are not
-exported by Rust, and resource render labels/sizes.
+cards while preserving the historical public import path. Rust-owned mirrored values live behind
+`client/src/config/timing.js`, `client/src/config/rules_mirror.js`, and
+`client/src/config/factions.js`; they include gameplay-visible costs, supply, sight, footprints,
+body dimensions, client-visible timing/range/duration constants, faction legality, upgrade
+metadata, ability descriptors exported by the Rust faction catalog, ability effect fields exported
+in the rules dump, and resource starting amounts. Client-owned values live in
+`client/src/config/presentation.js` and include render colors, camera defaults, fog overlay alpha,
+command-card layout hints, local presentation labels/icons that are not exported by Rust, and
+resource render labels/sizes.
 
 Run `node scripts/check-faction-catalog-parity.mjs` after changing Rust-owned values that are
 mirrored into `client/src/config.js`. The check runs the Rust `rts-rules` faction catalog dump,
@@ -60,7 +67,7 @@ Rust-owned ability descriptors/effect fields. Run `node scripts/check-wiki.mjs` 
 change affects visible stats, faction availability, upgrades, or ability metadata that appears on
 the generated `/wiki/stats` page.
 
-| Constant | Before Phase 5 | After Phase 5 | Mirror impact |
+| Constant | Before cleanup | After cleanup | Mirror impact |
 |----------|----------------|---------------|---------------|
 | `MORTAR_FIRE_TOLERANCE_RAD` | Sim-only mortar aim tolerance exported from `server/crates/sim/src/config.rs` beside mirrored balance constants | Sim-local `server/crates/sim/src/game/mortar.rs` `FIRE_TOLERANCE_RAD`, owned by mortar firing behavior | None; it is not mirrored into `client/src/config.js` and does not change wire shape or balance values |
 
@@ -92,7 +99,7 @@ review.
 | Camera defaults | None in Rust | `client/src/config.js` `CAMERA` | UI-only presentation data | None | Exclusion list in future config parity check | Client-only input/render affordance | No compact impact |
 | Anti-tank gun field-of-fire preview | `server/crates/rules/src/balance.rs` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` is authoritative at 45 degrees total | `client/src/config.js` `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD` | balance scalar / advisory UI mirror | `scripts/check-faction-catalog-parity.mjs` checks the client preview against the Rust field-of-fire constant | Keep the preview Rust-owned because it represents the authoritative deployed firing arc | Not client-only: the client preview represents an authoritative firing arc | No compact impact |
 
-### Phase 4 parity exclusions
+### Parity exclusions after the split
 
 The structured rules dump intentionally excludes client-owned presentation values that do not have
 Rust catalog or balance ownership: global terrain and selection colors, fog overlay alpha, camera

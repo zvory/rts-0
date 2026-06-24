@@ -13,15 +13,21 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
 - `server/crates/rules/src/defs.rs` — authoritative unit/building stat records
 - `server/crates/rules/src/faction.rs` — authoritative faction catalogs, train/build/research
   availability, and Rust-exported ability/command-card metadata
-- `server/crates/rules/src/balance.rs` — authoritative shared scalars and client-visible timing,
-  range, duration, body, resource, and ability effect constants
+- `server/crates/rules/src/balance.rs` — stable public balance surface; internal
+  `server/crates/rules/src/balance/*.rs` modules group timing, map, economy, supply, body,
+  support-weapon, upgrade, ability, and stat-helper definitions
+- `server/crates/sim/src/command_budget.rs` — sim-owned command admission caps mirrored by the
+  client and checked by faction catalog parity
 - `server/src/config.rs`, `server/crates/sim/src/config.rs` — compatibility shims for local callers
-- `client/src/config.js` — mirrors the UI/render/fog subset (costs, supply, sight, sizes)
+- `client/src/config.js` — stable public facade for the UI/render/fog mirror; internal
+  `client/src/config/*.js` modules split timing, Rust-owned rules mirror data, faction helpers, and
+  client-owned presentation data
 
 ## Invariants
-- **Mirror.** Change `server/crates/rules/src/balance.rs` and `client/src/config.js` together when
+- **Mirror.** Change the Rust rules balance surface and `client/src/config.js` facade together when
   the value is visible to the client (cost, supply, sight, size, anything used by HUD/render/fog).
-  Server-only tuning (damage curves, internal timers) stays in Rust rules/sim code.
+  Server-only tuning (damage curves, internal timers) stays in Rust rules/sim code. Command budget
+  values stay sim-owned but must continue to match the client exports.
 - **Parity.** Run `node scripts/check-faction-catalog-parity.mjs` after client-visible rules,
   faction catalog, upgrade, ability descriptor/effect, resource amount, or mirrored config changes.
 - `/wiki/stats` is generated from Rust rules definitions and faction catalogs. Run
