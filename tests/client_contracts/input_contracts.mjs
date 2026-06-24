@@ -4,6 +4,7 @@
 import { assert } from "./assertions.mjs";
 import { HUD } from "../../client/src/hud.js";
 import { Input } from "../../client/src/input/index.js";
+import { CameraNavigationInput } from "../../client/src/input/camera_navigation.js";
 import { _controlGroupSaveModifierActive } from "../../client/src/input/control_groups.js";
 import {
   cursorLockSupported,
@@ -546,6 +547,47 @@ import {
   nativeRouteInput._handleNativeCursorEvent({ type: "down", button: 0, x: 33, y: 44 });
   assert(routed.viewportX === 33 && routed.viewportY === 44, "native pointerDown routes viewport coords from the native cursor");
   assert(routed.clientX === 43 && routed.clientY === 64, "native pointerDown routes client coords matching the native cursor");
+}
+
+{
+  const pans = [];
+  const nativeMiddleInput = Object.create(Input.prototype);
+  nativeMiddleInput.pointerLocked = true;
+  nativeMiddleInput._cursorLockMode = "native-macos";
+  nativeMiddleInput.mouse = { x: 40, y: 50 };
+  nativeMiddleInput.dom = {
+    clientWidth: 200,
+    clientHeight: 160,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 200, height: 160 };
+    },
+  };
+  nativeMiddleInput.cameraNavigation = new CameraNavigationInput(nativeMiddleInput.dom, {
+    panByScreenDelta(dx, dy) {
+      pans.push({ dx, dy });
+    },
+  });
+  nativeMiddleInput.inputRouter = null;
+  nativeMiddleInput._pointerLockCursor = { style: {} };
+  nativeMiddleInput._pendingPointerLockCursor = null;
+  nativeMiddleInput._panDrag = null;
+  nativeMiddleInput._drag = null;
+  nativeMiddleInput._routeLockedPointerDown = () => false;
+  nativeMiddleInput._routeLockedPointerMove = () => false;
+  nativeMiddleInput._routeLockedPointerUp = () => false;
+  nativeMiddleInput._refreshResourceMiningPreview = () => {};
+  nativeMiddleInput._placement = () => null;
+  nativeMiddleInput._commandTarget = () => null;
+  nativeMiddleInput._labTool = () => null;
+  nativeMiddleInput._intent = () => null;
+
+  nativeMiddleInput._handleNativeCursorEvent({ type: "down", button: 1, x: 40, y: 50 });
+  nativeMiddleInput._handleNativeCursorEvent({ type: "move", x: 64, y: 68, dx: 24, dy: 18 });
+  nativeMiddleInput._handleNativeCursorEvent({ type: "up", button: 1, x: 64, y: 68 });
+
+  assert(pans.length === 1, "native middle-drag pans through shared camera navigation");
+  assert(pans[0].dx === 24 && pans[0].dy === 18, "native middle-drag uses native cursor screen delta");
+  assert(nativeMiddleInput.cameraNavigation.panDrag === null, "native middle-drag releases the shared pan state");
 }
 
 {
