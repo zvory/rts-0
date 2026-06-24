@@ -289,9 +289,10 @@ export class LabPanelWindowChrome {
     if (!this.collapseButton) return;
     const collapsed = this.collapsed;
     const label = this.collapseLabel || "panel";
-    this.collapseButton.textContent = collapsed ? "▸" : "▾";
-    this.collapseButton.title = `${collapsed ? "Expand" : "Collapse"} ${label}`;
-    this.collapseButton.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${label}`);
+    const action = collapsed ? "Expand" : "Collapse";
+    this.collapseButton.textContent = action;
+    this.collapseButton.title = `${action} ${label}`;
+    this.collapseButton.setAttribute("aria-label", `${action} ${label}`);
     this.collapseButton.setAttribute("aria-expanded", collapsed ? "false" : "true");
   }
 
