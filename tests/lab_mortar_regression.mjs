@@ -96,10 +96,29 @@ async function prepareDeployedPlayerTwoMortar(client) {
   const mortar = scenario.entities.find((entity) => entity.id === mortarId);
   requireCondition(mortar, "exported scenario includes spawned P2 mortar");
   mortar.setUp = true;
+  mortar.setupFacing = Math.atan2(targetPosition.y - mortar.y, targetPosition.x - mortar.x);
+  mortar.facing = mortar.setupFacing;
+  mortar.weaponFacing = mortar.setupFacing;
   mortar.setupTarget = { ...targetPosition };
 
   const remappedMortarId = await importScenario(client, 4, scenario, mortarId);
+  await waitForRestoredMortarSnapshot(client, remappedMortarId);
   return { mortarId: remappedMortarId, targetPosition };
+}
+
+async function waitForRestoredMortarSnapshot(client, mortarId) {
+  await client.waitFor(
+    (msg) =>
+      msg.t === "snapshot" &&
+      msg.entities.some(
+        (entity) =>
+          entity.id === mortarId &&
+          entity.owner === PLAYER_TWO_ID &&
+          entity.kind === KIND.MORTAR_TEAM,
+      ),
+    5_000,
+    "post-import remapped mortar snapshot",
+  );
 }
 
 async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageIndex) {

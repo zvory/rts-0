@@ -594,7 +594,14 @@ pub struct LabScenarioEntity {
     pub construction_total: Option<u32>,
     pub resource_remaining: Option<u32>,
     #[serde(default)]
+    pub facing: Option<f32>,
+    #[serde(default)]
+    pub weapon_facing: Option<f32>,
+    #[serde(default)]
     pub set_up: bool,
+    #[serde(default)]
+    pub setup_facing: Option<f32>,
+    #[serde(default)]
     pub setup_target: Option<LabScenarioPoint>,
 }
 
