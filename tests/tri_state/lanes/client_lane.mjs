@@ -442,7 +442,7 @@ export class ClientLane {
     await this.page.evaluate((speed) => window.__rts.match.net.setRoomTimeSpeed(speed), speed);
     if (speed === 0) {
       await this.page.waitForFunction(
-        () => window.__rts?.match?.replayControls?.roomTimeState?.paused === true,
+        () => window.__rts?.match?.roomTimeControls?.roomTimeState?.paused === true,
         { timeout: 5000 },
       );
     }
@@ -562,8 +562,8 @@ export class ClientLane {
 
   async currentTick() {
     return this.page.evaluate(() => {
-      const replayTick = window.__rts?.match?.replayControls?.roomTimeState?.currentTick;
-      if (Number.isFinite(replayTick)) return replayTick;
+      const roomTimeTick = window.__rts?.match?.roomTimeControls?.roomTimeState?.currentTick;
+      if (Number.isFinite(roomTimeTick)) return roomTimeTick;
       return window.__rts?.match?.state?._cur?.tick ?? null;
     });
   }
