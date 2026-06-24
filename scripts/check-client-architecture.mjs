@@ -87,6 +87,8 @@ const AREA_BY_FILE = new Map(Object.entries({
 }));
 
 const AREA_PREFIXES = [
+  ["config/", "rules-mirror"],
+  ["config_", "rules-mirror"],
   ["renderer/", "renderer"],
   ["input/", "input"],
 ];

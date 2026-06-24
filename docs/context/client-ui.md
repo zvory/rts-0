@@ -18,7 +18,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `model`: `state.js`, `state_ground_decals.js`, `client_intent.js`, `command_budget.js`,
   `command_composer.js`, `progress_extrapolator.js`, prediction adapters, display state.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
-- `rules-mirror`: `config.js`.
+- `rules-mirror`: `config.js`/`config/`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, resource icons, scoreboard, status badge, minimap,
   branch staging, lab panel, and settings. The lobby browser polls `GET /api/lobbies` and preflights
@@ -37,7 +37,7 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   or architecture-policy changes.
 - **Cross-area imports are constrained.** `protocol.js` and `config.js` are shared mirrors,
   same-area imports are allowed, and `app-shell` may compose other areas. Non-shell cross-area
-  imports should use dependency injection through `Match`/`App`, or be documented in
+  imports should use DI through `Match`/`App`, or be documented in
   `ALLOWED_CROSS_AREA_IMPORTS` with a reason.
 - **Lab UI stays app-owned.** `App` owns `LabClient` and `LabPanel`; `Match` receives injected lab
   metadata/control policy and must not import the lab transport or panel modules directly.

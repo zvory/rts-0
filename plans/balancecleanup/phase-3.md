@@ -1,6 +1,6 @@
 # Phase 3 - Client Config Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 

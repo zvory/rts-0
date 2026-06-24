@@ -12,7 +12,8 @@ styles.css        # HUD, lobby, menus, command card
 assets/decals/    # SVG alpha-mask sources for client-only permanent ground decals
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
-  config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
+  config.js       # PINNED — stable public facade for render/UI constants and balance mirrors
+  config/         # internal config modules: presentation, timing, rules mirror data, factions
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
@@ -860,6 +861,11 @@ local prediction remains disabled for unsupported local faction ids such as the 
 Generation is not required as long as the parity check remains a required gate comparing every
 client-exposed descriptor against the Rust dump.
 
+Internally, `config.js` is a facade over `config/timing.js`, `config/presentation.js`,
+`config/rules_mirror.js`, and `config/factions.js`. Runtime modules should keep importing
+`config.js`; internal config modules are in the pinned `rules-mirror` area and may import only
+`protocol.js` or same-area config modules.
+
 `minimap.js`
 ```js
 export class Minimap {
@@ -1120,7 +1126,7 @@ Current areas:
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
   `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
-- `rules-mirror`: `config.js`.
+- `rules-mirror`: `config.js` plus internal `config/` modules.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
   staging, lab panel, settings. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
@@ -1136,7 +1142,9 @@ Current areas:
   `report_window_aggregate.js`.
 
 Import rules:
-- `protocol.js` and `config.js` are shared mirrors and may be imported where needed.
+- `protocol.js` and the `config.js` facade are shared mirrors and may be imported where needed.
+- Internal `config/` modules are for the facade and same-area config imports; runtime modules should
+  not bypass `config.js`.
 - Files in the same area may import each other.
 - `app-shell` files may compose other areas; prefer adding new cross-area wiring in `match.js` or
   `app.js` instead of importing collaborators from feature modules.
@@ -1154,8 +1162,8 @@ Future client changes should use this checklist:
 - Did this change command-card behavior? Add descriptor coverage or DOM contract coverage for the
   visible command-card contract.
 - Did this change rendering? Run the client smoke suite and add a targeted check where practical.
-- Did this touch `protocol.js` or `config.js`? Update the mirrored server file and the relevant
-  design/context docs in the same change.
+- Did this touch `protocol.js` or Rust-owned values behind the `config.js` facade? Update the
+  mirrored server file and the relevant design/context docs in the same change.
 
 Large-file handling is ratcheted, not churn-driven. Do not split a large file only to reduce byte
 count. When adding behavior to an already large file, first look for a focused collaborator,
