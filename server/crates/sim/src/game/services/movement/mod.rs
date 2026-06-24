@@ -92,17 +92,26 @@ pub(crate) fn movement_system_with_events(
         }
     }
     for id in entities.ids() {
-        let has_meth = entities
+        let Some(has_meth) = entities
             .get(id)
             .filter(|e| e.kind == EntityKind::Rifleman)
-            .and_then(|e| players.iter().find(|p| p.id == e.owner))
-            .is_some_and(|p| {
-                p.upgrades
-                    .contains(&crate::game::upgrade::UpgradeKind::Methamphetamines)
-            });
-        if has_meth {
-            if let Some(e) = entities.get_mut(id) {
+            .and_then(|e| {
+                players
+                    .iter()
+                    .find(|p| p.id == e.owner)
+                    .map(|p| {
+                        p.upgrades
+                            .contains(&crate::game::upgrade::UpgradeKind::Methamphetamines)
+                    })
+            })
+        else {
+            continue;
+        };
+        if let Some(e) = entities.get_mut(id) {
+            if has_meth {
                 e.start_charge(u16::MAX);
+            } else if e.charge_ticks() > config::RIFLEMAN_CHARGE_TICKS {
+                e.clear_charge();
             }
         }
     }
