@@ -1,0 +1,34 @@
+//! Support-weapon setup, range, projectile, and area-effect constants.
+
+use super::TICK_HZ;
+
+pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
+pub const ANTI_TANK_GUN_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
+pub const MORTAR_TEAM_SETUP_TICKS: u16 = 0;
+pub const MORTAR_RANGE_TILES: u32 = 12;
+pub const MORTAR_SHELL_DELAY_TICKS: u32 = (TICK_HZ * 9 + 2) / 4;
+pub const MORTAR_OUTER_RADIUS_TILES: f32 = 1.5;
+pub const MORTAR_INNER_RADIUS_TILES: f32 = 0.5;
+pub const MORTAR_OUTER_DAMAGE: u32 = 40;
+pub const MORTAR_INNER_DAMAGE: u32 = 100;
+pub const MORTAR_AUTOFIRE_ERROR_TILES: f32 = 0.35;
+
+pub const ANTI_TANK_GUN_PACKED_RANGE_TILES: u32 = 5;
+pub const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES: u32 = 14;
+pub const ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
+pub const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD: f32 = 45.0_f32 * std::f32::consts::PI / 180.0;
+
+pub const ARTILLERY_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3;
+pub const ARTILLERY_RELOAD_TICKS: u32 = TICK_HZ * 3;
+pub const ARTILLERY_SHELL_DELAY_TICKS: u32 = TICK_HZ * 5;
+pub const ARTILLERY_MIN_RANGE_TILES: u32 = 15;
+pub const ARTILLERY_MAX_RANGE_TILES: u32 = 55;
+pub const ARTILLERY_FIELD_OF_FIRE_RAD: f32 = 20.0_f32 * std::f32::consts::PI / 180.0;
+pub const ARTILLERY_AMMO_COST_STEEL: u32 = 10;
+pub const ARTILLERY_INNER_RADIUS_TILES: f32 = 1.0;
+pub const ARTILLERY_OUTER_RADIUS_TILES: f32 = 3.0;
+pub const ARTILLERY_INNER_DAMAGE: u32 = 150;
+pub const ARTILLERY_OUTER_MIN_DAMAGE: u32 = 10;
+pub const ARTILLERY_INITIAL_ERROR_TILES: f32 = 10.0;
+pub const ARTILLERY_MIN_ERROR_TILES: f32 = 2.0;
+pub const ARTILLERY_ACCURACY_SHOTS_TO_MIN: u16 = 5;
