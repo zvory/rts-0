@@ -1,6 +1,6 @@
 # Capsule: testing
 
-Use when writing/debugging tests, changing CI/hooks, or choosing focused verification.
+Use when writing/debugging tests, CI/hooks, or focused verification.
 
 ## Read first
 - [docs/design/testing.md](../design/testing.md) §9 — self-play harness
@@ -14,6 +14,7 @@ Use when writing/debugging tests, changing CI/hooks, or choosing focused verific
 - `node tests/server_integration.mjs` — dep-free full server pipeline; needs a running server.
 - `node tests/regression.mjs` — dep-free hardening/DoS/robustness guards; needs a running server.
 - `node tests/ai_integration.mjs` — dep-free AI opponent lobby flow; needs a running server.
+- `node tests/lab_mortar_regression.mjs` — lab P2 mortar event regression; needs a server.
 - `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock contracts.
 - `tests/run-all.sh --no-rust` — live Node suites plus browser smoke with shared dependencies.
 - `tests/run-all.sh --with-tri-state-browser --no-rust` — opt into latency-sensitive tri-state
@@ -46,8 +47,7 @@ Use when writing/debugging tests, changing CI/hooks, or choosing focused verific
 - Installed hooks run staged whitespace checks, excluding the human-owned `playtest_notes.md`, plus
   `node scripts/check-docs-health.mjs` before commits and merges. They do not run `tests/run-all.sh`;
   GitHub Actions owns the full-suite gate.
-- Browser smoke dependencies are shared across worktrees under
-  `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}` and keyed by `tests/package-lock.json`.
+- Browser smoke dependencies are cached under `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}`.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.
 - A suite can be skipped only when `tests/select-suites.mjs` maps the changed files away from that
