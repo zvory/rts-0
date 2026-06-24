@@ -360,6 +360,9 @@ await withFakeDocument(async () => {
   const playerButtons = () => findFakes(root, (el) => (
     el.tagName === "BUTTON" && String(el.className).includes("lab-player-btn")
   ));
+  const playerButtonGroup = () => findFakes(root, (el) => (
+    String(el.className).split(/\s+/).includes("lab-player-buttons")
+  ))[0];
   const spawnPanel = (kind) => findFakes(root, (el) => (
     el.tagName === "SECTION" && el.dataset?.spawnPanel === kind
   ))[0];
@@ -444,10 +447,24 @@ await withFakeDocument(async () => {
     textWithin(sectionByClass("lab-tools")).includes("Unit Spawn") &&
       textWithin(sectionByClass("lab-tools")).includes("Building Spawn") &&
       textWithin(sectionByClass("lab-tools")).includes("Player State") &&
-      textWithin(sectionByClass("lab-tools")).includes("Remove tool") &&
+      textWithin(sectionByClass("lab-tools")).includes("Remove entities") &&
       !textWithin(sectionByClass("lab-tools")).includes("Unlimited commands") &&
       !textWithin(sectionByClass("lab-tools")).includes("Scenario"),
     "LabPanel groups placement tools in the Tools section",
+  );
+  assert(
+    findFakes(sectionByClass("lab-tools"), (el) => el.tagName === "H3" && el.textContent === "Tools").length === 0,
+    "LabPanel does not repeat the Tools title inside the Tools window",
+  );
+  assert(
+    !textWithin(sectionByClass("lab-tools")).includes("Target Player") &&
+      !findFakes(sectionByClass("lab-tools"), (el) => String(el.className).split(/\s+/).includes("lab-player-label")).length &&
+      sectionByClass("lab-tools").children.includes(playerButtonGroup()),
+    "LabPanel renders target player buttons directly without the old labels or fieldset",
+  );
+  assert(
+    textWithin(sectionByClass("lab-tools").children.at(-1)).includes("Player State"),
+    "LabPanel places Player State at the bottom of the Tools section",
   );
   assert(!textWithin(root).includes("Map Tools"), "LabPanel removes the old Map Tools section label");
   assert(!buttonByText("Move to point") && !buttonByText("Set owner"), "LabPanel removes the old selected move and owner tools");
@@ -553,7 +570,7 @@ await withFakeDocument(async () => {
   panel.fields.get("building-spawn-faction").value = "ekat";
   panel.fields.get("building-spawn-faction").listeners.change();
   assert(panel.buildingSpawnPalette.kind === KIND.ZAMOK, "LabPanel faction selection updates the building palette deterministically");
-  buttonByText("Remove tool").listeners.click();
+  buttonByText("Remove entities").listeners.click();
   assert(armedTool?.kind === "removeSelectableUnits", "LabPanel arms a remove setup tool for map clicks and drags");
   assert(
     armedTool?.keepArmedOnWorldClick === true &&

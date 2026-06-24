@@ -210,14 +210,16 @@ export class LabPanel {
   }
 
   renderToolsPanel() {
-    const root = this.panelSection("Tools", "lab-tools");
+    const root = document.createElement("section");
+    root.className = "lab-panel-section lab-tools";
+    root.setAttribute("aria-label", "Tools");
 
     root.appendChild(this.renderActiveToolStatus());
     root.appendChild(this.renderTargetPlayer());
-    root.appendChild(this.renderPlayerStatePanel());
     root.appendChild(this.renderRemoveTool());
     root.appendChild(this.renderSpawnPalette());
     root.appendChild(this.renderBuildingSpawnPalette());
+    root.appendChild(this.renderPlayerStatePanel());
 
     return root;
   }
@@ -264,7 +266,7 @@ export class LabPanel {
     const wrap = document.createElement("div");
     wrap.className = "lab-remove-tool-row";
     wrap.appendChild(
-      this.button("Remove tool", () => this.armRemoveTool(), {
+      this.button("Remove entities", () => this.armRemoveTool(), {
         title: "Click or drag over selectable units to delete them",
         dataset: { active: this.activeLabTool()?.kind === "removeSelectableUnits" ? "true" : "false" },
       }),
@@ -453,17 +455,10 @@ export class LabPanel {
   }
 
   renderTargetPlayer() {
-    return this.fieldset("Target Player", [
-      this.playerButtonField("lab-player", "Player"),
-    ]);
+    return this.playerButtonField("lab-player", "Target player");
   }
 
   playerButtonField(id, labelText) {
-    const wrap = document.createElement("div");
-    wrap.className = "lab-player-field";
-    const label = document.createElement("span");
-    label.className = "lab-player-label";
-    label.textContent = labelText;
     const group = document.createElement("div");
     group.className = "lab-player-buttons";
     group.setAttribute("role", "group");
@@ -491,8 +486,7 @@ export class LabPanel {
       this.playerButtons.set(playerId, button);
       group.appendChild(button);
     });
-    wrap.append(label, group);
-    return wrap;
+    return group;
   }
 
   selectTargetPlayer(owner) {

@@ -1923,16 +1923,6 @@ input[type="text"]:focus {
   gap: 3px;
   min-width: 0;
 }
-.lab-player-field {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-.lab-player-label {
-  color: var(--ink-dim);
-  font-size: 11px;
-}
 .lab-player-buttons {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
