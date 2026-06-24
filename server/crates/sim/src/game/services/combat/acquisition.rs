@@ -58,6 +58,7 @@ pub(super) fn resolve_target(
     py: f32,
     acquire_px: f32,
     mode: CombatMode,
+    preferred_target_filter: &dyn Fn(u32) -> bool,
 ) -> Option<u32> {
     if smokes.point_inside(px, py) {
         return None;
@@ -115,6 +116,14 @@ pub(super) fn resolve_target(
         tank_trap_obstructs_vehicle_route,
         attacker.target_id(),
     );
+    if let Some(target) = priority::choose_target(
+        &context,
+        candidates
+            .iter()
+            .filter(|candidate| preferred_target_filter(candidate.id)),
+    ) {
+        return Some(target);
+    }
     priority::choose_target(&context, &candidates)
 }
 

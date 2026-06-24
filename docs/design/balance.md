@@ -219,10 +219,11 @@ activation/autocast policy instead of being folded into default targeting.
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
   The inner radius is fully armor-piercing against armored targets; the outer radius keeps
   semi-armor-piercing damage against armored targets. Manual Fire uses hotkey `X`; autocast
-  uses normal idle/attack-move acquisition after Mortar Autocast research completes. Mortar impacts
-  apply the same damage to friendly and enemy units/buildings; autocast skips predicted impact
-  points that would hit any owned unit or building at its current position, while manual fire remains
-  unrestricted.
+  uses normal idle/attack-move acquisition after Mortar Autocast research completes, preferring
+  targets whose predicted impact avoids same-team units/buildings when alternatives are available.
+  Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
+  predicted impact points that would hit any same-team unit or building at its current position,
+  while manual fire remains unrestricted.
 - anti-tank guns use `ANTI_TANK_GUN_PACKED_RANGE_TILES = 5`, `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 14`,
   `ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 45 degrees total`.
