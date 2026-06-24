@@ -727,7 +727,7 @@ await withFakeDocument(async () => {
   collapseButton.listeners.click();
   assert(
     el.dataset.collapsed === "true" &&
-      collapseButton.textContent === "▸" &&
+      collapseButton.textContent === "Expand" &&
       JSON.parse(storage.values.get("test.lab.panel.window")).collapsed === true,
     "LabPanelWindowChrome persists collapsed panel state",
   );
@@ -735,6 +735,7 @@ await withFakeDocument(async () => {
   resetButton.listeners.click();
   assert(el.dataset.windowed === "false", "LabPanelWindowChrome reset returns to the stylesheet layout");
   assert(el.dataset.collapsed === "false", "LabPanelWindowChrome reset expands the panel");
+  assert(collapseButton.textContent === "Collapse", "LabPanelWindowChrome labels the expanded panel action");
   assert(!storage.values.has("test.lab.panel.window"), "LabPanelWindowChrome reset clears stored geometry");
   chrome.destroy();
   assert(!windowListeners.has("resize"), "LabPanelWindowChrome removes global listeners on destroy");
