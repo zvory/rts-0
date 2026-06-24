@@ -898,6 +898,10 @@ default is the union of all replay players.
 room task before snapshot projection; unknown, empty, or duplicate team selections are rejected.
 Lab vision is server-owned per operator, so one operator can inspect full world while another uses
 team fog in the same room. `labState.vision` and `start.lab.vision` are stamped for the recipient.
+Lab snapshot projection keeps snapshot body visibility and transient event visibility aligned but
+separate: full-world lab vision receives the full-world snapshot body plus the union of event
+buckets for all active lab players, while team and teams lab vision receive spectator-style snapshot
+bodies and event unions for only the selected real players.
 `issueCommandAs` queues a normal gameplay command as the selected player only when all selected
 units belong to that player; mixed-owner selections are rejected instead of partitioned. When
 `ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses
