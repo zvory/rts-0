@@ -361,10 +361,32 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(!listeners.has("window:keydown"), "Shared camera navigation removes key listeners on destroy");
   }
   assert(!shouldWarnBeforeUnload(), "lobby state does not warn before unload");
-  assert(shouldWarnBeforeUnload({ match: {} }), "live match warns before unload");
-  assert(shouldWarnBeforeUnload({ inReplayPlayback: true }), "replay playback warns before unload");
   assert(
-    !shouldWarnBeforeUnload({ match: {}, allowUnloadWithoutWarning: true }),
+    shouldWarnBeforeUnload({ match: { state: { spectator: false } } }),
+    "live player match warns before unload",
+  );
+  assert(
+    !shouldWarnBeforeUnload({ match: { state: { spectator: true } } }),
+    "live spectator does not warn before unload",
+  );
+  assert(
+    !shouldWarnBeforeUnload({ match: { state: { spectator: false }, labMetadata: { id: "lab" } } }),
+    "lab match does not warn before unload",
+  );
+  assert(
+    !shouldWarnBeforeUnload({ match: { state: { spectator: false }, replayViewer: true } }),
+    "replay viewer does not warn before unload",
+  );
+  assert(
+    !shouldWarnBeforeUnload({ match: { state: { spectator: false }, running: false } }),
+    "resolved or stopped match does not warn before unload",
+  );
+  assert(!shouldWarnBeforeUnload({ inReplayPlayback: true }), "replay playback does not warn before unload");
+  assert(
+    !shouldWarnBeforeUnload({
+      match: { state: { spectator: false } },
+      allowUnloadWithoutWarning: true,
+    }),
     "intentional app navigation bypasses unload warning",
   );
 
