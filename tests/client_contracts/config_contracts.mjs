@@ -1,7 +1,8 @@
 // tests/client_contracts/config_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
-import { assert } from "./assertions.mjs";
+import { assert, assertDeepEqual } from "./assertions.mjs";
+import * as configExports from "../../client/src/config.js";
 import {
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
@@ -37,9 +38,92 @@ import {
 import { Input } from "../../client/src/input/index.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 
+const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
+  "ABILITIES",
+  "ANTI_TANK_GUN_BODY",
+  "ANTI_TANK_GUN_DEPLOYED_RANGE_TILES",
+  "ANTI_TANK_GUN_FIELD_OF_FIRE_RAD",
+  "ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS",
+  "ARTILLERY_AMMO_COST",
+  "ARTILLERY_BODY",
+  "ARTILLERY_FIELD_OF_FIRE_RAD",
+  "ARTILLERY_MAX_RANGE_TILES",
+  "ARTILLERY_MIN_RANGE_TILES",
+  "ARTILLERY_OUTER_RADIUS_TILES",
+  "ARTILLERY_SETUP_TICKS",
+  "ARTILLERY_SHELL_DELAY_TICKS",
+  "ARTILLERY_UNLOCK_RESEARCH_TICKS",
+  "BASE_COMMAND_SUPPLY_CAP",
+  "BREAKTHROUGH_COOLDOWN_TICKS",
+  "BREAKTHROUGH_DURATION_TICKS",
+  "BREAKTHROUGH_RADIUS_TILES",
+  "CAMERA",
+  "COLORS",
+  "COMMAND_CAR_BODY",
+  "COMMAND_CAR_SUPPLY_CAP_BONUS",
+  "COMMAND_CAR_UNLOCK_RESEARCH_TICKS",
+  "EKAT_FACTION_ID",
+  "EKAT_LINE_SHOT_COOLDOWN_TICKS",
+  "EKAT_LINE_SHOT_DAMAGE",
+  "EKAT_LINE_SHOT_RANGE_TILES",
+  "EKAT_LINE_SHOT_SPEED_PX_PER_TICK",
+  "EKAT_LINE_SHOT_WIDTH_TILES",
+  "EKAT_MAGIC_ANCHOR_DURATION_TICKS",
+  "EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER",
+  "EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER",
+  "EKAT_MAGIC_ANCHOR_RADIUS_TILES",
+  "EKAT_MAGIC_ANCHOR_RANGE_TILES",
+  "EKAT_REGEN_TICKS",
+  "EKAT_TELEPORT_COOLDOWN_TICKS",
+  "EKAT_TELEPORT_RANGE_TILES",
+  "FACTION_CATALOGS",
+  "FIXTURE_FACTION_ID",
+  "FOG_EXPLORED_ALPHA",
+  "FOG_UNEXPLORED_ALPHA",
+  "INTERP_DELAY_MS",
+  "METHAMPHETAMINES_RESEARCH_TICKS",
+  "MINING_CC_RANGE_TILES",
+  "MORTAR_AUTOCAST_RESEARCH_TICKS",
+  "MORTAR_FIRE_COOLDOWN_TICKS",
+  "MORTAR_INNER_RADIUS_TILES",
+  "MORTAR_OUTER_RADIUS_TILES",
+  "MORTAR_RANGE_TILES",
+  "MORTAR_SHELL_DELAY_TICKS",
+  "PLAYER_PALETTE",
+  "RESOURCE_AMOUNTS",
+  "RIFLEMAN_CHARGE_COOLDOWN_TICKS",
+  "SCOUT_CAR_BODY",
+  "SCOUT_CAR_SMOKE_USES",
+  "SMOKE_ABILITY_COOLDOWN_TICKS",
+  "SMOKE_ABILITY_COST",
+  "SMOKE_ABILITY_RANGE_TILES",
+  "SMOKE_CLOUD_DURATION_TICKS",
+  "SMOKE_CLOUD_RADIUS_TILES",
+  "SMOKE_LAUNCH_MAX_DELAY_MS",
+  "SNAPSHOT_INTERP_DELAY_TICKS",
+  "SNAPSHOT_MS",
+  "STATS",
+  "TANK_BODY",
+  "TANK_UNLOCK_RESEARCH_TICKS",
+  "TICK_HZ",
+  "UPGRADES",
+  "WORKER_BUILDABLE",
+  "commandCardAbilitiesForFaction",
+  "factionCatalog",
+  "isProducerBuilding",
+  "researchableUpgradesForFaction",
+  "trainableUnitsForFaction",
+  "workerBuildablesForFaction",
+]);
+
 // Config
 // ---------------------------------------------------------------------------
 {
+  assertDeepEqual(
+    Object.keys(configExports).sort(),
+    EXPECTED_CONFIG_EXPORT_NAMES,
+    "client config public export names remain stable across internal splits",
+  );
   assert(MINING_CC_RANGE_TILES === 9, "client mirrors the server mining City Centre range");
   assert(STATS[KIND.CITY_CENTRE].cost.steel === 225, "City Centre cost mirrors server");
   assert(

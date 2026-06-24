@@ -1,6 +1,6 @@
 # Phase 2 - Command Budget And Export Snapshot
 
-Status: planned.
+Status: done.
 
 ## Goal
 
