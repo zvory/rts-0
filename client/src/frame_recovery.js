@@ -80,7 +80,10 @@ function runMatchFrame(match, now) {
     time("match.observerAnalysis", () => match.observerAnalysisOverlay?.update(frameViews, { profiler: match.frameProfiler }));
     time("match.healthPublish", () => match.health.publish());
   } finally {
-    match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });
+    const frameSummary = match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });
+    match.health?.noteFrameSummary?.(frameSummary, {
+      predictedSnapshotPresent: (match.state?.predictedById?.size || 0) > 0,
+    });
   }
 }
 

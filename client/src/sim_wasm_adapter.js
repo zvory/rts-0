@@ -31,6 +31,7 @@ export class SimWasmPredictionAdapter {
     this.replayBudgetMs = replayBudgetMs;
     this.budgetExceededCount = 0;
     this.memoryBytes = 0;
+    this.resetReportStats();
   }
 
   async init() {
@@ -88,7 +89,9 @@ export class SimWasmPredictionAdapter {
         this.predictor.enqueueCommandJson(pending.clientSeq, JSON.stringify(pending.cmd));
       }
     }, replayTicks);
-    if (elapsed > this.replayBudgetMs) this.budgetExceededCount += 1;
+    const replayBudgetExceeded = elapsed > this.replayBudgetMs;
+    this.recordReplayReport(elapsed, replayTicks, replayBudgetExceeded);
+    if (replayBudgetExceeded) this.budgetExceededCount += 1;
     const diagnostics = this.diagnostics();
     const correction = Number(diagnostics?.correctionMagnitude) || 0;
     this.maxCorrectionDistance = Math.max(this.maxCorrectionDistance, correction);
@@ -101,7 +104,7 @@ export class SimWasmPredictionAdapter {
       snapCorrection: correction > SNAP_CORRECTION_PX,
       maxCorrectionDistance: this.maxCorrectionDistance,
       snapCorrectionCount: this.snapCorrectionCount,
-      replayBudgetExceeded: elapsed > this.replayBudgetMs,
+      replayBudgetExceeded,
     };
   }
 
@@ -147,6 +150,36 @@ export class SimWasmPredictionAdapter {
       budgetExceededCount: this.budgetExceededCount,
       memoryBytes: this.refreshMemoryBytes(),
     };
+  }
+
+  consumeReportStats() {
+    const out = {
+      predictionReplayMaxMs: this.reportReplayMaxMs,
+      predictionReplayMaxTicks: this.reportReplayMaxTicks,
+      predictionReplayBudgetExceededCount: this.reportReplayBudgetExceededCount,
+    };
+    this.resetReportStats();
+    return out;
+  }
+
+  resetReportStats() {
+    this.reportReplayMaxMs = 0;
+    this.reportReplayMaxTicks = 0;
+    this.reportReplayBudgetExceededCount = 0;
+  }
+
+  recordReplayReport(elapsedMs, replayTicks, replayBudgetExceeded) {
+    const elapsed = Number(elapsedMs);
+    if (Number.isFinite(elapsed) && elapsed >= 0) {
+      this.reportReplayMaxMs = Math.max(this.reportReplayMaxMs, elapsed);
+    }
+    const ticks = Number(replayTicks);
+    if (Number.isFinite(ticks) && ticks >= 0) {
+      this.reportReplayMaxTicks = Math.max(this.reportReplayMaxTicks, Math.trunc(ticks));
+    }
+    if (replayBudgetExceeded) {
+      this.reportReplayBudgetExceededCount += 1;
+    }
   }
 
   measureTicks(fn, ticks) {

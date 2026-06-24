@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [x] Done.
 
 ## Objective
 
@@ -56,14 +56,14 @@ semantics or attempting a fix.
 
 ## Implementation Checklist
 
-- [ ] Select a bounded field set and document rejected/noisy candidates.
-- [ ] Add client aggregation for command density and prediction health.
-- [ ] Add server aggregation or structured rows for reliable-message/snapshot timing.
-- [ ] Extend protocol/report DTOs and structured logging if new report fields are required.
-- [ ] Update the parser summary and JSON/TSV output for the new fields.
-- [ ] Update docs explaining how to interpret command-density jitter evidence.
-- [ ] Add focused tests for report defaults, aggregation resets, parser output, and classification.
-- [ ] Mark this phase as done in this file in the implementation commit.
+- [x] Select a bounded field set and document rejected/noisy candidates.
+- [x] Add client aggregation for command density and prediction health.
+- [x] Add server aggregation or structured rows for reliable-message/snapshot timing.
+- [x] Extend protocol/report DTOs and structured logging if new report fields are required.
+- [x] Update the parser summary and JSON/TSV output for the new fields.
+- [x] Update docs explaining how to interpret command-density jitter evidence.
+- [x] Add focused tests for report defaults, aggregation resets, parser output, and classification.
+- [x] Mark this phase as done in this file in the implementation commit.
 
 ## Verification
 
@@ -85,3 +85,40 @@ normal gameplay still works. Do not attempt to validate or fix the stutter in th
 List every new diagnostic field, its unit, its reset/window behavior, and where it appears in the
 parser output. Include the exact beta log query the next phase should run after deployment. Call out
 any important missing signal that phase 2 should compensate for during manual reproduction.
+
+## Phase 1 Handoff
+
+New client `ClientNetReport` fields use milliseconds for `*Ms` and simulation ticks for `*Ticks`.
+Report-window fields reset after each net-report upload: `snapshotLateFrameCount`,
+`predictedSnapshotLateFrameCount`, `commandBurstBucketMs`, `commandBurstMax`,
+`commandBurstFrameGapMaxMs`, `commandBurstWorstFramePhase`, `commandBurstWorstFramePhaseMs`,
+`predictionReplayMaxMs`, `predictionReplayMaxTicks`, and
+`predictionReplayBudgetExceededCount`. Stable disable-reason buckets mirror the existing
+match-lifetime `predictionDisableCount` semantics: `predictionDisableUserCount`,
+`predictionDisableReplayCount`, `predictionDisableSpectatorCount`,
+`predictionDisableCompatibilityCount`, `predictionDisableWasmCount`, and
+`predictionDisableOtherCount`.
+
+New server-only `client_net_report` log fields are consumed on the same per-connection report
+window: `server_command_receipts_accepted`, `server_command_receipts_rejected`,
+`server_reliable_drained_before_snapshot`, `server_reliable_drained_before_snapshot_max`,
+`server_snapshot_waited_behind_reliable`, `server_snapshot_sent`,
+`server_snapshot_send_age_latest_ms`, `server_snapshot_send_age_max_ms`,
+`server_snapshot_send_age_avg_ms`, `server_snapshot_slot_stored`,
+`server_snapshot_slot_replaced`, and `server_snapshot_slot_closed`.
+
+`scripts/parse-net-report-logs.mjs` exposes the new fields in JSON/TSV summary rows, adds
+`command_density` and `prediction_health` issue groups, folds server outbound pressure into the
+WebSocket writer group, and adds markdown player columns for `cmds/burst` and server outbound
+pressure (`reliableDrained/waited/ageMax/replaced`).
+
+Rejected noisy candidates are intentionally not uploaded or logged: raw command payloads, unit ids,
+target ids, positions, per-command timestamp arrays, raw frame records, raw phase arrays, stack
+traces, raw snapshot payloads, and replay data. Phase 2 should treat the signal as window-level
+correlation evidence, not exact per-command causality.
+
+After deployment, use:
+
+```bash
+scripts/fly-logs.sh beta recent | rg 'client_net_report|performance writer timing|writer_send|performance tick summary|match_started|match_ended'
+```

@@ -1,6 +1,8 @@
+use std::fmt::Write as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::build_info::build_id;
+use crate::lobby::ConnectionReportStats;
 use crate::protocol::ClientNetReport;
 
 static NEXT_MATCH_RUN_ID: AtomicU64 = AtomicU64::new(1);
@@ -63,8 +65,13 @@ pub const NET_REPORT_PENDING_COMMAND_ISSUE: u16 = 8;
 pub const NET_REPORT_COMMAND_UPLOAD_ISSUE_MS: u16 = 180;
 pub const NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS: u16 = 66;
 pub const NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS: u16 = 16;
+pub const NET_REPORT_COMMAND_BURST_ISSUE: u16 = 6;
 pub const NET_REPORT_CORRECTION_ISSUE_PX: u16 = 32;
 pub const NET_REPORT_REPLAY_TICK_ISSUE: u16 = 8;
+pub const NET_REPORT_REPLAY_MS_ISSUE: u16 = 8;
+pub const NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_ISSUE: u32 = 1;
+pub const NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS: u32 = 100;
+pub const NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE: u32 = 1;
 
 pub fn new_match_run_id(room: &str) -> String {
     let seq = NEXT_MATCH_RUN_ID.fetch_add(1, Ordering::Relaxed);
@@ -76,128 +83,307 @@ pub fn log_client_net_report(
     player_id: u32,
     current_room_name: Option<&str>,
     report: ClientNetReport,
+    outbound: ConnectionReportStats,
 ) {
-    if !is_notable_net_report(&report) {
+    if !is_notable_net_report(&report, &outbound) {
         return;
     }
 
     let room = current_room_name.unwrap_or("");
-    let primary_issue = classify_client_net_report(&report);
-    tracing::info!(
-        event = "client_net_report",
-        schema_version = report.schema_version,
-        build_id = %build_id(),
-        room = %room,
-        match_run_id = %report.match_run_id,
-        player_id,
-        primary_issue,
-        elapsed_ms = report.elapsed_ms,
-        match_tick = report.match_tick,
-        rtt_ms = report.rtt_ms,
-        rtt_max_ms = report.rtt_max_ms,
-        bad_rtt_samples = report.bad_rtt_samples,
-        snapshot_jitter_ms = report.snapshot_jitter_ms,
-        snapshot_gap_max_ms = report.snapshot_gap_max_ms,
-        jitter_samples = report.jitter_samples,
-        snapshots = report.snapshots,
-        snapshot_bytes_total = report.snapshot_bytes_total,
-        snapshot_bytes_max = report.snapshot_bytes_max,
-        snapshot_bytes_avg = report.snapshot_bytes_avg,
-        snapshot_message_count = report.snapshot_message_count,
-        snapshot_byte_source = %report.snapshot_byte_source,
-        snapshot_codec = %report.snapshot_codec,
-        snapshot_codec_version = report.snapshot_codec_version,
-        snapshot_frame_kind = %report.snapshot_frame_kind,
-        snapshot_bytes_p95 = report.snapshot_bytes_p95,
-        snapshot_segment_budget_bytes = report.snapshot_segment_budget_bytes,
-        snapshot_over_segment_budget_count = report.snapshot_over_segment_budget_count,
-        snapshot_over_segment_budget_pct_x100 = report.snapshot_over_segment_budget_pct_x100,
-        snapshot_parse_max_ms = report.snapshot_parse_max_ms,
-        snapshot_parse_p95_ms = report.snapshot_parse_p95_ms,
-        snapshot_decode_max_ms = report.snapshot_decode_max_ms,
-        snapshot_decode_p95_ms = report.snapshot_decode_p95_ms,
-        websocket_extensions = %report.websocket_extensions,
-        websocket_compression = %report.websocket_compression,
-        snapshot_apply_max_ms = report.snapshot_apply_max_ms,
-        snapshot_apply_p95_ms = report.snapshot_apply_p95_ms,
-        prediction_apply_max_ms = report.prediction_apply_max_ms,
-        prediction_apply_p95_ms = report.prediction_apply_p95_ms,
-        snapshot_tick_gap_max = report.snapshot_tick_gap_max,
-        stale_snapshot_count = report.stale_snapshot_count,
-        duplicate_snapshot_count = report.duplicate_snapshot_count,
-        skipped_snapshot_count = report.skipped_snapshot_count,
-        snapshot_burst_count = report.snapshot_burst_count,
-        snapshot_burst_max = report.snapshot_burst_max,
-        frame_gap_max_ms = report.frame_gap_max_ms,
-        fps_estimate = report.fps_estimate,
-        frame_work_max_ms = report.frame_work_max_ms,
-        frame_work_p95_ms = report.frame_work_p95_ms,
-        slow_frame_count = report.slow_frame_count,
-        worst_frame_phase = %report.worst_frame_phase,
-        worst_frame_phase_ms = report.worst_frame_phase_ms,
-        renderer_max_ms = report.renderer_max_ms,
-        renderer_p95_ms = report.renderer_p95_ms,
-        entity_count = report.entity_count,
-        selected_count = report.selected_count,
-        visible_tile_count = report.visible_tile_count,
-        viewport_width = report.viewport_width,
-        viewport_height = report.viewport_height,
-        device_pixel_ratio_x100 = report.device_pixel_ratio_x100,
-        hidden = report.hidden,
-        focused = report.focused,
-        desktop_runtime_present = report.desktop_runtime_present,
-        native_cursor_bridge_present = report.native_cursor_bridge_present,
-        native_cursor_supported = report.native_cursor_supported,
-        native_cursor_active = report.native_cursor_active,
-        native_cursor_last_reason = %report.native_cursor_last_reason,
-        native_cursor_last_error = %report.native_cursor_last_error,
-        tauri_internals_present = report.tauri_internals_present,
-        tauri_global_present = report.tauri_global_present,
-        tauri_globals = %report.tauri_globals,
-        ws_buffered_bytes = report.ws_buffered_bytes,
-        server_tick_ms = report.server_tick_ms,
-        server_lag_ms = report.server_lag_ms,
-        slow_tick_count = report.slow_tick_count,
-        head_of_line_count = report.head_of_line_count,
-        prediction_mode = %report.prediction_mode,
-        pending_command_count = report.pending_command_count,
-        acknowledged_command_latency_ms = report.acknowledged_command_latency_ms,
-        commands_issued = report.commands_issued,
-        command_socket_send_accepted = report.command_socket_send_accepted,
-        command_server_received = report.command_server_received,
-        command_sim_acknowledged = report.command_sim_acknowledged,
-        command_rejected = report.command_rejected,
-        command_issue_to_server_receipt_latest_ms = report.command_issue_to_server_receipt_latest_ms,
-        command_issue_to_server_receipt_max_ms = report.command_issue_to_server_receipt_max_ms,
-        command_issue_to_server_receipt_p95_ms = report.command_issue_to_server_receipt_p95_ms,
-        command_server_receipt_to_sim_ack_latest_ms = report.command_server_receipt_to_sim_ack_latest_ms,
-        command_server_receipt_to_sim_ack_max_ms = report.command_server_receipt_to_sim_ack_max_ms,
-        command_server_receipt_to_sim_ack_p95_ms = report.command_server_receipt_to_sim_ack_p95_ms,
-        command_issue_to_sim_ack_latest_ms = report.command_issue_to_sim_ack_latest_ms,
-        command_issue_to_sim_ack_max_ms = report.command_issue_to_sim_ack_max_ms,
-        command_issue_to_sim_ack_p95_ms = report.command_issue_to_sim_ack_p95_ms,
-        command_ack_snapshot_received_to_applied_latest_ms = report.command_ack_snapshot_received_to_applied_latest_ms,
-        command_ack_snapshot_received_to_applied_max_ms = report.command_ack_snapshot_received_to_applied_max_ms,
-        command_ack_snapshot_received_to_applied_p95_ms = report.command_ack_snapshot_received_to_applied_p95_ms,
-        oldest_pending_command_age_ms = report.oldest_pending_command_age_ms,
-        max_pending_command_count = report.max_pending_command_count,
-        correction_distance_px = report.correction_distance_px,
-        correction_count = report.correction_count,
-        prediction_disable_count = report.prediction_disable_count,
-        wasm_tick_ms = report.wasm_tick_ms,
-        wasm_memory_bytes = report.wasm_memory_bytes,
-        prediction_replay_ticks = report.prediction_replay_ticks,
-        "client network report"
+    let primary_issue = classify_client_net_report(&report, &outbound);
+    let mut line = String::from("client network report");
+    macro_rules! field {
+        ($key:literal, $value:expr) => {
+            append_log_field(&mut line, $key, $value);
+        };
+    }
+    macro_rules! text_field {
+        ($key:literal, $value:expr) => {
+            append_text_log_field(&mut line, $key, $value);
+        };
+    }
+
+    text_field!("event", "client_net_report");
+    field!("schema_version", report.schema_version);
+    text_field!("build_id", build_id());
+    text_field!("room", room);
+    text_field!("match_run_id", &report.match_run_id);
+    field!("player_id", player_id);
+    text_field!("primary_issue", primary_issue);
+    field!("elapsed_ms", report.elapsed_ms);
+    field!("match_tick", report.match_tick);
+    field!("rtt_ms", report.rtt_ms);
+    field!("rtt_max_ms", report.rtt_max_ms);
+    field!("bad_rtt_samples", report.bad_rtt_samples);
+    field!("snapshot_jitter_ms", report.snapshot_jitter_ms);
+    field!("snapshot_gap_max_ms", report.snapshot_gap_max_ms);
+    field!("jitter_samples", report.jitter_samples);
+    field!("snapshots", report.snapshots);
+    field!(
+        "snapshot_late_frame_count",
+        report.snapshot_late_frame_count
     );
+    field!(
+        "predicted_snapshot_late_frame_count",
+        report.predicted_snapshot_late_frame_count
+    );
+    field!("snapshot_bytes_total", report.snapshot_bytes_total);
+    field!("snapshot_bytes_max", report.snapshot_bytes_max);
+    field!("snapshot_bytes_avg", report.snapshot_bytes_avg);
+    field!("snapshot_message_count", report.snapshot_message_count);
+    text_field!("snapshot_byte_source", &report.snapshot_byte_source);
+    text_field!("snapshot_codec", &report.snapshot_codec);
+    field!("snapshot_codec_version", report.snapshot_codec_version);
+    text_field!("snapshot_frame_kind", &report.snapshot_frame_kind);
+    field!("snapshot_bytes_p95", report.snapshot_bytes_p95);
+    field!(
+        "snapshot_segment_budget_bytes",
+        report.snapshot_segment_budget_bytes
+    );
+    field!(
+        "snapshot_over_segment_budget_count",
+        report.snapshot_over_segment_budget_count
+    );
+    field!(
+        "snapshot_over_segment_budget_pct_x100",
+        report.snapshot_over_segment_budget_pct_x100
+    );
+    field!("snapshot_parse_max_ms", report.snapshot_parse_max_ms);
+    field!("snapshot_parse_p95_ms", report.snapshot_parse_p95_ms);
+    field!("snapshot_decode_max_ms", report.snapshot_decode_max_ms);
+    field!("snapshot_decode_p95_ms", report.snapshot_decode_p95_ms);
+    text_field!("websocket_extensions", &report.websocket_extensions);
+    text_field!("websocket_compression", &report.websocket_compression);
+    field!("snapshot_apply_max_ms", report.snapshot_apply_max_ms);
+    field!("snapshot_apply_p95_ms", report.snapshot_apply_p95_ms);
+    field!("prediction_apply_max_ms", report.prediction_apply_max_ms);
+    field!("prediction_apply_p95_ms", report.prediction_apply_p95_ms);
+    field!("snapshot_tick_gap_max", report.snapshot_tick_gap_max);
+    field!("stale_snapshot_count", report.stale_snapshot_count);
+    field!("duplicate_snapshot_count", report.duplicate_snapshot_count);
+    field!("skipped_snapshot_count", report.skipped_snapshot_count);
+    field!("snapshot_burst_count", report.snapshot_burst_count);
+    field!("snapshot_burst_max", report.snapshot_burst_max);
+    field!("frame_gap_max_ms", report.frame_gap_max_ms);
+    field!("fps_estimate", report.fps_estimate);
+    field!("frame_work_max_ms", report.frame_work_max_ms);
+    field!("frame_work_p95_ms", report.frame_work_p95_ms);
+    field!("slow_frame_count", report.slow_frame_count);
+    text_field!("worst_frame_phase", &report.worst_frame_phase);
+    field!("worst_frame_phase_ms", report.worst_frame_phase_ms);
+    field!("renderer_max_ms", report.renderer_max_ms);
+    field!("renderer_p95_ms", report.renderer_p95_ms);
+    field!("entity_count", report.entity_count);
+    field!("selected_count", report.selected_count);
+    field!("visible_tile_count", report.visible_tile_count);
+    field!("viewport_width", report.viewport_width);
+    field!("viewport_height", report.viewport_height);
+    field!("device_pixel_ratio_x100", report.device_pixel_ratio_x100);
+    field!("command_burst_bucket_ms", report.command_burst_bucket_ms);
+    field!("command_burst_max", report.command_burst_max);
+    field!(
+        "command_burst_frame_gap_max_ms",
+        report.command_burst_frame_gap_max_ms
+    );
+    text_field!(
+        "command_burst_worst_frame_phase",
+        &report.command_burst_worst_frame_phase
+    );
+    field!(
+        "command_burst_worst_frame_phase_ms",
+        report.command_burst_worst_frame_phase_ms
+    );
+    field!("hidden", report.hidden);
+    field!("focused", report.focused);
+    field!("desktop_runtime_present", report.desktop_runtime_present);
+    field!(
+        "native_cursor_bridge_present",
+        report.native_cursor_bridge_present
+    );
+    field!("native_cursor_supported", report.native_cursor_supported);
+    field!("native_cursor_active", report.native_cursor_active);
+    text_field!(
+        "native_cursor_last_reason",
+        &report.native_cursor_last_reason
+    );
+    text_field!("native_cursor_last_error", &report.native_cursor_last_error);
+    field!("tauri_internals_present", report.tauri_internals_present);
+    field!("tauri_global_present", report.tauri_global_present);
+    text_field!("tauri_globals", &report.tauri_globals);
+    field!("ws_buffered_bytes", report.ws_buffered_bytes);
+    field!("server_tick_ms", report.server_tick_ms);
+    field!("server_lag_ms", report.server_lag_ms);
+    field!("slow_tick_count", report.slow_tick_count);
+    field!("head_of_line_count", report.head_of_line_count);
+    text_field!("prediction_mode", &report.prediction_mode);
+    field!("pending_command_count", report.pending_command_count);
+    field!(
+        "acknowledged_command_latency_ms",
+        report.acknowledged_command_latency_ms
+    );
+    field!("commands_issued", report.commands_issued);
+    field!(
+        "command_socket_send_accepted",
+        report.command_socket_send_accepted
+    );
+    field!("command_server_received", report.command_server_received);
+    field!("command_sim_acknowledged", report.command_sim_acknowledged);
+    field!("command_rejected", report.command_rejected);
+    field!(
+        "command_issue_to_server_receipt_latest_ms",
+        report.command_issue_to_server_receipt_latest_ms
+    );
+    field!(
+        "command_issue_to_server_receipt_max_ms",
+        report.command_issue_to_server_receipt_max_ms
+    );
+    field!(
+        "command_issue_to_server_receipt_p95_ms",
+        report.command_issue_to_server_receipt_p95_ms
+    );
+    field!(
+        "command_server_receipt_to_sim_ack_latest_ms",
+        report.command_server_receipt_to_sim_ack_latest_ms
+    );
+    field!(
+        "command_server_receipt_to_sim_ack_max_ms",
+        report.command_server_receipt_to_sim_ack_max_ms
+    );
+    field!(
+        "command_server_receipt_to_sim_ack_p95_ms",
+        report.command_server_receipt_to_sim_ack_p95_ms
+    );
+    field!(
+        "command_issue_to_sim_ack_latest_ms",
+        report.command_issue_to_sim_ack_latest_ms
+    );
+    field!(
+        "command_issue_to_sim_ack_max_ms",
+        report.command_issue_to_sim_ack_max_ms
+    );
+    field!(
+        "command_issue_to_sim_ack_p95_ms",
+        report.command_issue_to_sim_ack_p95_ms
+    );
+    field!(
+        "command_ack_snapshot_received_to_applied_latest_ms",
+        report.command_ack_snapshot_received_to_applied_latest_ms
+    );
+    field!(
+        "command_ack_snapshot_received_to_applied_max_ms",
+        report.command_ack_snapshot_received_to_applied_max_ms
+    );
+    field!(
+        "command_ack_snapshot_received_to_applied_p95_ms",
+        report.command_ack_snapshot_received_to_applied_p95_ms
+    );
+    field!(
+        "oldest_pending_command_age_ms",
+        report.oldest_pending_command_age_ms
+    );
+    field!(
+        "max_pending_command_count",
+        report.max_pending_command_count
+    );
+    field!("correction_distance_px", report.correction_distance_px);
+    field!("correction_count", report.correction_count);
+    field!("prediction_disable_count", report.prediction_disable_count);
+    field!(
+        "prediction_disable_user_count",
+        report.prediction_disable_user_count
+    );
+    field!(
+        "prediction_disable_replay_count",
+        report.prediction_disable_replay_count
+    );
+    field!(
+        "prediction_disable_spectator_count",
+        report.prediction_disable_spectator_count
+    );
+    field!(
+        "prediction_disable_compatibility_count",
+        report.prediction_disable_compatibility_count
+    );
+    field!(
+        "prediction_disable_wasm_count",
+        report.prediction_disable_wasm_count
+    );
+    field!(
+        "prediction_disable_other_count",
+        report.prediction_disable_other_count
+    );
+    field!("wasm_tick_ms", report.wasm_tick_ms);
+    field!("wasm_memory_bytes", report.wasm_memory_bytes);
+    field!("prediction_replay_ticks", report.prediction_replay_ticks);
+    field!("prediction_replay_max_ms", report.prediction_replay_max_ms);
+    field!(
+        "prediction_replay_max_ticks",
+        report.prediction_replay_max_ticks
+    );
+    field!(
+        "prediction_replay_budget_exceeded_count",
+        report.prediction_replay_budget_exceeded_count
+    );
+    field!(
+        "server_command_receipts_accepted",
+        outbound.command_receipts_accepted
+    );
+    field!(
+        "server_command_receipts_rejected",
+        outbound.command_receipts_rejected
+    );
+    field!(
+        "server_reliable_drained_before_snapshot",
+        outbound.reliable_drained_before_snapshot
+    );
+    field!(
+        "server_reliable_drained_before_snapshot_max",
+        outbound.reliable_drained_before_snapshot_max
+    );
+    field!(
+        "server_snapshot_waited_behind_reliable",
+        outbound.snapshot_waited_behind_reliable
+    );
+    field!("server_snapshot_sent", outbound.snapshot_sent);
+    field!(
+        "server_snapshot_send_age_latest_ms",
+        outbound.snapshot_send_age_latest_ms
+    );
+    field!(
+        "server_snapshot_send_age_max_ms",
+        outbound.snapshot_send_age_max_ms
+    );
+    field!(
+        "server_snapshot_send_age_avg_ms",
+        outbound.snapshot_send_age_avg_ms
+    );
+    field!("server_snapshot_slot_stored", outbound.snapshot_slot_stored);
+    field!(
+        "server_snapshot_slot_replaced",
+        outbound.snapshot_slot_replaced
+    );
+    field!("server_snapshot_slot_closed", outbound.snapshot_slot_closed);
+
+    tracing::info!("{}", line);
 }
 
-pub fn is_notable_net_report(report: &ClientNetReport) -> bool {
+fn append_log_field(line: &mut String, key: &str, value: impl std::fmt::Display) {
+    let _ = write!(line, " {key}={value}");
+}
+
+fn append_text_log_field(line: &mut String, key: &str, value: &str) {
+    let escaped = serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string());
+    append_log_field(line, key, escaped);
+}
+
+pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionReportStats) -> bool {
     report.rtt_ms >= NET_REPORT_LATENCY_ISSUE_MS
         || report.rtt_max_ms >= NET_REPORT_LATENCY_ISSUE_MS
         || report.bad_rtt_samples > 0
         || report.snapshot_jitter_ms >= NET_REPORT_JITTER_ISSUE_MS
         || report.jitter_samples > 0
         || report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS
+        || report.snapshot_late_frame_count > 0
         || has_packet_budget_pressure(report)
         || report.snapshot_bytes_max >= NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES
         || report.snapshot_bytes_avg >= NET_REPORT_SNAPSHOT_PAYLOAD_AVG_ISSUE_BYTES
@@ -234,14 +420,27 @@ pub fn is_notable_net_report(report: &ClientNetReport) -> bool {
             >= NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS
         || report.oldest_pending_command_age_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
         || report.max_pending_command_count >= NET_REPORT_PENDING_COMMAND_ISSUE
+        || report.command_burst_max >= NET_REPORT_COMMAND_BURST_ISSUE
+        || report.command_burst_frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.correction_distance_px >= NET_REPORT_CORRECTION_ISSUE_PX
         || report.correction_count > 0
         || report.prediction_disable_count > 0
         || report.wasm_tick_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.prediction_replay_ticks >= NET_REPORT_REPLAY_TICK_ISSUE
+        || report.prediction_replay_max_ticks >= NET_REPORT_REPLAY_TICK_ISSUE
+        || report.prediction_replay_max_ms >= NET_REPORT_REPLAY_MS_ISSUE
+        || report.prediction_replay_budget_exceeded_count > 0
+        || outbound.reliable_drained_before_snapshot
+            >= NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_ISSUE
+        || outbound.snapshot_waited_behind_reliable > 0
+        || outbound.snapshot_send_age_max_ms >= NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS
+        || outbound.snapshot_slot_replaced >= NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE
 }
 
-pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
+pub fn classify_client_net_report(
+    report: &ClientNetReport,
+    outbound: &ConnectionReportStats,
+) -> &'static str {
     if report.command_rejected > 0 {
         "command_rejected"
     } else if report.command_issue_to_server_receipt_max_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS {
@@ -258,6 +457,15 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
         || report.oldest_pending_command_age_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
     {
         "command_response_delay"
+    } else if outbound.reliable_drained_before_snapshot
+        >= NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_ISSUE
+        || outbound.snapshot_waited_behind_reliable > 0
+        || outbound.snapshot_send_age_max_ms >= NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS
+        || outbound.snapshot_slot_replaced >= NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE
+    {
+        "server_snapshot_outbound"
+    } else if report.command_burst_max >= NET_REPORT_COMMAND_BURST_ISSUE {
+        "command_density"
     } else if report.prediction_disable_count > 0 {
         "prediction_disabled"
     } else if report.correction_distance_px >= NET_REPORT_CORRECTION_ISSUE_PX
@@ -266,6 +474,9 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
         "prediction_correction"
     } else if report.wasm_tick_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.prediction_replay_ticks >= NET_REPORT_REPLAY_TICK_ISSUE
+        || report.prediction_replay_max_ticks >= NET_REPORT_REPLAY_TICK_ISSUE
+        || report.prediction_replay_max_ms >= NET_REPORT_REPLAY_MS_ISSUE
+        || report.prediction_replay_budget_exceeded_count > 0
     {
         "wasm_budget"
     } else if report.snapshot_bytes_max >= NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES
@@ -297,6 +508,7 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
     {
         "client_frame_work"
     } else if report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
+        || report.command_burst_frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.slow_frame_count > 0
     {
         "client_frame_stall"
@@ -314,7 +526,9 @@ pub fn classify_client_net_report(report: &ClientNetReport) -> &'static str {
         || report.acknowledged_command_latency_ms >= NET_REPORT_LATENCY_ISSUE_MS
     {
         "network_rtt"
-    } else if report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS {
+    } else if report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS
+        || report.snapshot_late_frame_count > 0
+    {
         "snapshot_gap"
     } else if report.snapshot_tick_gap_max >= NET_REPORT_SNAPSHOT_TICK_GAP_ISSUE
         || report.stale_snapshot_count > 0
@@ -443,6 +657,8 @@ mod tests {
             snapshot_gap_max_ms: 45,
             jitter_samples: 0,
             snapshots: 300,
+            snapshot_late_frame_count: 0,
+            predicted_snapshot_late_frame_count: 0,
             snapshot_bytes_total: 1_200_000,
             snapshot_bytes_max: 5_000,
             snapshot_bytes_avg: 4_000,
@@ -486,6 +702,11 @@ mod tests {
             viewport_width: 1280,
             viewport_height: 720,
             device_pixel_ratio_x100: 100,
+            command_burst_bucket_ms: 250,
+            command_burst_max: 0,
+            command_burst_frame_gap_max_ms: 0,
+            command_burst_worst_frame_phase: String::new(),
+            command_burst_worst_frame_phase_ms: 0,
             hidden: false,
             focused: true,
             desktop_runtime_present: false,
@@ -527,41 +748,55 @@ mod tests {
             correction_distance_px: 0,
             correction_count: 0,
             prediction_disable_count: 0,
+            prediction_disable_user_count: 0,
+            prediction_disable_replay_count: 0,
+            prediction_disable_spectator_count: 0,
+            prediction_disable_compatibility_count: 0,
+            prediction_disable_wasm_count: 0,
+            prediction_disable_other_count: 0,
             wasm_tick_ms: 0,
             wasm_memory_bytes: 0,
             prediction_replay_ticks: 0,
+            prediction_replay_max_ms: 0,
+            prediction_replay_max_ticks: 0,
+            prediction_replay_budget_exceeded_count: 0,
         }
+    }
+
+    fn notable(report: &ClientNetReport) -> bool {
+        is_notable_net_report(report, &ConnectionReportStats::default())
+    }
+
+    fn classify(report: &ClientNetReport) -> &'static str {
+        classify_client_net_report(report, &ConnectionReportStats::default())
     }
 
     #[test]
     fn clean_net_reports_are_not_notable() {
         let report = clean_report();
-        assert!(!is_notable_net_report(&report));
-        assert_eq!(classify_client_net_report(&report), "other");
+        assert!(!notable(&report));
+        assert_eq!(classify(&report), "other");
     }
 
     #[test]
     fn net_report_classification_prioritizes_actionable_issue() {
         let mut report = clean_report();
         report.snapshot_jitter_ms = NET_REPORT_JITTER_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "snapshot_jitter");
+        assert_eq!(classify(&report), "snapshot_jitter");
         report.frame_work_max_ms = NET_REPORT_FRAME_WORK_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "client_frame_work");
+        assert_eq!(classify(&report), "client_frame_work");
         report.snapshot_decode_max_ms = NET_REPORT_SNAPSHOT_DECODE_ISSUE_MS;
-        assert_eq!(
-            classify_client_net_report(&report),
-            "client_snapshot_decode"
-        );
+        assert_eq!(classify(&report), "client_snapshot_decode");
         report.snapshot_apply_max_ms = NET_REPORT_SNAPSHOT_APPLY_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "client_snapshot_apply");
+        assert_eq!(classify(&report), "client_snapshot_apply");
         report.snapshot_bytes_max = NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES;
-        assert_eq!(classify_client_net_report(&report), "payload_pressure");
+        assert_eq!(classify(&report), "payload_pressure");
         report.renderer_max_ms = NET_REPORT_RENDERER_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "payload_pressure");
+        assert_eq!(classify(&report), "payload_pressure");
         report.correction_count = 1;
-        assert_eq!(classify_client_net_report(&report), "prediction_correction");
+        assert_eq!(classify(&report), "prediction_correction");
         report.prediction_disable_count = 1;
-        assert_eq!(classify_client_net_report(&report), "prediction_disabled");
+        assert_eq!(classify(&report), "prediction_disabled");
     }
 
     #[test]
@@ -571,38 +806,35 @@ mod tests {
         report.snapshot_over_segment_budget_count = 200;
         report.snapshot_over_segment_budget_pct_x100 =
             NET_REPORT_SNAPSHOT_PACKET_BUDGET_OVER_PCT_X100;
-        assert!(is_notable_net_report(&report));
-        assert_eq!(
-            classify_client_net_report(&report),
-            "packet_budget_pressure"
-        );
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "packet_budget_pressure");
 
         report.snapshot_bytes_max = NET_REPORT_SNAPSHOT_PAYLOAD_MAX_ISSUE_BYTES;
-        assert_eq!(classify_client_net_report(&report), "payload_pressure");
+        assert_eq!(classify(&report), "payload_pressure");
     }
 
     #[test]
     fn net_report_classifies_frame_gap_separately_from_work() {
         let mut report = clean_report();
         report.frame_gap_max_ms = NET_REPORT_FRAME_GAP_ISSUE_MS;
-        assert!(is_notable_net_report(&report));
-        assert_eq!(classify_client_net_report(&report), "client_frame_stall");
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "client_frame_stall");
     }
 
     #[test]
     fn net_report_classifies_slow_frame_count_as_frame_stall_without_work_cost() {
         let mut report = clean_report();
         report.slow_frame_count = 1;
-        assert!(is_notable_net_report(&report));
-        assert_eq!(classify_client_net_report(&report), "client_frame_stall");
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "client_frame_stall");
     }
 
     #[test]
     fn net_report_classifies_snapshot_cadence_when_transport_timing_is_clean() {
         let mut report = clean_report();
         report.snapshot_tick_gap_max = NET_REPORT_SNAPSHOT_TICK_GAP_ISSUE;
-        assert!(is_notable_net_report(&report));
-        assert_eq!(classify_client_net_report(&report), "snapshot_cadence");
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "snapshot_cadence");
     }
 
     #[test]
@@ -610,17 +842,47 @@ mod tests {
         let mut report = clean_report();
         report.rtt_max_ms = NET_REPORT_LATENCY_ISSUE_MS;
         report.command_issue_to_server_receipt_max_ms = NET_REPORT_COMMAND_UPLOAD_ISSUE_MS;
-        assert!(is_notable_net_report(&report));
-        assert_eq!(classify_client_net_report(&report), "command_upload_delay");
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "command_upload_delay");
 
         let mut report = clean_report();
         report.command_server_receipt_to_sim_ack_max_ms = NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "command_server_queue");
+        assert_eq!(classify(&report), "command_server_queue");
 
         let mut report = clean_report();
         report.command_ack_snapshot_received_to_applied_max_ms =
             NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS;
-        assert_eq!(classify_client_net_report(&report), "command_ack_apply");
+        assert_eq!(classify(&report), "command_ack_apply");
+    }
+
+    #[test]
+    fn net_report_classifies_command_density_without_other_lag() {
+        let mut report = clean_report();
+        report.command_burst_max = NET_REPORT_COMMAND_BURST_ISSUE;
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "command_density");
+    }
+
+    #[test]
+    fn net_report_classifies_server_outbound_snapshot_pressure() {
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            reliable_drained_before_snapshot: 2,
+            reliable_drained_before_snapshot_max: 2,
+            snapshot_waited_behind_reliable: 1,
+            snapshot_sent: 1,
+            snapshot_send_age_latest_ms: 120,
+            snapshot_send_age_max_ms: 120,
+            snapshot_send_age_avg_ms: 120,
+            snapshot_slot_stored: 1,
+            snapshot_slot_replaced: 1,
+            ..ConnectionReportStats::default()
+        };
+        assert!(is_notable_net_report(&report, &outbound));
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "server_snapshot_outbound"
+        );
     }
 
     #[test]

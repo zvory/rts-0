@@ -59,7 +59,7 @@ mod snapshot_fanout;
 mod snapshots;
 mod tick_control;
 
-pub use connection::{ConnectionSink, ConnectionWriter};
+pub use connection::{ConnectionReportStats, ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
 use room_task::{RoomMode, RoomTask};

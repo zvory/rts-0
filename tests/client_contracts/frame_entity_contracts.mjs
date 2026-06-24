@@ -137,6 +137,27 @@ import { KIND } from "../../client/src/protocol.js";
   cadenceHealth.noteSnapshotArrival(21, false, 14);
   assert(cadenceHealth.reportStats.snapshotBurstMax === 4, "frame boundaries reset current burst without clearing report max");
 
+  const commandHealth = new MatchHealth({ net, statusBadge: null, snapshotMs: 33 });
+  commandHealth.noteCommandIssued(1000);
+  commandHealth.noteCommandIssued(1100);
+  commandHealth.noteCommandIssued(1200);
+  commandHealth.noteCommandIssued(1301);
+  assert(commandHealth.reportStats.commandBurstMax === 3, "command burst max uses a bounded short window");
+  commandHealth.noteFrameSummary({ at: 1320, frameGapMs: 48, worstPhase: "match.input", worstPhaseMs: 12 });
+  assert(commandHealth.reportStats.commandBurstFrameGapMaxMs === 48, "command burst frames track frame gap max");
+  assert(commandHealth.reportStats.commandBurstWorstFramePhase === "match.input", "command burst frames track worst phase");
+  commandHealth.noteSnapshotArrival(1400, false, 10);
+  commandHealth.noteFrameSummary({ at: 1490, frameGapMs: 16, worstPhase: "match.renderer", worstPhaseMs: 4 }, {
+    predictedSnapshotPresent: true,
+  });
+  assert(commandHealth.reportStats.snapshotLateFrameCount === 1, "late snapshot frames are counted");
+  assert(
+    commandHealth.reportStats.predictedSnapshotLateFrameCount === 1,
+    "predicted snapshot coverage during late snapshot frames is counted",
+  );
+  commandHealth.resetReportStats(1500);
+  assert(commandHealth.reportStats.commandBurstMax === 0, "command burst stats reset with the net report window");
+
   health.applyServerNetStatus({
     tickMs: 44,
     serverLagMs: 120,

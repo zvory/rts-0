@@ -169,6 +169,46 @@ fn connection_sink_coalesces_snapshots_to_latest_tick() {
 }
 
 #[test]
+fn connection_sink_report_stats_reset_after_consume() {
+    let (sink, _writer) = ConnectionSink::new();
+
+    sink.try_send_reliable(ServerMessage::CommandReceipt {
+        client_seq: 1,
+        server_tick: 10,
+        accepted: true,
+        reason: None,
+    })
+    .unwrap();
+    sink.try_send_reliable(ServerMessage::CommandReceipt {
+        client_seq: 2,
+        server_tick: 10,
+        accepted: false,
+        reason: Some("notPlayer".to_string()),
+    })
+    .unwrap();
+    assert_eq!(
+        sink.try_send_snapshot(test_snapshot(10, Vec::new())),
+        SnapshotSendStatus::Stored
+    );
+    assert_eq!(
+        sink.try_send_snapshot(test_snapshot(11, Vec::new())),
+        SnapshotSendStatus::Replaced
+    );
+
+    let stats = sink.consume_report_stats();
+    assert_eq!(stats.command_receipts_accepted, 1);
+    assert_eq!(stats.command_receipts_rejected, 1);
+    assert_eq!(stats.snapshot_slot_stored, 1);
+    assert_eq!(stats.snapshot_slot_replaced, 1);
+
+    let reset = sink.consume_report_stats();
+    assert_eq!(reset.command_receipts_accepted, 0);
+    assert_eq!(reset.command_receipts_rejected, 0);
+    assert_eq!(reset.snapshot_slot_stored, 0);
+    assert_eq!(reset.snapshot_slot_replaced, 0);
+}
+
+#[test]
 fn connection_sink_carries_resource_deltas_across_snapshot_replacement() {
     let (sink, writer) = ConnectionSink::new();
 

@@ -119,6 +119,39 @@ const tsv = run(["--format=tsv", ...logs]);
 assert.match(tsv, /^match\tplayer_id\treports/m);
 assert.match(tsv, /^54\t5\t17\tprediction_disabled:17/m);
 
+const commandDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-command-"));
+try {
+  const commandLog = path.join(commandDir, "command.log");
+  writeFileSync(
+    commandLog,
+    [
+      '2026-06-24T02:00:00Z INFO event="client_net_report" match_run_id="command-1" player_id=4 primary_issue="command_density" rtt_max_ms=42 snapshot_gap_max_ms=144 snapshot_jitter_ms=28 snapshot_late_frame_count=3 predicted_snapshot_late_frame_count=2 frame_gap_max_ms=118 frame_work_max_ms=12 fps_estimate=55 commands_issued=24 command_burst_bucket_ms=250 command_burst_max=9 command_burst_frame_gap_max_ms=118 command_burst_worst_frame_phase="match.input" command_burst_worst_frame_phase_ms=14 command_issue_to_sim_ack_max_ms=81 command_rejected=0 prediction_disable_user_count=0 prediction_disable_replay_count=1 prediction_disable_spectator_count=0 prediction_disable_compatibility_count=0 prediction_disable_wasm_count=0 prediction_disable_other_count=0 prediction_replay_max_ms=9 prediction_replay_max_ticks=10 prediction_replay_budget_exceeded_count=1 server_command_receipts_accepted=24 server_command_receipts_rejected=0 server_reliable_drained_before_snapshot=3 server_reliable_drained_before_snapshot_max=2 server_snapshot_waited_behind_reliable=1 server_snapshot_sent=50 server_snapshot_send_age_latest_ms=18 server_snapshot_send_age_max_ms=132 server_snapshot_send_age_avg_ms=12 server_snapshot_slot_stored=50 server_snapshot_slot_replaced=2 server_snapshot_slot_closed=0 server_tick_ms=4 server_lag_ms=1 "client network report"',
+    ].join("\n") + "\n"
+  );
+  const commandParsed = JSON.parse(run(["--format", "json", commandLog]));
+  const commandMatch = commandParsed.matches.find((match) => match.matchRunId === "command-1");
+  assert.ok(commandMatch, "expected synthetic command-density match summary");
+  const commandPlayer = commandMatch.players.find((player) => player.playerId === "4");
+  assert.ok(commandPlayer, "expected synthetic command-density player summary");
+  assert.equal(commandPlayer.metrics.command_burst_max.max, 9);
+  assert.equal(commandPlayer.metrics.server_snapshot_send_age_max_ms.max, 132);
+  assert.equal(commandPlayer.metrics.predicted_snapshot_late_frame_count.max, 2);
+  assert.equal(
+    commandMatch.classifications.find((item) => item.id === "command_density")?.result,
+    "indicated",
+  );
+  assert.equal(
+    commandMatch.classifications.find((item) => item.id === "websocket_writer_send")?.result,
+    "indicated",
+  );
+  const commandMarkdown = run([commandLog]);
+  assert.match(commandMarkdown, /cmds\/burst/);
+  assert.match(commandMarkdown, /24\/9/);
+  assert.match(commandMarkdown, /3\/1\/132\/2/);
+} finally {
+  rmSync(commandDir, { recursive: true, force: true });
+}
+
 const outDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-"));
 try {
   const out = run(["--out-dir", outDir, ...logs]);

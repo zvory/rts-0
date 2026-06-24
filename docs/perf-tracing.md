@@ -69,6 +69,8 @@ Every `ClientNetReport` upload includes a bounded report-window summary from the
 `rendererMaxMs`, `rendererP95Ms`, `entityCount`, `selectedCount`, `visibleTileCount`,
 `viewportWidth`, `viewportHeight`, and `devicePixelRatioX100`. Report-window profiler counters reset
 after each upload; the `window.__rtsPerf` debug summary remains cumulative until `reset()` is called.
+HUD `jit` in the live health readout is snapshot arrival jitter; it is not JavaScript compiler/JIT
+time.
 
 The same upload also includes bounded snapshot diagnostics:
 
@@ -81,14 +83,37 @@ The same upload also includes bounded snapshot diagnostics:
   `predictionApplyMaxMs`/`predictionApplyP95Ms`.
 - Cadence: `snapshotTickGapMax`, `staleSnapshotCount`, `duplicateSnapshotCount`,
   `skippedSnapshotCount`, `snapshotBurstCount`, and `snapshotBurstMax`.
+- Late-frame prediction coverage: `snapshotLateFrameCount` and
+  `predictedSnapshotLateFrameCount`, which count frames where the last snapshot was late and whether
+  an owned-unit predicted snapshot overlay was present on those frames.
 
 Command-response diagnostics are also reported as bounded window aggregates keyed by the live
 `matchRunId`: issued/send-accepted/server-received/sim-acknowledged/rejected counts,
 issue-to-server-receipt latest/max/p95, server-receipt-to-sim-ack latest/max/p95,
 issue-to-sim-ack latest/max/p95, ack-snapshot-received-to-applied latest/max/p95, oldest pending
-command age, and max pending command count. The server receipt comes from a tiny reliable
+command age, max pending command count, `commandBurstBucketMs`, `commandBurstMax`,
+`commandBurstFrameGapMaxMs`, `commandBurstWorstFramePhase`, and
+`commandBurstWorstFramePhaseMs`. The burst bucket is a fixed 250 ms sliding client window and only
+counts commands that passed local command-budget checks and reached the browser WebSocket send path.
+The server receipt comes from a tiny reliable
 `commandReceipt` message keyed only by `clientSeq`; it carries no command payload, unit ids, target
 ids, positions, or player-entered text and does not reconcile prediction.
+
+Prediction health fields include stable disable-reason buckets
+`predictionDisableUserCount`, `predictionDisableReplayCount`, `predictionDisableSpectatorCount`,
+`predictionDisableCompatibilityCount`, `predictionDisableWasmCount`, and
+`predictionDisableOtherCount`, plus `predictionReplayMaxMs`, `predictionReplayMaxTicks`, and
+`predictionReplayBudgetExceededCount` for report-window WASM pending-command replay work. Detailed
+WASM loader errors stay in local debug output and are not uploaded as labels.
+
+The server augments the `client_net_report` log row with per-connection outbound counters consumed
+on the same report cadence: `server_command_receipts_accepted`, `server_command_receipts_rejected`,
+`server_reliable_drained_before_snapshot`, `server_reliable_drained_before_snapshot_max`,
+`server_snapshot_waited_behind_reliable`, `server_snapshot_sent`,
+`server_snapshot_send_age_latest_ms`, `server_snapshot_send_age_max_ms`,
+`server_snapshot_send_age_avg_ms`, `server_snapshot_slot_stored`,
+`server_snapshot_slot_replaced`, and `server_snapshot_slot_closed`. These are server-only structured-log
+fields, not client protocol fields.
 
 The canonical single-segment payload budget is 1280 bytes. Client measurements count only snapshot
 WebSocket application payload bytes, currently `messagepack-application-payload` from binary
@@ -342,13 +367,19 @@ Classification is evidence-bounded:
 - Server snapshot projection/compact/serialization pressure requires `performance tick summary` or
   `performance snapshot timing` rows. Older incidents without those rows are reported as unavailable.
 - WebSocket writer/send pressure requires writer timing, high buffered bytes, or head-of-line/backlog
-  evidence.
+  evidence. Newer `client_net_report` rows can also show server outbound pressure from reliable
+  messages drained while a snapshot was pending, snapshot send age, or latest-only snapshot slot
+  replacement.
 - Client network/snapshot delivery pressure uses RTT, bad RTT samples, snapshot jitter, snapshot gaps,
   stale/duplicate/skipped snapshot counters, and burst counters.
 - Browser processing pressure uses payload size, packet-budget p95/rate, frame parse, compact decode,
   snapshot apply, prediction apply, frame work, renderer timing, frame gaps, and FPS estimates.
 - Command path pressure uses legacy acknowledged-command latency when that is all an old log has, and
   uses the newer upload/server-receipt/sim-ack/downstream-apply milestones when present.
+- Command density pressure uses `commandsIssued`, `commandBurstMax`, and server command-receipt
+  counts. It is a correlation signal, not proof that commands caused later jitter.
+- Prediction health uses stable disable-reason buckets, WASM replay max ms/ticks, replay-budget
+  exceed counts, and predicted-snapshot coverage during late snapshot frames.
 
 The parser always prints that packet loss, retransmit behavior, and per-packet browser transport data
 are unavailable. Packet-budget p95 and over-budget-rate fields are payload-byte aggregates only, not
@@ -416,6 +447,10 @@ architecture policy gate.
 - `client_frame_stall`: `frameGapMaxMs >= 100`, or `slowFrameCount > 0` when frame-work thresholds
   were not crossed; points at requestAnimationFrame gaps even when measured frame work was not the
   dominant issue.
+- `command_density` classifies high short-bucket command density before it falls through to
+  prediction or generic network buckets.
+- `server_snapshot_outbound` classifies reliable-before-snapshot, snapshot-send-age, or
+  latest-slot-replacement pressure observed by the server connection writer.
 - Existing buckets continue to separate `network_rtt`, `snapshot_gap`, `snapshot_jitter`,
   `snapshot_cadence`, `server_tick`, `server_scheduler_lag`, `websocket_backlog`, `pending_commands`,
   `prediction_correction`, `prediction_disabled`, and `wasm_budget`.

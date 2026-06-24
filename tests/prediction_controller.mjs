@@ -177,6 +177,20 @@ function sentSeqs(sent) {
 }
 
 {
+  const controller = new PredictionController({ sendCommand: () => true });
+  controller.recordReplayBudgetExceeded({ elapsedMs: 9.4, replayTicks: 11 });
+  const report = controller.consumeCommandReportStats();
+  assert(report.predictionReplayBudgetExceededCount === 1, "replay budget exceeds are counted in the report window");
+  assert(report.predictionReplayMaxMs === 9.4, "replay budget report preserves max replay milliseconds");
+  assert(report.predictionReplayMaxTicks === 11, "replay budget report preserves max replay ticks");
+  assert(controller.debugSummary().disableReasons["replay-budget-exceeded"] === 1, "replay budget resets use a stable reason");
+  assert(
+    controller.consumeCommandReportStats().predictionReplayBudgetExceededCount === 0,
+    "replay budget report counters reset after consumption",
+  );
+}
+
+{
   const calls = [];
   const fakePredictor = {
     enqueueCommand(clientSeq, command) {

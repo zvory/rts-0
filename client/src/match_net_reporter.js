@@ -73,6 +73,8 @@ export class MatchNetReporter {
       snapshotGapMaxMs: clampU16(stats.snapshotGapMaxMs),
       jitterSamples: clampU32(stats.jitterSamples),
       snapshots: clampU32(stats.snapshots),
+      snapshotLateFrameCount: clampU32(stats.snapshotLateFrameCount),
+      predictedSnapshotLateFrameCount: clampU32(stats.predictedSnapshotLateFrameCount),
       ...snapshotReportFields({
         reportStats: stats,
         transportStats,
@@ -81,6 +83,11 @@ export class MatchNetReporter {
       frameGapMaxMs: clampU16(stats.frameGapMaxMs),
       fpsEstimate: clampU16(avgFrameMs > 0 ? 1000 / avgFrameMs : 0),
       ...clientPerfReportFields(this.frameProfiler),
+      commandBurstBucketMs: clampU16(stats.commandBurstBucketMs),
+      commandBurstMax: clampU16(stats.commandBurstMax),
+      commandBurstFrameGapMaxMs: clampU16(stats.commandBurstFrameGapMaxMs),
+      commandBurstWorstFramePhase: clampReportLabel(stats.commandBurstWorstFramePhase),
+      commandBurstWorstFramePhaseMs: clampU16(stats.commandBurstWorstFramePhaseMs),
       hidden: !!document.hidden,
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : true,
       ...cursorRuntimeReportFields(),
@@ -100,6 +107,7 @@ export class MatchNetReporter {
       wsBufferedBytes: report.wsBufferedBytes,
       predictionMode: report.predictionMode,
       pendingCommandCount: report.pendingCommandCount,
+      commandBurstMax: report.commandBurstMax,
       correctionDistancePx: report.correctionDistancePx,
       frameWorkMaxMs: report.frameWorkMaxMs,
       rendererMaxMs: report.rendererMaxMs,
@@ -114,7 +122,9 @@ export class MatchNetReporter {
 export function predictionReportFields({ prediction, predictionAdapter } = {}) {
   const controller = prediction?.debugSummary?.() || {};
   const wasm = predictionAdapter?.diagnostics?.() || {};
+  const wasmReport = predictionAdapter?.consumeReportStats?.() || {};
   const commandReport = prediction?.consumeCommandReportStats?.() || {};
+  const disableCounts = stableDisableReasonCounts(controller.disableReasons || {}, wasm);
   return {
     predictionMode: String(controller.mode || "disabled"),
     pendingCommandCount: clampU16(controller.commandDiagnosticPendingCount ?? controller.pendingCommandCount),
@@ -123,9 +133,22 @@ export function predictionReportFields({ prediction, predictionAdapter } = {}) {
     correctionDistancePx: clampU16(controller.maxCorrectionDistance),
     correctionCount: clampU32(controller.correctionCount),
     predictionDisableCount: clampU32(controller.disableCount),
+    ...disableCounts,
     wasmTickMs: clampU16(wasm.lastTickMs),
     wasmMemoryBytes: clampU32(wasm.memoryBytes),
     predictionReplayTicks: clampU16(wasm.lastReplayTicks),
+    predictionReplayMaxMs: clampU16(Math.max(
+      Number(wasmReport.predictionReplayMaxMs) || 0,
+      Number(commandReport.predictionReplayMaxMs) || 0,
+    )),
+    predictionReplayMaxTicks: clampU16(Math.max(
+      Number(wasmReport.predictionReplayMaxTicks) || 0,
+      Number(commandReport.predictionReplayMaxTicks) || 0,
+    )),
+    predictionReplayBudgetExceededCount: clampU32(
+      (Number(wasmReport.predictionReplayBudgetExceededCount) || 0) +
+      (Number(commandReport.predictionReplayBudgetExceededCount) || 0),
+    ),
   };
 }
 
@@ -196,6 +219,51 @@ function clampedCommandReportFields(report = {}) {
     oldestPendingCommandAgeMs: clampU16(report.oldestPendingCommandAgeMs),
     maxPendingCommandCount: clampU16(report.maxPendingCommandCount),
   };
+}
+
+function stableDisableReasonCounts(reasons = {}, wasm = {}) {
+  const counts = {
+    predictionDisableUserCount: 0,
+    predictionDisableReplayCount: 0,
+    predictionDisableSpectatorCount: 0,
+    predictionDisableCompatibilityCount: 0,
+    predictionDisableWasmCount: 0,
+    predictionDisableOtherCount: 0,
+  };
+  for (const [reason, count] of Object.entries(reasons || {})) {
+    const bucket = stableDisableReasonBucket(reason);
+    counts[bucket] += clampU32(count);
+  }
+  if (wasm?.disabledReason && counts.predictionDisableWasmCount === 0) {
+    counts.predictionDisableWasmCount += 1;
+  }
+  return counts;
+}
+
+function stableDisableReasonBucket(reason) {
+  switch (reason) {
+    case "user-disabled":
+      return "predictionDisableUserCount";
+    case "replay-viewer":
+    case "replay-budget-exceeded":
+      return "predictionDisableReplayCount";
+    case "spectator":
+      return "predictionDisableSpectatorCount";
+    case "unsupported-local-faction":
+    case "prediction-version-mismatch":
+    case "prediction-unavailable":
+    case "prediction-build-mismatch":
+    case "compatibility-mismatch":
+      return "predictionDisableCompatibilityCount";
+    case "wasm-unavailable":
+      return "predictionDisableWasmCount";
+    default:
+      return "predictionDisableOtherCount";
+  }
+}
+
+function clampReportLabel(value) {
+  return String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 64);
 }
 
 function clampU16(value) {

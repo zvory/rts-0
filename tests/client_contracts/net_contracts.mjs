@@ -175,6 +175,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     "snapshotApplyMaxMs",
     "predictionApplyP95Ms",
     "snapshotTickGapMax",
+    "snapshotLateFrameCount",
+    "predictedSnapshotLateFrameCount",
     "snapshotBurstMax",
     "frameWorkMaxMs",
     "frameWorkP95Ms",
@@ -183,6 +185,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     "rendererMaxMs",
     "entityCount",
     "devicePixelRatioX100",
+    "commandBurstMax",
+    "predictionDisableWasmCount",
+    "predictionReplayMaxMs",
+    "predictionReplayBudgetExceededCount",
   ]) {
     assert(CLIENT_NET_REPORT_FIELDS.includes(field), `client net-report field list includes ${field}`);
   }
