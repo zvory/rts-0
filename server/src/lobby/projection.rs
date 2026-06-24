@@ -76,13 +76,8 @@ impl SnapshotProjection {
     fn full_world(player_id: u32, options: SnapshotOptions) -> Self {
         Self {
             body: SnapshotBodyProjection::FullWorld { player_id, options },
-            events: EventProjection::PlayerOnly { player_id },
+            events: EventProjection::FullVision,
         }
-    }
-
-    pub(super) fn with_event_projection(mut self, events: EventProjection) -> Self {
-        self.events = events;
-        self
     }
 
     pub(super) fn snapshot_with_events(
