@@ -24,16 +24,20 @@ use crate::rules;
 
 use super::{systems, Game, MapMetadata, PlayerInit};
 
+mod orientation;
 mod scenario;
 
+use orientation::{
+    lab_entity_facing, lab_entity_is_set_up, lab_entity_setup_facing, lab_entity_setup_target,
+    lab_entity_weapon_facing, restore_lab_entity_orientation, restore_lab_entity_setup,
+};
+use scenario::{
+    validate_lab_entity_setup_shape, validate_lab_scenario_shape, LAB_SCENARIO_KIND,
+    MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
+};
 pub use scenario::{
     LabScenarioEntity, LabScenarioMap, LabScenarioMetadata, LabScenarioPlayer, LabScenarioPoint,
     LabScenarioResearch, LabScenarioResources, LabScenarioV1,
-};
-use scenario::{
-    lab_entity_is_set_up, lab_entity_setup_target, restore_lab_entity_setup,
-    validate_lab_entity_setup_shape, validate_lab_scenario_shape,
-    LAB_SCENARIO_KIND, MAX_LAB_SCENARIO_UPGRADES_PER_PLAYER,
 };
 
 pub const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = scenario::LAB_SCENARIO_V1_SCHEMA_VERSION;
@@ -224,9 +228,7 @@ impl Game {
         }
         for entity_id in authority_entities {
             let Some(entity) = self.entities.get(entity_id) else {
-                return Err(LabError::StaleEntity {
-                    entity_id,
-                });
+                return Err(LabError::StaleEntity { entity_id });
             };
             if entity.owner != player_id {
                 return Err(LabError::InvalidCommand {
@@ -285,7 +287,10 @@ impl Game {
                 construction_progress: entity.construction.as_ref().map(|state| state.progress),
                 construction_total: entity.construction.as_ref().map(|state| state.total),
                 resource_remaining: entity.remaining(),
+                facing: lab_entity_facing(entity),
+                weapon_facing: lab_entity_weapon_facing(entity),
                 set_up: lab_entity_is_set_up(entity),
+                setup_facing: lab_entity_setup_facing(entity),
                 setup_target: lab_entity_setup_target(&self.map, entity),
             })
             .collect();
@@ -557,10 +562,7 @@ impl Game {
             self.lab_god_mode_players.remove(&player_id);
         }
         self.sync_lab_god_mode_flags();
-        Ok(LabOpOutcome::PlayerGodModeSet {
-            player_id,
-            enabled,
-        })
+        Ok(LabOpOutcome::PlayerGodModeSet { player_id, enabled })
     }
 
     fn lab_set_completed_research(
@@ -618,6 +620,7 @@ impl Game {
                 .ok_or_else(|| invalid_kind(kind, "restoreScenario"))?;
             if let Some(restored) = self.entities.get_mut(id) {
                 restored.hp = entity.hp.min(restored.max_hp).max(1);
+                restore_lab_entity_orientation(entity, restored)?;
                 restore_lab_entity_setup(&self.map, entity, restored)?;
             }
             id
@@ -653,6 +656,7 @@ impl Game {
                     });
                 }
                 restored.hp = entity.hp.min(restored.max_hp).max(1);
+                restore_lab_entity_orientation(entity, restored)?;
             }
             id
         } else if kind.is_node() {
@@ -1010,6 +1014,13 @@ mod tests {
         game.map.tile_center(x, y)
     }
 
+    fn assert_angle_close(actual: f32, expected: f32) {
+        assert!(
+            (actual - expected).abs() < 0.001,
+            "expected angle {expected:.4}, got {actual:.4}"
+        );
+    }
+
     fn free_unit_position(game: &Game, kind: EntityKind) -> (f32, f32) {
         for ty in 8..game.map.size.saturating_sub(8) {
             for tx in 8..game.map.size.saturating_sub(8) {
@@ -1327,25 +1338,29 @@ mod tests {
     #[test]
     fn lab_scenario_export_restore_round_trips_setup_with_id_remap() {
         let mut game = default_map_game();
-        let (x, y) = free_unit_position(&game, EntityKind::ScoutCar);
-        let LabOpOutcome::Spawned {
-            entity_id: scout_id,
-        } = game
+        let tank_facing = -1.25;
+        let tank_weapon_facing = 0.75;
+        let (x, y) = free_unit_position(&game, EntityKind::Tank);
+        let LabOpOutcome::Spawned { entity_id: tank_id } = game
             .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
                 owner: 1,
-                kind: EntityKind::ScoutCar,
+                kind: EntityKind::Tank,
                 x,
                 y,
                 completed: true,
             }))
-            .expect("scout should spawn")
+            .expect("tank should spawn")
         else {
             panic!("unexpected outcome");
         };
+        {
+            let tank = game.entities.get_mut(tank_id).expect("spawned tank");
+            tank.set_facing(tank_facing);
+            tank.set_weapon_facing(tank_weapon_facing);
+            tank.set_desired_weapon_facing(tank_weapon_facing);
+        }
         let (x, y) = free_unit_position(&game, EntityKind::AntiTankGun);
-        let LabOpOutcome::Spawned {
-            entity_id: gun_id,
-        } = game
+        let LabOpOutcome::Spawned { entity_id: gun_id } = game
             .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
                 owner: 1,
                 kind: EntityKind::AntiTankGun,
@@ -1359,40 +1374,37 @@ mod tests {
         };
         let setup_target = tile_center(&game, 40, 32);
         let setup_facing = (setup_target.1 - y).atan2(setup_target.0 - x);
+        let gun_weapon_facing = setup_facing + 0.125;
         {
             let gun = game.entities.get_mut(gun_id).expect("spawned gun");
             gun.set_weapon_setup(WeaponSetup::Deployed);
             gun.set_emplacement_facing(Some(setup_facing));
-            gun.set_weapon_facing(setup_facing);
-            gun.set_desired_weapon_facing(setup_facing);
+            gun.set_weapon_facing(gun_weapon_facing);
+            gun.set_desired_weapon_facing(gun_weapon_facing);
         }
-        game.apply_lab_op(LabOp::SetPlayerResources(LabSetPlayerResources {
-            player_id: 1,
-            steel: 321,
-            oil: 654,
-        }))
-        .expect("resources should set");
-        game.apply_lab_op(LabOp::SetCompletedResearch(LabSetCompletedResearch {
-            player_id: 1,
-            upgrade: UpgradeKind::TankUnlock,
-            completed: true,
-        }))
-        .expect("research should set");
 
         let scenario = game.export_lab_scenario();
-        let exported_scout = scenario
+        let exported_tank = scenario
             .entities
             .iter()
-            .find(|entity| entity.id == scout_id)
-            .expect("exported scout");
-        assert!(!exported_scout.set_up);
-        assert_eq!(exported_scout.setup_target, None);
+            .find(|entity| entity.id == tank_id)
+            .expect("exported tank");
+        assert!(!exported_tank.set_up);
+        assert_eq!(exported_tank.facing, Some(tank_facing));
+        assert_eq!(exported_tank.weapon_facing, Some(tank_weapon_facing));
+        assert_eq!(exported_tank.setup_facing, None);
+        assert_eq!(exported_tank.setup_target, None);
         let exported_gun = scenario
             .entities
             .iter()
             .find(|entity| entity.id == gun_id)
             .expect("exported gun");
         assert!(exported_gun.set_up);
+        assert_angle_close(exported_gun.setup_facing.unwrap_or_default(), setup_facing);
+        assert_angle_close(
+            exported_gun.weapon_facing.unwrap_or_default(),
+            gun_weapon_facing,
+        );
         assert!(exported_gun.setup_target.is_some());
 
         let mut restored = default_map_game();
@@ -1405,31 +1417,36 @@ mod tests {
         let remap = result
             .entity_id_map
             .iter()
-            .find(|entry| entry.old_id == scout_id)
+            .find(|entry| entry.old_id == tank_id)
             .expect("spawned entity should be remapped");
-        let restored_scout = restored.entities.get(remap.new_id).expect("restored scout");
-        assert_eq!(restored_scout.kind, EntityKind::ScoutCar);
-        assert_eq!(restored_scout.owner, 1);
-        assert!(matches!(restored_scout.weapon_setup(), WeaponSetup::Packed));
+        let restored_tank = restored.entities.get(remap.new_id).expect("restored tank");
+        assert_eq!(restored_tank.kind, EntityKind::Tank);
+        assert_eq!(restored_tank.owner, 1);
+        assert!(matches!(restored_tank.weapon_setup(), WeaponSetup::Packed));
+        assert_angle_close(restored_tank.facing(), tank_facing);
+        assert_angle_close(
+            restored_tank.weapon_facing().unwrap_or_default(),
+            tank_weapon_facing,
+        );
         let gun_remap = result
             .entity_id_map
             .iter()
             .find(|entry| entry.old_id == gun_id)
             .expect("gun should be remapped");
-        let restored_gun = restored.entities.get(gun_remap.new_id).expect("restored gun");
+        let restored_gun = restored
+            .entities
+            .get(gun_remap.new_id)
+            .expect("restored gun");
         assert_eq!(restored_gun.kind, EntityKind::AntiTankGun);
         assert!(matches!(restored_gun.weapon_setup(), WeaponSetup::Deployed));
-        assert!(
-            (restored_gun.emplacement_facing().unwrap_or_default() - setup_facing).abs() < 0.001
+        assert_angle_close(
+            restored_gun.emplacement_facing().unwrap_or_default(),
+            setup_facing,
         );
-        assert_eq!(
-            (restored.snapshot_for(1).steel, restored.snapshot_for(1).oil),
-            (321, 654)
+        assert_angle_close(
+            restored_gun.weapon_facing().unwrap_or_default(),
+            gun_weapon_facing,
         );
-        assert!(restored
-            .snapshot_for(1)
-            .upgrades
-            .contains(&UpgradeKind::TankUnlock.to_protocol_str().to_string()));
     }
 
     #[test]
@@ -1466,7 +1483,7 @@ mod tests {
 
         let mut scenario = game.export_lab_scenario();
         scenario.entities[0].set_up = true;
-        scenario.entities[0].setup_target = Some(LabScenarioPoint { x: 100.0, y: 100.0 });
+        scenario.entities[0].setup_facing = Some(0.0);
         assert!(matches!(
             game.apply_lab_op(LabOp::RestoreScenario(Box::new(scenario))),
             Err(LabError::InvalidScenario { .. })

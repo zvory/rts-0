@@ -990,7 +990,8 @@ damage, while resources keep normal damage behavior. The current enabled player 
   entities: [{
     id: u32, owner: u32, kind: string, x: f32, y: f32, hp: u32, completed: bool,
     constructionProgress?: u32, constructionTotal?: u32, resourceRemaining?: u32,
-    setUp?: bool, setupTarget?: { x: f32, y: f32 }
+    facing?: f32, weaponFacing?: f32,
+    setUp?: bool, setupFacing?: f32, setupTarget?: { x: f32, y: f32 }
   }],
   metadata: { exportedTick: u32, lab: { vision: LabVisionMode } }
 }
@@ -1000,12 +1001,18 @@ current lab vision in `metadata.lab.vision`. Import validates the schema, map me
 player/team/resource/research/entity fields, restores through the public lab `Game` API, applies
 scenario vision to the requester and future join default without overwriting already connected
 collaborators, and returns an entity id remap in `outcome.entityIdMap`.
-`setUp` serializes only stable deployed support-weapon state for machine gunners, anti-tank guns,
-mortar teams, and artillery; omitted `setUp` defaults to false on import. `setupTarget` is a finite
-world point used to reconstruct the unit's facing; it is required when `setUp` is true and rejected
-otherwise. Setup and teardown transition timers are still transient and are not serialized.
-Transient snapshot fields, fog recipient projections, events, projectile runtime state, command
-logs, interpolation state, and lab operation result metadata are intentionally omitted.
+`facing` serializes unit body orientation, and `weaponFacing` serializes stable combat
+weapon/turret orientation for entities with combat state. `setUp` serializes only stable deployed
+support-weapon state for machine gunners, anti-tank guns, mortar teams, and artillery; omitted
+`setUp` defaults to false on import. `setupFacing` is the authoritative deployed support-weapon
+direction in radians. `setupTarget` is a legacy finite world point fallback used to reconstruct
+that direction for older exported scenarios; new exports include `setupFacing` and may also include
+`setupTarget` for compatibility. A setup entity must include `setupFacing` or legacy
+`setupTarget`; both setup direction fields are rejected when `setUp` is false. Setup/teardown
+transition timers, active/queued orders, production/research queues, rally plans, attack cooldowns,
+ability cooldowns/uses/lockouts, projectile runtime state, transient snapshot fields, fog
+recipient projections, events, command logs, interpolation state, and lab operation result metadata
+are intentionally omitted because lab scenarios are setup fixtures rather than mid-match savegames.
 
 Reliable lab server messages:
 

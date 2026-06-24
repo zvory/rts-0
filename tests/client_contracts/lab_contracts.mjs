@@ -87,13 +87,13 @@ import { textWithin } from "./dom_text.mjs";
   void labClient.importScenario({
     schemaVersion: LAB_SCENARIO.SCHEMA_VERSION,
     kind: LAB_SCENARIO.KIND,
-    entities: [{ id: 7, setUp: true, setupTarget: { x: 128, y: 160 } }],
+    entities: [{ id: 7, facing: 0.25, weaponFacing: 0.5, setUp: true, setupFacing: 0.75 }],
   });
   assert(
     sent.at(-1).op.op === "importScenario" &&
       sent.at(-1).op.scenario.kind === LAB_SCENARIO.KIND &&
-      sent.at(-1).op.scenario.entities[0].setupTarget.x === 128,
-    "LabClient sends scenario import requests with setup fields",
+      sent.at(-1).op.scenario.entities[0].setupFacing === 0.75,
+    "LabClient sends scenario import requests with orientation setup fields",
   );
   labClient.resetScenario();
   assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabClient resets scenarios by seeking lab room time to tick zero");

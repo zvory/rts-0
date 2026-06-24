@@ -394,10 +394,15 @@ assert(
     rust.includes("ImportScenario") &&
     rust.includes("LabScenarioV1") &&
     rust.includes("set_up") &&
+    rust.includes("weapon_facing") &&
+    rust.includes("setup_facing") &&
     LAB_SCENARIO.KIND === "labScenario" &&
     LAB_SCENARIO.SCHEMA_VERSION === 1 &&
     protocolDoc.includes("LabScenarioV1") &&
     protocolDoc.includes("setUp") &&
+    protocolDoc.includes("facing") &&
+    protocolDoc.includes("weaponFacing") &&
+    protocolDoc.includes("setupFacing") &&
     protocolDoc.includes("setupTarget"),
   "lab scenario import/export protocol surface must be documented and mirrored",
 );

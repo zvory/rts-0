@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-use crate::config;
-use crate::game::entity::{Entity, EntityKind, WeaponSetup};
-use crate::game::map::Map;
+use crate::game::entity::EntityKind;
 
-use super::{validate_world_position, LabError};
+use super::orientation::{
+    lab_setup_capable, lab_weapon_facing_capable, validate_optional_lab_angle,
+};
+use super::LabError;
 
 pub(super) const LAB_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
 pub(super) const LAB_SCENARIO_KIND: &str = "labScenario";
@@ -80,7 +81,14 @@ pub struct LabScenarioEntity {
     pub construction_total: Option<u32>,
     pub resource_remaining: Option<u32>,
     #[serde(default)]
+    pub facing: Option<f32>,
+    #[serde(default)]
+    pub weapon_facing: Option<f32>,
+    #[serde(default)]
     pub set_up: bool,
+    #[serde(default)]
+    pub setup_facing: Option<f32>,
+    #[serde(default)]
     pub setup_target: Option<LabScenarioPoint>,
 }
 
@@ -133,95 +141,54 @@ pub(super) fn validate_lab_scenario_shape(scenario: &LabScenarioV1) -> Result<()
     Ok(())
 }
 
-pub(super) fn lab_entity_is_set_up(entity: &Entity) -> bool {
-    lab_setup_capable(entity.kind) && matches!(entity.weapon_setup(), WeaponSetup::Deployed)
-}
-
-pub(super) fn lab_entity_setup_target(map: &Map, entity: &Entity) -> Option<LabScenarioPoint> {
-    if !lab_entity_is_set_up(entity) {
-        return None;
-    }
-    let facing = entity
-        .emplacement_facing()
-        .or_else(|| entity.weapon_facing())
-        .filter(|facing| facing.is_finite())?;
-    Some(point_from_setup_facing(map, entity.pos_x, entity.pos_y, facing))
-}
-
-fn point_from_setup_facing(map: &Map, x: f32, y: f32, facing: f32) -> LabScenarioPoint {
-    let distance = config::TILE_SIZE as f32 * 4.0;
-    let world_max = (map.world_size_px() - 1.0).max(0.0);
-    LabScenarioPoint {
-        x: (x + facing.cos() * distance).clamp(0.0, world_max),
-        y: (y + facing.sin() * distance).clamp(0.0, world_max),
-    }
-}
-
 pub(super) fn validate_lab_entity_setup_shape(
     entity: &LabScenarioEntity,
     kind: EntityKind,
 ) -> Result<(), LabError> {
+    validate_optional_lab_angle(entity, "facing", entity.facing)?;
+    validate_optional_lab_angle(entity, "weaponFacing", entity.weapon_facing)?;
+    validate_optional_lab_angle(entity, "setupFacing", entity.setup_facing)?;
+
+    if entity.facing.is_some() && !kind.is_unit() {
+        return Err(LabError::InvalidScenario {
+            reason: format!(
+                "entity {} kind {} cannot have facing",
+                entity.id, entity.kind
+            ),
+        });
+    }
+    if entity.weapon_facing.is_some() && !lab_weapon_facing_capable(kind) {
+        return Err(LabError::InvalidScenario {
+            reason: format!(
+                "entity {} kind {} cannot have weaponFacing",
+                entity.id, entity.kind
+            ),
+        });
+    }
     if entity.setup_target.is_some() && !entity.set_up {
         return Err(LabError::InvalidScenario {
             reason: format!("entity {} has setupTarget without setUp", entity.id),
         });
     }
-    if (entity.set_up || entity.setup_target.is_some()) && !lab_setup_capable(kind) {
+    if entity.setup_facing.is_some() && !entity.set_up {
+        return Err(LabError::InvalidScenario {
+            reason: format!("entity {} has setupFacing without setUp", entity.id),
+        });
+    }
+    if (entity.set_up || entity.setup_target.is_some() || entity.setup_facing.is_some())
+        && !lab_setup_capable(kind)
+    {
         return Err(LabError::InvalidScenario {
             reason: format!("entity {} kind {} cannot be set up", entity.id, entity.kind),
         });
     }
-    Ok(())
-}
-
-pub(super) fn restore_lab_entity_setup(
-    map: &Map,
-    entity: &LabScenarioEntity,
-    restored: &mut Entity,
-) -> Result<(), LabError> {
-    if !entity.set_up {
-        return Ok(());
-    }
-    let target = entity
-        .setup_target
-        .as_ref()
-        .ok_or_else(|| LabError::InvalidScenario {
-            reason: format!("entity {} has setUp without setupTarget", entity.id),
-        })?;
-    validate_world_position(map, target.x, target.y)?;
-    let facing = normalize_lab_angle((target.y - restored.pos_y).atan2(target.x - restored.pos_x));
-    if !facing.is_finite() {
-        return Err(LabError::InvalidPosition {
-            x: target.x,
-            y: target.y,
-            reason: "setup target must produce a finite facing",
+    if entity.set_up && entity.setup_facing.is_none() && entity.setup_target.is_none() {
+        return Err(LabError::InvalidScenario {
+            reason: format!(
+                "entity {} has setUp without setupFacing or setupTarget",
+                entity.id
+            ),
         });
     }
-
-    restored.set_weapon_setup(WeaponSetup::Deployed);
-    restored.set_weapon_facing(facing);
-    restored.set_desired_weapon_facing(facing);
-    if uses_fixed_setup_facing(restored.kind) {
-        restored.set_emplacement_facing(Some(facing));
-    }
     Ok(())
-}
-
-fn lab_setup_capable(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::MachineGunner
-            | EntityKind::AntiTankGun
-            | EntityKind::MortarTeam
-            | EntityKind::Artillery
-    )
-}
-
-fn uses_fixed_setup_facing(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::AntiTankGun | EntityKind::Artillery)
-}
-
-pub(super) fn normalize_lab_angle(angle: f32) -> f32 {
-    let two_pi = std::f32::consts::TAU;
-    (angle + std::f32::consts::PI).rem_euclid(two_pi) - std::f32::consts::PI
 }

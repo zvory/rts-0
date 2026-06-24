@@ -238,6 +238,7 @@ const approvedCurrentFactionFiles = new Set([
   // Lab API tests stage current catalog entities while runtime validation stays catalog-routed.
   "server/crates/sim/src/game/lab.rs",
   // Lab scenario setup import/export preserves existing support-weapon setup states for current catalog kinds.
+  "server/crates/sim/src/game/lab/orientation.rs",
   "server/crates/sim/src/game/lab/scenario.rs",
   "server/crates/sim/src/game/mod.rs",
   "server/crates/sim/src/game/mortar.rs",
