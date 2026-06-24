@@ -1,7 +1,9 @@
 use super::connection::send_or_log;
 use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::participants::Participants;
-use super::projection::{ObserverAnalysisAudience, ProjectionPolicy, RecipientRole};
+use super::projection::{
+    EventProjection, ObserverAnalysisAudience, ProjectionPolicy, RecipientRole,
+};
 use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
@@ -26,8 +28,13 @@ pub(super) enum LiveTickResult {
 
 #[derive(Clone)]
 pub(super) enum LabSnapshotProjection {
-    FullWorld { view_player_id: u32 },
-    PlayerUnion { player_ids: Vec<u32> },
+    FullWorld {
+        view_player_id: u32,
+        event_player_ids: Vec<u32>,
+    },
+    PlayerUnion {
+        player_ids: Vec<u32>,
+    },
 }
 
 pub(super) struct LiveTickDriver<'a> {
@@ -199,9 +206,15 @@ impl LiveTickDriver<'_> {
                 RecipientRole::ActivePlayer
             };
             let projection = match lab_snapshot_projections.get(&id) {
-                Some(LabSnapshotProjection::FullWorld { view_player_id }) => self
+                Some(LabSnapshotProjection::FullWorld {
+                    view_player_id,
+                    event_player_ids,
+                }) => self
                     .projection_policy
-                    .live_snapshot_for(role, id, Some(*view_player_id), &spectator_visible_players),
+                    .live_snapshot_for(role, id, Some(*view_player_id), &spectator_visible_players)
+                    .with_event_projection(EventProjection::PlayerUnion {
+                        player_ids: event_player_ids.clone(),
+                    }),
                 Some(LabSnapshotProjection::PlayerUnion { player_ids }) => self
                     .projection_policy
                     .replay_snapshot_for(player_ids.clone()),

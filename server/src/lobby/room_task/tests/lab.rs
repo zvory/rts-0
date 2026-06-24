@@ -332,6 +332,339 @@ fn lab_room_snapshot_uses_full_world_projection() {
     assert_eq!(snapshot.net_status.prediction_version, 0);
 }
 
+fn drain_reliable_messages(writer: &mut ConnectionWriter) {
+    while writer.reliable_rx.try_recv().is_ok() {}
+}
+
+fn spawn_lab_entity(
+    task: &mut RoomTask,
+    writer: &mut ConnectionWriter,
+    request_id: u32,
+    owner: u32,
+    kind: &str,
+    position: (f32, f32),
+) -> u32 {
+    task.on_lab_request(
+        99,
+        request_id,
+        LabClientOp::SpawnEntity {
+            owner,
+            kind: kind.to_string(),
+            x: position.0,
+            y: position.1,
+            completed: true,
+        },
+    );
+    let result = lab_results(writer).pop().expect("spawn result");
+    assert!(result.ok, "spawn should succeed: {result:?}");
+    result
+        .outcome
+        .as_ref()
+        .and_then(|outcome| outcome.get("entityId"))
+        .and_then(serde_json::Value::as_u64)
+        .expect("spawned entity id") as u32
+}
+
+fn launch_event(snapshot: &Snapshot, mortar_id: u32) -> Option<Event> {
+    snapshot
+        .events
+        .iter()
+        .find(|event| matches!(event, Event::MortarLaunch { from, .. } if *from == mortar_id))
+        .cloned()
+}
+
+fn import_lab_scenario_with_deployed_entity(
+    task: &mut RoomTask,
+    entity_id: u32,
+    target: (f32, f32),
+) -> u32 {
+    let Phase::InGame(game) = &mut task.phase else {
+        panic!("lab should be running");
+    };
+    let mut scenario = game.export_lab_scenario();
+    let entity = scenario
+        .entities
+        .iter_mut()
+        .find(|entity| entity.id == entity_id)
+        .expect("exported scenario should include spawned entity");
+    entity.set_up = true;
+    entity.setup_target = Some(rts_sim::game::lab::LabScenarioPoint {
+        x: target.0,
+        y: target.1,
+    });
+
+    let outcome = game
+        .restore_lab_scenario(scenario)
+        .expect("scenario restore should succeed");
+    let rts_sim::game::lab::LabOpOutcome::ScenarioRestored(restore) = outcome else {
+        panic!("scenario restore should return entity id map");
+    };
+    restore
+        .entity_id_map
+        .iter()
+        .find_map(|entry| (entry.old_id == entity_id).then_some(entry.new_id))
+        .expect("restore should return remapped mortar id")
+}
+
+fn has_mortar_impact(snapshot: &Snapshot) -> bool {
+    snapshot
+        .events
+        .iter()
+        .any(|event| matches!(event, Event::MortarImpact { .. }))
+}
+
+fn issue_lab_mortar_fire(
+    task: &mut RoomTask,
+    writer: &mut ConnectionWriter,
+    request_id: u32,
+    player_id: u32,
+    mortar_id: u32,
+    target: (f32, f32),
+) {
+    task.on_lab_request(
+        99,
+        request_id,
+        LabClientOp::IssueCommandAs {
+            player_id,
+            cmd: Command::UseAbility {
+                ability: "mortarFire".to_string(),
+                units: vec![mortar_id],
+                x: Some(target.0),
+                y: Some(target.1),
+                queued: false,
+            },
+            ignore_command_limits: false,
+        },
+    );
+    let result = lab_results(writer).pop().expect("mortar fire result");
+    assert!(result.ok, "mortar fire should succeed: {result:?}");
+}
+
+fn prepare_player_two_lab_mortar(
+    task: &mut RoomTask,
+    writer: &mut ConnectionWriter,
+    request_id_base: u32,
+) -> (u32, (f32, f32)) {
+    let mortar_position = lab_tile_center(task, 30, 30);
+    let target_position = lab_tile_center(task, 38, 30);
+    let mortar_id = spawn_lab_entity(
+        task,
+        writer,
+        request_id_base,
+        LAB_PLAYER_TWO_ID,
+        crate::protocol::kinds::MORTAR_TEAM,
+        mortar_position,
+    );
+    spawn_lab_entity(
+        task,
+        writer,
+        request_id_base + 1,
+        LAB_PLAYER_ONE_ID,
+        crate::protocol::kinds::RIFLEMAN,
+        target_position,
+    );
+    let mortar_id = import_lab_scenario_with_deployed_entity(task, mortar_id, target_position);
+    (mortar_id, target_position)
+}
+
+#[test]
+fn lab_full_world_operator_receives_player_two_mortar_launch_event() {
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default".to_string(),
+        RoomMode::Lab(lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Operator".to_string(), true, false, msg_tx, ack);
+    drain_reliable_messages(&mut writer);
+
+    let (mortar_id, target_position) = prepare_player_two_lab_mortar(&mut task, &mut writer, 80);
+    let _ = writer.snapshots.take();
+    issue_lab_mortar_fire(
+        &mut task,
+        &mut writer,
+        83,
+        LAB_PLAYER_TWO_ID,
+        mortar_id,
+        target_position,
+    );
+    drain_reliable_messages(&mut writer);
+
+    for _ in 0..40 {
+        task.on_tick(TokioInstant::now());
+        let snapshot = writer.snapshots.take().expect("lab snapshot");
+        assert!(
+            !has_mortar_impact(&snapshot),
+            "impact should not arrive before launch"
+        );
+        if launch_event(&snapshot, mortar_id).is_some() {
+            return;
+        }
+    }
+    panic!("default full-world lab operator should receive P2 mortarLaunch");
+}
+
+#[test]
+fn multiple_lab_full_world_viewers_receive_same_mortar_launch_event() {
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default".to_string(),
+        RoomMode::Lab(lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (operator_tx, mut operator_writer) = ConnectionSink::new();
+    let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(
+        99,
+        "Operator".to_string(),
+        true,
+        false,
+        operator_tx,
+        operator_ack,
+    );
+    let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
+    let (viewer_ack, _viewer_ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(
+        100,
+        "Viewer".to_string(),
+        true,
+        false,
+        viewer_tx,
+        viewer_ack,
+    );
+    drain_reliable_messages(&mut operator_writer);
+    drain_reliable_messages(&mut viewer_writer);
+
+    let (mortar_id, target_position) =
+        prepare_player_two_lab_mortar(&mut task, &mut operator_writer, 90);
+    drain_reliable_messages(&mut viewer_writer);
+    let _ = operator_writer.snapshots.take();
+    let _ = viewer_writer.snapshots.take();
+    issue_lab_mortar_fire(
+        &mut task,
+        &mut operator_writer,
+        93,
+        LAB_PLAYER_TWO_ID,
+        mortar_id,
+        target_position,
+    );
+    drain_reliable_messages(&mut operator_writer);
+    drain_reliable_messages(&mut viewer_writer);
+
+    for _ in 0..40 {
+        task.on_tick(TokioInstant::now());
+        let operator_snapshot = operator_writer.snapshots.take().expect("operator snapshot");
+        let viewer_snapshot = viewer_writer.snapshots.take().expect("viewer snapshot");
+        assert!(
+            !has_mortar_impact(&operator_snapshot) && !has_mortar_impact(&viewer_snapshot),
+            "impact should not arrive before launch"
+        );
+        let operator_launch = launch_event(&operator_snapshot, mortar_id);
+        let viewer_launch = launch_event(&viewer_snapshot, mortar_id);
+        if operator_launch.is_some() || viewer_launch.is_some() {
+            assert_eq!(
+                operator_launch, viewer_launch,
+                "full-world lab viewers should receive identical launch events"
+            );
+            return;
+        }
+    }
+    panic!("both full-world lab viewers should receive P2 mortarLaunch");
+}
+
+#[test]
+fn lab_team_vision_receives_only_selected_player_mortar_events() {
+    let mut task = RoomTask::new(
+        "__lab__:sandbox:map=Default".to_string(),
+        RoomMode::Lab(lab_config()),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (operator_tx, mut operator_writer) = ConnectionSink::new();
+    let (operator_ack, _operator_ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(
+        99,
+        "Operator".to_string(),
+        true,
+        false,
+        operator_tx,
+        operator_ack,
+    );
+    let (viewer_tx, mut viewer_writer) = ConnectionSink::new();
+    let (viewer_ack, _viewer_ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(
+        100,
+        "Viewer".to_string(),
+        true,
+        false,
+        viewer_tx,
+        viewer_ack,
+    );
+    drain_reliable_messages(&mut operator_writer);
+    drain_reliable_messages(&mut viewer_writer);
+
+    task.on_lab_request(
+        99,
+        100,
+        LabClientOp::SetVision {
+            vision: LabVisionMode::Team { team_id: 2 },
+        },
+    );
+    assert!(lab_results(&mut operator_writer)[0].ok);
+    task.on_lab_request(
+        100,
+        101,
+        LabClientOp::SetVision {
+            vision: LabVisionMode::Team { team_id: 1 },
+        },
+    );
+    assert!(lab_results(&mut viewer_writer)[0].ok);
+    drain_reliable_messages(&mut operator_writer);
+    drain_reliable_messages(&mut viewer_writer);
+
+    let (mortar_id, target_position) =
+        prepare_player_two_lab_mortar(&mut task, &mut operator_writer, 102);
+    drain_reliable_messages(&mut viewer_writer);
+    let _ = operator_writer.snapshots.take();
+    let _ = viewer_writer.snapshots.take();
+    issue_lab_mortar_fire(
+        &mut task,
+        &mut operator_writer,
+        105,
+        LAB_PLAYER_TWO_ID,
+        mortar_id,
+        target_position,
+    );
+    drain_reliable_messages(&mut operator_writer);
+    drain_reliable_messages(&mut viewer_writer);
+
+    for _ in 0..40 {
+        task.on_tick(TokioInstant::now());
+        let team_two_snapshot = operator_writer
+            .snapshots
+            .take()
+            .expect("team 2 lab snapshot");
+        let team_one_snapshot = viewer_writer.snapshots.take().expect("team 1 lab snapshot");
+        assert!(
+            launch_event(&team_one_snapshot, mortar_id).is_none(),
+            "team 1 lab vision should not receive owner-only P2 launch events"
+        );
+        assert!(
+            !has_mortar_impact(&team_two_snapshot) && !has_mortar_impact(&team_one_snapshot),
+            "impact should not arrive before launch"
+        );
+        if launch_event(&team_two_snapshot, mortar_id).is_some() {
+            return;
+        }
+    }
+    panic!("team 2 lab vision should receive P2 mortarLaunch");
+}
+
 #[test]
 fn lab_start_payload_advertises_room_time_controls() {
     let mut task = RoomTask::new(
