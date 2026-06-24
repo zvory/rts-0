@@ -16,7 +16,7 @@ grow back into context-heavy hotspots.
 - Set budgets from the achieved final sizes after Phases 1-7, not from the pre-split 8k-line file.
 - Keep or update existing checks that route snapshot projection through `projection.rs` and lab
   mutation through the approved room-task lab boundary.
-- Update `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if the new
+- Update `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if the new
   `server/src/lobby/room_task/**` paths are not grouped under room-runtime ownership.
 - Rerun hotspot analysis and record whether the room-runtime logical group remains trackable after
   the split.
@@ -27,7 +27,7 @@ grow back into context-heavy hotspots.
 - `docs/context/server-sim.md`
 - `scripts/check-lobby-architecture.mjs`
 - `scripts/hotspot-analysis.mjs` if grouping needs the new child paths
-- `plans/hotspots/group-map.md` if grouping needs the new child paths
+- `docs/hotspot-analysis.md` if grouping needs the new child paths
 - `plans/archive/roomsplit/phase-8.md`
 
 ## Constraints

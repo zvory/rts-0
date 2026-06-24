@@ -10,8 +10,8 @@ decomposition, which require design work, and which should be deferred.
 
 ## Scope
 
-- Read `plans/hotspots/baseline.md` and `plans/hotspots/responsibility-map.md`.
-- Create `plans/hotspots/extraction-candidates.md`.
+- Read `plans/archive/hotspots/baseline.md` and `plans/archive/hotspots/responsibility-map.md`.
+- Create `plans/archive/hotspots/extraction-candidates.md`.
 - Rank candidates by:
   - expected cognitive-load reduction;
   - current churn and recency;
@@ -35,8 +35,8 @@ decomposition, which require design work, and which should be deferred.
 
 ## Expected Touch Points
 
-- `plans/hotspots/extraction-candidates.md`
-- `plans/hotspots/phase-3.md`
+- `plans/archive/hotspots/extraction-candidates.md`
+- `plans/archive/hotspots/phase-3.md`
 
 Do not modify runtime source, tests, protocol files, client modules, CSS, or design docs in this
 phase.

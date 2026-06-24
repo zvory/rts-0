@@ -10,13 +10,13 @@ composition shell and preserving lifecycle ordering.
 ## Scope
 
 - Read `docs/context/client-ui.md` and the `Match` app-shell section of
-  `plans/hotspots/responsibility-map.md`.
+  `plans/archive/hotspots/responsibility-map.md`.
 - Extract one or more small collaborators for net-report/ping management, combat audio event
   handling, or settings action wiring.
 - Keep prediction, frame loop, room-time, lab/replay wiring, and teardown ordering in `Match` unless
   a very small local helper can preserve the exact lifecycle.
 - Use dependency injection for collaborators rather than broad cross-area imports.
-- Update `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if new match helper paths
+- Update `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if new match helper paths
   are not grouped under `client-match-shell`.
 
 ## Touch Points
@@ -24,7 +24,7 @@ composition shell and preserving lifecycle ordering.
 - `client/src/match.js`
 - new match-local helper modules
 - match/frame/health/prediction/observer-analysis/teardown contract tests
-- `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if grouping needs new helper paths
+- `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if grouping needs new helper paths
 - `plans/hotspotcleanup/phase-7.md`
 
 ## Constraints

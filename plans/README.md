@@ -4,6 +4,11 @@ Use this directory for multi-phase or phased implementation plans. Each plan get
 `plans/<one-word-name>/` directory, with a short lowercase directory name that is easy to reference
 in later tasks.
 
+Reusable methodology belongs in `docs/`, not in active plan directories. Hotspot scoring,
+architectural group tracking, and before/after cleanup comparison live in
+[`docs/hotspot-analysis.md`](../docs/hotspot-analysis.md); completed hotspot evidence lives under
+`plans/archive/hotspots/`.
+
 Each plan directory must contain a brief `plan.md` entry point and one file per phase. Use simple
 phase filenames such as `phase-1.md`, `phase-2.md`, and `phase-3.md` unless a more specific name is
 clearer.

@@ -10,7 +10,7 @@ pure command input guard helpers while preserving command semantics exactly.
 ## Scope
 
 - Read `docs/context/server-sim.md`, `docs/context/testing.md`, and the command-service section of
-  `plans/hotspots/responsibility-map.md`.
+  `plans/archive/hotspots/responsibility-map.md`.
 - Split command-service tests by behavior family where they currently live inside
   `commands.rs`.
 - Extract pure helper code for input shaping, id dedupe/capping, command-budget validation,

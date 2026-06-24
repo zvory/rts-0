@@ -13,7 +13,7 @@ tracking before any balance or config source code is moved.
   `server/src/config.rs`, `server/crates/sim/src/config.rs`, and `client/src/config.js`.
 - Add or strengthen focused assertions that lock stable public balance/config surfaces used by
   downstream Rust and JS modules.
-- Update `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` so future
+- Update `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` so future
   `server/crates/rules/src/balance/**`, `client/src/config/**`, or `client/src/config_*.js` split
   files stay in the `balance-and-config` group.
 - Record any Rust-owned client-visible values that are not yet covered by structured parity,
@@ -26,7 +26,7 @@ tracking before any balance or config source code is moved.
 - `tests/client_contracts/config_contracts.mjs` or focused config contract files, only for public
   surface assertions that do not belong in parity
 - `scripts/hotspot-analysis.mjs`
-- `plans/hotspots/group-map.md`
+- `docs/hotspot-analysis.md`
 - `docs/design/balance.md`, only for boundary wording or guardrail inventory gaps
 
 ## Constraints
@@ -53,6 +53,6 @@ known mirror gaps, and future split paths are protected before source files move
 
 ## Handoff
 
-Mark this phase done only after committing the guardrail and group-map changes. Summarize which
+Mark this phase done only after committing the guardrail and hotspot-doc changes. Summarize which
 exports or gaps are now protected, which future split paths remain grouped, which verification
 passed, and whether Phase 2 can build the structured no-drift snapshot.

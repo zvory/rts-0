@@ -43,7 +43,7 @@ code, compact slot, version, enum vocabulary, optional slot, or exported API cha
 - Keep `rts-protocol` dependent only on `rts-contract` among workspace crates. Rules- or sim-aware
   kind conversion stays in `server/src/protocol.rs` and `server/crates/sim/src/protocol.rs`.
 - If a phase creates new split files, update `scripts/hotspot-analysis.mjs` and
-  `plans/hotspots/group-map.md` in that same phase so the protocol mirror remains one logical
+  `docs/hotspot-analysis.md` in that same phase so the protocol mirror remains one logical
   hotspot group.
 - If a phase discovers that cleanup requires a compact version bump, field rename, exported-name
   change, stale-client compatibility shim, or protocol migration, stop and report blocked instead of

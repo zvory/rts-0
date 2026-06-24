@@ -27,7 +27,7 @@ stable public import surface.
 - possible `client/src/config/*.js` or `client/src/config_*.js` files
 - `scripts/check-client-architecture.mjs`, only if new internal imports need an allowed local
   grouping
-- `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md`, only if Phase 1 did not already
+- `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md`, only if Phase 1 did not already
   cover the chosen split paths
 - `tests/client_contracts/config_contracts.mjs` or parity checks if a new split needs stronger
   public-surface assertions

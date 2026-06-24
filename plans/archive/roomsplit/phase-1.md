@@ -10,7 +10,7 @@ assertion and fixture behavior.
 ## Scope
 
 - Read `docs/context/server-sim.md`, `docs/context/testing.md`, and the room-runtime sections of
-  `plans/hotspots/responsibility-map.md`.
+  `plans/archive/hotspots/responsibility-map.md`.
 - Convert the `#[cfg(test)] mod tests` body in `server/src/lobby/room_task.rs` into a child test
   module under `server/src/lobby/room_task/tests/`.
 - Split tests by behavior family, with likely files for `lobby`, `live`, `replay`, `lab`, `branch`,

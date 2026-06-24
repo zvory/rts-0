@@ -23,7 +23,7 @@ confirmation.
 
 - `docs/design/balance.md`
 - `docs/context/balance.md`
-- `plans/hotspots/group-map.md`
+- `docs/hotspot-analysis.md`
 - `scripts/hotspot-analysis.mjs`, only if final grouping needs adjustment
 - any temporary scripts or test helpers introduced by earlier phases
 

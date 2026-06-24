@@ -10,13 +10,13 @@ snapshot application order, interpolation semantics, and the client intent bound
 ## Scope
 
 - Read `docs/context/client-ui.md` and the `GameState` section of
-  `plans/hotspots/responsibility-map.md`.
+  `plans/archive/hotspots/responsibility-map.md`.
 - Extract transient visual-effect buffers and read/query helpers first.
 - Consider selection/control-group helpers only if command-budget admission remains shared and the
   same public methods stay covered by contracts.
 - Keep prediction and optimistic overlay extraction out of scope unless the implementation proves a
   tiny mechanical helper split with existing coverage.
-- Update `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if new state helper paths
+- Update `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if new state helper paths
   are not grouped under `client-state-model`.
 
 ## Touch Points
@@ -24,7 +24,7 @@ snapshot application order, interpolation semantics, and the client intent bound
 - `client/src/state.js`
 - narrowly named state/model helper modules
 - GameState, selection, command-budget, or intent-state contract tests
-- `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if grouping needs new helper paths
+- `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if grouping needs new helper paths
 - `plans/hotspotcleanup/phase-6.md`
 
 ## Constraints

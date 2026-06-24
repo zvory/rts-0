@@ -30,7 +30,7 @@ the same public Rust and JS entry points.
 - `tests/protocol_parity.mjs`
 - `tests/client_contracts/protocol_contracts.mjs`
 - `docs/design/protocol.md`
-- `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if Phase 1 did not already cover
+- `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if Phase 1 did not already cover
   the new JS split path
 
 ## Constraints

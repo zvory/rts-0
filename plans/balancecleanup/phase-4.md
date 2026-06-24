@@ -28,7 +28,7 @@ Split Rust balance internals into focused modules while preserving the existing
 - `server/src/config.rs`
 - `server/crates/sim/src/config.rs`
 - `docs/design/balance.md`
-- `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md`, only if Phase 1 did not already
+- `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md`, only if Phase 1 did not already
   cover the chosen split paths
 
 ## Constraints
