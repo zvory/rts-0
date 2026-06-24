@@ -1,0 +1,72 @@
+{
+  "case": "aborted_pre_recording_alex_lobby_run",
+  "matchRunId": "alex-s-lobby-1782260563198-000002",
+  "approxWindow": {
+    "from": "2026-06-24T00:22:30Z",
+    "to": "2026-06-24T00:24:24Z"
+  },
+  "roomDisposedAt": "2026-06-24T00:24:24Z",
+  "historyReplay": {
+    "exists": false,
+    "reason": "room disposed before a match-history replay row was recorded"
+  },
+  "artifacts": {
+    "logs": "aborted-run-000002-logs.jsonl"
+  },
+  "sourceNotes": [
+    "Raw log file includes one adjacent Commander row from commander-s-lobby-1782260545876-000001 before the target run.",
+    "Metrics in this summary are for alex-s-lobby-1782260563198-000002 only."
+  ],
+  "players": {
+    "2": {
+      "reports": 7,
+      "max": {
+        "rtt_ms": 239,
+        "rtt_max_ms": 370,
+        "snapshot_jitter_ms": 41,
+        "snapshot_gap_max_ms": 1156,
+        "frame_gap_max_ms": 5734,
+        "command_issue_to_sim_ack_max_ms": 429,
+        "command_issue_to_server_receipt_max_ms": 414,
+        "command_server_receipt_to_sim_ack_max_ms": 406,
+        "server_tick_ms": 3,
+        "server_lag_ms": 1,
+        "slow_tick_count": 0,
+        "head_of_line_count": 0
+      }
+    },
+    "3": {
+      "reports": 1,
+      "max": {
+        "rtt_max_ms": 126,
+        "snapshot_jitter_ms": 33,
+        "snapshot_gap_max_ms": 322,
+        "frame_gap_max_ms": 1749,
+        "server_tick_ms": 4,
+        "server_lag_ms": 1
+      }
+    }
+  },
+  "worstActiveFocusedRow": {
+    "timestamp": "2026-06-24T00:24:03.433Z",
+    "playerId": 2,
+    "primaryIssue": "command_upload_delay",
+    "frame_gap_max_ms": 5734,
+    "rtt_ms": 31,
+    "rtt_max_ms": 108,
+    "snapshot_jitter_ms": 41,
+    "snapshot_gap_max_ms": 456,
+    "command_issue_to_sim_ack_max_ms": 347,
+    "hidden": false,
+    "focused": true,
+    "server_tick_ms": 3,
+    "server_lag_ms": 1
+  },
+  "classification": {
+    "server_tick_scheduler_pressure": "not indicated",
+    "websocket_writer_pressure": "not indicated",
+    "client_snapshot_delivery": "indicated",
+    "browser_frame_stall": "indicated",
+    "command_path": "indicated"
+  }
+}

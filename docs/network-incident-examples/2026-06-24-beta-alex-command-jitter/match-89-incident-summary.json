@@ -1,0 +1,51 @@
+{
+  "case": "recorded_beta_alex_vs_alex_match_89",
+  "publicMatchId": 89,
+  "matchRunId": "alex-s-lobby-1782260675313-000003",
+  "participants": ["alex", "alex"],
+  "startedAt": "2026-06-24T00:24:35.313112Z",
+  "endedAt": "2026-06-24T00:25:48.617844Z",
+  "durationMs": 73304,
+  "durationTicks": 2221,
+  "build": "fb3abd0b3fcc",
+  "map": {
+    "name": "Default",
+    "hash": "13ac64aab0be91a8"
+  },
+  "artifacts": {
+    "dbSummary": "match-89-db-summary.json",
+    "replay": "match-89-replay.json",
+    "logs": "match-89-runid-logs.jsonl"
+  },
+  "players": {
+    "4": {
+      "reports": 3,
+      "max": {
+        "rtt_ms": 58,
+        "rtt_max_ms": 17,
+        "snapshot_jitter_ms": 109,
+        "snapshot_gap_max_ms": 317,
+        "frame_gap_max_ms": 9,
+        "acknowledged_command_latency_ms": 118,
+        "server_tick_ms": 6,
+        "server_lag_ms": 1,
+        "slow_tick_count": 0,
+        "head_of_line_count": 0
+      }
+    },
+    "5": {
+      "reports": 1,
+      "notableRow": {
+        "rtt_ms": 157,
+        "server_tick_ms": 6,
+        "server_lag_ms": 1
+      }
+    }
+  },
+  "classification": {
+    "server_tick_scheduler_pressure": "not indicated",
+    "websocket_writer_pressure": "not indicated",
+    "client_snapshot_delivery": "indicated",
+    "command_path": "mild legacy ack latency on player 4"
+  }
+}
