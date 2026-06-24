@@ -27,7 +27,7 @@ command authority, spectator visibility, branch seat mapping, and existing live 
 - `server/src/lobby/room_task/live.rs`
 - `server/src/lobby/room_task/branch.rs`
 - Live/branch-focused room-task tests
-- `plans/roomsplit/phase-6.md`
+- `plans/archive/roomsplit/phase-6.md`
 
 ## Constraints
 

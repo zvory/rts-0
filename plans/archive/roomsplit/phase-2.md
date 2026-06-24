@@ -26,7 +26,7 @@ types, constants, and pure helpers out of the root file.
 - `server/src/lobby/room_task/types.rs`
 - `server/src/lobby/room_task/helpers.rs` only if pure helpers need a separate home
 - Existing lobby helper imports only where moved type paths require re-exports or import updates
-- `plans/roomsplit/phase-2.md`
+- `plans/archive/roomsplit/phase-2.md`
 
 ## Constraints
 

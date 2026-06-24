@@ -27,7 +27,7 @@ the module splits.
 - `plans/hotspots/group-map.md`
 - `scripts/hotspot-analysis.mjs`
 - protocol split files created in previous phases, only for stale comments or import cleanup
-- `plans/protocolcleanup/phase-5.md`
+- `plans/archive/protocolcleanup/phase-5.md`
 
 ## Constraints
 

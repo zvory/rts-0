@@ -26,7 +26,7 @@ assertion and fixture behavior.
 
 - `server/src/lobby/room_task.rs`
 - `server/src/lobby/room_task/tests/*.rs`
-- `plans/roomsplit/phase-1.md`
+- `plans/archive/roomsplit/phase-1.md`
 
 ## Constraints
 
