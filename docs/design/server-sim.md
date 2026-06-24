@@ -403,7 +403,9 @@ branch seed.
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
   selected perspective from vision selection, lab viewers get their room-owned per-operator lab vision,
   branch-live active players use original-seat aliases, and dev-watch viewers get full-world
-  scenario snapshots.
+  scenario snapshots. New event types and snapshot fields should be audited with
+  [docs/projection-audit-checklist.md](../projection-audit-checklist.md) so the owner, selected
+  player ids, full-world policy, and private-notice behavior are named before fanout code changes.
 - `launch.rs` owns the lobby start-payload builder and send loop for live, replay-branch-live,
   lab, dev-watch, and replay viewer starts. The builder consumes `SessionPolicy`, recipient role,
   projection-derived diagnostics, prediction eligibility, pending snapshot behavior, and

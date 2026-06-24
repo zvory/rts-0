@@ -627,6 +627,34 @@ fn lab_team_vision_receives_only_selected_player_mortar_events() {
     drain_reliable_messages(&mut operator_writer);
     drain_reliable_messages(&mut viewer_writer);
 
+    task.on_tick(TokioInstant::now());
+    let team_two_resource_scope = operator_writer
+        .snapshots
+        .take()
+        .expect("team 2 lab snapshot")
+        .player_resources
+        .into_iter()
+        .map(|resources| resources.id)
+        .collect::<Vec<_>>();
+    let team_one_resource_scope = viewer_writer
+        .snapshots
+        .take()
+        .expect("team 1 lab snapshot")
+        .player_resources
+        .into_iter()
+        .map(|resources| resources.id)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        team_two_resource_scope,
+        vec![LAB_PLAYER_TWO_ID],
+        "team 2 lab vision should only expose team 2 resource rows"
+    );
+    assert_eq!(
+        team_one_resource_scope,
+        vec![LAB_PLAYER_ONE_ID],
+        "team 1 lab vision should only expose team 1 resource rows"
+    );
+
     let (mortar_id, target_position) =
         prepare_player_two_lab_mortar(&mut task, &mut operator_writer, 102);
     drain_reliable_messages(&mut viewer_writer);
