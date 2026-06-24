@@ -1886,15 +1886,11 @@ async fn handle_client_message(
             .await;
         }
         ClientMessage::SetVisionSelection { selection } => {
-            send_room_event(
+            let event = RoomEvent::SetVisionSelection {
                 player_id,
-                current_room,
-                RoomEvent::SetVisionSelection {
-                    player_id,
-                    selection,
-                },
-            )
-            .await;
+                selection,
+            };
+            send_room_event(player_id, current_room, event).await;
         }
         ClientMessage::Lab { request_id, op } => {
             send_room_event(

@@ -60,7 +60,7 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 2161,
+      "lines": 2160,
       "reason": "Existing oversized server shell before repo-wide source-size gate."
     },
     {
