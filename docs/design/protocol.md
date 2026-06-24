@@ -801,6 +801,10 @@ the fog overlay; `toPos` lets tracers draw even when the hit target is no longer
 Overpenetration events are sent for secondary entities damaged behind the primary target. They carry
 only the damaged entity id and do not imply a separate fired shot, muzzle flash, tracer, shooter
 reveal, weapon recoil, or attack sound.
+Full-world room projections, including dev watch and full-world lab vision, attach a deterministic
+deduplicated union of the per-player event buckets so transient effects match the exposed world
+state. Normal active-player views keep player-only event delivery, and selected player/team replay
+or lab views union only the selected real-player buckets.
 
 When a normal live match accepts a mid-match spectator attach, the server queues a position-free
 info notice for every already-connected active player and spectator: `<name> has joined the match as

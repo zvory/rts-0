@@ -1,6 +1,6 @@
 # Phase 3 - Full-World Event Projection
 
-Status: planned.
+Status: done.
 
 ## Goal
 
