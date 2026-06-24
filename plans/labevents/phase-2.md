@@ -1,6 +1,6 @@
 # Phase 2 - Lab Mortar Regression Coverage
 
-Status: planned.
+Status: done.
 
 ## Goal
 
