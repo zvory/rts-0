@@ -58,7 +58,7 @@ pub(super) enum RoomTimeSource {
     ReplayPlayback,
     DevScenario,
     Lab,
-    LiveAiOnly,
+    LiveGame,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,32 +85,32 @@ impl RoomTimeOperations {
         seek_absolute: false,
     };
 
-    pub(super) const REPLAY_PLAYBACK: Self = Self {
+    pub(super) const SPEED_ONLY: Self = Self {
         set_speed: true,
         step: false,
-        seek_relative: true,
-        seek_absolute: true,
+        seek_relative: false,
+        seek_absolute: false,
     };
 
-    pub(super) const DEV_SCENARIO: Self = Self {
+    pub(super) const SPEED_AND_STEP: Self = Self {
         set_speed: true,
         step: true,
         seek_relative: false,
         seek_absolute: false,
     };
 
-    pub(super) const LAB: Self = Self {
+    pub(super) const SPEED_AND_SEEK: Self = Self {
         set_speed: true,
-        step: true,
+        step: false,
         seek_relative: true,
         seek_absolute: true,
     };
 
-    pub(super) const LIVE_AI_ONLY: Self = Self {
+    pub(super) const FULL_SEEKABLE: Self = Self {
         set_speed: true,
-        step: false,
-        seek_relative: false,
-        seek_absolute: false,
+        step: true,
+        seek_relative: true,
+        seek_absolute: true,
     };
 
     pub(super) fn allows(self, operation: RoomTimeOperation) -> bool {
@@ -141,19 +141,15 @@ impl ClockCapability {
     pub(super) const BRANCH_STAGING: Self = Self::FixedRealtime(ClockTickSource::BranchStaging);
     pub(super) const REPLAY_PLAYBACK: Self = Self::RoomControlled(RoomTimeCapability {
         source: RoomTimeSource::ReplayPlayback,
-        operations: RoomTimeOperations::REPLAY_PLAYBACK,
+        operations: RoomTimeOperations::SPEED_AND_SEEK,
     });
     pub(super) const DEV_SCENARIO: Self = Self::RoomControlled(RoomTimeCapability {
         source: RoomTimeSource::DevScenario,
-        operations: RoomTimeOperations::DEV_SCENARIO,
+        operations: RoomTimeOperations::SPEED_AND_STEP,
     });
     pub(super) const LAB: Self = Self::RoomControlled(RoomTimeCapability {
         source: RoomTimeSource::Lab,
-        operations: RoomTimeOperations::LAB,
-    });
-    pub(super) const LIVE_AI_ONLY: Self = Self::RoomControlled(RoomTimeCapability {
-        source: RoomTimeSource::LiveAiOnly,
-        operations: RoomTimeOperations::LIVE_AI_ONLY,
+        operations: RoomTimeOperations::FULL_SEEKABLE,
     });
 
     pub(super) fn room_time_source(self) -> Option<RoomTimeSource> {
@@ -586,7 +582,10 @@ impl SessionPolicy {
             && self.mode == SessionMode::Normal
             && self.phase == SessionPhase::LiveMatch
         {
-            self.clock = ClockCapability::LIVE_AI_ONLY;
+            self.clock = ClockCapability::RoomControlled(RoomTimeCapability {
+                source: RoomTimeSource::LiveGame,
+                operations: RoomTimeOperations::SPEED_ONLY,
+            });
         }
         self
     }
@@ -999,7 +998,11 @@ mod tests {
             ai_only_live_match: true,
         });
         let ai_only_caps = ai_only_live.start_capabilities(false);
-        assert_eq!(ai_only_live.clock, ClockCapability::LIVE_AI_ONLY);
+        let ClockCapability::RoomControlled(ai_only_clock) = ai_only_live.clock else {
+            panic!("AI-only live match should use room-controlled time");
+        };
+        assert_eq!(ai_only_clock.source, RoomTimeSource::LiveGame);
+        assert_eq!(ai_only_clock.operations, RoomTimeOperations::SPEED_ONLY);
         assert!(ai_only_caps.room_time.available);
         assert!(ai_only_caps.room_time.set_speed);
         assert!(ai_only_caps.room_time.pause);

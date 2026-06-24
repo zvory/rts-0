@@ -116,6 +116,7 @@ impl TickControl {
 
 #[cfg(test)]
 mod tests {
+    use super::super::session_policy::RoomTimeCapability;
     use super::*;
 
     fn assert_duration_close(actual: Duration, expected: Duration) {
@@ -232,8 +233,12 @@ mod tests {
         assert_eq!(paused_lab.scheduled_action(), ScheduledTickAction::Noop);
         assert!(paused_lab.can_step_room_time(true));
 
+        let live_game_speed_only = ClockCapability::RoomControlled(RoomTimeCapability {
+            source: RoomTimeSource::LiveGame,
+            operations: RoomTimeOperations::SPEED_ONLY,
+        });
         let live_ai = TickControl::new(
-            ClockCapability::LIVE_AI_ONLY,
+            live_game_speed_only,
             Some(RoomTimeClock {
                 speed: 4.0,
                 paused: false,
@@ -244,7 +249,7 @@ mod tests {
         assert_duration_close(live_ai.tick_interval(base), Duration::from_micros(22_500));
         assert_eq!(
             live_ai.scheduled_action(),
-            ScheduledTickAction::RoomControlled(RoomTimeSource::LiveAiOnly)
+            ScheduledTickAction::RoomControlled(RoomTimeSource::LiveGame)
         );
         assert!(live_ai.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
         assert!(!live_ai.allows_room_time_operation(RoomTimeOperation::Step, true));
@@ -252,7 +257,7 @@ mod tests {
         assert!(!live_ai.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
 
         let paused_live_ai = TickControl::new(
-            ClockCapability::LIVE_AI_ONLY,
+            live_game_speed_only,
             Some(RoomTimeClock {
                 speed: 4.0,
                 paused: true,

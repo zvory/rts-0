@@ -260,7 +260,7 @@ impl RoomTask {
                 speed: self.room_time_speed,
                 paused: self.room_time_paused,
             }),
-            (_, Some(RoomTimeSource::LiveAiOnly)) => Some(RoomTimeClock {
+            (_, Some(RoomTimeSource::LiveGame)) => Some(RoomTimeClock {
                 speed: self.room_time_speed,
                 paused: self.room_time_paused,
             }),

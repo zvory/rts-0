@@ -375,7 +375,7 @@ impl RoomTask {
                 self.broadcast_lab_room_time_state();
                 return;
             }
-            Some(RoomTimeSource::LiveAiOnly) => {
+            Some(RoomTimeSource::LiveGame) => {
                 self.apply_room_time_speed(speed);
                 self.broadcast_live_ai_room_time_state();
                 return;
@@ -410,7 +410,7 @@ impl RoomTask {
                 self.on_tick_live_game(TokioInstant::now());
                 self.broadcast_lab_room_time_state();
             }
-            Some(RoomTimeSource::ReplayPlayback) | Some(RoomTimeSource::LiveAiOnly) | None => {}
+            Some(RoomTimeSource::ReplayPlayback) | Some(RoomTimeSource::LiveGame) | None => {}
         }
     }
 
@@ -488,7 +488,7 @@ impl RoomTask {
                 return;
             }
             Some(RoomTimeSource::ReplayPlayback) => {}
-            Some(RoomTimeSource::DevScenario) | Some(RoomTimeSource::LiveAiOnly) | None => return,
+            Some(RoomTimeSource::DevScenario) | Some(RoomTimeSource::LiveGame) | None => return,
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;
@@ -551,7 +551,7 @@ impl RoomTask {
                 return;
             }
             Some(RoomTimeSource::ReplayPlayback) => {}
-            Some(RoomTimeSource::DevScenario) | Some(RoomTimeSource::LiveAiOnly) | None => return,
+            Some(RoomTimeSource::DevScenario) | Some(RoomTimeSource::LiveGame) | None => return,
         }
         let send_analysis = self.projection_policy().observer_analysis_audience()
             == ObserverAnalysisAudience::ReplayViewers;

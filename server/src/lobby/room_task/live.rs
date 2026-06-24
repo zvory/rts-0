@@ -510,7 +510,7 @@ impl RoomTask {
     }
 
     fn live_ai_room_time_state(&self) -> Option<RoomTimeState> {
-        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::LiveAiOnly) {
+        if self.session_policy().clock.room_time_source() != Some(RoomTimeSource::LiveGame) {
             return None;
         }
         let Phase::InGame(game) = &self.phase else {
