@@ -454,6 +454,10 @@ export class Input {
       clientX: rect.left + p.x,
       clientY: rect.top + p.y,
       button: Number.isFinite(p.button) ? p.button : ev.button,
+      buttons: Number.isFinite(ev.buttons) ? ev.buttons : undefined,
+      deltaX: Number.isFinite(ev.deltaX) ? ev.deltaX : 0,
+      deltaY: Number.isFinite(ev.deltaY) ? ev.deltaY : 0,
+      deltaMode: Number.isFinite(ev.deltaMode) ? ev.deltaMode : 0,
       shiftKey: ev.shiftKey,
       ctrlKey: ev.ctrlKey,
       metaKey: ev.metaKey,
@@ -650,6 +654,11 @@ export class Input {
 
   _handleMouseUp(ev) {
     if (this.cameraNavigation ? this.cameraNavigation.handleMouseUp(ev) : this._handleCameraPanMouseUpFallback(ev)) {
+      return;
+    }
+    if (ev.button !== 0 && this.pointerLocked) {
+      const p = this._eventScreenPos(ev);
+      if (this._routeLockedPointerUp(ev, p)) ev.preventDefault();
       return;
     }
     if (ev.button !== 0) return;
