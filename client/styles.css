@@ -489,6 +489,164 @@ input[type="text"]:focus {
   display: none !important;
 }
 
+/* ============================ LAB ENTRY ============================ */
+#lab-entry-screen {
+  display: block;
+  font-family: var(--lobby-font);
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25% 75%, rgba(0, 0, 0, 0.08) 75%),
+    linear-gradient(45deg, rgba(0, 0, 0, 0.08) 25%, transparent 25% 75%, rgba(255, 255, 255, 0.035) 75%),
+    var(--void);
+  background-position: 0 0, 8px 8px;
+  background-size: 16px 16px;
+  padding: 72px clamp(18px, 4vw, 42px) 42px;
+  overflow-y: auto;
+}
+
+.lab-entry-shell {
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.lab-entry-header,
+.lab-entry-controls,
+.lab-entry-list {
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  background: rgba(39, 37, 31, 0.98);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lab-entry-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+  padding: 24px 26px 18px;
+}
+
+.lab-entry-header h1 {
+  margin: 3px 0 0;
+  color: var(--accent);
+  font-size: 50px;
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.lab-entry-status {
+  min-width: 118px;
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(91, 83, 65, 0.72);
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.lab-entry-status[data-state="ready"] {
+  border-color: rgba(124, 164, 90, 0.55);
+  color: var(--good);
+}
+
+.lab-entry-status[data-state="error"] {
+  border-color: rgba(182, 74, 63, 0.58);
+  color: var(--bad);
+}
+
+.lab-entry-controls {
+  padding: 18px 20px;
+}
+
+.lab-entry-controls label {
+  display: grid;
+  max-width: 340px;
+  gap: 6px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.lab-entry-list {
+  display: grid;
+  overflow: hidden;
+}
+
+.lab-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(148px, auto);
+  gap: 16px;
+  align-items: center;
+  min-height: 112px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(91, 83, 65, 0.42);
+  background: rgba(39, 37, 31, 0.76);
+}
+
+.lab-entry-row:last-child {
+  border-bottom: 0;
+}
+
+.lab-entry-copy {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.lab-entry-copy h2,
+.lab-entry-copy p {
+  margin: 0;
+}
+
+.lab-entry-copy h2 {
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.lab-entry-copy p {
+  color: var(--ink-dim);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.lab-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lab-entry-meta span {
+  padding: 4px 7px;
+  border: 1px solid rgba(91, 83, 65, 0.72);
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.lab-entry-row .btn {
+  min-height: 44px;
+  justify-self: stretch;
+}
+
+.lab-entry-message {
+  margin: 0;
+  padding: 18px 20px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+
 .lobby-browser {
   display: grid;
   gap: 0;
@@ -1195,12 +1353,22 @@ input[type="text"]:focus {
 }
 
 @media (max-width: 720px) {
-  #lobby-screen {
+  #lobby-screen,
+  #lab-entry-screen {
     padding: 72px 12px 18px;
   }
 
   .lobby-masthead,
+  .lab-entry-header,
   .lobby-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-entry-header h1 {
+    font-size: 40px;
+  }
+
+  .lab-entry-row {
     grid-template-columns: 1fr;
   }
 

@@ -318,6 +318,13 @@ block readiness, or count toward win/loss.
 `selectMap`; `description` is display text for the lobby selector. Lobby `map` is the current
 selected map name and is distinct from replay start metadata `mapName`.
 
+`GET /api/lab-scenarios` returns a bounded catalog of bundled lab scenario metadata:
+`[{ id, title, description, tags, map, playerCount, filename }]`. `id` is the stable safe token used
+in direct lab room URLs as `scenario=<id>`, `map` and `playerCount` mirror the listed
+`LabScenarioV1`, and `filename` is the safe bundled JSON filename under
+`server/assets/lab-scenarios/`. The listing deliberately omits the full scenario JSON; lab starts
+load it server-side from the manifest source of truth.
+
 `teamId` is nonzero for active match players and AI seats. New active players and default-added AI
 opponents are assigned to the next empty team after the currently occupied teams when possible,
 falling back to the first empty team in `1..=4`; the host may move active human or AI seats between
@@ -634,7 +641,7 @@ change the wire shape or compact snapshot version.
 
 | Value/path | Rust owner | JS mirror path | Category | Current checker | Proposed future checker | Client-only exclusion reason | Compact version impact |
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
-| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby HTTP route handlers in `server/src/main.rs` and room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary and create-lobby behavior | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | None; JS is a protocol mirror | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
+| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, HTTP lab scenario catalog endpoint, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby/lab catalog HTTP route handlers in `server/src/main.rs`; lab catalog source of truth in `server/src/lab_scenarios.rs`; room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; `client/src/lab_catalog.js` consumes the HTTP lab catalog; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire/HTTP DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary, create-lobby behavior, and lab catalog loading | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | Lab catalog rows are HTTP metadata, not mirrored through `protocol.js`; they are consumed by the app-owned catalog selector | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
 | Semantic start/snapshot/replay/analysis DTOs | `server/crates/contract/src/lib.rs`, re-exported by `server/crates/protocol/src/lib.rs` | `client/src/protocol.js` decoder output consumed by client modules | wire DTO | `tests/protocol_parity.mjs` fixture decodes selected compact fields; Rust serde tests cover local serialization | Structured contract/schema dump for semantic DTO fields plus compact round-trip fixtures | None; JS is a protocol mirror | Compact bump only when the live compact representation changes |
 | `terrain` codes | `server/crates/protocol/src/contract_metadata.rs` `terrain`, re-exported by `lib.rs`; adapter test checks rules terrain constants | `client/src/protocol_constants.js` `TERRAIN` and `PASSABLE`, re-exported by `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
 | `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/contract_metadata.rs` `kinds`, re-exported by `lib.rs`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol_constants.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, re-exported by `client/src/protocol.js` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |
@@ -1022,11 +1029,11 @@ Reliable lab server messages:
 | `labResult` | `requestId`, `ok`, `op`, `error?`, `outcome?` | Targeted reply for every lab request accepted by the room task. Rejected requests include `error`; accepted setup mutations may include typed outcome metadata such as `entityId`. |
 
 Lab protocol deliberately omits seek controls, broad lab simulation flags such as globally disabled
-damage, server-side public scenario storage, fine-grained multi-operator permissions, visual
-iteration hot reload, and `/dev/scenario` migration. Pause, speed, step, and room-local timeline
-metadata use the neutral room-time messages instead of overloading `LabClientOp`.
-Debug-style prebuilt setups should return later as explicit lab scenario/preset protocol, not as a
-hidden normal-lobby command.
+damage, user-writable public scenario storage, fine-grained multi-operator permissions, visual
+iteration hot reload, and `/dev/scenario` migration. Bundled prebuilt setups are selected before
+join through the HTTP lab scenario catalog and direct lab URL `scenario=<id>` tokens, not through a
+normal-lobby command or a lab client op. Pause, speed, step, and room-local timeline metadata use
+the neutral room-time messages instead of overloading `LabClientOp`.
 
 ### 2.7 Observer analysis state
 

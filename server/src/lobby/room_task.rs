@@ -41,8 +41,7 @@ use helpers::{LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
 use lab::LabSession;
 use types::{AiSlot, Phase};
 pub(super) use types::{
-    DevScenarioConfig, DevScenarioId, LabRoomConfig, LabScenarioPreset, PendingClientCommandAck,
-    RoomMode, RoomPlayer,
+    DevScenarioConfig, DevScenarioId, LabRoomConfig, PendingClientCommandAck, RoomMode, RoomPlayer,
 };
 
 pub(super) struct RoomTask {

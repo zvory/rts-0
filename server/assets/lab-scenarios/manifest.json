@@ -1,0 +1,13 @@
+{
+  "scenarios": [
+    {
+      "id": "lategame",
+      "title": "Lategame Arsenal",
+      "description": "Two-player late-game lab with full tech, large armies, and maximum resources.",
+      "tags": ["two-player", "lategame", "full-tech"],
+      "map": "Default",
+      "playerCount": 2,
+      "filename": "lategame.json"
+    }
+  ]
+}

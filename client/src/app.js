@@ -17,6 +17,8 @@ import { Audio, SOUND_MANIFEST } from "./audio.js";
 import { S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
 import {
+  buildLabLaunchConfig,
+  labCatalogRouteConfig,
   devWatchConfig,
   diagnostics,
   dom,
@@ -39,6 +41,7 @@ import {
 } from "./hotkey_profiles.js";
 import { buildCommandCardContextCatalog } from "./hud_command_card.js";
 import { LabClient } from "./lab_client.js";
+import { LabCatalogScreen } from "./lab_catalog.js";
 import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_control_policy.js";
 import { LabPanel } from "./lab_panel.js";
 import { SettingsContainer } from "./settings_container.js";
@@ -77,6 +80,7 @@ export class App {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = new Net(wsUrl(), diagnostics);
     this.devWatch = devWatchConfig();
+    this.labCatalogLaunch = labCatalogRouteConfig();
     this.labLaunch = labLaunchConfig();
     this.replayLaunch = replayLaunchConfig();
     /**
@@ -103,6 +107,7 @@ export class App {
     this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
     this.match = null;
+    this.labCatalog = null;
     this.labClient = null;
     this.labPanel = null;
     this.labControlPolicy = null;
@@ -131,6 +136,7 @@ export class App {
     this.predictionEnabled = readPredictionEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
     this.mountLobbySettings();
+    if (this.labCatalogLaunch) this.lobby.hide();
   }
 
   /** Connect, wire global server messages, and show the lobby. */
@@ -148,14 +154,19 @@ export class App {
     window.addEventListener("beforeunload", this.onBeforeUnload);
 
     void this.loadVersion();
-    this.lobby.show();
-    this.mountLobbySettings();
-    this._mountMatchHistory();
+    if (this.labCatalogLaunch) {
+      this.showLabCatalog();
+    } else {
+      this.lobby.show();
+      this.mountLobbySettings();
+      this._mountMatchHistory();
+    }
     this.applyDevBanner();
     try {
       await this.net.connect();
       if (this.replayLaunch) this.maybeAutoJoinReplay();
       else if (this.labLaunch) this.maybeAutoJoinLab();
+      else if (this.labCatalogLaunch) this.labCatalog?.setConnected(true);
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.showConnectionWarning();
@@ -197,7 +208,24 @@ export class App {
     if (this.lobby?.elRoom) this.lobby.elRoom.value = this.labLaunch.room;
     this.net.join(name, this.labLaunch.room, true, false);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
-    this.lobby.setStatus("Starting lab...");
+    if (this.labCatalogLaunch) this.labCatalog?.setStatus("Starting lab...");
+    else this.lobby.setStatus("Starting lab...");
+  }
+
+  showLabCatalog() {
+    if (dom.lobbyScreen) dom.lobbyScreen.hidden = true;
+    if (!dom.labEntryScreen) return;
+    dom.labEntryScreen.hidden = false;
+    if (this.labCatalog) return;
+    this.labCatalog = new LabCatalogScreen({
+      root: dom.labEntryScreen,
+      initialRoom: this.labCatalogLaunch?.room || "default",
+      onStart: (selection) => {
+        this.labLaunch = buildLabLaunchConfig(selection);
+        this.maybeAutoJoinLab();
+      },
+    });
+    this.labCatalog.mount();
   }
 
   /**
@@ -206,7 +234,9 @@ export class App {
    * @param {{msg: string}} m
    */
   onError(m) {
-    this.showToast(m && m.msg ? m.msg : "Server error");
+    const msg = m && m.msg ? m.msg : "Server error";
+    this.showToast(msg);
+    this.labCatalog?.setStatus(msg, { error: true });
   }
 
   /**
@@ -233,6 +263,7 @@ export class App {
     this.hasConnected = true;
     this.stopHeartbeat();
     this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
+    this.labCatalog?.setConnected(true);
   }
 
   /** Socket closed: stop the heartbeat so we don't leak the interval. */
@@ -241,6 +272,7 @@ export class App {
     const text = this.hasConnected
       ? "Server connection lost. Refresh when the server is available."
       : "Unable to connect to the server. Make sure it is running, then refresh.";
+    this.labCatalog?.setConnected(false);
     this.showConnectionWarning(text);
   }
 
@@ -279,6 +311,7 @@ export class App {
 
     dom.gameScreen.classList.remove("branch-background");
     dom.lobbyScreen.hidden = true;
+    if (dom.labEntryScreen) dom.labEntryScreen.hidden = true;
     this.branchStaging.hide();
     if (dom.devLinks) dom.devLinks.hidden = true;
     dom.gameScreen.hidden = false;
@@ -622,6 +655,7 @@ export class App {
   ) {
     this.showToast(text);
     if (this.lobby) this.lobby.setStatus(text, true);
+    this.labCatalog?.setStatus(text, { error: true });
   }
 
   /** Fetch and display the build version in the shared top-left badge. */

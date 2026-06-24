@@ -86,36 +86,7 @@ pub(in crate::lobby) struct LabRoomConfig {
     pub(in crate::lobby) public_id: String,
     pub(in crate::lobby) map_name: String,
     pub(in crate::lobby) seed: Option<u32>,
-    pub(in crate::lobby) scenario: Option<LabScenarioPreset>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::lobby) enum LabScenarioPreset {
-    Lategame,
-}
-
-impl LabScenarioPreset {
-    pub(in crate::lobby) fn from_id(id: &str) -> Option<Self> {
-        match id {
-            "lategame" => Some(Self::Lategame),
-            _ => None,
-        }
-    }
-
-    pub(super) fn id(self) -> &'static str {
-        match self {
-            Self::Lategame => "lategame",
-        }
-    }
-
-    pub(super) fn json(self) -> &'static str {
-        match self {
-            Self::Lategame => include_str!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/assets/lab-scenarios/lategame.json"
-            )),
-        }
-    }
+    pub(in crate::lobby) scenario: Option<String>,
 }
 
 #[derive(Clone)]

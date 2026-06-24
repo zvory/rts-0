@@ -116,7 +116,7 @@ pub(super) fn lab_config() -> LabRoomConfig {
 
 pub(super) fn lategame_lab_config() -> LabRoomConfig {
     let mut config = lab_config();
-    config.scenario = Some(LabScenarioPreset::Lategame);
+    config.scenario = Some("lategame".to_string());
     config
 }
 

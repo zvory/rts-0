@@ -26,6 +26,10 @@ import {
   labVisionLabel,
 } from "../../client/src/lab_client.js";
 import {
+  LabCatalogScreen,
+  normalizeLabScenarioEntry,
+} from "../../client/src/lab_catalog.js";
+import {
   createDefaultControlPolicy,
   createLabControlPolicy,
 } from "../../client/src/lab_control_policy.js";
@@ -42,6 +46,72 @@ import { textWithin } from "./dom_text.mjs";
 
 // Lab client and panel
 // ---------------------------------------------------------------------------
+{
+  const normalized = normalizeLabScenarioEntry({
+    id: "lategame",
+    title: "Lategame Arsenal",
+    description: "Full tech setup",
+    tags: ["two-player", "lategame"],
+    map: "Default",
+    playerCount: 2,
+    scenario: { kind: "labScenario" },
+  });
+  assert(normalized.id === "lategame", "lab catalog entry keeps stable scenario id");
+  assert(normalized.playerCount === 2, "lab catalog entry keeps bounded player count metadata");
+  assert(!("scenario" in normalized), "lab catalog entry normalization keeps full scenario JSON out of the listing model");
+}
+
+await withFakeDocument(async () => {
+  const root = document.createElement("section");
+  const starts = [];
+  let requestedUrl = "";
+  const screen = new LabCatalogScreen({
+    root,
+    initialRoom: "sandbox",
+    fetchImpl: async (url, options) => {
+      requestedUrl = url;
+      assert(options.cache === "no-store", "LabCatalogScreen requests the catalog without cache");
+      return {
+        ok: true,
+        async json() {
+          return [
+            {
+              id: "lategame",
+              title: "Lategame Arsenal",
+              description: "Full tech setup",
+              tags: ["two-player", "lategame"],
+              map: "Default",
+              playerCount: 2,
+              filename: "lategame.json",
+            },
+          ];
+        },
+      };
+    },
+    onStart: (launch) => starts.push(launch),
+  });
+  screen.mount();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert(requestedUrl === "/api/lab-scenarios", "LabCatalogScreen loads the server catalog endpoint");
+  assert(textWithin(root).includes("Blank Lab"), "LabCatalogScreen renders a blank lab start row");
+  assert(textWithin(root).includes("Lategame Arsenal"), "LabCatalogScreen renders bundled scenario metadata");
+  screen.setConnected(true);
+  const scenarioButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start scenario",
+  )[0];
+  scenarioButton.listeners.click();
+  assert(
+    starts[0]?.room === "sandbox" &&
+      starts[0]?.map === "Default" &&
+      starts[0]?.scenario === "lategame",
+    "LabCatalogScreen reports the selected room, map, and catalog scenario id",
+  );
+});
+
 {
   const sent = [];
   const net = new Net("ws://example.test/ws");

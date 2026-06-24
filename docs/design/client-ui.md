@@ -55,6 +55,7 @@ src/
   frame_profiler.js # bounded client frame phase profiler and debug summary API
   live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel
+  lab_catalog.js # LabCatalogScreen: app-owned `/lab` scenario/blank selector
   lab_client.js  # LabClient: lab request ids, pending results, state/result subscriptions
   lab_panel.js   # LabPanel: app-owned lab controls/status UI mounted around Match
   lab_panel_window.js # draggable/resizable chrome helper for the app-owned LabPanel
@@ -419,6 +420,22 @@ export function labVisionLabel(vision)
 export const labVision                   // fullWorld(), team(teamId), teams(teamIds)
 ```
 
+`lab_catalog.js`
+```js
+export function normalizeLabScenarioEntry(entry)
+export class LabCatalogScreen {
+  constructor({ root, fetchImpl?, initialRoom?, onStart })
+  mount()                                // fetches GET /api/lab-scenarios and renders choices
+  setConnected(connected)
+  setStatus(status, options?)
+}
+```
+`LabCatalogScreen` is app-owned and used only for the bare `/lab` route. It renders a blank lab row
+plus bundled scenario metadata from `GET /api/lab-scenarios`; clicking a row builds the existing
+hidden `__lab__:<room>:map=<map>:scenario=<id>` join room and lets `App` start the normal lab flow.
+Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
+and auto-join for compatibility.
+
 `lab_panel.js`
 ```js
 export function labSpawnFactionOptions()
@@ -448,12 +465,13 @@ export function createLabControlPolicy({ labClient, metadata })
 export function createDefaultControlPolicy()
 ```
 
-`App` owns `LabClient`, `LabPanel`, and lab control policy lifetimes when a `start` payload carries
-`lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
-constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
-MVP exposes per-operator lab vision, per-player asset god mode, setup mutations, issue-as commands,
-and scenario import/export through those collaborators while keeping the normal match screen
-authentic. Lab operator starts are still spectator-shaped for projection and prediction, and
+`App` owns `LabCatalogScreen` before joining a lab and owns `LabClient`, `LabPanel`, and lab control
+policy lifetimes when a `start` payload carries `lab` metadata. `Match` receives `labMetadata`,
+`labClient`, and `labControlPolicy` through constructor options only; renderer, HUD, input, and
+minimap do not import lab modules. The shipped MVP exposes catalog/blank lab selection,
+per-operator lab vision, per-player asset god mode, setup mutations, issue-as commands, and
+scenario import/export through those collaborators while keeping the normal match screen authentic.
+Lab operator starts are still spectator-shaped for projection and prediction, and
 `LabClient` treats `start.lab.vision` plus `labState.vision` as the recipient's server-authoritative
 choice; `start.lab.godModePlayers` plus `labState.godModePlayers` mirror room-scoped player god
 mode. The injected control policy exposes `canUseCommandSurface(state)` and local
@@ -1131,8 +1149,9 @@ Current areas:
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` launch
-  URL mode/scenario defaults, audio, combat audio, alerts, fog, camera, prediction settings,
+- `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
+  route detection, direct launch URL parsing for scenario/map/seed, audio, combat audio, alerts,
+  fog, camera, prediction settings,
   `report_window_aggregate.js`.
 
 Import rules:
