@@ -3,10 +3,12 @@
 ## Purpose
 
 Reduce review and merge risk around the balance/config mirror without changing gameplay. This plan
-exists because `plans/archive/hotspotcleanup/phase-10.md` found a safe path only if validation expands before
-any source files move. Every phase is behavior-preserving: no cost, supply, sight, size, range,
-duration, ability, upgrade, faction, catalog, wiki-visible value, UI affordance, or exported API may
-change.
+exists because `plans/archive/hotspotcleanup/phase-10.md` found a safe path only if validation
+expands before any source files move. It has been rebaselined against the current balance,
+catalog, client-architecture, and hotspot guardrails on `origin/main`; earlier assumptions that the
+structured mirror snapshot did not exist are stale. Every phase is behavior-preserving: no cost,
+supply, sight, size, range, duration, ability, upgrade, faction, catalog, wiki-visible value, UI
+affordance, or exported API may change.
 
 ## Gate Evidence
 
@@ -16,15 +18,28 @@ change.
 - `server/src/config.rs` and `server/crates/sim/src/config.rs` are compatibility shims that
   re-export `rts_rules::balance::*`; they should not gain new server-shell or sim-only constants.
 - `client/src/config.js` currently mixes Rust-owned mirror values with client-owned presentation
-  data such as colors, fog alpha, camera defaults, labels, icons, and layout hints.
-- `scripts/check-faction-catalog-parity.mjs` already compares the Rust catalog dump against client
-  catalogs, unit/building stats, bodies, resource amounts, upgrade metadata, ability descriptors,
-  and many client-visible scalar constants.
+  data such as colors, fog alpha, camera defaults, labels, icons, layout hints, command budget
+  constants, Kriegsia and Ekat client catalogs, and the fixture-only `phase2_empty_fixture` catalog.
+- `scripts/check-faction-catalog-parity.mjs` already compares the Rust catalog dump and its
+  `clientConfig` payload against client catalogs, unit/building stats, bodies, resource amounts,
+  upgrade metadata, ability descriptors, Rust-owned ability effect fields, compact ability/order
+  codes, playable faction exposure, and many client-visible scalar constants.
 - `scripts/check-wiki.mjs` wraps generated wiki route/table checks and faction catalog parity for
   visible stat, faction, upgrade, and ability changes.
-- Remaining risk is not numeric coverage alone: command budget constants are mirrored between the
-  client and sim command service, and client-only presentation fields must stay excluded from Rust
-  authority unless a later design explicitly moves them.
+- `scripts/hotspot-analysis.mjs` still groups only the current exact balance/config paths; future
+  `client/src/config/**`, `client/src/config_*.js`, and `server/crates/rules/src/balance/**` split
+  files are not yet guaranteed to roll up into the `balance-and-config` group.
+- `scripts/check-client-architecture.mjs` currently treats only `client/src/config.js` as the
+  pinned shared rules mirror. A client config split must classify and allow any internal config
+  modules deliberately, then update `docs/design/client-ui.md` and `docs/context/client-ui.md`.
+- Remaining no-drift risk is not broad numeric coverage. The open gap is that
+  `BASE_COMMAND_SUPPLY_CAP` and `COMMAND_CAR_SUPPLY_CAP_BONUS` are mirrored between
+  `client/src/config.js` and the sim command service outside the Rust rules dump, and client-only
+  presentation fields must stay excluded from Rust authority unless a later design explicitly moves
+  them.
+- `server/crates/rules/src/balance.rs` still contains some sim-only movement/recovery constants
+  consumed through `server/crates/sim/src/config.rs`. The Rust cleanup must either keep public
+  compatibility re-exports or stop for a design gate before removing exported names.
 
 ## Overall Constraints
 
@@ -37,11 +52,19 @@ change.
 - Do not move server-only simulation internals into client mirrors, and do not move client-only
   presentation labels, colors, camera defaults, fog alpha, or layout hints into Rust authority
   without a new design gate.
-- Before any file split, add no-drift guardrails that compare Rust-owned mirror data and client
-  exports through structured data rather than brittle source-order snapshots.
+- Before any file split, close the remaining no-drift gaps by comparing server-owned command budget
+  values and stable client config export names through structured data rather than brittle
+  source-order snapshots.
 - If a phase creates new split files, update `scripts/hotspot-analysis.mjs` and
   `docs/hotspot-analysis.md` in that same phase so the balance mirror remains one logical
   hotspot group.
+- If a phase creates client config split files, update `scripts/check-client-architecture.mjs`,
+  `docs/design/client-ui.md`, and `docs/context/client-ui.md` so the new files remain a pinned
+  rules-mirror area instead of ad-hoc cross-area imports.
+- Treat command budget as sim command-service policy unless Phase 2 deliberately documents a
+  different owner. Do not move it into `rts_rules::balance` just to make parity easier.
+- Do not remove exported Rust balance names when relocating sim-only constants unless that phase
+  explicitly proves no downstream public import depends on them and updates the design docs.
 - Use focused verification. At minimum, code-moving phases run
   `node scripts/check-faction-catalog-parity.mjs`, `node scripts/check-wiki.mjs`,
   `node tests/client_contracts.mjs`, and `git diff --check`; Rust-moving phases also run focused
@@ -55,37 +78,38 @@ change.
 
 ## Phase Summaries
 
-### [Phase 1 - Mirror Guardrail Baseline](phase-1.md)
+### [Phase 1 - Rebaseline Guardrails And Grouping](phase-1.md)
 
-Strengthen the tests and hotspot grouping that make later balance movement reviewable. This phase
-does not move balance source code; it records the stable Rust and JS public surfaces, protects future
-split paths as one balance/config hotspot, and identifies any Rust-owned client-visible values still
-missing from structured parity. It should stop with a no-go handoff if guardrails cannot be improved
-without changing balance behavior.
+Refresh the plan's guardrail baseline against current `origin/main` and protect future split paths
+as one logical balance/config hotspot. This phase does not move balance source code; it verifies the
+current parity payload, records only the remaining mirror gaps, and updates hotspot grouping for
+future Rust and JS split files. It should stop with a no-go handoff if grouping or guardrail updates
+would require balance behavior changes.
 
-### [Phase 2 - Structured Mirror Snapshot](phase-2.md)
+### [Phase 2 - Command Budget And Export Snapshot](phase-2.md)
 
-Build a no-drift comparison path before manual file splits. This phase should extend or supplement
-the Rust rules/catalog dump and client-side checks so Rust-owned mirror data, including command
-budget values if they remain player-visible, can be compared as structured data. It should leave
-runtime imports stable and decide explicitly whether source generation is useful or whether
-validation-only checks are the safer long-term guardrail.
+Close the remaining split-blocking no-drift gaps before manual file movement. This phase should add
+a structured comparison for the server-owned command budget constants and a split-safe public export
+snapshot for `client/src/config.js`. It should leave runtime imports stable and reaffirm whether
+validation-only checks remain safer than generated client config.
 
 ### [Phase 3 - Client Config Split](phase-3.md)
 
-Split `client/src/config.js` behind the same public exports after the structured mirror snapshot is
-in place. Keep Rust-owned mirror data separate from client-only presentation modules, and preserve
-all exported constants, `STATS`, `ABILITIES`, `UPGRADES`, `FACTION_CATALOGS`, helper functions, and
-import paths. This phase should be mechanical and must fail closed on any snapshot, wiki, parity, or
-client-contract drift.
+Split `client/src/config.js` behind the same public exports after command-budget and export-name
+guardrails are in place. Keep Rust-owned mirror data separate from client-only presentation modules,
+preserve all exported constants, `STATS`, `ABILITIES`, `UPGRADES`, `FACTION_CATALOGS`, fixture
+catalog handling, helper functions, and import paths, and update the client architecture checker for
+the new rules-mirror modules. This phase should be mechanical and must fail closed on any snapshot,
+wiki, parity, architecture, or client-contract drift.
 
-### [Phase 4 - Rust Balance Split](phase-4.md)
+### [Phase 4 - Rust Balance Ownership Split](phase-4.md)
 
-Split Rust balance internals into focused modules while preserving `rts_rules::balance::*` as the
-stable public surface. Keep `defs.rs`, `faction.rs`, `server/src/config.rs`, and
-`server/crates/sim/src/config.rs` behavior-compatible, and move only constants or helper structs
-whose ownership is already documented in `docs/design/balance.md`. This phase should not rename
-exports or move sim-only behavior constants into the compatibility shims.
+Split Rust balance internals by ownership while preserving `rts_rules::balance::*` as the stable
+public surface. Keep `defs.rs`, `faction.rs`, `server/src/config.rs`, and
+`server/crates/sim/src/config.rs` behavior-compatible, and treat sim-only movement/recovery
+constants as a deliberate ownership decision rather than another balance submodule by default. This
+phase should not rename exports, hide public API breaks, or move sim command-service policy into
+rules just for cleanup convenience.
 
 ### [Phase 5 - Cleanup Closeout](phase-5.md)
 
@@ -96,10 +120,10 @@ additional balance logic unless an earlier phase explicitly deferred a tiny mech
 
 ## Phase Index
 
-1. [Phase 1 - Mirror Guardrail Baseline](phase-1.md)
-2. [Phase 2 - Structured Mirror Snapshot](phase-2.md)
+1. [Phase 1 - Rebaseline Guardrails And Grouping](phase-1.md)
+2. [Phase 2 - Command Budget And Export Snapshot](phase-2.md)
 3. [Phase 3 - Client Config Split](phase-3.md)
-4. [Phase 4 - Rust Balance Split](phase-4.md)
+4. [Phase 4 - Rust Balance Ownership Split](phase-4.md)
 5. [Phase 5 - Cleanup Closeout](phase-5.md)
 
 ## Non-Goals

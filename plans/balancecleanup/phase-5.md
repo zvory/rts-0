@@ -9,12 +9,13 @@ confirmation.
 
 ## Scope
 
-- Update `docs/design/balance.md`, `docs/context/balance.md`, and hotspot docs for any internal
-  module paths created by Phases 3 and 4.
+- Update `docs/design/balance.md`, `docs/context/balance.md`, client architecture docs, and hotspot
+  docs for any internal module paths created by Phases 3 and 4.
 - Rerun hotspot analysis and confirm split files still roll up to the `balance-and-config` logical
   group.
 - Capture before/after structured balance outputs from the current branch and confirm no stat,
-  catalog, ability, upgrade, resource, body, command-budget, or wiki-visible values changed.
+  catalog, ability, upgrade, resource, body, command-budget, public config export, or wiki-visible
+  values changed.
 - Remove only stale comments or temporary helper code created by this plan.
 - Do not move additional balance, config, faction, or wiki logic unless an earlier phase explicitly
   deferred a tiny mechanical cleanup.
@@ -23,6 +24,8 @@ confirmation.
 
 - `docs/design/balance.md`
 - `docs/context/balance.md`
+- `docs/design/client-ui.md`
+- `docs/context/client-ui.md`
 - `docs/hotspot-analysis.md`
 - `scripts/hotspot-analysis.mjs`, only if final grouping needs adjustment
 - any temporary scripts or test helpers introduced by earlier phases
@@ -34,12 +37,16 @@ confirmation.
   the boundary, not redesign it.
 - Treat any before/after structured output drift as a blocker unless it is an explicitly documented
   docs-only wording change with no runtime data change.
+- Do not remove compatibility re-exports or export aliases created by earlier phases unless their
+  phase handoff explicitly identified them as temporary and already proved downstream callers no
+  longer need them.
 
 ## Verification
 
 - `node scripts/check-faction-catalog-parity.mjs`
 - `node scripts/check-wiki.mjs`
 - `node tests/client_contracts.mjs`
+- any command-budget/export-name parity command introduced by Phase 2
 - `node scripts/check-docs-health.mjs`
 - `node scripts/hotspot-analysis.mjs --base-ref HEAD --recent-days 14 --limit 0 --output /tmp/rts-hotspots-after.json`
 - `git diff --check`
