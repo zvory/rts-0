@@ -786,7 +786,8 @@ impl Game {
         let enabled_players = self.lab_god_mode_players.clone();
         for entity_id in self.entities.ids() {
             if let Some(entity) = self.entities.get_mut(entity_id) {
-                entity.set_invulnerable(entity.is_unit() && enabled_players.contains(&entity.owner));
+                let is_player_asset = entity.is_unit() || entity.is_building();
+                entity.set_invulnerable(is_player_asset && enabled_players.contains(&entity.owner));
             }
         }
     }

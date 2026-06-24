@@ -443,7 +443,7 @@ export function createDefaultControlPolicy()
 `App` owns `LabClient`, `LabPanel`, and lab control policy lifetimes when a `start` payload carries
 `lab` metadata. `Match` receives `labMetadata`, `labClient`, and `labControlPolicy` through
 constructor options only; renderer, HUD, input, and minimap do not import lab modules. The shipped
-MVP exposes per-operator lab vision, per-player unit god mode, setup mutations, issue-as commands,
+MVP exposes per-operator lab vision, per-player asset god mode, setup mutations, issue-as commands,
 and scenario import/export through those collaborators while keeping the normal match screen
 authentic. Lab operator starts are still spectator-shaped for projection and prediction, and
 `LabClient` treats `start.lab.vision` plus `labState.vision` as the recipient's server-authoritative
