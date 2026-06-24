@@ -84,6 +84,7 @@ fn resolve_target(
         py,
         acquire_px,
         mode,
+        &|_| true,
     )
 }
 
@@ -195,6 +196,15 @@ pub(crate) fn combat_system(
         let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
             occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
         };
+        let prefer_safe_mortar_autocast_targets = is_mortar_team
+            && matches!(
+                entities
+                    .get(id)
+                    .and_then(|e| e.autocast_enabled(AbilityKind::MortarFire)),
+                Some(true)
+            )
+            && matches!(entities.get(id), Some(e) if e.attack_cd() == 0)
+            && mortar_autocast_researched(owner);
         let target = resolve_target_with_obstruction(
             map,
             entities,
@@ -210,6 +220,10 @@ pub(crate) fn combat_system(
             py,
             acquire_px,
             mode,
+            &|target_id| {
+                !prefer_safe_mortar_autocast_targets
+                    || mortar_autocast_target_safe(entities, teams, spatial, owner, target_id, tick)
+            },
         );
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.
@@ -319,7 +333,9 @@ pub(crate) fn combat_system(
                         continue;
                     }
                     let (mx, my) = mortar_aim_point(entities, tid, tick);
-                    if mortar_autocast_would_hit_same_team_entity(entities, teams, owner, mx, my) {
+                    if mortar_autocast_would_hit_same_team_entity(
+                        entities, teams, spatial, owner, mx, my,
+                    ) {
                         continue;
                     }
                     mortar_shells
@@ -400,6 +416,18 @@ pub(crate) fn combat_system(
     }
 }
 
+fn mortar_autocast_target_safe(
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    spatial: &SpatialIndex,
+    owner: u32,
+    target: u32,
+    tick: u32,
+) -> bool {
+    let (x, y) = mortar_aim_point(entities, target, tick);
+    !mortar_autocast_would_hit_same_team_entity(entities, teams, spatial, owner, x, y)
+}
+
 fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32) {
     let Some(t) = entities.get(target) else {
         return (0.0, 0.0);
@@ -451,13 +479,14 @@ fn mortar_lead_delta(target: &Entity) -> Option<(f32, f32)> {
 fn mortar_autocast_would_hit_same_team_entity(
     entities: &EntityStore,
     teams: &TeamRelations,
+    spatial: &SpatialIndex,
     owner: u32,
     x: f32,
     y: f32,
 ) -> bool {
     let outer_radius = config::MORTAR_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
     let outer2 = outer_radius * outer_radius;
-    entities.ids().into_iter().any(|id| {
+    spatial.ids_in_circle_bbox(x, y, outer_radius).any(|id| {
         entities.get(id).is_some_and(|e| {
             teams.same_team_or_same_owner(owner, e.owner)
                 && e.hp > 0
