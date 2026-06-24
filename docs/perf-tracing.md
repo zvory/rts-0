@@ -95,6 +95,8 @@ command age, max pending command count, `commandBurstBucketMs`, `commandBurstMax
 `commandBurstFrameGapMaxMs`, `commandBurstWorstFramePhase`, and
 `commandBurstWorstFramePhaseMs`. The burst bucket is a fixed 250 ms sliding client window and only
 counts commands that passed local command-budget checks and reached the browser WebSocket send path.
+`commandsIssued` is the report-window total and catches sustained rapid input that may never reach
+the short-bucket burst threshold.
 The server receipt comes from a tiny reliable
 `commandReceipt` message keyed only by `clientSeq`; it carries no command payload, unit ids, target
 ids, positions, or player-entered text and does not reconcile prediction.
@@ -113,7 +115,8 @@ on the same report cadence: `server_command_receipts_accepted`, `server_command_
 `server_snapshot_send_age_latest_ms`, `server_snapshot_send_age_max_ms`,
 `server_snapshot_send_age_avg_ms`, `server_snapshot_slot_stored`,
 `server_snapshot_slot_replaced`, and `server_snapshot_slot_closed`. These are server-only structured-log
-fields, not client protocol fields.
+fields, not client protocol fields. One reliable message before a snapshot with no send age or slot
+replacement is normal ordering, not outbound pressure.
 
 The canonical single-segment payload budget is 1280 bytes. Client measurements count only snapshot
 WebSocket application payload bytes, currently `messagepack-application-payload` from binary
@@ -367,8 +370,8 @@ Classification is evidence-bounded:
 - Server snapshot projection/compact/serialization pressure requires `performance tick summary` or
   `performance snapshot timing` rows. Older incidents without those rows are reported as unavailable.
 - WebSocket writer/send pressure requires writer timing, high buffered bytes, or head-of-line/backlog
-  evidence. Newer `client_net_report` rows can also show server outbound pressure from reliable
-  messages drained while a snapshot was pending, snapshot send age, or latest-only snapshot slot
+  evidence. Newer `client_net_report` rows can also show server outbound pressure from multiple
+  reliable messages drained before one snapshot, snapshot send age, or latest-only snapshot slot
   replacement.
 - Client network/snapshot delivery pressure uses RTT, bad RTT samples, snapshot jitter, snapshot gaps,
   stale/duplicate/skipped snapshot counters, and burst counters.
@@ -447,10 +450,12 @@ architecture policy gate.
 - `client_frame_stall`: `frameGapMaxMs >= 100`, or `slowFrameCount > 0` when frame-work thresholds
   were not crossed; points at requestAnimationFrame gaps even when measured frame work was not the
   dominant issue.
-- `command_density` classifies high short-bucket command density before it falls through to
-  prediction or generic network buckets.
-- `server_snapshot_outbound` classifies reliable-before-snapshot, snapshot-send-age, or
-  latest-slot-replacement pressure observed by the server connection writer.
+- `command_density` classifies sustained report-window command totals, high short-bucket command
+  density, or high server command-receipt volume before it falls through to prediction, outbound
+  writer, or generic network buckets.
+- `server_snapshot_outbound` classifies multi-reliable-before-snapshot backlog, snapshot-send-age,
+  or latest-slot-replacement pressure observed by the server connection writer. One reliable message
+  before a snapshot with zero send age and no slot replacement is normal ordering, not pressure.
 - Existing buckets continue to separate `network_rtt`, `snapshot_gap`, `snapshot_jitter`,
   `snapshot_cadence`, `server_tick`, `server_scheduler_lag`, `websocket_backlog`, `pending_commands`,
   `prediction_correction`, `prediction_disabled`, and `wasm_budget`.

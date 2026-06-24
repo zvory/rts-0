@@ -62,6 +62,7 @@ pub const NET_REPORT_WS_BUFFERED_BYTES_ISSUE: u32 = 64 * 1024;
 pub const NET_REPORT_SERVER_TICK_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_SERVER_LAG_ISSUE_MS: u16 = 33;
 pub const NET_REPORT_PENDING_COMMAND_ISSUE: u16 = 8;
+pub const NET_REPORT_COMMAND_COUNT_ISSUE: u32 = 20;
 pub const NET_REPORT_COMMAND_UPLOAD_ISSUE_MS: u16 = 180;
 pub const NET_REPORT_COMMAND_SERVER_QUEUE_ISSUE_MS: u16 = 66;
 pub const NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS: u16 = 16;
@@ -69,7 +70,7 @@ pub const NET_REPORT_COMMAND_BURST_ISSUE: u16 = 6;
 pub const NET_REPORT_CORRECTION_ISSUE_PX: u16 = 32;
 pub const NET_REPORT_REPLAY_TICK_ISSUE: u16 = 8;
 pub const NET_REPORT_REPLAY_MS_ISSUE: u16 = 8;
-pub const NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_ISSUE: u32 = 1;
+pub const NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_MAX_ISSUE: u32 = 2;
 pub const NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS: u32 = 100;
 pub const NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE: u32 = 1;
 
@@ -420,7 +421,7 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
             >= NET_REPORT_COMMAND_ACK_APPLY_ISSUE_MS
         || report.oldest_pending_command_age_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
         || report.max_pending_command_count >= NET_REPORT_PENDING_COMMAND_ISSUE
-        || report.command_burst_max >= NET_REPORT_COMMAND_BURST_ISSUE
+        || has_command_density(report, outbound)
         || report.command_burst_frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
         || report.correction_distance_px >= NET_REPORT_CORRECTION_ISSUE_PX
         || report.correction_count > 0
@@ -430,11 +431,7 @@ pub fn is_notable_net_report(report: &ClientNetReport, outbound: &ConnectionRepo
         || report.prediction_replay_max_ticks >= NET_REPORT_REPLAY_TICK_ISSUE
         || report.prediction_replay_max_ms >= NET_REPORT_REPLAY_MS_ISSUE
         || report.prediction_replay_budget_exceeded_count > 0
-        || outbound.reliable_drained_before_snapshot
-            >= NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_ISSUE
-        || outbound.snapshot_waited_behind_reliable > 0
-        || outbound.snapshot_send_age_max_ms >= NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS
-        || outbound.snapshot_slot_replaced >= NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE
+        || has_server_snapshot_outbound_pressure(outbound)
 }
 
 pub fn classify_client_net_report(
@@ -457,15 +454,10 @@ pub fn classify_client_net_report(
         || report.oldest_pending_command_age_ms >= NET_REPORT_COMMAND_UPLOAD_ISSUE_MS
     {
         "command_response_delay"
-    } else if outbound.reliable_drained_before_snapshot
-        >= NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_ISSUE
-        || outbound.snapshot_waited_behind_reliable > 0
-        || outbound.snapshot_send_age_max_ms >= NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS
-        || outbound.snapshot_slot_replaced >= NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE
-    {
-        "server_snapshot_outbound"
-    } else if report.command_burst_max >= NET_REPORT_COMMAND_BURST_ISSUE {
+    } else if has_command_density(report, outbound) {
         "command_density"
+    } else if has_server_snapshot_outbound_pressure(outbound) {
+        "server_snapshot_outbound"
     } else if report.prediction_disable_count > 0 {
         "prediction_disabled"
     } else if report.correction_distance_px >= NET_REPORT_CORRECTION_ISSUE_PX
@@ -542,6 +534,20 @@ pub fn classify_client_net_report(
     } else {
         "other"
     }
+}
+
+fn has_command_density(report: &ClientNetReport, outbound: &ConnectionReportStats) -> bool {
+    report.commands_issued >= NET_REPORT_COMMAND_COUNT_ISSUE
+        || report.command_burst_max >= NET_REPORT_COMMAND_BURST_ISSUE
+        || outbound.command_receipts_accepted >= NET_REPORT_COMMAND_COUNT_ISSUE
+}
+
+fn has_server_snapshot_outbound_pressure(outbound: &ConnectionReportStats) -> bool {
+    outbound.reliable_drained_before_snapshot_max
+        >= NET_REPORT_SERVER_RELIABLE_BEFORE_SNAPSHOT_MAX_ISSUE
+        || outbound.snapshot_send_age_max_ms >= NET_REPORT_SERVER_SNAPSHOT_SEND_AGE_ISSUE_MS
+        || outbound.snapshot_slot_replaced >= NET_REPORT_SERVER_SNAPSHOT_REPLACED_ISSUE
+        || outbound.snapshot_slot_closed > 0
 }
 
 fn has_packet_budget_pressure(report: &ClientNetReport) -> bool {
@@ -861,6 +867,49 @@ mod tests {
         report.command_burst_max = NET_REPORT_COMMAND_BURST_ISSUE;
         assert!(notable(&report));
         assert_eq!(classify(&report), "command_density");
+
+        let mut report = clean_report();
+        report.commands_issued = NET_REPORT_COMMAND_COUNT_ISSUE;
+        assert!(notable(&report));
+        assert_eq!(classify(&report), "command_density");
+    }
+
+    #[test]
+    fn net_report_classifies_server_receipt_volume_as_command_density() {
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            command_receipts_accepted: NET_REPORT_COMMAND_COUNT_ISSUE,
+            reliable_drained_before_snapshot: 40,
+            reliable_drained_before_snapshot_max: 1,
+            snapshot_waited_behind_reliable: 40,
+            snapshot_sent: 40,
+            ..ConnectionReportStats::default()
+        };
+        assert!(is_notable_net_report(&report, &outbound));
+        assert_eq!(
+            classify_client_net_report(&report, &outbound),
+            "command_density"
+        );
+    }
+
+    #[test]
+    fn net_report_does_not_classify_single_reliable_before_snapshots_as_outbound_pressure() {
+        let report = clean_report();
+        let outbound = ConnectionReportStats {
+            reliable_drained_before_snapshot: 615,
+            reliable_drained_before_snapshot_max: 1,
+            snapshot_waited_behind_reliable: 615,
+            snapshot_sent: 615,
+            snapshot_send_age_latest_ms: 0,
+            snapshot_send_age_max_ms: 0,
+            snapshot_send_age_avg_ms: 0,
+            snapshot_slot_stored: 615,
+            snapshot_slot_replaced: 0,
+            snapshot_slot_closed: 0,
+            ..ConnectionReportStats::default()
+        };
+        assert!(!is_notable_net_report(&report, &outbound));
+        assert_eq!(classify_client_net_report(&report, &outbound), "other");
     }
 
     #[test]

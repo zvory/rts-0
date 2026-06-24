@@ -152,6 +152,30 @@ try {
   rmSync(commandDir, { recursive: true, force: true });
 }
 
+const sustainedCommandDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-sustained-command-"));
+try {
+  const sustainedCommandLog = path.join(sustainedCommandDir, "sustained-command.log");
+  writeFileSync(
+    sustainedCommandLog,
+    [
+      '2026-06-24T10:48:10Z INFO event="client_net_report" match_run_id="sustained-command-1" player_id=1 primary_issue="command_density" rtt_max_ms=76 snapshot_gap_max_ms=59 snapshot_jitter_ms=18 frame_gap_max_ms=64 fps_estimate=60 commands_issued=42 command_burst_bucket_ms=250 command_burst_max=2 command_burst_frame_gap_max_ms=64 command_rejected=0 server_command_receipts_accepted=42 server_command_receipts_rejected=0 server_reliable_drained_before_snapshot=615 server_reliable_drained_before_snapshot_max=1 server_snapshot_waited_behind_reliable=615 server_snapshot_sent=615 server_snapshot_send_age_latest_ms=0 server_snapshot_send_age_max_ms=0 server_snapshot_send_age_avg_ms=0 server_snapshot_slot_stored=615 server_snapshot_slot_replaced=0 server_snapshot_slot_closed=0 server_tick_ms=3 server_lag_ms=0 "client network report"',
+    ].join("\n") + "\n"
+  );
+  const sustainedParsed = JSON.parse(run(["--format", "json", sustainedCommandLog]));
+  const sustainedMatch = sustainedParsed.matches.find((match) => match.matchRunId === "sustained-command-1");
+  assert.ok(sustainedMatch, "expected sustained command-density match summary");
+  assert.equal(
+    sustainedMatch.classifications.find((item) => item.id === "command_density")?.result,
+    "indicated",
+  );
+  assert.equal(
+    sustainedMatch.classifications.find((item) => item.id === "websocket_writer_send")?.result,
+    "not indicated",
+  );
+} finally {
+  rmSync(sustainedCommandDir, { recursive: true, force: true });
+}
+
 const outDir = mkdtempSync(path.join(os.tmpdir(), "rts-net-report-parser-"));
 try {
   const out = run(["--out-dir", outDir, ...logs]);
