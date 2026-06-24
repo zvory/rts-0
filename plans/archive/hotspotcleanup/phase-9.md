@@ -26,7 +26,7 @@ implementation phase.
 ## Touch Points
 
 - `plans/hotspotcleanup/phase-9.md`
-- possible new `plans/protocolcleanup/plan.md` and phase files
+- possible new `plans/archive/protocolcleanup/plan.md` and phase files
 - no protocol source files unless the user explicitly changes this phase from gate to implementation
 
 ## Constraints
@@ -58,7 +58,7 @@ decision is needed before protocol source files move.
 ## Gate Decision
 
 Go, with guardrails. The safe path is a separate phase-runner-ready plan at
-`plans/protocolcleanup/plan.md`; this phase does not move protocol source files.
+`plans/archive/protocolcleanup/plan.md`; this phase does not move protocol source files.
 
 Evidence:
 

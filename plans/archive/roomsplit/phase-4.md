@@ -30,7 +30,7 @@ authorization, dev scenario behavior, or projection policy.
 - `server/src/lobby/room_task/dev.rs`
 - `scripts/check-lobby-architecture.mjs` if the lab mutation allowlist needs a precise update
 - Lab/dev-focused room-task tests
-- `plans/roomsplit/phase-4.md`
+- `plans/archive/roomsplit/phase-4.md`
 
 ## Constraints
 

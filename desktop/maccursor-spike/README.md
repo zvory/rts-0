@@ -1,6 +1,6 @@
 # macOS Native Cursor Capture Spike
 
-This is a disposable macOS-only harness for `plans/maccursor/phase-1.md`. It
+This is a disposable macOS-only harness for `plans/archive/maccursor/phase-1.md`. It
 does not use the game client, browser Pointer Lock, Tauri, a WebView, or the
 RTS render loop.
 

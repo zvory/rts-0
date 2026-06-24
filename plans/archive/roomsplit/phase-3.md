@@ -26,7 +26,7 @@ keeping the root event dispatcher readable and stable.
 - `server/src/lobby/room_task/lobby.rs`
 - `server/src/lobby/room_task/types.rs` if roster type visibility needs adjustment
 - Lobby-focused room-task tests
-- `plans/roomsplit/phase-3.md`
+- `plans/archive/roomsplit/phase-3.md`
 
 ## Constraints
 

@@ -72,7 +72,7 @@ Perform the final human gate after the technical shipping prep is complete.
 - Compare against normal browser play on the same Mac when practical.
 - Apply only small fixes found during the gate. Larger product changes should become a follow-up
   plan.
-- Update `docs/tauri-retrospective.md`, `plans/maccursor/phase-4.md`, or this phase with the final
+- Update `docs/tauri-retrospective.md`, `plans/archive/maccursor/phase-4.md`, or this phase with the final
   go/no-go result.
 
 ## Expected Touch Points
@@ -81,7 +81,7 @@ Perform the final human gate after the technical shipping prep is complete.
 - startup UI files for small fixes
 - `desktop/maccursor-shell/README.md`
 - `docs/tauri-retrospective.md`
-- `plans/maccursor/phase-4.md`
+- `plans/archive/maccursor/phase-4.md`
 - this phase document
 
 Avoid touching:

@@ -28,7 +28,7 @@ grow back into context-heavy hotspots.
 - `scripts/check-lobby-architecture.mjs`
 - `scripts/hotspot-analysis.mjs` if grouping needs the new child paths
 - `plans/hotspots/group-map.md` if grouping needs the new child paths
-- `plans/roomsplit/phase-8.md`
+- `plans/archive/roomsplit/phase-8.md`
 
 ## Constraints
 

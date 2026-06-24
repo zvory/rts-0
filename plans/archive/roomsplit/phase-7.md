@@ -30,7 +30,7 @@ they make illegal optional-field combinations harder to create.
 - Lifecycle and match-history-focused room-task tests
 - `scripts/check-lobby-architecture.mjs` only if moved persistence-policy guardrails need a precise
   new target
-- `plans/roomsplit/phase-7.md`
+- `plans/archive/roomsplit/phase-7.md`
 
 ## Constraints
 

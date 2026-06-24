@@ -2,13 +2,13 @@
 
 ## Phase Status
 
-- [x] Done through `plans/taurimvp/phase-5.md`.
+- [x] Done through `plans/archive/taurimvp/phase-5.md`.
 
 This manual plausibility gate should now run after the Tauri MVP shell has startup server selection,
 thin-shell packaging, basic logs, and an unsigned release artifact. Use
-`plans/taurimvp/phase-5.md` as the active final manual gate.
+`plans/archive/taurimvp/phase-5.md` as the active final manual gate.
 
-Final result: the `plans/taurimvp/phase-5.md` gate passed on 2026-06-23 with a ship recommendation
+Final result: the `plans/archive/taurimvp/phase-5.md` gate passed on 2026-06-23 with a ship recommendation
 for the unsigned macOS playtest artifact. The native cursor path was accepted for playtesting on the
 tested Mac, with signing/notarization and broader release polish left out of scope.
 

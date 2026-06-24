@@ -25,7 +25,7 @@ while preserving replay playback, vision, seek, and prompt behavior.
 - `server/src/lobby/room_task.rs`
 - `server/src/lobby/room_task/replay.rs`
 - Replay-focused room-task tests
-- `plans/roomsplit/phase-5.md`
+- `plans/archive/roomsplit/phase-5.md`
 
 ## Constraints
 
