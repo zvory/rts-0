@@ -218,6 +218,10 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/selfplay/replay.rs",
   "server/crates/ai/src/selfplay/scripts.rs",
   "server/crates/rules/src/balance.rs",
+  // Balance Phase 4 split: these modules contain constants/helpers moved from balance.rs without
+  // changing current-faction ownership.
+  "server/crates/rules/src/balance/economy.rs",
+  "server/crates/rules/src/balance/stats.rs",
   // Catalog dump tool projects current catalog stats for parity checks.
   "server/crates/rules/src/bin/dump-faction-catalog.rs",
   "server/crates/rules/src/combat.rs",
