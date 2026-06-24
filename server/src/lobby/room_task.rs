@@ -387,16 +387,17 @@ impl RoomTask {
             RoomEvent::SeekRoomTimeTo { player_id, tick } => {
                 self.on_seek_room_time_to(player_id, tick)
             }
-            RoomEvent::SetReplayVision { player_id, vision } => {
-                self.on_set_replay_vision(player_id, vision)
-            }
+            RoomEvent::SetVisionSelection {
+                player_id,
+                selection,
+            } => self.on_set_vision_selection(player_id, selection),
             RoomEvent::Lab {
                 player_id,
                 request_id,
                 op,
             } => self.on_lab_request(player_id, request_id, op),
-            RoomEvent::RequestReplayBranch { player_id, reply } => {
-                let _ = reply.send(self.on_request_replay_branch(player_id));
+            RoomEvent::RequestBranchFromTick { player_id, reply } => {
+                let _ = reply.send(self.on_request_branch_from_tick(player_id));
             }
             RoomEvent::ClaimBranchSeat {
                 player_id,
@@ -407,11 +408,11 @@ impl RoomTask {
                 seat_player_id,
             } => self.on_release_branch_seat(player_id, seat_player_id),
             RoomEvent::StartBranch { player_id } => self.on_start_branch(player_id),
-            RoomEvent::AnnounceReplayBranch {
+            RoomEvent::AnnounceBranchFromTick {
                 branch_room,
                 source_tick,
                 seats,
-            } => self.on_announce_replay_branch(branch_room, source_tick, seats),
+            } => self.on_announce_branch_from_tick(branch_room, source_tick, seats),
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
             RoomEvent::ReportDisposableIfEmpty => self.report_disposable_if_empty(),
             RoomEvent::DrainStarted(notice) => self.on_drain_started(notice),

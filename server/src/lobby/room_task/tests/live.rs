@@ -294,8 +294,8 @@ fn normal_live_start_payloads_stamp_active_players_and_spectators() {
     assert!(player_payload.capabilities.commands.gameplay);
     assert!(player_payload.capabilities.match_controls.pause);
     assert!(!player_payload.capabilities.room_time.available);
-    assert!(!player_payload.capabilities.visibility.replay_vision);
-    assert!(!player_payload.capabilities.actions.replay_branch);
+    assert!(!player_payload.capabilities.visibility.vision_selection);
+    assert!(!player_payload.capabilities.actions.branch_from_tick);
     assert!(player_payload.replay.is_none());
     assert!(player_payload.lab.is_none());
     assert!(player_payload.diagnostics.is_empty());
@@ -310,8 +310,8 @@ fn normal_live_start_payloads_stamp_active_players_and_spectators() {
     assert!(!spectator_payload.capabilities.commands.gameplay);
     assert!(!spectator_payload.capabilities.match_controls.pause);
     assert!(!spectator_payload.capabilities.room_time.available);
-    assert!(!spectator_payload.capabilities.visibility.replay_vision);
-    assert!(!spectator_payload.capabilities.actions.replay_branch);
+    assert!(!spectator_payload.capabilities.visibility.vision_selection);
+    assert!(!spectator_payload.capabilities.actions.branch_from_tick);
     assert!(spectator_payload.replay.is_none());
     assert!(spectator_payload.lab.is_none());
     assert_eq!(

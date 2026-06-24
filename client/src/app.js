@@ -115,7 +115,7 @@ export class App {
     this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
-    this.onReplayBranchCreated = this.onReplayBranchCreated.bind(this);
+    this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
@@ -130,7 +130,7 @@ export class App {
     this.net.on(S.START, this.onStart);
     this.net.on(S.ERROR, this.onError);
     this.net.on(S.GAME_OVER, this.onGameOver);
-    this.net.on(S.REPLAY_BRANCH_CREATED, this.onReplayBranchCreated);
+    this.net.on(S.BRANCH_FROM_TICK_CREATED, this.onBranchFromTickCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
@@ -326,7 +326,7 @@ export class App {
     diagnostics.mark("app.onStart.end");
   }
 
-  onReplayBranchCreated(m) {
+  onBranchFromTickCreated(m) {
     const branchRoom = (m?.branchRoom || "").trim();
     if (!branchRoom) return;
     if (this.match) {

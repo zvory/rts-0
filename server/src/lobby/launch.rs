@@ -94,7 +94,7 @@ impl<'a> StartPayloadBuilder<'a> {
                 },
                 StartPayloadPolicy::ReplayViewer,
             ) => {
-                capabilities.actions.replay_branch = *branch_available;
+                capabilities.actions.branch_from_tick = *branch_available;
                 Some(metadata.clone())
             }
             _ => None,

@@ -9,9 +9,9 @@ export const S = Object.freeze({
   SNAPSHOT: "snapshot",
   ROOM_TIME_STATE: "roomTimeState",
   LIVE_PAUSE_STATE: "livePauseState",
-  REPLAY_ANALYSIS: "replayAnalysis",
+  OBSERVER_ANALYSIS: "observerAnalysis",
   JOIN_REPLAY_PROMPT: "joinReplayPrompt",
-  REPLAY_BRANCH_CREATED: "replayBranchCreated",
+  BRANCH_FROM_TICK_CREATED: "branchFromTickCreated",
   BRANCH_STAGING: "branchStaging",
   LAB_STATE: "labState",
   LAB_RESULT: "labResult",
@@ -45,9 +45,9 @@ export const C = Object.freeze({
   STEP_ROOM_TIME: "stepRoomTime",
   SEEK_ROOM_TIME: "seekRoomTime",
   SEEK_ROOM_TIME_TO: "seekRoomTimeTo",
-  SET_REPLAY_VISION: "setReplayVision",
+  SET_VISION_SELECTION: "setVisionSelection",
   LAB: "lab",
-  REQUEST_REPLAY_BRANCH: "requestReplayBranch",
+  REQUEST_BRANCH_FROM_TICK: "requestBranchFromTick",
   CLAIM_BRANCH_SEAT: "claimBranchSeat",
   RELEASE_BRANCH_SEAT: "releaseBranchSeat",
   START_BRANCH: "startBranch",
@@ -195,7 +195,7 @@ export const ABILITY = Object.freeze({
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
 });
 
-export const REPLAY_VISION = Object.freeze({
+export const VISION_SELECTION = Object.freeze({
   ALL: "all",
   PLAYER: "player",
   PLAYERS: "players",

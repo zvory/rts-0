@@ -12,11 +12,11 @@ use rts_protocol::{
     ObserverAnalysisPayload, ObserverAnalysisPlayer, ObserverAnalysisProduction,
     ObserverAnalysisResourcesLost, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
     PlayerStart, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags, ProtocolVocabularies,
-    RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,
-    ServerMessage, SlotField, SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract,
-    SnapshotEncodeError, SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId,
-    VisibilityCapabilities, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
+    RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode,
+    RoomCapabilities, RoomTimeCapabilities, RoomTimeState, ServerMessage, SlotField,
+    SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
+    SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, VisibilityCapabilities,
+    VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
     MESSAGEPACK_SNAPSHOT_FRAME_MAGIC, PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON,
     SNAPSHOT_CODEC_MESSAGEPACK_COMPACT, SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY,
     SNAPSHOT_FRAME_KIND_TEXT,
@@ -78,7 +78,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<RememberedBuildingView>();
     assert_type::<ReplayBranchSeat>();
     assert_type::<ReplayStartMetadata>();
-    assert_type::<ReplayVisionRequest>();
+    assert_type::<VisionSelectionRequest>();
     assert_type::<ResourceDelta>();
     assert_type::<ResourceNode>();
     assert_type::<RoomCapabilities>();

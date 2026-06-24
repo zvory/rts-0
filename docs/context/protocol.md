@@ -30,9 +30,10 @@ Use when adding, removing, or changing any field on a client↔server message, s
   rows). Replay start metadata separately uses `mapName`.
 - Lab start payloads carry `lab` metadata with the public lab id, original operator id, recipient
   role, that recipient's current lab vision mode, dirty flag, and operation count.
-- Start payloads carry recipient-scoped `capabilities` metadata for shared room-time, replay-vision,
-  and gameplay-command affordances. The client parser must not infer these from replay/dev/lab
-  mode names. Lab timeline controls use neutral room-time speed, pause, step, relative seek,
+- Start payloads carry recipient-scoped `capabilities` metadata for shared room-time,
+  vision-selection, and gameplay-command affordances. The client parser must not infer these from
+  replay/dev/lab mode names. Lab timeline controls use neutral room-time speed, pause, step,
+  relative seek,
   absolute seek, and `roomTimeState` keyframe metadata; they are not `LabClientOp` messages.
 - Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
   movement-path overlays or observer analysis. Do not infer those affordances from room mode names.

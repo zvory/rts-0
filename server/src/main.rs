@@ -1885,11 +1885,14 @@ async fn handle_client_message(
             )
             .await;
         }
-        ClientMessage::SetReplayVision { vision } => {
+        ClientMessage::SetVisionSelection { selection } => {
             send_room_event(
                 player_id,
                 current_room,
-                RoomEvent::SetReplayVision { player_id, vision },
+                RoomEvent::SetVisionSelection {
+                    player_id,
+                    selection,
+                },
             )
             .await;
         }
@@ -1905,8 +1908,8 @@ async fn handle_client_message(
             )
             .await;
         }
-        ClientMessage::RequestReplayBranch => {
-            request_replay_branch(player_id, lobby, conn_tx, current_room).await;
+        ClientMessage::RequestBranchFromTick => {
+            request_branch_from_tick(player_id, lobby, conn_tx, current_room).await;
         }
         ClientMessage::ClaimBranchSeat {
             player_id: seat_player_id,
@@ -1957,27 +1960,27 @@ async fn handle_client_message(
     }
 }
 
-async fn request_replay_branch(
+async fn request_branch_from_tick(
     player_id: u32,
     lobby: &Lobby,
     conn_tx: &lobby::ConnectionSink,
     current_room: &Option<lobby::RoomHandle>,
 ) {
     let Some(handle) = current_room else {
-        rts_server::log_debug!(player_id, "ignoring replay branch request before join");
+        rts_server::log_debug!(player_id, "ignoring branch-from-tick request before join");
         return;
     };
     let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
     if handle
         .event_tx
-        .send(RoomEvent::RequestReplayBranch {
+        .send(RoomEvent::RequestBranchFromTick {
             player_id,
             reply: reply_tx,
         })
         .await
         .is_err()
     {
-        rts_server::log_warn!(player_id, "room task gone; cannot request replay branch");
+        rts_server::log_warn!(player_id, "room task gone; cannot request branch from tick");
         return;
     }
     let seed = match reply_rx.await {
@@ -1987,7 +1990,7 @@ async fn request_replay_branch(
             return;
         }
         Err(_) => {
-            rts_server::log_warn!(player_id, "room dropped replay branch reply");
+            rts_server::log_warn!(player_id, "room dropped branch-from-tick reply");
             return;
         }
     };
@@ -1996,7 +1999,7 @@ async fn request_replay_branch(
     let branch_room = lobby.create_replay_branch_room(seed).await;
     if handle
         .event_tx
-        .send(RoomEvent::AnnounceReplayBranch {
+        .send(RoomEvent::AnnounceBranchFromTick {
             branch_room: branch_room.clone(),
             source_tick,
             seats: seats.clone(),
@@ -2004,7 +2007,7 @@ async fn request_replay_branch(
         .await
         .is_err()
     {
-        let _ = conn_tx.try_send_reliable(ServerMessage::ReplayBranchCreated {
+        let _ = conn_tx.try_send_reliable(ServerMessage::BranchFromTickCreated {
             branch_room,
             source_tick,
             seats,

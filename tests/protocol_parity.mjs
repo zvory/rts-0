@@ -99,7 +99,7 @@ const STABLE_JS_PROTOCOL_EXPORTS = [
   "ORDER_STAGE_CODE",
   "PASSABLE",
   "PREDICTION_PROTOCOL_VERSION",
-  "REPLAY_VISION",
+  "VISION_SELECTION",
   "RESOURCE_KINDS",
   "S",
   "SETUP",
@@ -350,10 +350,10 @@ assert(
     roomCapabilities.includes("startPayload?.capabilities") &&
     roomCapabilities.includes("roomTime") &&
     roomCapabilities.includes("matchControls") &&
-    roomCapabilities.includes("replayVision") &&
+    roomCapabilities.includes("visionSelection") &&
     roomCapabilities.includes("gameplay") &&
-    roomCapabilities.includes("replayBranch") &&
-    protocolDoc.includes("actions?: { replayBranch?: bool }"),
+    roomCapabilities.includes("branchFromTick") &&
+    protocolDoc.includes("actions?: { branchFromTick?: bool }"),
   "start payload room capabilities must be documented and mirrored by the client parser",
 );
 assert(
@@ -465,12 +465,21 @@ assert(
   "compact ability owner state decodes",
 );
 assert(
-  C.REQUEST_REPLAY_BRANCH === "requestReplayBranch",
-  "requestReplayBranch client message tag must match Rust",
+  C.SET_VISION_SELECTION === "setVisionSelection",
+  "setVisionSelection client message tag must match Rust",
 );
 assert(
-  JSON.stringify(msg.requestReplayBranch()) === JSON.stringify({ t: "requestReplayBranch" }),
-  "requestReplayBranch builder must emit the exact wire shape",
+  JSON.stringify(msg.visionSelectionPlayer(7)) ===
+    JSON.stringify({ t: "setVisionSelection", selection: { mode: "player", playerId: 7 } }),
+  "setVisionSelection builder must emit the exact wire shape",
+);
+assert(
+  C.REQUEST_BRANCH_FROM_TICK === "requestBranchFromTick",
+  "requestBranchFromTick client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.requestBranchFromTick()) === JSON.stringify({ t: "requestBranchFromTick" }),
+  "requestBranchFromTick builder must emit the exact wire shape",
 );
 assert(
   C.CLAIM_BRANCH_SEAT === "claimBranchSeat",
@@ -497,13 +506,13 @@ assert(
   "startBranch builder must emit the exact wire shape",
 );
 assert(
-  S.REPLAY_BRANCH_CREATED === "replayBranchCreated",
-  "replayBranchCreated server message tag must match Rust",
+  S.BRANCH_FROM_TICK_CREATED === "branchFromTickCreated",
+  "branchFromTickCreated server message tag must match Rust",
 );
 // Temporary source-text allowlist: branch and observer-analysis payload field lists are still
 // DTO shape smoke checks until a later phase expands structured contract-field exports.
 for (const field of ["branch_room", "source_tick", "seats", "player_id", "team_id", "faction_id", "claimable"]) {
-  assert(rust.includes(field), `replayBranchCreated Rust contract is missing ${field}`);
+  assert(rust.includes(field), `branchFromTickCreated Rust contract is missing ${field}`);
 }
 assert(
   S.BRANCH_STAGING === "branchStaging",
@@ -513,14 +522,14 @@ for (const field of ["host_id", "team_id", "faction_id", "claimant_id", "occupan
   assert(rust.includes(field), `branchStaging Rust contract is missing ${field}`);
 }
 assert(
-  S.REPLAY_ANALYSIS === "replayAnalysis",
-  "replayAnalysis server message tag must match Rust",
+  S.OBSERVER_ANALYSIS === "observerAnalysis",
+  "observerAnalysis server message tag must match Rust",
 );
 for (const field of ["units_lost", "resources_lost", "steel_value", "oil_value", "queue_depth"]) {
-  assert(rust.includes(field), `replayAnalysis Rust contract is missing ${field}`);
+  assert(rust.includes(field), `observerAnalysis Rust contract is missing ${field}`);
 }
 const observerAnalysis = decodeServerMessage({
-  t: S.REPLAY_ANALYSIS,
+  t: S.OBSERVER_ANALYSIS,
   tick: 9,
   players: [{
     id: 1,
@@ -530,6 +539,6 @@ const observerAnalysis = decodeServerMessage({
     resourcesLost: { steel: 0, oil: 0 },
   }],
 });
-assert(observerAnalysis.t === "replayAnalysis" && observerAnalysis.players[0].production[0].queueDepth === 1, "replayAnalysis passes through decode");
+assert(observerAnalysis.t === "observerAnalysis" && observerAnalysis.players[0].production[0].queueDepth === 1, "observerAnalysis passes through decode");
 
 console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");

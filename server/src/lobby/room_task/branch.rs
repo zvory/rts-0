@@ -219,7 +219,7 @@ impl RoomTask {
         self.start_match_countdown();
     }
 
-    pub(super) fn on_announce_replay_branch(
+    pub(super) fn on_announce_branch_from_tick(
         &self,
         branch_room: String,
         source_tick: u32,
@@ -228,7 +228,7 @@ impl RoomTask {
         if !matches!(self.phase, Phase::ReplayViewer(_)) {
             return;
         }
-        self.broadcast(&ServerMessage::ReplayBranchCreated {
+        self.broadcast(&ServerMessage::BranchFromTickCreated {
             branch_room,
             source_tick,
             seats,

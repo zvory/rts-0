@@ -11,7 +11,7 @@ const EMPTY_ROOM_TIME = Object.freeze({
 });
 
 const EMPTY_VISIBILITY = Object.freeze({
-  replayVision: false,
+  visionSelection: false,
 });
 
 const EMPTY_MATCH_CONTROLS = Object.freeze({
@@ -28,7 +28,7 @@ const EMPTY_COMMANDS = Object.freeze({
 });
 
 const EMPTY_ACTIONS = Object.freeze({
-  replayBranch: false,
+  branchFromTick: false,
 });
 
 export function createRoomCapabilities({ startPayload } = {}) {
@@ -73,7 +73,7 @@ function normalizeMatchControls(matchControls) {
 function normalizeVisibility(visibility) {
   return Object.freeze({
     ...EMPTY_VISIBILITY,
-    replayVision: visibility?.replayVision === true,
+    visionSelection: visibility?.visionSelection === true,
   });
 }
 
@@ -87,7 +87,7 @@ function normalizeCommands(commands) {
 function normalizeActions(actions) {
   return Object.freeze({
     ...EMPTY_ACTIONS,
-    replayBranch: actions?.replayBranch === true,
+    branchFromTick: actions?.branchFromTick === true,
   });
 }
 

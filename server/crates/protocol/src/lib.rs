@@ -130,7 +130,7 @@ pub enum ClientMessage {
     /// Seek room-controlled time to an absolute simulation tick where absolute seek is allowed.
     SeekRoomTimeTo { tick: u32 },
     /// Select which players' fog to use while viewing a replay. Per-viewer only.
-    SetReplayVision { vision: ReplayVisionRequest },
+    SetVisionSelection { selection: VisionSelectionRequest },
     /// Privileged lab request envelope. Only lab rooms route these requests.
     Lab {
         #[serde(rename = "requestId")]
@@ -138,7 +138,7 @@ pub enum ClientMessage {
         op: LabClientOp,
     },
     /// Request a new practice branch room from this replay room's current authoritative tick.
-    RequestReplayBranch,
+    RequestBranchFromTick,
     /// Claim one original player seat in a replay branch staging room.
     ClaimBranchSeat {
         #[serde(rename = "playerId")]
@@ -485,7 +485,7 @@ pub enum Command {
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
-pub enum ReplayVisionRequest {
+pub enum VisionSelectionRequest {
     All,
     Player { player_id: u32 },
     Players { player_ids: Vec<u32> },
@@ -521,8 +521,15 @@ pub enum LabClientOp {
         entity_id: u32,
         owner: u32,
     },
-    SetPlayerResources { player_id: u32, steel: u32, oil: u32 },
-    SetPlayerGodMode { player_id: u32, enabled: bool },
+    SetPlayerResources {
+        player_id: u32,
+        steel: u32,
+        oil: u32,
+    },
+    SetPlayerGodMode {
+        player_id: u32,
+        enabled: bool,
+    },
     SetCompletedResearch {
         player_id: u32,
         upgrade: String,
@@ -689,9 +696,7 @@ pub enum ServerMessage {
     RoomTimeState(RoomTimeState),
     /// Authoritative live-match pause state. Sent reliably after start and on every transition.
     LivePauseState(LivePauseState),
-    /// Authoritative observer analysis data for replay viewers and live spectators. The wire tag
-    /// remains `replayAnalysis` for compatibility while live delivery is gated by the room task.
-    #[serde(rename = "replayAnalysis")]
+    /// Authoritative observer analysis data for replay viewers and live spectators.
     ObserverAnalysis(ObserverAnalysisPayload),
     /// The requested room is currently replay playback. The client should confirm before retrying
     /// `join` with `replayOk: true`.
@@ -699,7 +704,7 @@ pub enum ServerMessage {
         room: String,
     },
     /// A practice branch room was created from the current replay tick.
-    ReplayBranchCreated {
+    BranchFromTickCreated {
         branch_room: String,
         source_tick: u32,
         seats: Vec<ReplayBranchSeat>,
@@ -1240,11 +1245,26 @@ mod tests {
     }
 
     #[test]
-    fn request_replay_branch_deserializes() {
-        let msg: ClientMessage = serde_json::from_str(r#"{"t":"requestReplayBranch"}"#)
-            .expect("requestReplayBranch should deserialize");
+    fn set_vision_selection_deserializes() {
+        let msg: ClientMessage = serde_json::from_str(
+            r#"{"t":"setVisionSelection","selection":{"mode":"player","playerId":7}}"#,
+        )
+        .expect("setVisionSelection should deserialize");
 
-        assert!(matches!(msg, ClientMessage::RequestReplayBranch));
+        match msg {
+            ClientMessage::SetVisionSelection {
+                selection: VisionSelectionRequest::Player { player_id },
+            } => assert_eq!(player_id, 7),
+            other => panic!("expected setVisionSelection, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn request_branch_from_tick_deserializes() {
+        let msg: ClientMessage = serde_json::from_str(r#"{"t":"requestBranchFromTick"}"#)
+            .expect("requestBranchFromTick should deserialize");
+
+        assert!(matches!(msg, ClientMessage::RequestBranchFromTick));
     }
 
     #[test]
@@ -1269,8 +1289,8 @@ mod tests {
     }
 
     #[test]
-    fn replay_branch_created_serializes_contract_shape() {
-        let msg = ServerMessage::ReplayBranchCreated {
+    fn branch_from_tick_created_serializes_contract_shape() {
+        let msg = ServerMessage::BranchFromTickCreated {
             branch_room: "__replay_branch__:00000001".to_string(),
             source_tick: 123,
             seats: vec![ReplayBranchSeat {
@@ -1284,7 +1304,7 @@ mod tests {
         };
         let json = serde_json::to_value(msg).expect("branch message should serialize");
 
-        assert_eq!(json["t"], "replayBranchCreated");
+        assert_eq!(json["t"], "branchFromTickCreated");
         assert_eq!(json["branchRoom"], "__replay_branch__:00000001");
         assert_eq!(json["sourceTick"], 123);
         assert_eq!(json["seats"][0]["playerId"], 7);
@@ -1326,7 +1346,7 @@ mod tests {
         });
         let json = serde_json::to_value(msg).expect("observer analysis should serialize");
 
-        assert_eq!(json["t"], "replayAnalysis");
+        assert_eq!(json["t"], "observerAnalysis");
         assert_eq!(json["tick"], 77);
         assert_eq!(json["players"][0]["id"], 1);
         assert_eq!(json["players"][0]["units"][0]["kind"], "rifleman");
