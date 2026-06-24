@@ -16,7 +16,7 @@ coupling and from areas that are already owned by active plans.
   - `docs/context/protocol.md` for protocol mirrors;
   - `docs/context/balance.md` for balance mirrors;
   - `docs/context/testing.md` for large client and simulation test files.
-- Create `plans/hotspots/responsibility-map.md`.
+- Create `plans/archive/hotspots/responsibility-map.md`.
 - For each selected hotspot, document:
   - primary responsibilities;
   - internal sections or clusters;
@@ -35,8 +35,8 @@ coupling and from areas that are already owned by active plans.
 
 ## Expected Touch Points
 
-- `plans/hotspots/responsibility-map.md`
-- `plans/hotspots/phase-2.md`
+- `plans/archive/hotspots/responsibility-map.md`
+- `plans/archive/hotspots/phase-2.md`
 
 Do not modify runtime source, tests, protocol files, client modules, CSS, or design docs in this
 phase.

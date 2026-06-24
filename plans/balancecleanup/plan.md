@@ -40,7 +40,7 @@ change.
 - Before any file split, add no-drift guardrails that compare Rust-owned mirror data and client
   exports through structured data rather than brittle source-order snapshots.
 - If a phase creates new split files, update `scripts/hotspot-analysis.mjs` and
-  `plans/hotspots/group-map.md` in that same phase so the balance mirror remains one logical
+  `docs/hotspot-analysis.md` in that same phase so the balance mirror remains one logical
   hotspot group.
 - Use focused verification. At minimum, code-moving phases run
   `node scripts/check-faction-catalog-parity.mjs`, `node scripts/check-wiki.mjs`,

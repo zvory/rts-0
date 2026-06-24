@@ -10,14 +10,14 @@ and player-visible command-card behavior.
 ## Scope
 
 - Read `docs/context/client-ui.md` and the HUD section of
-  `plans/hotspots/responsibility-map.md`.
+  `plans/archive/hotspots/responsibility-map.md`.
 - Reuse the local helper pattern from `hud_command_card.js`, `hud_selection_panel.js`, and
   `hud_unit_commands.js`.
 - Extract resource-row rendering, control-group tab rendering, and command-card DOM/button rendering
   where doing so reduces `hud.js` context without hiding command semantics.
 - Keep command intent dispatch, command issuer calls, affordability checks, cooldowns, missing
   resource feedback, hotkey resolution, and `ClientIntent` usage stable.
-- Update `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if new HUD helper paths are
+- Update `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if new HUD helper paths are
   not grouped under `client-hud`.
 - Prefer using the split client contract domain files if Phase 2 created them; otherwise run the
   stable full client contract command.
@@ -27,7 +27,7 @@ and player-visible command-card behavior.
 - `client/src/hud.js`
 - `client/src/hud_*.js` or narrowly named HUD helper modules
 - HUD-related client contract files
-- `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` if grouping needs new helper paths
+- `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` if grouping needs new helper paths
 - `plans/hotspotcleanup/phase-5.md`
 
 ## Constraints

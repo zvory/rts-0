@@ -1,7 +1,7 @@
 # Hotspot Responsibility Map
 
 Generated for Phase 2 from the Phase 1 baseline in
-[`plans/hotspots/baseline.md`](baseline.md). This is triage evidence only: it maps current
+[`plans/archive/hotspots/baseline.md`](baseline.md). This is triage evidence only: it maps current
 responsibilities and cleanup seams, but does not propose runtime edits or change gameplay behavior.
 
 ## Reading Basis

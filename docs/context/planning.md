@@ -4,6 +4,11 @@ Use this capsule whenever a task asks for a multi-phase plan, phased plan, imple
 or similar staged handoff. Phased plans live under `plans/<one-word-name>/`, where the directory
 name is short, lowercase, and descriptive.
 
+Reusable analysis methods do not belong in active plan directories. For hotspot scoring,
+architectural group tracking, and before/after cleanup comparisons, use
+[docs/hotspot-analysis.md](../hotspot-analysis.md), then create a phased plan only when the current
+evidence supports implementation work.
+
 ## Required shape
 
 - Create `plans/<one-word-name>/plan.md` as the entry point.

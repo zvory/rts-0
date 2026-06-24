@@ -16,7 +16,7 @@ the module splits.
   `client/src/protocol.js`.
 - Rerun hotspot analysis with the protocol split paths included in the `protocol-and-contracts`
   group and summarize whether the logical group stayed trackable.
-- Update `docs/design/protocol.md`, `plans/hotspots/group-map.md`, or
+- Update `docs/design/protocol.md`, `docs/hotspot-analysis.md`, or
   `scripts/hotspot-analysis.mjs` only if earlier phases left stale references.
 - Do not move additional protocol logic unless a previous phase explicitly deferred a small
   mechanical cleanup that still preserves this plan's invariants.
@@ -24,7 +24,7 @@ the module splits.
 ## Touch Points
 
 - `docs/design/protocol.md`
-- `plans/hotspots/group-map.md`
+- `docs/hotspot-analysis.md`
 - `scripts/hotspot-analysis.mjs`
 - protocol split files created in previous phases, only for stale comments or import cleanup
 - `plans/archive/protocolcleanup/phase-5.md`

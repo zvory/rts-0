@@ -11,8 +11,8 @@ into an implementation phase.
 ## Scope
 
 - Read `docs/context/balance.md` and the relevant sections of `docs/design/balance.md`.
-- Re-read the balance/config sections of `plans/hotspots/responsibility-map.md` and
-  `plans/hotspots/extraction-candidates.md`.
+- Re-read the balance/config sections of `plans/archive/hotspots/responsibility-map.md` and
+  `plans/archive/hotspots/extraction-candidates.md`.
 - Inspect the current boundaries among `server/crates/rules/src/balance.rs`,
   `server/crates/rules/src/defs.rs`, `server/crates/rules/src/faction.rs`, `server/src/config.rs`,
   `server/crates/sim/src/config.rs`, `client/src/config.js`, wiki checks, faction parity checks, and

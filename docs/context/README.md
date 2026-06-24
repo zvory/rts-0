@@ -19,6 +19,7 @@ then refresh the capsule's section list if structure changed.
 | Server wiki route and generated stats reference     | [deployment.md](deployment.md)         |
 | Match history persistence and `/api/matches`        | [match-history.md](match-history.md)   |
 | Multi-phase or phased implementation planning       | [planning.md](planning.md)             |
+| Hotspot analysis methodology and group tracking     | [../hotspot-analysis.md](../hotspot-analysis.md) |
 
 Read the relevant design doc only when changing cross-file contracts (protocol ⇄ client,
 `Game` API, balance mirror, fog rules). Otherwise, the capsule + the code is enough.
@@ -28,6 +29,10 @@ task-specific capsules it references as each phase begins.
 
 For any multi-phase or phased implementation plan, read [planning.md](planning.md) before writing
 the plan.
+
+For hotspot scoring, architectural group tracking, and before/after cleanup comparisons, use
+[docs/hotspot-analysis.md](../hotspot-analysis.md). Create a plan only after current hotspot
+evidence supports concrete implementation phases.
 
 For optional source-to-doc navigation, use the advisory routing map at
 [../doc-map.json](../doc-map.json). It points common source areas to likely relevant capsules and

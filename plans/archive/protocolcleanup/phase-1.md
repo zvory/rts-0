@@ -12,7 +12,7 @@ tracking before any protocol code is moved.
 - Inspect current exports from `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 - Add or strengthen focused assertions that lock the stable public protocol surface used by
   downstream modules.
-- Update `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` so future
+- Update `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` so future
   `client/src/protocol_*.js` or `client/src/protocol/**` split files stay in the
   `protocol-and-contracts` group.
 - Update `docs/design/protocol.md` only if the boundary inventory needs to name the future internal
@@ -25,7 +25,7 @@ tracking before any protocol code is moved.
 - `tests/client_contracts/protocol_contracts.mjs`, only if a client public-surface assertion belongs
   there instead of parity
 - `scripts/hotspot-analysis.mjs`
-- `plans/hotspots/group-map.md`
+- `docs/hotspot-analysis.md`
 - `docs/design/protocol.md`, only for boundary wording
 
 ## Constraints

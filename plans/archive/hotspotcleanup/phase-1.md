@@ -10,7 +10,7 @@ contract splits can follow an established local shape.
 
 ## Scope
 
-- Read `plans/hotspots/extraction-candidates.md` and the `tests/client_contracts.mjs`
+- Read `plans/archive/hotspots/extraction-candidates.md` and the `tests/client_contracts.mjs`
   responsibility map.
 - Create `tests/client_contracts/` helper modules for shared assertions, fake DOM/Pixi/audio/storage,
   and common fixtures where those helpers are currently copied or tightly clustered in the top-level
@@ -28,7 +28,7 @@ contract splits can follow an established local shape.
 
 - `tests/client_contracts.mjs`
 - new `tests/client_contracts/*.mjs` helper or domain files
-- `plans/hotspots/group-map.md` and `scripts/hotspot-analysis.mjs` only if the new paths are not
+- `docs/hotspot-analysis.md` and `scripts/hotspot-analysis.mjs` only if the new paths are not
   already grouped under `tests/client_contracts/`
 - `plans/hotspotcleanup/phase-1.md`
 

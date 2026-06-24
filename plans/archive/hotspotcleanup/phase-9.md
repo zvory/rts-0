@@ -11,8 +11,8 @@ implementation phase.
 ## Scope
 
 - Read `docs/context/protocol.md` and the relevant sections of `docs/design/protocol.md`.
-- Re-read the protocol sections of `plans/hotspots/responsibility-map.md` and
-  `plans/hotspots/extraction-candidates.md`.
+- Re-read the protocol sections of `plans/archive/hotspots/responsibility-map.md` and
+  `plans/archive/hotspots/extraction-candidates.md`.
 - Inspect the current boundaries among `server/crates/protocol/src/lib.rs`,
   `server/src/protocol.rs`, `server/crates/sim/src/protocol.rs`, `server/crates/contract/src/lib.rs`,
   `client/src/protocol.js`, `tests/protocol_parity.mjs`, and protocol client contracts.

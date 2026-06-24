@@ -9,7 +9,7 @@ pressure. It does not prove that a file should be split; it identifies files and
 groups that deserve the Phase 2 responsibility-map read.
 
 Machine-readable evidence is in
-[`plans/hotspots/evidence/baseline-hotspots.json`](evidence/baseline-hotspots.json).
+[`plans/archive/hotspots/evidence/baseline-hotspots.json`](evidence/baseline-hotspots.json).
 
 ## Scope and Filters
 

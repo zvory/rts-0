@@ -10,7 +10,7 @@ test defaults, full-AI gates, and replay artifact behavior.
 ## Scope
 
 - Read `docs/context/server-sim.md`, `docs/context/testing.md`, and the AI self-play section of
-  `plans/hotspots/responsibility-map.md`.
+  `plans/archive/hotspots/responsibility-map.md`.
 - Split harness/artifact helpers from profile matchup tests.
 - Split resource regression, pending-build tracker, live-AI team behavior, and full real-AI tests
   into domain files.

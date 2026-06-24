@@ -23,17 +23,17 @@ filtering out stale paths, generated artifacts, replay fixtures, build outputs, 
   - repository-wide rename events that affect source files.
 - Compare rename-aware current-file results against raw path-level churn to show why stale paths and
   artifacts should not drive cleanup priorities.
-- Produce `plans/hotspots/baseline.md` with the summarized findings, commands, filters, caveats, and
+- Produce `plans/archive/hotspots/baseline.md` with the summarized findings, commands, filters, caveats, and
   first-pass hotspot list.
 - Produce a small machine-readable evidence file, for example
-  `plans/hotspots/evidence/baseline-hotspots.json` or
-  `plans/hotspots/evidence/baseline-hotspots.csv`, containing the top ranked rows.
+  `plans/archive/hotspots/evidence/baseline-hotspots.json` or
+  `plans/archive/hotspots/evidence/baseline-hotspots.csv`, containing the top ranked rows.
 
 ## Expected Touch Points
 
-- `plans/hotspots/baseline.md`
-- `plans/hotspots/evidence/baseline-hotspots.json` or `.csv`
-- `plans/hotspots/phase-1.md`
+- `plans/archive/hotspots/baseline.md`
+- `plans/archive/hotspots/evidence/baseline-hotspots.json` or `.csv`
+- `plans/archive/hotspots/phase-1.md`
 
 Do not modify runtime source, tests, protocol files, client modules, CSS, or design docs in this
 phase.

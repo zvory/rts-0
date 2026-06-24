@@ -133,7 +133,7 @@ cleanup sees the split files as one ownership area instead of losing history.
   orientation. Phase 8 should set the exact guardrail from the achieved size rather than blessing a
   large file.
 - If new split paths are not already grouped by `scripts/hotspot-analysis.mjs`, update both
-  `scripts/hotspot-analysis.mjs` and `plans/hotspots/group-map.md` in the phase that creates or
+  `scripts/hotspot-analysis.mjs` and `docs/hotspot-analysis.md` in the phase that creates or
   finalizes those paths.
 - Use focused verification during phase work. The PR gate remains the authoritative full
   `./tests/run-all.sh` check.

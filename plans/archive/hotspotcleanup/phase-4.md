@@ -10,7 +10,7 @@ public `Game` API, setup helpers, or assertion meaning.
 ## Scope
 
 - Read `docs/context/server-sim.md`, `docs/context/testing.md`, and the broad sim test section of
-  `plans/hotspots/responsibility-map.md`.
+  `plans/archive/hotspots/responsibility-map.md`.
 - Convert `server/crates/sim/src/game/tests.rs` into a test module root or otherwise split it into
   domain files under `server/crates/sim/src/game/tests/`.
 - Move shared fixtures first so domain files stay small.

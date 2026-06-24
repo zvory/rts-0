@@ -360,7 +360,7 @@ function buildReport(options) {
     generator_notes: {
       rename_tracking: "Per-current-file history uses git log --follow --find-renames=40% --numstat. This follows whole-file renames but cannot perfectly preserve identity after a split.",
       raw_path_comparison: "Raw no-rename path churn is included to expose stale or removed paths that should not drive cleanup by themselves.",
-      group_tracking: "Architectural groups are defined in this script and documented in plans/hotspots/group-map.md; update both when a cleanup introduces new split files.",
+      group_tracking: "Architectural groups are defined in this script and documented in docs/hotspot-analysis.md; update both when a cleanup introduces new split files.",
       blame_freshness: "This repeatable script omits blame freshness to stay cheap. Use git blame -w -M -C -C on the top rows when line-origin evidence matters.",
     },
   };

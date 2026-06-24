@@ -10,27 +10,25 @@ should let another agent rerun the analysis without reconstructing the method fr
 ## Scope
 
 - Read the Phase 1 baseline, Phase 2 responsibility map, and Phase 3 candidate ranking.
-- Create or update `plans/hotspots/runbook.md`.
+- Create or update `docs/hotspot-analysis.md`.
 - Add a small repo-local script only if it stays focused on metrics collection and is clearly better
   than a documented command sequence. If added, prefer `scripts/hotspot-analysis.mjs` and have it
   emit JSON or CSV without requiring external dependencies.
-- If a script is not added, the runbook must include exact shell commands and filtering rules that
-  reproduce the useful parts of the Phase 1 baseline.
+- If a script is not added, the documentation must include exact shell commands and filtering rules
+  that reproduce the useful parts of the Phase 1 baseline.
 - Add or document an architectural-group mapping so future runs can compare groups after files split
-  or move. This can live in `plans/hotspots/group-map.md`, in the runbook, or in a script-local
-  mapping table.
+  or move. This can live in `docs/hotspot-analysis.md` or in a script-local mapping table.
 - Explain how to rerun the analysis before and after a cleanup PR, including how to interpret
   history disruption from file splits.
-- Update `plans/hotspots/extraction-candidates.md` only if the repeatable workflow changes the
+- Update `plans/archive/hotspots/extraction-candidates.md` only if the repeatable workflow changes the
   recommended ranking.
 
 ## Expected Touch Points
 
-- `plans/hotspots/runbook.md`
-- optional `plans/hotspots/group-map.md`
+- `docs/hotspot-analysis.md`
 - optional `scripts/hotspot-analysis.mjs`
-- optional `plans/hotspots/evidence/*.json` or `.csv`
-- `plans/hotspots/phase-4.md`
+- optional `plans/archive/hotspots/evidence/*.json` or `.csv`
+- `plans/archive/hotspots/phase-4.md`
 
 Do not modify runtime source, tests, protocol files, client modules, CSS, or design docs in this
 phase unless a tiny tooling script requires a documented test/check update.

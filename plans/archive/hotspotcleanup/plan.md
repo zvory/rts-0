@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Turn the ranked hotspot backlog from `plans/hotspots/extraction-candidates.md` into executable
+Turn the ranked hotspot backlog from `plans/archive/hotspots/extraction-candidates.md` into executable
 cleanup phases. The goal is to reduce review context and future merge risk without changing
 gameplay, wire protocol behavior, balance values, UI affordances, or test meaning.
 
@@ -114,7 +114,7 @@ split.
   review before code movement; Phase 9 and Phase 10 are gates, not automatic refactors.
 - If a split creates new files that are not already covered by `scripts/hotspot-analysis.mjs`
   architectural groups, update both `scripts/hotspot-analysis.mjs` and
-  `plans/hotspots/group-map.md` in the same phase.
+  `docs/hotspot-analysis.md` in the same phase.
 - After any phase that materially splits a hotspot, rerun
   `node scripts/hotspot-analysis.mjs --base-ref HEAD --recent-days 14 --limit 0 --output /tmp/rts-hotspots-after.json`
   and summarize whether the logical group stayed trackable.
