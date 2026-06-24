@@ -265,7 +265,7 @@ alive.
   of game state — no locks around `Game`.
 - Room-mode, phase, and match-composition dependent lobby checks use a lobby-local `SessionPolicy`
   descriptor for the current room mode and phase matrix, including dev-watch, replay-room,
-  branch-staging, AI-only live speed controls, countdown, speed-source, and match-history
+  branch-staging, speed-only live-game room-time controls, countdown, speed-source, and match-history
   decisions. Live-match handlers live in `room_task/live.rs`,
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
@@ -348,7 +348,7 @@ split into focused room-local modules:
   host fallback, team and faction selection, AI seats, spectator flags, selected map, quickstart,
   countdown entry, and lobby broadcasts.
 - `room_task/live.rs` owns live-match room controls: command routing, command receipts, active
-  player pause and unpause, AI-only live room-time speed/pause state, give-up, late spectator
+  player pause and unpause, speed-only live-game room-time state, give-up, late spectator
   attach, live start-payload glue, pending recipient notices, and live snapshot notice plumbing.
 - `room_task/lab.rs` owns lab sessions: first-join launch, lab role/vision metadata, request
   authorization, mutation and issue-as routing, result delivery, dirty state, operation logging,
@@ -375,15 +375,19 @@ branch seed.
   persistence/export, drain launch/accounting, start-payload, and UI-affordance choices used by the
   rest of the lobby helpers. Persistence is split into match-history eligibility, transient
   post-match replay capture, match-history replay-artifact attachment, and room-local lab operation
-  logging. Product identity still selects real setup paths such as replay-artifact loading, dev
-  scenario construction, replay-branch seeding, and lab room initialization; lower-level helpers
-  should consume the explicit policy fields when the behavior is shared.
+  logging. Room-controlled clock policy keeps tick routing sources such as replay playback, dev
+  scenario, lab, and live game separate from neutral operation profiles such as speed-only,
+  speed-and-step, speed-and-seek, and full seekable. Product identity still selects real setup paths
+  such as replay-artifact loading, dev scenario construction, replay-branch seeding, and lab room
+  initialization; lower-level helpers should consume the explicit policy fields when the behavior is
+  shared.
 - `participants.rs` is the connected-user and active-seat helper. It owns host fallback, active
   human and AI seat lists, spectator visible-seat lists, branch-live connection-to-original-seat
   aliases, and command issuer resolution.
-- `tick_control.rs` maps the session clock policy, replay pause/speed, dev-watch and lab pause
-  state, and countdown state to the room ticker interval and scheduled action. `RoomTask` still
-  owns the Tokio interval and remains the only task that advances a room.
+- `tick_control.rs` maps the session clock policy, replay pause/speed, room-controlled live-game
+  pause/speed, dev-watch and lab pause state, and countdown state to the room ticker interval and
+  scheduled action. `RoomTask` still owns the Tokio interval and remains the only task that advances
+  a room.
 - `lab_timeline.rs` owns room-local in-memory lab rewind recording outside the simulation crate. It
   records a baseline keyframe after lab `Game` creation or scenario import, records accepted lab
   world mutations and issue-as commands in authoritative room order, stores periodic cloned `Game`
