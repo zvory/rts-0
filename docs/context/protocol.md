@@ -44,6 +44,9 @@ Use when adding, removing, or changing any field on a client↔server message, s
   countdown skipping is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?`, and `isSpectator`; spectators are
   lobby members but not active match players.
+- Lab scenario authoring has `validateScenario` for dry-run previews and `submitScenario` for the
+  disabled-by-default draft PR service. `submitScenario` returns one async `labResult` and never
+  accepts client-supplied scenario JSON, branch names, paths, or credentials.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

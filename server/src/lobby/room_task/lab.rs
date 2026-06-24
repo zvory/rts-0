@@ -31,6 +31,8 @@ use crate::protocol::{
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::{Game, PlayerInit};
 
+mod submission;
+
 pub(super) struct LabSession {
     pub(super) public_id: String,
     pub(super) operator_id: u32,
@@ -40,6 +42,7 @@ pub(super) struct LabSession {
     pub(super) dirty: bool,
     pub(super) operation_log: Vec<LabOperationLogEntry>,
     pub(super) view_player_id: u32,
+    pub(super) scenario_submission_jobs_started: u8,
 }
 
 #[allow(dead_code)]
@@ -77,6 +80,7 @@ impl LabSession {
             dirty: false,
             operation_log: Vec::new(),
             view_player_id: LAB_PLAYER_ONE_ID,
+            scenario_submission_jobs_started: 0,
         }
     }
 
@@ -162,6 +166,7 @@ fn lab_op_kind(op: &LabClientOp) -> &'static str {
         LabClientOp::ExportScenario { .. } => "exportScenario",
         LabClientOp::ImportScenario { .. } => "importScenario",
         LabClientOp::ValidateScenario { .. } => "validateScenario",
+        LabClientOp::SubmitScenario { .. } => "submitScenario",
         LabClientOp::SpawnEntity { .. } => "spawnEntity",
         LabClientOp::DeleteEntity { .. } => "deleteEntity",
         LabClientOp::MoveEntity { .. } => "moveEntity",
@@ -239,6 +244,7 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
         }
         LabClientOp::ExportScenario { .. }
         | LabClientOp::ValidateScenario { .. }
+        | LabClientOp::SubmitScenario { .. }
         | LabClientOp::SetVision { .. }
         | LabClientOp::IssueCommandAs { .. } => Err("not a lab mutation".to_string()),
     }
@@ -847,6 +853,7 @@ impl RoomTask {
             LabClientOp::ExportScenario { .. }
                 | LabClientOp::ImportScenario { .. }
                 | LabClientOp::ValidateScenario { .. }
+                | LabClientOp::SubmitScenario { .. }
         ) && !policy.allows_lab_scenario_io()
         {
             self.send_lab_result_to(
@@ -884,19 +891,22 @@ impl RoomTask {
 
         let result = match op {
             LabClientOp::SetVision { vision } => {
-                self.apply_lab_vision(player_id, request_id, vision)
+                Some(self.apply_lab_vision(player_id, request_id, vision))
             }
             LabClientOp::ExportScenario { name } => {
-                self.export_lab_scenario(player_id, request_id, name)
+                Some(self.export_lab_scenario(player_id, request_id, name))
             }
             LabClientOp::ValidateScenario { metadata } => {
-                self.validate_lab_scenario(player_id, request_id, metadata)
+                Some(self.validate_lab_scenario(player_id, request_id, metadata))
+            }
+            LabClientOp::SubmitScenario { metadata } => {
+                self.submit_lab_scenario(player_id, request_id, metadata)
             }
             LabClientOp::IssueCommandAs {
                 player_id: command_player_id,
                 cmd,
                 ignore_command_limits,
-            } => self.apply_lab_issue_command(
+            } => Some(self.apply_lab_issue_command(
                 request_id,
                 player_id,
                 command_player_id,
@@ -904,10 +914,12 @@ impl RoomTask {
                 LabCommandOptions {
                     ignore_command_limits,
                 },
-            ),
-            op => self.apply_lab_mutation(player_id, request_id, op),
+            )),
+            op => Some(self.apply_lab_mutation(player_id, request_id, op)),
         };
-        self.send_lab_result_to(player_id, result);
+        if let Some(result) = result {
+            self.send_lab_result_to(player_id, result);
+        }
     }
 
     fn apply_lab_vision(

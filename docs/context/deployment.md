@@ -32,6 +32,11 @@ relative to the server crate, so `cargo run` from `server/` is the whole dev loo
 - `/wiki` is server-rendered and read-only. It may serve only allowlisted Markdown from
   `docs/context` and `docs/design`; `/wiki/stats` must be generated from `rts-rules` definitions
   and faction catalogs, not scraped from client config or rendered docs.
+- Lab scenario PR submission is disabled unless server env explicitly enables it and supplies
+  server-side GitHub credentials. The browser probes only `/api/lab-scenarios/submission`; actual
+  submissions are lab-room requests that export authoritative game state, write only the scenario
+  JSON plus manifest allowlist, and run GitHub work outside the room tick path. Live submissions
+  currently require `git` and GitHub CLI (`gh`) on the server host.
 
 ## Cross-capsule triggers
 - Touching the wire surface → [protocol.md](protocol.md).
