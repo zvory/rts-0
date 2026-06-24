@@ -1,4 +1,80 @@
 use super::support::*;
+use rts_rules::balance::TILE_SIZE;
+use rts_sim::game::lab::{LabOp, LabOpOutcome, LabSpawnEntity};
+use rts_sim::game::{Game, PlayerInit};
+
+fn tile_center(tile_x: u32, tile_y: u32) -> (f32, f32) {
+    let tile_size = TILE_SIZE as f32;
+    (
+        (tile_x as f32 + 0.5) * tile_size,
+        (tile_y as f32 + 0.5) * tile_size,
+    )
+}
+
+fn spawn_replay_test_entity(
+    game: &mut Game,
+    owner: u32,
+    kind: EntityKind,
+    position: (f32, f32),
+) -> u32 {
+    match game
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner,
+            kind,
+            x: position.0,
+            y: position.1,
+            completed: true,
+        }))
+        .expect("test entity spawn should succeed")
+    {
+        LabOpOutcome::Spawned { entity_id } => entity_id,
+        outcome => panic!("unexpected spawn outcome: {outcome:?}"),
+    }
+}
+
+fn delete_replay_test_entity(game: &mut Game, entity_id: u32) {
+    match game
+        .apply_lab_op(LabOp::DeleteEntity { entity_id })
+        .expect("test entity delete should succeed")
+    {
+        LabOpOutcome::Deleted { .. } => {}
+        outcome => panic!("unexpected delete outcome: {outcome:?}"),
+    }
+}
+
+fn replay_game_with_split_building_memory(players: &[PlayerInit]) -> (Game, u32) {
+    let mut game = replay_test_game(players, 0x5150_5505);
+    let p1_scout_pos = tile_center(20, 20);
+    let p2_scout_pos = tile_center(24, 20);
+    let depot_pos = tile_center(22, 20);
+
+    let depot = spawn_replay_test_entity(&mut game, 3, EntityKind::Depot, depot_pos);
+    let p1_scout = spawn_replay_test_entity(&mut game, 1, EntityKind::Rifleman, p1_scout_pos);
+    game.tick();
+
+    delete_replay_test_entity(&mut game, p1_scout);
+    let p2_scout = spawn_replay_test_entity(&mut game, 2, EntityKind::Rifleman, p2_scout_pos);
+    game.tick();
+
+    delete_replay_test_entity(&mut game, p2_scout);
+    game.tick();
+
+    assert!(
+        game.snapshot_for_spectator(&[1])
+            .remembered_buildings
+            .iter()
+            .any(|building| building.id == depot),
+        "test setup should give P1 stale memory"
+    );
+    assert!(
+        game.snapshot_for_spectator(&[2])
+            .remembered_buildings
+            .iter()
+            .any(|building| building.id == depot),
+        "test setup should give P2 stale memory"
+    );
+    (game, depot)
+}
 
 #[test]
 fn room_task_tick_control_preserves_current_intervals_by_mode() {
@@ -252,6 +328,76 @@ fn rapid_vision_selection_changes_remain_per_viewer() {
     assert_ne!(
         snapshot_a.visible_tiles, snapshot_b.visible_tiles,
         "test setup should exercise different fog perspectives"
+    );
+}
+
+#[test]
+fn replay_vision_switch_replaces_memory_and_resource_scope() {
+    let players = replay_test_players(3);
+    let (_live, artifact) = replay_test_artifact(&players, 1);
+    let mut replay = ReplaySession::new(artifact).unwrap();
+    let (memory_game, depot) = replay_game_with_split_building_memory(&players);
+    replay.game = Box::new(memory_game);
+    replay.duration_ticks = replay.current_tick() + 2;
+
+    let mut task = RoomTask::new(
+        "replay-memory-vision-switch-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let writer = add_test_room_spectator(&mut task, 100);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    task.on_set_vision_selection(
+        100,
+        VisionSelectionRequest::Player {
+            player_id: players[0].id,
+        },
+    );
+    task.on_tick_replay_viewer(TokioInstant::now());
+    let player_one_snapshot = writer.snapshots.take().expect("P1 replay snapshot");
+    let player_one_memory = player_one_snapshot
+        .remembered_buildings
+        .iter()
+        .find(|building| building.id == depot)
+        .expect("P1 replay vision should include P1 memory");
+    assert_eq!(
+        player_one_snapshot
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![players[0].id],
+        "P1 replay vision should only expose P1 resource rows"
+    );
+
+    task.on_set_vision_selection(
+        100,
+        VisionSelectionRequest::Player {
+            player_id: players[1].id,
+        },
+    );
+    task.on_tick_replay_viewer(TokioInstant::now());
+    let player_two_snapshot = writer.snapshots.take().expect("P2 replay snapshot");
+    let player_two_memory = player_two_snapshot
+        .remembered_buildings
+        .iter()
+        .find(|building| building.id == depot)
+        .expect("P2 replay vision should include P2 memory after switching");
+    assert!(
+        player_two_memory.observed_tick > player_one_memory.observed_tick,
+        "switching replay vision should replace remembered-building memory with the selected player's store"
+    );
+    assert_eq!(
+        player_two_snapshot
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![players[1].id],
+        "P2 replay vision should only expose P2 resource rows after switching"
     );
 }
 

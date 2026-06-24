@@ -463,6 +463,11 @@ replay viewers, and normal spectators remain passive. Lab selection itself is no
 control. Operator gameplay commands still flow through `commandIssuer.issueCommand`, where
 `LabControlPolicy` wraps them as lab `issueCommandAs` requests for the single controllable selected
 owner and includes whether that command should bypass the normal command-supply limit.
+Every client surface that needs ownership semantics must read through the injected control policy
+or the `GameState` helpers that delegate to it: command-card resources/faction/upgrades,
+right-click enemy classification, control groups, renderer feedback ownership, rally/order overlays,
+range/setup previews, minimap commands, and combat audio categories. Raw `state.playerId` remains
+the local viewer id and is not the lab command owner.
 
 Lab setup tools use `ClientIntent.activeLabTool` for browser-local armed tool state. `LabPanel`
 may ask `Match.armLabTool(tool, { onWorldClick, onBoxSelection })` to arm a tool, and normal

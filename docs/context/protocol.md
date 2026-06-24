@@ -11,8 +11,11 @@ Use when adding, removing, or changing any field on a client↔server message, s
   - §2.4 `snapshot` payload (per-player, fog-filtered)
   - §2.4.1 Boundary inventory
   - §2.5 `Event` (transient, one snapshot only)
+  - §2.5.1 Projection contract summary
   - §2.6 Replay playback state and vision
   - §2.7 Observer analysis state
+- [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
+  projection-affecting snapshot fields, events, or observer modes
 
 ## Code map
 - `server/crates/protocol/src/lib.rs` — authoritative Rust wire DTOs and compact transport

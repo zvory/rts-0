@@ -1,6 +1,6 @@
 # Phase 5 - Projection Contract Hardening
 
-Status: planned.
+Status: done.
 
 ## Goal
 

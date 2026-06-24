@@ -854,6 +854,28 @@ friendly-fire attribution rule as mortar splash: owned and allied entities in th
 damage, but same-team damage does not produce hostile reveal, under-attack, or score attribution.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
+#### 2.5.1 Projection contract summary
+
+Projection modes select a viewer, an optional command issuer, a snapshot body, and an event policy
+separately. Normal active-player views use the recipient's living-team current fog for entity
+visibility but keep resources, upgrades, ability affordances, command authority, order plans, and
+rally plans exact-owner-only. Lab operator command surfaces are the exception on the client side:
+they are still spectator-shaped projections, but `issueCommandAs` names the selected real player as
+the authoritative command issuer and rejects mixed-owner selections.
+
+Replay, live spectator, and lab team/teams views pass selected real player ids through one
+projection seam. The same selected ids drive `visibleTiles`, visible entities, remembered-building
+memory, `playerResources`, and event unions; switching a replay viewer from all-player vision to
+one player therefore replaces both current fog and stale memory with that player's projection.
+Full-world lab/dev projections use full-world snapshots plus full-world event unions, not a fake
+viewer id. `artilleryFiring` is the only current intentionally global event: it gives every
+recipient a visual minimap firing marker without granting terrain, target, entity id, or hidden
+snapshot visibility.
+
+When adding a projection-affecting field or event, use
+[docs/projection-audit-checklist.md](../projection-audit-checklist.md) and update this section's
+mode/event policy if the new data does not fit an existing row.
+
 ### 2.6 Room time state and vision selection
 
 `roomTimeState` is a reliable server message that carries the shared room-controlled time
