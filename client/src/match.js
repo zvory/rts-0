@@ -521,7 +521,7 @@ export class Match {
       !((this.state?.controlPolicy || this.labControlPolicy)?.canUseCommandSurface?.(this.state) ?? !this.state?.spectator);
     if (dom.selectionArea) dom.selectionArea.hidden = hidden;
     if (dom.commandCard) dom.commandCard.hidden = hidden;
-    if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
+    this.closeGiveUpConfirm();
   }
 
   armLabTool(tool, callbacks = {}) {
@@ -610,22 +610,26 @@ export class Match {
     if (this.state?.spectator) return;
     if (!dom.giveUpConfirm || this.giveUpSent) return;
     this.closeSettingsMenu();
+    this.resetGiveUpConfirmButton();
     dom.giveUpConfirm.hidden = false;
     dom.giveUpConfirmButton?.focus();
   }
 
-  closeGiveUpConfirm() {
-    if (!dom.giveUpConfirm) return;
-    dom.giveUpConfirm.hidden = true;
+  resetGiveUpConfirmButton() {
     if (dom.giveUpConfirmButton) {
       dom.giveUpConfirmButton.disabled = false;
       dom.giveUpConfirmButton.textContent = "Give up";
     }
   }
 
+  closeGiveUpConfirm() {
+    if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
+    this.resetGiveUpConfirmButton();
+  }
+
   closeMenus() {
     this.closeSettingsMenu();
-    if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
+    this.closeGiveUpConfirm();
   }
 
   requestGiveUp() {
