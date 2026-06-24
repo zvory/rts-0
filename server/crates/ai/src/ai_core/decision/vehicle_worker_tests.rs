@@ -3,7 +3,7 @@ use super::*;
 use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
 };
-use crate::ai_core::profiles::AI_1_1_TANK_MG;
+use crate::ai_core::profiles::{AiProfile, AI_1_1_TANK_MG, AI_1_2_WAVE_COHORTS};
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
@@ -146,12 +146,16 @@ fn with_expansion_resources(mut observation: AiObservation) -> AiObservation {
 }
 
 fn decide(observation: &AiObservation) -> AiDecision {
+    decide_with_profile(observation, &AI_1_1_TANK_MG)
+}
+
+fn decide_with_profile(observation: &AiObservation, profile: &'static AiProfile) -> AiDecision {
     let width = observation.map.width;
     let height = observation.map.height;
     decide_profile(
         observation,
-        &AI_1_1_TANK_MG,
-        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
+        profile,
+        &mut AiDecisionMemory::for_profile(profile),
         ai_shared::BuildSearch {
             min_radius: 0,
             max_radius: 0,
@@ -160,6 +164,27 @@ fn decide(observation: &AiObservation) -> AiDecision {
         },
         |_, tx, ty| tx < width && ty < height,
     )
+}
+
+fn second_steelworks_observation(steel: u32, oil: u32) -> AiObservation {
+    with_expansion_resources(observation(
+        AiEconomy {
+            steel,
+            oil,
+            supply_used: 54,
+            supply_cap: 120,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::CityCentre, Some(0)),
+            building(12, EntityKind::Barracks, Some(0)),
+            building(13, EntityKind::TrainingCentre, None),
+            building(14, EntityKind::ResearchComplex, None),
+            building(15, EntityKind::Factory, Some(0)),
+            building(16, EntityKind::Steelworks, Some(0)),
+            worker(20, AiEntityState::Idle),
+        ],
+    ))
 }
 
 #[test]
@@ -250,6 +275,39 @@ fn does_not_build_second_factory_for_tank_production() {
         }),
         "AI 1.1 should stay capped at one Factory"
     );
+}
+
+#[test]
+fn ai_1_2_builds_second_steelworks_above_resource_float() {
+    let observation = second_steelworks_observation(601, 401);
+
+    let decision = decide_with_profile(&observation, &AI_1_2_WAVE_COHORTS);
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Steelworks
+    }));
+}
+
+#[test]
+fn ai_1_2_waits_until_above_second_steelworks_resource_float() {
+    let observation = second_steelworks_observation(600, 400);
+
+    let decision = decide_with_profile(&observation, &AI_1_2_WAVE_COHORTS);
+
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Steelworks
+    }));
+}
+
+#[test]
+fn ai_1_1_does_not_build_second_steelworks_at_ai_1_2_float() {
+    let observation = second_steelworks_observation(601, 401);
+
+    let decision = decide(&observation);
+
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Steelworks
+    }));
 }
 
 #[test]
