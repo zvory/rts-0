@@ -11,6 +11,13 @@ const VISUAL: &str = "dom-event-time";
 const DEFAULT_WIDTH: f64 = 1280.0;
 const DEFAULT_HEIGHT: f64 = 820.0;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NativeMouseButton {
+    Primary,
+    Secondary,
+    Other(i32),
+}
+
 #[derive(Clone, Default)]
 pub struct NativeCursorBackend {
     inner: Arc<Mutex<NativeCursorSession>>,
@@ -435,6 +442,16 @@ fn now_ms() -> f64 {
         .unwrap_or(0.0)
 }
 
+fn dom_button_from_native(button: NativeMouseButton) -> Option<i32> {
+    match button {
+        NativeMouseButton::Primary => Some(0),
+        NativeMouseButton::Secondary => Some(2),
+        NativeMouseButton::Other(2) => Some(1),
+        NativeMouseButton::Other(n) if n >= 3 => Some(n),
+        NativeMouseButton::Other(_) => None,
+    }
+}
+
 #[derive(Clone, Copy)]
 struct SystemCaptureState {
     cursor_hidden: bool,
@@ -583,32 +600,34 @@ fn install_native_event_monitor(backend: NativeCursorBackend) {
             }
             NSEventType::LeftMouseDown => {
                 let mut input = base("down");
-                input.button = Some(0);
+                input.button = dom_button_from_native(NativeMouseButton::Primary);
                 Some(input)
             }
             NSEventType::LeftMouseUp => {
                 let mut input = base("up");
-                input.button = Some(0);
+                input.button = dom_button_from_native(NativeMouseButton::Primary);
                 Some(input)
             }
             NSEventType::RightMouseDown => {
                 let mut input = base("down");
-                input.button = Some(2);
+                input.button = dom_button_from_native(NativeMouseButton::Secondary);
                 Some(input)
             }
             NSEventType::RightMouseUp => {
                 let mut input = base("up");
-                input.button = Some(2);
+                input.button = dom_button_from_native(NativeMouseButton::Secondary);
                 Some(input)
             }
             NSEventType::OtherMouseDown => {
                 let mut input = base("down");
-                input.button = Some(event.buttonNumber() as i32);
+                input.button =
+                    dom_button_from_native(NativeMouseButton::Other(event.buttonNumber() as i32));
                 Some(input)
             }
             NSEventType::OtherMouseUp => {
                 let mut input = base("up");
-                input.button = Some(event.buttonNumber() as i32);
+                input.button =
+                    dom_button_from_native(NativeMouseButton::Other(event.buttonNumber() as i32));
                 Some(input)
             }
             NSEventType::ScrollWheel => {
@@ -644,5 +663,18 @@ mod tests {
         assert_eq!(snapshot.visual, VISUAL);
         assert!(!snapshot.movement_batched);
         assert!(!snapshot.active);
+    }
+
+    #[test]
+    fn native_mouse_buttons_emit_dom_button_codes() {
+        assert_eq!(dom_button_from_native(NativeMouseButton::Primary), Some(0));
+        assert_eq!(
+            dom_button_from_native(NativeMouseButton::Secondary),
+            Some(2)
+        );
+        assert_eq!(dom_button_from_native(NativeMouseButton::Other(2)), Some(1));
+        assert_eq!(dom_button_from_native(NativeMouseButton::Other(3)), Some(3));
+        assert_eq!(dom_button_from_native(NativeMouseButton::Other(4)), Some(4));
+        assert_eq!(dom_button_from_native(NativeMouseButton::Other(1)), None);
     }
 }
