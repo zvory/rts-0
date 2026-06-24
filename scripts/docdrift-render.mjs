@@ -177,6 +177,7 @@ function renderGenerateDocsMarkdown(report) {
     `- Applied patches: ${report.docPatch.summary.applied}`,
     `- Already applied patches: ${report.docPatch.summary.alreadyApplied}`,
     `- Doc patch cache hits: ${report.docPatch.summary.cacheHits}`,
+    `- Skipped decisions: ${report.docPatch.summary.skipped ?? 0}`,
     `- Estimated doc patch prompt tokens: ${report.docPatch.budget.estimatedPromptTokens}`,
     `- Partial failure: ${report.docPatch.partial ? "yes" : "no"}`,
     "",
@@ -192,6 +193,14 @@ function renderGenerateDocsMarkdown(report) {
       `- Error: ${report.docPatch.failure.message}`,
       "",
     );
+  }
+
+  if (report.docPatch.skipped?.length > 0) {
+    lines.push("## Skipped Decisions", "");
+    for (const skip of report.docPatch.skipped) {
+      lines.push(`- ${skip.index}/${skip.total} ${skip.shortSha} ${skip.subject}: ${skip.kind} - ${skip.message}`);
+    }
+    lines.push("");
   }
 
   if (report.docPatch.summary.patchRecords === 0) {
@@ -247,6 +256,7 @@ function renderFullMarkdown(report) {
     `- Skipped docs-only churn commits: ${report.summary.skippedDocsOnlyCommits}`,
     `- Update-docs decisions: ${report.docPatch?.summary?.updateDocsDecisions ?? "not run"}`,
     `- Applied patches: ${report.docPatch?.summary?.applied ?? "not run"}`,
+    `- Skipped doc-patch decisions: ${report.docPatch?.summary?.skipped ?? "not run"}`,
     `- PR: ${report.sweep.prUrl ?? "none"}`,
     "",
     "## Lifecycle",
@@ -257,6 +267,39 @@ function renderFullMarkdown(report) {
   }
   lines.push("");
   return `${lines.join("\n")}\n`;
+}
+
+export function writeFullPrBody(bodyPath, report, reportPath) {
+  const failure = report.docPatch?.failure;
+  const skipped = report.docPatch?.skipped ?? [];
+  const lines = [
+    "## Documentation Drift Sweep",
+    "",
+    `- Base: ${report.base.sha}`,
+    `- Head: ${report.head.sha}`,
+    `- Report: ${reportPath}`,
+    `- Update-docs decisions: ${report.docPatch?.summary?.updateDocsDecisions ?? 0}`,
+    `- Applied patches: ${report.docPatch?.summary?.applied ?? 0}`,
+    `- Skipped doc-patch decisions: ${skipped.length}`,
+    `- Partial run: ${report.docPatch?.partial ? "yes" : "no"}`,
+    "",
+    report.docPatch?.partial
+      ? "The local checkpoint is advanced only to the last source commit before the failed doc-patch commit after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`."
+      : "The local checkpoint is advanced only after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`.",
+    "",
+  ];
+  if (failure) {
+    lines.push("## Partial Failure", "", `- Failed commit: ${failure.shortSha} ${failure.subject}`, `- Error: ${failure.message}`, "");
+  }
+  if (skipped.length > 0) {
+    lines.push("## Skipped Doc-Patch Decisions", "");
+    for (const skip of skipped) {
+      lines.push(`- ${skip.shortSha} ${skip.subject}: ${skip.kind} - ${skip.message}`);
+    }
+    lines.push("");
+  }
+  writeFileSync(bodyPath, lines.join("\n"));
+  return bodyPath;
 }
 
 export function writeOutputs(report, outDir) {
