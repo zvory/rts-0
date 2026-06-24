@@ -342,12 +342,12 @@ export class Net {
    * @param {number} ticksBack
    */
   seekRoomTime(ticksBack) {
-    this._send(msg.seekRoomTime(ticksBack));
+    return this._send(msg.seekRoomTime(ticksBack));
   }
 
   /** Seek room-controlled time to an absolute simulation tick where allowed. */
   seekRoomTimeTo(tick) {
-    this._send(msg.seekRoomTimeTo(tick));
+    return this._send(msg.seekRoomTimeTo(tick));
   }
 
   /**

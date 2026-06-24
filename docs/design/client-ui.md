@@ -404,6 +404,7 @@ export class LabClient {
   subscribeResult(handler)               // returns unsubscribe
   setVision(vision)                      // sends {op:"setVision", vision} for this operator only
   setPlayerGodMode(playerId, enabled)    // sends {op:"setPlayerGodMode", playerId, enabled}
+  resetScenario()                        // seeks lab room time to the current scenario baseline
   request(op, options?)                  // allocates requestId, resolves with labResult/timeout
   destroy()
 }
@@ -428,7 +429,7 @@ export class LabPanel {
 }
 ```
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
-status, lab vision, command-limit policy, scenario import/export, and result status; Tools owns
+status, lab vision, command-limit policy, scenario import/export/reset, and result status; Tools owns
 target player, player state, spawn palettes, active tool status, and the remove setup tool.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no

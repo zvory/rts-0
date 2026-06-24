@@ -172,6 +172,7 @@ export class LabPanel {
       this.textAreaField("scenario-json", "JSON", ""),
       this.button("Export JSON", () => this.exportScenario()),
       this.button("Import JSON", () => this.importScenario()),
+      this.button("Reset scenario", () => this.resetScenario()),
     ]));
 
     return root;
@@ -1002,6 +1003,12 @@ export class LabPanel {
       return Promise.resolve(this.lastResult);
     }
     return this.labClient.importScenario(scenario);
+  }
+
+  resetScenario() {
+    const sent = this.labClient.resetScenario();
+    const summary = sent ? "Scenario reset requested." : "Scenario reset could not be sent.";
+    return this.publishLocalResult("resetScenario", sent, summary);
   }
 
   activeLabTool() {

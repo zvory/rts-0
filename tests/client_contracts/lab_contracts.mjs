@@ -95,6 +95,8 @@ import { textWithin } from "./dom_text.mjs";
       sent.at(-1).op.scenario.entities[0].setupTarget.x === 128,
     "LabClient sends scenario import requests with setup fields",
   );
+  labClient.resetScenario();
+  assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabClient resets scenarios by seeking lab room time to tick zero");
   assert(labVisionLabel(labVision.teams([1, 2])) === "Teams 1, 2", "labVisionLabel formats team unions");
   labClient.destroy();
 }
@@ -658,6 +660,9 @@ await withFakeDocument(async () => {
   });
   void panel.importScenario();
   assert(sent.at(-1).op.op === "importScenario" && sent.at(-1).op.scenario.name === "saved setup", "LabPanel imports pasted scenario JSON");
+  buttonByText("Reset scenario").listeners.click();
+  assert(sent.at(-1).t === "seekRoomTimeTo" && sent.at(-1).tick === 0, "LabPanel reset scenario seeks the lab timeline to the scenario start");
+  assert(textWithin(root).includes("Scenario reset requested."), "LabPanel surfaces reset scenario requests locally");
   panel.destroy();
   labClient.destroy();
   assert(cancelledToolReason === "panelDestroy", "LabPanel cancels an active lab tool on teardown");

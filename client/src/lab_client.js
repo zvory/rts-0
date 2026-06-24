@@ -51,6 +51,10 @@ export class LabClient {
     return this.request({ op: "importScenario", scenario });
   }
 
+  resetScenario() {
+    return this.net.seekRoomTimeTo(0);
+  }
+
   spawnEntity({ owner, kind, x, y, completed = true }) {
     return this.request({ op: "spawnEntity", owner, kind, x, y, completed: !!completed });
   }
