@@ -27,6 +27,7 @@ export class LabPanel {
       oil: null,
       researchUpgrade: "",
     };
+    this.researchOverrides = new Map();
     this.spawnPalette = {
       factionId: DEFAULT_FACTION_ID,
       kind: "",
@@ -252,14 +253,37 @@ export class LabPanel {
       this.checkboxField("player-god-mode", "God mode", this.playerGodModeEnabled(), {
         onChange: (enabled) => this.setPlayerGodMode(enabled),
       }),
-      this.selectField("research-upgrade", "Research", Object.keys(UPGRADES), upgradeLabels(), {
-        value: this.playerState.researchUpgrade,
-        onChange: (value) => {
-          this.playerState.researchUpgrade = value;
-        },
-      }),
-      this.button("Set research", () => this.setCompletedResearch()),
+      this.researchButtonGrid(),
     ]);
+  }
+
+  researchButtonGrid() {
+    const grid = document.createElement("div");
+    grid.className = "lab-research-palette";
+    grid.setAttribute("role", "group");
+    grid.setAttribute("aria-label", "Research");
+    const completed = this.completedResearchForTargetPlayer();
+    const targetPlayer = this.targetPlayer();
+    for (const upgrade of Object.keys(UPGRADES)) {
+      const def = UPGRADES[upgrade] || {};
+      const researched = completed.has(upgrade);
+      const label = def.label || upgrade;
+      const button = this.button(label, () => this.toggleCompletedResearch(upgrade), {
+        className: "lab-btn lab-research-option",
+        title: researched
+          ? `${label} researched for Player ${targetPlayer}. Click to remove it.`
+          : `${label} not researched for Player ${targetPlayer}. Click to add it.`,
+        dataset: {
+          upgrade,
+          available: researched ? "true" : "false",
+          researched: researched ? "true" : "false",
+          active: researched ? "true" : "false",
+        },
+      });
+      button.setAttribute("aria-pressed", researched ? "true" : "false");
+      grid.appendChild(button);
+    }
+    return grid;
   }
 
   renderRemoveTool() {
@@ -750,9 +774,6 @@ export class LabPanel {
   captureVisibleSetupFields() {
     if (this.fields.has("resource-steel")) this.playerState.steel = this.uint("resource-steel");
     if (this.fields.has("resource-oil")) this.playerState.oil = this.uint("resource-oil");
-    if (this.fields.has("research-upgrade")) {
-      this.playerState.researchUpgrade = this.value("research-upgrade") || this.playerState.researchUpgrade;
-    }
     if (this.fields.has("spawn-faction")) this.spawnPalette.factionId = this.value("spawn-faction") || this.spawnPalette.factionId;
     if (this.fields.has("building-spawn-faction")) {
       this.buildingSpawnPalette.factionId = this.value("building-spawn-faction") || this.buildingSpawnPalette.factionId;
@@ -780,17 +801,12 @@ export class LabPanel {
     const resources = this.resourcesForTargetPlayer();
     if (this.playerState.steel == null) this.playerState.steel = resources.steel;
     if (this.playerState.oil == null) this.playerState.oil = resources.oil;
-    const upgrades = Object.keys(UPGRADES);
-    if (!upgrades.includes(this.playerState.researchUpgrade)) {
-      this.playerState.researchUpgrade = upgrades[0] || "";
-    }
   }
 
   capturePlayerStateFields() {
     this.captureTargetPlayerField();
     this.playerState.steel = this.uint("resource-steel");
     this.playerState.oil = this.uint("resource-oil");
-    this.playerState.researchUpgrade = this.value("research-upgrade") || this.playerState.researchUpgrade;
   }
 
   setPlayerResources() {
@@ -821,13 +837,33 @@ export class LabPanel {
     return this.publishPlayerResourceBatchResult(results);
   }
 
-  setCompletedResearch() {
+  toggleCompletedResearch(upgrade) {
+    const researched = this.completedResearchForTargetPlayer().has(upgrade);
+    return this.setCompletedResearch(upgrade, !researched);
+  }
+
+  async setCompletedResearch(upgrade = this.playerState.researchUpgrade, completed = true) {
     this.capturePlayerStateFields();
-    return this.labClient.setCompletedResearch(
-      this.targetPlayer(),
-      this.playerState.researchUpgrade,
-      true,
-    );
+    const selectedUpgrade = String(upgrade || "");
+    if (!UPGRADES[selectedUpgrade]) {
+      return this.publishLocalResult("setCompletedResearch", false, "Select a research first.");
+    }
+    const playerId = this.targetPlayer();
+    this.playerState.researchUpgrade = selectedUpgrade;
+    const result = await this.labClient.setCompletedResearch(playerId, selectedUpgrade, completed);
+    if (result?.ok) this.recordResearchOverride(playerId, selectedUpgrade, completed);
+    return result;
+  }
+
+  recordResearchOverride(playerId, upgrade, completed) {
+    const key = String(playerId);
+    let overrides = this.researchOverrides.get(key);
+    if (!overrides) {
+      overrides = new Map();
+      this.researchOverrides.set(key, overrides);
+    }
+    overrides.set(upgrade, !!completed);
+    this.render();
   }
 
   setPlayerGodMode(enabled) {
@@ -996,11 +1032,18 @@ export class LabPanel {
       this.render();
       return Promise.resolve(this.lastResult);
     }
-    return this.labClient.importScenario(scenario);
+    return this.labClient.importScenario(scenario).then((result) => {
+      if (result?.ok) {
+        this.researchOverrides.clear();
+        this.render();
+      }
+      return result;
+    });
   }
 
   resetScenario() {
     const sent = this.labClient.resetScenario();
+    if (sent) this.researchOverrides.clear();
     const summary = sent ? "Scenario reset requested." : "Scenario reset could not be sent.";
     return this.publishLocalResult("resetScenario", sent, summary);
   }
@@ -1021,6 +1064,33 @@ export class LabPanel {
     const fallback = rows[target - 1] || rows[0] || null;
     const resources = byId || fallback;
     return { steel: resources?.steel ?? 0, oil: resources?.oil ?? 0 };
+  }
+
+  completedResearchForTargetPlayer() {
+    const target = this.targetPlayer();
+    const completed = new Set(this.snapshotCompletedResearchForPlayer(target));
+    const overrides = this.researchOverrides.get(String(target));
+    if (overrides) {
+      for (const [upgrade, researched] of overrides.entries()) {
+        if (researched) completed.add(upgrade);
+        else completed.delete(upgrade);
+      }
+    }
+    return completed;
+  }
+
+  snapshotCompletedResearchForPlayer(playerId) {
+    const state = this.match?.state || null;
+    const policyUpgrades = this.labControlPolicy()?.commandUpgrades?.(state, playerId);
+    if (Array.isArray(policyUpgrades)) return policyUpgrades;
+    const playerUpgrades = upgradeArrayForOwner(state?.playerUpgrades, playerId) ||
+      upgradeArrayForOwner(state?.upgradesByPlayer, playerId) ||
+      upgradeArrayForOwner(state?.completedResearchByPlayer, playerId);
+    if (playerUpgrades) return playerUpgrades;
+    if (Number(state?.playerId) === Number(playerId) && Array.isArray(state?.upgrades)) {
+      return state.upgrades;
+    }
+    return [];
   }
 
   value(id) {
@@ -1185,12 +1255,6 @@ function toUint(value) {
   return numeric == null ? 0 : Math.max(0, numeric);
 }
 
-function upgradeLabels() {
-  return Object.fromEntries(
-    Object.entries(UPGRADES).map(([upgrade, def]) => [upgrade, def.label || upgrade]),
-  );
-}
-
 function selectedEntityIdsFromPayload(entityIds) {
   if (!Array.isArray(entityIds)) return [];
   const seen = new Set();
@@ -1202,6 +1266,34 @@ function selectedEntityIdsFromPayload(entityIds) {
     ids.push(id);
   }
   return ids;
+}
+
+function upgradeArrayForOwner(source, ownerId) {
+  const value = ownerValue(source, ownerId);
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.upgrades)) return value.upgrades;
+  if (Array.isArray(value?.completed)) return value.completed;
+  if (Array.isArray(value?.completedResearch)) return value.completedResearch;
+  return null;
+}
+
+function ownerValue(source, ownerId) {
+  if (!source) return null;
+  if (source instanceof Map) return source.get(ownerId) || source.get(String(ownerId)) || null;
+  if (Array.isArray(source)) return rowForOwner(source, ownerId);
+  if (typeof source === "object") return source[ownerId] || source[String(ownerId)] || null;
+  return null;
+}
+
+function rowForOwner(rows, ownerId) {
+  if (!Array.isArray(rows)) return null;
+  const numericOwner = Number(ownerId);
+  const explicit = rows.find((row) => Number(row?.id ?? row?.playerId ?? row?.owner) === numericOwner);
+  if (explicit) return explicit;
+  const positional = rows[numericOwner - 1] || null;
+  const positionalOwner = positional == null ? null : Number(positional.id ?? positional.playerId ?? positional.owner);
+  if (Number.isFinite(positionalOwner) && positionalOwner !== numericOwner) return null;
+  return positional;
 }
 
 function batchResultSummary(op, accepted, failures) {
