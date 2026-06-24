@@ -1,6 +1,6 @@
 # Phase 4 - Rust Balance Ownership Split
 
-Status: planned.
+Status: done.
 
 ## Goal
 

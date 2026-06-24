@@ -3,9 +3,11 @@ Kind-specific server balance lives in `server/crates/rules/src/defs.rs`; faction
 buildables, trainables, upgrade ids, and ability carriers live in
 `server/crates/rules/src/faction.rs`; terrain movement/cover/concealment hooks live in
 `server/crates/rules/src/terrain.rs` and currently return the all-open-ground defaults.
-`config.rs` is the thin constants module for timings, tile size, starting resources, supply caps,
-mining amounts, and other scalar simulation constants; its `unit_stats(kind)` and
-`building_stats(kind)` helpers read the defs table.
+`server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
+starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
+and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules
+group those Rust-owned values by domain, and its `unit_stats(kind)` and `building_stats(kind)`
+helpers read the defs table.
 `client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight, sizes,
 colors, and command-card descriptors). Keep both in sync; run
 `node scripts/check-faction-catalog-parity.mjs` to mechanically compare the Rust-authoritative
@@ -24,10 +26,23 @@ or sim-only implementation constants. Those values belong beside the module that
 Use `server/crates/rules/src/defs.rs` for unit/building stat records, costs, supply, sight, ranges,
 footprints, body dimensions, and build/train timing. Use `server/crates/rules/src/faction.rs` for
 faction catalogs: buildables, trainables, research rows, ability carriers, command-card descriptors,
-and ability/upgrade metadata exported by Rust. Use `server/crates/rules/src/balance.rs` for shared
-scalar constants such as tick rate, resource-node amounts, support-weapon timings/ranges, upgrade
-durations, body dimensions, and ability effect scalars. Sim-only behavior constants belong beside
-the sim module that owns the behavior rather than in the compatibility config shims.
+and ability/upgrade metadata exported by Rust. Use `server/crates/rules/src/balance.rs` as the
+stable public balance surface; the internal `balance/timing.rs`, `balance/map.rs`,
+`balance/economy.rs`, `balance/supply.rs`, `balance/bodies.rs`, `balance/support_weapons.rs`,
+`balance/upgrades.rs`, `balance/abilities.rs`, and `balance/stats.rs` files group shared scalar
+constants and helper definitions without changing ownership or exported names. Sim-only behavior
+constants belong beside the sim module that owns the behavior rather than in the compatibility
+config shims.
+
+Phase 4 left the movement/arrival recovery constants (`STUCK_EPS_PX`,
+`STUCK_ARRIVAL_TICKS`, `TOLERANT_ARRIVAL_RADIUS_PX`, `SIDESTEP_*`,
+`STATIC_BLOCKED_REPATH_TICKS`, `ARRIVE_RADIUS_INTERMEDIATE_PX`,
+`VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX`, `SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX`,
+`SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS`, `SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX`, and
+`SCOUT_CAR_RECOVERY_COOLDOWN_TICKS`) on the `rts_rules::balance::*` surface as explicit
+compatibility exports. They are sim-movement policy, not client-mirrored balance values; moving
+them beside `rts-sim` movement should be a later API/design migration rather than a silent Phase 4
+source shuffle.
 
 `client/src/config.js` mirrors only the subset needed by UI, rendering, fog previews, and command
 cards. Rust-owned mirrored values include gameplay-visible costs, supply, sight, footprints, body
