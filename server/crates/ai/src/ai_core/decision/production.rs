@@ -15,6 +15,26 @@ pub(super) fn wants_depot(facts: &AiFacts, profile: &AiProfile) -> bool {
             || !facts.production_buildings(EntityKind::Barracks).is_empty())
 }
 
+pub(super) fn should_build_extra_steelworks(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+    planned_steelworks: usize,
+) -> bool {
+    let Some(policy) = profile.extra_steelworks else {
+        return false;
+    };
+    if observation.economy.steel <= policy.resource_float.steel
+        || observation.economy.oil <= policy.resource_float.oil
+    {
+        return false;
+    }
+    facts
+        .building_count(EntityKind::Steelworks)
+        .saturating_add(planned_steelworks)
+        < policy.target_count
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn try_build_kind<F>(
     observation: &AiObservation,
