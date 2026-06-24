@@ -1744,7 +1744,6 @@ input[type="text"]:focus {
   align-items: center;
   gap: 6px;
 }
-.lab-panel-reset,
 .lab-panel-collapse {
   flex: 0 0 auto;
 }
@@ -3166,7 +3165,6 @@ input[type="text"]:focus {
   align-items: center;
   gap: 5px;
 }
-.room-time-panel-reset,
 .room-time-panel-collapse {
   appearance: none;
   flex: 0 0 auto;
@@ -3181,8 +3179,6 @@ input[type="text"]:focus {
   letter-spacing: 0;
   padding: 4px 7px;
 }
-.room-time-panel-reset:hover,
-.room-time-panel-reset:focus-visible,
 .room-time-panel-collapse:hover,
 .room-time-panel-collapse:focus-visible {
   border-color: var(--accent);

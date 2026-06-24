@@ -65,13 +65,6 @@ export class LabPanelWindowChrome {
     }
     dragHandle.append(grip, titleGroup);
 
-    const reset = document.createElement("button");
-    reset.type = "button";
-    reset.className = "lab-btn lab-panel-reset";
-    reset.textContent = "Reset";
-    reset.title = "Reset lab panel position and size";
-    reset.setAttribute("aria-label", "Reset lab panel position and size");
-
     const collapse = document.createElement("button");
     collapse.type = "button";
     collapse.className = "lab-btn lab-panel-collapse";
@@ -81,12 +74,11 @@ export class LabPanelWindowChrome {
 
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginInteraction("move", event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleMoveKey(event));
-    this.listenRender(reset, "click", () => this.resetGeometry());
     this.listenRender(collapse, "click", () => this.toggleCollapsed());
 
     const actions = document.createElement("div");
     actions.className = "lab-panel-titlebar-actions";
-    actions.append(collapse, reset);
+    actions.append(collapse);
 
     header.append(dragHandle, actions);
     return header;
