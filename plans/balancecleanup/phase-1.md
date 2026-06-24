@@ -1,6 +1,6 @@
 # Phase 1 - Rebaseline Guardrails And Grouping
 
-Status: planned.
+Status: done.
 
 ## Goal
 
