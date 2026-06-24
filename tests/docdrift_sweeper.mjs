@@ -825,7 +825,9 @@ try {
   assert.equal(fullPreview.dryRun, true);
   assert.equal(fullPreview.sweep.action, "noop_no_commits");
   assert.equal(fullPreview.checkpoint.advanced, false);
-  assert.ok(fullPreview.lifecycle.some((step) => step.name === "open or update owned PR"));
+  const openPrStep = fullPreview.lifecycle.find((step) => step.name === "open or update owned PR");
+  assert.ok(openPrStep);
+  assert.match(openPrStep.command, /--label docdrift-sweep/);
   assert.ok(fullPreview.lifecycle.some((step) => step.command.includes("scripts/wait-pr.sh")));
   assert.ok(fs.existsSync(path.join(fullPreviewOutDir, "docdrift-full.json")));
   assert.ok(fs.existsSync(path.join(fullPreviewOutDir, "docdrift-full.md")));
