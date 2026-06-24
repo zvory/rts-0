@@ -333,7 +333,37 @@ Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, includ
 `--run-id <id>` for predictable report paths. The wrapper defaults scheduled runs to
 `--max-commits 300` so ordinary daily backlog does not trip the interactive classifier guard; set
 `DOC_DRIFT_MAX_COMMITS` to override that limit. It also passes `--codex-timeout-seconds` from
-`DOC_DRIFT_CODEX_TIMEOUT_SECONDS`, defaulting to 300 seconds per Codex call. When the daily command exits non-zero, it writes an
-ignored `.docdrift/last-failure.md` marker with the command, UTC timestamps, exit code, and stdout
-and stderr tails, and it clears that marker after the next successful run. The wrapper only runs the
-command; it does not install or require a launchd job for other developers.
+`DOC_DRIFT_CODEX_TIMEOUT_SECONDS`, defaulting to 300 seconds per Codex call. When the daily command
+exits non-zero, it writes an ignored `.docdrift/last-failure.md` marker with the command, UTC
+timestamps, exit code, and stdout and stderr tails, and it clears that marker after the next
+successful run. The wrapper only runs the command; it does not install or require a launchd job for
+other developers.
+
+The recurring daily schedule is local macOS `launchd`, not a GitHub Actions scheduled workflow.
+Do not start a "did it run?" investigation in `.github/workflows`; start with the loaded user
+LaunchAgent. On the primary workstation the job is installed as
+`$HOME/Library/LaunchAgents/com.zvory.rts-docdrift.plist` with label `com.zvory.rts-docdrift`,
+`WorkingDirectory` set to `/Users/az/Code/rts-0`, and `ProgramArguments` beginning with
+`/Users/az/Code/rts-0/scripts/docdrift-daily.sh`. Its `StartCalendarInterval` is local wall-clock
+time, currently `Hour = 4`, `Minute = 0`. Run artifacts use UTC ids, so a 4 a.m. run may appear as
+`.docdrift/runs/YYYY-MM-DDT08-00-...Z` during daylight-saving time and
+`.docdrift/runs/YYYY-MM-DDT09-00-...Z` during standard time.
+
+For future operational checks, use this order:
+
+```bash
+launchctl list | rg -i "docdrift|rts-docdrift"
+plutil -p "$HOME/Library/LaunchAgents/com.zvory.rts-docdrift.plist"
+ls -lt .docdrift/runs
+sed -n '1,180p' .docdrift/last-failure.md
+tail -n 120 "$HOME/Library/Logs/rts-docdrift.out.log"
+tail -n 120 "$HOME/Library/Logs/rts-docdrift.err.log"
+git -C .docdrift/worktrees/docdrift-sweep status --short
+```
+
+Treat `.docdrift/last-failure.md` as the fastest answer for "did the daily fail?". A partial
+full sweep can still create, merge, and checkpoint a successful prefix PR before exiting non-zero;
+in that case the failure marker is expected and should name the later commit that stopped doc
+generation. Use the linked PR or the `prUrl`/`sweep.action` fields in
+`.docdrift/runs/<run-id>/docdrift-full.json` to distinguish a clean no-op, a merged full sweep, a
+merged partial prefix, and a hard failure that produced no PR.
