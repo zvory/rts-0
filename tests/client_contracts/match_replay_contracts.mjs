@@ -590,8 +590,14 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       JSON.parse(localStorageValues.get("rts.roomTimeControls.panel.v1")).collapsed === true,
     "collapse hides and persists the floating room-time panel body",
   );
-  const resetPanel = replayControls.querySelector(".room-time-panel-reset");
-  resetPanel._listeners.get("click")({});
+  assert(
+    replayControls.querySelector(".room-time-panel-reset") === null,
+    "floating room-time panel omits the position reset button",
+  );
+  dragHandle._listeners.get("keydown")({
+    key: "Home",
+    preventDefault() {},
+  });
   assert(!localStorageValues.has("rts.roomTimeControls.panel.v1"), "reset clears the persisted room-time panel position");
   assert(replayControls.style.left === "" && replayControls.style.top === "",
     "reset returns the floating room-time panel to its default CSS position");

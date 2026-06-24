@@ -27,10 +27,9 @@ export class FloatingRoomTimePanel {
 
     let body = this.root.querySelector(".room-time-panel-body");
     let dragHandle = this.root.querySelector(".room-time-panel-drag-handle");
-    let reset = this.root.querySelector(".room-time-panel-reset");
     let collapse = this.root.querySelector(".room-time-panel-collapse");
 
-    if (!body || !dragHandle || !reset || !collapse) {
+    if (!body || !dragHandle || !collapse) {
       const existing = Array.from(this.root.children || []);
       const header = document.createElement("div");
       header.className = "room-time-panel-titlebar";
@@ -52,11 +51,6 @@ export class FloatingRoomTimePanel {
       dragHandle.appendChild(grip);
       dragHandle.appendChild(title);
 
-      reset = document.createElement("button");
-      reset.type = "button";
-      reset.className = "room-time-panel-reset";
-      reset.textContent = "Reset";
-
       collapse = document.createElement("button");
       collapse.type = "button";
       collapse.className = "room-time-panel-collapse";
@@ -68,7 +62,6 @@ export class FloatingRoomTimePanel {
       const actions = document.createElement("div");
       actions.className = "room-time-panel-actions";
       actions.appendChild(collapse);
-      actions.appendChild(reset);
 
       header.appendChild(dragHandle);
       header.appendChild(actions);
@@ -80,7 +73,6 @@ export class FloatingRoomTimePanel {
     this.contentEl = body;
     this.listenRender(dragHandle, "pointerdown", (event) => this.beginDrag(event));
     this.listenRender(dragHandle, "keydown", (event) => this.handleKeyDown(event));
-    this.listenRender(reset, "click", () => this.resetPosition());
     this.listenRender(collapse, "click", () => this.toggleCollapsed());
     this.listenWindow("resize", () => this.constrainToViewport());
     this.restorePosition();
@@ -89,15 +81,10 @@ export class FloatingRoomTimePanel {
 
   syncLabels() {
     const dragHandle = this.root?.querySelector(".room-time-panel-drag-handle");
-    const reset = this.root?.querySelector(".room-time-panel-reset");
     const collapse = this.root?.querySelector(".room-time-panel-collapse");
     const title = this.root?.querySelector(".room-time-panel-title");
     if (title) title.textContent = this.label;
     dragHandle?.setAttribute("aria-label", `Move ${this.label.toLowerCase()} controls`);
-    if (reset) {
-      reset.title = `Reset ${this.label.toLowerCase()} controls position`;
-      reset.setAttribute("aria-label", `Reset ${this.label.toLowerCase()} controls position`);
-    }
     if (collapse) {
       const action = this.collapsed ? "Expand" : "Collapse";
       collapse.textContent = action;

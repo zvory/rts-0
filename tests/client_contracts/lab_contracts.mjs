@@ -383,7 +383,10 @@ await withFakeDocument(async () => {
   const toolsPanel = panelByClass("lab-tools-window");
   assert(root.children.length === 2, "LabPanel mounts separate options and tools windows inside the app-owned root");
   assert(optionsPanel && toolsPanel && !toolsPanel.hidden, "LabPanel shows both floating windows for operators");
-  assert(textWithin(root).includes("Reset"), "LabPanel exposes reset affordances for its movable panels");
+  assert(
+    findFakes(root, (el) => String(el.className).split(/\s+/).includes("lab-panel-reset")).length === 0,
+    "LabPanel omits reset buttons from its movable panels",
+  );
   assert(
     [optionsPanel, toolsPanel].every((child) => child.children.some((grandchild) => grandchild.className === "lab-panel-resize-handle")),
     "LabPanel exposes visible resize handles for both windows",
@@ -693,7 +696,7 @@ await withFakeDocument(async () => {
   const dragHandle = header.children[0];
   const actions = header.children[1];
   const collapseButton = actions.children[0];
-  const resetButton = actions.children[1];
+  assert(actions.children.length === 1, "LabPanelWindowChrome omits the reset button from panel headers");
   dragHandle.listeners.pointerdown({
     button: 0,
     pointerId: 7,
@@ -732,7 +735,10 @@ await withFakeDocument(async () => {
     "LabPanelWindowChrome persists collapsed panel state",
   );
 
-  resetButton.listeners.click();
+  dragHandle.listeners.keydown({
+    key: "Home",
+    preventDefault() {},
+  });
   assert(el.dataset.windowed === "false", "LabPanelWindowChrome reset returns to the stylesheet layout");
   assert(el.dataset.collapsed === "false", "LabPanelWindowChrome reset expands the panel");
   assert(collapseButton.textContent === "Collapse", "LabPanelWindowChrome labels the expanded panel action");
