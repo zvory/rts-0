@@ -626,7 +626,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
 }
 
 #[test]
-fn manual_mortar_fire_launches_immediately_after_snapping_to_target() {
+fn manual_mortar_fire_turns_briefly_before_launching() {
     let players = [
         PlayerInit {
             id: 1,
@@ -679,14 +679,29 @@ fn manual_mortar_fire_launches_immediately_after_snapping_to_target() {
 
     game.tick();
     let mortar_entity = game.entities.get(mortar).expect("mortar should exist");
+    assert_eq!(
+        mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire),
+        0,
+        "manual mortar fire should wait for the brief facing slew before launching"
+    );
+    assert!(
+        (mortar_entity.facing() + mortar::TURN_RATE_RAD_PER_TICK).abs() <= 0.001,
+        "mortar should rotate one fast step toward the manual target, got {:.4}",
+        mortar_entity.facing()
+    );
+
+    for _ in 0..2 {
+        game.tick();
+    }
+    let mortar_entity = game.entities.get(mortar).expect("mortar should exist");
     assert!(
         mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire) > 0,
-        "manual mortar fire should launch on the first tick"
+        "manual mortar fire should launch once the fast facing slew completes"
     );
     assert!(
         (mortar_entity.facing() + std::f32::consts::FRAC_PI_2).abs()
             <= mortar::FIRE_TOLERANCE_RAD + 0.001,
-        "mortar should snap toward the manual target, got {:.4}",
+        "mortar should finish facing the manual target, got {:.4}",
         mortar_entity.facing()
     );
     let hp_before_impact = game

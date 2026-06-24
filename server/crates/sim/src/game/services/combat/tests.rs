@@ -2024,7 +2024,7 @@ fn anti_tank_gun_turns_slowly_before_firing() {
 }
 
 #[test]
-fn mortar_snaps_and_auto_fires_immediately() {
+fn mortar_turns_fast_before_auto_firing() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
@@ -2038,20 +2038,19 @@ fn mortar_snaps_and_auto_fires_immediately() {
         mortar.set_weapon_setup(WeaponSetup::Deployed);
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
-
     run_combat_tick(&mut entities);
-
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert!(angle_delta(mortar.facing(), -mortar::TURN_RATE_RAD_PER_TICK).abs() <= 0.001);
+    assert_eq!(mortar.attack_cd(), 0);
+    for _ in 0..2 {
+        run_combat_tick(&mut entities);
+    }
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
         angle_delta(mortar.facing(), -std::f32::consts::FRAC_PI_2).abs()
-            <= mortar::FIRE_TOLERANCE_RAD + 0.001,
-        "mortar should snap to face the target before firing, got {:.4}",
-        mortar.facing()
+            <= mortar::FIRE_TOLERANCE_RAD + 0.001
     );
-    assert!(
-        mortar.attack_cd() > 0,
-        "mortar should fire on the first combat tick once it has a valid autocast target"
-    );
+    assert!(mortar.attack_cd() > 0);
 }
 
 #[test]
