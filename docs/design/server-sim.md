@@ -334,8 +334,11 @@ alive.
   than in `Game`. Scenario PR submission also starts in `room_task/lab.rs`: the room exports the
   authoritative lab `Game`, validates authoring metadata, rate-limits the room to one PR job, and
   then hands the already-validated preview to a bounded background service so GitHub or git work
-  never runs on the room tick path. Paused lab room-time suppresses scheduled ticks; one-tick lab
-  steps and running lab ticks use the same `LiveTickDriver` path as ordinary live simulation.
+  never runs on the room tick path. The submission service rechecks catalog duplicates, safe
+  filenames, path allowlists, payload/entity caps, branch safety, and the exact scenario plus
+  manifest file set before opening a draft PR with a reviewer checklist. Paused lab room-time
+  suppresses scheduled ticks; one-tick lab steps and running lab ticks use the same
+  `LiveTickDriver` path as ordinary live simulation.
 - Dev scenario watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, drive authored scenario setup and optional scripted movement, and use the shared
   projection and fanout helpers to send watchers full-world snapshots for the configured view

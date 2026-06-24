@@ -28,6 +28,9 @@ const MAX_SCENARIO_TAGS: usize = 8;
 const MAX_SCENARIO_TAG_LEN: usize = 32;
 const MAX_SCENARIO_NAME_LEN: usize = 80;
 const MAX_REVIEW_NOTES_LEN: usize = 2000;
+const MAX_SCENARIO_CATALOG_ENTRIES: usize = 256;
+const MAX_AUTHORING_SCENARIO_ENTITIES: usize = 2000;
+const MAX_AUTHORING_SCENARIO_JSON_BYTES: usize = 1_000_000;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -146,6 +149,12 @@ pub fn validate_lab_scenario_authoring(
     }
 
     scenario.name = name;
+    if scenario.entities.len() > MAX_AUTHORING_SCENARIO_ENTITIES {
+        return Err(format!(
+            "scenario has too many entities: {} > {MAX_AUTHORING_SCENARIO_ENTITIES}",
+            scenario.entities.len()
+        ));
+    }
     let filename = format!("{slug}.json");
     let entry = LabScenarioCatalogEntry {
         id: slug.clone(),
@@ -178,6 +187,14 @@ pub fn validate_lab_scenario_authoring(
 
     validate_entry_matches_scenario(&entry, &scenario)?;
     validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
+    let scenario_json = serde_json::to_string_pretty(&scenario)
+        .map_err(|err| format!("failed to format lab scenario JSON: {err}"))?
+        + "\n";
+    if scenario_json.len() > MAX_AUTHORING_SCENARIO_JSON_BYTES {
+        return Err(format!(
+            "scenario JSON must be at most {MAX_AUTHORING_SCENARIO_JSON_BYTES} bytes"
+        ));
+    }
     let sim_scenario = protocol_scenario_to_sim(&scenario)
         .map_err(|err| format!("invalid lab scenario payload: {err}"))?;
     build_game_from_scenario(&scenario, sim_scenario).map_err(|err| {
@@ -186,9 +203,6 @@ pub fn validate_lab_scenario_authoring(
             entry.id
         )
     })?;
-    let scenario_json = serde_json::to_string_pretty(&scenario)
-        .map_err(|err| format!("failed to format lab scenario JSON: {err}"))?
-        + "\n";
 
     Ok(LabScenarioAuthoringPreview {
         slug,
@@ -233,6 +247,12 @@ fn load_lab_scenario_manifest_entries_from_dir(
         .map_err(|err| format!("failed to parse lab scenario manifest: {err}"))?;
     if manifest.scenarios.is_empty() {
         return Err("lab scenario manifest must contain at least one scenario".to_string());
+    }
+    if manifest.scenarios.len() > MAX_SCENARIO_CATALOG_ENTRIES {
+        return Err(format!(
+            "lab scenario manifest has too many scenarios: {} > {MAX_SCENARIO_CATALOG_ENTRIES}",
+            manifest.scenarios.len()
+        ));
     }
 
     let mut seen_ids = HashSet::new();
@@ -291,6 +311,13 @@ fn validate_manifest_entry(entry: &LabScenarioCatalogEntry) -> Result<(), String
         return Err(format!(
             "invalid lab scenario filename {:?}",
             entry.filename
+        ));
+    }
+    let expected_filename = format!("{}.json", entry.id);
+    if entry.filename != expected_filename {
+        return Err(format!(
+            "lab scenario {:?} filename must be {:?}",
+            entry.id, expected_filename
         ));
     }
     if entry.title.trim().is_empty() || entry.title.len() > MAX_SCENARIO_TITLE_LEN {
@@ -590,14 +617,101 @@ mod tests {
     }
 
     #[test]
+    fn lab_scenario_authoring_validation_rejects_entity_cap_before_restore() {
+        let loaded =
+            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
+        let mut scenario = loaded.scenario;
+        let template = scenario
+            .entities
+            .first()
+            .expect("lategame should include entities")
+            .clone();
+        let mut next_id = scenario
+            .entities
+            .iter()
+            .map(|entity| entity.id)
+            .max()
+            .unwrap_or(0)
+            + 1;
+        while scenario.entities.len() <= MAX_AUTHORING_SCENARIO_ENTITIES {
+            let mut entity = template.clone();
+            entity.id = next_id;
+            next_id += 1;
+            scenario.entities.push(entity);
+        }
+
+        let err = validate_lab_scenario_authoring(
+            LabScenarioAuthoringMetadata {
+                slug: "too-many-entities".to_string(),
+                name: "Too Many Entities".to_string(),
+                title: "Too Many Entities".to_string(),
+                description: "Exercises the authoring entity cap.".to_string(),
+                tags: vec!["test".to_string()],
+                review_notes: None,
+            },
+            scenario,
+        )
+        .expect_err("authoring should reject scenarios over the entity cap");
+
+        assert!(
+            err.contains("scenario has too many entities"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn lab_scenario_authoring_validation_rejects_oversized_payload_before_restore() {
+        let loaded =
+            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
+        let mut scenario = loaded.scenario;
+        let template = scenario
+            .entities
+            .first()
+            .expect("lategame should include entities")
+            .clone();
+        let mut next_id = scenario
+            .entities
+            .iter()
+            .map(|entity| entity.id)
+            .max()
+            .unwrap_or(0)
+            + 1;
+        while scenario.entities.len() < 850 {
+            let mut entity = template.clone();
+            entity.id = next_id;
+            entity.kind = "oversized-authoring-kind".repeat(90);
+            next_id += 1;
+            scenario.entities.push(entity);
+        }
+
+        let err = validate_lab_scenario_authoring(
+            LabScenarioAuthoringMetadata {
+                slug: "oversized-payload".to_string(),
+                name: "Oversized Payload".to_string(),
+                title: "Oversized Payload".to_string(),
+                description: "Exercises the authoring JSON byte cap.".to_string(),
+                tags: vec!["test".to_string()],
+                review_notes: None,
+            },
+            scenario,
+        )
+        .expect_err("authoring should reject oversized scenario JSON");
+
+        assert!(
+            err.contains("scenario JSON must be at most"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn lab_scenario_catalog_rejects_duplicate_ids_before_reading_json() {
         let dir = temp_catalog_dir("duplicate");
         std::fs::write(
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"dupe","title":"One","description":"First","tags":[],"map":"Default","playerCount":2,"filename":"one.json"},
-                {"id":"dupe","title":"Two","description":"Second","tags":[],"map":"Default","playerCount":2,"filename":"two.json"}
+                {"id":"dupe","title":"One","description":"First","tags":[],"map":"Default","playerCount":2,"filename":"dupe.json"},
+                {"id":"dupe","title":"Two","description":"Second","tags":[],"map":"Default","playerCount":2,"filename":"dupe.json"}
               ]
             }"#,
         )
@@ -606,6 +720,51 @@ mod tests {
         let err = load_lab_scenario_catalog_from_dir(&dir).expect_err("duplicate id should reject");
         assert!(
             err.contains("duplicate lab scenario id"),
+            "unexpected error: {err}"
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn lab_scenario_catalog_rejects_filename_that_does_not_match_id() {
+        let dir = temp_catalog_dir("filename-mismatch");
+        std::fs::write(
+            dir.join(LAB_SCENARIO_MANIFEST),
+            r#"{
+              "scenarios": [
+                {"id":"safe-id","title":"Safe","description":"Filename mismatch","tags":[],"map":"Default","playerCount":2,"filename":"other-safe-id.json"}
+              ]
+            }"#,
+        )
+        .unwrap();
+
+        let err =
+            load_lab_scenario_catalog_from_dir(&dir).expect_err("filename mismatch should reject");
+        assert!(err.contains("filename must be"), "unexpected error: {err}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn lab_scenario_catalog_rejects_too_many_manifest_entries() {
+        let dir = temp_catalog_dir("too-many");
+        let entries = (0..=MAX_SCENARIO_CATALOG_ENTRIES)
+            .map(|index| {
+                format!(
+                    r#"{{"id":"scenario-{index}","title":"Scenario {index}","description":"Catalog cap test","tags":[],"map":"Default","playerCount":2,"filename":"scenario-{index}.json"}}"#
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        std::fs::write(
+            dir.join(LAB_SCENARIO_MANIFEST),
+            format!(r#"{{"scenarios":[{entries}]}}"#),
+        )
+        .unwrap();
+
+        let err =
+            load_lab_scenario_catalog_from_dir(&dir).expect_err("large manifest should reject");
+        assert!(
+            err.contains("too many scenarios"),
             "unexpected error: {err}"
         );
         let _ = std::fs::remove_dir_all(dir);
