@@ -7,6 +7,16 @@ enum PlayerResourceProjection<'a> {
     Selected(&'a [u32]),
 }
 
+#[derive(Clone, Copy)]
+struct SnapshotMode<'a> {
+    player: u32,
+    remembered_building_players: &'a [u32],
+    fog: &'a Fog,
+    actionable_fog: Option<&'a Fog>,
+    fogged: bool,
+    player_resource_projection: PlayerResourceProjection<'a>,
+}
+
 impl Game {
     const SPECTATOR_VIEWER_ID: u32 = 0;
 
@@ -20,24 +30,28 @@ impl Game {
         let live_fog = self.team_current_fog_for(player, &self.fog);
         if self.lingering_sight.is_empty() {
             return self.snapshot_for_mode(
-                player,
-                &[player],
-                &live_fog,
-                Some(&live_fog),
-                true,
-                PlayerResourceProjection::None,
+                SnapshotMode {
+                    player,
+                    remembered_building_players: &[player],
+                    fog: &live_fog,
+                    actionable_fog: Some(&live_fog),
+                    fogged: true,
+                    player_resource_projection: PlayerResourceProjection::None,
+                },
                 options,
             );
         }
         let snapshot_fog = self.snapshot_fog();
         let team_snapshot_fog = self.team_current_fog_for(player, &snapshot_fog);
         self.snapshot_for_mode(
-            player,
-            &[player],
-            &team_snapshot_fog,
-            Some(&live_fog),
-            true,
-            PlayerResourceProjection::None,
+            SnapshotMode {
+                player,
+                remembered_building_players: &[player],
+                fog: &team_snapshot_fog,
+                actionable_fog: Some(&live_fog),
+                fogged: true,
+                player_resource_projection: PlayerResourceProjection::None,
+            },
             options,
         )
     }
@@ -54,12 +68,14 @@ impl Game {
         options: SnapshotOptions,
     ) -> Snapshot {
         self.snapshot_for_mode(
-            player,
-            &[],
-            &self.fog,
-            None,
-            false,
-            PlayerResourceProjection::All,
+            SnapshotMode {
+                player,
+                remembered_building_players: &[],
+                fog: &self.fog,
+                actionable_fog: None,
+                fogged: false,
+                player_resource_projection: PlayerResourceProjection::All,
+            },
             options,
         )
     }
@@ -79,12 +95,16 @@ impl Game {
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
         if self.lingering_sight.is_empty() {
             return self.snapshot_for_mode(
-                Self::SPECTATOR_VIEWER_ID,
-                visible_players,
-                &actionable_fog,
-                Some(&actionable_fog),
-                true,
-                PlayerResourceProjection::Selected(visible_players),
+                SnapshotMode {
+                    player: Self::SPECTATOR_VIEWER_ID,
+                    remembered_building_players: visible_players,
+                    fog: &actionable_fog,
+                    actionable_fog: Some(&actionable_fog),
+                    fogged: true,
+                    player_resource_projection: PlayerResourceProjection::Selected(
+                        visible_players,
+                    ),
+                },
                 options,
             );
         }
@@ -92,12 +112,14 @@ impl Game {
             .snapshot_fog()
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
         self.snapshot_for_mode(
-            Self::SPECTATOR_VIEWER_ID,
-            visible_players,
-            &snapshot_fog,
-            Some(&actionable_fog),
-            true,
-            PlayerResourceProjection::Selected(visible_players),
+            SnapshotMode {
+                player: Self::SPECTATOR_VIEWER_ID,
+                remembered_building_players: visible_players,
+                fog: &snapshot_fog,
+                actionable_fog: Some(&actionable_fog),
+                fogged: true,
+                player_resource_projection: PlayerResourceProjection::Selected(visible_players),
+            },
             options,
         )
     }
@@ -116,16 +138,15 @@ impl Game {
         fog
     }
 
-    fn snapshot_for_mode(
-        &self,
-        player: u32,
-        remembered_building_players: &[u32],
-        fog: &Fog,
-        actionable_fog: Option<&Fog>,
-        fogged: bool,
-        player_resource_projection: PlayerResourceProjection<'_>,
-        options: SnapshotOptions,
-    ) -> Snapshot {
+    fn snapshot_for_mode(&self, mode: SnapshotMode<'_>, options: SnapshotOptions) -> Snapshot {
+        let SnapshotMode {
+            player,
+            remembered_building_players,
+            fog,
+            actionable_fog,
+            fogged,
+            player_resource_projection,
+        } = mode;
         let ps = self.player(player);
         let teams = self.team_relations();
         let (steel, oil, supply_used, supply_cap) = match ps {
