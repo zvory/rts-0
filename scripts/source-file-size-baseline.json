@@ -10,7 +10,7 @@
     },
     {
       "path": "scripts/docdrift-sweep.mjs",
-      "lines": 1997,
+      "lines": 1989,
       "reason": "Docs sweep core remains over the cap after renderer extraction; keep ratcheting as follow-up pieces split out."
     },
     {

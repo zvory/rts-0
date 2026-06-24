@@ -309,8 +309,11 @@ inspect the resulting docs diff before any PR lifecycle step. Fixture runs use t
 replacement text is already present, it reports the patch as already applied without spending
 another Codex generation call. Patch application is atomic per commit: all patches for one
 `update_docs` decision are validated against the current working tree before any file is written.
-If doc generation or application fails after earlier decisions succeeded, the report is marked
-partial, keeps the successful prefix, and records the failed decision and error.
+If one `update_docs` decision cannot generate or apply a safe patch, the report records that
+decision in `docPatch.skipped[]` with the commit, error kind, and message, then continues with
+later decisions. Skipped doc-patch decisions do not make the command exit non-zero; they are
+visible in `docdrift-generate.{md,json}`, the full-sweep report, and any sweep PR body so humans
+can decide whether to follow up manually.
 
 `scripts/docdrift-sweep.mjs --full` is the PR-first operator lifecycle. It fetches `origin/main`,
 uses the local checkpoint from `.docdrift/checkpoint.txt` when present, falls back to the committed
@@ -319,12 +322,13 @@ seed in `docs/docdrift-checkpoint.txt`, creates or reuses `.docdrift/worktrees/d
 pushes the sweep branch, opens or updates the owned PR through `scripts/agent-pr.sh`, and waits with
 `scripts/wait-pr.sh`. The checkpoint advances atomically only after a no-PR range is fully processed
 or after `wait-pr.sh` confirms the sweep PR head is reachable from `origin/main`; failed checks,
-closed PRs, stale branches, dirty sweep worktrees, and Codex failures leave the checkpoint unchanged.
-If a full run hits a partial doc-patch failure after applying a successful prefix, it commits and
-opens a PR for that prefix, then advances the checkpoint only to the last source commit before the
-failed commit after the PR merges. If there is no successful prefix to commit, the checkpoint stays
-unchanged. Partial runs still exit non-zero after writing reports so the daily wrapper preserves the
-local failure marker for operator follow-up.
+closed PRs, stale branches, dirty sweep worktrees, and fatal classifier/lifecycle failures leave the
+checkpoint unchanged.
+Per-decision doc-patch skips do not block checkpoint advancement: once any generated docs PR merges,
+or once a run has no docs changes to PR, the checkpoint advances to the processed head. This keeps
+the nightly gardener from retrying the same stale patch indefinitely. Lifecycle failures such as
+failed checks, closed PRs, stale branches, dirty sweep worktrees, or unrecoverable git/GitHub errors
+still exit non-zero and leave the checkpoint unchanged.
 
 Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, including
 `docdrift-full.{md,json}` and any classify/generate reports. Use

@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, w
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { renderMarkdown, writeOutputs } from "./docdrift-render.mjs";
+import { renderMarkdown, writeFullPrBody, writeOutputs } from "./docdrift-render.mjs";
 
 const defaultRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultCheckpointFile = ".docdrift/checkpoint.txt";
@@ -1215,21 +1215,22 @@ function applyDocPatches(repoRoot, patches) {
   return results;
 }
 
-function docPatchFailure({ error, decision, commit, index, total, patchRecords }) {
+function docPatchSkip({ error, decision, commit, index, total, patchRecords }) {
   return {
     index: index + 1,
     total,
     commitSha: commit.sha,
     shortSha: commit.shortSha,
     subject: commit.subject,
+    kind: error instanceof DocPatchApplyError ? "apply_error" : "generation_error",
     message: error.message,
     appliedRecords: patchRecords.length,
     priorAppliedPatches: patchRecords
       .flatMap((record) => record.applications)
       .filter((application) => application.status === "applied").length,
     decision: {
-      likelyDocs: decision.likelyDocs,
-      evidenceNote: decision.evidenceNote,
+      likelyDocs: decision.likelyDocs ?? [],
+      evidenceNote: decision.evidenceNote ?? "",
     },
   };
 }
@@ -1382,11 +1383,15 @@ export function generateDocsReport(classifierReport, options) {
   const loadedFixture = options.noCodex ? loadDocPatchFixture(options.repoRoot, options.fixture) : null;
   const patchRecords = [];
   let estimatedPromptTokens = 0;
-  let failure = null;
+  const skipped = [];
   for (const [index, decision] of updateDecisions.entries()) {
     const commit = commitBySha.get(decision.commitSha);
     if (!commit) {
-      throw new Error(`classifier decision references missing commit: ${decision.commitSha}`);
+      const missingSha = typeof decision.commitSha === "string" ? decision.commitSha : "(missing)";
+      const missingCommit = { sha: missingSha, shortSha: missingSha.slice(0, 8), subject: "(missing commit)" };
+      const error = new Error(`classifier decision references missing commit: ${missingSha}`);
+      skipped.push(docPatchSkip({ error, decision, commit: missingCommit, index, total: updateDecisions.length, patchRecords }));
+      continue;
     }
     try {
       const entry = buildDocPatchEntry({ options, decision, commit });
@@ -1457,8 +1462,11 @@ export function generateDocsReport(classifierReport, options) {
       writeCachedClassifierRecord(entry.cachePath, cacheRecord);
       patchRecords.push(record);
     } catch (error) {
-      failure = docPatchFailure({ error, decision, commit, index, total: updateDecisions.length, patchRecords });
-      break;
+      const skip = docPatchSkip({ error, decision, commit, index, total: updateDecisions.length, patchRecords });
+      skipped.push(skip);
+      if (!options.noCodex) {
+        console.error(`docdrift: generate-docs ${index + 1}/${updateDecisions.length} ${commit.shortSha} skipped: ${error.message}`);
+      }
     }
   }
 
@@ -1474,8 +1482,9 @@ export function generateDocsReport(classifierReport, options) {
       cacheDir: repoRelative(options.repoRoot, cacheRoot),
       noCodex: options.noCodex,
       fixture: loadedFixture?.path ?? null,
-      partial: Boolean(failure),
-      failure,
+      partial: false,
+      failure: null,
+      skipped,
       budget: {
         maxDocPromptTokens: options.maxDocPromptTokens,
         maxTotalDocPromptTokens: options.maxTotalDocPromptTokens,
@@ -1489,7 +1498,8 @@ export function generateDocsReport(classifierReport, options) {
         applied,
         alreadyApplied,
         cacheHits: patchRecords.filter((record) => record.cache.hit).length,
-        failed: Boolean(failure),
+        skipped: skipped.length,
+        failed: false,
       },
     },
   };
@@ -1650,31 +1660,6 @@ function ensureSweepWorktree(options, lifecycle, headSha) {
     headSha,
   ]);
   return worktreePath;
-}
-
-function writeFullPrBody(operatorRepoRoot, runDir, report) {
-  const failure = report.docPatch?.failure;
-  const bodyPath = path.join(runDir, "docdrift-pr-body.md");
-  const lines = [
-    "## Documentation Drift Sweep",
-    "",
-    `- Base: ${report.base.sha}`,
-    `- Head: ${report.head.sha}`,
-    `- Report: ${repoRelative(operatorRepoRoot, path.join(runDir, "docdrift-generate.json"))}`,
-    `- Update-docs decisions: ${report.docPatch?.summary?.updateDocsDecisions ?? 0}`,
-    `- Applied patches: ${report.docPatch?.summary?.applied ?? 0}`,
-    `- Partial run: ${report.docPatch?.partial ? "yes" : "no"}`,
-    "",
-    report.docPatch?.partial
-      ? "The local checkpoint is advanced only to the last source commit before the failed doc-patch commit after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`."
-      : "The local checkpoint is advanced only after `scripts/wait-pr.sh` confirms this PR head is reachable from `origin/main`.",
-    "",
-  ];
-  if (failure) {
-    lines.push("## Partial Failure", "", `- Failed commit: ${failure.shortSha} ${failure.subject}`, `- Error: ${failure.message}`, "");
-  }
-  writeFileSync(bodyPath, lines.join("\n"));
-  return bodyPath;
 }
 
 function parseAgentPrOutput(output) {
@@ -1905,6 +1890,9 @@ export function runFullSweep(options) {
       generatedReport.docPatch?.partial
         ? `Partial sweep stopped at ${generatedReport.docPatch.failure.shortSha}: ${generatedReport.docPatch.failure.message}`
         : null,
+      generatedReport.docPatch?.summary?.skipped
+        ? `Skipped doc-patch decisions: ${generatedReport.docPatch.summary.skipped}`
+        : null,
       `Report: ${repoRelative(options.repoRoot, runDir)}/docdrift-generate.json`,
     ]
       .filter(Boolean)
@@ -1913,7 +1901,11 @@ export function runFullSweep(options) {
   const sweepHeadSha = git(worktreePath, ["rev-parse", "HEAD"]);
   runLifecycleCommand(lifecycle, worktreePath, "push sweep branch", "git", ["push", "-u", "origin", options.sweepBranch]);
 
-  const bodyPath = writeFullPrBody(options.repoRoot, runDir, generatedReport);
+  const bodyPath = writeFullPrBody(
+    path.join(runDir, "docdrift-pr-body.md"),
+    generatedReport,
+    repoRelative(options.repoRoot, path.join(runDir, "docdrift-generate.json")),
+  );
   const agentOutput = runLifecycleCommand(lifecycle, worktreePath, "open or update owned PR", path.join(worktreePath, "scripts", "agent-pr.sh"), [
     "--title",
     options.prTitle,
