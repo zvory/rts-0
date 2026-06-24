@@ -121,6 +121,87 @@ const EXPECTED_PLAYABLE_FACTION_IDS = Object.freeze([
   DEFAULT_FACTION_ID,
   "ekat",
 ]);
+const EXPECTED_CLIENT_CONFIG_SECTIONS = Object.freeze([
+  "abilityEffects",
+  "bodies",
+  "buildingStats",
+  "constants",
+  "resourceAmounts",
+  "unitStats",
+  "upgrades",
+]);
+const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
+  "antiTankGunDeployedRangeTiles",
+  "antiTankGunFieldOfFireRad",
+  "artilleryAmmoCost",
+  "artilleryFieldOfFireRad",
+  "artilleryMaxRangeTiles",
+  "artilleryMinRangeTiles",
+  "artilleryOuterRadiusTiles",
+  "artillerySetupTicks",
+  "artilleryShellDelayTicks",
+  "breakthroughCooldownTicks",
+  "breakthroughDurationTicks",
+  "breakthroughRadiusTiles",
+  "ekatLineShotCooldownTicks",
+  "ekatLineShotDamage",
+  "ekatLineShotRangeTiles",
+  "ekatLineShotSpeedPxPerTick",
+  "ekatLineShotWidthTiles",
+  "ekatMagicAnchorDurationTicks",
+  "ekatMagicAnchorPullAwayMultiplier",
+  "ekatMagicAnchorPullTowardMultiplier",
+  "ekatMagicAnchorRadiusTiles",
+  "ekatMagicAnchorRangeTiles",
+  "ekatRegenTicks",
+  "ekatTeleportCooldownTicks",
+  "ekatTeleportRangeTiles",
+  "miningCcRangeTiles",
+  "mortarFireCooldownTicks",
+  "mortarInnerRadiusTiles",
+  "mortarOuterRadiusTiles",
+  "mortarShellDelayTicks",
+  "riflemanChargeCooldownTicks",
+  "scoutCarSmokeUses",
+  "smokeAbilityCooldownTicks",
+  "smokeAbilityCost",
+  "smokeAbilityRangeTiles",
+  "smokeCloudDurationTicks",
+  "smokeCloudRadiusTiles",
+  "smokeLaunchMaxDelayMs",
+  "tickHz",
+]);
+const EXPECTED_UNIT_STAT_FIELDS = Object.freeze([
+  "buildTicks",
+  "cost",
+  "rangeTiles",
+  "sight",
+  "size",
+  "supply",
+]);
+const EXPECTED_BUILDING_STAT_FIELDS = Object.freeze([
+  "buildTicks",
+  "cost",
+  "footH",
+  "footW",
+  "sight",
+]);
+const EXPECTED_BODY_FIELDS = Object.freeze(["clearance", "length", "width"]);
+const EXPECTED_UPGRADE_FIELDS = Object.freeze(["cost", "researchTicks", "requiresUpgrade"]);
+const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
+  [ABILITY.SMOKE]: Object.freeze(["durationTicks", "radiusTiles"]),
+  [ABILITY.MORTAR_FIRE]: Object.freeze(["radiusTiles"]),
+  [ABILITY.POINT_FIRE]: Object.freeze(["delayTicks", "radiusTiles"]),
+  [ABILITY.BREAKTHROUGH]: Object.freeze(["durationTicks", "radiusTiles"]),
+  [ABILITY.EKAT_TELEPORT]: Object.freeze([]),
+  [ABILITY.EKAT_LINE_SHOT]: Object.freeze(["damage", "radiusTiles", "speedPxPerTick"]),
+  [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze([
+    "durationTicks",
+    "pullAwayMultiplier",
+    "pullTowardMultiplier",
+    "radiusTiles",
+  ]),
+});
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {
@@ -161,6 +242,10 @@ function sorted(values) {
 
 function assertObjectKeys(actual, expected, message) {
   assert.deepEqual(Object.keys(actual || {}), expected, message);
+}
+
+function assertSortedObjectKeys(actual, expected, message) {
+  assert.deepEqual(sorted(Object.keys(actual || {})), sorted(expected), message);
 }
 
 function assertAbilityDescriptor(entry, factionId) {
@@ -350,6 +435,16 @@ for (const [kind, cost] of Object.entries(rustCatalog.costs)) {
 
 const rustClientConfig = rustCatalog.clientConfig;
 assert(rustClientConfig, "rules dump includes clientConfig parity payload");
+assertSortedObjectKeys(
+  rustClientConfig,
+  EXPECTED_CLIENT_CONFIG_SECTIONS,
+  "rules dump clientConfig sections remain explicit",
+);
+assertSortedObjectKeys(
+  rustClientConfig.constants,
+  EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS,
+  "rules dump clientConfig constants guard the current mirrored scalar surface",
+);
 
 const clientConstants = {
   tickHz: TICK_HZ,
@@ -398,7 +493,17 @@ assertClientObjectFields(
   "client config constant mirrors Rust rules",
 );
 
+assertSortedObjectKeys(
+  rustClientConfig.unitStats,
+  new Set(allRustCatalogs.catalogs.flatMap((catalog) => catalog.units)),
+  "rules dump unitStats cover every client-mirrored catalog unit",
+);
 for (const [kind, expected] of Object.entries(rustClientConfig.unitStats)) {
+  assertSortedObjectKeys(
+    expected,
+    EXPECTED_UNIT_STAT_FIELDS,
+    `${kind} unitStats payload fields remain explicit`,
+  );
   const clientKind = kindByStableId.get(kind);
   assert(clientKind, `client KIND is missing ${kind}`);
   const clientStats = STATS[clientKind];
@@ -413,7 +518,17 @@ for (const [kind, expected] of Object.entries(rustClientConfig.unitStats)) {
   assert.equal(clientStats.buildTicks, expected.buildTicks, `${kind} build ticks mirror Rust rules`);
 }
 
+assertSortedObjectKeys(
+  rustClientConfig.buildingStats,
+  new Set(allRustCatalogs.catalogs.flatMap((catalog) => catalog.buildings)),
+  "rules dump buildingStats cover every client-mirrored catalog building",
+);
 for (const [kind, expected] of Object.entries(rustClientConfig.buildingStats)) {
+  assertSortedObjectKeys(
+    expected,
+    EXPECTED_BUILDING_STAT_FIELDS,
+    `${kind} buildingStats payload fields remain explicit`,
+  );
   const clientKind = kindByStableId.get(kind);
   assert(clientKind, `client KIND is missing ${kind}`);
   const clientStats = STATS[clientKind];
@@ -441,7 +556,17 @@ const clientBodies = {
   [KIND.SCOUT_CAR]: SCOUT_CAR_BODY,
   [KIND.COMMAND_CAR]: COMMAND_CAR_BODY,
 };
+assertSortedObjectKeys(
+  rustClientConfig.bodies,
+  Object.keys(clientBodies),
+  "rules dump bodies cover every client-mirrored vehicle body",
+);
 for (const [kind, expected] of Object.entries(rustClientConfig.bodies)) {
+  assertSortedObjectKeys(
+    expected,
+    EXPECTED_BODY_FIELDS,
+    `${kind} body payload fields remain explicit`,
+  );
   const clientKind = kindByStableId.get(kind);
   assert(clientKind, `client KIND is missing ${kind}`);
   assertClientObjectFields(clientBodies[clientKind], expected, `${kind} body mirror`);
@@ -455,7 +580,17 @@ const clientUpgradeResearchTicks = {
   [UPGRADE.COMMAND_CAR_UNLOCK]: COMMAND_CAR_UNLOCK_RESEARCH_TICKS,
   [UPGRADE.MORTAR_AUTOCAST]: MORTAR_AUTOCAST_RESEARCH_TICKS,
 };
+assertSortedObjectKeys(
+  rustClientConfig.upgrades,
+  new Set(allRustCatalogs.catalogs.flatMap((catalog) => catalog.research.map((entry) => entry.id))),
+  "rules dump upgrades cover every client-mirrored catalog upgrade",
+);
 for (const [upgradeId, expected] of Object.entries(rustClientConfig.upgrades)) {
+  assertSortedObjectKeys(
+    expected,
+    EXPECTED_UPGRADE_FIELDS,
+    `${upgradeId} upgrade payload fields remain explicit`,
+  );
   const upgrade = upgradeByStableId.get(upgradeId);
   assert(upgrade, `client UPGRADE is missing ${upgradeId}`);
   assert.deepEqual(UPGRADES[upgrade]?.cost, expected.cost, `${upgradeId} cost mirrors Rust rules`);
@@ -472,7 +607,17 @@ for (const [upgradeId, expected] of Object.entries(rustClientConfig.upgrades)) {
   );
 }
 
+assertSortedObjectKeys(
+  rustClientConfig.abilityEffects,
+  Object.keys(EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID),
+  "rules dump abilityEffects cover every client-mirrored ability effect record",
+);
 for (const [abilityId, expected] of Object.entries(rustClientConfig.abilityEffects)) {
+  assertSortedObjectKeys(
+    expected,
+    EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID[abilityId],
+    `${abilityId} ability effect payload fields remain explicit`,
+  );
   const ability = abilityByStableId.get(abilityId);
   assert(ability, `client ABILITY is missing ${abilityId}`);
   assertClientObjectFields(ABILITIES[ability], expected, `${abilityId} ability effect mirror`);

@@ -59,7 +59,11 @@ const GROUP_RULES = [
       "scripts/check-faction-catalog-parity.mjs",
       "scripts/check-wiki.mjs",
     ],
-    prefixes: [],
+    prefixes: [
+      "client/src/config/",
+      "client/src/config_",
+      "server/crates/rules/src/balance/",
+    ],
   },
   {
     group: "server-lobby-runtime",
