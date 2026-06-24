@@ -1656,68 +1656,6 @@ fn ai_1_1_local_defense_pulls_perimeter_machine_gunners() {
 }
 
 #[test]
-fn ai_1_1_builds_second_factory_for_tank_production() {
-    let ts = config::TILE_SIZE as f32;
-    let mut observation = with_expansion_resources(observation(
-        AiEconomy {
-            steel: 1_500,
-            oil: 800,
-            supply_used: 54,
-            supply_cap: 120,
-        },
-        vec![
-            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
-            building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
-            building(12, EntityKind::Barracks, Some(0)),
-            building(13, EntityKind::TrainingCentre, None),
-            building(14, EntityKind::ResearchComplex, None),
-            building(15, EntityKind::Factory, Some(0)),
-            worker(60, AiEntityState::Idle),
-            combat(30, EntityKind::MachineGunner),
-            combat(31, EntityKind::MachineGunner),
-            combat(32, EntityKind::MachineGunner),
-            combat(33, EntityKind::MachineGunner),
-        ],
-    ));
-    observation.upgrades.push(UpgradeKind::TankUnlock);
-    observation.upgrades.push(UpgradeKind::Methamphetamines);
-
-    let width = observation.map.width;
-    let height = observation.map.height;
-    let decision = decide_profile(
-        &observation,
-        &AI_1_1_TANK_MG,
-        &mut AiDecisionMemory::for_profile(&AI_1_1_TANK_MG),
-        ai_shared::BuildSearch {
-            min_radius: 2,
-            max_radius: 6,
-            prefer_away_from_center: false,
-            prefer_toward_center: false,
-        },
-        |kind, tx, ty| {
-            tx < width
-                && ty < height
-                && kind == EntityKind::Factory
-                && matches!((tx, ty), (6, 8) | (28, 28))
-        },
-    );
-
-    assert!(decision.intents.contains(&AiIntent::Build {
-        kind: EntityKind::Factory
-    }));
-    assert!(
-        decision.commands.iter().any(|command| {
-            matches!(
-                command,
-                Command::Build { building: EntityKind::Factory, tile_x, tile_y, .. }
-                    if (*tile_x, *tile_y) == (28, 28)
-            )
-        }),
-        "the second Factory should take the expanded forward site instead of the nearer rear site"
-    );
-}
-
-#[test]
 fn ai_1_1_tank_transition_does_not_train_riflemen() {
     let mut observation = observation(
         AiEconomy {

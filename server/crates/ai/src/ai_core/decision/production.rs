@@ -82,12 +82,16 @@ mod tests {
     }
 
     #[test]
-    fn vehicle_and_gun_works_expand_forward_build_search() {
+    fn vehicle_and_gun_works_use_modest_forward_build_search() {
         for kind in [EntityKind::Factory, EntityKind::Steelworks] {
             let search = build_search_for_kind(short_search(), kind);
             assert_eq!(
                 search.max_radius,
                 ai_shared::FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS
+            );
+            assert_eq!(
+                search.max_radius,
+                ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS + 2
             );
             assert!(!search.prefer_away_from_center);
             assert!(search.prefer_toward_center);

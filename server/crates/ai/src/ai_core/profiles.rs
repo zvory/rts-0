@@ -758,7 +758,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
             banked_steel_step: 0,
             max: 1,
         },
-        factory_target: 2,
+        factory_target: 1,
         proxy_barracks: None,
         required_tech_path: &FULL_TECH_PATH,
         max_pending_per_kind: 1,
@@ -861,7 +861,7 @@ mod tests {
     }
 
     #[test]
-    fn ai_1_1_forks_ai_1_0_without_scout_cars_or_extra_barracks() {
+    fn ai_1_1_forks_ai_1_0_without_scout_cars_extra_barracks_or_second_factory() {
         let transition = AI_1_1_TANK_MG.tech_transition.unwrap();
         let expansion = AI_1_1_TANK_MG.expansion.unwrap();
 
@@ -871,7 +871,7 @@ mod tests {
         assert_eq!(expansion.pre_expansion_steel_worker_cap, 18);
         assert_eq!(expansion.post_expansion_steel_worker_cap, Some(36));
         assert_eq!(AI_1_1_TANK_MG.buildings.barracks_curve.max, 1);
-        assert_eq!(AI_1_1_TANK_MG.buildings.factory_target, 2);
+        assert_eq!(AI_1_1_TANK_MG.buildings.factory_target, 1);
         assert_eq!(
             AI_1_1_TANK_MG
                 .buildings

@@ -9,7 +9,7 @@ use rts_sim::protocol::{MapInfo, Snapshot};
 
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
-pub(crate) const FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS: i32 = 24;
+pub(crate) const FORWARD_PRODUCTION_BUILD_SEARCH_MAX_RADIUS: i32 = 18;
 pub(crate) const AI_DEFAULT_BUILDING_CLEARANCE_TILES: i32 = 1;
 pub(crate) const AI_FACTORY_CLEARANCE_TILES: i32 = 2;
 
