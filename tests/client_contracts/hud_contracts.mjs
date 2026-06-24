@@ -382,6 +382,51 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   assert(commandButtons(mixedLabCard).length === 0, "mixed-owner lab selections stay non-commandable");
 
+  const p2CityCentre = { id: 701, owner: 2, kind: KIND.CITY_CENTRE, buildProgress: null };
+  const p2TrainingCentre = { id: 702, owner: 2, kind: KIND.TRAINING_CENTRE, buildProgress: null };
+  const p2Barracks = { id: 703, owner: 2, kind: KIND.BARRACKS, buildProgress: null };
+  const p2Steelworks = { id: 704, owner: 2, kind: KIND.STEELWORKS, buildProgress: null };
+  const p2Entities = [p2CityCentre, p2TrainingCentre, p2Barracks, p2Steelworks];
+  let p2Selection = [p2Barracks];
+  const p2LabHudState = {
+    playerId: 1,
+    spectator: true,
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 50 },
+    playerResources: [
+      { id: 1, steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 50 },
+      { id: 2, steel: 25, oil: 0, supplyUsed: 4, supplyCap: 50 },
+    ],
+    upgrades: [],
+    playerUpgrades: new Map([[2, [UPGRADE.ANTI_TANK_GUN_UNLOCK]]]),
+    players: [
+      { id: 1, teamId: 1, factionId: DEFAULT_FACTION_ID },
+      { id: 2, teamId: 2, factionId: DEFAULT_FACTION_ID },
+    ],
+    selectedEntities() {
+      return p2Selection;
+    },
+    entitiesInterpolated() {
+      return p2Entities;
+    },
+  };
+  const p2Hud = new HUD({ querySelector: () => null }, p2LabHudState, {}, null, null, null, labPolicy);
+  const p2BarracksCard = buildCommandCardDescriptors(
+    p2Hud._commandDescriptorContext({ selectedEntities: p2Selection, currentEntities: p2Entities }),
+  );
+  assert(
+    buttonByLabel(p2BarracksCard, "Rifleman").unaffordable,
+    "lab command card affordability uses the selected owner's resources instead of the viewer resources",
+  );
+  p2Selection = [p2Steelworks];
+  p2LabHudState.playerResources[1] = { id: 2, steel: 1000, oil: 1000, supplyUsed: 4, supplyCap: 50 };
+  const p2SteelworksCard = buildCommandCardDescriptors(
+    p2Hud._commandDescriptorContext({ selectedEntities: p2Selection, currentEntities: p2Entities }),
+  );
+  assert(
+    buttonByLabel(p2SteelworksCard, "Anti-Tank Gun").enabled,
+    "lab command card tech checks use selected-owner upgrades when per-owner upgrade data is present",
+  );
+
   const worker = { id: 10, owner: 1, kind: KIND.WORKER };
   const cityCentre = { id: 11, owner: 1, kind: KIND.CITY_CENTRE };
   const buildCard = buildCommandCardDescriptors(commandCardCtx({

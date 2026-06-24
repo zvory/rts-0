@@ -517,7 +517,14 @@ function distanceSqToCenter(unit, center) {
 }
 
 function isOwn(ctx, e) {
-  if (ctx?.controlPolicy?.kind === "lab") return ctx.controlPolicy.canControlOwner(e?.owner, ctx.state);
+  const commandOwner = Number(ctx?.commandOwner);
+  if (Number.isInteger(commandOwner) && commandOwner > 0) return e && Number(e.owner) === commandOwner;
+  if (ctx?.controlPolicy?.kind === "lab") {
+    if (typeof ctx.controlPolicy.isCommandOwner === "function") {
+      return ctx.controlPolicy.isCommandOwner(e?.owner, ctx.state);
+    }
+    return ctx.controlPolicy.canControlOwner(e?.owner, ctx.state);
+  }
   return e && e.owner === ctx.playerId;
 }
 

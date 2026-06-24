@@ -1084,6 +1084,9 @@ function latestMovementOrderPlanPoint(entity) {
 
 function ownOwner(state, owner) {
   if (state?.controlPolicy?.kind === "lab") {
+    if (typeof state.controlPolicy.isCommandOwner === "function") {
+      return state.controlPolicy.isCommandOwner(owner, state);
+    }
     return state.controlPolicy.canControlOwner(owner, state);
   }
   return typeof state?.isOwnOwner === "function"
@@ -1092,6 +1095,11 @@ function ownOwner(state, owner) {
 }
 
 function allyOwner(state, owner) {
+  if (state?.controlPolicy?.kind === "lab") {
+    return typeof state.controlPolicy.isCommandAllyOwner === "function"
+      ? state.controlPolicy.isCommandAllyOwner(owner, state)
+      : false;
+  }
   return typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner);
 }
 

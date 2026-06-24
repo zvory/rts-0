@@ -109,6 +109,21 @@ import { textWithin } from "./dom_text.mjs";
   });
   assert(policy.kind === "lab" && policy.canIssueAs(1), "lab control policy gates issue-as to operator");
   const state = {
+    playerId: 1,
+    resources: { steel: 999, oil: 999, supplyUsed: 1, supplyCap: 99 },
+    upgrades: [UPGRADE.TANK_UNLOCK],
+    playerResources: [
+      { id: 1, steel: 999, oil: 999, supplyUsed: 1, supplyCap: 99 },
+      { id: 2, steel: 125, oil: 50, supplyUsed: 7, supplyCap: 12 },
+    ],
+    playerUpgrades: [
+      { id: 2, upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] },
+    ],
+    players: [
+      { id: 1, teamId: 1, factionId: DEFAULT_FACTION_ID },
+      { id: 2, teamId: 2, factionId: "ekat" },
+      { id: 3, teamId: 2, factionId: DEFAULT_FACTION_ID },
+    ],
     selectedEntities() {
       return [{ id: 11, owner: 2, kind: KIND.RIFLEMAN }];
     },
@@ -119,6 +134,17 @@ import { textWithin } from "./dom_text.mjs";
   assert(policy.feedbackOwnerForSelection(state.selectedEntities()) === 2, "lab control policy resolves feedback owner from a selection read model");
   assert(policy.isFeedbackOwner(2, state), "lab control policy identifies the feedback owner");
   assert(!policy.isFeedbackOwner(1, state), "lab control policy does not treat the raw local player id as feedback owner");
+  assert(policy.commandOwner(state) === 2, "lab control policy exposes the selected command owner");
+  assert(policy.commandResources(state).steel === 125, "lab command resources resolve from the selected owner row");
+  assert(policy.commandFactionId(state) === "ekat", "lab command faction resolves from the selected owner");
+  assertDeepEqual(
+    policy.commandUpgrades(state),
+    [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+    "lab command upgrades resolve from per-owner upgrade rows when available",
+  );
+  assert(policy.isCommandOwner(2, state), "lab command owner matching is exact-owner based");
+  assert(policy.isCommandEnemyOwner(1, state), "lab command enemies are classified relative to the selected owner");
+  assert(policy.isCommandAllyOwner(3, state), "lab command allies are classified relative to the selected owner");
   assert(policy.canUseCommandSurface(state), "lab operator can use the command surface");
   const issued = await policy.issueCommand(cmd.move([11], 20, 30), { state });
   assert(
