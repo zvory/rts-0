@@ -621,7 +621,10 @@ authoritative snapshots. `ClientIntent` owns placement intent, command-card subm
 command-target arming, hover previews, command feedback, and ability previews. `GameState` must not
 grow compatibility accessors for those intent fields; HUD, input, minimap, and renderer feedback
 use the injected facade or a narrow read model. Lab Unit Spawn and Building Spawn panels expose the
-target player's color through DOM data/style hooks before map placement.
+target player's color through DOM data/style hooks before map placement. In Lab, visual and audio
+feedback for controlled-side selections and commands is issued as the selected controlled player
+instead of the raw local player id. Lab Options, Lab Tools, and floating room-time panel headers
+preserve drag, collapse, and keyboard geometry handling without visible reset actions.
 
 Frame-local entity views belong to the app-shell frame loop, not to `GameState`. Rendering, local
 fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
@@ -1120,9 +1123,11 @@ Current areas:
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, settings. Lobby AI creation is exposed from the roster's team context, not
-  as a duplicate global sidebar action. The in-match debug status badge displays live and rolling
-  one-minute FPS metrics from `MatchHealth`.
+  staging, lab panel, settings. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
+  in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
+  Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
+  exposed from the roster's team context, not as a duplicate global sidebar action. The in-match
+  debug status badge displays live and rolling one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
