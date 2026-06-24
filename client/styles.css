@@ -1965,13 +1965,15 @@ input[type="text"]:focus {
   padding: 0;
   accent-color: var(--accent);
 }
-.lab-spawn-palette {
+.lab-spawn-palette,
+.lab-research-palette {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
-.lab-spawn-option {
+.lab-spawn-option,
+.lab-research-option {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1982,6 +1984,35 @@ input[type="text"]:focus {
 }
 .lab-spawn-option[data-active="true"] {
   color: #f4f0d8;
+}
+.lab-research-option {
+  position: relative;
+  padding-right: 26px;
+}
+.lab-research-option[data-researched="true"] {
+  border-color: var(--accent);
+  background:
+    linear-gradient(180deg, rgba(35, 58, 49, 0.92), rgba(21, 31, 29, 0.94)),
+    rgba(17, 22, 24, 0.9);
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 1px rgba(199, 208, 122, 0.34);
+  color: #f4f0d8;
+}
+.lab-research-option[data-researched="true"]::before {
+  content: "\2713";
+  position: absolute;
+  top: 0;
+  right: 7px;
+  bottom: 0;
+  width: 20px;
+  display: grid;
+  place-items: center;
+  color: rgba(244, 240, 216, 0.3);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
 }
 .lab-result {
   margin: 10px 0 0;

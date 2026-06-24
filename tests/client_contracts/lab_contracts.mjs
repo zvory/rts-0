@@ -329,7 +329,12 @@ await withFakeDocument(async () => {
     camera: { x: 320, y: 352 },
     state: {
       map: { width: 64, height: 64 },
+      playerId: 1,
       playerResources: [{ steel: 500, oil: 200 }],
+      upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+      playerUpgrades: [
+        { id: 2, upgrades: [] },
+      ],
       controlPolicy: {
         ignoreCommandLimitsEnabled() {
           return ignoreCommandLimits;
@@ -529,8 +534,22 @@ await withFakeDocument(async () => {
       !panel.fields.has("advanced-spawn-kind") &&
       !panel.fields.has("advanced-spawn-completed") &&
       !panel.fields.has("spawn-completed") &&
-      !panel.fields.has("research-completed"),
+      !panel.fields.has("research-completed") &&
+      !panel.fields.has("research-upgrade") &&
+      !buttonByText("Set research"),
     "LabPanel does not expose advanced spawn or completion toggles",
+  );
+  assert(
+    buttonByText("Anti-Tank Gun Crews")?.dataset.researched === "true" &&
+      buttonByText("Anti-Tank Gun Crews")?.dataset.available === "true" &&
+      buttonByText("Anti-Tank Gun Crews")?.["aria-pressed"] === "true",
+    "LabPanel renders completed research as a depressed available button",
+  );
+  assert(
+    buttonByText("Tank Production")?.dataset.researched === "false" &&
+      buttonByText("Tank Production")?.dataset.available === "false" &&
+      buttonByText("Tank Production")?.["aria-pressed"] === "false",
+    "LabPanel renders incomplete research as an up unavailable button",
   );
   const teamButton = buttonByText("Team 2");
   teamButton.listeners.click();
@@ -686,23 +705,39 @@ await withFakeDocument(async () => {
     "LabPanel Give All summarizes the all-player resource grant",
   );
   playerButtonById(2).listeners.click();
-  panel.fields.get("research-upgrade").value = UPGRADE.TANK_UNLOCK;
-  buttonByText("Set research").listeners.click();
+  const setResearchPromise = buttonByText("Tank Production").listeners.click();
   assert(
     sent.at(-1).op.op === "setCompletedResearch" &&
       sent.at(-1).op.playerId === 2 &&
       sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK &&
       sent.at(-1).op.completed === true,
-    "LabPanel research edits use the shared target player and complete upgrades",
+    "LabPanel research buttons use the shared target player and complete upgrades",
   );
   resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: true } });
+  await setResearchPromise;
   assert(
     panel.fields.get("lab-player").value === "2" &&
       playerButtonById(2)?.dataset.selected === "true" &&
       panel.fields.get("resource-steel").value === "900" &&
       panel.fields.get("resource-oil").value === "300" &&
-      panel.fields.get("research-upgrade").value === UPGRADE.TANK_UNLOCK,
-    "LabPanel preserves resource and research form values after set-research results re-render the panel",
+      buttonByText("Tank Production")?.dataset.researched === "true" &&
+      buttonByText("Tank Production")?.["aria-pressed"] === "true",
+    "LabPanel preserves resource values and depresses completed research after set-research results re-render the panel",
+  );
+  const clearResearchPromise = buttonByText("Tank Production").listeners.click();
+  assert(
+    sent.at(-1).op.op === "setCompletedResearch" &&
+      sent.at(-1).op.playerId === 2 &&
+      sent.at(-1).op.upgrade === UPGRADE.TANK_UNLOCK &&
+      sent.at(-1).op.completed === false,
+    "LabPanel researched buttons toggle completed research off",
+  );
+  resolveLastLabResult({ outcome: { playerId: 2, upgrade: UPGRADE.TANK_UNLOCK, completed: false } });
+  await clearResearchPromise;
+  assert(
+    buttonByText("Tank Production")?.dataset.researched === "false" &&
+      buttonByText("Tank Production")?.["aria-pressed"] === "false",
+    "LabPanel raises research buttons again after clearing completed research",
   );
   panel.fields.get("scenario-name").value = "saved setup";
   void labClient.exportScenario(panel.value("scenario-name"));
