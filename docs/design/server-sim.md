@@ -273,9 +273,9 @@ alive.
   lab scenario; `scenario=blank` keeps blank lab startup, and custom map or seed lab URLs stay blank
   unless they set an explicit scenario. Bundled lab scenario startup uses the same restore-scenario
   path as manual imports and starts with `operation_count=0` plus a tick-0 timeline keyframe. Lab
-  god mode is lab-only state: `setPlayerGodMode` marks that player's units invulnerable, applies
-  across lab mutations, owner changes, spawned units, and timeline replay state, and is mirrored in
-  start/labState metadata.
+  god mode is lab-only state: `setPlayerGodMode` marks that player's units and buildings
+  invulnerable, applies across lab mutations, owner changes, spawned assets, and timeline replay
+  state, and is mirrored in start/labState metadata.
 - The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead
   of reading room internals. Only normal lobby/countdown/live-match rooms are summarized; dev,
   replay, replay-artifact, replay-branch, and lab modes stay hidden. `GET /api/lobbies` collects

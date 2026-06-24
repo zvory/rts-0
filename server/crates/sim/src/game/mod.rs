@@ -182,7 +182,7 @@ pub struct Game {
     map_metadata: MapMetadata,
     /// Under-construction building ids that received authoritative build progress this tick.
     active_construction_sites: BTreeSet<u32>,
-    /// Lab-only player ids whose units ignore incoming damage.
+    /// Lab-only player ids whose units and buildings ignore incoming damage.
     lab_god_mode_players: BTreeSet<u32>,
     starting_loadout: StartingLoadout,
     pub(crate) rng: SmallRng,

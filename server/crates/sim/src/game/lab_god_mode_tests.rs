@@ -53,7 +53,7 @@ fn tile_center(game: &Game, x: u32, y: u32) -> (f32, f32) {
 }
 
 #[test]
-fn lab_god_mode_makes_player_units_ignore_damage() {
+fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
     let mut game = new_game();
     let worker_id = game
         .entities
@@ -62,6 +62,11 @@ fn lab_god_mode_makes_player_units_ignore_damage() {
         .expect("starting worker")
         .id;
     let worker_hp = game.entities.get(worker_id).expect("worker").hp;
+    let (node_x, node_y) = tile_center(&game, 42, 42);
+    let node_id = game
+        .entities
+        .spawn_node(EntityKind::Steel, node_x, node_y)
+        .expect("steel node should spawn");
 
     game.apply_lab_op(LabOp::SetPlayerGodMode {
         player_id: 1,
@@ -106,9 +111,12 @@ fn lab_god_mode_makes_player_units_ignore_damage() {
     };
     let depot = game.entities.get_mut(depot_id).expect("depot");
     let depot_hp = depot.hp;
-    assert!(!depot.invulnerable());
-    assert!(depot.apply_damage(10, Some((2, (0.0, 0.0), 1))));
-    assert_eq!(depot.hp, depot_hp - 10);
+    assert!(depot.invulnerable());
+    assert!(!depot.apply_damage(10, Some((2, (0.0, 0.0), 1))));
+    assert_eq!(depot.hp, depot_hp);
+
+    let node = game.entities.get(node_id).expect("steel node");
+    assert!(!node.invulnerable());
 
     game.apply_lab_op(LabOp::SetPlayerGodMode {
         player_id: 1,
@@ -119,6 +127,11 @@ fn lab_god_mode_makes_player_units_ignore_damage() {
     assert!(!worker.invulnerable());
     assert!(worker.apply_damage(10, Some((2, (0.0, 0.0), 2))));
     assert_eq!(worker.hp, worker_hp - 10);
+
+    let depot = game.entities.get_mut(depot_id).expect("depot");
+    assert!(!depot.invulnerable());
+    assert!(depot.apply_damage(10, Some((2, (0.0, 0.0), 2))));
+    assert_eq!(depot.hp, depot_hp - 10);
 }
 
 #[test]

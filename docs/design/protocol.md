@@ -899,8 +899,8 @@ team fog in the same room. `labState.vision` and `start.lab.vision` are stamped 
 units belong to that player; mixed-owner selections are rejected instead of partitioned. When
 `ignoreCommandLimits` is true, the lab command bypasses the normal command-supply budget and uses
 the larger bounded lab command window instead of the ordinary live-player unit-id window.
-`setPlayerGodMode` is lab-only room state: enabled players' units ignore incoming damage, while
-buildings and resources keep normal damage behavior. The current enabled player ids are mirrored in
+`setPlayerGodMode` is lab-only room state: enabled players' units and buildings ignore incoming
+damage, while resources keep normal damage behavior. The current enabled player ids are mirrored in
 `start.lab.godModePlayers` and `labState.godModePlayers`.
 
 `LabScenarioV1` is versioned setup JSON, not a saved snapshot:
