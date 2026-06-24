@@ -160,7 +160,9 @@ export class FloatingRoomTimePanel {
     this.finishDrag(false);
     event.preventDefault?.();
     event.stopPropagation?.();
-    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    try {
+      event.currentTarget?.setPointerCapture?.(event.pointerId);
+    } catch {}
 
     const rect = this.currentRect();
     const start = this.constrainPosition({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });

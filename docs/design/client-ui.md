@@ -785,11 +785,14 @@ export class MatchInputRouter {
   pointerDown(ev) -> boolean             // routes to highest-priority matching zone
   pointerMove(ev) -> boolean             // captured zone receives moves until release
   pointerUp(ev) -> boolean               // releases capture after the originating source handles up
+  wheel(ev) -> boolean                   // routes locked/native wheel events to DOM surfaces before camera zoom
 }
 ```
 Router events carry `viewportX`/`viewportY` plus `clientX`/`clientY`; pointer-lock input and DOM
-input use the same zone contract so HUD interactions can work while the browser routes mouse events
-to the locked viewport.
+input use the same zone contract so DOM overlays can work while the browser routes mouse events
+to the locked viewport. `Match` registers one game-screen DOM zone that ignores the viewport
+subtree; explicit zones such as the minimap keep higher priority, and any future interactive panel
+above the battlefield receives pointer/mouse/click/wheel events without being separately listed.
 
 `audio.js`
 ```js

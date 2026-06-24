@@ -188,11 +188,14 @@ export class Match {
       ),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
-    this.hudInputZone = this._timeInit(
-      "match.hudInputZone",
-      () => new DomClickInputZone([dom.gameMenu, dom.commandCard]),
+    this.domInputZone = this._timeInit(
+      "match.domInputZone",
+      () => new DomClickInputZone(dom.gameScreen, {
+        priority: 20,
+        ignoreRoots: [dom.viewport],
+      }),
     );
-    this.unregisterHudInputZone = this.inputRouter.registerZone(this.hudInputZone);
+    this.unregisterDomInputZone = this.inputRouter.registerZone(this.domInputZone);
     this.minimap = this._timeInit(
       "match.minimap",
       () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandIssuer, this.inputRouter, {
@@ -1224,9 +1227,9 @@ export class Match {
     this.livePauseOverlay = null;
     if (dom.selectionArea) dom.selectionArea.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;
-    if (this.unregisterHudInputZone) {
-      this.unregisterHudInputZone();
-      this.unregisterHudInputZone = null;
+    if (this.unregisterDomInputZone) {
+      this.unregisterDomInputZone();
+      this.unregisterDomInputZone = null;
     }
     // Let modules release DOM/WebGL resources if they own any.
     for (const m of [this.input, this.minimap, this.hud, this.renderer, this.fog]) {

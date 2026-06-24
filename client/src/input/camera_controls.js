@@ -129,6 +129,10 @@ function clientIntent(input) {
 }
 
 export function _handleWheel(ev) {
+  if (this.pointerLocked && this.inputRouter?.wheel && typeof this._eventScreenPos === "function") {
+    const p = this._eventScreenPos(ev);
+    if (this.inputRouter.wheel(this._routedPointerEvent(ev, p, "locked"))) return;
+  }
   if (this.cameraNavigation) {
     this.cameraNavigation.handleWheel(ev);
     return;

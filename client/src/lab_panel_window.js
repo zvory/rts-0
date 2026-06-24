@@ -113,7 +113,9 @@ export class LabPanelWindowChrome {
 
     event.preventDefault?.();
     event.stopPropagation?.();
-    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    try {
+      event.currentTarget?.setPointerCapture?.(event.pointerId);
+    } catch {}
 
     const rect = this.currentGeometry();
     this.applyGeometry(rect);

@@ -165,6 +165,93 @@ import {
   assert(button.clickCount === 1, "empty HUD panel space does not click the prior button");
 }
 
+{
+  const viewport = {
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+    },
+  };
+  const canvas = {
+    parentElement: viewport,
+    closest() {
+      return null;
+    },
+  };
+  viewport.contains = (el) => el === viewport || el === canvas;
+
+  const overlayEvents = [];
+  const overlay = {
+    parentElement: null,
+    hidden: false,
+    scrollHeight: 400,
+    clientHeight: 100,
+    scrollWidth: 100,
+    clientWidth: 100,
+    scrollTop: 0,
+    scrollLeft: 0,
+    getBoundingClientRect() {
+      return { left: 500, top: 50, right: 760, bottom: 360, width: 260, height: 310 };
+    },
+    contains(el) {
+      return el === this || el === overlayChild;
+    },
+    closest() {
+      return null;
+    },
+    dispatchEvent(ev) {
+      overlayEvents.push(ev.type);
+      return true;
+    },
+  };
+  const overlayChild = {
+    parentElement: overlay,
+    closest() {
+      return null;
+    },
+    dispatchEvent(ev) {
+      overlayEvents.push(ev.type);
+      return true;
+    },
+  };
+  const gameScreen = {
+    hidden: false,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+    },
+    contains(el) {
+      return el === this || overlay.contains(el) || viewport.contains(el);
+    },
+  };
+  const doc = {
+    elementFromPoint(x, y) {
+      if (x >= 500 && x <= 760 && y >= 50 && y <= 360) return overlayChild;
+      return canvas;
+    },
+  };
+  const priorGetComputedStyle = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = () => ({ overflowY: "auto", overflowX: "hidden" });
+  const router = new MatchInputRouter(viewport);
+  router.registerZone(new DomClickInputZone(gameScreen, {
+    priority: 20,
+    documentRef: doc,
+    ignoreRoots: [viewport],
+  }));
+
+  assert(!router.pointerDown({ clientX: 100, clientY: 100, button: 0, source: "locked" }), "DOM zone ignores viewport hits so terrain input still receives clicks");
+  assert(router.pointerDown({ clientX: 520, clientY: 80, button: 0, source: "locked" }), "DOM zone consumes arbitrary overlay pointerDown");
+  assert(router.pointerMove({ clientX: 530, clientY: 90, button: 0, source: "locked" }), "DOM zone forwards arbitrary overlay pointerMove");
+  assert(router.pointerUp({ clientX: 530, clientY: 90, button: 0, source: "locked" }), "DOM zone consumes arbitrary overlay pointerUp");
+  assert(
+    ["pointerdown", "mousedown", "pointermove", "mousemove", "pointerup", "mouseup", "click"]
+      .every((type) => overlayEvents.includes(type)),
+    "DOM zone forwards pointer, mouse, and click events to arbitrary overlays",
+  );
+  assert(router.wheel({ clientX: 520, clientY: 80, deltaY: 42, deltaX: 0, source: "locked" }), "DOM zone consumes wheel over arbitrary overlay");
+  assert(overlay.scrollTop === 42, "DOM zone applies wheel scrolling to scrollable overlay ancestors");
+  if (priorGetComputedStyle === undefined) delete globalThis.getComputedStyle;
+  else globalThis.getComputedStyle = priorGetComputedStyle;
+}
+
 // ---------------------------------------------------------------------------
 // Pointer lock bridge
 // ---------------------------------------------------------------------------
