@@ -7,7 +7,7 @@
 #   2. Rust formatting              (cargo fmt --check)
 #   3. Rust nextest fast scripted tests (deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
-#   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration, faction_integration, team_integration, lobby_browser_integration, lab_mortar_regression)
+#   5. Node API suites              (protocol/UI units, live API batch, then serialized lab_mortar_regression)
 #   6. Headless browser suites      (client_smoke, plus tri-state lag scenarios in CI or when opted in; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
@@ -657,7 +657,6 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   run_suite_bg "API: faction_integration" node "$SCRIPT_DIR/faction_integration.mjs"
   run_suite_bg "API: team_integration"   node "$SCRIPT_DIR/team_integration.mjs"
   run_suite_bg "API: lobby_browser_integration" node "$SCRIPT_DIR/lobby_browser_integration.mjs"
-  run_suite_bg "API: lab_mortar_regression" node "$SCRIPT_DIR/lab_mortar_regression.mjs"
   else
     SKIPPED+=("Live Node API suites")
   fi
@@ -666,6 +665,10 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   # them off the already-parallel background batch so snapshot-lane comparisons are not distorted
   # by local browser/server head-of-line pressure.
   collect_bg_results
+
+  if [ "$RUN_LIVE_NODE" = "1" ]; then
+    run_suite "API: lab_mortar_regression" node "$SCRIPT_DIR/lab_mortar_regression.mjs"
+  fi
 
   if [ "$RUN_CLIENT" = "1" ]; then
     # Auto-detect Chrome if not set: macOS app bundle, then common Linux paths.

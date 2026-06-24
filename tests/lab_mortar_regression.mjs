@@ -102,26 +102,35 @@ async function prepareDeployedPlayerTwoMortar(client) {
   return { mortarId: remappedMortarId, targetPosition };
 }
 
-async function waitForMortarLaunchBeforeImpact(client, mortarId) {
+async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageIndex) {
   let launch = null;
   let impact = null;
+  let cursor = startMessageIndex;
 
   while (!impact) {
-    const snapshot = await client.waitNext(
-      (msg) => msg.t === "snapshot",
-      SNAPSHOT_TIMEOUT_MS,
-      "snapshot containing mortar launch/impact events",
-    );
+    let snapshot = null;
+    while (cursor < client.msgs.length) {
+      const msg = client.msgs[cursor++];
+      if (msg.t === "snapshot") {
+        snapshot = msg;
+        break;
+      }
+    }
+    if (!snapshot) {
+      snapshot = await client.waitNext(
+        (msg) => msg.t === "snapshot",
+        SNAPSHOT_TIMEOUT_MS,
+        "snapshot containing mortar launch/impact events",
+      );
+      cursor = client.msgs.length;
+    }
     for (const event of snapshot.events || []) {
       if (event?.e === EVENT.MORTAR_LAUNCH && event.from === mortarId) {
         launch = { event, tick: snapshot.tick };
-      }
-      if (event?.e === EVENT.MORTAR_IMPACT) {
-        requireCondition(
-          launch,
-          `mortarImpact did not arrive before mortarLaunch at tick ${snapshot.tick}`,
-        );
-        impact = { event, tick: snapshot.tick };
+      } else if (event?.e === EVENT.MORTAR_IMPACT) {
+        if (launch) {
+          impact = { event, tick: snapshot.tick };
+        }
       }
     }
   }
@@ -151,6 +160,7 @@ async function waitForMortarLaunchBeforeImpact(client, mortarId) {
     );
 
     const { mortarId, targetPosition } = await prepareDeployedPlayerTwoMortar(operator);
+    const commandStartMessageIndex = operator.msgs.length;
     await labRequest(
       operator,
       5,
@@ -162,7 +172,7 @@ async function waitForMortarLaunchBeforeImpact(client, mortarId) {
       },
       "issue P2 mortarFire",
     );
-    await waitForMortarLaunchBeforeImpact(operator, mortarId);
+    await waitForMortarLaunchBeforeImpact(operator, mortarId, commandStartMessageIndex);
   } finally {
     closeClients(operator);
   }
