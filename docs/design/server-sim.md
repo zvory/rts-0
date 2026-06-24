@@ -559,10 +559,12 @@ unattributed: it does not update `last_damage_owner`/position/tick, does not tri
 retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
 Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research: before
 scheduling a shell, combat checks the predicted impact point against owned and allied units/buildings
-at their current positions and holds fire if any would be inside the damaging radius. Manual mortar
-fire is intentionally allowed onto same-team positions, so players can still take risky shots
-deliberately. Mortar autocast is stored on the authoritative combat state, is enabled for current
-and future Mortar Teams when research completes, and can be disabled through
+at their current positions and holds fire if any would be inside the damaging radius. Autocast
+target acquisition uses the same safety check, so Mortar Teams face the nearest target that can be
+autocast safely instead of tracking an unsafe closer enemy. Manual mortar fire is intentionally
+allowed onto same-team positions, so players can still take risky shots deliberately. Mortar
+autocast is stored on the authoritative combat state, is enabled for current and future Mortar Teams
+when research completes, and can be disabled through
 `SetAutocast(mortarFire, enabled=false)`; disabled mortars still accept manual `mortarFire` commands.
 
 Artillery point-fire shells follow the same support-weapon friendly-fire contract: blast damage can
