@@ -231,6 +231,24 @@ fn rapid_vision_selection_changes_remain_per_viewer() {
 
     assert_eq!(snapshot_a.visible_tiles, expected_a.visible_tiles);
     assert_eq!(snapshot_b.visible_tiles, expected_b.visible_tiles);
+    assert_eq!(
+        snapshot_a
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![players[0].id],
+        "single-player replay vision should only expose that player's resources"
+    );
+    assert_eq!(
+        snapshot_b
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![players[1].id],
+        "single-player replay vision should only expose that player's resources"
+    );
     assert_ne!(
         snapshot_a.visible_tiles, snapshot_b.visible_tiles,
         "test setup should exercise different fog perspectives"

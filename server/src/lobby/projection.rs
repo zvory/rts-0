@@ -1,7 +1,7 @@
 use super::session_policy::{
     DiagnosticPolicy, MovementPathDiagnosticPolicy, ObserverAnalysisPolicy, VisibilityPolicy,
 };
-use super::snapshots::union_events;
+use super::snapshots::{union_events, union_events_without_private_notices};
 use crate::protocol::{DiagnosticCapabilities, Event, MovementPathDiagnosticScope, Snapshot};
 use rts_sim::game::{Game, SnapshotOptions};
 use std::collections::HashMap;
@@ -34,9 +34,14 @@ enum SnapshotBodyProjection {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum EventProjection {
-    PlayerOnly { player_id: u32 },
+    PlayerOnly {
+        player_id: u32,
+    },
     FullVision,
-    PlayerUnion { player_ids: Vec<u32> },
+    PlayerUnion {
+        player_ids: Vec<u32>,
+        include_private_notices: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,10 +61,13 @@ impl SnapshotProjection {
     fn spectator_union(player_ids: Vec<u32>, options: SnapshotOptions) -> Self {
         Self {
             body: SnapshotBodyProjection::SpectatorUnion {
-                player_ids,
+                player_ids: player_ids.clone(),
                 options,
             },
-            events: EventProjection::FullVision,
+            events: EventProjection::PlayerUnion {
+                player_ids,
+                include_private_notices: false,
+            },
         }
     }
 
@@ -69,7 +77,10 @@ impl SnapshotProjection {
                 player_ids: player_ids.clone(),
                 options,
             },
-            events: EventProjection::PlayerUnion { player_ids },
+            events: EventProjection::PlayerUnion {
+                player_ids,
+                include_private_notices: true,
+            },
         }
     }
 
@@ -112,12 +123,20 @@ impl SnapshotProjection {
             EventProjection::FullVision => {
                 snapshot.events.extend(full_vision_events.to_vec());
             }
-            EventProjection::PlayerUnion { player_ids } => {
-                snapshot.events.extend(union_events(
-                    player_ids
-                        .iter()
-                        .filter_map(|player_id| per_player_events.get(player_id)),
-                ));
+            EventProjection::PlayerUnion {
+                player_ids,
+                include_private_notices,
+            } => {
+                let event_sets = player_ids
+                    .iter()
+                    .filter_map(|player_id| per_player_events.get(player_id));
+                if *include_private_notices {
+                    snapshot.events.extend(union_events(event_sets));
+                } else {
+                    snapshot
+                        .events
+                        .extend(union_events_without_private_notices(event_sets));
+                }
             }
         }
 

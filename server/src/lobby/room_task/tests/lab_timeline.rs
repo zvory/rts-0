@@ -767,6 +767,15 @@ fn lab_team_vision_uses_server_projection() {
     compact_snapshot_for_wire(&mut expected);
     assert_eq!(snapshot.visible_tiles, expected.visible_tiles);
     assert_eq!(snapshot.entities.len(), expected.entities.len());
+    assert_eq!(
+        snapshot
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![LAB_PLAYER_TWO_ID],
+        "team lab vision should only expose selected-team resource rows"
+    );
 }
 
 #[test]

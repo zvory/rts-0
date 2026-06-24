@@ -233,6 +233,23 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
 }
 
 #[test]
+fn spectator_player_resources_follow_selected_players() {
+    let players = human_vs_ai_players();
+    let game = Game::new(&players, 0x515C_0DE);
+
+    let snapshot = game.snapshot_for_spectator(&[2]);
+
+    assert_eq!(
+        snapshot
+            .player_resources
+            .iter()
+            .map(|resources| resources.id)
+            .collect::<Vec<_>>(),
+        vec![2]
+    );
+}
+
+#[test]
 fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
     let players = [
         PlayerInit {

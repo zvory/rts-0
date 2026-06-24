@@ -314,7 +314,7 @@ pub struct Snapshot {
     pub events: Vec<Event>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub upgrades: Vec<String>,
-    /// Per-player resources for all players. Populated only in spectator/replay modes.
+    /// Per-player resources for the projected observer players.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_resources: Vec<PlayerResourceSnapshot>,
     /// Per-recipient server/network diagnostics for the current match.
@@ -406,7 +406,7 @@ fn is_zero_u32(value: &u32) -> bool {
     *value == 0
 }
 
-/// Resources for one player, included in no-fog snapshots so replay viewers see all players.
+/// Resources for one projected player, included in observer snapshots.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerResourceSnapshot {
     pub id: u32,
