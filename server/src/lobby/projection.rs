@@ -22,7 +22,7 @@ enum SnapshotBodyProjection {
         player_ids: Vec<u32>,
         options: SnapshotOptions,
     },
-    ReplayVision {
+    SelectablePerspective {
         player_ids: Vec<u32>,
         options: SnapshotOptions,
     },
@@ -63,9 +63,9 @@ impl SnapshotProjection {
         }
     }
 
-    fn replay_vision(player_ids: Vec<u32>, options: SnapshotOptions) -> Self {
+    fn selected_perspective(player_ids: Vec<u32>, options: SnapshotOptions) -> Self {
         Self {
-            body: SnapshotBodyProjection::ReplayVision {
+            body: SnapshotBodyProjection::SelectablePerspective {
                 player_ids: player_ids.clone(),
                 options,
             },
@@ -99,7 +99,7 @@ impl SnapshotProjection {
                 player_ids,
                 options,
             }
-            | SnapshotBodyProjection::ReplayVision {
+            | SnapshotBodyProjection::SelectablePerspective {
                 player_ids,
                 options,
             } => game.snapshot_for_spectator_with_options(player_ids, *options),
@@ -133,8 +133,8 @@ impl SnapshotProjection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ObserverAnalysisAudience {
     None,
-    LiveSpectators,
-    ReplayViewers,
+    SpectatorRecipients,
+    AllRecipients,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,7 +158,7 @@ impl ProjectionPolicy {
         seat_id: Option<u32>,
         spectator_visible_player_ids: &[u32],
     ) -> SnapshotProjection {
-        if self.visibility == VisibilityPolicy::LabFullWorld {
+        if self.visibility == VisibilityPolicy::FullWorldProjection {
             return SnapshotProjection::full_world(
                 seat_id.unwrap_or(connection_id),
                 self.snapshot_options_for(role),
@@ -176,14 +176,17 @@ impl ProjectionPolicy {
         }
     }
 
-    pub(super) fn replay_snapshot_for(self, visible_player_ids: Vec<u32>) -> SnapshotProjection {
-        SnapshotProjection::replay_vision(
+    pub(super) fn selected_perspective_snapshot_for(
+        self,
+        visible_player_ids: Vec<u32>,
+    ) -> SnapshotProjection {
+        SnapshotProjection::selected_perspective(
             visible_player_ids,
             self.snapshot_options_for(RecipientRole::Spectator),
         )
     }
 
-    pub(super) fn dev_snapshot_for(self, view_player_id: u32) -> SnapshotProjection {
+    pub(super) fn full_world_snapshot_for(self, view_player_id: u32) -> SnapshotProjection {
         SnapshotProjection::full_world(
             view_player_id,
             self.snapshot_options_for(RecipientRole::Spectator),
@@ -192,8 +195,10 @@ impl ProjectionPolicy {
 
     pub(super) fn observer_analysis_audience(self) -> ObserverAnalysisAudience {
         match self.diagnostics.observer_analysis {
-            ObserverAnalysisPolicy::LiveSpectators => ObserverAnalysisAudience::LiveSpectators,
-            ObserverAnalysisPolicy::ReplayViewers => ObserverAnalysisAudience::ReplayViewers,
+            ObserverAnalysisPolicy::SpectatorRecipients => {
+                ObserverAnalysisAudience::SpectatorRecipients
+            }
+            ObserverAnalysisPolicy::AllRecipients => ObserverAnalysisAudience::AllRecipients,
             ObserverAnalysisPolicy::None => ObserverAnalysisAudience::None,
         }
     }
@@ -204,9 +209,9 @@ impl ProjectionPolicy {
             observer_analysis: matches!(
                 (self.diagnostics.observer_analysis, role),
                 (
-                    ObserverAnalysisPolicy::LiveSpectators,
+                    ObserverAnalysisPolicy::SpectatorRecipients,
                     RecipientRole::Spectator
-                ) | (ObserverAnalysisPolicy::ReplayViewers, _)
+                ) | (ObserverAnalysisPolicy::AllRecipients, _)
             ),
         }
     }
@@ -241,7 +246,7 @@ mod tests {
     fn projection_policy_classifies_live_players_spectators_and_branch_aliases() {
         let policy = ProjectionPolicy::new(
             VisibilityPolicy::LiveFog,
-            DiagnosticPolicy::LIVE_SPECTATOR_OBSERVER_ANALYSIS,
+            DiagnosticPolicy::SPECTATOR_OBSERVER_ANALYSIS,
         );
 
         assert_eq!(
@@ -258,7 +263,7 @@ mod tests {
         );
         assert_eq!(
             policy.observer_analysis_audience(),
-            ObserverAnalysisAudience::LiveSpectators
+            ObserverAnalysisAudience::SpectatorRecipients
         );
         assert!(
             policy
@@ -275,24 +280,24 @@ mod tests {
     #[test]
     fn projection_policy_classifies_replay_and_dev_snapshots() {
         let replay = ProjectionPolicy::new(
-            VisibilityPolicy::ReplayVision,
-            DiagnosticPolicy::REPLAY_OBSERVER_ANALYSIS,
+            VisibilityPolicy::SelectablePerspective,
+            DiagnosticPolicy::ALL_RECIPIENT_OBSERVER_ANALYSIS,
         );
         assert_eq!(
-            replay.replay_snapshot_for(vec![2]),
-            SnapshotProjection::replay_vision(vec![2], SnapshotOptions::default())
+            replay.selected_perspective_snapshot_for(vec![2]),
+            SnapshotProjection::selected_perspective(vec![2], SnapshotOptions::default())
         );
         assert_eq!(
             replay.observer_analysis_audience(),
-            ObserverAnalysisAudience::ReplayViewers
+            ObserverAnalysisAudience::AllRecipients
         );
 
         let dev = ProjectionPolicy::new(
-            VisibilityPolicy::DevFullWorld,
-            DiagnosticPolicy::DEV_MOVEMENT_PATHS,
+            VisibilityPolicy::FullWorldProjection,
+            DiagnosticPolicy::PROJECTED_MOVEMENT_PATHS,
         );
         assert_eq!(
-            dev.dev_snapshot_for(7),
+            dev.full_world_snapshot_for(7),
             SnapshotProjection::full_world(
                 7,
                 SnapshotOptions {
@@ -314,7 +319,10 @@ mod tests {
 
     #[test]
     fn projection_policy_classifies_lab_as_full_world_without_analysis() {
-        let lab = ProjectionPolicy::new(VisibilityPolicy::LabFullWorld, DiagnosticPolicy::NONE);
+        let lab = ProjectionPolicy::new(
+            VisibilityPolicy::FullWorldProjection,
+            DiagnosticPolicy::NONE,
+        );
         assert_eq!(
             lab.live_snapshot_for(RecipientRole::Spectator, 99, Some(1), &[1, 2]),
             SnapshotProjection::full_world(1, SnapshotOptions::default())

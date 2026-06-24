@@ -93,7 +93,7 @@ export class Match {
     this.capabilities = options.capabilities || createRoomCapabilities({ startPayload: payload });
     this.observerAnalysisOverlayPreferences = options.observerAnalysisOverlayPreferences || null;
     this.predictionStateMismatchLogged = false;
-    this.replayControls = null;
+    this.roomTimeControls = null;
     this.observerAnalysisOverlay = null;
     this.livePauseOverlay = null;
     this.livePauseState = {
@@ -267,7 +267,7 @@ export class Match {
       );
       if (ackSeq != null) this.prediction.recordAckSnapshotApplied(ackSeq, now);
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
-      this.replayControls?.noteSnapshotTick(m?.tick);
+      this.roomTimeControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
       this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
@@ -313,8 +313,8 @@ export class Match {
     this.health.publish();
     if (this.prediction.enabled) this.initPredictionAdapter();
 
-    if (this.capabilities.roomTime.available && dom.replaySpeed) {
-      this.replayControls = new RoomTimeControls({
+    if (this.capabilities.roomTime.available && dom.roomTimeControls) {
+      this.roomTimeControls = new RoomTimeControls({
         net: this.net,
         state: this.state,
         replayViewer: this.replayViewer,
@@ -1180,7 +1180,7 @@ export class Match {
     this.net.off(S.LIVE_PAUSE_STATE, this.onLivePauseState);
     this.net.off(S.REPLAY_ANALYSIS, this.onObserverAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
-    this.replayControls?.destroy();
+    this.roomTimeControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
     this.livePauseOverlay?.destroy();
     this.cancelLabTool("freeze");
@@ -1189,7 +1189,7 @@ export class Match {
     if (typeof window !== "undefined" && window.__rtsPerf === this.frameProfilerSurface) {
       delete window.__rtsPerf;
     }
-    this.replayControls = null;
+    this.roomTimeControls = null;
     this.observerAnalysisOverlay = null;
     this.livePauseOverlay = null;
     if (this.input && typeof this.input.destroy === "function") {
@@ -1199,7 +1199,7 @@ export class Match {
   }
 
   applyRoomTimeState(state) {
-    this.replayControls?.applyRoomTimeState(state);
+    this.roomTimeControls?.applyRoomTimeState(state);
   }
 
   /**
@@ -1225,13 +1225,13 @@ export class Match {
       dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     }
-    this.replayControls?.destroy();
+    this.roomTimeControls?.destroy();
     this.observerAnalysisOverlay?.destroy();
     this.livePauseOverlay?.destroy();
     this.cancelLabTool("destroy");
     this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
-    this.replayControls = null;
+    this.roomTimeControls = null;
     this.observerAnalysisOverlay = null;
     this.livePauseOverlay = null;
     if (dom.selectionArea) dom.selectionArea.hidden = false;

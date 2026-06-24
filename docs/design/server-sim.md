@@ -143,7 +143,8 @@ impl Game {
     /// Same projection as `snapshot_for_spectator`, with explicit room-projection diagnostic options.
     pub fn snapshot_for_spectator_with_options(&self, visible_players: &[u32], options: SnapshotOptions) -> Snapshot;
 
-    /// Build a full-world snapshot for a dev watch client. Normal gameplay must not use this.
+    /// Build a full-world snapshot for a room projection that intentionally exposes all state.
+    /// Normal gameplay must not use this.
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot;
 
     /// Same full-world projection, with explicit room-projection diagnostic options.
@@ -164,7 +165,7 @@ impl Game {
     /// Frozen score-screen rows for every match participant, in start/lobby order.
     pub fn scores(&self) -> Vec<PlayerScore>;
 
-    /// Authoritative observer analysis state for replay viewers and live spectators.
+    /// Authoritative observer analysis state for configured spectator-only or all-recipient audiences.
     pub fn observer_analysis(&self) -> ObserverAnalysisPayload;
 
     /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
@@ -286,8 +287,9 @@ alive.
   list; the HTTP poll cadence is the accepted freshness target.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → build
   per-audience snapshots through the lobby-owned `ProjectionPolicy` → send through
-  `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, replay
-  per-viewer vision, dev full-world snapshots, and observer-analysis audiences; `SnapshotFanout`
+  `SnapshotFanout`. `ProjectionPolicy` names live player fog, spectator union vision, selected
+  perspective projection, full-world projection, projected movement-path diagnostics, and
+  observer-analysis recipient scopes; `SnapshotFanout`
   owns compacting, net status, and perf accounting. Lobby phase: broadcast `lobby` on changes.
 - Live-match pause state belongs to `RoomTask`, not `Game` and not `tick_control.rs`. Normal live
   and branch-live active seats can spend up to three successful pause starts per match; spectators,
@@ -395,8 +397,9 @@ branch seed.
   after a past seek plus a new accepted lab operation or issue-as command.
 - `projection.rs` owns snapshot projection and observer-analysis decisions for client fanout. Live
   active players get player fog, live spectators get active-seat union fog, replay viewers get their
-  per-viewer replay vision, lab viewers get their room-owned per-operator lab vision, branch-live
-  active players use original-seat aliases, and dev-watch viewers get full-world scenario snapshots.
+  selected perspective from replay vision, lab viewers get their room-owned per-operator lab vision,
+  branch-live active players use original-seat aliases, and dev-watch viewers get full-world
+  scenario snapshots.
 - `launch.rs` owns the lobby start-payload builder and send loop for live, replay-branch-live,
   lab, dev-watch, and replay viewer starts. The builder consumes `SessionPolicy`, recipient role,
   projection-derived diagnostics, prediction eligibility, pending snapshot behavior, and

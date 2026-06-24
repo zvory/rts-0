@@ -224,7 +224,7 @@ export const dom = {
   commandCard: document.getElementById("command-card"),
   devBanner: document.getElementById("dev-banner"),
   devLinks: document.getElementById("dev-links"),
-  replaySpeed: document.getElementById("replay-speed"),
+  roomTimeControls: document.getElementById("room-time-controls"),
 };
 
 export function formatScore(value) {

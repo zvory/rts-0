@@ -1,6 +1,6 @@
 # Phase 1 - Internal And Client Names
 
-Status: planned.
+Status: done.
 
 ## Goal
 

@@ -20,29 +20,29 @@ export class RoomTimeControls {
     this.lastRoomTimeSpeed = 2;
     this.floatingPanel = null;
 
-    if (!dom.replaySpeed || !this.roomTime.available) return;
+    if (!dom.roomTimeControls || !this.roomTime.available) return;
 
-    dom.replaySpeed.hidden = false;
-    dom.replaySpeed.classList.toggle("replay-viewer-controls", this.replayViewer);
-    dom.replaySpeed.classList.add("room-time-controls");
-    dom.replaySpeed.setAttribute("aria-label", `${this.label} controls`);
-    this.floatingPanel = new FloatingRoomTimePanel({ root: dom.replaySpeed, label: this.label });
+    dom.roomTimeControls.hidden = false;
+    dom.roomTimeControls.classList.toggle("replay-viewer-controls", this.replayViewer);
+    dom.roomTimeControls.classList.add("room-time-controls");
+    dom.roomTimeControls.setAttribute("aria-label", `${this.label} controls`);
+    this.floatingPanel = new FloatingRoomTimePanel({ root: dom.roomTimeControls, label: this.label });
     this.floatingPanel.mount();
-    for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".spd-btn")) {
       const speed = parseFloat(btn.dataset.speed);
       if (Number.isFinite(speed) && speed > 0) btn.hidden = !this.roomTime.setSpeed;
     }
-    for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".seek-btn")) {
       btn.hidden = !this.roomTime.seekRelative;
     }
-    for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".room-time-pause-btn")) {
       btn.hidden = this.replayViewer || !this.roomTime.pause;
     }
-    for (const btn of dom.replaySpeed.querySelectorAll(".dev-step-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".room-time-step-btn")) {
       btn.hidden = !this.roomTime.step;
     }
     this.roomTimeHandler = (e) => this.onRoomTimeControlClick(e);
-    dom.replaySpeed.addEventListener("click", this.roomTimeHandler);
+    dom.roomTimeControls.addEventListener("click", this.roomTimeHandler);
     this.setRoomTimeSpeedActive(this.replayViewer ? 2 : null);
     if (this.replayViewer && this.roomTime.pause) this.buildReplayPauseControl();
     if (this.replayViewer && this.actions.replayBranch) this.buildReplayBranchControl();
@@ -53,7 +53,7 @@ export class RoomTimeControls {
   }
 
   roomTimeControlSurface() {
-    return this.floatingPanel?.contentEl || dom.replaySpeed?.querySelector(".room-time-panel-body") || dom.replaySpeed;
+    return this.floatingPanel?.contentEl || dom.roomTimeControls?.querySelector(".room-time-panel-body") || dom.roomTimeControls;
   }
 
   onRoomTimeControlClick(e) {
@@ -74,7 +74,7 @@ export class RoomTimeControls {
       this.net.seekRoomTime(ticksBack);
       return;
     }
-    if (btn.dataset.replayPauseToggle !== undefined || btn.classList.contains("dev-pause-btn")) {
+    if (btn.dataset.roomTimePauseToggle !== undefined || btn.classList.contains("room-time-pause-btn")) {
       if (!this.roomTime.pause) return;
       const speed = this.isRoomTimePaused() ? this.lastRoomTimeSpeed : 0;
       this.net.setRoomTimeSpeed(speed);
@@ -121,15 +121,15 @@ export class RoomTimeControls {
   }
 
   setRoomTimeConcluded(concluded) {
-    const status = dom.replaySpeed?.querySelector("#replay-concluded");
+    const status = dom.roomTimeControls?.querySelector("#room-time-concluded");
     if (!status) return;
     status.textContent = this.replayViewer ? "Replay Concluded" : "Room Time Ended";
     status.hidden = !concluded;
   }
 
   setRoomTimeSpeedActive(speed) {
-    if (!dom.replaySpeed) return;
-    for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn:not(.seek-btn)")) {
+    if (!dom.roomTimeControls) return;
+    for (const btn of dom.roomTimeControls.querySelectorAll(".spd-btn:not(.seek-btn)")) {
       if (btn.dataset.speed === undefined) continue;
       const btnSpeed = parseFloat(btn.dataset.speed);
       btn.classList.toggle(
@@ -144,9 +144,9 @@ export class RoomTimeControls {
   }
 
   updateRoomTimePauseButton() {
-    if (!dom.replaySpeed) return;
+    if (!dom.roomTimeControls) return;
     const paused = this.isRoomTimePaused();
-    for (const btn of dom.replaySpeed.querySelectorAll(".replay-pause-btn, .dev-pause-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".replay-pause-btn, .room-time-pause-btn")) {
       btn.textContent = paused ? "Resume" : "Pause";
       btn.title = paused ? `Resume ${this.label.toLowerCase()} at ${this.lastRoomTimeSpeed}x.` : `Pause ${this.label.toLowerCase()}.`;
       btn.classList.toggle("active", paused);
@@ -154,20 +154,20 @@ export class RoomTimeControls {
   }
 
   buildReplayPauseControl() {
-    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-pause-btn")) return;
+    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".replay-pause-btn")) return;
     const surface = this.roomTimeControlSurface();
     if (!surface) return;
     const pause = document.createElement("button");
     pause.type = "button";
     pause.className = "spd-btn replay-pause-btn";
-    pause.dataset.replayPauseToggle = "1";
+    pause.dataset.roomTimePauseToggle = "1";
     pause.textContent = "Pause";
     pause.title = "Pause replay playback.";
     surface.appendChild(pause);
   }
 
   buildReplayBranchControl() {
-    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-branch-btn")) return;
+    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".replay-branch-btn")) return;
     const surface = this.roomTimeControlSurface();
     if (!surface) return;
     const resume = document.createElement("button");
@@ -180,7 +180,7 @@ export class RoomTimeControls {
   }
 
   buildReplayVisionControls() {
-    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-vision-controls")) return;
+    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".replay-vision-controls")) return;
     const surface = this.roomTimeControlSurface();
     if (!surface) return;
 
@@ -213,37 +213,37 @@ export class RoomTimeControls {
   }
 
   buildRoomTimeStatus() {
-    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-tick-status")) return;
+    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".room-time-tick-status")) return;
     const surface = this.roomTimeControlSurface();
     if (!surface) return;
     const status = document.createElement("span");
-    status.className = "replay-status replay-tick-status room-time-tick-status";
+    status.className = "room-time-status room-time-tick-status";
     status.textContent = `${this.label} 0 / 0`;
     surface.appendChild(status);
   }
 
   buildRoomTimeTimeline() {
-    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-timeline")) return;
+    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".room-time-timeline")) return;
     if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
     const surface = this.roomTimeControlSurface();
     if (!surface) return;
 
     const wrap = document.createElement("div");
-    wrap.className = "replay-timeline room-time-timeline";
+    wrap.className = "room-time-timeline";
 
     const track = document.createElement("button");
     track.type = "button";
-    track.className = "replay-timeline-track room-time-timeline-track";
+    track.className = "room-time-timeline-track";
     track.setAttribute("aria-label", `Seek ${this.label.toLowerCase()} timeline`);
     track.title = `Click to seek ${this.label.toLowerCase()}`;
     track.addEventListener("click", (ev) => this.onRoomTimeTimelineClick(ev));
 
     const progress = document.createElement("span");
-    progress.className = "replay-timeline-progress room-time-timeline-progress";
+    progress.className = "room-time-timeline-progress";
     track.appendChild(progress);
 
     const marks = document.createElement("span");
-    marks.className = "replay-timeline-marks room-time-timeline-marks";
+    marks.className = "room-time-timeline-marks";
     track.appendChild(marks);
 
     wrap.appendChild(track);
@@ -273,16 +273,15 @@ export class RoomTimeControls {
   }
 
   updateRoomTimeTimeline() {
-    const timeline = dom.replaySpeed?.querySelector(".replay-timeline");
+    const timeline = dom.roomTimeControls?.querySelector(".room-time-timeline");
     if (!timeline) return;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
     const current = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
     const ratio = duration > 0 ? Math.max(0, Math.min(1, current / duration)) : 0;
-    const progress = timeline.querySelector(".replay-timeline-progress");
-    progress?.style.setProperty("--replay-progress", `${ratio * 100}%`);
+    const progress = timeline.querySelector(".room-time-timeline-progress");
     progress?.style.setProperty("--room-time-progress", `${ratio * 100}%`);
 
-    const marks = timeline.querySelector(".replay-timeline-marks");
+    const marks = timeline.querySelector(".room-time-timeline-marks");
     if (!marks) return;
     const keyframeTicks = Array.isArray(this.roomTimeState?.keyframeTicks) ? this.roomTimeState.keyframeTicks : [];
     const normalized = [...new Set(keyframeTicks)]
@@ -294,7 +293,7 @@ export class RoomTimeControls {
     marks.replaceChildren();
     for (const tick of normalized) {
       const mark = document.createElement("span");
-      mark.className = "replay-timeline-mark room-time-timeline-mark";
+      mark.className = "room-time-timeline-mark";
       const left = duration > 0 ? (tick / duration) * 100 : 0;
       mark.style.left = `${Math.max(0, Math.min(100, left))}%`;
       mark.title = `Keyframe ${tick}`;
@@ -338,9 +337,9 @@ export class RoomTimeControls {
   }
 
   syncReplayVisionButtons() {
-    if (!dom.replaySpeed) return;
+    if (!dom.roomTimeControls) return;
     const allActive = this.replayVisionSelection.size === 0;
-    for (const btn of dom.replaySpeed.querySelectorAll(".vision-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".vision-btn")) {
       if (btn.dataset.vision === "all") {
         btn.classList.toggle("active", allActive);
         continue;
@@ -351,7 +350,7 @@ export class RoomTimeControls {
   }
 
   updateRoomTimeStatus() {
-    const status = dom.replaySpeed?.querySelector(".replay-tick-status");
+    const status = dom.roomTimeControls?.querySelector(".room-time-tick-status");
     if (!status) return;
     const current = Number.isFinite(this.roomTimeState?.currentTick) ? this.roomTimeState.currentTick : 0;
     const duration = Number.isFinite(this.roomTimeState?.durationTicks) ? this.roomTimeState.durationTicks : 0;
@@ -362,75 +361,35 @@ export class RoomTimeControls {
     status.textContent = `${this.label} ${current} / ${duration} @ ${speed}x${seeking}`;
   }
 
-  onReplaySpeedClick(e) {
-    return this.onRoomTimeControlClick(e);
-  }
-
-  setReplayConcluded(concluded) {
-    return this.setRoomTimeConcluded(concluded);
-  }
-
-  isReplayPaused() {
-    return this.isRoomTimePaused();
-  }
-
-  updateReplayPauseButton() {
-    return this.updateRoomTimePauseButton();
-  }
-
-  buildReplayStatus() {
-    return this.buildRoomTimeStatus();
-  }
-
-  buildReplayTimeline() {
-    return this.buildRoomTimeTimeline();
-  }
-
-  onReplayTimelineClick(ev) {
-    return this.onRoomTimeTimelineClick(ev);
-  }
-
-  setReplaySeekPending(targetTick, pending = true) {
-    return this.setRoomTimeSeekPending(targetTick, pending);
-  }
-
-  updateReplayTimeline() {
-    return this.updateRoomTimeTimeline();
-  }
-
-  updateReplayStatus() {
-    return this.updateRoomTimeStatus();
-  }
-
   destroy() {
-    if (!dom.replaySpeed) return;
+    if (!dom.roomTimeControls) return;
     if (this.roomTimeHandler) {
-      dom.replaySpeed.removeEventListener("click", this.roomTimeHandler);
+      dom.roomTimeControls.removeEventListener("click", this.roomTimeHandler);
       this.roomTimeHandler = null;
     }
-    dom.replaySpeed.hidden = true;
+    dom.roomTimeControls.hidden = true;
     this.setRoomTimeConcluded(false);
-    for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".spd-btn")) {
       const speed = parseFloat(btn.dataset.speed);
       if (Number.isFinite(speed) && speed > 0) btn.hidden = false;
     }
-    for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) btn.hidden = false;
-    for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
+    for (const btn of dom.roomTimeControls.querySelectorAll(".seek-btn")) btn.hidden = false;
+    for (const btn of dom.roomTimeControls.querySelectorAll(".room-time-pause-btn, .room-time-step-btn")) {
       btn.hidden = true;
-      if (btn.classList.contains("dev-pause-btn")) {
+      if (btn.classList.contains("room-time-pause-btn")) {
         btn.textContent = "Pause";
         btn.title = "Pause room time";
         btn.classList.remove("active");
       }
     }
-    dom.replaySpeed.classList.remove("replay-viewer-controls");
-    dom.replaySpeed.classList.remove("room-time-controls");
-    dom.replaySpeed.removeAttribute?.("aria-label");
-    dom.replaySpeed.querySelector(".replay-pause-btn")?.remove();
-    dom.replaySpeed.querySelector(".replay-branch-btn")?.remove();
-    dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
-    dom.replaySpeed.querySelector(".replay-tick-status")?.remove();
-    dom.replaySpeed.querySelector(".replay-timeline")?.remove();
+    dom.roomTimeControls.classList.remove("replay-viewer-controls");
+    dom.roomTimeControls.classList.remove("room-time-controls");
+    dom.roomTimeControls.removeAttribute?.("aria-label");
+    dom.roomTimeControls.querySelector(".replay-pause-btn")?.remove();
+    dom.roomTimeControls.querySelector(".replay-branch-btn")?.remove();
+    dom.roomTimeControls.querySelector(".replay-vision-controls")?.remove();
+    dom.roomTimeControls.querySelector(".room-time-tick-status")?.remove();
+    dom.roomTimeControls.querySelector(".room-time-timeline")?.remove();
     this.floatingPanel?.destroy();
     this.floatingPanel = null;
   }

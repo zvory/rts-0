@@ -803,7 +803,7 @@ impl RoomTask {
                         player_ids: event_player_ids.clone(),
                     }),
                 Some(LabSnapshotProjection::PlayerUnion { player_ids }) => {
-                    projection_policy.replay_snapshot_for(player_ids.clone())
+                    projection_policy.selected_perspective_snapshot_for(player_ids.clone())
                 }
                 None => projection_policy.live_snapshot_for(
                     RecipientRole::Spectator,

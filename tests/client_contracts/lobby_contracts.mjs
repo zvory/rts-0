@@ -273,7 +273,7 @@ import { textWithin } from "./dom_text.mjs";
     "normal lobby does not render the legacy quickstart control");
   assert(!indexHtml.includes("Debug mode"),
     "normal lobby copy no longer advertises Debug mode as the experimentation path");
-  const staticStepButton = indexHtml.match(/<button[^>]*class="[^"]*\bdev-step-btn\b[^"]*"[^>]*>/)?.[0] || "";
+  const staticStepButton = indexHtml.match(/<button[^>]*class="[^"]*\broom-time-step-btn\b[^"]*"[^>]*>/)?.[0] || "";
   assert(staticStepButton.includes("data-step-room-time"),
     "static dev scenario Step button uses the neutral room-time step contract");
   assert(!staticStepButton.includes("data-step-dev-tick"),
