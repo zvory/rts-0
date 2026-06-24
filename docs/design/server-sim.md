@@ -7,6 +7,7 @@ src/
   main.rs        # tokio runtime, axum router: static files + /ws, room manager task
   protocol.rs    # server-shell protocol adapter shim; serde DTOs live in crates/protocol
   config.rs      # server-shell balance shim; authoritative values live in crates/rules
+  lab_scenarios.rs # bundled lab scenario manifest loader and restore validator
   lobby/         # Lobby API plus room task, connection writers, snapshots, dev replay, crash replay
 crates/
   contract/      # semantic DTOs shared below protocol/sim/server
@@ -272,11 +273,16 @@ alive.
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
   `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
   bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
-  authority. Default lab URLs request the bundled `lategame`
-  lab scenario; `scenario=blank` keeps blank lab startup, and custom map or seed lab URLs stay blank
-  unless they set an explicit scenario. Bundled lab scenario startup uses the same restore-scenario
-  path as manual imports and starts with `operation_count=0` plus a tick-0 timeline keyframe. Lab
-  god mode is lab-only state: `setPlayerGodMode` marks that player's units and buildings
+  authority. Plain `/lab` is a client-side catalog selector. Direct lab URLs keep compatibility:
+  `scenario=lategame` requests the bundled catalog scenario, `scenario=blank` keeps blank lab
+  startup, and custom map or seed lab URLs stay blank unless they set an explicit scenario. Bundled
+  lab scenario ids are safe tokens listed in `server/assets/lab-scenarios/manifest.json`; the
+  loader in `server/src/lab_scenarios.rs` validates manifest metadata, safe filenames, duplicate
+  ids, JSON parseability, map/player-count consistency, and restore compatibility through the
+  public lab `Game` API before a scenario is exposed or launched. Bundled lab scenario startup uses
+  the same restore-scenario path as manual imports and starts with `operation_count=0` plus a tick-0
+  timeline keyframe. Lab god mode is lab-only state: `setPlayerGodMode` marks that player's units
+  and buildings
   invulnerable, applies across lab mutations, owner changes, spawned assets, and timeline replay
   state, and is mirrored in start/labState metadata.
 - The public lobby browser asks room tasks for bounded summaries over `RoomEvent::Summary` instead

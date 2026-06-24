@@ -25,7 +25,7 @@
   <body>
     <!--
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
-        Lobby:  #lobby-screen, #lobby-browser, #lobby-browser-rows, #lobby-name,
+        Lobby:  #lobby-screen, #lab-entry-screen, #lobby-browser, #lobby-browser-rows, #lobby-name,
                 #lobby-create, #lobby-lab-open, #lobby-players, #lobby-ready,
                 #lobby-start, #lobby-status
                 #lobby-room and #lobby-join remain hidden compatibility controls, not visible
@@ -155,6 +155,8 @@
         </div>
         <div id="match-history-host" class="match-history"></div>
       </section>
+
+      <section id="lab-entry-screen" class="screen" hidden></section>
 
       <section id="branch-screen" class="screen" hidden></section>
 

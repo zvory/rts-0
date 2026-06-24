@@ -154,32 +154,48 @@ function safeLabToken(value, fallback, maxLen) {
   return raw;
 }
 
-const DEFAULT_LAB_SCENARIO = "lategame";
+function safeLabSeed(value) {
+  const raw = String(value || "").trim();
+  return /^[0-9]+$/.test(raw) && Number(raw) <= 0xffffffff ? raw : "";
+}
+
+function isLabPath(pathname) {
+  return pathname === "/lab" || pathname === "/lab/";
+}
+
+export function buildLabLaunchConfig({ room, map, seed = "", scenario = "" } = {}) {
+  const publicRoom = safeLabToken(room, "default", 40);
+  const mapName = safeLabToken(map, "Default", 48);
+  const seedPart = safeLabSeed(seed);
+  const scenarioId = safeLabToken(scenario, "", 48);
+  return {
+    room: `__lab__:${publicRoom}:map=${mapName}${seedPart ? `:seed=${seedPart}` : ""}${scenarioId ? `:scenario=${scenarioId}` : ""}`,
+    publicRoom,
+    map: mapName,
+    scenario: scenarioId,
+    banner: `lab ${publicRoom} map=${mapName}${scenarioId ? ` scenario=${scenarioId}` : ""}`,
+  };
+}
+
+export function labCatalogRouteConfig() {
+  if (!isLabPath(window.location.pathname)) return null;
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("scenario") || params.has("map") || params.has("seed")) return null;
+  return {
+    room: safeLabToken(params.get("room"), "default", 40),
+  };
+}
 
 export function labLaunchConfig() {
-  if (window.location.pathname !== "/lab" && window.location.pathname !== "/lab/") return null;
+  if (!isLabPath(window.location.pathname)) return null;
+  if (labCatalogRouteConfig()) return null;
   const params = new URLSearchParams(window.location.search);
-  const room = safeLabToken(params.get("room"), "default", 40);
-  const hasMapOverride = params.has("map");
-  const hasSeedOverride = params.has("seed");
-  const hasScenarioOverride = params.has("scenario");
-  const map = safeLabToken(params.get("map"), "Default", 48);
-  const rawSeed = (params.get("seed") || "").trim();
-  const seed = /^[0-9]+$/.test(rawSeed) && Number(rawSeed) <= 0xffffffff ? rawSeed : "";
-  const seedPart = seed ? `:seed=${seed}` : "";
-  const scenario = hasScenarioOverride
-    ? safeLabToken(params.get("scenario"), "", 48)
-    : !hasMapOverride && !hasSeedOverride
-      ? DEFAULT_LAB_SCENARIO
-      : "";
-  const scenarioPart = scenario ? `:scenario=${scenario}` : "";
-  return {
-    room: `__lab__:${room}:map=${map}${seedPart}${scenarioPart}`,
-    publicRoom: room,
-    map,
-    scenario,
-    banner: `lab ${room} map=${map}${scenario ? ` scenario=${scenario}` : ""}`,
-  };
+  return buildLabLaunchConfig({
+    room: params.get("room"),
+    map: params.get("map"),
+    seed: params.get("seed"),
+    scenario: params.get("scenario"),
+  });
 }
 
 export function replayLaunchConfig() {
@@ -201,6 +217,7 @@ export function replayLaunchConfig() {
 export const dom = {
   version: document.getElementById("version"),
   lobbyScreen: document.getElementById("lobby-screen"),
+  labEntryScreen: document.getElementById("lab-entry-screen"),
   branchScreen: document.getElementById("branch-screen"),
   gameScreen: document.getElementById("game-screen"),
   viewport: document.getElementById("viewport"),

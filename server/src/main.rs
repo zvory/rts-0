@@ -14,12 +14,10 @@ use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, Path, Query, State};
-use axum::http::header;
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::{get, post};
-use axum::Json;
-use axum::Router;
+use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -35,6 +33,7 @@ use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_case_label,
     dev_scenario_unit_label, parse_dev_scenario_launch_with_case,
 };
+use rts_server::lab_scenarios::catalog_handler as lab_scenarios_handler;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::protocol::{
     default_snapshot_codec, encode_snapshot_frame, ClientMessage, ServerMessage, SnapshotFrame,
@@ -162,6 +161,7 @@ async fn main() {
         .route("/dev/replay-artifact", get(dev_replay_artifact_handler))
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
+        .route("/api/lab-scenarios", get(lab_scenarios_handler))
         .route("/maps/catalog", get(map_catalog_handler))
         .route("/maps/save", post(map_save_handler))
         .route(

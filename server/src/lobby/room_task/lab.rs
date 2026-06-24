@@ -21,12 +21,12 @@ use super::super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy};
 use super::super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::super::{normalize_start_team_id, PLAYER_PALETTE};
 use super::helpers::{DRAINING_NEW_MATCHES_DISABLED_MSG, LAB_PLAYER_ONE_ID, LAB_PLAYER_TWO_ID};
-use super::types::{LabRoomConfig, LabScenarioPreset, LabSeekTarget, Phase, RoomMode, RoomPlayer};
+use super::types::{LabRoomConfig, LabSeekTarget, Phase, RoomMode, RoomPlayer};
 use super::RoomTask;
+use crate::lab_scenarios::load_lab_scenario_by_id;
 use crate::protocol::{
-    Command, Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabScenarioV1,
-    LabStartMetadata, LabStartRole, LabState, LabVisionMode, RoomTimeState, ServerMessage, TeamId,
-    DEFAULT_FACTION_ID,
+    Command, Event, LabClientOp, LabResult, LabScenarioLabMetadata, LabStartMetadata, LabStartRole,
+    LabState, LabVisionMode, RoomTimeState, ServerMessage, TeamId, DEFAULT_FACTION_ID,
 };
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::{Game, PlayerInit};
@@ -240,20 +240,6 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, String> {
         | LabClientOp::SetVision { .. }
         | LabClientOp::IssueCommandAs { .. } => Err("not a lab mutation".to_string()),
     }
-}
-
-fn load_lab_scenario_preset(
-    preset: LabScenarioPreset,
-) -> Result<(LabScenarioV1, SimLabScenarioV1), String> {
-    let scenario: LabScenarioV1 = serde_json::from_str(preset.json())
-        .map_err(|err| format!("invalid bundled lab scenario JSON: {err}"))?;
-    validate_lab_scenario_vision(&scenario.metadata.lab.vision, &scenario.players)?;
-    let sim_scenario: SimLabScenarioV1 = serde_json::from_value(
-        serde_json::to_value(&scenario)
-            .map_err(|err| format!("invalid bundled lab scenario payload: {err}"))?,
-    )
-    .map_err(|err| format!("invalid bundled lab scenario payload: {err}"))?;
-    Ok((scenario, sim_scenario))
 }
 
 fn validate_lab_vision(game: &Game, vision: &LabVisionMode) -> Result<(), String> {
@@ -545,62 +531,29 @@ impl RoomTask {
 
     fn build_lab_launch(&self, config: &LabRoomConfig) -> Result<LabLaunch, String> {
         match config.scenario {
-            Some(preset) => self.build_lab_launch_from_scenario(preset),
+            Some(ref scenario_id) => self.build_lab_launch_from_scenario(scenario_id),
             None => self.build_blank_lab_launch(config),
         }
     }
 
-    fn build_lab_launch_from_scenario(
-        &self,
-        preset: LabScenarioPreset,
-    ) -> Result<LabLaunch, String> {
-        let (scenario, sim_scenario) = load_lab_scenario_preset(preset)
-            .map_err(|err| format!("Cannot load lab scenario \"{}\": {err}", preset.id()))?;
-        let inits: Vec<_> = scenario
-            .players
-            .iter()
-            .map(|player| PlayerInit {
-                id: player.id,
-                team_id: player.team_id,
-                faction_id: player.faction_id.clone(),
-                name: player.name.clone(),
-                color: player.color.clone(),
-                is_ai: player.is_ai,
-            })
-            .collect();
-        let start_players: Vec<_> = inits
-            .iter()
-            .map(|player| {
-                (
-                    player.id,
-                    normalize_start_team_id(player.id, player.team_id),
-                )
-            })
-            .collect();
-        let map_metadata = Map::metadata_for_name(&scenario.map.name)
-            .map_err(|err| format!("Cannot load lab scenario \"{}\": {err}", preset.id()))?;
-        let map = Map::load_for_players(&scenario.map.name, &start_players, scenario.seed)
-            .map_err(|err| format!("Cannot load lab scenario \"{}\": {err}", preset.id()))?;
-        let mut game = Game::new_lab(&inits, scenario.seed, map, map_metadata);
-        game.apply_lab_op(LabOp::RestoreScenario(Box::new(sim_scenario)))
-            .map_err(|err| {
-                format!(
-                    "Cannot load lab scenario \"{}\": {}",
-                    preset.id(),
-                    lab_error_text(&err)
-                )
-            })?;
+    fn build_lab_launch_from_scenario(&self, scenario_id: &str) -> Result<LabLaunch, String> {
+        let loaded = load_lab_scenario_by_id(scenario_id)
+            .map_err(|err| format!("Cannot load lab scenario \"{scenario_id}\": {err}"))?;
+        let scenario = &loaded.scenario;
+        let game = loaded
+            .build_game()
+            .map_err(|err| format!("Cannot load lab scenario \"{scenario_id}\": {err}"))?;
         Ok(LabLaunch {
             game,
             seed: scenario.seed,
-            map_name: scenario.map.name,
+            map_name: scenario.map.name.clone(),
             player_count: scenario.players.len(),
             participants: scenario
                 .players
                 .iter()
                 .map(|player| player.name.clone())
                 .collect(),
-            default_vision: Some(scenario.metadata.lab.vision),
+            default_vision: Some(scenario.metadata.lab.vision.clone()),
         })
     }
 

@@ -1,8 +1,7 @@
-use super::room_task::{
-    DevScenarioConfig, DevScenarioId, LabRoomConfig, LabScenarioPreset, RoomMode,
-};
+use super::room_task::{DevScenarioConfig, DevScenarioId, LabRoomConfig, RoomMode};
 use super::*;
 use crate::dev_scenarios::parse_dev_scenario_room;
+use crate::lab_scenarios::lab_scenario_exists;
 use rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V2;
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
@@ -66,7 +65,10 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
                 if !safe_lab_token(raw_scenario, 48) {
                     return None;
                 }
-                scenario = Some(LabScenarioPreset::from_id(raw_scenario)?);
+                if !lab_scenario_exists(raw_scenario) {
+                    return None;
+                }
+                scenario = Some(raw_scenario.to_string());
             }
         } else {
             return None;
@@ -191,7 +193,7 @@ mod tests {
         match room_mode_for("__lab__:sandbox:map=Default:scenario=lategame") {
             RoomMode::Lab(config) => {
                 assert_eq!(config.public_id, "sandbox");
-                assert_eq!(config.scenario, Some(LabScenarioPreset::Lategame));
+                assert_eq!(config.scenario.as_deref(), Some("lategame"));
             }
             _ => panic!("safe lab scenario room should parse as lab mode"),
         }

@@ -101,7 +101,7 @@ async function testLabLaunchConfig() {
     localStorage: { getItem: () => null },
   };
   try {
-    const { labLaunchConfig } = await import("../../client/src/bootstrap.js");
+    const { labCatalogRouteConfig, labLaunchConfig } = await import("../../client/src/bootstrap.js");
     let config = labLaunchConfig();
     assert(config, "lab route launch config should be recognized");
     assert(config.publicRoom === "sandbox", "lab launch keeps public room label");
@@ -120,9 +120,25 @@ async function testLabLaunchConfig() {
 
     globalThis.window.location = new URL("http://localhost/lab");
     config = labLaunchConfig();
+    assert(config === null, "plain lab route should show the scenario catalog before joining");
+    assert(
+      labCatalogRouteConfig().room === "default",
+      "plain lab route should default the catalog room label",
+    );
+
+    globalThis.window.location = new URL("http://localhost/lab?room=sandbox");
+    config = labLaunchConfig();
+    assert(config === null, "room-only lab route should still show the scenario catalog");
+    assert(
+      labCatalogRouteConfig().room === "sandbox",
+      "room-only lab route should prefill the catalog room label",
+    );
+
+    globalThis.window.location = new URL("http://localhost/lab?scenario=lategame");
+    config = labLaunchConfig();
     assert(
       config.room === "__lab__:default:map=Default:scenario=lategame",
-      "plain lab launch should request the default lategame scenario",
+      "explicit lategame lab scenario launch should request the bundled catalog id",
     );
 
     globalThis.window.location = new URL("http://localhost/lab?scenario=blank");
