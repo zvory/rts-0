@@ -27,6 +27,10 @@ Read the relevant design doc only when changing cross-file contracts (protocol â
 For new unit work, start with [docs/new-unit-checklist.md](../new-unit-checklist.md), then read the
 task-specific capsules it references as each phase begins.
 
+For new building work, start with [docs/new-building-checklist.md](../new-building-checklist.md),
+then read the task-specific capsules it references as each phase begins. For faction work that adds
+both units and buildings, use both checklists and keep the Phase 0/1 user-review gate explicit.
+
 For any multi-phase or phased implementation plan, read [planning.md](planning.md) before writing
 the plan.
 

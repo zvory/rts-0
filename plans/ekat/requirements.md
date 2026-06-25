@@ -3,6 +3,24 @@
 Status: Draft product requirements. This document describes the desired player-facing faction
 shape, not implementation details or approved phase scope.
 
+Active planning gate: [plan.md](plan.md). The current work is Phase 0/1 only: user-reviewed
+briefs, rules specs, and checklists for Ekat, Golem, Zamok, Death Box, Vortex, and the Dash
+building currently called **XYZ**. Do not implement Rust, JavaScript, protocol, balance, art, tests,
+or scenario files from this requirements draft until the user approves the Phase 0 brief and Phase
+1 rules/balance spec.
+
+## Planning Workflow
+
+- Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for Ekat and Golem.
+- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for Zamok, Death Box,
+  Vortex, and the Dash building.
+- Treat each building as its own user-reviewed design object. For each one, confirm the fantasy,
+  strategic reason to choose it, counterplay, unlock behavior, loss/destruction consequences, and
+  first playable scope before implementation.
+- Reconcile this draft with the current playable Ekat hero/Zamok slice before changing behavior.
+  In particular, this draft says Ekat has no combat abilities by default and no natural health
+  regeneration, while the current implementation exposes Ekat abilities and regeneration.
+
 ## Core Direction
 
 Ekat remains a hero-centric faction built around one primary hero, the Zamok, and Golems rather than
