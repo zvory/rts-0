@@ -129,7 +129,7 @@ trained Riflemen or Tanks must form the next outbound wave instead of being coun
 the already-launched group. Forming waves receive deterministic individual attack-move staging slots
 along the same enemy-facing main-steel line shape used by the defensive Machine Gunner perimeter,
 avoiding a single rally point. Local defense still selects any eligible local combat unit, including
-units that are excluded from outbound wave formation. AI 1.2 also targets a second Steelworks once
+units that are excluded from outbound wave formation. AI 1.2 also targets a second Vehicle Works once
 its bank is above 600 steel and 400 oil, while still using the normal build placement, prerequisite,
 pending-build, expansion-save, and defensive-panic gates.
 The aliases `ai_1_2` and `ai12` resolve to `ai_1_2_wave_cohorts`; `ai_1_1` and

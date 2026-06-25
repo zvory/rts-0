@@ -23,7 +23,7 @@ const LATE_TANK_TECH_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThre
     steel: 700,
     oil: 300,
 };
-const AI_1_2_SECOND_STEELWORKS_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
+const AI_1_2_SECOND_FACTORY_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFloatThreshold {
     steel: 600,
     oil: 400,
 };
@@ -34,7 +34,7 @@ pub(crate) struct AiProfile {
     pub(crate) workers: WorkerPolicy,
     pub(crate) supply: SupplyPolicy,
     pub(crate) buildings: BuildingPolicy,
-    pub(crate) extra_steelworks: Option<ExtraSteelworksPolicy>,
+    pub(crate) extra_factories: Option<ExtraFactoryPolicy>,
     pub(crate) production: ProductionPolicy,
     pub(crate) attack: AttackPolicy,
     pub(crate) resources: ResourcePolicy,
@@ -116,7 +116,7 @@ pub(crate) struct BuildingPolicy {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ExtraSteelworksPolicy {
+pub(crate) struct ExtraFactoryPolicy {
     pub(crate) target_count: usize,
     pub(crate) resource_float: ResourceFloatThreshold,
 }
@@ -318,7 +318,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         required_tech_path: &FAST_TECH_PATH,
         max_pending_per_kind: 1,
     },
-    extra_steelworks: None,
+    extra_factories: None,
     production: ProductionPolicy {
         queue_depth: 2,
         unit_priorities: &RIFLE_ONLY,
@@ -458,7 +458,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         required_tech_path: &FULL_TECH_PATH,
         max_pending_per_kind: 1,
     },
-    extra_steelworks: None,
+    extra_factories: None,
     production: ProductionPolicy {
         queue_depth: 3,
         unit_priorities: &RIFLE_ONLY,
@@ -545,7 +545,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         required_tech_path: &TANK_TECH_PATH,
         max_pending_per_kind: 1,
     },
-    extra_steelworks: None,
+    extra_factories: None,
     production: ProductionPolicy {
         queue_depth: 1,
         unit_priorities: &TANK_AND_RIFLE,
@@ -612,7 +612,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         required_tech_path: &SUPPORT_TECH_PATH,
         max_pending_per_kind: 1,
     },
-    extra_steelworks: None,
+    extra_factories: None,
     production: ProductionPolicy {
         queue_depth: 3,
         unit_priorities: &SUPPORT_WEAPONS,
@@ -697,7 +697,7 @@ pub(crate) static AI_1_0_TECH: AiProfile = AiProfile {
         required_tech_path: &FULL_TECH_PATH,
         max_pending_per_kind: 1,
     },
-    extra_steelworks: None,
+    extra_factories: None,
     production: ProductionPolicy {
         queue_depth: 2,
         unit_priorities: &RIFLE_ONLY,
@@ -779,7 +779,7 @@ pub(crate) static AI_1_1_TANK_MG: AiProfile = AiProfile {
         required_tech_path: &FULL_TECH_PATH,
         max_pending_per_kind: 1,
     },
-    extra_steelworks: None,
+    extra_factories: None,
     production: AI_1_0_TECH.production,
     attack: AI_1_0_TECH.attack,
     resources: AI_1_0_TECH.resources,
@@ -826,9 +826,9 @@ pub(crate) static AI_1_2_WAVE_COHORTS: AiProfile = AiProfile {
     workers: AI_1_1_TANK_MG.workers,
     supply: AI_1_1_TANK_MG.supply,
     buildings: AI_1_1_TANK_MG.buildings,
-    extra_steelworks: Some(ExtraSteelworksPolicy {
+    extra_factories: Some(ExtraFactoryPolicy {
         target_count: 2,
-        resource_float: AI_1_2_SECOND_STEELWORKS_FLOAT_THRESHOLD,
+        resource_float: AI_1_2_SECOND_FACTORY_FLOAT_THRESHOLD,
     }),
     production: AI_1_1_TANK_MG.production,
     attack: AI_1_1_TANK_MG.attack,
@@ -893,7 +893,7 @@ mod tests {
         assert_eq!(expansion.post_expansion_steel_worker_cap, Some(36));
         assert_eq!(AI_1_1_TANK_MG.buildings.barracks_curve.max, 1);
         assert_eq!(AI_1_1_TANK_MG.buildings.factory_target, 1);
-        assert_eq!(AI_1_1_TANK_MG.extra_steelworks, None);
+        assert_eq!(AI_1_1_TANK_MG.extra_factories, None);
         assert_eq!(
             AI_1_1_TANK_MG
                 .buildings
@@ -926,10 +926,10 @@ mod tests {
         assert_eq!(AI_1_2_WAVE_COHORTS.supply, AI_1_1_TANK_MG.supply);
         assert_eq!(AI_1_2_WAVE_COHORTS.buildings, AI_1_1_TANK_MG.buildings);
         assert_eq!(
-            AI_1_2_WAVE_COHORTS.extra_steelworks,
-            Some(ExtraSteelworksPolicy {
+            AI_1_2_WAVE_COHORTS.extra_factories,
+            Some(ExtraFactoryPolicy {
                 target_count: 2,
-                resource_float: AI_1_2_SECOND_STEELWORKS_FLOAT_THRESHOLD,
+                resource_float: AI_1_2_SECOND_FACTORY_FLOAT_THRESHOLD,
             })
         );
         assert_eq!(AI_1_2_WAVE_COHORTS.production, AI_1_1_TANK_MG.production);
