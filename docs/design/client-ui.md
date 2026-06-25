@@ -687,8 +687,11 @@ grow compatibility accessors for those intent fields; HUD, input, minimap, and r
 use the injected facade or a narrow read model. Lab Unit Spawn and Building Spawn panels expose the
 target player's color through DOM data/style hooks before map placement. In Lab, visual and audio
 feedback for controlled-side selections and commands is issued as the selected controlled player
-instead of the raw local player id. Lab Options, Lab Tools, and floating room-time panel headers
-preserve drag, collapse, and keyboard geometry handling without visible reset actions.
+instead of the raw local player id. Lab command-card and targeted-command policy resolves resources,
+faction catalogs, per-owner upgrades when present, prerequisites, production helpers, self-ability
+hover origins, and hostility from the selected issue-as owner rather than the spectator/viewer id.
+Lab Options, Lab Tools, and floating room-time panel headers preserve drag, collapse, and keyboard
+geometry handling without visible reset actions.
 
 Frame-local entity views belong to the app-shell frame loop, not to `GameState`. Rendering, local
 fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and observer Army Value
@@ -1028,7 +1031,7 @@ the input module enters targeted cursor mode:
 - While the resolved hotkey remains held, repeated left-clicks keep the current selection intact and
   keep targeted mode armed so multi-selected Mortar Teams and Scout Cars can distribute repeated
   point commands without the next click falling back to normal selection.
-- Right-click / Escape: cancel cursor mode through `ClientIntent.endCommandTarget()`.
+- Right-click / Escape: cancel cursor mode through `ClientIntent.endCommandTarget()`, including while cursor lock is active.
 - Minimap right-click also fires an ability command if in targeted mode.
 Selected owned Mortar Teams also draw dotted firing-range circles even when the Fire command is not
 armed. The Mortar Team Fire command-card button shows an autocast swirl while any selected mortar's
@@ -1184,7 +1187,7 @@ Current areas:
   `match_net_reporter.js`, `match_settings_context.js`, `client_perf_report.js`, `match_health.js`,
   `frame_profiler.js`, `frame_recovery.js`, `frame_entity_views.js`, `live_pause_overlay.js`,
   `observer_analysis_overlay.js`, `observer_analysis_signatures.js`, `replay_controls.js`,
-  `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`.
+  `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
   `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
@@ -1193,7 +1196,7 @@ Current areas:
   `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, lab scenario authoring/submission helpers, settings. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
+  staging, lab panel, lab scenario authoring/submission helpers, settings. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. The settings panel uses the in-match header action slot for Give Up
   in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
   Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match
