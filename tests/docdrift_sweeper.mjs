@@ -88,13 +88,15 @@ function writeExecutable(name, text) {
 }
 
 function runDailyWrapper(fakeBin, args, options = {}) {
-  return execFileSync("bash", [dailyScript, ...args], {
-    cwd: repoRoot,
+  const scriptPath = options.dailyScript ?? dailyScript;
+  return execFileSync("bash", [scriptPath, ...args], {
+    cwd: options.cwd ?? path.dirname(scriptPath),
     env: {
       ...process.env,
       PATH: `${fakeBin}${path.delimiter}${process.env.PATH}`,
       DOC_DRIFT_OBSERVABILITY_DIR: options.observabilityDir,
       DOC_DRIFT_MAX_COMMITS: options.maxCommits ?? "300",
+      DOC_DRIFT_RUNNER_WORKTREE: options.runnerWorktree,
       FAKE_NODE_ARGS_FILE: options.argsFile,
       FAKE_NODE_EXIT: String(options.exitCode ?? 0),
       FAKE_NODE_STDOUT: options.stdout ?? "",
@@ -869,6 +871,25 @@ try {
   assert.match(fs.readFileSync(path.join(repo, ".docdrift/checkpoint.txt"), "utf8"), new RegExp(docsOnlyHead));
   assert.ok(fs.existsSync(path.join(fullNoopOutDir, "docdrift-full.json")));
 
+  const remoteUpdateRepo = path.join(fixtureRoot, "remote-update");
+  run("git", ["clone", "--branch", "main", bareOrigin, remoteUpdateRepo], { cwd: fixtureRoot });
+  run("git", ["config", "user.email", "agent@example.invalid"], { cwd: remoteUpdateRepo });
+  run("git", ["config", "user.name", "Agent"], { cwd: remoteUpdateRepo });
+  fs.writeFileSync(path.join(remoteUpdateRepo, "docs/design/testing.md"), "testing design\nremote-only update\n");
+  run("git", ["add", "docs/design/testing.md"], { cwd: remoteUpdateRepo });
+  run("git", ["commit", "-m", "Remote only testing docs"], {
+    cwd: remoteUpdateRepo,
+    date: "2026-06-20T12:06:00Z",
+  });
+  const remoteOnlyHead = run("git", ["rev-parse", "HEAD"], { cwd: remoteUpdateRepo }).trim();
+  run("git", ["push", "origin", "main"], { cwd: remoteUpdateRepo });
+  assert.equal(git(["rev-parse", "HEAD"]), docsOnlyHead);
+
+  const fixtureDailyScript = path.join(repo, "scripts", "docdrift-daily.sh");
+  fs.mkdirSync(path.dirname(fixtureDailyScript), { recursive: true });
+  fs.copyFileSync(dailyScript, fixtureDailyScript);
+  fs.chmodSync(fixtureDailyScript, 0o755);
+
   const fakeNodeBin = path.join(fixtureRoot, "fake-node-bin");
   fs.mkdirSync(fakeNodeBin, { recursive: true });
   writeExecutable(
@@ -884,15 +905,20 @@ try {
     ].join("\n"),
   );
   const dailyObservabilityDir = path.join(fixtureRoot, "daily-observability");
+  const dailyRunnerWorktree = path.join(fixtureRoot, "daily-runner");
   const dailyArgsFile = path.join(fixtureRoot, "daily-args.txt");
   runDailyWrapper(fakeNodeBin, ["--checkpoint-ref", "docdrift-checkpoint"], {
+    dailyScript: fixtureDailyScript,
     observabilityDir: dailyObservabilityDir,
+    runnerWorktree: dailyRunnerWorktree,
     argsFile: dailyArgsFile,
     stdout: "daily ok",
   });
   assert.deepEqual(fs.readFileSync(dailyArgsFile, "utf8").trim().split("\n"), [
-    "scripts/docdrift-sweep.mjs",
+    path.join(dailyRunnerWorktree, "scripts/docdrift-sweep.mjs"),
     "--full",
+    "--repo",
+    repo,
     "--head",
     "origin/main",
     "--max-commits",
@@ -902,11 +928,15 @@ try {
     "--checkpoint-ref",
     "docdrift-checkpoint",
   ]);
+  assert.equal(run("git", ["-C", dailyRunnerWorktree, "rev-parse", "HEAD"], { cwd: fixtureRoot }).trim(), remoteOnlyHead);
+  assert.equal(git(["rev-parse", "HEAD"]), docsOnlyHead);
   assert.equal(fs.existsSync(path.join(dailyObservabilityDir, "last-failure.md")), false);
 
   try {
     runDailyWrapper(fakeNodeBin, ["--checkpoint-ref", "docdrift-checkpoint"], {
+      dailyScript: fixtureDailyScript,
       observabilityDir: dailyObservabilityDir,
+      runnerWorktree: dailyRunnerWorktree,
       argsFile: dailyArgsFile,
       exitCode: 42,
       stderr: "classify budget exceeded: 75 considered commits exceeds --max-commits 25",

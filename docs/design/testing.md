@@ -336,7 +336,12 @@ Full sweeps write ignored local reports under `.docdrift/runs/<run-id>/`, includ
 `docdrift-full.{md,json}` and any classify/generate reports. Use
 `scripts/docdrift-daily.sh` as the launchd-friendly daily command; pass normal
 `docdrift-sweep.mjs` options after it, for example `--dry-run` for a lifecycle preview or
-`--run-id <id>` for predictable report paths. The wrapper defaults scheduled runs to
+`--run-id <id>` for predictable report paths. The wrapper first fetches `origin/main`, creates or
+refreshes a clean detached `.docdrift/worktrees/docdrift-runner` checkout at that ref, then runs
+that latest `scripts/docdrift-sweep.mjs` with `--repo` pointed back at the primary checkout. The
+primary checkout still owns `.docdrift` checkpoints, caches, reports, and sweep worktrees, while the
+runner worktree prevents stale local `main` from running obsolete sweeper code. Set
+`DOC_DRIFT_RUNNER_WORKTREE` to override the runner location. The wrapper defaults scheduled runs to
 `--max-commits 300` so ordinary daily backlog does not trip the interactive classifier guard; set
 `DOC_DRIFT_MAX_COMMITS` to override that limit. It also passes `--codex-timeout-seconds` from
 `DOC_DRIFT_CODEX_TIMEOUT_SECONDS`, defaulting to 300 seconds per Codex call. When the daily command
@@ -364,6 +369,7 @@ ls -lt .docdrift/runs
 sed -n '1,180p' .docdrift/last-failure.md
 tail -n 120 "$HOME/Library/Logs/rts-docdrift.out.log"
 tail -n 120 "$HOME/Library/Logs/rts-docdrift.err.log"
+git -C .docdrift/worktrees/docdrift-runner rev-parse --short HEAD
 git -C .docdrift/worktrees/docdrift-sweep status --short
 ```
 
