@@ -166,7 +166,7 @@ fn decide_with_profile(observation: &AiObservation, profile: &'static AiProfile)
     )
 }
 
-fn second_steelworks_observation(steel: u32, oil: u32) -> AiObservation {
+fn second_factory_observation(steel: u32, oil: u32) -> AiObservation {
     with_expansion_resources(observation(
         AiEconomy {
             steel,
@@ -181,7 +181,6 @@ fn second_steelworks_observation(steel: u32, oil: u32) -> AiObservation {
             building(13, EntityKind::TrainingCentre, None),
             building(14, EntityKind::ResearchComplex, None),
             building(15, EntityKind::Factory, Some(0)),
-            building(16, EntityKind::Steelworks, Some(0)),
             worker(20, AiEntityState::Idle),
         ],
     ))
@@ -278,35 +277,38 @@ fn does_not_build_second_factory_for_tank_production() {
 }
 
 #[test]
-fn ai_1_2_builds_second_steelworks_above_resource_float() {
-    let observation = second_steelworks_observation(601, 401);
+fn ai_1_2_builds_second_factory_above_resource_float() {
+    let observation = second_factory_observation(601, 401);
 
     let decision = decide_with_profile(&observation, &AI_1_2_WAVE_COHORTS);
 
     assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Steelworks
     }));
 }
 
 #[test]
-fn ai_1_2_waits_until_above_second_steelworks_resource_float() {
-    let observation = second_steelworks_observation(600, 400);
+fn ai_1_2_waits_until_above_second_factory_resource_float() {
+    let observation = second_factory_observation(600, 400);
 
     let decision = decide_with_profile(&observation, &AI_1_2_WAVE_COHORTS);
 
     assert!(!decision.intents.contains(&AiIntent::Build {
-        kind: EntityKind::Steelworks
+        kind: EntityKind::Factory
     }));
 }
 
 #[test]
-fn ai_1_1_does_not_build_second_steelworks_at_ai_1_2_float() {
-    let observation = second_steelworks_observation(601, 401);
+fn ai_1_1_does_not_build_second_factory_at_ai_1_2_float() {
+    let observation = second_factory_observation(601, 401);
 
     let decision = decide(&observation);
 
     assert!(!decision.intents.contains(&AiIntent::Build {
-        kind: EntityKind::Steelworks
+        kind: EntityKind::Factory
     }));
 }
 

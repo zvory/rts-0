@@ -50,7 +50,7 @@ use self::policies::{
 };
 use self::production::{
     production_building_order, production_uses_building, should_save_for_first_tech_unit,
-    should_save_for_required_tech_building, should_build_extra_steelworks, try_build_kind,
+    should_save_for_required_tech_building, should_build_extra_factory, try_build_kind,
     unit_counts_for_priorities, wants_depot,
 };
 use self::proxy::{should_use_proxy_barracks, try_proxy_barracks};
@@ -518,12 +518,12 @@ where
     if !defensive_panic.active
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
-        && planned_in_intents(&intents, EntityKind::Steelworks) == 0
-        && should_build_extra_steelworks(
+        && planned_in_intents(&intents, EntityKind::Factory) == 0
+        && should_build_extra_factory(
             observation,
             &facts,
             profile,
-            planned_in_intents(&intents, EntityKind::Steelworks),
+            planned_in_intents(&intents, EntityKind::Factory),
         )
         && try_build_kind(
             observation,
@@ -531,14 +531,14 @@ where
             &mut actions,
             &builder_pools,
             profile,
-            EntityKind::Steelworks,
+            EntityKind::Factory,
             build_search,
             &mut placeable,
         )
         .is_some()
     {
         intents.push(AiIntent::Build {
-            kind: EntityKind::Steelworks,
+            kind: EntityKind::Factory,
         });
     }
 

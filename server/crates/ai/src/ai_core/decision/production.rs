@@ -15,13 +15,13 @@ pub(super) fn wants_depot(facts: &AiFacts, profile: &AiProfile) -> bool {
             || !facts.production_buildings(EntityKind::Barracks).is_empty())
 }
 
-pub(super) fn should_build_extra_steelworks(
+pub(super) fn should_build_extra_factory(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
-    planned_steelworks: usize,
+    planned_factories: usize,
 ) -> bool {
-    let Some(policy) = profile.extra_steelworks else {
+    let Some(policy) = profile.extra_factories else {
         return false;
     };
     if observation.economy.steel <= policy.resource_float.steel
@@ -30,8 +30,8 @@ pub(super) fn should_build_extra_steelworks(
         return false;
     }
     facts
-        .building_count(EntityKind::Steelworks)
-        .saturating_add(planned_steelworks)
+        .building_count(EntityKind::Factory)
+        .saturating_add(planned_factories)
         < policy.target_count
 }
 
