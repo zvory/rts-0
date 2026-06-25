@@ -19,6 +19,13 @@ If the building belongs to a new unit, faction, or new production model, pair th
 [docs/new-unit-checklist.md](new-unit-checklist.md). After Phase 0 and Phase 1 are complete, stop
 and hand off the brief/spec unless the user explicitly says to proceed with implementation code.
 
+## Multiple-Building Serial Rule
+
+If a task includes more than one new building, work through them serially. Pick one active
+building, complete that building's Phase 0 brief and Phase 1 rules/balance spec, get user review,
+and only then start the next building's checklist. Do not brief several buildings in parallel and
+then spec several buildings in parallel unless the user explicitly overrides this rule.
+
 ## User Engagement Rule
 
 Every building brief must be reviewed as a player-facing decision, not only as an implementation
