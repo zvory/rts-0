@@ -3,17 +3,20 @@
 Status: Draft product requirements. This document describes the desired player-facing faction
 shape, not implementation details or approved phase scope.
 
-Active planning gate: [plan.md](plan.md). The current work is Phase 0/1 only: user-reviewed
-briefs, rules specs, and checklists for Ekat, Golem, Zamok, Death Box, Vortex, and the Dash
-building currently called **XYZ**. Do not implement Rust, JavaScript, protocol, balance, art, tests,
-or scenario files from this requirements draft until the user approves the Phase 0 brief and Phase
-1 rules/balance spec.
+Active planning gate: [plan.md](plan.md). The current work is serial Phase 0/1 planning only: each
+unit or building gets its own user-reviewed brief and rules spec before the next entity starts. Do
+not implement Rust, JavaScript, protocol, balance, art, tests, or scenario files from this
+requirements draft until the user approves the serial briefs/specs and explicitly authorizes an
+implementation phase.
 
 ## Planning Workflow
 
 - Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for Ekat and Golem.
 - Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for Zamok, Death Box,
   Vortex, and the Dash building.
+- Work serially: global identity gate, then Ekat, then Zamok, then Golem, then Death Box, then
+  Vortex, then the Dash building. Do not brief or spec multiple entities in parallel unless the
+  user explicitly overrides the active plan.
 - Treat each building as its own user-reviewed design object. For each one, confirm the fantasy,
   strategic reason to choose it, counterplay, unlock behavior, loss/destruction consequences, and
   first playable scope before implementation.

@@ -15,6 +15,13 @@ allowed files before that gate are planning, checklist, and design documents.
 After Phase 0 and Phase 1 are complete, stop and hand off the brief/spec unless the user explicitly
 says to proceed with implementation code.
 
+## Multiple-Unit Serial Rule
+
+If a task includes more than one new unit, work through them serially. Pick one active unit,
+complete that unit's Phase 0 brief and Phase 1 rules/balance spec, get user review, and only then
+start the next unit's checklist. Do not brief several units in parallel and then spec several units
+in parallel unless the user explicitly overrides this rule.
+
 ## Phase 0: Unit Brief
 
 Create a short unit brief before touching implementation code.

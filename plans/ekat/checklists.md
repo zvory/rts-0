@@ -1,6 +1,6 @@
 # Ekat Phase 0/1 Working Checklists
 
-Status: not started. This file is the working checklist for the active Ekat planning gate.
+Status: not started. This file is the working checklist for the active Ekat serial planning gate.
 
 Sources:
 
@@ -8,8 +8,25 @@ Sources:
 - [docs/new-building-checklist.md](../../docs/new-building-checklist.md)
 - [plans/ekat/requirements.md](requirements.md)
 
-Do not edit implementation files until every required Phase 0 and Phase 1 item below is either
-approved or explicitly deferred by the user.
+Do not edit implementation files until every required per-entity Phase 0 brief item and Phase 1
+rules item below is either approved or explicitly deferred by the user.
+
+## Serial Queue
+
+Only one entity may be active at a time. Complete the active entity's Phase 0 brief and Phase 1
+rules/balance spec, get user review, and then move to the next entity.
+
+- [ ] Phase 0: Global Gate.
+- [ ] Phase 1: Ekat Hero/Body only.
+- [ ] Phase 2: Zamok/Home Structure only.
+- [ ] Phase 3: Golem only.
+- [ ] Phase 4: Death Box only.
+- [ ] Phase 5: Vortex only.
+- [ ] Phase 6: Dash Building only.
+- [ ] User explicitly approved moving beyond serial Phase 0/1 planning into implementation.
+
+If the user changes the order, update [plan.md](plan.md), the relevant phase handoff, and this
+queue before continuing. Do not fill checklist sections for later entities early.
 
 ## Global Gate
 
@@ -23,7 +40,7 @@ approved or explicitly deferred by the user.
 - [ ] Record patch-note bullets as draft, factual notes only.
 - [ ] Confirm no implementation files were edited during Phase 0/1.
 
-## Phase 0: Unit And Actor Briefs
+## Entity Brief Items: Units And Actors
 
 ### Ekat Hero/Body
 
@@ -48,7 +65,7 @@ approved or explicitly deferred by the user.
 - [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
 - [ ] Known unknowns are explicit.
 
-## Phase 0: Building Briefs
+## Entity Brief Items: Buildings
 
 ### Zamok/Home Structure
 
@@ -98,7 +115,7 @@ approved or explicitly deferred by the user.
 - [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
 - [ ] Known unknowns are explicit.
 
-## Phase 1: Ekat Hero/Body Rules
+## Entity Rules Items: Ekat Hero/Body
 
 - [ ] Cost is specified.
 - [ ] Supply impact is specified.
@@ -115,7 +132,7 @@ approved or explicitly deferred by the user.
 - [ ] Ability unlock behavior is specified for Dash, Line Shot, and Magic Anchor.
 - [ ] AI availability and intended AI usage are specified.
 
-## Phase 1: Golem Rules
+## Entity Rules Items: Golem
 
 - [ ] Cost is specified.
 - [ ] Supply impact is specified.
@@ -133,7 +150,7 @@ approved or explicitly deferred by the user.
 - [ ] Consumption healing rules are specified.
 - [ ] AI availability and intended AI usage are specified.
 
-## Phase 1: Zamok/Home Structure Rules
+## Entity Rules Items: Zamok/Home Structure
 
 - [ ] Creation source is specified.
 - [ ] Command and hotkey are specified if buildable or interactable.
@@ -151,7 +168,7 @@ approved or explicitly deferred by the user.
 - [ ] Death behavior and victory relevance are specified.
 - [ ] AI availability and intended AI usage are specified.
 
-## Phase 1: Death Box Rules
+## Entity Rules Items: Death Box
 
 - [ ] Creation source is specified.
 - [ ] Command and hotkey are specified.
@@ -170,7 +187,7 @@ approved or explicitly deferred by the user.
 - [ ] Death behavior is specified.
 - [ ] AI availability and intended AI usage are specified.
 
-## Phase 1: Vortex Rules
+## Entity Rules Items: Vortex
 
 - [ ] Creation source is specified.
 - [ ] Command and hotkey are specified.
@@ -189,7 +206,7 @@ approved or explicitly deferred by the user.
 - [ ] Death behavior is specified.
 - [ ] AI availability and intended AI usage are specified.
 
-## Phase 1: Dash Building Rules
+## Entity Rules Items: Dash Building
 
 - [ ] Final name replaces `XYZ`.
 - [ ] Creation source is specified.
