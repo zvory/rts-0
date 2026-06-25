@@ -10,6 +10,15 @@ Kriegsia-style workers, barracks, factories, and broad unit production. The fact
 a compact economy and tech engine that converts field presence into a small number of powerful
 choices.
 
+## Visual Theme
+
+- [Rodchenko](https://www.paratype.com/fonts/pt/rodchenko) is the theme/display font direction for
+  Ekat's English-language faction identity.
+- Ekat's Russian feel should come from Constructivist-inspired typography and layout, not
+  fake-Cyrillic glyph substitutions or pseudo-Russian letter swaps.
+- Use Rodchenko as the starting reference for faction names, titles, and other high-emphasis text;
+  validate licensing and delivery details before any shippable implementation.
+
 ## Economy
 
 - Ekat can mine Steel and Oil directly.
