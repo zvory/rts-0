@@ -514,6 +514,12 @@ impl Entity {
         }
     }
 
+    pub(crate) fn clear_charge(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.charge_ticks = 0;
+        }
+    }
+
     pub(crate) fn tick_charge(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.charge_ticks = m.charge_ticks.saturating_sub(1);

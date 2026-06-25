@@ -14,6 +14,7 @@ mod determinism_tests;
 mod ekat_tests;
 mod faction_ability_tests;
 mod fixtures;
+mod meth_movement_tests;
 mod movement_replay_tests;
 mod resources_mining_tests;
 mod scoring_projection_tests;
