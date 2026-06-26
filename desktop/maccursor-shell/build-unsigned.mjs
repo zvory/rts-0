@@ -13,6 +13,7 @@ const TAURI_DIR = path.join(SHELL_DIR, "src-tauri");
 const TAURI_CONFIG_PATH = path.join(TAURI_DIR, "tauri.conf.json");
 const CARGO_TOML_PATH = path.join(TAURI_DIR, "Cargo.toml");
 const DEFAULT_OUTPUT_ROOT = path.join(TAURI_DIR, "target", "unsigned-playtest");
+const ARTIFACT_SLUG = "bewegungskrieg";
 const BUILD_CONFIG_OVERRIDE = {
   bundle: {
     active: true,
@@ -168,7 +169,7 @@ function writeContentsListing(artifactDir, listingPath) {
   fs.writeFileSync(
     listingPath,
     [
-      "# RTS Mac Cursor Shell unsigned artifact contents",
+      "# Bewegungskrieg unsigned artifact contents",
       "# Format: TYPE SHA256 SIZE_OR_TARGET RELATIVE_PATH",
       "# This listing covers payload files and excludes this contents file.",
       ...rows,
@@ -229,7 +230,7 @@ function validateThinShellConfig(tauriConfig) {
 function writeArtifactReadme(filePath, manifest) {
   fs.writeFileSync(
     filePath,
-    `# RTS Mac Cursor Shell unsigned macOS artifact
+    `# Bewegungskrieg unsigned macOS artifact
 
 Artifact: \`${manifest.artifact.name}\`
 Built: ${manifest.createdAt}
@@ -260,7 +261,7 @@ The shell does not include or start \`rts-server\`, the browser client, maps, la
 Shell logs are local JSONL files at:
 
 \`\`\`text
-~/Library/Logs/dev.bewegungskrieg.MacCursorShell/shell.log
+~/Library/Logs/${manifest.shell.identifier}/shell.log
 \`\`\`
 
 The startup screen also has **Copy log path** and **Reveal logs** actions.
@@ -302,7 +303,7 @@ function main() {
   const shortSha = gitSha.slice(0, 12);
   const dirty = gitOutput(["status", "--short", "--untracked-files=normal"]).length > 0;
   const arch = os.arch();
-  const artifactName = `maccursor-shell-v${pkg.version}-${shortSha}-${arch}`;
+  const artifactName = `${ARTIFACT_SLUG}-v${pkg.version}-${shortSha}-${arch}`;
   const outputRoot = path.resolve(options.outputRoot);
   const artifactDir = path.join(outputRoot, artifactName);
   const appBundleName = `${tauriConfig.productName}.app`;

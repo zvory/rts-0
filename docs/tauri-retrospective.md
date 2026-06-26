@@ -47,3 +47,7 @@ native cursor gameplay path were accepted for playtesting on macOS 15.7.7 on an 
 MacBook Pro. The recommendation is to ship this unsigned macOS MVP artifact to playtesters while
 keeping signing, notarization, auto-update, cross-platform support, and broader release automation
 out of scope.
+
+A follow-up packaging pass keeps the internal `desktop/maccursor-shell` source/crate name but ships
+the public app bundle and artifact names as Bewegungskrieg. The unsigned playtest distribution
+should prefer a universal DMG so Apple Silicon and Intel Mac playtesters use one download.

@@ -1111,6 +1111,8 @@ mod tests {
     fn bundle_config_excludes_game_runtime_assets() {
         let config: serde_json::Value =
             serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config["productName"], "Bewegungskrieg");
+        assert_eq!(config["identifier"], "dev.bewegungskrieg.Bewegungskrieg");
         assert_eq!(config["build"]["frontendDist"], "../ui");
 
         let bundle = &config["bundle"];
