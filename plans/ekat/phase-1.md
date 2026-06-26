@@ -6,8 +6,9 @@ Status: complete; user decisions recorded in [checklists.md](checklists.md) and
 ## Goal
 
 Approve the exact stat changes and ability availability rule for the already-implemented Ekat
-hero/body. Ekat, Dash, Line Shot, Magic Anchor, return markers, line projectiles, and Magic Anchor
-runtime already exist; this phase must not redesign or reimplement those systems.
+hero/body. Ekat, current Dash/Projection runtime, Line Shot, Magic Anchor, return markers, line
+projectiles, and Magic Anchor runtime already exist; this phase must not redesign or reimplement
+those systems.
 
 ## Scope
 
@@ -18,7 +19,7 @@ runtime already exist; this phase must not redesign or reimplement those systems
   [checklists.md](checklists.md), or mark items as deferred with named unknowns.
 - Specify exact HP, armor/tags, sight, size, speed, supply, cost, regeneration, death/recovery, and
   no-default-attack policy.
-- Specify that Dash, Line Shot, and Magic Anchor are not available at match start.
+- Specify that Projection, Line Shot, and Magic Anchor are not available at match start.
 - Specify the unlock source for each ability. The current code can enforce ability requirements
   through completed building kinds, but the named unlock buildings still need their own serial
   building specs before implementation can depend on them.
@@ -27,9 +28,10 @@ runtime already exist; this phase must not redesign or reimplement those systems
 
 ## Out of Scope
 
-- Rebuilding Ekat's body, Dash, Line Shot, Magic Anchor, return marker, projectile, or anchor
+- Rebuilding Ekat's body, current Dash/Projection runtime, Line Shot, Magic Anchor, return marker,
+  projectile, or anchor
   runtime.
-- Zamok, Golem, Killing Tools, Anchorage, or Dash building briefs/specs except for naming the unlock
+- Zamok, Golem, Killing Tools, Anchorage, or Positioning briefs/specs except for naming the unlock
   source needed by the existing ability gate.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
@@ -42,7 +44,7 @@ runtime already exist; this phase must not redesign or reimplement those systems
   radius, 0 supply, no default attack, and no cost?
 - Should natural regeneration be removed entirely, matching the requirements draft?
 - What is the recovery rule before Golem consumption exists?
-- Which ability unlocks first, if any: Dash, Line Shot, or Magic Anchor?
+- Which ability unlocks first, if any: Projection, Line Shot, or Magic Anchor?
 - Is each ability unlocked by a completed building, a consumed/transformed Golem, a research-like
   flag, or another source?
 - If the unlock buildings are not implemented yet, should Ekat ship temporarily with all combat
@@ -58,7 +60,7 @@ runtime already exist; this phase must not redesign or reimplement those systems
 - Natural regeneration policy, Golem-consumption healing dependency, death behavior, and comeback
   behavior.
 - Combat policy before tech buildings unlock abilities: no attack, basic attack, or another rule.
-- Ability access policy for Dash, Line Shot, and Magic Anchor before and after unlocks exist.
+- Ability access policy for Projection, Line Shot, and Magic Anchor before and after unlocks exist.
 - AI availability and prediction policy as they apply to controlling this hero/body.
 
 ## Expected Deliverables
@@ -107,11 +109,11 @@ Approved health and death rules:
 
 Approved ability availability:
 
-- Dash, Line Shot, and Magic Anchor are not unlocked at match start.
+- Projection, Line Shot, and Magic Anchor are not unlocked at match start.
 - Locked abilities stay visible but disabled in the command card.
 - Killing Tools unlocks Line Shot.
 - Anchorage unlocks Magic Anchor.
-- The Dash building currently named `XYZ` unlocks Dash.
+- Positioning unlocks Projection.
 
 Unresolved tuning questions:
 

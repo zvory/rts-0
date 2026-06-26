@@ -1,7 +1,7 @@
 # Ekat Phase 0/1 Working Checklists
 
-Status: Global Gate, Ekat hero/body, Zamok, Golem, Killing Tools, and Anchorage decisions recorded.
-This file is the working checklist for the active Ekat serial planning gate.
+Status: Global Gate, Ekat hero/body, Zamok, Golem, Killing Tools, Anchorage, and Positioning
+decisions recorded. This file is the working checklist for the active Ekat serial planning gate.
 
 Sources:
 
@@ -23,7 +23,7 @@ rules/balance spec, get user review, and then move to the next entity.
 - [x] Phase 3: Golem only.
 - [x] Phase 4: Killing Tools only.
 - [x] Phase 5: Anchorage only.
-- [ ] Phase 6: Dash Building only.
+- [x] Phase 6: Positioning only.
 - [ ] User explicitly approved moving beyond serial Phase 0/1 planning into implementation.
 
 If the user changes the order, update [plan.md](plan.md), the relevant phase handoff, and this
@@ -74,6 +74,9 @@ Draft patch-note bullets:
 - Anchorage replaces the Vortex draft name for the anchor-placement tech building. Its first
   playable scope is a base Magic Anchor unlock from a free Golem transform; future anchor
   customizations are deferred.
+- Positioning replaces the `XYZ` draft name for the mobility/repositioning tech building. Its first
+  playable scope is a base Projection unlock from a free Golem transform; future movement and
+  mobility customizations are deferred.
 
 ## Entity Brief Items: Units And Actors
 
@@ -92,7 +95,7 @@ Approved Ekat hero/body brief:
 
 - Ekat is unique and starts at match start. Future cloning abilities are possible but deferred.
 - Ekat has no basic attack and no unlocked combat abilities at match start.
-- Locked Dash, Line Shot, and Magic Anchor command-card entries should be visible but disabled.
+- Locked Projection, Line Shot, and Magic Anchor command-card entries should be visible but disabled.
 - The current visuals, body feel, and ability runtime are reused.
 - The stat rework makes Ekat fragile at match start: 150 HP, 1.6 px/tick Rifleman movement speed,
   9-tile sight, existing radius/selection/render feel, no default attack, no regeneration, and no
@@ -176,7 +179,7 @@ Approved Zamok brief:
 - [x] Final or placeholder name status is approved.
 - [x] Player-facing UI description is approved.
 - [x] Strategic purpose is approved.
-- [x] Reason to choose it over Anchorage and the Dash building is approved.
+- [x] Reason to choose it over Anchorage and Positioning is approved.
 - [x] Line Shot unlock fantasy and upgrade direction are approved.
 - [x] Creation rule from Golem transformation is approved or revised.
 - [x] Expected counters and failure modes are approved.
@@ -190,8 +193,7 @@ Approved Killing Tools brief:
 - Player-facing description: offensive attack technology structure. Unlocks Line Shot now and later
   hosts Ekat attack customizations.
 - Strategic purpose: Killing Tools is the damage-dealing tech choice. The first playable reason to
-  choose it over Anchorage or the Dash building is access to offensive kill pressure through Line
-  Shot.
+  choose it over Anchorage or Positioning is access to offensive kill pressure through Line Shot.
 - Long-term direction: Killing Tools should eventually unlock or customize a more basic offensive
   attack package, with Line Shot, fan-out behavior, return behavior, or other build variants as
   possible choices.
@@ -214,7 +216,7 @@ Approved Killing Tools brief:
 - [x] Final or placeholder name status is approved.
 - [x] Player-facing UI description is approved.
 - [x] Strategic purpose is approved.
-- [x] Reason to choose it over Killing Tools and the Dash building is approved.
+- [x] Competitive reason versus Killing Tools and Positioning is recorded or explicitly deferred.
 - [x] Magic Anchor unlock fantasy and upgrade direction are approved.
 - [x] Creation rule from Golem transformation is approved or revised.
 - [x] Expected counters and failure modes are approved.
@@ -236,7 +238,7 @@ Approved Anchorage brief:
   customizations. The current Magic Anchor/Vortex behavior is one possible anchor, not the whole
   future space.
 - Reason to choose: Killing Tools is expected to be the first-priority tech for raw pressure.
-  Anchorage's exact reason to choose before Killing Tools or Dash tech is deferred to playtesting.
+  Anchorage's exact reason to choose before Killing Tools or Positioning is deferred to playtesting.
 - Creation rule: a Golem transforms into Anchorage for free except for permanently consuming that
   Golem.
 - Failure mode: if all completed Anchorage structures are destroyed, Magic Anchor becomes locked or
@@ -249,17 +251,45 @@ Approved Anchorage brief:
   profile, anchor/customization list, upgrade costs/times, final ability name, and the exact
   strategic reason to choose Anchorage before other tech.
 
-### Dash Building
+### Positioning
 
-- [ ] Final name for `XYZ` is approved.
-- [ ] Player-facing UI description is approved.
-- [ ] Strategic purpose is approved.
-- [ ] Reason to choose it over Killing Tools and Anchorage is approved.
-- [ ] Dash unlock fantasy and upgrade direction are approved.
-- [ ] Creation rule from Golem transformation is approved or revised.
-- [ ] Expected counters and failure modes are approved.
-- [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
-- [ ] Known unknowns are explicit.
+- [x] Final name for `XYZ` is approved.
+- [x] Player-facing UI description is approved.
+- [x] Strategic purpose is approved.
+- [x] Competitive reason versus Killing Tools and Anchorage is recorded or explicitly deferred.
+- [x] Projection unlock fantasy and upgrade direction are approved.
+- [x] Creation rule from Golem transformation is approved or revised.
+- [x] Expected counters and failure modes are approved.
+- [x] Initial exposure is approved: playable, debug-only, hidden, or blocked.
+- [x] Known unknowns are explicit.
+
+Approved Positioning brief:
+
+- Name status: Positioning replaces `XYZ` as the current building name.
+- Ability naming direction: Projection is the approved player-facing rename for the current Dash
+  ability/runtime.
+- Player-facing description: mobility and repositioning technology structure. Unlocks Projection now
+  and later hosts movement/mobility customizations.
+- Strategic purpose: Positioning is the flexible mobility tech choice for repositioning, escape,
+  engage, and outplay potential.
+- First playable scope: only the base Projection unlock is included; upgrades and broader movement
+  customization are deferred.
+- Long-term direction: Positioning should eventually customize broader movement and mobility tools,
+  not only Projection.
+- Reason to choose: there is no settled reason to choose Positioning before Killing Tools yet.
+  Positioning's exact competitive reason versus Killing Tools and Anchorage is deferred to
+  playtesting.
+- Creation rule: a Golem transforms into Positioning for free except for permanently consuming that
+  Golem.
+- Failure mode: if all completed Positioning structures are destroyed, Projection becomes locked or
+  disabled again.
+- Upgrade persistence: future upgrades/customizations researched through Positioning are not lost or
+  disabled when all Positioning structures are gone, though Projection access still requires a
+  completed Positioning structure.
+- Initial exposure: playable when the Ekat direction replaces the current prototype slice.
+- Known unknowns: exact transform command/hotkey, transform completion timing, low-HP starting
+  profile, movement/mobility customization list, upgrade costs/times, and the exact strategic reason
+  to choose Positioning before other tech.
 
 ## Entity Rules Items: Existing Ekat Hero/Body Stats And Ability Gate
 
@@ -274,7 +304,7 @@ Approved Anchorage brief:
 - [x] Movement speed and movement semantics are specified.
 - [x] Health recovery, no-regeneration policy, Golem consumption, death, and revival are specified.
 - [x] Baseline combat policy is specified.
-- [x] Ability unlock behavior is specified for Dash, Line Shot, and Magic Anchor.
+- [x] Ability unlock behavior is specified for Projection, Line Shot, and Magic Anchor.
 - [x] Temporary behavior before unlock buildings exist is specified: hidden/locked, debug-only, or
       blocked from shipping.
 - [x] AI availability and intended AI usage are specified.
@@ -284,7 +314,8 @@ Approved Ekat hero/body rules:
 - Cost: none; Ekat is a starting hero and is not normally produced.
 - Supply: 0.
 - Starting loadout and creation source: one unique Ekat starts with each Ekat player at match start.
-- Command-card exposure: Dash, Line Shot, and Magic Anchor stay visible but disabled while locked.
+- Command-card exposure: Projection, Line Shot, and Magic Anchor stay visible but disabled while
+  locked.
 - HP: 150 at match start; future HP scaling mechanism deferred.
 - Armor/tags/status rules: reuse current Ekat defaults unless a later implementation pass names a
   specific mismatch.
@@ -297,8 +328,8 @@ Approved Ekat hero/body rules:
 - Death/revival: Ekat death causes immediate player loss for the first implementation target; no
   revival rule in this slice.
 - Baseline combat: no basic attack.
-- Ability unlocks: Killing Tools unlocks Line Shot, Anchorage unlocks Magic Anchor, and the Dash
-  building currently named `XYZ` unlocks Dash.
+- Ability unlocks: Killing Tools unlocks Line Shot, Anchorage unlocks Magic Anchor, and Positioning
+  unlocks Projection.
 - Temporary behavior: until unlock buildings exist, abilities should remain visible but disabled
   rather than being freely usable.
 - AI/prediction: AI support and local prediction may remain disabled indefinitely.
@@ -485,28 +516,63 @@ Approved Anchorage rules:
   erase future researched upgrades/customizations.
 - AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
-## Entity Rules Items: Dash Building
+## Entity Rules Items: Positioning
 
-- [ ] Final name replaces `XYZ`.
-- [ ] Creation source is specified.
-- [ ] Command and hotkey are specified.
-- [ ] Transform cost, consumed Golem behavior, refund, and cancellation are specified.
-- [ ] Transform time is specified.
-- [ ] Prerequisites, build limit, and unlock timing are specified.
-- [ ] Hit points are specified.
-- [ ] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
-- [ ] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
+- [x] Final name replaces `XYZ`.
+- [x] Creation source is specified.
+- [x] Command and hotkey are specified.
+- [x] Transform cost, consumed Golem behavior, refund, and cancellation are specified.
+- [x] Transform time is specified.
+- [x] Prerequisites, build limit, and unlock timing are specified.
+- [x] Hit points are specified.
+- [x] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
+- [x] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
       specified.
-- [ ] Selection size, render size, and minimap behavior are specified.
-- [ ] Sight range, fog reveal, and remembered-building behavior are specified.
-- [ ] Supply behavior is specified.
-- [ ] Dash unlock, upgrade costs, upgrade times, and loss-on-destruction behavior are specified.
-- [ ] Death behavior is specified.
-- [ ] AI availability and intended AI usage are specified.
+- [x] Selection size, render size, and minimap behavior are specified.
+- [x] Sight range, fog reveal, and remembered-building behavior are specified.
+- [x] Supply behavior is specified.
+- [x] Projection unlock, upgrade costs, upgrade times, and loss-on-destruction behavior are specified.
+- [x] Death behavior is specified.
+- [x] AI availability and intended AI usage are specified.
+
+Approved Positioning rules:
+
+- Creation source: Golem transformation.
+- Command and hotkey: deferred until command-card implementation.
+- Transform cost/refund/cancellation: free Steel/Oil transform, permanently consumes the Golem, and
+  has no refund after the immediate transform begins.
+- Transform time: the Golem disappears immediately and the Positioning structure appears at low HP,
+  following the approved Golem morph direction. Exact completion timing and starting HP profile are
+  deferred.
+- Prerequisites/build limit: requires an owned Golem; no additional tech prerequisite or hard build
+  limit unless a later phase adds one.
+- Max HP: 165, matching Killing Tools, Anchorage, and the current R&D Complex.
+- Armor/tags: armored. Other tags, repairability, capture rules, and vulnerabilities use ordinary
+  owner-only tech-building defaults unless a later implementation pass names a specific difference.
+- Footprint: 3x3.
+- Placement/pathing/render/minimap/fog: use ordinary tech-building defaults by default.
+- Sight: 1 tile by default, matching Killing Tools, Anchorage, and current R&D Complex sight.
+- Supply: no Supply provided or used.
+- Weapon: no weapon or active combat behavior.
+- Unlock behavior: at least one completed Positioning unlocks Projection, the renamed current Dash
+  implementation. If all completed Positioning structures are destroyed, Projection becomes
+  locked/disabled again.
+- Upgrade behavior: first implementation includes no upgrades. Future Positioning upgrades or
+  movement/mobility customizations persist after research and are not lost or disabled by
+  Positioning destruction.
+- Death behavior: destroying the last completed Positioning removes Projection access but does not
+  erase future researched upgrades/customizations.
+- AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
 ## Future Implementation Permission
 
-- [ ] User explicitly approved proceeding beyond Phase 1.
+- [ ] User explicitly approved proceeding beyond Phase 6 planning into implementation.
 - [ ] Approved implementation scope is named exactly.
 - [ ] Blocked mechanics are named exactly.
 - [ ] Required design docs and context capsules for the approved implementation scope are listed.
+
+Current implementation permission status:
+
+- Implementation is not yet approved. This serial planning gate has completed the entity briefs and
+  rules specs, but code work remains blocked until the user explicitly approves an implementation
+  scope.

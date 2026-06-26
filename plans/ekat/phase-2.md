@@ -22,7 +22,7 @@ details are designed.
 
 ## Out of Scope
 
-- Golem, Killing Tools, Anchorage, or Dash building briefs/specs except for dependency questions
+- Golem, Killing Tools, Anchorage, or Positioning briefs/specs except for dependency questions
   needed to keep Zamok coherent.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
