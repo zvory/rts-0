@@ -195,7 +195,7 @@ export class Match {
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.domInputZone = this._timeInit(
       "match.domInputZone",
-      () => new DomClickInputZone(dom.gameScreen, {
+      () => new DomClickInputZone([dom.gameScreen, dom.gameMenu], {
         priority: 20,
         ignoreRoots: [dom.viewport],
       }),
