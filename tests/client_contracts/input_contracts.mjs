@@ -254,6 +254,71 @@ import {
   else globalThis.getComputedStyle = priorGetComputedStyle;
 }
 
+{
+  const viewport = {
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+    },
+  };
+  const canvas = {
+    parentElement: viewport,
+    closest() {
+      return null;
+    },
+  };
+  viewport.contains = (el) => el === viewport || el === canvas;
+  const settingsButton = {
+    disabled: false,
+    clickCount: 0,
+    parentElement: null,
+    closest() {
+      return this;
+    },
+    getAttribute() {
+      return null;
+    },
+    dispatchEvent(ev) {
+      if (ev.type === "click") this.clickCount += 1;
+      return true;
+    },
+  };
+  const gameScreen = {
+    hidden: false,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+    },
+    contains(el) {
+      return el === this || viewport.contains(el);
+    },
+  };
+  const gameMenu = {
+    hidden: false,
+    getBoundingClientRect() {
+      return { left: 740, top: 10, right: 790, bottom: 120, width: 50, height: 110 };
+    },
+    contains(el) {
+      return el === this || el === settingsButton;
+    },
+  };
+  const doc = {
+    elementFromPoint(x, y) {
+      if (x >= 750 && x <= 780 && y >= 20 && y <= 50) return settingsButton;
+      return canvas;
+    },
+  };
+  const router = new MatchInputRouter(viewport);
+  router.registerZone(new DomClickInputZone([gameScreen, gameMenu], {
+    priority: 20,
+    documentRef: doc,
+    ignoreRoots: [viewport],
+  }));
+
+  assert(router.pointerDown({ clientX: 760, clientY: 30, button: 0, source: "locked" }), "DOM zone consumes locked pointerDown over sibling settings menu");
+  assert(router.pointerUp({ clientX: 760, clientY: 30, button: 0, source: "locked" }), "DOM zone consumes locked pointerUp over sibling settings menu");
+  assert(settingsButton.clickCount === 1, "DOM zone forwards locked clicks to settings chrome outside the game screen");
+  assert(!router.pointerDown({ clientX: 100, clientY: 100, button: 0, source: "locked" }), "DOM zone still ignores viewport hits when multiple roots are registered");
+}
+
 // ---------------------------------------------------------------------------
 // Pointer lock bridge
 // ---------------------------------------------------------------------------
@@ -665,6 +730,98 @@ import {
   nativeRouteInput._handleNativeCursorEvent({ type: "down", button: 0, x: 33, y: 44 });
   assert(routed.viewportX === 33 && routed.viewportY === 44, "native pointerDown routes viewport coords from the native cursor");
   assert(routed.clientX === 43 && routed.clientY === 64, "native pointerDown routes client coords matching the native cursor");
+}
+
+{
+  const routed = [];
+  const nativeButtonInput = Object.create(Input.prototype);
+  nativeButtonInput.pointerLocked = true;
+  nativeButtonInput._cursorLockMode = "native-macos";
+  nativeButtonInput.mouse = { x: 0, y: 0 };
+  nativeButtonInput.dom = {
+    clientWidth: 120,
+    clientHeight: 80,
+    getBoundingClientRect() {
+      return { left: 10, top: 20, width: 120, height: 80 };
+    },
+  };
+  nativeButtonInput.cameraNavigation = null;
+  nativeButtonInput.inputRouter = {
+    pointerDown(ev) {
+      routed.push(["down", ev.buttons]);
+      return true;
+    },
+    pointerMove(ev) {
+      routed.push(["move", ev.buttons]);
+      return true;
+    },
+    pointerUp(ev) {
+      routed.push(["up", ev.buttons]);
+      return true;
+    },
+  };
+  nativeButtonInput._pointerLockCursor = { style: {} };
+  nativeButtonInput._pendingPointerLockCursor = null;
+  nativeButtonInput._nativeButtonsMask = 0;
+  nativeButtonInput._panDrag = null;
+  nativeButtonInput._drag = null;
+  nativeButtonInput._finishTankTrapPlacementDrag = () => false;
+
+  nativeButtonInput._handleNativeCursorEvent({ type: "down", button: 0, x: 20, y: 20 });
+  nativeButtonInput._handleNativeCursorEvent({ type: "move", x: 30, y: 30, dx: 10, dy: 10 });
+  nativeButtonInput._handleNativeCursorEvent({ type: "up", button: 0, x: 30, y: 30 });
+
+  assert(routed.map((entry) => entry.join(":")).join(",") === "down:1,move:1,up:0",
+    "native cursor events preserve the pressed left-button mask across drag moves");
+}
+
+{
+  const boxes = [];
+  let committedDrag = null;
+  const nativeDragInput = Object.create(Input.prototype);
+  nativeDragInput.pointerLocked = true;
+  nativeDragInput._cursorLockMode = "native-macos";
+  nativeDragInput.mouse = { x: 10, y: 10 };
+  nativeDragInput.dom = {
+    clientWidth: 200,
+    clientHeight: 160,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 200, height: 160 };
+    },
+  };
+  nativeDragInput.cameraNavigation = null;
+  nativeDragInput.inputRouter = null;
+  nativeDragInput._pointerLockCursor = { style: {} };
+  nativeDragInput._pendingPointerLockCursor = null;
+  nativeDragInput._nativeButtonsMask = 0;
+  nativeDragInput._panDrag = null;
+  nativeDragInput._drag = null;
+  nativeDragInput._postQuickCastSelectionGuard = null;
+  nativeDragInput.renderer = {
+    drawSelectionBox(box) {
+      boxes.push(box);
+    },
+  };
+  nativeDragInput._placement = () => null;
+  nativeDragInput._commandTarget = () => null;
+  nativeDragInput._labTool = () => null;
+  nativeDragInput._intent = () => null;
+  nativeDragInput._cancelLabToolForBoxSelect = () => {};
+  nativeDragInput._finishTankTrapPlacementDrag = () => false;
+  nativeDragInput._commitBoxSelection = (drag) => {
+    committedDrag = drag;
+  };
+  nativeDragInput._commitClickSelection = () => {
+    throw new Error("native left-drag should not finish as a click");
+  };
+
+  nativeDragInput._handleNativeCursorEvent({ type: "down", button: 0, x: 10, y: 10 });
+  nativeDragInput._handleNativeCursorEvent({ type: "move", x: 40, y: 44, dx: 30, dy: 34 });
+  nativeDragInput._handleNativeCursorEvent({ type: "up", button: 0, x: 40, y: 44 });
+
+  assert(boxes.some((box) => box?.w === 30 && box?.h === 34), "native left-drag draws the gameplay selection box");
+  assert(committedDrag?.x0 === 10 && committedDrag?.x1 === 40, "native left-drag commits box selection on release");
+  assert(boxes.at(-1) === null, "native left-drag clears the selection box after release");
 }
 
 {

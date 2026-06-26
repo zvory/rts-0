@@ -28,6 +28,7 @@ export function _setNativeCursorPoint(detail) {
 
 export function _handleNativeCursorEvent(detail) {
   if (detail?.type === "capture" && detail.active === false) {
+    this._nativeButtonsMask = 0;
     if (this.pointerLocked && this._cursorLockMode === "native-macos") {
       this._setCursorLockState(false, null);
     }
@@ -36,6 +37,7 @@ export function _handleNativeCursorEvent(detail) {
   if (!this.pointerLocked || this._cursorLockMode !== "native-macos") return;
 
   const p = this._setNativeCursorPoint(detail);
+  updateNativeButtonsMask(this, detail);
   const ev = this._nativePointerEvent(detail, p);
   switch (detail?.type) {
     case "move":
@@ -68,6 +70,7 @@ export function _nativePointerEvent(detail, p) {
     movementX: Number.isFinite(detail?.dx) ? detail.dx : 0,
     movementY: Number.isFinite(detail?.dy) ? detail.dy : 0,
     button,
+    buttons: Number.isFinite(this._nativeButtonsMask) ? this._nativeButtonsMask : 0,
     deltaX,
     deltaY,
     shiftKey: !!detail?.shiftKey,
@@ -78,4 +81,31 @@ export function _nativePointerEvent(detail, p) {
     preventDefault() {},
     stopPropagation() {},
   };
+}
+
+function updateNativeButtonsMask(input, detail) {
+  const button = Number.isFinite(detail?.button) ? detail.button : null;
+  const mask = button == null ? 0 : nativeButtonMask(button);
+  const current = Number.isFinite(input._nativeButtonsMask) ? input._nativeButtonsMask : 0;
+  switch (detail?.type) {
+    case "down":
+      input._nativeButtonsMask = current | mask;
+      return;
+    case "up":
+      input._nativeButtonsMask = current & ~mask;
+      return;
+    case "capture":
+      input._nativeButtonsMask = 0;
+      return;
+    default:
+      return;
+  }
+}
+
+function nativeButtonMask(button) {
+  if (button === 0) return 1;
+  if (button === 1) return 4;
+  if (button === 2) return 2;
+  if (button >= 3 && button < 31) return 2 ** button;
+  return 0;
 }

@@ -221,6 +221,7 @@ export class Input {
     this._pointerLockAttempt = 0;
     this._lastPointerLockFocusAttempt = null;
     this._lastPointerLockRequest = null;
+    this._nativeButtonsMask = 0;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
 
@@ -555,6 +556,7 @@ export class Input {
       this._setPointerLockCursor(this.mouse);
     } else {
       this.mouse = null;
+      this._nativeButtonsMask = 0;
       this._panDrag = null;
       if (this._drag) {
         this._drag = null;
