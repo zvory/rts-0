@@ -2,6 +2,11 @@ FROM rust:1-bookworm AS builder
 
 WORKDIR /app
 
+ARG WASM_BINDGEN_CLI_VERSION=0.2.123
+
+RUN rustup target add wasm32-unknown-unknown \
+    && cargo install wasm-bindgen-cli --version "${WASM_BINDGEN_CLI_VERSION}" --locked
+
 # Git metadata is not needed during compilation; deploy metadata is injected into
 # the runtime image below so Rust artifacts stay reusable across commits.
 COPY server/Cargo.toml server/Cargo.lock ./server/
@@ -10,6 +15,11 @@ COPY server/src ./server/src
 COPY server/assets ./server/assets
 COPY server/migrations ./server/migrations
 COPY client ./client
+COPY scripts/build-sim-wasm.sh ./scripts/build-sim-wasm.sh
+
+RUN ./scripts/build-sim-wasm.sh \
+    && test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
+    && test -s ./client/vendor/sim-wasm/rts_sim_wasm_bg.wasm
 
 WORKDIR /app/server
 RUN cargo build --release --locked

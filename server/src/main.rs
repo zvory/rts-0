@@ -14,14 +14,14 @@ use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, Path, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{header, StatusCode, Uri};
 use axum::response::{IntoResponse, Redirect};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
@@ -162,10 +162,10 @@ async fn main() {
         lab_scenario_submission,
     };
     let shutdown_lobby = state.lobby.clone();
-    // Static files for everything except `/ws`; unknown paths fall back to `index.html` so the
-    // single-page client loads regardless of the requested path.
-    let static_service =
-        ServeDir::new(&client_dir).fallback(ServeFile::new(format!("{client_dir}/index.html")));
+    // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the
+    // single-page client loads, but missing asset URLs stay 404 so packaging errors are visible.
+    let static_service = ServeDir::new(&client_dir)
+        .fallback(get(client_spa_fallback_handler).with_state(state.clone()));
 
     let app = Router::new()
         .route("/", get(index_handler))
@@ -312,6 +312,38 @@ async fn index_handler(State(state): State<AppState>) -> impl IntoResponse {
         ],
         state.index_html,
     )
+}
+
+async fn client_spa_fallback_handler(uri: Uri, State(state): State<AppState>) -> impl IntoResponse {
+    if is_client_asset_path(uri.path()) {
+        return (StatusCode::NOT_FOUND, "static asset not found").into_response();
+    }
+    (
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        state.index_html,
+    )
+        .into_response()
+}
+
+fn is_client_asset_path(path: &str) -> bool {
+    let path = path.split('?').next().unwrap_or(path);
+    let normalized = path.trim_start_matches('/');
+    if normalized.is_empty() {
+        return false;
+    }
+    if matches!(
+        normalized.split('/').next(),
+        Some("src" | "assets" | "vendor")
+    ) {
+        return true;
+    }
+    let Some(last_segment) = normalized.rsplit('/').next() else {
+        return false;
+    };
+    last_segment.contains('.')
 }
 
 /// Return the short git commit SHA that identifies this build.
@@ -878,6 +910,31 @@ mod tests {
         assert!(html.contains("./src/main.js?v=test-version\""));
         assert!(html.contains("./styles.css?v=test-version\""));
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
+    }
+
+    #[test]
+    fn client_asset_path_detection_keeps_missing_assets_out_of_spa_fallback() {
+        for path in [
+            "/vendor/sim-wasm/rts_sim_wasm.js",
+            "/vendor/sim-wasm/rts_sim_wasm_bg.wasm",
+            "/src/main.js",
+            "/assets/decals/infantry-splash-01.svg",
+            "/styles.css",
+            "/manifest.webmanifest",
+            "/favicon.ico",
+        ] {
+            assert!(
+                is_client_asset_path(path),
+                "{path} should be treated as a static asset"
+            );
+        }
+
+        for path in ["/", "/lab", "/lab/", "/beta", "/rooms/open"] {
+            assert!(
+                !is_client_asset_path(path),
+                "{path} should stay eligible for SPA fallback"
+            );
+        }
     }
 
     #[test]

@@ -585,6 +585,8 @@ run_rust_suites_bg() {
       node "$REPO_ROOT/scripts/check-faction-catalog-parity.mjs"
     run_suite_bg "Architecture: structured logging" \
       "$REPO_ROOT/scripts/check-structured-logging.sh"
+    run_suite_bg "Architecture: deploy assets" \
+      node "$REPO_ROOT/scripts/check-deploy-assets.mjs"
     run_suite_bg "Architecture: test selection policy" \
       node "$SCRIPT_DIR/select-suites.mjs" --verify
     run_suite_bg "Rust format (cargo fmt --check)" \

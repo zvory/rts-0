@@ -15,7 +15,10 @@ node scripts/check-crate-boundaries.mjs
 ```
 
 No JS build step (plain ES modules + PixiJS from CDN). The client is served from `../client`
-relative to the server crate, so `cargo run` from `server/` is the whole dev loop.
+relative to the server crate, so `cargo run` from `server/` is the whole dev loop. Release Docker
+builds do have a prediction-WASM generation step: they run `scripts/build-sim-wasm.sh` inside the
+builder image and fail if `client/vendor/sim-wasm/rts_sim_wasm.js` or
+`rts_sim_wasm_bg.wasm` is missing.
 
 ## Invariants
 - **Clients are untrusted.** Validate and bound every wire input:
@@ -29,6 +32,9 @@ relative to the server crate, so `cargo run` from `server/` is the whole dev loo
   `checked_*`.
 - Keep the room task alive: handle errors, don't propagate panics out of message handlers.
 - `rts-server` is the only crate that may own Axum/Tokio WebSocket/static-file serving.
+- Missing static asset URLs must not fall back to the SPA shell. App routes may fall back to
+  `index.html`, but `/vendor`, `/src`, `/assets`, and root asset files should return 404 when the
+  requested file is absent.
 - `/wiki` is server-rendered and read-only. It may serve only allowlisted Markdown from
   `docs/context` and `docs/design`; `/wiki/stats` must be generated from `rts-rules` definitions
   and faction catalogs, not scraped from client config or rendered docs.

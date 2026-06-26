@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { DEFAULT_FACTION_ID } from "../client/src/protocol.js";
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const gluePath = path.join(repoRoot, "client/vendor/sim-wasm/rts_sim_wasm.js");
 const wasmPath = path.join(repoRoot, "client/vendor/sim-wasm/rts_sim_wasm_bg.wasm");
@@ -30,9 +32,33 @@ const start = {
     resources: [],
   },
   players: [
-    { id: 1, teamId: 1, name: "A", color: "#f00", startTileX: 5, startTileY: 5 },
-    { id: 2, teamId: 1, name: "B", color: "#0f0", startTileX: 8, startTileY: 5 },
-    { id: 3, teamId: 2, name: "C", color: "#00f", startTileX: 50, startTileY: 50 },
+    {
+      id: 1,
+      teamId: 1,
+      factionId: DEFAULT_FACTION_ID,
+      name: "A",
+      color: "#f00",
+      startTileX: 5,
+      startTileY: 5,
+    },
+    {
+      id: 2,
+      teamId: 1,
+      factionId: DEFAULT_FACTION_ID,
+      name: "B",
+      color: "#0f0",
+      startTileX: 8,
+      startTileY: 5,
+    },
+    {
+      id: 3,
+      teamId: 2,
+      factionId: DEFAULT_FACTION_ID,
+      name: "C",
+      color: "#00f",
+      startTileX: 50,
+      startTileY: 50,
+    },
   ],
 };
 const baseline = {
