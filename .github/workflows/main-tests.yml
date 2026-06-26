@@ -72,7 +72,7 @@ jobs:
   server-build:
     name: CI / server binary
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: changed-files
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
@@ -102,9 +102,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Install prediction WASM tooling
+        if: needs.changed-files.outputs.run_server_build == 'true'
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.123 --locked
+
       - name: Build debug server
         if: needs.changed-files.outputs.run_server_build == 'true'
         run: cargo build --manifest-path server/Cargo.toml
+
+      - name: Build prediction WASM assets
+        if: needs.changed-files.outputs.run_server_build == 'true'
+        run: scripts/build-sim-wasm.sh
 
       - name: Upload server binary
         if: needs.changed-files.outputs.run_server_build == 'true'
@@ -112,6 +122,18 @@ jobs:
         with:
           name: rts-server-debug
           path: server/target/debug/rts-server
+          if-no-files-found: error
+
+      - name: Upload prediction WASM assets
+        if: needs.changed-files.outputs.run_server_build == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rts-sim-wasm-assets
+          path: |
+            client/vendor/sim-wasm/rts_sim_wasm.js
+            client/vendor/sim-wasm/rts_sim_wasm_bg.wasm
+            client/vendor/sim-wasm/rts_sim_wasm.d.ts
+            client/vendor/sim-wasm/rts_sim_wasm_bg.wasm.d.ts
           if-no-files-found: error
 
   rust:
@@ -232,7 +254,7 @@ jobs:
   browser:
     name: CI / browser and tri-state
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     needs:
       - changed-files
       - server-build
@@ -259,10 +281,18 @@ jobs:
           name: rts-server-debug
           path: .ci-server
 
+      - name: Download prediction WASM assets
+        if: needs.changed-files.outputs.run_browser == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: rts-sim-wasm-assets
+          path: client/vendor/sim-wasm
+
       - name: Run browser and tri-state suites
         if: needs.changed-files.outputs.run_browser == 'true'
         env:
           CHROME: /usr/bin/google-chrome-stable
+          RTS_RUN_WASM_TRI_STATE: "0"
         run: |
           chmod +x .ci-server/rts-server
           RTS_SERVER_BIN="$PWD/.ci-server/rts-server" ./tests/run-all.sh --only-browser

@@ -6,7 +6,7 @@ SERVER_MANIFEST="$ROOT/server/Cargo.toml"
 RAW_WASM="$ROOT/server/target/wasm32-unknown-unknown/release/rts_sim_wasm.wasm"
 OUT_DIR="$ROOT/client/vendor/sim-wasm"
 
-cargo build --manifest-path "$SERVER_MANIFEST" -p rts-sim-wasm --release --target wasm32-unknown-unknown
+cargo build --manifest-path "$SERVER_MANIFEST" -p rts-sim-wasm --release --target wasm32-unknown-unknown --locked
 
 mkdir -p "$OUT_DIR"
 

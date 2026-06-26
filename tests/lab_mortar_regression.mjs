@@ -66,6 +66,7 @@ async function exportScenario(client, requestId) {
 }
 
 async function importScenario(client, requestId, scenario, oldMortarId) {
+  const importStartMessageIndex = client.msgs.length;
   const result = await labRequest(
     client,
     requestId,
@@ -75,7 +76,7 @@ async function importScenario(client, requestId, scenario, oldMortarId) {
   const remap = result.outcome?.entityIdMap || [];
   const entry = remap.find((item) => item.oldId === oldMortarId);
   requireCondition(Number.isInteger(entry?.newId), "scenario import remaps mortar entity id");
-  return entry.newId;
+  return { mortarId: entry.newId, importStartMessageIndex };
 }
 
 async function prepareDeployedPlayerTwoMortar(client) {
@@ -101,24 +102,29 @@ async function prepareDeployedPlayerTwoMortar(client) {
   mortar.weaponFacing = mortar.setupFacing;
   mortar.setupTarget = { ...targetPosition };
 
-  const remappedMortarId = await importScenario(client, 4, scenario, mortarId);
-  await waitForRestoredMortarSnapshot(client, remappedMortarId);
+  const { mortarId: remappedMortarId, importStartMessageIndex } = await importScenario(
+    client,
+    4,
+    scenario,
+    mortarId,
+  );
+  await waitForRestoredMortarSnapshot(client, remappedMortarId, importStartMessageIndex);
   return { mortarId: remappedMortarId, targetPosition };
 }
 
-async function waitForRestoredMortarSnapshot(client, mortarId) {
-  await client.waitFor(
-    (msg) =>
-      msg.t === "snapshot" &&
-      msg.entities.some(
-        (entity) =>
-          entity.id === mortarId &&
-          entity.owner === PLAYER_TWO_ID &&
-          entity.kind === KIND.MORTAR_TEAM,
-      ),
-    5_000,
-    "post-import remapped mortar snapshot",
-  );
+async function waitForRestoredMortarSnapshot(client, mortarId, startMessageIndex) {
+  const restored = (msg) =>
+    msg.t === "snapshot" &&
+    msg.entities.some(
+      (entity) =>
+        entity.id === mortarId &&
+        entity.owner === PLAYER_TWO_ID &&
+        entity.kind === KIND.MORTAR_TEAM &&
+        entity.setupState === "deployed",
+    );
+  const existing = client.msgs.slice(startMessageIndex).find(restored);
+  if (existing) return existing;
+  return client.waitNext(restored, 5_000, "post-import deployed mortar snapshot");
 }
 
 async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageIndex) {

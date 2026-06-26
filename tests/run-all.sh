@@ -32,6 +32,7 @@
 #   RTS_SERVER_BIN=/path/to/rts-server tests/run-all.sh --only-live-node  # reuse a prebuilt server
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
+#   RTS_RUN_WASM_TRI_STATE=0 tests/run-all.sh     # skip WASM-backed tri-state groups even when assets exist
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -61,6 +62,7 @@ RUN_LIVE_NODE=1
 RUN_CLIENT=1
 RUN_FULL_AI=0
 RUN_TRI_STATE_BROWSER=0
+RUN_WASM_TRI_STATE="${RTS_RUN_WASM_TRI_STATE:-1}"
 VERBOSE=0
 case "${RTS_RUN_TRI_STATE_BROWSER:-}" in
   1|true|TRUE|yes|YES|on|ON) RUN_TRI_STATE_BROWSER=1 ;;
@@ -585,6 +587,8 @@ run_rust_suites_bg() {
       node "$REPO_ROOT/scripts/check-faction-catalog-parity.mjs"
     run_suite_bg "Architecture: structured logging" \
       "$REPO_ROOT/scripts/check-structured-logging.sh"
+    run_suite_bg "Architecture: deploy assets" \
+      node "$REPO_ROOT/scripts/check-deploy-assets.mjs"
     run_suite_bg "Architecture: test selection policy" \
       node "$SCRIPT_DIR/select-suites.mjs" --verify
     run_suite_bg "Rust format (cargo fmt --check)" \
@@ -713,7 +717,12 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
           node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-2.5
         CHROME="$CHROME" run_suite "Tri-state scenarios: phase 5" \
           node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-5
-        if [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm.js" ] && [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm_bg.wasm" ]; then
+        if [ "$RUN_WASM_TRI_STATE" != "1" ]; then
+          info "skipping WASM-backed tri-state scenarios: RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE"
+          SKIPPED+=("Tri-state scenarios: phase 3.5 (RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE)")
+          SKIPPED+=("Tri-state scenarios: phase 4.5 (RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE)")
+          SKIPPED+=("Tri-state scenarios: phase 6 (RTS_RUN_WASM_TRI_STATE=$RUN_WASM_TRI_STATE)")
+        elif [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm.js" ] && [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm_bg.wasm" ]; then
           CHROME="$CHROME" run_suite "Tri-state scenarios: phase 3.5" \
             node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-3.5
           CHROME="$CHROME" run_suite "Tri-state scenarios: phase 4.5" \

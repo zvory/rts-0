@@ -244,7 +244,9 @@ authoritative lane, a real browser client lane, and a WASM local lane backed by
 Tri-state browser scenarios run automatically in CI, where they are the shared signal for lag and
 prediction regressions. Local `tests/run-all.sh` skips them by default because the browser lanes are
 latency-sensitive under workstation CPU contention; opt in with `--with-tri-state-browser` or
-`RTS_RUN_TRI_STATE_BROWSER=1`.
+`RTS_RUN_TRI_STATE_BROWSER=1`. WASM-backed tri-state groups still require generated assets and can
+be disabled with `RTS_RUN_WASM_TRI_STATE=0`; the split browser CI job uses that switch while
+client smoke verifies that the WASM adapter can load.
 
 Run the no-server harness contract checks:
 
