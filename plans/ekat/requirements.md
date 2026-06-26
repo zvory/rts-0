@@ -55,8 +55,25 @@ health regeneration are not the target behavior.
 - Ekat can mine either Steel or Oil at a time.
 - The player mines by right-clicking Ekat onto a Steel or Oil patch near a Zamok.
 - Ekat's direct mining requires Zamok proximity.
+- Golem mining also requires Zamok proximity.
+- Zamok proximity for Ekat and Golem mining should use the same role and implementation shape as
+  City Centre mining proximity.
 - Ekat's direct mining income should match the income rate of four Kriegsia engineers.
 - This direct mining is a baseline faction action, not an unlocked combat ability.
+
+## Zamok Home Structure
+
+- Zamok is Ekat's home base structure and core building.
+- Zamok and City Centre fill the same faction role: use City Centre-equivalent structure semantics
+  wherever possible, with Ekat-specific visuals and Golem production.
+- Each Ekat player starts with one Zamok.
+- Additional Zamoks can be built, but should be expensive. Exact cost, builder, command, hotkey, and
+  build time are deferred.
+- Zamok provides +10 Supply.
+- Zamok builds Golems.
+- Zamok anchors both Ekat direct mining and Golem mining.
+- If a player has no Zamoks, Ekat dies. If Ekat dies, that player loses.
+- Zamok has no default weapon or defensive attack in the first target.
 
 ## Golems
 
