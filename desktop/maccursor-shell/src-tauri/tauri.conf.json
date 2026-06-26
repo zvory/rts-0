@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "RTS Mac Cursor Shell",
+  "productName": "Bewegungskrieg",
   "version": "0.1.0",
-  "identifier": "dev.bewegungskrieg.MacCursorShell",
+  "identifier": "dev.bewegungskrieg.Bewegungskrieg",
   "build": {
     "frontendDist": "../ui"
   },

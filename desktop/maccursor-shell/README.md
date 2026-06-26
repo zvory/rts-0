@@ -88,8 +88,8 @@ src-tauri/target/unsigned-playtest/
 ```
 
 The artifact directory and zip are named
-`maccursor-shell-v<version>-<short-sha>-<arch>`. Each artifact directory
-contains `RTS Mac Cursor Shell.app`, `manifest.json`, `README.md`, and
+`bewegungskrieg-v<version>-<short-sha>-<arch>`. Each artifact directory
+contains `Bewegungskrieg.app`, `manifest.json`, `README.md`, and
 `contents.txt`. The manifest records the git SHA, build date, target
 architecture, shell version, Tauri product metadata, release-channel URLs, and
 the thin-shell asset check. `contents.txt` lists the payload files with SHA-256
@@ -110,7 +110,7 @@ Use `./build-unsigned.mjs --output <dir>` to write the artifact somewhere else.
 The shell writes local JSONL diagnostics to Tauri's app log directory:
 
 ```text
-~/Library/Logs/dev.bewegungskrieg.MacCursorShell/shell.log
+~/Library/Logs/dev.bewegungskrieg.Bewegungskrieg/shell.log
 ```
 
 The startup screen has **Copy log path** and **Reveal logs** actions. Log-path
