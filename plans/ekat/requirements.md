@@ -77,12 +77,21 @@ health regeneration are not the target behavior.
 
 ## Golems
 
-- Ekat can build Golems.
+- The Ekat faction can build Golems through Zamok.
+- Golems are directly controllable worker-like units with Ekat-specific economy, transformation,
+  and healing mechanics.
 - A Golem is roughly equivalent to four Kriegsia engineers combined:
   - 4x supply use.
   - 4x HP.
   - 4x mining speed.
+- Golems can attack, using four times worker damage.
 - Golems are the faction's main economic and tech-conversion piece, not a broad army roster.
+- Golems permanently transform into tech buildings and any other approved Golem-transformed
+  structures.
+- Golem transformation should work like a Zerg-style building morph: the Golem disappears
+  immediately, the building immediately comes into existence, and the building starts at low HP.
+- Ekat can consume a Golem for full healing only when the Golem is near Ekat. Exact range is
+  deferred.
 
 ## Tech Buildings
 
@@ -127,7 +136,8 @@ the building choice determines which ability family becomes available.
 ## Out Of Scope For This Requirements Draft
 
 - Exact mining timing, drop-off rules, and Zamok proximity numbers.
-- Exact Golem build cost, build time, command UI, and transformation timing.
+- Exact Golem build cost, build time, command UI, healing range, and transformation building HP
+  profile.
 - Exact ability upgrade names, costs, effects, and ordering.
 - Final name for the Dash building currently called **XYZ**.
 - Ekat HP scaling mechanics, cloning mechanics, revival/comeback mechanics, AI support, prediction

@@ -1,6 +1,6 @@
 # Ekat Phase 0/1 Working Checklists
 
-Status: Global Gate, Ekat hero/body, and Zamok decisions recorded. This file is the working
+Status: Global Gate, Ekat hero/body, Zamok, and Golem decisions recorded. This file is the working
 checklist for the active Ekat serial planning gate.
 
 Sources:
@@ -20,7 +20,7 @@ rules/balance spec, get user review, and then move to the next entity.
 - [x] Phase 0: Global Gate.
 - [x] Phase 1: Ekat Hero/Body only.
 - [x] Phase 2: Zamok/Home Structure only.
-- [ ] Phase 3: Golem only.
+- [x] Phase 3: Golem only.
 - [ ] Phase 4: Death Box only.
 - [ ] Phase 5: Vortex only.
 - [ ] Phase 6: Dash Building only.
@@ -65,6 +65,9 @@ Draft patch-note bullets:
   1.6 px/tick Rifleman movement speed.
 - Zamok becomes an expensive, buildable City Centre-equivalent core structure that produces Golems,
   anchors Ekat/Golem mining, provides +10 Supply, and makes Ekat die if the player has no Zamoks.
+- Golems become directly controllable worker-like economy units with 4 Supply, 160 HP, 4x worker
+  mining, 16 worker-like attack damage, permanent building transformation, and proximity-gated Ekat
+  healing.
 
 ## Entity Brief Items: Units And Actors
 
@@ -97,14 +100,37 @@ Approved Ekat hero/body brief:
 
 ### Golem
 
-- [ ] Name and identity are approved.
-- [ ] Player-facing UI description is approved.
-- [ ] Strategic purpose is approved.
-- [ ] Expected counters and failure modes are approved.
-- [ ] Relationship to "four Kriegsia engineers" is approved as direction, rejected, or revised.
-- [ ] Mining, transformation, and consumption roles are approved at a high level.
-- [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
-- [ ] Known unknowns are explicit.
+- [x] Name and identity are approved.
+- [x] Player-facing UI description is approved.
+- [x] Strategic purpose is approved.
+- [x] Expected counters and failure modes are approved.
+- [x] Relationship to "four Kriegsia engineers" is approved as direction, rejected, or revised.
+- [x] Mining, transformation, and consumption roles are approved at a high level.
+- [x] Initial exposure is approved: playable, debug-only, hidden, or blocked.
+- [x] Known unknowns are explicit.
+
+Approved Golem brief:
+
+- Name and identity: Golem is Ekat's directly controllable worker-like economy body and tech
+  conversion piece.
+- Player-facing description: heavy worker that mines, fights weakly in worker terms, can be
+  consumed to heal Ekat, and can permanently become Ekat tech buildings.
+- Strategic purpose: Golems concentrate worker value into fewer, more important bodies. The player
+  chooses between economy, Ekat recovery, and permanent tech-building transformation.
+- Four-worker relationship: Golem uses 4 Supply, has 160 HP, mines at 4x worker rate, and attacks
+  for 16 damage using worker-like attack semantics.
+- Mining role: Golems mine Steel or Oil near Zamok using the same Zamok proximity anchor direction
+  approved for Ekat economy.
+- Transformation role: Golems are permanently consumed when transformed into a tech building or any
+  other approved Golem-transformed structure.
+- Consumption role: Ekat can consume a nearby owned Golem to heal to full HP; exact range is
+  deferred.
+- Failure mode: killing or forcing commitment of Golems attacks Ekat's economy, tech path, and
+  emergency healing reserve at the same time.
+- Initial exposure: playable when the Ekat direction replaces the current prototype slice.
+- Known unknowns: exact Golem build cost, build time, hotkey, command-card details, healing range,
+  transformed-building starting HP profile, exact transform completion timing, size/render tuning,
+  and any future cap beyond normal Supply.
 
 ## Entity Brief Items: Buildings
 
@@ -219,21 +245,51 @@ Approved Ekat hero/body rules:
 
 ## Entity Rules Items: Golem
 
-- [ ] Cost is specified.
-- [ ] Supply impact is specified.
-- [ ] Build source is specified.
-- [ ] Build hotkey is specified.
-- [ ] Build time is specified.
-- [ ] Research or tech prerequisite is specified.
-- [ ] Hit points are specified.
-- [ ] Armor, armored status, tags, status immunities, and vulnerabilities are specified.
-- [ ] Sight range is specified.
-- [ ] Collision size, selection size, and render size are specified.
-- [ ] Movement speed and movement semantics are specified.
-- [ ] Mining target rules, range/proximity rules, cadence, and income are specified.
-- [ ] Transformation rules are specified for each building.
-- [ ] Consumption healing rules are specified.
-- [ ] AI availability and intended AI usage are specified.
+- [x] Cost is specified.
+- [x] Supply impact is specified.
+- [x] Build source is specified.
+- [x] Build hotkey is specified.
+- [x] Build time is specified.
+- [x] Research or tech prerequisite is specified.
+- [x] Hit points are specified.
+- [x] Armor, armored status, tags, status immunities, and vulnerabilities are specified.
+- [x] Sight range is specified.
+- [x] Collision size, selection size, and render size are specified.
+- [x] Movement speed and movement semantics are specified.
+- [x] Mining target rules, range/proximity rules, cadence, and income are specified.
+- [x] Transformation rules are specified for each building.
+- [x] Consumption healing rules are specified.
+- [x] AI availability and intended AI usage are specified.
+
+Approved Golem rules:
+
+- Cost: exact Golem cost is deferred. The first implementation should treat the four-worker
+  relationship as the default cost direction unless a later tuning pass changes it.
+- Supply: 4.
+- Build source: Zamok builds Golems.
+- Build hotkey: deferred until command-card implementation.
+- Build time: deferred.
+- Research/tech prerequisite: none for baseline Golem production from Zamok unless a later phase
+  explicitly adds one.
+- HP: 160.
+- Armor/tags/status rules: worker-like defaults unless a later implementation pass names a specific
+  Ekat difference.
+- Sight: worker-like by default, currently 7 tiles.
+- Size/render: worker-like control semantics with Golem-specific visuals; exact collision,
+  selection, and render size are deferred for implementation/art fit.
+- Movement: directly controllable worker-like ground movement, currently 2.0 px/tick.
+- Attack: worker-like attack semantics with 16 damage, four times current worker damage. Worker-like
+  range, cooldown, and target filters are the default unless implementation finds a specific reason
+  to differ.
+- Mining: can mine Steel or Oil near Zamok at 4x worker mining rate. Exact drop-off/cadence details
+  follow the existing worker/Zamok proximity model where possible.
+- Transformation: transforming permanently consumes the Golem. The Golem disappears immediately,
+  the target building immediately exists, and that building starts at low HP. Exact starting HP and
+  completion timing are deferred to the per-building phases or implementation planning.
+- Consumption healing: Ekat can consume a nearby owned Golem to heal to full HP. Exact proximity
+  range and command flow are deferred.
+- Cap: no hard cap beyond normal Supply unless a later phase adds one.
+- AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
 ## Entity Rules Items: Zamok/Home Structure
 
