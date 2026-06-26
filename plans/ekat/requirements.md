@@ -17,6 +17,8 @@ implementation phase.
 - Work serially: global identity gate, then Ekat, then Zamok, then Golem, then Death Box, then
   Vortex, then the Dash building. Do not brief or spec multiple entities in parallel unless the
   user explicitly overrides the active plan.
+- Treat the current Ekat body and ability runtime as already implemented. The next Ekat-body work
+  is stat rework plus ability availability gating, not a from-scratch hero or ability design pass.
 - Treat each building as its own user-reviewed design object. For each one, confirm the fantasy,
   strategic reason to choose it, counterplay, unlock behavior, loss/destruction consequences, and
   first playable scope before implementation.

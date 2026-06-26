@@ -32,6 +32,7 @@ queue before continuing. Do not fill checklist sections for later entities early
 
 - [ ] Confirm whether the new requirements replace, hide, debug-gate, or evolve the current playable
       Ekat hero/Zamok slice.
+- [ ] Confirm that the existing Ekat body and ability runtime are reused instead of redesigned.
 - [ ] Confirm whether Ekat starts with no combat abilities until buildings unlock them.
 - [ ] Confirm whether Ekat has no natural health regeneration.
 - [ ] Confirm whether Steel, Oil, and Supply remain the only resources for this slice.
@@ -42,15 +43,14 @@ queue before continuing. Do not fill checklist sections for later entities early
 
 ## Entity Brief Items: Units And Actors
 
-### Ekat Hero/Body
+### Existing Ekat Hero/Body Stats And Ability Gate
 
-- [ ] Name and identity are approved.
-- [ ] Player-facing UI description is approved.
-- [ ] Strategic purpose is approved.
-- [ ] Expected counters and failure modes are approved.
-- [ ] Direct mining fantasy and player action are approved.
-- [ ] Unusual interactions are listed: Zamok proximity, fog, queueing, abilities, Golem consumption,
-      death, replay, AI, and prediction.
+- [ ] Current body and ability runtime are confirmed as implemented and reused.
+- [ ] Player-facing stat rework goal is approved.
+- [ ] Expected counters and failure modes from the stat rework are approved.
+- [ ] Ability availability goal is approved: hidden, locked, debug-only, or another first slice.
+- [ ] Unusual interactions are listed: command card, queued abilities, recast return, Magic Anchor,
+      Golem consumption, death, replay, AI, and prediction.
 - [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
 - [ ] Known unknowns are explicit.
 
@@ -115,7 +115,7 @@ queue before continuing. Do not fill checklist sections for later entities early
 - [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
 - [ ] Known unknowns are explicit.
 
-## Entity Rules Items: Ekat Hero/Body
+## Entity Rules Items: Existing Ekat Hero/Body Stats And Ability Gate
 
 - [ ] Cost is specified.
 - [ ] Supply impact is specified.
@@ -126,10 +126,11 @@ queue before continuing. Do not fill checklist sections for later entities early
 - [ ] Sight range is specified.
 - [ ] Collision size, selection size, and render size are specified.
 - [ ] Movement speed and movement semantics are specified.
-- [ ] Direct mining target rules, range/proximity rules, cadence, and income are specified.
 - [ ] Health recovery, no-regeneration policy, Golem consumption, death, and revival are specified.
 - [ ] Baseline combat policy is specified.
 - [ ] Ability unlock behavior is specified for Dash, Line Shot, and Magic Anchor.
+- [ ] Temporary behavior before unlock buildings exist is specified: hidden/locked, debug-only, or
+      blocked from shipping.
 - [ ] AI availability and intended AI usage are specified.
 
 ## Entity Rules Items: Golem
