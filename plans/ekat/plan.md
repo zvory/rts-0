@@ -18,7 +18,7 @@ code, balance, protocol, art, or tests change.
 - [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) is mandatory for Ekat and Golem
   work.
 - [docs/new-building-checklist.md](../../docs/new-building-checklist.md) is mandatory for Zamok,
-  Killing Tools, Vortex, and the Dash building currently named `XYZ`.
+  Killing Tools, Anchorage, and the Dash building currently named `XYZ`.
 - The archived clean-slate brief under `plans/archive/faction/ekat-brief.md` remains evidence that
   purged RTS-style Ekat content is not approved.
 - Current design docs describe the implemented Ekat hero/Zamok slice. Phase 0 must reconcile that
@@ -48,11 +48,12 @@ healing. It stops for user review before any Golem-converted tech building is br
 Phase 4 handles only Killing Tools, formerly called Death Box in the draft. It completes the
 new-building checklist Phase 0 brief and Phase 1 rules/balance spec for the offensive attack tech
 slot, first Line Shot unlock, transformation tradeoff, destruction consequence, and upgrade
-direction. It stops for user review before Vortex work starts.
+direction. It stops for user review before Anchorage work starts.
 
-Phase 5 handles only Vortex. It completes the new-building checklist Phase 0 brief and Phase 1
-rules/balance spec for the Magic Anchor unlock family, transformation tradeoff, destruction
-consequence, and upgrade direction. It stops for user review before the Dash building work starts.
+Phase 5 handles only Anchorage, formerly called Vortex in the draft. It completes the new-building
+checklist Phase 0 brief and Phase 1 rules/balance spec for the anchor-placement tech slot, first
+Magic Anchor unlock, transformation tradeoff, destruction consequence, and upgrade direction. It
+stops for user review before the Dash building work starts.
 
 Phase 6 handles only the Dash building currently named `XYZ`. It completes the new-building
 checklist Phase 0 brief and Phase 1 rules/balance spec for the Dash unlock family, final name,
@@ -66,7 +67,7 @@ before any implementation phase is written.
 2. [Phase 2 - Zamok Brief and Spec](phase-2.md)
 3. [Phase 3 - Golem Brief and Spec](phase-3.md)
 4. [Phase 4 - Killing Tools Brief and Spec](phase-4.md)
-5. [Phase 5 - Vortex Brief and Spec](phase-5.md)
+5. [Phase 5 - Anchorage Brief and Spec](phase-5.md)
 6. [Phase 6 - Dash Building Brief and Spec](phase-6.md)
 
 Future implementation phase files are intentionally not authored yet. Per the new unit and new

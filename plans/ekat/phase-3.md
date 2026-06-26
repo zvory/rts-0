@@ -22,7 +22,7 @@ building is designed.
 
 ## Out of Scope
 
-- Killing Tools, Vortex, or Dash building briefs/specs except for dependency questions needed to
+- Killing Tools, Anchorage, or Dash building briefs/specs except for dependency questions needed to
   keep Golem transformation coherent.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
