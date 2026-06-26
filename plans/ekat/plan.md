@@ -18,7 +18,7 @@ code, balance, protocol, art, or tests change.
 - [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) is mandatory for Ekat and Golem
   work.
 - [docs/new-building-checklist.md](../../docs/new-building-checklist.md) is mandatory for Zamok,
-  Killing Tools, Anchorage, and the Dash building currently named `XYZ`.
+  Killing Tools, Anchorage, and Positioning.
 - The archived clean-slate brief under `plans/archive/faction/ekat-brief.md` remains evidence that
   purged RTS-style Ekat content is not approved.
 - Current design docs describe the implemented Ekat hero/Zamok slice. Phase 0 must reconcile that
@@ -32,10 +32,10 @@ current playable Ekat slice. It ends by naming the first active entity and confi
 implementation files were edited.
 
 Phase 1 handles only the existing Ekat hero/body stat rework and ability availability gate. The
-Ekat body, Dash, Line Shot, Magic Anchor, return marker, projectile, and Magic Anchor runtime
-already exist; this phase must not redesign or reimplement them. It only approves exact hero stat
-changes and the rule that those existing abilities are unavailable at match start and become
-available through explicit unlock sources.
+Ekat body, current Dash/Projection runtime, Line Shot, Magic Anchor, return marker, projectile, and
+Magic Anchor runtime already exist; this phase must not redesign or reimplement them. It only
+approves exact hero stat changes and the rule that those existing abilities are unavailable at match
+start and become available through explicit unlock sources.
 
 Phase 2 handles only Zamok as the home structure. It completes the new-building checklist Phase 0
 brief and Phase 1 rules/balance spec for mining proximity, starting-state, supply, revival, and
@@ -53,12 +53,12 @@ direction. It stops for user review before Anchorage work starts.
 Phase 5 handles only Anchorage, formerly called Vortex in the draft. It completes the new-building
 checklist Phase 0 brief and Phase 1 rules/balance spec for the anchor-placement tech slot, first
 Magic Anchor unlock, transformation tradeoff, destruction consequence, and upgrade direction. It
-stops for user review before the Dash building work starts.
+stops for user review before Positioning work starts.
 
-Phase 6 handles only the Dash building currently named `XYZ`. It completes the new-building
-checklist Phase 0 brief and Phase 1 rules/balance spec for the Dash unlock family, final name,
-transformation tradeoff, destruction consequence, and upgrade direction. It stops for user review
-before any implementation phase is written.
+Phase 6 handles only Positioning, formerly the Dash building named `XYZ` in the draft. It completes
+the new-building checklist Phase 0 brief and Phase 1 rules/balance spec for the Projection unlock
+family, final name, transformation tradeoff, destruction consequence, and upgrade direction. It
+stops for user review before any implementation phase is written.
 
 ## Phase Index
 
@@ -68,7 +68,7 @@ before any implementation phase is written.
 3. [Phase 3 - Golem Brief and Spec](phase-3.md)
 4. [Phase 4 - Killing Tools Brief and Spec](phase-4.md)
 5. [Phase 5 - Anchorage Brief and Spec](phase-5.md)
-6. [Phase 6 - Dash Building Brief and Spec](phase-6.md)
+6. [Phase 6 - Positioning Brief and Spec](phase-6.md)
 
 Future implementation phase files are intentionally not authored yet. Per the new unit and new
 building workflow gates, each entity phase stops after that entity's Phase 0/1 checklist until the
@@ -90,8 +90,9 @@ explicitly approves implementation scope.
 - Do not assume the current playable Ekat slice is the final target. Phase 0 must explicitly decide
   whether the new design replaces, hides, debug-gates, or incrementally evolves the current slice.
 - Treat Ekat's current body and ability mechanics as implemented. Future work may tune stats and
-  gate ability availability, but should not rebuild Dash, Line Shot, Magic Anchor, return markers,
-  line projectiles, or anchor projection unless a later bug or design change explicitly requires it.
+  gate ability availability, but should not rebuild the current Dash/Projection runtime, Line Shot,
+  Magic Anchor, return markers, line projectiles, or anchor projection unless a later bug or design
+  change explicitly requires it.
 - Keep the faction hero-centric unless the user changes that requirement. Golems and buildings are
   supporting strategic choices, not a broad RTS roster by default.
 - Apply the new unit checklist to Ekat and Golem, and the new building checklist to each building.

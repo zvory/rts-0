@@ -13,9 +13,9 @@ implementation phase.
 
 - Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for Ekat and Golem.
 - Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for Zamok, Killing
-  Tools, Anchorage, and the Dash building.
+  Tools, Anchorage, and Positioning.
 - Work serially: global identity gate, then Ekat, then Zamok, then Golem, then Killing Tools, then
-  Anchorage, then the Dash building. Do not brief or spec multiple entities in parallel unless the
+  Anchorage, then Positioning. Do not brief or spec multiple entities in parallel unless the
   user explicitly overrides the active plan.
 - Treat the current Ekat body and ability runtime as already implemented. The next Ekat-body work
   is stat rework plus ability availability gating, not a from-scratch hero or ability design pass.
@@ -123,7 +123,12 @@ Shared first-target rules for Ekat tech buildings:
 - In the longer-term direction, Anchorage becomes the place to create and customize anchors. The
   current Magic Anchor implementation should probably be renamed to Vortex later, and future anchors
   may do other things.
-- **XYZ** is a placeholder building name for Dash and Dash upgrades.
+- **Positioning** is the current name for the mobility/repositioning tech building formerly drafted
+  as `XYZ`.
+- **Positioning** unlocks Projection, the approved player-facing rename for the current Dash
+  implementation, in the first implementation target.
+- In the longer-term direction, Positioning becomes the place to customize broader movement and
+  mobility tools.
 
 ### Killing Tools
 
@@ -157,15 +162,35 @@ Shared first-target rules for Ekat tech buildings:
 - Anchorage uses the shared Ekat tech-building stat profile: 3x3 footprint, 165 HP, 1-tile sight,
   and armored status.
 - Killing Tools is expected to be the first-priority tech choice for raw pressure. Anchorage's exact
-  competitive reason versus Killing Tools and Dash tech is deferred for playtesting.
+  competitive reason versus Killing Tools and Positioning is deferred for playtesting.
 - Exact command, hotkey, transform completion timing, low-HP starting profile, anchor customization
   list, upgrade costs, and upgrade times are deferred.
+
+### Positioning
+
+- Positioning is Ekat's mobility and repositioning technology structure.
+- Projection is the approved player-facing rename for the current Dash ability/runtime.
+- A Golem transforms into Positioning for free except for permanently consuming that Golem.
+- At least one completed Positioning structure unlocks base Projection.
+- If all completed Positioning structures are destroyed, Projection becomes locked/disabled again.
+- Future Positioning upgrades or movement/mobility customizations should persist once researched;
+  they are not lost or disabled just because all Positioning structures are gone. Projection access
+  itself still requires a completed Positioning structure.
+- The first implementation target includes only the base Projection unlock; upgrades and broader
+  movement customization are deferred.
+- Positioning has no weapon or active combat behavior. It is a tech unlock structure.
+- Positioning uses the shared Ekat tech-building stat profile: 3x3 footprint, 165 HP, 1-tile sight,
+  and armored status.
+- Positioning is deliberately flexible. Its exact competitive reason versus Killing Tools and
+  Anchorage is deferred for playtesting.
+- Exact command, hotkey, transform completion timing, low-HP starting profile, movement/mobility
+  customization list, upgrade costs, and upgrade times are deferred.
 
 ## Abilities
 
 - Ekat has no combat abilities by default and no basic attack.
 - Locked abilities should remain visible in the command card but disabled.
-- Line Shot, Magic Anchor, and Dash must be unlocked through their associated Golem-converted
+- Line Shot, Magic Anchor, and Projection must be unlocked through their associated Golem-converted
   buildings.
 - Each ability family can have upgrades associated with its building.
 
@@ -197,8 +222,7 @@ Shared first-target rules for Ekat tech buildings:
 - Exact mining timing, drop-off rules, and Zamok proximity numbers.
 - Exact Golem build cost, build time, command UI, healing range, and transformation building HP
   profile.
-- Exact Killing Tools attack customizations, Anchorage anchor customizations, ability upgrade names,
-  costs, effects, and ordering.
-- Final name for the Dash building currently called **XYZ**.
+- Exact Killing Tools attack customizations, Anchorage anchor customizations, Positioning
+  movement/mobility customizations, ability upgrade names, costs, effects, and ordering.
 - Ekat HP scaling mechanics, cloning mechanics, revival/comeback mechanics, AI support, prediction
   support, replay compatibility, art, sound, and implementation phases.

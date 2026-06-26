@@ -7,7 +7,7 @@ Status: complete; user decisions recorded in [checklists.md](checklists.md) and
 
 Complete the new-building checklist Phase 0 brief and Phase 1 rules/balance spec for Killing Tools,
 formerly called Death Box in the draft. This phase should define the offensive attack tech
-commitment and first Line Shot unlock before Anchorage or the Dash building is designed.
+commitment and first Line Shot unlock before Anchorage or Positioning is designed.
 
 ## Scope
 
@@ -22,7 +22,7 @@ commitment and first Line Shot unlock before Anchorage or the Dash building is d
 
 ## Out of Scope
 
-- Anchorage or Dash building briefs/specs except for comparison questions needed to make Killing Tools'
+- Anchorage or Positioning briefs/specs except for comparison questions needed to make Killing Tools'
   tradeoff clear.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
@@ -32,7 +32,7 @@ commitment and first Line Shot unlock before Anchorage or the Dash building is d
 ## User Interview Focus
 
 - Is Killing Tools the final name?
-- Why does the player choose Killing Tools over Anchorage or the Dash building?
+- Why does the player choose Killing Tools over Anchorage or Positioning?
 - What should Line Shot and its upgrades do before numbers are chosen?
 - Should Killing Tools be fragile, durable, hidden, obvious, attackable, or mainly a tech
   commitment?
@@ -72,8 +72,7 @@ Approved Killing Tools brief:
 - Long-term direction: Killing Tools becomes the place to customize Ekat attacks through alternate
   build choices such as Line Shot, fan-out behavior, return behavior, or other offensive variants.
 - Killing Tools has no weapon or active combat behavior; it is a tech unlock structure.
-- The reason to choose Killing Tools before Anchorage or the Dash building is offensive kill
-  pressure.
+- The reason to choose Killing Tools before Anchorage or Positioning is offensive kill pressure.
 
 Approved Killing Tools rules:
 
