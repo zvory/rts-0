@@ -18,7 +18,7 @@ code, balance, protocol, art, or tests change.
 - [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) is mandatory for Ekat and Golem
   work.
 - [docs/new-building-checklist.md](../../docs/new-building-checklist.md) is mandatory for Zamok,
-  Death Box, Vortex, and the Dash building currently named `XYZ`.
+  Killing Tools, Vortex, and the Dash building currently named `XYZ`.
 - The archived clean-slate brief under `plans/archive/faction/ekat-brief.md` remains evidence that
   purged RTS-style Ekat content is not approved.
 - Current design docs describe the implemented Ekat hero/Zamok slice. Phase 0 must reconcile that
@@ -45,9 +45,10 @@ Phase 3 handles only Golem. It completes the new-unit checklist Phase 0 brief an
 rules/balance spec for production, mining, transformation, supply, vulnerability, and consumption
 healing. It stops for user review before any Golem-converted tech building is briefed.
 
-Phase 4 handles only Death Box. It completes the new-building checklist Phase 0 brief and Phase 1
-rules/balance spec for the Line Shot unlock family, transformation tradeoff, destruction
-consequence, and upgrade direction. It stops for user review before Vortex work starts.
+Phase 4 handles only Killing Tools, formerly called Death Box in the draft. It completes the
+new-building checklist Phase 0 brief and Phase 1 rules/balance spec for the offensive attack tech
+slot, first Line Shot unlock, transformation tradeoff, destruction consequence, and upgrade
+direction. It stops for user review before Vortex work starts.
 
 Phase 5 handles only Vortex. It completes the new-building checklist Phase 0 brief and Phase 1
 rules/balance spec for the Magic Anchor unlock family, transformation tradeoff, destruction
@@ -64,7 +65,7 @@ before any implementation phase is written.
 1. [Phase 1 - Ekat Stats and Ability Unlock Gate](phase-1.md)
 2. [Phase 2 - Zamok Brief and Spec](phase-2.md)
 3. [Phase 3 - Golem Brief and Spec](phase-3.md)
-4. [Phase 4 - Death Box Brief and Spec](phase-4.md)
+4. [Phase 4 - Killing Tools Brief and Spec](phase-4.md)
 5. [Phase 5 - Vortex Brief and Spec](phase-5.md)
 6. [Phase 6 - Dash Building Brief and Spec](phase-6.md)
 

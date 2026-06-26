@@ -1,7 +1,7 @@
 # Ekat Phase 0/1 Working Checklists
 
-Status: Global Gate, Ekat hero/body, Zamok, and Golem decisions recorded. This file is the working
-checklist for the active Ekat serial planning gate.
+Status: Global Gate, Ekat hero/body, Zamok, Golem, and Killing Tools decisions recorded. This file
+is the working checklist for the active Ekat serial planning gate.
 
 Sources:
 
@@ -21,7 +21,7 @@ rules/balance spec, get user review, and then move to the next entity.
 - [x] Phase 1: Ekat Hero/Body only.
 - [x] Phase 2: Zamok/Home Structure only.
 - [x] Phase 3: Golem only.
-- [ ] Phase 4: Death Box only.
+- [x] Phase 4: Killing Tools only.
 - [ ] Phase 5: Vortex only.
 - [ ] Phase 6: Dash Building only.
 - [ ] User explicitly approved moving beyond serial Phase 0/1 planning into implementation.
@@ -68,6 +68,9 @@ Draft patch-note bullets:
 - Golems become directly controllable worker-like economy units with 4 Supply, 160 HP, 4x worker
   mining, 16 worker-like attack damage, permanent building transformation, and proximity-gated Ekat
   healing.
+- Killing Tools replaces the Death Box draft name for the offensive attack tech building. Its first
+  playable scope is a base Line Shot unlock from a free Golem transform; future attack
+  customizations are deferred.
 
 ## Entity Brief Items: Units And Actors
 
@@ -165,24 +168,49 @@ Approved Zamok brief:
 - Known unknowns: exact expansion Zamok cost, builder/source command, hotkey, build time, repair
   actor, and any tuning differences from City Centre that playtests require.
 
-### Death Box
+### Killing Tools
 
-- [ ] Final or placeholder name status is approved.
-- [ ] Player-facing UI description is approved.
-- [ ] Strategic purpose is approved.
-- [ ] Reason to choose it over Vortex and the Dash building is approved.
-- [ ] Line Shot unlock fantasy and upgrade direction are approved.
-- [ ] Creation rule from Golem transformation is approved or revised.
-- [ ] Expected counters and failure modes are approved.
-- [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
-- [ ] Known unknowns are explicit.
+- [x] Final or placeholder name status is approved.
+- [x] Player-facing UI description is approved.
+- [x] Strategic purpose is approved.
+- [x] Reason to choose it over Vortex and the Dash building is approved.
+- [x] Line Shot unlock fantasy and upgrade direction are approved.
+- [x] Creation rule from Golem transformation is approved or revised.
+- [x] Expected counters and failure modes are approved.
+- [x] Initial exposure is approved: playable, debug-only, hidden, or blocked.
+- [x] Known unknowns are explicit.
+
+Approved Killing Tools brief:
+
+- Name status: Killing Tools replaces Death Box as the current name. It may still change later, but
+  it is not treated as a throwaway placeholder.
+- Player-facing description: offensive attack technology structure. Unlocks Line Shot now and later
+  hosts Ekat attack customizations.
+- Strategic purpose: Killing Tools is the damage-dealing tech choice. The first playable reason to
+  choose it over Vortex or the Dash building is access to offensive kill pressure through Line Shot.
+- Long-term direction: Killing Tools should eventually unlock or customize a more basic offensive
+  attack package, with Line Shot, fan-out behavior, return behavior, or other build variants as
+  possible choices.
+- First playable scope: only the base Line Shot unlock is included; upgrades and broader attack
+  customization are deferred.
+- Creation rule: a Golem transforms into Killing Tools for free except for permanently consuming
+  that Golem.
+- Failure mode: if all completed Killing Tools structures are destroyed, Line Shot becomes locked or
+  disabled again.
+- Upgrade persistence: future upgrades/customizations researched through Killing Tools are not lost
+  or disabled when all Killing Tools structures are gone, though Line Shot access still requires a
+  completed Killing Tools structure.
+- Initial exposure: playable when the Ekat direction replaces the current prototype slice.
+- Known unknowns: exact transform command/hotkey, transform completion timing, low-HP starting
+  profile, upgrade/customization list, upgrade costs/times, final name, and any future relationship
+  between a more basic offensive attack and Line Shot.
 
 ### Vortex
 
 - [ ] Final or placeholder name status is approved.
 - [ ] Player-facing UI description is approved.
 - [ ] Strategic purpose is approved.
-- [ ] Reason to choose it over Death Box and the Dash building is approved.
+- [ ] Reason to choose it over Killing Tools and the Dash building is approved.
 - [ ] Magic Anchor unlock fantasy and upgrade direction are approved.
 - [ ] Creation rule from Golem transformation is approved or revised.
 - [ ] Expected counters and failure modes are approved.
@@ -194,7 +222,7 @@ Approved Zamok brief:
 - [ ] Final name for `XYZ` is approved.
 - [ ] Player-facing UI description is approved.
 - [ ] Strategic purpose is approved.
-- [ ] Reason to choose it over Death Box and Vortex is approved.
+- [ ] Reason to choose it over Killing Tools and Vortex is approved.
 - [ ] Dash unlock fantasy and upgrade direction are approved.
 - [ ] Creation rule from Golem transformation is approved or revised.
 - [ ] Expected counters and failure modes are approved.
@@ -237,8 +265,8 @@ Approved Ekat hero/body rules:
 - Death/revival: Ekat death causes immediate player loss for the first implementation target; no
   revival rule in this slice.
 - Baseline combat: no basic attack.
-- Ability unlocks: Death Box unlocks Line Shot, Vortex unlocks Magic Anchor, and the Dash building
-  currently named `XYZ` unlocks Dash.
+- Ability unlocks: Killing Tools unlocks Line Shot, Vortex unlocks Magic Anchor, and the Dash
+  building currently named `XYZ` unlocks Dash.
 - Temporary behavior: until unlock buildings exist, abilities should remain visible but disabled
   rather than being freely usable.
 - AI/prediction: AI support and local prediction may remain disabled indefinitely.
@@ -331,24 +359,52 @@ Approved Zamok rules:
 - Death/victory: if a player has no Zamoks, Ekat dies. If Ekat dies, that player loses.
 - AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
-## Entity Rules Items: Death Box
+## Entity Rules Items: Killing Tools
 
-- [ ] Creation source is specified.
-- [ ] Command and hotkey are specified.
-- [ ] Transform cost, consumed Golem behavior, refund, and cancellation are specified.
-- [ ] Transform time is specified.
-- [ ] Prerequisites, build limit, and unlock timing are specified.
-- [ ] Hit points are specified.
-- [ ] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
-- [ ] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
+- [x] Creation source is specified.
+- [x] Command and hotkey are specified.
+- [x] Transform cost, consumed Golem behavior, refund, and cancellation are specified.
+- [x] Transform time is specified.
+- [x] Prerequisites, build limit, and unlock timing are specified.
+- [x] Hit points are specified.
+- [x] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
+- [x] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
       specified.
-- [ ] Selection size, render size, and minimap behavior are specified.
-- [ ] Sight range, fog reveal, and remembered-building behavior are specified.
-- [ ] Supply behavior is specified.
-- [ ] Line Shot unlock, upgrade costs, upgrade times, and loss-on-destruction behavior are
+- [x] Selection size, render size, and minimap behavior are specified.
+- [x] Sight range, fog reveal, and remembered-building behavior are specified.
+- [x] Supply behavior is specified.
+- [x] Line Shot unlock, upgrade costs, upgrade times, and loss-on-destruction behavior are
       specified.
-- [ ] Death behavior is specified.
-- [ ] AI availability and intended AI usage are specified.
+- [x] Death behavior is specified.
+- [x] AI availability and intended AI usage are specified.
+
+Approved Killing Tools rules:
+
+- Creation source: Golem transformation.
+- Command and hotkey: deferred until command-card implementation.
+- Transform cost/refund/cancellation: free Steel/Oil transform, permanently consumes the Golem, and
+  has no refund after the immediate transform begins.
+- Transform time: the Golem disappears immediately and the Killing Tools structure appears at low
+  HP, following the approved Golem morph direction. Exact completion timing and starting HP profile
+  are deferred.
+- Prerequisites/build limit: requires an owned Golem; no additional tech prerequisite or hard build
+  limit unless a later phase adds one.
+- Max HP: 165, matching the current R&D Complex.
+- Armor/tags: armored. Other tags, repairability, capture rules, and vulnerabilities use ordinary
+  owner-only tech-building defaults unless a later implementation pass names a specific difference.
+- Footprint: 3x3.
+- Placement/pathing/render/minimap/fog: use ordinary tech-building defaults by default.
+- Sight: 1 tile by default, matching current R&D Complex sight.
+- Supply: no Supply provided or used.
+- Weapon: no weapon or active combat behavior.
+- Unlock behavior: at least one completed Killing Tools unlocks base Line Shot. If all completed
+  Killing Tools structures are destroyed, Line Shot becomes locked/disabled again.
+- Upgrade behavior: first implementation includes no upgrades. Future Killing Tools upgrades or
+  attack customizations persist after research and are not lost or disabled by Killing Tools
+  destruction.
+- Death behavior: destroying the last completed Killing Tools removes Line Shot access but does not
+  erase future researched upgrades/customizations.
+- AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
 ## Entity Rules Items: Vortex
 

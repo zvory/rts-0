@@ -12,9 +12,9 @@ implementation phase.
 ## Planning Workflow
 
 - Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for Ekat and Golem.
-- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for Zamok, Death Box,
-  Vortex, and the Dash building.
-- Work serially: global identity gate, then Ekat, then Zamok, then Golem, then Death Box, then
+- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for Zamok, Killing
+  Tools, Vortex, and the Dash building.
+- Work serially: global identity gate, then Ekat, then Zamok, then Golem, then Killing Tools, then
   Vortex, then the Dash building. Do not brief or spec multiple entities in parallel unless the
   user explicitly overrides the active plan.
 - Treat the current Ekat body and ability runtime as already implemented. The next Ekat-body work
@@ -98,9 +98,31 @@ health regeneration are not the target behavior.
 Ekat unlocks hero abilities by transforming Golems into buildings. The transformation is free, and
 the building choice determines which ability family becomes available.
 
-- **Death Box** unlocks Line Shot and Line Shot upgrades.
+- **Killing Tools** is the current name for the offensive attack tech building formerly drafted as
+  Death Box. The name may still change, but it is no longer treated as a throwaway placeholder.
+- **Killing Tools** unlocks base Line Shot in the first implementation target.
+- In the longer-term direction, Killing Tools becomes the place to customize Ekat's offensive
+  attacks. Future customizations may include Line Shot, fan-out behavior, return behavior, or other
+  build-like attack variants.
 - **Vortex** unlocks Magic Anchor and Magic Anchor upgrades.
 - **XYZ** is a placeholder building name for Dash and Dash upgrades.
+
+### Killing Tools
+
+- Killing Tools is Ekat's offensive damage-dealing technology structure.
+- A Golem transforms into Killing Tools for free except for permanently consuming that Golem.
+- At least one completed Killing Tools structure unlocks base Line Shot.
+- If all completed Killing Tools structures are destroyed, base Line Shot becomes locked/disabled
+  again.
+- Future Killing Tools upgrades or customizations should persist once researched; they are not lost
+  or disabled just because all Killing Tools structures are gone. Line Shot access itself still
+  requires a completed Killing Tools structure.
+- The first implementation target includes only the base Line Shot unlock; upgrades and broader
+  attack customization are deferred.
+- Killing Tools has no weapon or active combat behavior. It is a tech unlock structure.
+- Killing Tools uses a 3x3 footprint, 165 HP to match the current R&D Complex, and armored status.
+- Exact command, hotkey, transform completion timing, low-HP starting profile, upgrade list, upgrade
+  costs, and upgrade times are deferred.
 
 ## Abilities
 
@@ -138,7 +160,7 @@ the building choice determines which ability family becomes available.
 - Exact mining timing, drop-off rules, and Zamok proximity numbers.
 - Exact Golem build cost, build time, command UI, healing range, and transformation building HP
   profile.
-- Exact ability upgrade names, costs, effects, and ordering.
+- Exact Killing Tools attack customizations, ability upgrade names, costs, effects, and ordering.
 - Final name for the Dash building currently called **XYZ**.
 - Ekat HP scaling mechanics, cloning mechanics, revival/comeback mechanics, AI support, prediction
   support, replay compatibility, art, sound, and implementation phases.
