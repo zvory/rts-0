@@ -29,7 +29,7 @@ This phase should define the Magic Anchor tech commitment before the Dash buildi
 ## User Interview Focus
 
 - Is Vortex the final name?
-- Why does the player choose Vortex over Death Box or the Dash building?
+- Why does the player choose Vortex over Killing Tools or the Dash building?
 - What should Magic Anchor and its upgrades do before numbers are chosen?
 - Should Vortex change battlefield space, defense, pursuit, escape, or economy?
 - What should happen to Magic Anchor access if Vortex is destroyed or transformed away?

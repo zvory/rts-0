@@ -29,7 +29,7 @@ runtime already exist; this phase must not redesign or reimplement those systems
 
 - Rebuilding Ekat's body, Dash, Line Shot, Magic Anchor, return marker, projectile, or anchor
   runtime.
-- Zamok, Golem, Death Box, Vortex, or Dash building briefs/specs except for naming the unlock
+- Zamok, Golem, Killing Tools, Vortex, or Dash building briefs/specs except for naming the unlock
   source needed by the existing ability gate.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
@@ -109,7 +109,7 @@ Approved ability availability:
 
 - Dash, Line Shot, and Magic Anchor are not unlocked at match start.
 - Locked abilities stay visible but disabled in the command card.
-- Death Box unlocks Line Shot.
+- Killing Tools unlocks Line Shot.
 - Vortex unlocks Magic Anchor.
 - The Dash building currently named `XYZ` unlocks Dash.
 

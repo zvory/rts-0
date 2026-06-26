@@ -22,8 +22,8 @@ building is designed.
 
 ## Out of Scope
 
-- Death Box, Vortex, or Dash building briefs/specs except for dependency questions needed to keep
-  Golem transformation coherent.
+- Killing Tools, Vortex, or Dash building briefs/specs except for dependency questions needed to
+  keep Golem transformation coherent.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
 - Implementing the specified rules.
@@ -58,7 +58,7 @@ None. This phase has no gameplay change.
 ## Handoff Expectations
 
 The handoff must name the approved Golem brief and rules, unresolved tuning questions, and exactly
-one next active entity. By default, the next active entity is Death Box in
+one next active entity. By default, the next active entity is Killing Tools in
 [phase-4.md](phase-4.md). If Golem is not approved, the handoff must say that Golem-converted
 building work remains blocked.
 
@@ -101,6 +101,6 @@ Unresolved tuning questions:
 
 Next active entity:
 
-- Death Box in [phase-4.md](phase-4.md).
+- Killing Tools in [phase-4.md](phase-4.md).
 
 No implementation files were edited.

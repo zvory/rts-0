@@ -24,7 +24,7 @@ entities, and designing them in parallel would blur tradeoffs that should be pla
 
 ## Out of Scope
 
-- Briefing or speccing Ekat, Zamok, Golem, Death Box, Vortex, or the Dash building in detail.
+- Briefing or speccing Ekat, Zamok, Golem, Killing Tools, Vortex, or the Dash building in detail.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
 - Exact stat, cost, cooldown, timing, radius, footprint, or mining-rate implementation.
@@ -42,7 +42,8 @@ entities, and designing them in parallel would blur tradeoffs that should be pla
 - Should Ekat have no natural health regeneration, replacing the current implemented regeneration?
 - Are Steel, Oil, and Supply still the only resources for this slice?
 - Should AI and prediction remain blocked for Ekat in the first implementation pass?
-- Is the serial entity order approved: Ekat, Zamok, Golem, Death Box, Vortex, then Dash building?
+- Is the serial entity order approved: Ekat, Zamok, Golem, Killing Tools, Vortex, then Dash
+  building?
 
 ## Serial Handoff Rule
 
