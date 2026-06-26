@@ -1,6 +1,7 @@
 # Phase 1 - Ekat Stats and Ability Unlock Gate
 
-Status: planned.
+Status: complete; user decisions recorded in [checklists.md](checklists.md) and
+[requirements.md](requirements.md).
 
 ## Goal
 
@@ -83,3 +84,45 @@ The handoff must name the approved Ekat stat line, natural regeneration decision
 sources, unresolved tuning questions, and exactly one next active entity. By default, the next
 active entity is Zamok in [phase-2.md](phase-2.md). If stat numbers or unlock sources are not
 approved, the handoff must say that implementation remains blocked.
+
+## Handoff
+
+Approved Ekat stat line:
+
+- One unique Ekat hero/body starts at match start for each Ekat player.
+- Cost 0, Supply 0, not normally produced.
+- 150 starting HP.
+- 1.6 px/tick movement speed, matching Rifleman speed.
+- 9-tile sight.
+- Existing body radius, selection feel, render presentation, armor/tags, visuals, and ability
+  runtime are reused unless a later implementation pass identifies a specific mismatch.
+- No default attack.
+
+Approved health and death rules:
+
+- Ekat has no natural health regeneration.
+- Until Golem consumption exists, damaged Ekat has no recovery.
+- Golem consumption heals Ekat to full HP once implemented.
+- Ekat death causes immediate player loss for the first implementation target.
+
+Approved ability availability:
+
+- Dash, Line Shot, and Magic Anchor are not unlocked at match start.
+- Locked abilities stay visible but disabled in the command card.
+- Death Box unlocks Line Shot.
+- Vortex unlocks Magic Anchor.
+- The Dash building currently named `XYZ` unlocks Dash.
+
+Unresolved tuning questions:
+
+- Future HP scaling mechanism.
+- Future cloning mechanics.
+- Future revival or comeback mechanics.
+- Exact Golem consumption command flow.
+- Replay support and any future AI/prediction support.
+
+Next active entity:
+
+- Zamok home/core structure in [phase-2.md](phase-2.md).
+
+No implementation files were edited.

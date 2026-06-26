@@ -1,6 +1,7 @@
 # Phase 0 - Serial Gate and Global Identity
 
-Status: planned.
+Status: complete; user decisions recorded in [checklists.md](checklists.md) and
+[requirements.md](requirements.md).
 
 ## Goal
 
@@ -72,3 +73,33 @@ None. This phase has no gameplay change.
 The handoff must list approved global decisions, unresolved global questions, rejected ideas, the
 single next active entity, and any current-implementation behavior that the new global direction
 intends to replace. It must also say that no implementation files were edited.
+
+## Handoff
+
+Approved global decisions:
+
+- Ekat is the faction name and hero/body name. It is one word, short for Ekaterina.
+- Zamok is the home base structure and core building.
+- The new requirements replace the current playable Ekat/Zamok slice when ready.
+- The existing Ekat body, visuals, abilities, and ability runtime are reused.
+- Ekat starts with no unlocked combat abilities; locked abilities remain visible but disabled.
+- Ekat has no natural health regeneration.
+- Steel, Oil, and Supply remain the only resources for this slice.
+- AI support and local prediction may remain disabled for Ekat indefinitely.
+
+Unresolved global questions:
+
+- None blocking Phase 1. HP scaling, cloning, revival/comeback mechanics, and AI/prediction support
+  are deferred future design topics.
+
+Rejected or replaced current behavior:
+
+- The current prototype behavior where Dash, Line Shot, and Magic Anchor are available immediately
+  is replaced by building-based unlocks.
+- The current 1 HP/s Ekat regeneration is replaced by no natural regeneration.
+
+Next active entity:
+
+- Ekat hero/body stat and ability gate in [phase-1.md](phase-1.md).
+
+No implementation files were edited.

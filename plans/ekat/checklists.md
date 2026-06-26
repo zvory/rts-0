@@ -1,6 +1,7 @@
 # Ekat Phase 0/1 Working Checklists
 
-Status: not started. This file is the working checklist for the active Ekat serial planning gate.
+Status: Global Gate and Ekat hero/body decisions recorded. This file is the working checklist for
+the active Ekat serial planning gate.
 
 Sources:
 
@@ -16,8 +17,8 @@ rules item below is either approved or explicitly deferred by the user.
 Only one entity may be active at a time. Complete the active entity's Phase 0 brief and Phase 1
 rules/balance spec, get user review, and then move to the next entity.
 
-- [ ] Phase 0: Global Gate.
-- [ ] Phase 1: Ekat Hero/Body only.
+- [x] Phase 0: Global Gate.
+- [x] Phase 1: Ekat Hero/Body only.
 - [ ] Phase 2: Zamok/Home Structure only.
 - [ ] Phase 3: Golem only.
 - [ ] Phase 4: Death Box only.
@@ -30,29 +31,67 @@ queue before continuing. Do not fill checklist sections for later entities early
 
 ## Global Gate
 
-- [ ] Confirm whether the new requirements replace, hide, debug-gate, or evolve the current playable
+- [x] Confirm whether the new requirements replace, hide, debug-gate, or evolve the current playable
       Ekat hero/Zamok slice.
-- [ ] Confirm that the existing Ekat body and ability runtime are reused instead of redesigned.
-- [ ] Confirm whether Ekat starts with no combat abilities until buildings unlock them.
-- [ ] Confirm whether Ekat has no natural health regeneration.
-- [ ] Confirm whether Steel, Oil, and Supply remain the only resources for this slice.
-- [ ] Confirm whether AI support remains blocked for Ekat.
-- [ ] Confirm whether local prediction remains disabled for Ekat.
-- [ ] Record patch-note bullets as draft, factual notes only.
-- [ ] Confirm no implementation files were edited during Phase 0/1.
+- [x] Confirm that the existing Ekat body and ability runtime are reused instead of redesigned.
+- [x] Confirm whether Ekat starts with no combat abilities until buildings unlock them.
+- [x] Confirm whether Ekat has no natural health regeneration.
+- [x] Confirm whether Steel, Oil, and Supply remain the only resources for this slice.
+- [x] Confirm whether AI support remains blocked for Ekat.
+- [x] Confirm whether local prediction remains disabled for Ekat.
+- [x] Record patch-note bullets as draft, factual notes only.
+- [x] Confirm no implementation files were edited during Phase 0/1.
+
+Approved global decisions:
+
+- Ekat is the faction name and hero/body name. It is one word, short for Ekaterina.
+- Zamok is the home base structure and core building.
+- The new direction replaces the current playable Ekat/Zamok slice when ready.
+- The current Ekat body, visuals, abilities, and ability runtime are reused.
+- Ekat starts without unlocked combat abilities; locked abilities stay visible but disabled.
+- Ekat has no natural health regeneration.
+- Steel, Oil, and Supply remain the only resources for this slice.
+- AI support and local prediction may remain disabled for Ekat indefinitely.
+
+Draft patch-note bullets:
+
+- Ekat will move from the current prototype slice toward a Zamok-proximity hero economy with Golem
+  tech conversion.
+- Ekat abilities remain mechanically familiar but become locked until the matching tech buildings
+  unlock them.
+- Ekat loses natural regeneration and relies on Golem consumption for full healing once that
+  mechanic exists.
+- Ekat's starting combat body target changes from 300 HP and current fast movement to 150 HP and
+  1.6 px/tick Rifleman movement speed.
 
 ## Entity Brief Items: Units And Actors
 
 ### Existing Ekat Hero/Body Stats And Ability Gate
 
-- [ ] Current body and ability runtime are confirmed as implemented and reused.
-- [ ] Player-facing stat rework goal is approved.
-- [ ] Expected counters and failure modes from the stat rework are approved.
-- [ ] Ability availability goal is approved: hidden, locked, debug-only, or another first slice.
-- [ ] Unusual interactions are listed: command card, queued abilities, recast return, Magic Anchor,
+- [x] Current body and ability runtime are confirmed as implemented and reused.
+- [x] Player-facing stat rework goal is approved.
+- [x] Expected counters and failure modes from the stat rework are approved.
+- [x] Ability availability goal is approved: hidden, locked, debug-only, or another first slice.
+- [x] Unusual interactions are listed: command card, queued abilities, recast return, Magic Anchor,
       Golem consumption, death, replay, AI, and prediction.
-- [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
-- [ ] Known unknowns are explicit.
+- [x] Initial exposure is approved: playable, debug-only, hidden, or blocked.
+- [x] Known unknowns are explicit.
+
+Approved Ekat hero/body brief:
+
+- Ekat is unique and starts at match start. Future cloning abilities are possible but deferred.
+- Ekat has no basic attack and no unlocked combat abilities at match start.
+- Locked Dash, Line Shot, and Magic Anchor command-card entries should be visible but disabled.
+- The current visuals, body feel, and ability runtime are reused.
+- The stat rework makes Ekat fragile at match start: 150 HP, 1.6 px/tick Rifleman movement speed,
+  9-tile sight, existing radius/selection/render feel, no default attack, no regeneration, and no
+  recovery until Golem consumption exists.
+- Ekat dying causes immediate player loss for the first implementation target.
+- Initial exposure remains playable when this direction replaces the current prototype slice.
+- Expected failure mode: Ekat can be punished if exposed, overextended, or separated from the
+  Zamok/Golem economy; the faction's recovery depends on preserving or producing Golems.
+- Known unknowns: HP scaling mechanism, future cloning, future revival/comeback rules, exact Golem
+  consumption command flow, replay support, and any future AI/prediction support.
 
 ### Golem
 
@@ -117,21 +156,45 @@ queue before continuing. Do not fill checklist sections for later entities early
 
 ## Entity Rules Items: Existing Ekat Hero/Body Stats And Ability Gate
 
-- [ ] Cost is specified.
-- [ ] Supply impact is specified.
-- [ ] Starting loadout and creation source are specified.
-- [ ] Hotkeys and command-card exposure are specified.
-- [ ] Hit points are specified.
-- [ ] Armor, armored status, tags, status immunities, and vulnerabilities are specified.
-- [ ] Sight range is specified.
-- [ ] Collision size, selection size, and render size are specified.
-- [ ] Movement speed and movement semantics are specified.
-- [ ] Health recovery, no-regeneration policy, Golem consumption, death, and revival are specified.
-- [ ] Baseline combat policy is specified.
-- [ ] Ability unlock behavior is specified for Dash, Line Shot, and Magic Anchor.
-- [ ] Temporary behavior before unlock buildings exist is specified: hidden/locked, debug-only, or
+- [x] Cost is specified.
+- [x] Supply impact is specified.
+- [x] Starting loadout and creation source are specified.
+- [x] Hotkeys and command-card exposure are specified.
+- [x] Hit points are specified.
+- [x] Armor, armored status, tags, status immunities, and vulnerabilities are specified.
+- [x] Sight range is specified.
+- [x] Collision size, selection size, and render size are specified.
+- [x] Movement speed and movement semantics are specified.
+- [x] Health recovery, no-regeneration policy, Golem consumption, death, and revival are specified.
+- [x] Baseline combat policy is specified.
+- [x] Ability unlock behavior is specified for Dash, Line Shot, and Magic Anchor.
+- [x] Temporary behavior before unlock buildings exist is specified: hidden/locked, debug-only, or
       blocked from shipping.
-- [ ] AI availability and intended AI usage are specified.
+- [x] AI availability and intended AI usage are specified.
+
+Approved Ekat hero/body rules:
+
+- Cost: none; Ekat is a starting hero and is not normally produced.
+- Supply: 0.
+- Starting loadout and creation source: one unique Ekat starts with each Ekat player at match start.
+- Command-card exposure: Dash, Line Shot, and Magic Anchor stay visible but disabled while locked.
+- HP: 150 at match start; future HP scaling mechanism deferred.
+- Armor/tags/status rules: reuse current Ekat defaults unless a later implementation pass names a
+  specific mismatch.
+- Sight: 9 tiles.
+- Size: reuse current collision radius, selection size, render size, and visual feel.
+- Movement: 1.6 px/tick, matching Rifleman movement speed, and otherwise use ordinary current Ekat
+  movement semantics.
+- Recovery: no natural regeneration; no recovery until Golem consumption exists; Golem consumption
+  heals Ekat to full HP once implemented.
+- Death/revival: Ekat death causes immediate player loss for the first implementation target; no
+  revival rule in this slice.
+- Baseline combat: no basic attack.
+- Ability unlocks: Death Box unlocks Line Shot, Vortex unlocks Magic Anchor, and the Dash building
+  currently named `XYZ` unlocks Dash.
+- Temporary behavior: until unlock buildings exist, abilities should remain visible but disabled
+  rather than being freely usable.
+- AI/prediction: AI support and local prediction may remain disabled indefinitely.
 
 ## Entity Rules Items: Golem
 
