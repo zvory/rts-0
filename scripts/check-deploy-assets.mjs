@@ -22,6 +22,7 @@ function assertMatches(text, pattern, message) {
 
 const dockerfile = read("Dockerfile");
 const cargoLock = read("server/Cargo.lock");
+const mainTestWorkflow = read(".github/workflows/main-tests.yml");
 const wasmBuildScript = read("scripts/build-sim-wasm.sh");
 const wasmGitignore = read("client/vendor/sim-wasm/.gitignore");
 const wasmBindgenLockVersion = cargoLock.match(
@@ -77,6 +78,21 @@ assertMatches(
   wasmBuildScript,
   /cargo build [^\n]*-p rts-sim-wasm[^\n]*--locked/,
   "scripts/build-sim-wasm.sh must use Cargo.lock when generating deploy assets",
+);
+assertIncludes(
+  mainTestWorkflow,
+  "name: rts-sim-wasm-assets",
+  "main test workflow must publish prediction WASM assets for split browser jobs",
+);
+assertIncludes(
+  mainTestWorkflow,
+  "run: scripts/build-sim-wasm.sh",
+  "main test workflow must generate prediction WASM assets before browser suites",
+);
+assertIncludes(
+  mainTestWorkflow,
+  "path: client/vendor/sim-wasm",
+  "browser job must download prediction WASM assets into the served client tree",
 );
 
 console.log("deploy asset contract: ok");
