@@ -1,43 +1,51 @@
-# Phase 1 - Ekat Hero/Body Brief and Spec
+# Phase 1 - Ekat Stats and Ability Unlock Gate
 
 Status: planned.
 
 ## Goal
 
-Complete the new-unit checklist Phase 0 brief and Phase 1 rules/balance spec for the Ekat
-hero/body only. This phase should answer what the player does with the central controlled entity
-before Zamok, Golem, or tech-building details are designed.
+Approve the exact stat changes and ability availability rule for the already-implemented Ekat
+hero/body. Ekat, Dash, Line Shot, Magic Anchor, return markers, line projectiles, and Magic Anchor
+runtime already exist; this phase must not redesign or reimplement those systems.
 
 ## Scope
 
 - Read [docs/context/balance.md](../../docs/context/balance.md) before editing rules/spec details.
-- Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for this entity.
-- Complete only the Ekat Hero/Body sections in [checklists.md](checklists.md), or mark items as
-  deferred with named unknowns.
-- Specify direct mining, regeneration, recovery, death, command-card exposure, and ability-lockout
-  policy only as far as they affect the hero/body.
-- Update [requirements.md](requirements.md) only when a hero/body decision becomes approved product
-  direction.
+- Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) only for the stat and
+  availability parts of the existing Ekat unit.
+- Complete only the Ekat Hero/Body checklist items needed for stats and ability availability in
+  [checklists.md](checklists.md), or mark items as deferred with named unknowns.
+- Specify exact HP, armor/tags, sight, size, speed, supply, cost, regeneration, death/recovery, and
+  no-default-attack policy.
+- Specify that Dash, Line Shot, and Magic Anchor are not available at match start.
+- Specify the unlock source for each ability. The current code can enforce ability requirements
+  through completed building kinds, but the named unlock buildings still need their own serial
+  building specs before implementation can depend on them.
+- Update [requirements.md](requirements.md) only when a stat or unlock decision becomes approved
+  product direction.
 
 ## Out of Scope
 
-- Zamok, Golem, Death Box, Vortex, or Dash building briefs/specs except for dependency questions
-  needed to keep the Ekat hero/body coherent.
+- Rebuilding Ekat's body, Dash, Line Shot, Magic Anchor, return marker, projectile, or anchor
+  runtime.
+- Zamok, Golem, Death Box, Vortex, or Dash building briefs/specs except for naming the unlock
+  source needed by the existing ability gate.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
-- Implementing the specified rules.
+- Implementing the specified rules before exact stats and unlock sources are approved.
 - Future implementation phase files.
 
 ## User Interview Focus
 
-- What is the hero/body's battlefield role: harvester, duelist, raider, support caster, map-control
-  piece, or something else?
-- What should the UI description say in player-facing language?
-- What does direct mining ask the player to do moment-to-moment?
-- What should threaten Ekat while mining, fighting, or retreating?
-- Should the current implemented Dash, Line Shot, Magic Anchor, and regeneration be preserved,
-  replaced, hidden, or treated as debug-only?
-- What should be in the first playable version, and what should wait for later entities?
+- What exact Ekat stat line replaces the current 300 HP, 2.0 px/tick speed, 9-tile sight, 10 px
+  radius, 0 supply, no default attack, and no cost?
+- Should natural regeneration be removed entirely, matching the requirements draft?
+- What is the recovery rule before Golem consumption exists?
+- Which ability unlocks first, if any: Dash, Line Shot, or Magic Anchor?
+- Is each ability unlocked by a completed building, a consumed/transformed Golem, a research-like
+  flag, or another source?
+- If the unlock buildings are not implemented yet, should Ekat ship temporarily with all combat
+  abilities hidden/locked, debug-only unlocks, or a smaller first ability gate?
 
 ## Rules To Specify
 
@@ -46,18 +54,17 @@ before Zamok, Golem, or tech-building details are designed.
 - Cost, supply impact, buildability, respawn or revival rules, and match-start loadout.
 - Hit points, armor/tags, sight, collision size, selection size, render size, movement speed, and
   movement semantics.
-- Direct mining command, valid resource targets, Zamok proximity requirement if any, deposit
-  cadence, income rate, interruption behavior, and UI feedback.
 - Natural regeneration policy, Golem-consumption healing dependency, death behavior, and comeback
   behavior.
 - Combat policy before tech buildings unlock abilities: no attack, basic attack, or another rule.
-- Ability access policy for Dash, Line Shot, and Magic Anchor before and after buildings exist.
+- Ability access policy for Dash, Line Shot, and Magic Anchor before and after unlocks exist.
 - AI availability and prediction policy as they apply to controlling this hero/body.
 
 ## Expected Deliverables
 
-- [checklists.md](checklists.md) updated only for Ekat Hero/Body Phase 0 and Phase 1 items.
-- [requirements.md](requirements.md) updated only for confirmed hero/body product rules.
+- [checklists.md](checklists.md) updated only for Ekat Hero/Body stat and ability-availability
+  items.
+- [requirements.md](requirements.md) updated only for confirmed Ekat stat and unlock product rules.
 - No implementation files edited.
 
 ## Verification
@@ -72,7 +79,7 @@ None. This phase has no gameplay change.
 
 ## Handoff Expectations
 
-The handoff must name the approved Ekat hero/body brief and rules, unresolved tuning questions, and
-exactly one next active entity. By default, the next active entity is Zamok in
-[phase-2.md](phase-2.md). If the hero/body is not approved, the handoff must say that later entity
-work remains blocked.
+The handoff must name the approved Ekat stat line, natural regeneration decision, ability unlock
+sources, unresolved tuning questions, and exactly one next active entity. By default, the next
+active entity is Zamok in [phase-2.md](phase-2.md). If stat numbers or unlock sources are not
+approved, the handoff must say that implementation remains blocked.

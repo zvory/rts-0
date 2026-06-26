@@ -31,10 +31,11 @@ entity is briefed. It decides whether the new draft replaces, hides, debug-gates
 current playable Ekat slice. It ends by naming the first active entity and confirming no
 implementation files were edited.
 
-Phase 1 handles only the Ekat hero/body. It completes the new-unit checklist Phase 0 brief and
-Phase 1 rules/balance spec for that one entity, including direct mining, regeneration, ability
-lockout, death, and recovery decisions. It stops for user review before Zamok, Golem, or any tech
-building work starts.
+Phase 1 handles only the existing Ekat hero/body stat rework and ability availability gate. The
+Ekat body, Dash, Line Shot, Magic Anchor, return marker, projectile, and Magic Anchor runtime
+already exist; this phase must not redesign or reimplement them. It only approves exact hero stat
+changes and the rule that those existing abilities are unavailable at match start and become
+available through explicit unlock sources.
 
 Phase 2 handles only Zamok as the home structure. It completes the new-building checklist Phase 0
 brief and Phase 1 rules/balance spec for mining proximity, starting-state, supply, revival, and
@@ -60,7 +61,7 @@ before any implementation phase is written.
 ## Phase Index
 
 0. [Phase 0 - Serial Gate and Global Identity](phase-0.md)
-1. [Phase 1 - Ekat Hero/Body Brief and Spec](phase-1.md)
+1. [Phase 1 - Ekat Stats and Ability Unlock Gate](phase-1.md)
 2. [Phase 2 - Zamok Brief and Spec](phase-2.md)
 3. [Phase 3 - Golem Brief and Spec](phase-3.md)
 4. [Phase 4 - Death Box Brief and Spec](phase-4.md)
@@ -76,8 +77,9 @@ explicitly approves implementation scope.
 
 - Do not edit Rust, JavaScript, protocol, generated config, tests, art, sound, or other
   implementation files during this planning gate.
-- Work serially. Only one entity may be active at a time, and the next entity's brief/spec must not
-  start until the current entity has a user-reviewed Phase 0 brief and Phase 1 rules/balance spec.
+- Work serially. Only one entity or existing entity slice may be active at a time, and the next
+  brief/spec must not start until the current slice has a user-reviewed Phase 0 brief and Phase 1
+  rules/balance spec.
 - Treat every unchecked item in [checklists.md](checklists.md) as unresolved. If the user chooses a
   direction but not a number, record the direction and leave the number deferred.
 - Do not recreate purged RTS-style Ekat content such as workers, conscripts, signal teams, command
@@ -85,6 +87,9 @@ explicitly approves implementation scope.
   that content by name.
 - Do not assume the current playable Ekat slice is the final target. Phase 0 must explicitly decide
   whether the new design replaces, hides, debug-gates, or incrementally evolves the current slice.
+- Treat Ekat's current body and ability mechanics as implemented. Future work may tune stats and
+  gate ability availability, but should not rebuild Dash, Line Shot, Magic Anchor, return markers,
+  line projectiles, or anchor projection unless a later bug or design change explicitly requires it.
 - Keep the faction hero-centric unless the user changes that requirement. Golems and buildings are
   supporting strategic choices, not a broad RTS roster by default.
 - Apply the new unit checklist to Ekat and Golem, and the new building checklist to each building.
