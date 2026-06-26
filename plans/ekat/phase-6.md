@@ -21,7 +21,7 @@ building name before any implementation phase is written.
 
 ## Out of Scope
 
-- Reopening Killing Tools or Vortex specs except for explicit user-requested comparison updates.
+- Reopening Killing Tools or Anchorage specs except for explicit user-requested comparison updates.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
 - Implementing the specified rules.
@@ -31,7 +31,7 @@ building name before any implementation phase is written.
 ## User Interview Focus
 
 - What is the final name for the building currently called `XYZ`?
-- Why does the player choose the Dash building over Killing Tools or Vortex?
+- Why does the player choose the Dash building over Killing Tools or Anchorage?
 - What should Dash and its upgrades do before numbers are chosen?
 - Is Dash primarily escape, engage, repositioning, mining tempo, or something else?
 - What should happen to Dash access if this building is destroyed or transformed away?

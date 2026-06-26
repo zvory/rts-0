@@ -1,7 +1,7 @@
 # Ekat Phase 0/1 Working Checklists
 
-Status: Global Gate, Ekat hero/body, Zamok, Golem, and Killing Tools decisions recorded. This file
-is the working checklist for the active Ekat serial planning gate.
+Status: Global Gate, Ekat hero/body, Zamok, Golem, Killing Tools, and Anchorage decisions recorded.
+This file is the working checklist for the active Ekat serial planning gate.
 
 Sources:
 
@@ -22,7 +22,7 @@ rules/balance spec, get user review, and then move to the next entity.
 - [x] Phase 2: Zamok/Home Structure only.
 - [x] Phase 3: Golem only.
 - [x] Phase 4: Killing Tools only.
-- [ ] Phase 5: Vortex only.
+- [x] Phase 5: Anchorage only.
 - [ ] Phase 6: Dash Building only.
 - [ ] User explicitly approved moving beyond serial Phase 0/1 planning into implementation.
 
@@ -70,6 +70,9 @@ Draft patch-note bullets:
   healing.
 - Killing Tools replaces the Death Box draft name for the offensive attack tech building. Its first
   playable scope is a base Line Shot unlock from a free Golem transform; future attack
+  customizations are deferred.
+- Anchorage replaces the Vortex draft name for the anchor-placement tech building. Its first
+  playable scope is a base Magic Anchor unlock from a free Golem transform; future anchor
   customizations are deferred.
 
 ## Entity Brief Items: Units And Actors
@@ -173,7 +176,7 @@ Approved Zamok brief:
 - [x] Final or placeholder name status is approved.
 - [x] Player-facing UI description is approved.
 - [x] Strategic purpose is approved.
-- [x] Reason to choose it over Vortex and the Dash building is approved.
+- [x] Reason to choose it over Anchorage and the Dash building is approved.
 - [x] Line Shot unlock fantasy and upgrade direction are approved.
 - [x] Creation rule from Golem transformation is approved or revised.
 - [x] Expected counters and failure modes are approved.
@@ -187,7 +190,8 @@ Approved Killing Tools brief:
 - Player-facing description: offensive attack technology structure. Unlocks Line Shot now and later
   hosts Ekat attack customizations.
 - Strategic purpose: Killing Tools is the damage-dealing tech choice. The first playable reason to
-  choose it over Vortex or the Dash building is access to offensive kill pressure through Line Shot.
+  choose it over Anchorage or the Dash building is access to offensive kill pressure through Line
+  Shot.
 - Long-term direction: Killing Tools should eventually unlock or customize a more basic offensive
   attack package, with Line Shot, fan-out behavior, return behavior, or other build variants as
   possible choices.
@@ -205,24 +209,52 @@ Approved Killing Tools brief:
   profile, upgrade/customization list, upgrade costs/times, final name, and any future relationship
   between a more basic offensive attack and Line Shot.
 
-### Vortex
+### Anchorage
 
-- [ ] Final or placeholder name status is approved.
-- [ ] Player-facing UI description is approved.
-- [ ] Strategic purpose is approved.
-- [ ] Reason to choose it over Killing Tools and the Dash building is approved.
-- [ ] Magic Anchor unlock fantasy and upgrade direction are approved.
-- [ ] Creation rule from Golem transformation is approved or revised.
-- [ ] Expected counters and failure modes are approved.
-- [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
-- [ ] Known unknowns are explicit.
+- [x] Final or placeholder name status is approved.
+- [x] Player-facing UI description is approved.
+- [x] Strategic purpose is approved.
+- [x] Reason to choose it over Killing Tools and the Dash building is approved.
+- [x] Magic Anchor unlock fantasy and upgrade direction are approved.
+- [x] Creation rule from Golem transformation is approved or revised.
+- [x] Expected counters and failure modes are approved.
+- [x] Initial exposure is approved: playable, debug-only, hidden, or blocked.
+- [x] Known unknowns are explicit.
+
+Approved Anchorage brief:
+
+- Name status: Anchorage replaces Vortex as the current building name.
+- Ability naming direction: the current Magic Anchor implementation should probably be renamed to
+  Vortex later.
+- Player-facing description: anchor-placement technology structure. Unlocks the current Magic
+  Anchor implementation now and later hosts anchor customizations.
+- Strategic purpose: Anchorage is the positioning/space-control tech choice built around placing
+  anchors that do things.
+- First playable scope: only the base Magic Anchor unlock is included; upgrades and broader anchor
+  customization are deferred.
+- Long-term direction: Anchorage should eventually support different anchor builds or
+  customizations. The current Magic Anchor/Vortex behavior is one possible anchor, not the whole
+  future space.
+- Reason to choose: Killing Tools is expected to be the first-priority tech for raw pressure.
+  Anchorage's exact reason to choose before Killing Tools or Dash tech is deferred to playtesting.
+- Creation rule: a Golem transforms into Anchorage for free except for permanently consuming that
+  Golem.
+- Failure mode: if all completed Anchorage structures are destroyed, Magic Anchor becomes locked or
+  disabled again.
+- Upgrade persistence: future upgrades/customizations researched through Anchorage are not lost or
+  disabled when all Anchorage structures are gone, though Magic Anchor access still requires a
+  completed Anchorage structure.
+- Initial exposure: playable when the Ekat direction replaces the current prototype slice.
+- Known unknowns: exact transform command/hotkey, transform completion timing, low-HP starting
+  profile, anchor/customization list, upgrade costs/times, final ability name, and the exact
+  strategic reason to choose Anchorage before other tech.
 
 ### Dash Building
 
 - [ ] Final name for `XYZ` is approved.
 - [ ] Player-facing UI description is approved.
 - [ ] Strategic purpose is approved.
-- [ ] Reason to choose it over Killing Tools and Vortex is approved.
+- [ ] Reason to choose it over Killing Tools and Anchorage is approved.
 - [ ] Dash unlock fantasy and upgrade direction are approved.
 - [ ] Creation rule from Golem transformation is approved or revised.
 - [ ] Expected counters and failure modes are approved.
@@ -265,7 +297,7 @@ Approved Ekat hero/body rules:
 - Death/revival: Ekat death causes immediate player loss for the first implementation target; no
   revival rule in this slice.
 - Baseline combat: no basic attack.
-- Ability unlocks: Killing Tools unlocks Line Shot, Vortex unlocks Magic Anchor, and the Dash
+- Ability unlocks: Killing Tools unlocks Line Shot, Anchorage unlocks Magic Anchor, and the Dash
   building currently named `XYZ` unlocks Dash.
 - Temporary behavior: until unlock buildings exist, abilities should remain visible but disabled
   rather than being freely usable.
@@ -406,24 +438,52 @@ Approved Killing Tools rules:
   erase future researched upgrades/customizations.
 - AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
-## Entity Rules Items: Vortex
+## Entity Rules Items: Anchorage
 
-- [ ] Creation source is specified.
-- [ ] Command and hotkey are specified.
-- [ ] Transform cost, consumed Golem behavior, refund, and cancellation are specified.
-- [ ] Transform time is specified.
-- [ ] Prerequisites, build limit, and unlock timing are specified.
-- [ ] Hit points are specified.
-- [ ] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
-- [ ] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
+- [x] Creation source is specified.
+- [x] Command and hotkey are specified.
+- [x] Transform cost, consumed Golem behavior, refund, and cancellation are specified.
+- [x] Transform time is specified.
+- [x] Prerequisites, build limit, and unlock timing are specified.
+- [x] Hit points are specified.
+- [x] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
+- [x] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
       specified.
-- [ ] Selection size, render size, and minimap behavior are specified.
-- [ ] Sight range, fog reveal, and remembered-building behavior are specified.
-- [ ] Supply behavior is specified.
-- [ ] Magic Anchor unlock, upgrade costs, upgrade times, and loss-on-destruction behavior are
+- [x] Selection size, render size, and minimap behavior are specified.
+- [x] Sight range, fog reveal, and remembered-building behavior are specified.
+- [x] Supply behavior is specified.
+- [x] Magic Anchor unlock, upgrade costs, upgrade times, and loss-on-destruction behavior are
       specified.
-- [ ] Death behavior is specified.
-- [ ] AI availability and intended AI usage are specified.
+- [x] Death behavior is specified.
+- [x] AI availability and intended AI usage are specified.
+
+Approved Anchorage rules:
+
+- Creation source: Golem transformation.
+- Command and hotkey: deferred until command-card implementation.
+- Transform cost/refund/cancellation: free Steel/Oil transform, permanently consumes the Golem, and
+  has no refund after the immediate transform begins.
+- Transform time: the Golem disappears immediately and the Anchorage structure appears at low HP,
+  following the approved Golem morph direction. Exact completion timing and starting HP profile are
+  deferred.
+- Prerequisites/build limit: requires an owned Golem; no additional tech prerequisite or hard build
+  limit unless a later phase adds one.
+- Max HP: 165, matching Killing Tools and the current R&D Complex.
+- Armor/tags: armored. Other tags, repairability, capture rules, and vulnerabilities use ordinary
+  owner-only tech-building defaults unless a later implementation pass names a specific difference.
+- Footprint: 3x3.
+- Placement/pathing/render/minimap/fog: use ordinary tech-building defaults by default.
+- Sight: 1 tile by default, matching Killing Tools and current R&D Complex sight.
+- Supply: no Supply provided or used.
+- Weapon: no weapon or active combat behavior.
+- Unlock behavior: at least one completed Anchorage unlocks the current Magic Anchor
+  implementation. If all completed Anchorage structures are destroyed, Magic Anchor becomes
+  locked/disabled again.
+- Upgrade behavior: first implementation includes no upgrades. Future Anchorage upgrades or anchor
+  customizations persist after research and are not lost or disabled by Anchorage destruction.
+- Death behavior: destroying the last completed Anchorage removes Magic Anchor access but does not
+  erase future researched upgrades/customizations.
+- AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
 ## Entity Rules Items: Dash Building
 

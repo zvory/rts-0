@@ -22,8 +22,8 @@ details are designed.
 
 ## Out of Scope
 
-- Golem, Killing Tools, Vortex, or Dash building briefs/specs except for dependency questions needed to
-  keep Zamok coherent.
+- Golem, Killing Tools, Anchorage, or Dash building briefs/specs except for dependency questions
+  needed to keep Zamok coherent.
 - Rust, JavaScript, protocol, generated config, tests, art, sound, scenario, replay, AI, or
   deployment changes.
 - Implementing the specified rules.

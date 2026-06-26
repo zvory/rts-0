@@ -13,9 +13,9 @@ implementation phase.
 
 - Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for Ekat and Golem.
 - Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for Zamok, Killing
-  Tools, Vortex, and the Dash building.
+  Tools, Anchorage, and the Dash building.
 - Work serially: global identity gate, then Ekat, then Zamok, then Golem, then Killing Tools, then
-  Vortex, then the Dash building. Do not brief or spec multiple entities in parallel unless the
+  Anchorage, then the Dash building. Do not brief or spec multiple entities in parallel unless the
   user explicitly overrides the active plan.
 - Treat the current Ekat body and ability runtime as already implemented. The next Ekat-body work
   is stat rework plus ability availability gating, not a from-scratch hero or ability design pass.
@@ -98,13 +98,31 @@ health regeneration are not the target behavior.
 Ekat unlocks hero abilities by transforming Golems into buildings. The transformation is free, and
 the building choice determines which ability family becomes available.
 
+Shared first-target rules for Ekat tech buildings:
+
+- A tech building transform is free except for permanently consuming the transforming Golem.
+- Ability access requires at least one completed structure for that ability family.
+- If all completed structures for an ability family are destroyed, that ability becomes
+  locked/disabled again.
+- Researched upgrades or customizations persist once researched and are not lost or disabled just
+  because the associated tech building is gone.
+- First-target tech buildings use the same stat profile unless a later phase explicitly changes it:
+  3x3 footprint, 165 HP to match the current R&D Complex, 1-tile sight, armored, no weapon, and no
+  active combat behavior.
+- First implementation targets skip upgrades unless the active entity phase explicitly includes one.
+
 - **Killing Tools** is the current name for the offensive attack tech building formerly drafted as
   Death Box. The name may still change, but it is no longer treated as a throwaway placeholder.
 - **Killing Tools** unlocks base Line Shot in the first implementation target.
 - In the longer-term direction, Killing Tools becomes the place to customize Ekat's offensive
   attacks. Future customizations may include Line Shot, fan-out behavior, return behavior, or other
   build-like attack variants.
-- **Vortex** unlocks Magic Anchor and Magic Anchor upgrades.
+- **Anchorage** is the current name for the anchor-placement tech building formerly drafted as
+  Vortex.
+- **Anchorage** unlocks the current Magic Anchor implementation in the first implementation target.
+- In the longer-term direction, Anchorage becomes the place to create and customize anchors. The
+  current Magic Anchor implementation should probably be renamed to Vortex later, and future anchors
+  may do other things.
 - **XYZ** is a placeholder building name for Dash and Dash upgrades.
 
 ### Killing Tools
@@ -123,6 +141,25 @@ the building choice determines which ability family becomes available.
 - Killing Tools uses a 3x3 footprint, 165 HP to match the current R&D Complex, and armored status.
 - Exact command, hotkey, transform completion timing, low-HP starting profile, upgrade list, upgrade
   costs, and upgrade times are deferred.
+
+### Anchorage
+
+- Anchorage is Ekat's anchor-placement technology structure.
+- A Golem transforms into Anchorage for free except for permanently consuming that Golem.
+- At least one completed Anchorage structure unlocks the current Magic Anchor implementation.
+- If all completed Anchorage structures are destroyed, Magic Anchor becomes locked/disabled again.
+- Future Anchorage upgrades or anchor customizations should persist once researched; they are not
+  lost or disabled just because all Anchorage structures are gone. Magic Anchor access itself still
+  requires a completed Anchorage structure.
+- The first implementation target includes only the base Magic Anchor unlock; upgrades and broader
+  anchor customization are deferred.
+- Anchorage has no weapon or active combat behavior. It is a tech unlock structure.
+- Anchorage uses the shared Ekat tech-building stat profile: 3x3 footprint, 165 HP, 1-tile sight,
+  and armored status.
+- Killing Tools is expected to be the first-priority tech choice for raw pressure. Anchorage's exact
+  competitive reason versus Killing Tools and Dash tech is deferred for playtesting.
+- Exact command, hotkey, transform completion timing, low-HP starting profile, anchor customization
+  list, upgrade costs, and upgrade times are deferred.
 
 ## Abilities
 
@@ -160,7 +197,8 @@ the building choice determines which ability family becomes available.
 - Exact mining timing, drop-off rules, and Zamok proximity numbers.
 - Exact Golem build cost, build time, command UI, healing range, and transformation building HP
   profile.
-- Exact Killing Tools attack customizations, ability upgrade names, costs, effects, and ordering.
+- Exact Killing Tools attack customizations, Anchorage anchor customizations, ability upgrade names,
+  costs, effects, and ordering.
 - Final name for the Dash building currently called **XYZ**.
 - Ekat HP scaling mechanics, cloning mechanics, revival/comeback mechanics, AI support, prediction
   support, replay compatibility, art, sound, and implementation phases.
