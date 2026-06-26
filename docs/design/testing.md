@@ -237,10 +237,12 @@ The canonical required PR check context is `./tests/run-all.sh` in the `Main tes
 It is an aggregate check over split coverage jobs for server binary build, Rust/architecture, live
 Node, and browser/tri-state coverage on pull requests targeting `main` and on pushes to `main`.
 The split jobs run `tests/run-all.sh` sub-modes under CI so the required aggregate gate preserves
-client smoke plus tri-state browser coverage without serializing every suite in one runner. Local
+client smoke plus tri-state browser coverage without serializing every suite in one runner. The
+server-build job uploads generated sim-WASM browser assets, and the split browser job downloads them
+into `client/vendor/sim-wasm` before client smoke runs from its clean checkout. Local
 `tests/run-all.sh` runs keep client smoke in the default browser gate but skip the latency-sensitive
 tri-state browser scenarios unless `--with-tri-state-browser` or `RTS_RUN_TRI_STATE_BROWSER=1` is
-set.
+set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STATE=1` is set.
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative

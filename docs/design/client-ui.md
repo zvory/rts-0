@@ -1202,7 +1202,7 @@ Current areas:
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match
   debug status badge displays live and rolling one-minute FPS metrics from `MatchHealth`.
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
-  command-free camera gesture helper for live input and replay/observer wrappers.
+  command-free camera gesture helper for live input and replay/observer wrappers. Locked native-cursor routing sends clicks through both settings chrome and the game screen, and preserves pressed-button state across macOS drag events for routed pointer moves and gameplay selection drags.
 - `renderer`: `renderer/`.
 - `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
   route detection, direct launch URL parsing for scenario/map/seed, audio, combat audio, alerts,
