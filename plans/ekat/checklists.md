@@ -1,7 +1,7 @@
 # Ekat Phase 0/1 Working Checklists
 
-Status: Global Gate and Ekat hero/body decisions recorded. This file is the working checklist for
-the active Ekat serial planning gate.
+Status: Global Gate, Ekat hero/body, and Zamok decisions recorded. This file is the working
+checklist for the active Ekat serial planning gate.
 
 Sources:
 
@@ -19,7 +19,7 @@ rules/balance spec, get user review, and then move to the next entity.
 
 - [x] Phase 0: Global Gate.
 - [x] Phase 1: Ekat Hero/Body only.
-- [ ] Phase 2: Zamok/Home Structure only.
+- [x] Phase 2: Zamok/Home Structure only.
 - [ ] Phase 3: Golem only.
 - [ ] Phase 4: Death Box only.
 - [ ] Phase 5: Vortex only.
@@ -63,6 +63,8 @@ Draft patch-note bullets:
   mechanic exists.
 - Ekat's starting combat body target changes from 300 HP and current fast movement to 150 HP and
   1.6 px/tick Rifleman movement speed.
+- Zamok becomes an expensive, buildable City Centre-equivalent core structure that produces Golems,
+  anchors Ekat/Golem mining, provides +10 Supply, and makes Ekat die if the player has no Zamoks.
 
 ## Entity Brief Items: Units And Actors
 
@@ -108,15 +110,34 @@ Approved Ekat hero/body brief:
 
 ### Zamok/Home Structure
 
-- [ ] Name and identity are approved.
-- [ ] Player-facing UI description is approved.
-- [ ] Strategic purpose is approved.
-- [ ] Relationship to Ekat mining, Golem production, supply, revival, and victory is approved.
-- [ ] Creation rule is approved: match-start only, buildable, transformable, summonable, or another
+- [x] Name and identity are approved.
+- [x] Player-facing UI description is approved.
+- [x] Strategic purpose is approved.
+- [x] Relationship to Ekat mining, Golem production, supply, revival, and victory is approved.
+- [x] Creation rule is approved: match-start only, buildable, transformable, summonable, or another
       rule.
-- [ ] Expected counters and failure modes are approved.
-- [ ] Initial exposure is approved: playable, debug-only, hidden, or blocked.
-- [ ] Known unknowns are explicit.
+- [x] Expected counters and failure modes are approved.
+- [x] Initial exposure is approved: playable, debug-only, hidden, or blocked.
+- [x] Known unknowns are explicit.
+
+Approved Zamok brief:
+
+- Name and identity: Zamok is Ekat's home base structure and core building.
+- Player-facing description: Ekat's core structure. Produces Golems, anchors mining, and provides
+  Supply.
+- Strategic purpose: Zamok fills the same role for Ekat that City Centre fills for Kriegsia, but
+  with Ekat visuals and Golem production instead of worker production.
+- Creation rule: each Ekat player starts with one Zamok, and additional Zamoks can be built at an
+  expensive cost.
+- Ekat/Golem relationship: Zamok anchors Ekat direct mining, Golem mining, Golem production, +10
+  Supply, and Ekat survival.
+- Failure mode: losing the last Zamok kills Ekat; Ekat death causes immediate defeat for the first
+  implementation target.
+- Counterplay: opponents can scout, pressure, and destroy Zamoks to shut down mining anchors, Golem
+  production, Supply, and ultimately Ekat's survival.
+- Initial exposure: playable when the Ekat direction replaces the current prototype slice.
+- Known unknowns: exact expansion Zamok cost, builder/source command, hotkey, build time, repair
+  actor, and any tuning differences from City Centre that playtests require.
 
 ### Death Box
 
@@ -216,21 +237,43 @@ Approved Ekat hero/body rules:
 
 ## Entity Rules Items: Zamok/Home Structure
 
-- [ ] Creation source is specified.
-- [ ] Command and hotkey are specified if buildable or interactable.
-- [ ] Cost, refund, and cancellation are specified if buildable.
-- [ ] Build or setup time is specified if buildable.
-- [ ] Prerequisites, uniqueness, and unlock timing are specified.
-- [ ] Hit points are specified.
-- [ ] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
-- [ ] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
+- [x] Creation source is specified.
+- [x] Command and hotkey are specified if buildable or interactable.
+- [x] Cost, refund, and cancellation are specified if buildable.
+- [x] Build or setup time is specified if buildable.
+- [x] Prerequisites, uniqueness, and unlock timing are specified.
+- [x] Hit points are specified.
+- [x] Armor, tags, repairability, capture rules, and vulnerabilities are specified.
+- [x] Footprint, placement grid, terrain restrictions, collision, and pathing interactions are
       specified.
-- [ ] Selection size, render size, and minimap behavior are specified.
-- [ ] Sight range, fog reveal, and remembered-building behavior are specified.
-- [ ] Supply behavior is specified.
-- [ ] Mining proximity, Golem production, hero revival, or other economy/tech behavior is specified.
-- [ ] Death behavior and victory relevance are specified.
-- [ ] AI availability and intended AI usage are specified.
+- [x] Selection size, render size, and minimap behavior are specified.
+- [x] Sight range, fog reveal, and remembered-building behavior are specified.
+- [x] Supply behavior is specified.
+- [x] Mining proximity, Golem production, hero revival, or other economy/tech behavior is specified.
+- [x] Death behavior and victory relevance are specified.
+- [x] AI availability and intended AI usage are specified.
+
+Approved Zamok rules:
+
+- Creation source: each Ekat player starts with one free Zamok. Additional Zamoks are buildable and
+  expensive; exact builder/source command is deferred.
+- Command and hotkey: deferred until the additional-Zamok builder/source is finalized.
+- Cost/refund/cancellation: expensive expansion Zamok direction approved; exact cost, refund, and
+  cancellation rules are deferred.
+- Build/setup time: buildable expansion direction approved; exact build time is deferred.
+- Prerequisites/uniqueness: Zamok is not unique. Additional Zamoks need no tech prerequisite unless
+  a later implementation pass introduces one.
+- Stats and footprint: use City Centre-equivalent values by default, including current 600 HP, 3x3
+  footprint, and 1-tile sight.
+- Armor/tags/repairability/capture/vulnerability: use City Centre-equivalent defaults by default.
+  The exact repair actor is deferred because Ekat does not use Kriegsia workers.
+- Placement/pathing/render/minimap/fog: use City Centre-equivalent defaults by default.
+- Supply: each Zamok provides +10 Supply.
+- Economy/tech: Zamok anchors Ekat direct mining and Golem mining using City Centre-equivalent
+  proximity semantics. Zamok produces/builds Golems.
+- Weapon: no default weapon or defensive attack in the first target.
+- Death/victory: if a player has no Zamoks, Ekat dies. If Ekat dies, that player loses.
+- AI/prediction: AI support and local prediction may remain disabled indefinitely for Ekat.
 
 ## Entity Rules Items: Death Box
 
