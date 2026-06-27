@@ -11,8 +11,8 @@ building is designed.
 
 ## Scope
 
-- Read [docs/context/balance.md](../../docs/context/balance.md) before editing rules/spec details.
-- Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for this unit.
+- Read [docs/context/balance.md](../../../docs/context/balance.md) before editing rules/spec details.
+- Use [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md) for this unit.
 - Complete only the Golem sections in [checklists.md](checklists.md), or mark items as deferred with
   named unknowns.
 - Specify production, mining, transformation, supply, vulnerability, and consumption-healing policy
