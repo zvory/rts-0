@@ -12,8 +12,8 @@ those systems.
 
 ## Scope
 
-- Read [docs/context/balance.md](../../../docs/context/balance.md) before editing rules/spec details.
-- Use [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md) only for the stat and
+- Read [docs/context/balance.md](../../docs/context/balance.md) before editing rules/spec details.
+- Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) only for the stat and
   availability parts of the existing Ekat unit.
 - Complete only the Ekat Hero/Body checklist items needed for stats and ability availability in
   [checklists.md](checklists.md), or mark items as deferred with named unknowns.

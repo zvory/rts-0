@@ -15,9 +15,9 @@ code, balance, protocol, art, or tests change.
 ## Product Inputs
 
 - [requirements.md](requirements.md) is the active draft input.
-- [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md) is mandatory for Ekat and Golem
+- [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) is mandatory for Ekat and Golem
   work.
-- [docs/new-building-checklist.md](../../../docs/new-building-checklist.md) is mandatory for Zamok,
+- [docs/new-building-checklist.md](../../docs/new-building-checklist.md) is mandatory for Zamok,
   Killing Tools, Anchorage, and Positioning.
 - The archived clean-slate brief under `plans/archive/faction/ekat-brief.md` remains evidence that
   purged RTS-style Ekat content is not approved.

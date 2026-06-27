@@ -11,8 +11,8 @@ implementation phase.
 
 ## Planning Workflow
 
-- Use [docs/new-unit-checklist.md](../../../docs/new-unit-checklist.md) for Ekat and Golem.
-- Use [docs/new-building-checklist.md](../../../docs/new-building-checklist.md) for Zamok, Killing
+- Use [docs/new-unit-checklist.md](../../docs/new-unit-checklist.md) for Ekat and Golem.
+- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for Zamok, Killing
   Tools, Anchorage, and Positioning.
 - Work serially: global identity gate, then Ekat, then Zamok, then Golem, then Killing Tools, then
   Anchorage, then Positioning. Do not brief or spec multiple entities in parallel unless the
