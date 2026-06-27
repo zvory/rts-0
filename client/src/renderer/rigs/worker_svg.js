@@ -9,3 +9,7 @@ export const WORKER_RIG_SVG = `<svg viewBox="-24 -24 48 48" data-rts-rig-kind="w
   <rect id="bounds.selection" x="-13" y="-13" width="26" height="26" fill="none" />
   <rect id="bounds.hp" x="-11" y="-18" width="22" height="6" fill="none" />
 </svg>`;
+
+export const GOLEM_RIG_SVG = WORKER_RIG_SVG
+  .replace('data-rts-rig-kind="worker"', 'data-rts-rig-kind="golem"')
+  .replace('id="worker.authored"', 'id="golem.authored"');

@@ -807,7 +807,14 @@ mod planned_actions {
                     }
                     planner::OrderIntent::SelfAbility { ability } => {
                         if let Some(ability) = ability_from_planner(ability) {
-                            launch_self_ability(entities, &faction_id, player, unit, ability);
+                            launch_self_ability(
+                                entities,
+                                events,
+                                &faction_id,
+                                player,
+                                unit,
+                                ability,
+                            );
                         }
                     }
                 },
@@ -880,7 +887,14 @@ mod planned_actions {
                     };
                     match target {
                         planner::AbilityTarget::SelfTarget => {
-                            launch_self_ability(entities, &faction_id, player, unit, ability);
+                            launch_self_ability(
+                                entities,
+                                events,
+                                &faction_id,
+                                player,
+                                unit,
+                                ability,
+                            );
                         }
                         planner::AbilityTarget::WorldPoint(point) => {
                             if ability == AbilityKind::PointFire {
@@ -1091,6 +1105,7 @@ fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
         AbilityKind::EkatTeleport => planner::AbilityId(5),
         AbilityKind::EkatLineShot => planner::AbilityId(6),
         AbilityKind::EkatMagicAnchor => planner::AbilityId(7),
+        AbilityKind::EkatConsumeGolem => planner::AbilityId(8),
     }
 }
 
@@ -1104,6 +1119,7 @@ fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
         5 => Some(AbilityKind::EkatTeleport),
         6 => Some(AbilityKind::EkatLineShot),
         7 => Some(AbilityKind::EkatMagicAnchor),
+        8 => Some(AbilityKind::EkatConsumeGolem),
         _ => None,
     }
 }

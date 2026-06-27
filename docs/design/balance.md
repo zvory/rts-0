@@ -304,12 +304,12 @@ activation/autocast policy instead of being folded into default targeting.
   autocast support, and command-card affordances; `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
-  world effect, dash return, line projectile, Magic Anchor placement, and the one-off artillery
-  point-fire path.
+  world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
+  one-off artillery point-fire path.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
-  controllable combat units. Ekat has 300 HP, 1 HP/s regeneration while alive, 2.0 px/tick
-  speed, 9-tile sight, no default attack, and no Steel/Oil/Supply cost. Her
+  controllable combat units besides Golems produced from Zamok. Ekat has 150 HP, no passive
+  regeneration, 1.6 px/tick speed, 9-tile sight, no default attack, and no Steel/Oil/Supply cost. Her
   Dash ability targets up to 5 tiles, has no resource cost, has an 8s cooldown, requires a
   statically standable landing point, and leaves a four-second return marker that can be recast
   after one tick if the marker destination remains standable. Her Line Shot ability targets up to
@@ -320,7 +320,10 @@ activation/autocast policy instead of being folded into default targeting.
   no resource cost, places one replacement-style non-blocking, non-attackable 10-second pull field
   with a 3-tile radius, slows units moving away from the anchor to as low as 0.45x speed near the
   center, boosts units moving toward the anchor up to 1.35x speed near the center, and drags idle
-  units toward the anchor with less displacement for braced or heavy units.
+  units toward the anchor with less displacement for braced or heavy units. Her Consume ability is
+  self-targeted, has no resource cost or cooldown, consumes the nearest owned living Golem within 2
+  tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
+  until the Ekat tech-unlock building slice replaces them.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
@@ -353,19 +356,21 @@ activation/autocast policy instead of being folded into default targeting.
   one City Centre at the player's start tile, 12 steel patches with 1,000 steel each + 3 oil
   patches with 3,333 oil each nearby.
 - Supply: City Centre and Zamok each give `+10`; Depots give `+8`; hard cap `200`.
-- Attached mining: workers walk to a patch, latch onto it, and mine in place.
-  Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
+- Attached mining: gatherers walk to a patch, latch onto it, and mine in place.
+  Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
-  `MINING_CC_RANGE_TILES = 9.0` tiles of a completed City Centre owned by that player.
+  `MINING_CC_RANGE_TILES = 9.0` tiles of a completed home-base mining anchor owned by that player:
+  City Centre for Kriegsia, or Zamok for Ekat. Workers deposit the base load; Golems deposit four
+  times the base load.
   Starting resources are placed within `CC_RESOURCE_MAX_DIST_TILES = 7.0`, giving City Centres a
-  two-tile mining buffer around the authored/base resource cluster. If no completed City Centre is
-  close enough, workers ignore new gather orders for that patch and active miners scatter roughly
+  two-tile mining buffer around the authored/base resource cluster. If no completed mining anchor is
+  close enough, gatherers ignore new gather orders for that patch and active miners scatter roughly
   one tile away from the patch.
-  When a patch empties the worker goes idle (no automatic retarget).
-- One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
-  occupied only after the worker reaches `GatherPhase::Harvesting`; right-clicking a patch
-  does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
-  is advisory and self-heals — it's only honored while the recorded worker is alive and
+  When a patch empties the gatherer goes idle (no automatic retarget).
+- One gatherer per patch: each node has a single harvest slot (`Entity::miner`). A patch is
+  occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch
+  does not reserve it. Extra gatherers that arrive while the slot is taken go idle. The slot
+  is advisory and self-heals — it's only honored while the recorded gatherer is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
 - Starting layout: each active main or natural site gets 12 steel patches and 3 oil patches.
   Map schema v2 stores named main/natural `sites` plus explicit spawn `layouts`. Each layout
@@ -383,6 +388,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 396 (~13.2s) |
+| golem           | 160 | 16  | 1     | 24 | 2.0   | 7     | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 12 | 60 | 1.6 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
@@ -391,7 +397,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | scout_car       | 100 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
 | command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
-| ekat       | 300 | 0   | 0     | 0  | 2.0   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; regenerates 1 HP/s |
+| ekat       | 150 | 0   | 0     | 0  | 1.6   | 9     | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
 outward from the footprint edge, not from only the building center, so sight 1 reveals the full
@@ -400,7 +406,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
 | city_centre                | City Centre        | 600 | 1     | 225 | 3x3  | 550       | trains worker; +10 supply; players start with one free |
-| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +10 supply; no trains/research in first playable slice |
+| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; +10 supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 1     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |

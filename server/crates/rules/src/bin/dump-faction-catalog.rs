@@ -352,8 +352,8 @@ fn print_client_constants(indent: &str) {
         balance::TICK_HZ * 2
     );
     println!(
-        "{indent}    \"ekatRegenTicks\": {},",
-        balance::EKAT_REGEN_TICKS
+        "{indent}    \"ekatConsumeGolemRangeTiles\": {},",
+        balance::EKAT_CONSUME_GOLEM_RANGE_TILES
     );
     println!(
         "{indent}    \"ekatTeleportRangeTiles\": {},",
@@ -526,12 +526,17 @@ fn print_ability_effects(indent: &str) {
         balance::EKAT_LINE_SHOT_DAMAGE,
     );
     println!(
-        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"pullAwayMultiplier\":{},\"pullTowardMultiplier\":{}}}",
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"pullAwayMultiplier\":{},\"pullTowardMultiplier\":{}}},",
         faction::EKAT_MAGIC_ANCHOR_ABILITY,
         json_f32(balance::EKAT_MAGIC_ANCHOR_RADIUS_TILES),
         balance::EKAT_MAGIC_ANCHOR_DURATION_TICKS,
         json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER),
         json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{}}}",
+        faction::EKAT_CONSUME_GOLEM_ABILITY,
+        json_f32(balance::EKAT_CONSUME_GOLEM_RANGE_TILES as f32),
     );
 }
 

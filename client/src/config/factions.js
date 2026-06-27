@@ -83,12 +83,19 @@ export const FACTION_CATALOGS = Object.freeze({
   [EKAT_FACTION_ID]: freezeCatalog({
     id: EKAT_FACTION_ID,
     loadoutId: "ekat.standard",
-    units: [KIND.EKAT],
+    units: [KIND.EKAT, KIND.GOLEM],
     buildings: [KIND.ZAMOK],
     buildables: [],
-    trainables: {},
+    trainables: {
+      [KIND.ZAMOK]: [KIND.GOLEM],
+    },
     research: {},
-    abilities: [ABILITY.EKAT_TELEPORT, ABILITY.EKAT_LINE_SHOT, ABILITY.EKAT_MAGIC_ANCHOR],
+    abilities: [
+      ABILITY.EKAT_TELEPORT,
+      ABILITY.EKAT_LINE_SHOT,
+      ABILITY.EKAT_MAGIC_ANCHOR,
+      ABILITY.EKAT_CONSUME_GOLEM,
+    ],
   }),
 });
 

@@ -438,6 +438,7 @@ fn render_stats_tables(tables: &[StatsTable]) -> String {
 fn kind_label(kind: EntityKind) -> String {
     match kind {
         EntityKind::Worker => "Engineer",
+        EntityKind::Golem => "Golem",
         EntityKind::Rifleman => "Rifleman",
         EntityKind::MachineGunner => "Machine Gunner",
         EntityKind::AntiTankGun => "Anti-Tank Gun",

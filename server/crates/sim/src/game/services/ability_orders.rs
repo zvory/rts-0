@@ -406,6 +406,7 @@ fn caster_locked_out(entities: &EntityStore, caster: u32, ability: AbilityKind, 
 
 pub(crate) fn launch_self_ability(
     entities: &mut EntityStore,
+    events: &mut HashMap<u32, Vec<Event>>,
     faction_id: &str,
     player: u32,
     caster: u32,
@@ -461,8 +462,58 @@ pub(crate) fn launch_self_ability(
             }
             true
         }
+        (AbilityEffectHook::ConsumeGolem, AbilityKind::EkatConsumeGolem) => {
+            let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
+            else {
+                return false;
+            };
+            let Some(golem) = nearest_owned_golem_for_consume(entities, player, caster_x, caster_y)
+            else {
+                return false;
+            };
+            entities.release_miner(golem);
+            if entities.remove(golem).is_none() {
+                return false;
+            }
+            let Some(e) = entities.get_mut(caster) else {
+                return false;
+            };
+            let missing_hp = e.max_hp.saturating_sub(e.hp);
+            e.restore_hp(missing_hp);
+            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            notice_positioned(
+                events,
+                player,
+                "Consumed Golem",
+                crate::protocol::NoticeSeverity::Info,
+                caster_x,
+                caster_y,
+            );
+            true
+        }
         _ => false,
     }
+}
+
+fn nearest_owned_golem_for_consume(
+    entities: &EntityStore,
+    player: u32,
+    x: f32,
+    y: f32,
+) -> Option<u32> {
+    let range_px = config::EKAT_CONSUME_GOLEM_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let range2 = range_px * range_px + 0.01;
+    entities
+        .iter()
+        .filter(|candidate| {
+            candidate.owner == player
+                && candidate.kind == EntityKind::Golem
+                && candidate.hp > 0
+                && dist2(x, y, candidate.pos_x, candidate.pos_y) <= range2
+        })
+        .map(|candidate| (candidate.id, dist2(x, y, candidate.pos_x, candidate.pos_y)))
+        .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
+        .map(|(id, _)| id)
 }
 
 fn smoke_launch_delay_ticks(

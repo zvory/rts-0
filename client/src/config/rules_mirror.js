@@ -33,7 +33,7 @@ export const COMMAND_CAR_BODY = Object.freeze({
   clearance: 1.0,
 });
 
-// Workers can mine a resource only when a completed City Centre is within this many tiles.
+// Gatherers can mine a resource only when a completed home-base mining anchor is within range.
 export const MINING_CC_RANGE_TILES = 9.0;
 export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 14;
 export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 45 * Math.PI / 180;
@@ -66,7 +66,7 @@ export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 9;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
 export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
-export const EKAT_REGEN_TICKS = TICK_HZ;
+export const EKAT_CONSUME_GOLEM_RANGE_TILES = 2;
 export const EKAT_TELEPORT_RANGE_TILES = 5;
 export const EKAT_TELEPORT_COOLDOWN_TICKS = TICK_HZ * 8;
 export const EKAT_LINE_SHOT_RANGE_TILES = 6;
@@ -88,6 +88,8 @@ export const COMMAND_CAR_SUPPLY_CAP_BONUS = 20;
 export const STATS = Object.freeze({
   [KIND.WORKER]: { label: "Engineer", icon: "EN", size: 9, sight: 7,
     rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 396 },
+  [KIND.GOLEM]: { label: "Golem", icon: "GLM", size: 9, sight: 7,
+    rangeTiles: 1, cost: { steel: 0, oil: 0 }, supply: 4, buildTicks: 396 },
   [KIND.RIFLEMAN]: { label: "Rifleman", icon: "RF", size: 9, sight: 8,
     rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
@@ -120,7 +122,7 @@ export const STATS = Object.freeze({
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 1,
     cost: { steel: 225, oil: 0 }, buildTicks: 550, trains: [KIND.WORKER] },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
-    cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [] },
+    cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 300, trains: [] },
   [KIND.BARRACKS]: { label: "Barracks", icon: "BK", footW: 3, footH: 2, sight: 1,
@@ -264,6 +266,20 @@ export const ABILITIES = Object.freeze({
     pullAwayMultiplier: EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER,
     pullTowardMultiplier: EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER,
     queued: true,
+  }),
+  [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze({
+    ability: ABILITY.EKAT_CONSUME_GOLEM,
+    label: "Consume",
+    icon: "CON",
+    hotkey: "Z",
+    title: "Consume a nearby Golem to heal Ekat to full HP",
+    carriers: Object.freeze([KIND.EKAT]),
+    targetMode: "self",
+    rangeTiles: EKAT_CONSUME_GOLEM_RANGE_TILES,
+    cooldownTicks: 0,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    radiusTiles: EKAT_CONSUME_GOLEM_RANGE_TILES,
+    queued: false,
   }),
 });
 

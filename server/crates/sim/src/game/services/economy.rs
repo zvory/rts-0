@@ -11,8 +11,8 @@ use crate::protocol::terrain;
 
 const SCATTER_RESOURCE_RANGE_TILES: f32 = 10.0;
 
-/// Worker harvest loop: walk to node -> latch onto one free patch -> mine in place.
-/// Depletes the node; when empty, the worker goes idle.
+/// Gatherer harvest loop: walk to node -> latch onto one free patch -> mine in place.
+/// Depletes the node; when empty, the gatherer goes idle.
 pub(crate) fn gather_system(
     map: &Map,
     entities: &mut EntityStore,
@@ -23,10 +23,12 @@ pub(crate) fn gather_system(
 ) {
     for id in entities.ids() {
         let node = match entities.get(id) {
-            Some(e) if e.hp > 0 && e.kind == EntityKind::Worker => match e.order().gather_node() {
-                Some(node) => node,
-                None => continue,
-            },
+            Some(e) if e.hp > 0 && is_gatherer_kind(e.kind) => {
+                match e.order().gather_node() {
+                    Some(node) => node,
+                    None => continue,
+                }
+            }
             _ => continue,
         };
 
@@ -88,7 +90,7 @@ fn gather_to_node(
             e.set_facing((node_pos.1 - wy).atan2(node_pos.0 - wx));
             if can_mine {
                 // Gather is terminal once harvesting begins: drop any later queued
-                // handoff orders so the worker stays on the node.
+                // handoff orders so the gatherer stays on the node.
                 e.clear_queued_orders();
                 e.mark_gather_phase(GatherPhase::Harvesting);
             }
@@ -241,8 +243,8 @@ fn gather_harvesting(
     id: u32,
     node: u32,
 ) {
-    let owner = match entities.get(id) {
-        Some(e) => e.owner,
+    let (owner, gatherer_kind) = match entities.get(id) {
+        Some(e) => (e.owner, e.kind),
         None => return,
     };
     if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
@@ -287,11 +289,7 @@ fn gather_harvesting(
         return;
     }
 
-    let load_cap = if node_kind_amount.0 == EntityKind::Oil {
-        config::OIL_LOAD
-    } else {
-        config::STEEL_LOAD
-    };
+    let load_cap = gather_load_cap(gatherer_kind, node_kind_amount.0);
     let taken = entities
         .get_mut(node)
         .map(|n| n.harvest_resources(load_cap))
@@ -311,6 +309,23 @@ fn gather_harvesting(
     if taken == node_kind_amount.1 {
         entities.release_miner(id);
         idle_gatherer(entities, id);
+    }
+}
+
+fn is_gatherer_kind(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Worker | EntityKind::Golem)
+}
+
+fn gather_load_cap(gatherer_kind: EntityKind, node_kind: EntityKind) -> u32 {
+    let base = if node_kind == EntityKind::Oil {
+        config::OIL_LOAD
+    } else {
+        config::STEEL_LOAD
+    };
+    if gatherer_kind == EntityKind::Golem {
+        base.saturating_mul(4)
+    } else {
+        base
     }
 }
 

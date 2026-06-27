@@ -4,6 +4,7 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EntityKind {
     Worker,
+    Golem,
     Rifleman,
     MachineGunner,
     AntiTankGun,
@@ -27,8 +28,9 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 21] = [
+    pub const ALL: [EntityKind; 22] = [
         EntityKind::Worker,
+        EntityKind::Golem,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
         EntityKind::AntiTankGun,
@@ -66,6 +68,7 @@ impl EntityKind {
     pub fn stable_id(self) -> &'static str {
         match self {
             EntityKind::Worker => "worker",
+            EntityKind::Golem => "golem",
             EntityKind::Rifleman => "rifleman",
             EntityKind::MachineGunner => "machine_gunner",
             EntityKind::AntiTankGun => "anti_tank_gun",
@@ -96,6 +99,7 @@ impl FromStr for EntityKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "worker" => Ok(EntityKind::Worker),
+            "golem" => Ok(EntityKind::Golem),
             "rifleman" => Ok(EntityKind::Rifleman),
             "machine_gunner" => Ok(EntityKind::MachineGunner),
             "anti_tank_gun" => Ok(EntityKind::AntiTankGun),

@@ -468,8 +468,8 @@ policy is centralized instead of scattered through services.
   `EntityKind`, upgrade id, ability id, and Steel/Oil/Supply costs; reuse a global id across
   factions only when gameplay semantics are identical for every faction that can use it. Divergent
   behavior, stats, production role, or ability meaning requires a distinct global id gated through
-  catalog availability. The default catalog is `kriegsia`; `ekat` exposes the current Ekat hero
-  and Zamok slice; `phase2_empty_fixture` exists only as a command-validation test fixture.
+  catalog availability. The default catalog is `kriegsia`; `ekat` exposes the current Ekat hero,
+  Zamok, and Golem slice; `phase2_empty_fixture` exists only as a command-validation test fixture.
   Server-side lifecycle policy lives in `server/src/lobby/faction_validation.rs`.
 - `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`), target-ranking classifiers
   (`target_threat_role`, `default_weapon_target_fit`), `attack_profile(kind) -> AttackProfile`, and
@@ -499,10 +499,10 @@ adding only the effect-specific code that the registry cannot express.
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
 effect shapes that actually exist today: self status (`charge` legacy compatibility), owned area
 status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), dash return, line
-projectile, Magic Anchor placement, and the intentionally one-off artillery point-fire path. The
-hook receives the owning player's faction id at execution time through the normal command/order
-helpers, so wrong-faction ability use fails before effects, resource spending, cooldowns, or events
-are applied. The hook is deliberately not a generic script engine. Phase 11 signature abilities
+projectile, Magic Anchor placement, Golem consumption, and the intentionally one-off artillery
+point-fire path. The hook receives the owning player's faction id at execution time through the
+normal command/order helpers, so wrong-faction ability use fails before effects, resource spending,
+cooldowns, or events are applied. The hook is deliberately not a generic script engine. Phase 11 signature abilities
 should first use one of the existing shapes; if they cannot, add either a narrow explicit hook or a
 named one-off path with faction validation, cost validation, and fog-safe event tests rather than
 widening the hook into generic scripting.
@@ -518,9 +518,10 @@ widening the hook into generic scripting.
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
-- `launch_self_ability` — validates the self-targeted registry row and dispatches self-status or
-  owned-area-status hooks. Breakthrough remains an owned-unit area buff; legacy Charge remains
-  decodable but has no current carriers.
+- `launch_self_ability` — validates the self-targeted registry row and dispatches self-status,
+  owned-area-status, or Golem-consumption hooks. Breakthrough remains an owned-unit area buff; Ekat
+  Consume removes the nearest owned living Golem in range and restores Ekat to full HP; legacy Charge
+  remains decodable but has no current carriers.
 - `caster_can_attempt`, `tech_requirement_met`, `caster_in_range` — pure predicates used by both
   command validation and order-queue promotion.
 
@@ -573,6 +574,11 @@ the anchor, and stationary pull is reduced by the same footing resistance used b
 braced and heavy units move less than soft infantry. If an active anchor exists when `ekatLineShot`
 is accepted, the runtime spawns one projectile from Ekat and one from the anchor toward the same
 cursor point; both return toward Ekat's current server position.
+
+Ekat's `ekatConsumeGolem` self activation has no cooldown or resource cost. It finds the nearest
+owned, living Golem within the ability range, releases any active mining slot held by that Golem,
+removes the Golem permanently, restores Ekat to max HP, and emits an owner-visible positioned
+notice. If no Golem is in range, the command is a no-op. Ekat has no passive regeneration.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
@@ -720,7 +726,7 @@ Allocation rules:
 
 - Point orders (`move`, `attackMove`) apply to every selected owned unit that can receive orders.
 - Target/resource orders apply to every selected compatible owned unit after the target has passed
-  issue-time validation. Occupied resource nodes are still valid gather targets; when a worker
+  issue-time validation. Occupied resource nodes are still valid gather targets; when a gatherer
   arrives and the patch is already occupied, the economy service redirects it to the nearest
   unoccupied same-resource node within ten tiles, or moves it to nearby open grass if none exists.
   Build and Tank Trap deconstruct orders allocate one compatible selected worker per click after the

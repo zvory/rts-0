@@ -59,8 +59,7 @@ Draft patch-note bullets:
   tech conversion.
 - Ekat abilities remain mechanically familiar but become locked until the matching tech buildings
   unlock them.
-- Ekat loses natural regeneration and relies on Golem consumption for full healing once that
-  mechanic exists.
+- Ekat loses natural regeneration and relies on Golem consumption for full healing.
 - Ekat's starting combat body target changes from 300 HP and current fast movement to 150 HP and
   1.6 px/tick Rifleman movement speed.
 - Zamok becomes an expensive, buildable City Centre-equivalent core structure that produces Golems,
@@ -99,7 +98,7 @@ Approved Ekat hero/body brief:
 - The current visuals, body feel, and ability runtime are reused.
 - The stat rework makes Ekat fragile at match start: 150 HP, 1.6 px/tick Rifleman movement speed,
   9-tile sight, existing radius/selection/render feel, no default attack, no regeneration, and no
-  recovery until Golem consumption exists.
+  recovery except Golem consumption.
 - Ekat dying causes immediate player loss for the first implementation target.
 - Initial exposure remains playable when this direction replaces the current prototype slice.
 - Expected failure mode: Ekat can be punished if exposed, overextended, or separated from the
@@ -323,8 +322,7 @@ Approved Ekat hero/body rules:
 - Size: reuse current collision radius, selection size, render size, and visual feel.
 - Movement: 1.6 px/tick, matching Rifleman movement speed, and otherwise use ordinary current Ekat
   movement semantics.
-- Recovery: no natural regeneration; no recovery until Golem consumption exists; Golem consumption
-  heals Ekat to full HP once implemented.
+- Recovery: no natural regeneration; Golem consumption heals Ekat to full HP.
 - Death/revival: Ekat death causes immediate player loss for the first implementation target; no
   revival rule in this slice.
 - Baseline combat: no basic attack.

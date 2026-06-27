@@ -14,7 +14,7 @@ pub const MAX_QUEUED_ORDERS: usize = 8;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
     /// No order: units hold position; idle army units and armed buildings may auto-acquire,
-    /// but workers stay passive unless explicitly ordered.
+    /// but worker-like gatherers stay passive unless explicitly ordered.
     Idle,
     /// Stand ground without chasing or walking to auto-acquire; fire only at enemies already in
     /// weapon range.

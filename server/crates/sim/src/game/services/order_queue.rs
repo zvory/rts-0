@@ -238,7 +238,7 @@ pub(crate) fn promote_ready_orders(
                     .find(|p| p.id == owner)
                     .map(|p| p.faction_id.as_str())
                     .unwrap_or(crate::rules::faction::DEFAULT_FACTION_ID);
-                launch_self_ability(entities, faction_id, owner, id, ability);
+                launch_self_ability(entities, events, faction_id, owner, id, ability);
             }
             PromotedIntent::SetupAntiTankGuns { x, y } => {
                 execute_anti_tank_gun_setup(entities, id, x, y, FutureOrderMode::Preserve);
@@ -598,8 +598,9 @@ fn deployed_anti_tank_gun_target_outside_arc(entities: &EntityStore, id: u32, ta
 }
 
 fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u32) -> bool {
-    let is_worker = matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker);
-    if !is_worker {
+    let is_gatherer = matches!(entities.get(worker), Some(e)
+        if e.owner == owner && e.hp > 0 && matches!(e.kind, EntityKind::Worker | EntityKind::Golem));
+    if !is_gatherer {
         return false;
     }
     let node_ok = matches!(entities.get(node), Some(n)

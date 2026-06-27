@@ -23,6 +23,7 @@ import {
   BASE_COMMAND_SUPPLY_CAP,
   COMMAND_CAR_BODY,
   COMMAND_CAR_SUPPLY_CAP_BONUS,
+  EKAT_CONSUME_GOLEM_RANGE_TILES,
   EKAT_LINE_SHOT_COOLDOWN_TICKS,
   EKAT_LINE_SHOT_DAMAGE,
   EKAT_LINE_SHOT_RANGE_TILES,
@@ -33,7 +34,6 @@ import {
   EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER,
   EKAT_MAGIC_ANCHOR_RADIUS_TILES,
   EKAT_MAGIC_ANCHOR_RANGE_TILES,
-  EKAT_REGEN_TICKS,
   EKAT_TELEPORT_COOLDOWN_TICKS,
   EKAT_TELEPORT_RANGE_TILES,
   FACTION_CATALOGS,
@@ -159,6 +159,7 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "breakthroughCooldownTicks",
   "breakthroughDurationTicks",
   "breakthroughRadiusTiles",
+  "ekatConsumeGolemRangeTiles",
   "ekatLineShotCooldownTicks",
   "ekatLineShotDamage",
   "ekatLineShotRangeTiles",
@@ -169,7 +170,6 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "ekatMagicAnchorPullTowardMultiplier",
   "ekatMagicAnchorRadiusTiles",
   "ekatMagicAnchorRangeTiles",
-  "ekatRegenTicks",
   "ekatTeleportCooldownTicks",
   "ekatTeleportRangeTiles",
   "miningCcRangeTiles",
@@ -221,6 +221,7 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
     "pullTowardMultiplier",
     "radiusTiles",
   ]),
+  [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze(["radiusTiles"]),
 });
 
 function asClientKinds(kinds) {
@@ -401,7 +402,11 @@ for (const rustFaction of allRustCatalogs.catalogs) {
   );
   assert.deepEqual(
     rustFaction.gatherers.map((kind) => kindByStableId.get(kind)),
-    rustFaction.id === DEFAULT_FACTION_ID ? [KIND.WORKER] : [],
+    rustFaction.id === DEFAULT_FACTION_ID
+      ? [KIND.WORKER]
+      : rustFaction.id === "ekat"
+        ? [KIND.GOLEM]
+        : [],
     `${rustFaction.id} gatherer set remains explicit`,
   );
   assert.deepEqual(
@@ -490,7 +495,7 @@ const clientConstants = {
   mortarOuterRadiusTiles: MORTAR_OUTER_RADIUS_TILES,
   mortarInnerRadiusTiles: MORTAR_INNER_RADIUS_TILES,
   mortarFireCooldownTicks: MORTAR_FIRE_COOLDOWN_TICKS,
-  ekatRegenTicks: EKAT_REGEN_TICKS,
+  ekatConsumeGolemRangeTiles: EKAT_CONSUME_GOLEM_RANGE_TILES,
   ekatTeleportRangeTiles: EKAT_TELEPORT_RANGE_TILES,
   ekatTeleportCooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
   ekatLineShotRangeTiles: EKAT_LINE_SHOT_RANGE_TILES,

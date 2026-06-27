@@ -104,9 +104,9 @@ impl EntityStore {
         self.map.values().any(|e| e.owner == player)
     }
 
-    /// Whichever worker currently holds `node_id`'s single harvest slot, if any.
+    /// Whichever gatherer currently holds `node_id`'s single harvest slot, if any.
     ///
-    /// A reservation is only authoritative while the recorded worker is alive, is still
+    /// A reservation is only authoritative while the recorded gatherer is alive, is still
     /// gathering this exact node, and is in the `Harvesting` phase. Stale ids are ignored so
     /// command handling and economy progression agree on when a slot is actually occupied.
     pub fn node_slot_holder(&self, node_id: u32) -> Option<u32> {
@@ -118,8 +118,8 @@ impl EntityStore {
         }
     }
 
-    /// Claim `node_id`'s harvest slot for `worker_id` if the worker is in the authoritative
-    /// slot-holding state and no other valid worker already holds it.
+    /// Claim `node_id`'s harvest slot for `worker_id` if the gatherer is in the authoritative
+    /// slot-holding state and no other valid gatherer already holds it.
     pub fn claim_miner(&mut self, node_id: u32, worker_id: u32) -> bool {
         if matches!(self.node_slot_holder(node_id), Some(holder) if holder != worker_id) {
             return false;
@@ -153,13 +153,13 @@ impl EntityStore {
             return false;
         };
         worker.hp > 0
-            && worker.kind == EntityKind::Worker
+            && matches!(worker.kind, EntityKind::Worker | EntityKind::Golem)
             && worker.order().gather_node() == Some(node_id)
             && worker.gather_phase() == Some(GatherPhase::Harvesting)
     }
 
-    /// Clear every node reservation pointing to this worker, even if the worker's order has
-    /// already changed or the worker has already been removed.
+    /// Clear every node reservation pointing to this gatherer, even if the gatherer's order has
+    /// already changed or the gatherer has already been removed.
     pub fn release_miner(&mut self, worker_id: u32) {
         // Order-independent: every matching resource node receives the same idempotent clear.
         for entity in self.map.values_mut() {

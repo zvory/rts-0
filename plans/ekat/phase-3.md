@@ -83,19 +83,21 @@ Approved Golem rules:
 - Sight: worker-like by default, currently 7 tiles.
 - Attack: 16 damage using worker-like range, cooldown, and target filters by default.
 - Mining: 4x worker mining rate, requiring Zamok proximity.
+- First playable implementation tuning: 0 Steel / 0 Oil cost, 396-tick Zamok build time, and 2-tile
+  Ekat consume range. These values are intentionally provisional until playtesting.
 - Transformation: the Golem is permanently consumed; it disappears immediately; the target building
   immediately exists at low HP. Exact low-HP profile and completion timing are deferred.
-- Healing: Ekat can consume a nearby owned Golem to heal to full HP. Exact range and command flow
-  are deferred.
+- Healing: Ekat can consume a nearby owned Golem to heal to full HP. The first command flow is a
+  self-targeted Consume command that removes the nearest owned living Golem in range.
 - Cap: no hard cap beyond normal Supply unless a later phase adds one.
 - AI support and local prediction may remain disabled indefinitely for Ekat.
 
 Unresolved tuning questions:
 
-- Exact Golem cost.
-- Golem build hotkey, command-card details, and build time.
+- Final Golem cost and build time.
+- Final Golem build hotkey and command-card details.
 - Exact collision, selection, and render size.
-- Exact Golem-heal proximity range and command flow.
+- Final Golem-heal proximity range and command-card flow.
 - Exact transformed-building starting HP profile and completion timing.
 - Any future cap beyond normal Supply.
 

@@ -175,7 +175,7 @@ fn ekat_start_projects_hero_zamok_and_abilities() {
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Ekat)
         .expect("Ekat should start with her hero");
-    assert_eq!(hero.hp, 300);
+    assert_eq!(hero.hp, 150);
 
     let snapshot = game.snapshot_for(1);
     let hero_view = snapshot
@@ -194,12 +194,13 @@ fn ekat_start_projects_hero_zamok_and_abilities() {
             crate::protocol::abilities::EKAT_TELEPORT,
             crate::protocol::abilities::EKAT_LINE_SHOT,
             crate::protocol::abilities::EKAT_MAGIC_ANCHOR,
+            crate::protocol::abilities::EKAT_CONSUME_GOLEM,
         ]
     );
 }
 
 #[test]
-fn ekat_regenerates_one_hp_per_second_while_alive() {
+fn ekat_does_not_passively_regenerate() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -223,5 +224,5 @@ fn ekat_regenerates_one_hp_per_second_while_alive() {
         game.tick();
     }
 
-    assert_eq!(game.entities.get(hero).expect("hero exists").hp, 251);
+    assert_eq!(game.entities.get(hero).expect("hero exists").hp, 100);
 }

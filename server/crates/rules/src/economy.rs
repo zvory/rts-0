@@ -190,6 +190,7 @@ mod tests {
             trainable_units(EntityKind::CityCentre),
             &[EntityKind::Worker]
         );
+        assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
             trainable_units(EntityKind::Barracks),
             &[EntityKind::Rifleman, EntityKind::MachineGunner]
@@ -290,6 +291,7 @@ mod tests {
         ));
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
+        assert_eq!(cost(EntityKind::Golem), (0, 0));
         assert_eq!(cost(EntityKind::ScoutCar), (125, 50));
         assert_eq!(cost(EntityKind::Tank), (425, 150));
         assert_eq!(cost(EntityKind::MortarTeam), (100, 50));
@@ -317,6 +319,7 @@ mod tests {
         );
         assert_eq!(supply_cost(EntityKind::ScoutCar), 3);
         assert_eq!(supply_cost(EntityKind::MortarTeam), 3);
+        assert_eq!(supply_cost(EntityKind::Golem), 4);
         assert_eq!(cost(EntityKind::Steelworks), (150, 100));
         assert_eq!(supply_cost(EntityKind::Tank), 8);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
@@ -351,6 +354,14 @@ mod tests {
             DEFAULT_FACTION_ID,
             EntityKind::Tank,
             &[EntityKind::Factory]
+        ));
+        assert_eq!(
+            trainable_units_for_faction(crate::faction::EKAT_FACTION_ID, EntityKind::Zamok),
+            vec![EntityKind::Golem]
+        );
+        assert!(can_gather_for_faction(
+            crate::faction::EKAT_FACTION_ID,
+            EntityKind::Golem
         ));
     }
 

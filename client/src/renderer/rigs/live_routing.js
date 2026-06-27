@@ -18,13 +18,14 @@ import {
   SCOUT_CAR_PARTS,
   SCOUT_CAR_RIG_SVG,
 } from "./vehicle_svg.js";
-import { WORKER_RIG_SVG } from "./worker_svg.js";
+import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "./worker_svg.js";
 
 const LIVE_RIG_SOURCES = Object.freeze([
   [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_RIG_SVG],
   [KIND.ARTILLERY, ARTILLERY_RIG_SVG],
   [KIND.COMMAND_CAR, COMMAND_CAR_RIG_SVG],
   [KIND.EKAT, EKAT_RIG_SVG],
+  [KIND.GOLEM, GOLEM_RIG_SVG],
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_RIG_SVG],
   [KIND.MORTAR_TEAM, MORTAR_TEAM_RIG_SVG],
   [KIND.RIFLEMAN, RIFLEMAN_RIG_SVG],
@@ -110,6 +111,10 @@ const LIVE_RIG_PARTS = Object.freeze({
   }),
   [KIND.COMMAND_CAR]: COMMAND_CAR_PARTS,
   [KIND.EKAT]: EKAT_PARTS,
+  [KIND.GOLEM]: Object.freeze({
+    shadow: Object.freeze(["part.shadow"]),
+    unit: WORKER_UNIT_PARTS,
+  }),
   [KIND.MACHINE_GUNNER]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
     unit: MACHINE_GUNNER_UNIT_PARTS,

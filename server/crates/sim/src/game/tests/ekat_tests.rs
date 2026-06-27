@@ -74,6 +74,19 @@ fn enqueue_ekat_anchor(game: &mut Game, hero: u32, target: (f32, f32)) {
     );
 }
 
+fn enqueue_ekat_consume_golem(game: &mut Game, hero: u32) {
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::EkatConsumeGolem,
+            units: vec![hero],
+            x: None,
+            y: None,
+            queued: false,
+        },
+    );
+}
+
 fn active_return_marker_id(game: &Game, hero: u32) -> Option<u32> {
     game.ability_runtime
         .active_return_marker(
@@ -110,6 +123,167 @@ fn refresh_visibility(game: &mut Game) {
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
+}
+
+#[test]
+fn zamok_trains_golem_for_ekat_faction() {
+    let players = [ekat_player()];
+    let mut game = Game::new_for_replay(&players, 0x1234_5678);
+    let zamok = game
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Zamok)
+        .map(|entity| entity.id)
+        .expect("Ekat should start with Zamok");
+
+    game.enqueue(
+        1,
+        Command::Train {
+            building: zamok,
+            unit: EntityKind::Golem,
+        },
+    );
+    for _ in 0..=config::unit_stats(EntityKind::Golem)
+        .expect("Golem stats should exist")
+        .build_ticks
+    {
+        game.tick();
+    }
+
+    assert!(
+        game.entities
+            .iter()
+            .any(|entity| entity.owner == 1 && entity.kind == EntityKind::Golem),
+        "Zamok should produce Golems"
+    );
+    assert_eq!(game.players[0].supply_used, 4);
+}
+
+#[test]
+fn golem_mines_four_worker_loads_near_zamok() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let center = game.map.tile_center(10, 10);
+    game.entities
+        .spawn_building(1, EntityKind::Zamok, center.0, center.1, true)
+        .expect("Zamok should spawn");
+    let node = game
+        .entities
+        .spawn_node(EntityKind::Steel, center.0 + 96.0, center.1)
+        .expect("steel node should spawn");
+    let golem = game
+        .entities
+        .spawn_unit(1, EntityKind::Golem, center.0 + 128.0, center.1)
+        .expect("Golem should spawn");
+
+    game.enqueue(
+        1,
+        Command::Gather {
+            units: vec![golem],
+            node,
+            queued: false,
+        },
+    );
+    for _ in 0..=config::HARVEST_TICKS + 2 {
+        game.tick();
+    }
+
+    assert_eq!(game.players[0].steel, config::STEEL_LOAD * 4);
+}
+
+#[test]
+fn golem_ordered_attack_deals_four_worker_damage() {
+    let players = [ekat_player(), kriegsia_enemy()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let golem = game
+        .entities
+        .spawn_unit(1, EntityKind::Golem, pos.0, pos.1)
+        .expect("Golem should spawn");
+    let target = game
+        .entities
+        .spawn_unit(2, EntityKind::Worker, pos.0 + 20.0, pos.1)
+        .expect("target worker should spawn");
+    let target_hp = game.entities.get(target).expect("target exists").hp;
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![golem],
+            target,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.entities.get(target).expect("target exists").hp,
+        target_hp - 16
+    );
+}
+
+#[test]
+fn ekat_consumes_nearby_golem_to_heal_to_full() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+    let golem = game
+        .entities
+        .spawn_unit(1, EntityKind::Golem, pos.0 + config::TILE_SIZE as f32, pos.1)
+        .expect("Golem should spawn");
+    game.entities
+        .get_mut(hero)
+        .expect("hero exists")
+        .apply_damage(70, None);
+
+    enqueue_ekat_consume_golem(&mut game, hero);
+    game.tick();
+
+    let hero_entity = game.entities.get(hero).expect("hero exists");
+    assert_eq!(hero_entity.hp, hero_entity.max_hp);
+    assert!(
+        game.entities.get(golem).is_none(),
+        "consumed Golem should be removed permanently"
+    );
+}
+
+#[test]
+fn ekat_consume_requires_nearby_golem() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let hero = game
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+    let golem = game
+        .entities
+        .spawn_unit(
+            1,
+            EntityKind::Golem,
+            pos.0 + config::TILE_SIZE as f32 * 4.0,
+            pos.1,
+        )
+        .expect("Golem should spawn");
+    game.entities
+        .get_mut(hero)
+        .expect("hero exists")
+        .apply_damage(70, None);
+
+    enqueue_ekat_consume_golem(&mut game, hero);
+    game.tick();
+
+    assert_eq!(game.entities.get(hero).expect("hero exists").hp, 80);
+    assert!(
+        game.entities.get(golem).is_some(),
+        "out-of-range Golem should not be consumed"
+    );
 }
 
 #[test]

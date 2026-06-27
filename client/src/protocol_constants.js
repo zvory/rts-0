@@ -88,6 +88,7 @@ export const PASSABLE = Object.freeze({ 0: true, 1: false, 2: false });
 // --- Entity kinds (must match protocol::kinds) ---
 export const KIND = Object.freeze({
   WORKER: "worker",
+  GOLEM: "golem",
   RIFLEMAN: "rifleman",
   MACHINE_GUNNER: "machine_gunner",
   ANTI_TANK_GUN: "anti_tank_gun",
@@ -111,6 +112,7 @@ export const KIND = Object.freeze({
 });
 export const UNIT_KINDS = Object.freeze([
   KIND.WORKER,
+  KIND.GOLEM,
   KIND.RIFLEMAN,
   KIND.MACHINE_GUNNER,
   KIND.ANTI_TANK_GUN,
@@ -193,6 +195,7 @@ export const ABILITY = Object.freeze({
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
+  EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
 });
 
 export const VISION_SELECTION = Object.freeze({
@@ -216,7 +219,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 23;
+export const COMPACT_SNAPSHOT_VERSION = 24;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
   COMPACT_JSON: "compact-json",
@@ -229,6 +232,7 @@ export const SNAPSHOT_FRAME_KIND = Object.freeze({
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
+  [KIND.GOLEM]: 22,
   [KIND.RIFLEMAN]: 2,
   [KIND.MACHINE_GUNNER]: 3,
   [KIND.ANTI_TANK_GUN]: 4,
@@ -316,6 +320,7 @@ export const ORDER_STAGE = Object.freeze({
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
+  EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
 
@@ -335,6 +340,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EKAT_LINE_SHOT]: 13,
   [ORDER_STAGE.EKAT_MAGIC_ANCHOR]: 14,
   [ORDER_STAGE.DECONSTRUCT]: 15,
+  [ORDER_STAGE.EKAT_CONSUME_GOLEM]: 16,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -346,6 +352,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EKAT_TELEPORT]: 6,
   [ABILITY.EKAT_LINE_SHOT]: 7,
   [ABILITY.EKAT_MAGIC_ANCHOR]: 8,
+  [ABILITY.EKAT_CONSUME_GOLEM]: 9,
 });
 
 export const ABILITY_OBJECT_KIND_CODE = Object.freeze({

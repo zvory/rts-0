@@ -23,8 +23,9 @@ implementation phase.
   strategic reason to choose it, counterplay, unlock behavior, loss/destruction consequences, and
   first playable scope before implementation.
 - Reconcile this draft with the current playable Ekat hero/Zamok slice before changing behavior.
-  In particular, this draft says Ekat has no combat abilities by default and no natural health
-  regeneration, while the current implementation exposes Ekat abilities and regeneration.
+  In particular, the target says Ekat has no combat abilities by default; the current playable slice
+  still exposes prototype Ekat combat abilities until tech-building gating lands. Natural health
+  regeneration has already been removed.
 
 ## Core Direction
 
@@ -200,7 +201,6 @@ Shared first-target rules for Ekat tech buildings:
 - Ekat can consume a Golem to return to full HP.
 - Golem consumption is the faction's primary recovery rule unless later requirements add another
   healing path.
-- Until Golem consumption exists, damaged Ekat has no recovery.
 - If Ekat dies, that player loses immediately for the first implementation target. Future revival,
   cloning, or comeback mechanics are possible later but are not part of the current target.
 
@@ -220,8 +220,8 @@ Shared first-target rules for Ekat tech buildings:
 ## Out Of Scope For This Requirements Draft
 
 - Exact mining timing, drop-off rules, and Zamok proximity numbers.
-- Exact Golem build cost, build time, command UI, healing range, and transformation building HP
-  profile.
+- Final Golem build cost, build time, command UI, healing range, and transformation building HP
+  profile. The first playable Golem values are intentionally provisional.
 - Exact Killing Tools attack customizations, Anchorage anchor customizations, Positioning
   movement/mobility customizations, ability upgrade names, costs, effects, and ordering.
 - Ekat HP scaling mechanics, cloning mechanics, revival/comeback mechanics, AI support, prediction

@@ -178,7 +178,7 @@ const clientProtocol = [
   read("client/src/protocol.js"),
   read("client/src/protocol_constants.js"),
 ].join("\n");
-for (const token of ["WORKER", "EKAT", "CITY_CENTRE", "ZAMOK", "STEEL", "OIL"]) {
+for (const token of ["WORKER", "GOLEM", "EKAT", "CITY_CENTRE", "ZAMOK", "STEEL", "OIL"]) {
   assert(protocol.includes(`pub const ${token}`), `Rust protocol missing ${token}`);
   assert(clientProtocol.includes(`${token}:`), `client protocol missing ${token}`);
 }
@@ -193,7 +193,7 @@ assert(
   `compact snapshot version mismatch: Rust ${rustCompactVersion}, client ${clientCompactVersion}`,
 );
 
-const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|CityCentre|Depot|Barracks|TrainingCentre|ResearchComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS)\b/;
+const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|Golem|CityCentre|Depot|Barracks|TrainingCentre|ResearchComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS)\b/;
 const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/actions.rs",
   "server/crates/ai/src/ai_core/decision/defense.rs",
@@ -306,8 +306,8 @@ const approvedSpecialCaseBudgets = new Map([
   // those helpers shrink or move behind catalog APIs.
   // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
   // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
-  ["server/crates/rules/src/faction.rs", 84],
-  ["server/crates/rules/src/economy.rs", 101],
+  ["server/crates/rules/src/faction.rs", 89],
+  ["server/crates/rules/src/economy.rs", 106],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
   // Tank Trap deconstruction adds worker-only command validation and trap target admission.

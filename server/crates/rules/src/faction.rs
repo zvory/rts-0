@@ -26,6 +26,7 @@ pub const CHARGE_ABILITY: &str = "charge";
 pub const EKAT_TELEPORT_ABILITY: &str = "ekatTeleport";
 pub const EKAT_LINE_SHOT_ABILITY: &str = "ekatLineShot";
 pub const EKAT_MAGIC_ANCHOR_ABILITY: &str = "ekatMagicAnchor";
+pub const EKAT_CONSUME_GOLEM_ABILITY: &str = "ekatConsumeGolem";
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
@@ -269,7 +270,7 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
     },
 ];
 
-const EKAT_UNITS: &[EntityKind] = &[EntityKind::Ekat];
+const EKAT_UNITS: &[EntityKind] = &[EntityKind::Ekat, EntityKind::Golem];
 const EKAT_BUILDINGS: &[EntityKind] = &[EntityKind::Zamok];
 
 const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
@@ -333,6 +334,26 @@ const EKAT_ABILITIES: &[AbilityCatalogEntry] = &[
         protocol_code: 8,
         order_stage_code: 14,
     },
+    AbilityCatalogEntry {
+        id: EKAT_CONSUME_GOLEM_ABILITY,
+        label: "Consume",
+        icon: "CON",
+        hotkey: Some("Z"),
+        title: "Consume a nearby Golem to heal Ekat to full HP",
+        carriers: &[EntityKind::Ekat],
+        target_mode: AbilityTargetMode::SelfTarget,
+        range_tiles: Some(balance::EKAT_CONSUME_GOLEM_RANGE_TILES),
+        min_range_tiles: None,
+        cooldown_ticks: 0,
+        charges: None,
+        cost: ResourceCost::new(0, 0),
+        tech_requirement: None,
+        may_queue: false,
+        autocast: false,
+        command_card: true,
+        protocol_code: 9,
+        order_stage_code: 16,
+    },
 ];
 
 pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
@@ -375,8 +396,8 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
     upgrades: &[],
     abilities: EKAT_ABILITIES,
     builders: &[],
-    gatherers: &[],
-    production_anchors: &[],
+    gatherers: &[EntityKind::Golem],
+    production_anchors: &[EntityKind::Zamok],
 };
 
 pub const CATALOGS: &[FactionCatalog] = &[CURRENT_CATALOG, EKAT_CATALOG, EMPTY_FIXTURE_CATALOG];
@@ -612,16 +633,23 @@ mod tests {
     }
 
     #[test]
-    fn ekat_catalog_exposes_one_hero_and_zamok() {
+    fn ekat_catalog_exposes_hero_golem_and_zamok() {
         let catalog = EKAT_CATALOG;
 
-        assert_eq!(catalog.units, &[EntityKind::Ekat]);
+        assert_eq!(catalog.units, &[EntityKind::Ekat, EntityKind::Golem]);
         assert_eq!(catalog.buildings, &[EntityKind::Zamok]);
+        assert_eq!(
+            catalog.trainable_units(EntityKind::Zamok),
+            vec![EntityKind::Golem]
+        );
         assert_eq!(catalog.loadout.id, "ekat.standard");
         assert_eq!(catalog.loadout.starting_entities, EKAT_START_ENTITIES);
+        assert!(catalog.can_gather(EntityKind::Golem));
+        assert!(catalog.can_act_as_production_anchor(EntityKind::Zamok));
         assert!(catalog.allows_ability(EKAT_TELEPORT_ABILITY, EntityKind::Ekat));
         assert!(catalog.allows_ability(EKAT_LINE_SHOT_ABILITY, EntityKind::Ekat));
         assert!(catalog.allows_ability(EKAT_MAGIC_ANCHOR_ABILITY, EntityKind::Ekat));
+        assert!(catalog.allows_ability(EKAT_CONSUME_GOLEM_ABILITY, EntityKind::Ekat));
         assert!(!catalog.allows_unit(EntityKind::Rifleman));
         assert!(!catalog.allows_building(EntityKind::CityCentre));
     }
@@ -693,6 +721,16 @@ mod tests {
             anchor.range_tiles,
             Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
         );
+
+        let consume = EKAT_CATALOG.ability(EKAT_CONSUME_GOLEM_ABILITY).unwrap();
+        assert_eq!(consume.carriers, &[EntityKind::Ekat]);
+        assert_eq!(consume.target_mode, AbilityTargetMode::SelfTarget);
+        assert_eq!(
+            consume.range_tiles,
+            Some(balance::EKAT_CONSUME_GOLEM_RANGE_TILES)
+        );
+        assert_eq!(consume.protocol_code, 9);
+        assert_eq!(consume.order_stage_code, 16);
     }
 
     #[test]
