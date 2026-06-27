@@ -88,8 +88,8 @@ export const COMMAND_CAR_SUPPLY_CAP_BONUS = 20;
 export const STATS = Object.freeze({
   [KIND.WORKER]: { label: "Engineer", icon: "EN", size: 9, sight: 7,
     rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 396 },
-  [KIND.GOLEM]: { label: "Golem", icon: "GLM", size: 9, sight: 7,
-    rangeTiles: 1, cost: { steel: 0, oil: 0 }, supply: 4, buildTicks: 396 },
+  [KIND.GOLEM]: { label: "Golem", icon: "GLM", size: 13.5, sight: 7,
+    rangeTiles: 1, cost: { steel: 200, oil: 0 }, supply: 4, buildTicks: 396 },
   [KIND.RIFLEMAN]: { label: "Rifleman", icon: "RF", size: 9, sight: 8,
     rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
