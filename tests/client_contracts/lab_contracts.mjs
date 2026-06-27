@@ -330,8 +330,8 @@ await withFakeDocument(async () => {
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("ekat"),
-    [KIND.EKAT],
-    "LabPanel spawn palette filters Ekat to Ekat units",
+    [KIND.EKAT, KIND.GOLEM],
+    "LabPanel spawn palette filters Ekat to Ekat catalog units",
   );
   assertDeepEqual(
     labBuildingSpawnFactionOptions().map((entry) => entry.id),

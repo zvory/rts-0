@@ -80,7 +80,8 @@ impl Entity {
             },
             production: None,
             construction: None,
-            worker: (kind == EntityKind::Worker).then(WorkerState::default),
+            worker: matches!(kind, EntityKind::Worker | EntityKind::Golem)
+                .then(WorkerState::default),
             resource_node: None,
             ability_cooldowns: BTreeMap::new(),
             ability_lockouts_until_tick: BTreeMap::new(),

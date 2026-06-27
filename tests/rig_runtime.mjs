@@ -28,7 +28,7 @@ import {
   EKAT_RIG_SVG,
   SCOUT_CAR_RIG_SVG,
 } from "../client/src/renderer/rigs/vehicle_svg.js";
-import { WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
+import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "fixtures/svg");
@@ -232,6 +232,8 @@ test("live rig definitions compile production SVG sources", () => {
   const ekatFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-ekat.svg"), "utf8").trim();
   const tankFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-vehicle.svg"), "utf8").trim();
   assert.equal(WORKER_RIG_SVG.trim(), workerFixtureText);
+  assert.equal(GOLEM_RIG_SVG.includes('data-rts-rig-kind="golem"'), true);
+  assert.equal(GOLEM_RIG_SVG.includes('id="golem.authored"'), true);
   assert.equal(RIFLEMAN_RIG_SVG.trim(), riflemanFixtureText);
   assert.equal(MACHINE_GUNNER_RIG_SVG.trim(), machineGunnerFixtureText);
   assert.equal(ANTI_TANK_GUN_RIG_SVG.trim(), antiTankGunFixtureText);
@@ -248,6 +250,8 @@ test("live rig definitions compile production SVG sources", () => {
   assert.equal(definitions.get(KIND.ARTILLERY).id, "artillery.authored");
   assert.equal(definitions.has(KIND.WORKER), true);
   assert.equal(definitions.get(KIND.WORKER).id, "worker.authored");
+  assert.equal(definitions.has(KIND.GOLEM), true);
+  assert.equal(definitions.get(KIND.GOLEM).id, "golem.authored");
   assert.equal(definitions.has(KIND.RIFLEMAN), true);
   assert.equal(definitions.get(KIND.RIFLEMAN).id, "rifleman.authored");
   assert.equal(definitions.has(KIND.MACHINE_GUNNER), true);
@@ -309,6 +313,10 @@ test("live rig routes expose kind-specific production part groups", () => {
   const workerRoutes = liveRigRoutesFor(KIND.WORKER);
   assert.deepEqual(workerRoutes[0].parts, ["part.shadow"]);
   assert.deepEqual(workerRoutes[1].parts, ["part.body", "part.busyIndicator", "part.facingTick"]);
+
+  const golemRoutes = liveRigRoutesFor(KIND.GOLEM);
+  assert.deepEqual(golemRoutes[0].parts, ["part.shadow"]);
+  assert.deepEqual(golemRoutes[1].parts, ["part.body", "part.busyIndicator", "part.facingTick"]);
 
   const tankRoutes = liveRigRoutesFor(KIND.TANK);
   assert.deepEqual(tankRoutes[0].parts, ["part.shadow"]);

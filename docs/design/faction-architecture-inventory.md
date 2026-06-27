@@ -48,15 +48,15 @@ Lifecycle status is explicit and separate from catalog existence:
 
 ## Current Entity Identity
 
-Runtime identity is still global `EntityKind`. The current roster has 21 global kinds: 10 units,
+Runtime identity is still global `EntityKind`. The current roster has 22 global kinds: 11 units,
 9 buildings, and 2 resource nodes. Server rules own the stable ids in
 `server/crates/rules/src/kind.rs`; protocol mirrors expose the same string ids in
 `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 
 The current production catalog is in `server/crates/rules/src/defs.rs`:
 
-- Units: Worker, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank,
-  Command Car, and Ekat.
+- Units: Worker, Golem, Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car,
+  Tank, Command Car, and Ekat.
 - Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, Gun
   Works, and Tank Trap. Tank Trap construction is server-authoritative after Training Centre
   eligibility and is exposed through the mirrored worker build menu.
@@ -95,7 +95,8 @@ catalog loadout, starting entities, starting Steel/Oil, or Kriegsia supply credi
 must validate before building a `Game`.
 
 The standard Ekat match start is defined by the `ekat.standard` faction loadout: one completed
-Zamok and one Ekat hero, with no starting Steel/Oil or Supply requirement. The
+Zamok and one Ekat hero, with no starting Steel/Oil or Supply requirement. Zamok trains Golems for
+the current Ekat economy and recovery slice. The
 `phase2_empty_fixture.scout_depot` loadout starts one Depot and one Scout Car for explicit
 fixture tests only; catalog existence does not make that id product-playable.
 
@@ -120,12 +121,13 @@ Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client desc
 `client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
 Anti-Tank Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; Unlock
 Artillery requires completed Anti-Tank Gun Crews research, and Command Car requires completed Tank
-Production research.
+Production research. The current Ekat tech tree starts with Zamok training Golems; Golem-converted
+tech buildings are still planned work.
 
 ## Current Ability Surface
 
 Current ability ids are Charge, Smoke, Mortar Fire, Point Fire, Breakthrough, Ekat Teleport, Ekat
-Line Shot, and Ekat Magic Anchor. The Rust faction catalog in
+Line Shot, Ekat Magic Anchor, and Ekat Consume Golem. The Rust faction catalog in
 `server/crates/rules/src/faction.rs` is authoritative for ability id, carrier, target mode,
 range, cooldown/charge, resource cost, queueability, autocast support, and command-card affordance
 metadata. `client/src/config.js` is the checked client projection, while

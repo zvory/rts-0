@@ -36,9 +36,13 @@ pub(super) fn combat_mode(e: &Entity) -> CombatMode {
         Order::AttackMove(_) => CombatMode::Aggressive,
         Order::Move(_) if can_fire_while_moving(e) => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
-        Order::Idle if e.is_unit() && e.kind != EntityKind::Worker => CombatMode::Aggressive,
+        Order::Idle if e.is_unit() && !is_passive_idle_unit(e.kind) => CombatMode::Aggressive,
         _ => CombatMode::Passive,
     }
+}
+
+fn is_passive_idle_unit(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Worker | EntityKind::Golem)
 }
 
 /// Resolve which entity an attacker should engage this tick.

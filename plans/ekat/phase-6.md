@@ -98,15 +98,15 @@ Approved serial-plan rules summary:
 - Ekat is one word, short for Ekaterina, and is both the faction and hero/body name.
 - Zamok is the Ekat home/core structure and City Centre-equivalent mining/Golem-production anchor.
 - Ekat starts unique at match start, costs 0, uses 0 Supply, has 150 HP, 1.6 px/tick movement,
-  9-tile sight, no basic attack, no natural regeneration, and no recovery until Golem consumption
-  exists.
+  9-tile sight, no basic attack, no natural regeneration, and Golem consumption as her current
+  recovery path.
 - Ekat death causes immediate defeat for the first implementation target.
 - If a player has no Zamoks, Ekat dies.
 - Golems are directly controllable worker-like economy/tech units built by Zamok: 4 Supply, 160 HP,
   4x worker mining, 16 worker-like attack damage, worker-like movement and sight defaults, and no
   hard cap beyond Supply.
-- Ekat can consume a nearby owned Golem to heal to full HP; exact range and command flow are
-  deferred.
+- Ekat can consume a nearby owned Golem to heal to full HP; first playable range is 2 tiles and the
+  command consumes the nearest owned living Golem in range.
 - Golem transformations are free except for permanent Golem consumption and immediately create a
   low-HP tech building.
 - Killing Tools unlocks Line Shot.

@@ -72,8 +72,8 @@ pub(crate) fn completed_building_kinds(entities: &EntityStore, player: u32) -> V
         .collect()
 }
 
-/// Whether a resource node is mineable by `player` because a completed City Centre is close
-/// enough to receive attached-mining income from that node.
+/// Whether a resource node is mineable by `player` because a completed home-base mining anchor
+/// (City Centre or Zamok) is close enough to receive attached-mining income from that node.
 pub(crate) fn resource_has_completed_mining_cc(
     entities: &EntityStore,
     player: u32,
@@ -85,7 +85,7 @@ pub(crate) fn resource_has_completed_mining_cc(
     if !resource.is_node() || resource.remaining().unwrap_or(0) == 0 {
         return false;
     }
-    nearest_completed_mining_cc(entities, player, resource.pos_x, resource.pos_y)
+    nearest_completed_mining_anchor(entities, player, resource.pos_x, resource.pos_y)
         .map(|(_, dist2)| {
             let range_px = config::MINING_CC_RANGE_TILES * config::TILE_SIZE as f32;
             dist2 <= range_px * range_px + 0.01
@@ -93,20 +93,24 @@ pub(crate) fn resource_has_completed_mining_cc(
         .unwrap_or(false)
 }
 
-fn nearest_completed_mining_cc(
+fn nearest_completed_mining_anchor(
     entities: &EntityStore,
     player: u32,
     x: f32,
     y: f32,
 ) -> Option<(u32, f32)> {
     completed_buildings(entities, player)
-        .filter(|e| e.kind == EntityKind::CityCentre && e.hp > 0)
+        .filter(|e| is_home_base_mining_anchor(e.kind) && e.hp > 0)
         .map(|e| {
             let dx = e.pos_x - x;
             let dy = e.pos_y - y;
             (e.id, dx * dx + dy * dy)
         })
         .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
+}
+
+fn is_home_base_mining_anchor(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::CityCentre | EntityKind::Zamok)
 }
 
 /// Town halls (City Centres) owned by `player`, in any construction state.
@@ -345,10 +349,12 @@ mod tests {
     }
 
     #[test]
-    fn resource_mining_requires_completed_cc_in_range() {
+    fn resource_mining_requires_completed_home_base_anchor_in_range() {
         let ts = config::TILE_SIZE as f32;
         let mut s = EntityStore::default();
         s.spawn_building(1, EntityKind::CityCentre, 100.0, 100.0, true)
+            .unwrap();
+        s.spawn_building(2, EntityKind::Zamok, 500.0, 100.0, true)
             .unwrap();
         let near = s
             .spawn_node(
@@ -381,9 +387,17 @@ mod tests {
             )
             .unwrap();
         let unfinished_near = s.spawn_node(EntityKind::Steel, 100.0, 300.0).unwrap();
+        let zamok_near = s
+            .spawn_node(
+                EntityKind::Oil,
+                500.0 + config::MINING_CC_RANGE_TILES * ts,
+                100.0,
+            )
+            .unwrap();
 
         assert!(resource_has_completed_mining_cc(&s, 1, near));
         assert!(resource_has_completed_mining_cc(&s, 1, forgiving));
+        assert!(resource_has_completed_mining_cc(&s, 2, zamok_near));
         assert!(!resource_has_completed_mining_cc(&s, 1, far));
         assert!(!resource_has_completed_mining_cc(&s, 2, unfinished_near));
         s.remove(unfinished_cc);

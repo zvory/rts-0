@@ -802,6 +802,7 @@ function buttonByLabel(card, label) {
   rightClickInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
   rightClickInput._resourceAtWorld = Input.prototype._resourceAtWorld;
   rightClickInput._selectedOwnUnitIds = Input.prototype._selectedOwnUnitIds;
+  rightClickInput._selectedGathererIds = Input.prototype._selectedGathererIds;
   rightClickInput._selectedWorkerIds = Input.prototype._selectedWorkerIds;
   rightClickInput._selectedProducerBuildingIds = Input.prototype._selectedProducerBuildingIds;
   rightClickInput._issueCommand = (command) => alliedRightClickCommands.push(command);

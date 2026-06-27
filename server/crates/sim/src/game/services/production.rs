@@ -109,7 +109,7 @@ pub(crate) fn production_system(
                     player.record_entity_created(unit);
                 }
                 // Send the new unit through the building's rally plan. Plain rally stages default
-                // to attack-move for combat units, but workers keep the old move rally behavior.
+                // to attack-move for combat units, but worker-like gatherers keep move rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
                     coordinator.order_group_move(
                         entities,
@@ -130,7 +130,11 @@ pub(crate) fn production_system(
 }
 
 fn rally_stage_attacks(unit: EntityKind, rally: RallyIntent) -> bool {
-    matches!(rally.kind, RallyKind::AttackMove) || unit != EntityKind::Worker
+    matches!(rally.kind, RallyKind::AttackMove) || !is_worker_like_gatherer(unit)
+}
+
+fn is_worker_like_gatherer(unit: EntityKind) -> bool {
+    matches!(unit, EntityKind::Worker | EntityKind::Golem)
 }
 
 fn rally_order_intent(unit: EntityKind, rally: RallyIntent) -> OrderIntent {

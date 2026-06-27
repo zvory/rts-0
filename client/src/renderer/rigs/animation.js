@@ -217,7 +217,10 @@ function visualCarriageFacing(kind, facing, weaponFacing, deploy, fallback) {
 }
 
 function isBusy(entity) {
-  return entity.kind === KIND.WORKER && (entity.latchedNode || entity.state === STATE.BUILD);
+  return (
+    (entity.kind === KIND.WORKER || entity.kind === KIND.GOLEM) &&
+    (entity.latchedNode || entity.state === STATE.BUILD)
+  );
 }
 
 function finite(value, fallback) {

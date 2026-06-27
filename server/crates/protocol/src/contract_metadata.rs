@@ -20,6 +20,7 @@ pub mod terrain {
 /// `EntityView.kind` values.
 pub mod kinds {
     pub const WORKER: &str = "worker";
+    pub const GOLEM: &str = "golem";
     pub const RIFLEMAN: &str = "rifleman";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
     pub const ANTI_TANK_GUN: &str = "anti_tank_gun";
@@ -64,6 +65,7 @@ pub mod abilities {
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
+    pub const EKAT_CONSUME_GOLEM: &str = "ekatConsumeGolem";
 }
 
 /// `AbilityObjectView.kind` values.
@@ -89,7 +91,7 @@ pub mod upgrades {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 23;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 24;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -249,6 +251,7 @@ fn code_map(entries: &[(&'static str, u8)]) -> BTreeMap<&'static str, u8> {
 
 const KIND_CODES: &[(&str, u8)] = &[
     (kinds::WORKER, 1),
+    (kinds::GOLEM, 22),
     (kinds::RIFLEMAN, 2),
     (kinds::MACHINE_GUNNER, 3),
     (kinds::ANTI_TANK_GUN, 4),
@@ -319,6 +322,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_LINE_SHOT, 13),
     (abilities::EKAT_MAGIC_ANCHOR, 14),
     ("deconstruct", 15),
+    (abilities::EKAT_CONSUME_GOLEM, 16),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -330,6 +334,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EKAT_TELEPORT, 6),
     (abilities::EKAT_LINE_SHOT, 7),
     (abilities::EKAT_MAGIC_ANCHOR, 8),
+    (abilities::EKAT_CONSUME_GOLEM, 9),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -496,6 +501,7 @@ fn terrain_codes() -> BTreeMap<&'static str, u8> {
 fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[
         ("WORKER", kinds::WORKER),
+        ("GOLEM", kinds::GOLEM),
         ("RIFLEMAN", kinds::RIFLEMAN),
         ("MACHINE_GUNNER", kinds::MACHINE_GUNNER),
         ("ANTI_TANK_GUN", kinds::ANTI_TANK_GUN),
@@ -554,6 +560,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
+        ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
     ])
 }
 
@@ -596,6 +603,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
+        ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }

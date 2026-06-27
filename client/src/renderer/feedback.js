@@ -111,7 +111,7 @@ export function _drawPlacement(view, fog) {
     }
   }
 
-  if (p.building !== KIND.CITY_CENTRE) return;
+  if (p.building !== KIND.CITY_CENTRE && p.building !== KIND.ZAMOK) return;
 
   const x0 = p.tileX * ts;
   const y0 = p.tileY * ts;

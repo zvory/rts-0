@@ -400,7 +400,10 @@ pub fn project_entity(
         view.remaining = entity.remaining();
     }
 
-    if entity.kind == crate::game::entity::EntityKind::Worker
+    if matches!(
+        entity.kind,
+        crate::game::entity::EntityKind::Worker | crate::game::entity::EntityKind::Golem
+    )
         && entity.gather_phase() == Some(GatherPhase::Harvesting)
     {
         if let Some(node) = entity.order().gather_node() {

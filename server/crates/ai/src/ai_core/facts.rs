@@ -314,6 +314,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::Tank
         | EntityKind::Ekat => true,
         EntityKind::Worker
+        | EntityKind::Golem
         | EntityKind::CityCentre
         | EntityKind::Zamok
         | EntityKind::Depot

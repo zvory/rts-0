@@ -144,7 +144,7 @@ pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
 fn anti_tank_gun_miss_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Worker | EntityKind::Rifleman | EntityKind::MachineGunner
+        EntityKind::Worker | EntityKind::Golem | EntityKind::Rifleman | EntityKind::MachineGunner
     )
 }
 
@@ -309,6 +309,7 @@ mod tests {
     fn combat_classification_matches_default_weapon_policy_table() {
         let expected = [
             (EntityKind::Worker, false, false, TargetThreatRole::Ordinary),
+            (EntityKind::Golem, false, false, TargetThreatRole::Ordinary),
             (
                 EntityKind::Rifleman,
                 false,
@@ -432,6 +433,10 @@ mod tests {
     fn anti_tank_gun_miss_chance_applies_only_to_infantry_sized_targets() {
         assert_eq!(
             miss_chance(EntityKind::AntiTankGun, EntityKind::Worker),
+            0.65
+        );
+        assert_eq!(
+            miss_chance(EntityKind::AntiTankGun, EntityKind::Golem),
             0.65
         );
         assert_eq!(

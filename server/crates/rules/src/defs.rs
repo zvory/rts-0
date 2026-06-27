@@ -48,6 +48,7 @@ pub struct NodeDef {
 }
 
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
+const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
 const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
@@ -88,6 +89,26 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::CityCentre),
+        train_requires: &[],
+    },
+    UnitDef {
+        kind: EntityKind::Golem,
+        stats: balance::UnitStats {
+            hp: 160,
+            dmg: 16,
+            range_tiles: 1,
+            cooldown: 24,
+            speed: 2.0,
+            sight_tiles: 7,
+            cost_steel: 0,
+            cost_oil: 0,
+            supply: 4,
+            build_ticks: 396,
+            radius: 9.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        trained_at: Some(EntityKind::Zamok),
         train_requires: &[],
     },
     UnitDef {
@@ -253,11 +274,11 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::Ekat,
         stats: balance::UnitStats {
-            hp: 300,
+            hp: 150,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
-            speed: 2.0,
+            speed: 1.6,
             sight_tiles: 9,
             cost_steel: 0,
             cost_oil: 0,
@@ -310,7 +331,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: &[],
+        trains: GOLEM_ONLY,
         build_requires: &[],
     },
     BuildingDef {
@@ -532,6 +553,7 @@ mod tests {
             units,
             vec![
                 EntityKind::Worker,
+                EntityKind::Golem,
                 EntityKind::Rifleman,
                 EntityKind::MachineGunner,
                 EntityKind::AntiTankGun,

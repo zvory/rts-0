@@ -50,11 +50,12 @@ export function _onRightClick(p, ev = {}) {
   }
 
   const world = this._worldAt(p.x, p.y);
+  const gatherers = this._selectedGathererIds();
   const workers = this._selectedWorkerIds();
-  if (workers.length > 0) {
+  if (gatherers.length > 0) {
     const resource = this._resourceAtWorld(world.x, world.y);
     if (resource && resource.remaining !== 0) {
-      this._issueCommand(cmd.gather(workers, resource.id, queued));
+      this._issueCommand(cmd.gather(gatherers, resource.id, queued));
       this._addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
@@ -81,13 +82,13 @@ export function _onRightClick(p, ev = {}) {
     return;
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
-    // Resource node -> gather, but only with the workers in the selection.
-    if (workers.length > 0) {
-      this._issueCommand(cmd.gather(workers, target.id, queued));
+    // Resource node -> gather, but only with the gatherers in the selection.
+    if (gatherers.length > 0) {
+      this._issueCommand(cmd.gather(gatherers, target.id, queued));
       this._addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
-    // Selection has no workers: fall through to a move onto the node's position.
+    // Selection has no gatherers: fall through to a move onto the node's position.
   }
   // Default -> move to the world point.
   this._issueCommand(cmd.move(ownUnits, world.x, world.y, queued));
@@ -180,6 +181,15 @@ export function _selectedWorkerIds() {
   return this.state
     .selectedEntities()
     .filter((e) => ownOwner(this.state, e.owner) && e.kind === KIND.WORKER)
+    .map((e) => e.id);
+}
+
+export function _selectedGathererIds() {
+  return this.state
+    .selectedEntities()
+    .filter((e) =>
+      ownOwner(this.state, e.owner) &&
+      (e.kind === KIND.WORKER || e.kind === KIND.GOLEM))
     .map((e) => e.id);
 }
 
@@ -354,7 +364,7 @@ function latestMovementOrderPlanPoint(entity) {
 
 export function _refreshResourceMiningPreview() {
   const intent = clientIntent(this);
-  if (this._drag || intent?.commandTarget || !this.mouse || this._selectedWorkerIds().length === 0) {
+  if (this._drag || intent?.commandTarget || !this.mouse || this._selectedGathererIds().length === 0) {
     intent?.updateResourceMiningPreview?.(null);
     return;
   }
@@ -389,7 +399,7 @@ export function _nearestOwnCompletedCityCentre(x, y) {
   for (const e of this.state.entitiesInterpolated(1)) {
     if (
       !ownOwner(this.state, e.owner) ||
-      e.kind !== KIND.CITY_CENTRE ||
+      (e.kind !== KIND.CITY_CENTRE && e.kind !== KIND.ZAMOK) ||
       (typeof e.buildProgress === "number" && e.buildProgress < 1)
     ) {
       continue;

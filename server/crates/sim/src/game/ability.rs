@@ -15,6 +15,7 @@ pub enum AbilityKind {
     EkatTeleport,
     EkatLineShot,
     EkatMagicAnchor,
+    EkatConsumeGolem,
 }
 
 impl AbilityKind {
@@ -28,6 +29,7 @@ impl AbilityKind {
             AbilityKind::EkatTeleport => protocol::abilities::EKAT_TELEPORT,
             AbilityKind::EkatLineShot => protocol::abilities::EKAT_LINE_SHOT,
             AbilityKind::EkatMagicAnchor => protocol::abilities::EKAT_MAGIC_ANCHOR,
+            AbilityKind::EkatConsumeGolem => protocol::abilities::EKAT_CONSUME_GOLEM,
         }
     }
 }
@@ -45,6 +47,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::EKAT_TELEPORT => Ok(AbilityKind::EkatTeleport),
             protocol::abilities::EKAT_LINE_SHOT => Ok(AbilityKind::EkatLineShot),
             protocol::abilities::EKAT_MAGIC_ANCHOR => Ok(AbilityKind::EkatMagicAnchor),
+            protocol::abilities::EKAT_CONSUME_GOLEM => Ok(AbilityKind::EkatConsumeGolem),
             _ => Err(()),
         }
     }
@@ -65,6 +68,7 @@ pub enum AbilityEffectHook {
     DashReturn,
     LineProjectile,
     MagicAnchor,
+    ConsumeGolem,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +124,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
+        AbilityKind::EkatConsumeGolem => AbilityEffectHook::ConsumeGolem,
     }
 }
 
@@ -160,6 +165,10 @@ mod tests {
         assert_eq!(
             definition(AbilityKind::EkatMagicAnchor).effect_hook,
             AbilityEffectHook::MagicAnchor
+        );
+        assert_eq!(
+            definition(AbilityKind::EkatConsumeGolem).effect_hook,
+            AbilityEffectHook::ConsumeGolem
         );
     }
 }
