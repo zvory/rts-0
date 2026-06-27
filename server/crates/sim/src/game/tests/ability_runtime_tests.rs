@@ -164,12 +164,19 @@ fn ekat_start_projects_hero_zamok_and_abilities() {
     }];
     let game = Game::new_for_replay(&players, 0x1234_5678);
 
-    assert_eq!(game.players[0].steel, 0);
-    assert_eq!(game.players[0].oil, 0);
+    assert_eq!(game.players[0].steel, config::STARTING_STEEL);
+    assert_eq!(game.players[0].oil, config::STARTING_OIL);
     assert!(game
         .entities
         .iter()
         .any(|entity| entity.owner == 1 && entity.kind == EntityKind::Zamok));
+    assert_eq!(
+        game.entities
+            .iter()
+            .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::Golem)
+            .count(),
+        1
+    );
     let hero = game
         .entities
         .iter()

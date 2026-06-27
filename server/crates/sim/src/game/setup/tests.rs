@@ -1,7 +1,7 @@
 use super::*;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::Order;
-use crate::rules::faction::EMPTY_FIXTURE_FACTION_ID;
+use crate::rules::faction::{EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID};
 
 fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
     game.entities
@@ -62,6 +62,41 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
         resource_nodes > 0,
         "fixture starts still use universal Steel/Oil nodes"
     );
+}
+
+#[test]
+fn ekat_faction_start_uses_kriegsia_resources_and_one_golem() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: EKAT_FACTION_ID.to_string(),
+        name: "Ekat".to_string(),
+        color: "#8844ff".to_string(),
+        is_ai: false,
+    }];
+    let game = Game::new(&players, 9);
+    game.assert_invariants();
+
+    let player = &game.players[0];
+    assert_eq!(player.faction_id, EKAT_FACTION_ID);
+    assert_eq!(player.steel, config::STARTING_STEEL);
+    assert_eq!(player.oil, config::STARTING_OIL);
+    assert_eq!(player.supply_cap, config::CITY_CENTRE_SUPPLY);
+    assert_eq!(
+        player.supply_used,
+        crate::rules::economy::supply_cost(EntityKind::Golem)
+    );
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Zamok), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Ekat), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Golem), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::CityCentre), 0);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Worker), 0);
+
+    let loadout = &game.starting_loadouts()[0];
+    assert_eq!(loadout.faction_id, EKAT_FACTION_ID);
+    assert_eq!(loadout.loadout_id, "ekat.standard");
+    assert_eq!(loadout.starting_steel, config::STARTING_STEEL);
+    assert_eq!(loadout.starting_oil, config::STARTING_OIL);
 }
 
 #[test]

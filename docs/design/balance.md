@@ -307,8 +307,9 @@ activation/autocast policy instead of being folded into default targeting.
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
   one-off artillery point-fire path.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
-  one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
-  controllable combat units besides Golems produced from Zamok. Ekat has 150 HP, no passive
+  one Ekat, one Golem, and one Zamok, no workers, no buildable menu, no research, and no other
+  controllable combat units besides Golems produced from Zamok. Ekat starts with the same 75 steel
+  and 0 oil as Kriegsia. Ekat has 150 HP, no passive
   regeneration, 1.6 px/tick speed, 9-tile sight, no default attack, and no Steel/Oil/Supply cost. Her
   Dash ability targets up to 5 tiles, has no resource cost, has an 8s cooldown, requires a
   statically standable landing point, and leaves a four-second return marker that can be recast

@@ -77,6 +77,14 @@ const EKAT_START_ENTITIES: &[StartingEntityGroup] = &[
         },
         completed: true,
     },
+    StartingEntityGroup {
+        kind: EntityKind::Golem,
+        count: 1,
+        formation: StartingFormation::Ring {
+            radius_tiles_x10: 35,
+        },
+        completed: true,
+    },
 ];
 
 pub const CURRENT_STANDARD_LOADOUT: FactionLoadout = FactionLoadout {
@@ -97,8 +105,8 @@ pub const EMPTY_FIXTURE_LOADOUT: FactionLoadout = FactionLoadout {
 
 pub const EKAT_LOADOUT: FactionLoadout = FactionLoadout {
     id: "ekat.standard",
-    initial_steel: 0,
-    initial_oil: 0,
+    initial_steel: crate::balance::STARTING_STEEL,
+    initial_oil: crate::balance::STARTING_OIL,
     starting_entities: EKAT_START_ENTITIES,
     opening_upgrades: &[],
 };
@@ -784,8 +792,14 @@ mod tests {
             EMPTY_FIXTURE_START_ENTITIES
         );
 
-        assert_eq!(EKAT_CATALOG.loadout.initial_steel, 0);
-        assert_eq!(EKAT_CATALOG.loadout.initial_oil, 0);
+        assert_eq!(
+            EKAT_CATALOG.loadout.initial_steel,
+            crate::balance::STARTING_STEEL
+        );
+        assert_eq!(
+            EKAT_CATALOG.loadout.initial_oil,
+            crate::balance::STARTING_OIL
+        );
         assert_eq!(EKAT_CATALOG.loadout.starting_entities, EKAT_START_ENTITIES);
     }
 }
