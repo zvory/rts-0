@@ -11,8 +11,8 @@ commitment and final building name before any implementation phase is written.
 
 ## Scope
 
-- Read [docs/context/balance.md](../../docs/context/balance.md) before editing rules/spec details.
-- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for this building.
+- Read [docs/context/balance.md](../../../docs/context/balance.md) before editing rules/spec details.
+- Use [docs/new-building-checklist.md](../../../docs/new-building-checklist.md) for this building.
 - Complete only the Positioning sections in [checklists.md](checklists.md), or mark items as
   deferred with named unknowns.
 - Specify Projection unlocks, upgrades, transformation tradeoff, destruction consequence, final

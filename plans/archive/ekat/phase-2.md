@@ -11,8 +11,8 @@ details are designed.
 
 ## Scope
 
-- Read [docs/context/balance.md](../../docs/context/balance.md) before editing rules/spec details.
-- Use [docs/new-building-checklist.md](../../docs/new-building-checklist.md) for this building.
+- Read [docs/context/balance.md](../../../docs/context/balance.md) before editing rules/spec details.
+- Use [docs/new-building-checklist.md](../../../docs/new-building-checklist.md) for this building.
 - Complete only the Zamok/Home Structure sections in [checklists.md](checklists.md), or mark items
   as deferred with named unknowns.
 - Specify mining proximity, starting-state, supply, revival, victory relevance, and destruction
