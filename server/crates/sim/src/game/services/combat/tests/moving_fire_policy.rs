@@ -91,6 +91,38 @@ fn non_moving_fire_attack_move_still_chases_out_of_range_targets() {
 }
 
 #[test]
+fn attack_move_prefers_in_range_armored_fallback_over_out_of_range_soft_target() {
+    let map = open_map(20);
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let in_range_tank = entities
+        .spawn_unit(2, EntityKind::Tank, 180.0, 100.0)
+        .expect("fallback tank should spawn");
+    let out_of_range_worker = entities
+        .spawn_unit(2, EntityKind::Worker, 300.0, 100.0)
+        .expect("preferred soft target should spawn");
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.set_order(Order::attack_move_to(500.0, 100.0));
+        rifleman.set_path(vec![(500.0, 100.0)]);
+        rifleman.set_path_goal(Some((500.0, 100.0)));
+        rifleman.mark_move_phase(MovePhase::Moving);
+    }
+
+    let target = resolve_test_target(
+        &map,
+        &entities,
+        &default_team_relations(),
+        rifleman_id,
+        256.0,
+    );
+
+    assert_eq!(target, Some(in_range_tank));
+    assert_ne!(target, Some(out_of_range_worker));
+}
+
+#[test]
 fn direct_tank_attack_chases_to_standoff_range_instead_of_target_center() {
     let mut entities = EntityStore::new();
     let tank_id = entities

@@ -1,6 +1,6 @@
 use crate::config;
 use crate::game::entity::{
-    movement_body_class, Entity, EntityKind, EntityStore, MovementBodyClass, Order,
+    movement_body_class, Entity, EntityKind, EntityStore, MovePhase, MovementBodyClass, Order,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -125,12 +125,40 @@ pub(super) fn resolve_target(
         tank_trap_obstructs_vehicle_route,
         attacker.target_id(),
     );
+    if mode_requires_currently_fireable_targets(mode) {
+        return priority::choose_target(
+            &context,
+            candidates
+                .iter()
+                .filter(|candidate| candidate.in_weapon_range && target_filter(candidate.id)),
+        );
+    }
+    if pathing_attack_move_prefers_currently_fireable_targets(attacker) {
+        let fireable_target = priority::choose_target(
+            &context,
+            candidates
+                .iter()
+                .filter(|candidate| candidate.in_weapon_range && target_filter(candidate.id)),
+        );
+        if fireable_target.is_some() {
+            return fireable_target;
+        }
+    }
     priority::choose_target(
         &context,
         candidates
             .iter()
             .filter(|candidate| target_filter(candidate.id)),
     )
+}
+
+fn mode_requires_currently_fireable_targets(mode: CombatMode) -> bool {
+    mode == CombatMode::Opportunistic
+}
+
+fn pathing_attack_move_prefers_currently_fireable_targets(attacker: &Entity) -> bool {
+    matches!(attacker.order(), Order::AttackMove(_))
+        && !matches!(attacker.move_phase(), Some(MovePhase::Arrived))
 }
 
 fn target_relevant_for_auto_acquisition(attacker: EntityKind, target: &Entity) -> bool {
@@ -195,7 +223,7 @@ fn legal_target_candidates(
         let effective_weapon_range_px = weapon_range_px * concealment;
         let in_weapon_range = effective_weapon_range_px.is_finite()
             && distance_sq <= effective_weapon_range_px * effective_weapon_range_px;
-        if !target_currently_fireable(
+        if !target_has_legal_shot(
             map, entities, los, fog, smokes, self_id, owner, px, py, target,
         ) {
             continue;
@@ -229,7 +257,7 @@ fn legal_target_candidates(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn target_currently_fireable(
+fn target_has_legal_shot(
     map: &Map,
     entities: &EntityStore,
     los: &LineOfSight<'_>,

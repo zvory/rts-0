@@ -685,11 +685,15 @@ General rules:
   Tank Traps keep generic building targeting and cleanup behavior but do not count for elimination
   survival. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
-  acquisition remains stricter and prefers targets that are currently fireable.
+  acquisition remains stricter while the movement path is active: it chooses currently fireable
+  targets first, and only uses out-of-range acquisition/chase targets when no current target is
+  fireable.
 - Active moving-fire `Move` and `AttackMove` orders preserve the player-issued destination while
   they are still in `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is
-  opportunistic: it may retain, aim at, expose, and fire on currently fireable targets, but it must
-  not request chase paths, vehicle standoff paths, or enemy-directed replacements for `path_goal`.
+  opportunistic: it may retain, aim at, expose, and fire on targets that are currently inside
+  weapon range and pass hostile, visibility, smoke, terrain line-of-sight, and blocker checks, but
+  it must not request chase paths, vehicle standoff paths, or enemy-directed replacements for
+  `path_goal`.
   Once an `AttackMove` reaches `MovePhase::Arrived`, its existing aggressive post-arrival behavior
   applies. Direct `Attack` orders and idle-aggressive behavior remain separate and may still pursue.
 - Normal combat auto-acquisition first filters already-legal hostile candidates in
