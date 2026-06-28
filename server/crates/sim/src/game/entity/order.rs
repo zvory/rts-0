@@ -1,9 +1,12 @@
+use crate::config;
 use crate::game::ability::AbilityKind;
 
 use super::EntityKind;
 
 /// Maximum number of queued command intents stored on one mobile unit.
 pub const MAX_QUEUED_ORDERS: usize = 8;
+/// Number of simulation ticks a waiting build order may tolerate a relevant unit blocker.
+pub(super) const BUILD_UNIT_BLOCK_GRACE_TICKS: u32 = config::TICK_HZ * 3;
 
 /// The high-level order a unit/building is currently executing.
 ///
@@ -92,7 +95,7 @@ impl Order {
         match self {
             Order::Build(order) => match order.execution.phase {
                 BuildPhase::Constructing { site } => Some(site),
-                BuildPhase::ToSite => None,
+                BuildPhase::ToSite | BuildPhase::WaitingAtSite => None,
             },
             _ => None,
         }
@@ -367,9 +370,7 @@ impl BuildOrder {
                 tile_x,
                 tile_y,
             },
-            execution: BuildExecution {
-                phase: BuildPhase::ToSite,
-            },
+            execution: BuildExecution::new(),
         }
     }
 }
@@ -377,6 +378,16 @@ impl BuildOrder {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BuildExecution {
     pub phase: BuildPhase,
+    pub unit_blocked_ticks: u32,
+}
+
+impl BuildExecution {
+    fn new() -> Self {
+        BuildExecution {
+            phase: BuildPhase::ToSite,
+            unit_blocked_ticks: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -384,6 +395,9 @@ pub enum BuildPhase {
     /// Worker is walking toward the target tile. No building has been spawned and no
     /// resources have been deducted yet.
     ToSite,
+    /// Worker has reached the target tile and is waiting for construction to begin.
+    /// The building has not been spawned and resources have not been deducted yet.
+    WaitingAtSite,
     /// Worker has arrived, the building has been spawned in CONSTRUCT state, and
     /// construction is progressing. `site` is the building entity id.
     Constructing { site: u32 },

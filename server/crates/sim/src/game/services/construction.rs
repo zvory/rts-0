@@ -154,7 +154,7 @@ pub(crate) fn construction_system(
             }
             match e.build_phase()? {
                 BuildPhase::Constructing { site } => Some((e.id, site)),
-                BuildPhase::ToSite => None,
+                BuildPhase::ToSite | BuildPhase::WaitingAtSite => None,
             }
         })
         .collect();

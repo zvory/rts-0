@@ -332,7 +332,8 @@ fn attack_and_build_orders_have_explicit_execution_phases() {
         worker.order(),
         Order::Build(BuildOrder {
             execution: BuildExecution {
-                phase: BuildPhase::ToSite
+                phase: BuildPhase::ToSite,
+                unit_blocked_ticks: 0,
             },
             ..
         })
@@ -343,9 +344,60 @@ fn attack_and_build_orders_have_explicit_execution_phases() {
         worker.order(),
         Order::Build(BuildOrder {
             execution: BuildExecution {
-                phase: BuildPhase::Constructing { site: 7 }
+                phase: BuildPhase::Constructing { site: 7 },
+                unit_blocked_ticks: 0,
             },
             ..
         })
     ));
+}
+
+#[test]
+fn build_wait_state_tracks_unit_block_ticks_and_resets() {
+    let mut worker =
+        Entity::new_unit(1, EntityKind::Worker, 10.0, 20.0).expect("worker should spawn");
+    worker.set_order(Order::build(EntityKind::Depot, 4, 5));
+
+    assert_eq!(worker.build_phase(), Some(BuildPhase::ToSite));
+    assert_eq!(
+        worker.update_build_unit_blocked(true),
+        None,
+        "unit-block ticks are only meaningful while waiting at the site"
+    );
+
+    worker.mark_build_phase(BuildPhase::WaitingAtSite);
+    assert_eq!(worker.update_build_unit_blocked(true), Some(false));
+    assert_eq!(worker.update_build_unit_blocked(true), Some(false));
+    match worker.order() {
+        Order::Build(order) => assert_eq!(order.execution.unit_blocked_ticks, 2),
+        other => panic!("expected build order, got {other:?}"),
+    }
+
+    assert_eq!(worker.update_build_unit_blocked(false), Some(false));
+    match worker.order() {
+        Order::Build(order) => assert_eq!(order.execution.unit_blocked_ticks, 0),
+        other => panic!("expected build order, got {other:?}"),
+    }
+
+    let mut grace_reached = false;
+    for _ in 0..crate::config::TICK_HZ * 3 {
+        grace_reached = worker
+            .update_build_unit_blocked(true)
+            .expect("waiting build order should count unit-blocked ticks");
+    }
+    assert!(grace_reached);
+    match worker.order() {
+        Order::Build(order) => assert_eq!(
+            order.execution.unit_blocked_ticks,
+            crate::config::TICK_HZ * 3
+        ),
+        other => panic!("expected build order, got {other:?}"),
+    }
+
+    worker.mark_build_phase(BuildPhase::Constructing { site: 7 });
+    match worker.order() {
+        Order::Build(order) => assert_eq!(order.execution.unit_blocked_ticks, 0),
+        other => panic!("expected build order, got {other:?}"),
+    }
+    assert_eq!(worker.update_build_unit_blocked(true), None);
 }

@@ -119,7 +119,7 @@ pub(crate) fn building_site_clear(
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
-    building_site_clear_with_ignored_unit(map, entities, building, tile_x, tile_y, None)
+    building_site_status(map, entities, building, tile_x, tile_y).is_clear()
 }
 
 #[allow(dead_code)]
@@ -149,21 +149,26 @@ pub(crate) fn building_site_clear_spatial(
         .saturating_add(stats.foot_h)
         .saturating_add(BUILD_SITE_SPATIAL_PADDING_TILES as u32) as i32;
 
-    spatial
-        .ids_in_rect(min_tx, min_ty, max_tx, max_ty)
-        .all(|id| {
-            entities
-                .get(id)
-                .is_none_or(|e| {
-                    entity_clear_of_building_rect(
-                        map,
-                        e,
-                        rect,
-                        None,
-                        build_placement_policy(building),
-                    )
-                })
-        })
+    classify_entity_blockers(
+        spatial
+            .ids_in_rect(min_tx, min_ty, max_tx, max_ty)
+            .filter_map(|id| entities.get(id)),
+        map,
+        rect,
+        None,
+        build_placement_policy(building),
+    )
+    .is_clear()
+}
+
+fn building_site_status(
+    map: &Map,
+    entities: &EntityStore,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> BuildSiteStatus {
+    building_site_status_with_ignored_unit(map, entities, building, tile_x, tile_y, None)
 }
 
 pub(crate) fn building_site_clear_for_build_intent(
@@ -174,7 +179,41 @@ pub(crate) fn building_site_clear_for_build_intent(
     tile_y: u32,
     builder_id: u32,
 ) -> bool {
-    building_site_clear_with_ignored_unit(map, entities, building, tile_x, tile_y, Some(builder_id))
+    building_site_status_for_build_intent(map, entities, building, tile_x, tile_y, builder_id)
+        .is_clear()
+}
+
+pub(crate) fn building_site_status_for_build_intent(
+    map: &Map,
+    entities: &EntityStore,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    builder_id: u32,
+) -> BuildSiteStatus {
+    building_site_status_with_ignored_unit(
+        map,
+        entities,
+        building,
+        tile_x,
+        tile_y,
+        Some(builder_id),
+    )
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BuildSiteStatus {
+    Clear,
+    InvalidFootprint,
+    BlockedByBuilding,
+    BlockedByResourceNode,
+    BlockedByUnit,
+}
+
+impl BuildSiteStatus {
+    fn is_clear(self) -> bool {
+        self == Self::Clear
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -191,56 +230,103 @@ pub(crate) fn build_placement_policy(building: EntityKind) -> BuildPlacementPoli
     }
 }
 
-fn building_site_clear_with_ignored_unit(
+fn building_site_status_with_ignored_unit(
     map: &Map,
     entities: &EntityStore,
     building: EntityKind,
     tile_x: u32,
     tile_y: u32,
     ignored_unit: Option<u32>,
-) -> bool {
+) -> BuildSiteStatus {
     let Some(rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
-        return false;
+        return BuildSiteStatus::InvalidFootprint;
     };
     if !footprint_in_bounds_and_passable(map, building, tile_x, tile_y) {
-        return false;
+        return BuildSiteStatus::InvalidFootprint;
     }
 
-    entities
-        .iter()
-        .all(|e| {
-            entity_clear_of_building_rect(map, e, rect, ignored_unit, build_placement_policy(building))
-        })
+    classify_entity_blockers(
+        entities.iter(),
+        map,
+        rect,
+        ignored_unit,
+        build_placement_policy(building),
+    )
 }
 
-fn entity_clear_of_building_rect(
+fn classify_entity_blockers<'a>(
+    entities: impl Iterator<Item = &'a Entity>,
+    map: &Map,
+    rect: RectBody,
+    ignored_unit: Option<u32>,
+    policy: BuildPlacementPolicy,
+) -> BuildSiteStatus {
+    let mut status = BuildSiteStatus::Clear;
+    for entity in entities {
+        status = combine_build_site_status(
+            status,
+            entity_build_site_status(map, entity, rect, ignored_unit, policy),
+        );
+        if status == BuildSiteStatus::BlockedByBuilding {
+            break;
+        }
+    }
+    status
+}
+
+fn combine_build_site_status(
+    current: BuildSiteStatus,
+    candidate: BuildSiteStatus,
+) -> BuildSiteStatus {
+    use BuildSiteStatus::*;
+
+    match (current, candidate) {
+        (InvalidFootprint, _) | (_, InvalidFootprint) => InvalidFootprint,
+        (BlockedByBuilding, _) | (_, BlockedByBuilding) => BlockedByBuilding,
+        (BlockedByResourceNode, _) | (_, BlockedByResourceNode) => BlockedByResourceNode,
+        (BlockedByUnit, _) | (_, BlockedByUnit) => BlockedByUnit,
+        (Clear, Clear) => Clear,
+    }
+}
+
+fn entity_build_site_status(
     map: &Map,
     e: &Entity,
     rect: RectBody,
     ignored_unit: Option<u32>,
     policy: BuildPlacementPolicy,
-) -> bool {
+) -> BuildSiteStatus {
     if e.hp == 0 {
-        return true;
+        return BuildSiteStatus::Clear;
     }
     if e.is_unit() && ignored_unit == Some(e.id) {
-        return true;
+        return BuildSiteStatus::Clear;
     }
     if e.is_building() {
-        return building_rect_for_entity(map, e).is_none_or(|other| !rects_intersect(rect, other));
+        return match building_rect_for_entity(map, e) {
+            Some(other) if rects_intersect(rect, other) => BuildSiteStatus::BlockedByBuilding,
+            _ => BuildSiteStatus::Clear,
+        };
     }
     if e.is_node() {
-        return !circle_intersects_rect(entity_circle_body(e), rect);
+        return if circle_intersects_rect(entity_circle_body(e), rect) {
+            BuildSiteStatus::BlockedByResourceNode
+        } else {
+            BuildSiteStatus::Clear
+        };
     }
     if e.is_unit() {
         if policy == BuildPlacementPolicy::VehicleBodyOnly
             && movement_body_class(e.kind) == MovementBodyClass::InfantryLike
         {
-            return true;
+            return BuildSiteStatus::Clear;
         }
-        return unit_body_for_entity(e).is_none_or(|body| !unit_body_intersects_rect(body, rect));
+        return match unit_body_for_entity(e) {
+            Some(body) if unit_body_intersects_rect(body, rect) => BuildSiteStatus::BlockedByUnit,
+            _ => BuildSiteStatus::Clear,
+        };
     }
-    true
+    BuildSiteStatus::Clear
 }
 
 fn footprint_in_bounds_and_passable(
@@ -315,6 +401,10 @@ fn segment_body_facing(kind: EntityKind, from: (f32, f32), to: (f32, f32)) -> f3
         dy.atan2(dx)
     }
 }
+
+#[cfg(test)]
+#[path = "standability/build_site_tests.rs"]
+mod build_site_tests;
 
 #[cfg(test)]
 mod tests {
