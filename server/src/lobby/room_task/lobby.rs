@@ -58,13 +58,12 @@ impl RoomTask {
         } else {
             match &self.phase {
                 Phase::Lobby => {
-                    let join_state = if kind == LobbyKind::Replay {
-                        LobbyJoinState::FullSpectatorOnly
-                    } else if self.total_player_count() >= MAX_PLAYERS {
-                        LobbyJoinState::FullSpectatorOnly
-                    } else {
-                        LobbyJoinState::Open
-                    };
+                    let join_state =
+                        if kind == LobbyKind::Replay || self.total_player_count() >= MAX_PLAYERS {
+                            LobbyJoinState::FullSpectatorOnly
+                        } else {
+                            LobbyJoinState::Open
+                        };
                     (LobbySummaryPhase::Lobby, join_state, self.lobby_map_name())
                 }
                 Phase::InGame(_) => (
