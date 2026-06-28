@@ -18,6 +18,12 @@ inheriting vehicle turret, standoff, or repathing behavior.
 - For moving-fire units on player-issued `Move` and `AttackMove`, target acquisition may affect
   firing, facing, and `target_id`, but it must not issue chase paths, standoff paths, or
   enemy-directed repaths.
+- "Currently fireable" means the target is inside the unit's current weapon range and passes the
+  normal legal-shot checks from that position: hostile/targetable status, visibility and smoke
+  gates, terrain line of sight, and friendly or hard-blocker interception.
+- Do not change what happens after an `AttackMove` destination is reached. This plan only changes
+  movement-order combat while the unit is still following or resuming the player-issued path; any
+  current post-arrival idle/aggressive behavior should remain as it is.
 - Do not globally remove normal non-moving-fire attack-move engagement behavior. Scope the no-repath
   invariant to units that can fire while moving.
 - Do not let out-of-range auto-acquisition targets suppress valid in-range fire.
@@ -40,14 +46,15 @@ Separate "can fire while moving" from vehicle-specific behavior and chase/repath
 the behavior where a moving-fire unit on player-issued `Move` or `AttackMove` repaths toward an
 auto-acquired enemy, including moving-fire vehicle standoff/chase paths. Vehicle turret and
 presentation behavior should remain vehicle-specific policy, not a side effect of the shared
-moving-fire capability.
+moving-fire capability. Leave `AttackMove` post-arrival behavior untouched.
 
 ### [Phase 2 - Movement-Order Target Filtering](phase-2.md)
 
 Make target acquisition and retention respect current fireability while units are continuing a
 movement path. Moving-fire `Move` and `AttackMove` orders should choose only fireable targets, and
 the DV vs Soupman rifleman/tank case should become a focused regression for unreachable preferred
-targets blocking valid in-range fallback fire.
+targets blocking valid in-range fallback fire. Fireability includes weapon range plus legal-shot,
+line-of-sight, smoke, visibility, and blocker checks.
 
 ### [Phase 3 - Meth Riflemen Use Shared Moving Fire](phase-3.md)
 
