@@ -7,8 +7,8 @@ use crate::EntityKind;
 const FRONT_ARC_RAD: f32 = std::f32::consts::FRAC_PI_4;
 const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
 const FRONT_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.0;
-const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.25;
-const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.75;
+const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.5;
+const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.7;
 /// Attack profile for a combat-capable unit or building.
 pub struct AttackProfile {
     pub range_tiles: u32,
@@ -487,7 +487,7 @@ mod tests {
                 (100.0, 100.0),
                 (100.0, 140.0),
             ),
-            60
+            72
         );
     }
 
@@ -503,7 +503,7 @@ mod tests {
                 (100.0, 100.0),
                 (60.0, 100.0),
             ),
-            84
+            82
         );
     }
 
@@ -531,7 +531,7 @@ mod tests {
                 (100.0, 100.0),
                 (100.0, 140.0),
             ),
-            75
+            90
         );
         assert_eq!(
             effective_damage_with_facing(
@@ -543,7 +543,7 @@ mod tests {
                 (100.0, 100.0),
                 (60.0, 100.0),
             ),
-            105
+            102
         );
     }
 

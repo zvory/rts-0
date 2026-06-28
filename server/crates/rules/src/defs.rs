@@ -155,7 +155,7 @@ pub const UNITS: &[UnitDef] = &[
         kind: EntityKind::AntiTankGun,
         stats: balance::UnitStats {
             hp: 45,
-            dmg: 80,
+            dmg: 100,
             range_tiles: 5,
             cooldown: 72,
             speed: 1.6,
