@@ -8,14 +8,18 @@ Status: planned.
 
 Separate the combat capability "can fire while moving" from vehicle-specific weapon handling and
 from auto-chase pathing. A unit following a player-issued `Move` or `AttackMove` destination should
-not replace that path merely because it can fire while moving.
+not replace that path merely because it can fire while moving or because combat auto-acquisition saw
+an enemy.
 
 ## Scope
 
 - Split or rename policy helpers so moving-fire capability, vehicle/turret handling, and chase
   permission are represented separately.
-- Make active `Move` and `AttackMove` paths stay pointed at their commanded destinations for current
-  moving-fire units.
+- Remove auto-acquisition-driven repaths for player-issued `Move` and `AttackMove` orders. These
+  orders must not chase visible enemies, must not route to vehicle standoff points, and must not
+  replace the path goal with an enemy-directed goal.
+- Make active `Move` and `AttackMove` paths stay pointed at their commanded destinations for all
+  affected units, including current moving-fire vehicles.
 - Keep explicit `Attack` command pursuit and idle-aggressive behavior separate from movement-order
   drive-by fire.
 - Keep vehicle-only aiming, turret facing, standoff, and projection logic tied to vehicle policy
@@ -35,6 +39,8 @@ not replace that path merely because it can fire while moving.
 ## Verification
 
 - Focused Rust tests covering moving-fire `Move` and `AttackMove` path preservation.
+- Focused Rust tests proving visible out-of-range enemies do not change `Move` or `AttackMove` path
+  goals.
 - Focused Rust tests showing explicit `Attack` still pursues as intended.
 - Sim architecture check if helper movement changes module boundaries.
 - `git diff --check`.
@@ -42,8 +48,8 @@ not replace that path merely because it can fire while moving.
 ## Manual Test Focus
 
 Check a tank or scout car moving past enemies: it should keep its commanded path and fire only when
-able. Also check a direct attack order against an out-of-range enemy so intentional pursuit still
-works.
+able, with no enemy-directed repath or standoff path. Also check a direct attack order against an
+out-of-range enemy so intentional pursuit still works.
 
 ## Handoff Expectations
 
