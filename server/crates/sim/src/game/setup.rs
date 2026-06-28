@@ -296,6 +296,7 @@ impl Game {
             spatial,
             pathing,
             lingering_sight: Vec::new(),
+            firing_reveals: Vec::new(),
             smokes: SmokeCloudStore::new(),
             ability_runtime: crate::game::ability_runtime::AbilityRuntime::new(),
             mortar_shells: crate::game::mortar::MortarShellStore::default(),
@@ -311,8 +312,7 @@ impl Game {
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.players, &game.entities);
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog
-            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+        game.recompute_live_fog(&ids);
         game.refresh_building_memory(&ids);
         game
     }

@@ -201,6 +201,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
 
     let mut rng = SmallRng::seed_from_u64(rng_seed);
     let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
+    let mut firing_reveals = Vec::new();
     let mortar_autocast_researched = |owner| {
         players
             .iter()
@@ -225,6 +226,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         &mut mortar_shells,
         &mut rng,
         &mut events,
+        &mut firing_reveals,
         10,
     );
     events
@@ -1194,6 +1196,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let smokes = SmokeCloudStore::new();
     let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
     let mut events = HashMap::from([(1, Vec::new())]);
+    let mut firing_reveals = Vec::new();
 
     let mut rng = SmallRng::seed_from_u64(0);
     let mortar_autocast_researched = |_owner| false;
@@ -1212,6 +1215,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
         &mut mortar_shells,
         &mut rng,
         &mut events,
+        &mut firing_reveals,
         10,
     );
     assert_eq!(

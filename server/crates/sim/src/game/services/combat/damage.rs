@@ -42,9 +42,9 @@ pub(super) fn apply_damage(
     range_px: f32,
     extra_miss_chance: f32,
     tick: u32,
-) {
+) -> Vec<u32> {
     if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
-        return;
+        return Vec::new();
     }
     let shot_victim = resolve_shot_victim(
         map,
@@ -57,7 +57,7 @@ pub(super) fn apply_damage(
         ay,
     );
     let Some(shot_victim) = shot_victim else {
-        return;
+        return Vec::new();
     };
     let shot_victim_pos = entities
         .get(shot_victim)
@@ -68,7 +68,7 @@ pub(super) fn apply_damage(
     let victim_kind = entities.get(shot_victim).map(|e| e.kind);
     let victim_facing = entities.get(shot_victim).map(|e| e.facing());
     let victim_owner = entities.get(shot_victim).map(|e| e.owner).unwrap_or(0);
-    emit_attack_event(
+    let attack_recipients = emit_attack_event(
         events,
         fog,
         teams,
@@ -86,7 +86,7 @@ pub(super) fn apply_damage(
     if let (Some(ak), Some(vk)) = (attacker_kind, victim_kind) {
         let mc = combat_rules::miss_chance(ak, vk).max(extra_miss_chance);
         if mc > 0.0 && rng.gen::<f32>() < mc {
-            return;
+            return attack_recipients;
         }
     }
     let effective_dmg = match (attacker_kind, victim_kind) {
@@ -142,6 +142,7 @@ pub(super) fn apply_damage(
             shot_victim_pos.1,
         );
     }
+    attack_recipients
 }
 
 #[allow(clippy::too_many_arguments)]

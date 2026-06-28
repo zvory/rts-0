@@ -20,6 +20,7 @@ use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::FiringRevealSource;
 
 /// Temporary sight left behind by an owned unit/building after it dies. This is used only by
 /// snapshot projection; command validation and combat still use live fog.
@@ -191,6 +192,27 @@ impl Fog {
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
 
+    pub(crate) fn stamp_firing_reveal_sources_with_smoke(
+        &mut self,
+        sources: &[FiringRevealSource],
+        store: &EntityStore,
+        smokes: &SmokeCloudStore,
+    ) {
+        let size = self.size;
+        for source in sources {
+            let Some(entity) = store.get(source.entity_id()) else {
+                continue;
+            };
+            if entity.hp == 0 || smokes.point_inside(entity.pos_x, entity.pos_y) {
+                continue;
+            }
+            let Some(grid) = self.grids.get_mut(&source.viewer()) else {
+                continue;
+            };
+            stamp_point(grid, size, entity.pos_x, entity.pos_y);
+        }
+    }
+
     /// Whether `player` can currently see the tile `(tx, ty)`.
     pub fn is_visible(&self, player: u32, tx: u32, ty: u32) -> bool {
         if tx >= self.size || ty >= self.size {
@@ -244,6 +266,21 @@ impl Fog {
             return false;
         }
         self.is_visible(player, tx as u32, ty as u32)
+    }
+}
+
+fn stamp_point(grid: &mut [bool], size: u32, x: f32, y: f32) {
+    let ts = config::TILE_SIZE as f32;
+    if x < 0.0 || y < 0.0 {
+        return;
+    }
+    let tx = (x / ts).floor() as i64;
+    let ty = (y / ts).floor() as i64;
+    if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
+        return;
+    }
+    if let Some(visible) = grid.get_mut((ty as u32 * size + tx as u32) as usize) {
+        *visible = true;
     }
 }
 
