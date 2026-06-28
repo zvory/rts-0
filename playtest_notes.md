@@ -1,3 +1,38 @@
+jeffrey playtest
+
+- [ ] observer unit  (sensor tower for commands?)
+- [ ] haraass unit for gun works
+- [ ] camoflauge for AT guns (probably not)
+- [ ] pause doens't work
+- [ ] increase AT gun damage and range
+- [ ] when clicking inside of a cluster, they should group and ignore formations, i guess this is hard because sometimes we need to retain formation, so instead we should do it like the closer the move command is i think, the smaller the size of the resultant formation, like sc2 behaviour
+- [ ] riflemen need some kind of anti tank behaviour, not very strong, but enough to at least hold off an emergency situation under some situations
+- [ ] meth should increase machine gunner move speed to rifleman speed without meth (1.6px/tick)
+- [ ] maybe we should return to the old charge behaviour so that riflemen with melee attack on tanks aren't chasing down tanks
+- [ ] watch replays as a group, hitting watch replay should create a lobby with all spectators
+- [ ] proxy mortars, maybe like two mortars should be able to one shot a huge clump of workers
+- [ ] increase the vision range of all units, or make that a training centre upgrade (binoculars)
+- [ ] stationary tanks should have more range (hmm, should i add attack range indicators to all units?)
+- [ ] if a worker arrives an'd there's not enough resources to build the building, it should continuously stand there trying to build the building when resources are availeble.
+
+- [ ] MORTAR ANIMATION
+- [ ] artillery does not requir AT guns
+- [ ] pause button broken
+- [ ]
+- [ ] side paths slowing field that A* is aware of, they are muddy/rocky or something
+- [ ] anti tank atack for riflement
+- [ ] machine gunners dig in and attacks get change to miss OR increased machine gunner range so one can deter a scout car
+- [ ] remove the R&D structure, instead split it into two. steel press is a new building tthat unlocks building anti tank guns, and has an upgrade for artillery production and mortar auto cast. engine industry (name to be workshopped, ask user before implementing) unlocks tank and has a research for command cars
+- [ ] oh actually better than above player sbuild factories, instead of gunworks or vehicle works. this produces mortar and scout car by default. player can then conver the factory into either a vehicle works or a gun works
+- [ ] workers should not mine oil directly, instead right clicking a worker onto a oil patch will have it build an pump jack for ten seconds. pump jack has 50 hp, cannot move, mines oil at the same rate as a worker, is NOT ARMORED, does not block shooting, requires no tech
+- [ ] maybe move to having two oil patches per base instead of three
+- [ ] new building: intelligence. building it allows riflemen to transform into observation posts (provides maybe, 17 tile radius vision which sees through buildings), rifleman gets consumed. costs 25 steel. engineer can build listening post, which listens for commands within a thirty tile radius. basically, enemy units that recieve commands get revealed on the minimap and in the world map as like question marks or X marks, so they can't be targetted, but it's like a sensor tower in
+  sc2
+
+
+- [ ] crazy idea: riflemen and machine gunners can climb on top of buildings, friendly or enemy, and have increased vision range, attacks on them have cahnge to miss?
+
+
 oti vs matthew
 
 - [ ] smoke doens't always go off
