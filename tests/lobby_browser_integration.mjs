@@ -1,5 +1,8 @@
 // Focused lobby-browser HTTP + join-flow coverage. Expects a running server; use
 // `tests/run-all.sh` or start one with `cd server && cargo run` and set RTS_WS if needed.
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   addAi,
   closeClients,
@@ -14,6 +17,23 @@ import {
 
 const assertions = createAssertions();
 const { ok } = assertions;
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REPLAY_FIXTURE = path.join(
+  REPO_ROOT,
+  "docs/network-incident-examples/2026-06-24-beta-alex-command-jitter/match-89-replay.json",
+);
+const SAFE_REPLAY_LOBBY_ROW_KEYS = [
+  "createdAtUnixMs",
+  "hostName",
+  "joinState",
+  "kind",
+  "map",
+  "maxSlots",
+  "occupiedSlots",
+  "phase",
+  "room",
+  "spectatorCount",
+].sort().join(",");
 
 function lobbiesUrl() {
   const url = new URL(WS_URL);
@@ -23,12 +43,32 @@ function lobbiesUrl() {
   return url;
 }
 
+function devReplayLobbyUrl(replay) {
+  const url = lobbiesUrl();
+  url.pathname = "/dev/replay-lobby";
+  url.searchParams.set("replay", replay);
+  return url;
+}
+
+function installReplayLobbyFixture() {
+  const name = `replaylobby-${process.pid}-${Date.now()}`;
+  const dir = path.join(REPO_ROOT, "server", "target", "selfplay-artifacts", name);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  fs.copyFileSync(REPLAY_FIXTURE, path.join(dir, "replay.json"));
+  return { name, dir };
+}
+
 async function createLobby(room) {
   return fetch(lobbiesUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ room }),
   });
+}
+
+async function createDevReplayLobby(replay) {
+  return fetch(devReplayLobbyUrl(replay), { method: "POST" });
 }
 
 async function lobbyRows() {
@@ -95,6 +135,130 @@ async function main() {
   closeClients(LabViewer);
   await sleep(200);
   await expectNoLobbyRow(labRoom, "empty internal lab room does not leak into the public browser");
+
+  const replayFixture = installReplayLobbyFixture();
+  const replayCreate = await createDevReplayLobby(replayFixture.name);
+  ok(replayCreate.status === 201,
+    `dev replay-lobby helper creates a replay staging room (${replayCreate.status})`);
+  const replayPayload = await replayCreate.json();
+  const replayRoom = replayPayload.room;
+  ok(/^__match_replay__:[0-9a-f]+$/.test(replayRoom),
+    `dev replay-lobby helper returns a match-history-style room (${replayRoom})`);
+  await expectNoLobbyRow(replayRoom, "empty replay staging room stays out of the public browser");
+
+  const ReplayHost = await connectClient("browser-replay-host");
+  ReplayHost.send({ t: "join", name: "Archivist", room: replayRoom });
+  const hostReplayLobby = await ReplayHost.waitFor(
+    (msg) => msg.t === "lobby" && msg.kind === "replay" && msg.room === replayRoom,
+    3000,
+    "replay staging host lobby",
+  );
+  ok(hostReplayLobby.hostId === ReplayHost.playerId, "first replay staging viewer becomes host");
+  ok(hostReplayLobby.canStart, "replay staging host can start immediately");
+  ok(hostReplayLobby.players.length === 1 && hostReplayLobby.players[0].isSpectator,
+    "replay staging lobby admits the first viewer as spectator only");
+  ok(hostReplayLobby.maps.length === 0, "replay staging lobby does not expose map selection");
+
+  const replayRow = await waitForLobbyRow(
+    replayRoom,
+    (row) => row.kind === "replay" &&
+      row.hostName === "Archivist" &&
+      row.joinState === "fullSpectatorOnly" &&
+      row.occupiedSlots === 0 &&
+      row.maxSlots === 0 &&
+      row.spectatorCount === 1,
+    "replay staging browser row",
+  );
+  ok(Object.keys(replayRow).sort().join(",") === SAFE_REPLAY_LOBBY_ROW_KEYS,
+    "replay browser row exposes only safe lobby metadata");
+  ok(replayRow.map === "Default", "replay browser row shows the artifact map name");
+
+  const ReplayGuest = await connectClient("browser-replay-guest");
+  ReplayGuest.send({ t: "join", name: "Viewer", room: replayRoom, spectator: true });
+  await ReplayHost.waitFor(
+    (msg) => msg.t === "lobby" && msg.kind === "replay" && msg.players.length === 2,
+    3000,
+    "replay staging host sees second viewer",
+  );
+  const guestReplayLobby = await ReplayGuest.waitFor(
+    (msg) => msg.t === "lobby" && msg.kind === "replay" && msg.players.length === 2,
+    3000,
+    "replay staging guest lobby",
+  );
+  ok(guestReplayLobby.players.every((player) => player.isSpectator),
+    "replay staging lobby keeps every occupant as spectator");
+  await waitForLobbyRow(
+    replayRoom,
+    (row) => row.kind === "replay" && row.spectatorCount === 2 && row.occupiedSlots === 0,
+    "replay staging browser row with two viewers",
+  );
+
+  ReplayHost.send({ t: "start" });
+  const [replayStartHost, replayStartGuest] = await Promise.all([
+    ReplayHost.waitFor((msg) => msg.t === "start" && msg.replay, 4000, "replay host start"),
+    ReplayGuest.waitFor((msg) => msg.t === "start" && msg.replay, 4000, "replay guest start"),
+  ]);
+  ok(replayStartHost.spectator && replayStartGuest.spectator,
+    "shared replay playback starts both staging viewers as spectators");
+  ok(replayStartHost.players.length === 2 && replayStartGuest.players.length === 2,
+    "shared replay playback carries the original active replay players");
+  ok(replayStartHost.replay.durationTicks > 0,
+    `shared replay playback carries replay metadata (${replayStartHost.replay.durationTicks} ticks)`);
+  const [hostRoomTime, guestRoomTime] = await Promise.all([
+    ReplayHost.waitFor((msg) => msg.t === "roomTimeState" && msg.currentTick === 0,
+      4000,
+      "replay host room-time state"),
+    ReplayGuest.waitFor((msg) => msg.t === "roomTimeState" && msg.currentTick === 0,
+      4000,
+      "replay guest room-time state"),
+  ]);
+  ok(hostRoomTime.speed === 2 && guestRoomTime.speed === 2,
+    "shared replay playback keeps the replay default speed");
+  await waitForLobbyGone(replayRoom, "started replay playback leaves the staging browser");
+
+  const guestInitialSnapshot = await ReplayGuest.waitFor(
+    (msg) => msg.t === "snapshot",
+    4000,
+    "replay guest initial snapshot",
+  );
+  ReplayHost.send({ t: "returnToLobby" });
+  const guestContinuedSnapshot = await ReplayGuest.waitNext(
+    (msg) => msg.t === "snapshot" && msg.tick > guestInitialSnapshot.tick,
+    4000,
+    "replay guest snapshot after host leaves",
+  );
+  ok(guestContinuedSnapshot.tick > guestInitialSnapshot.tick,
+    "leaving one replay viewer keeps playback alive for remaining viewers");
+  closeClients(ReplayHost, ReplayGuest);
+  await sleep(200);
+
+  const savedReplayRoom = `__replay_artifact__:${replayFixture.name}`;
+  const SavedReplayViewer = await connectClient("browser-saved-replay");
+  SavedReplayViewer.send({ t: "join", name: "Saved", room: savedReplayRoom, spectator: true });
+  const savedReplayPrompt = await SavedReplayViewer.waitFor(
+    (msg) => msg.t === "joinReplayPrompt" && msg.room === savedReplayRoom,
+    3000,
+    "saved replay artifact prompt",
+  );
+  ok(!!savedReplayPrompt, "saved replay artifacts still require explicit replay confirmation");
+  await expectNoLobbyRow(savedReplayRoom, "saved replay artifact rooms stay out of the public browser");
+  SavedReplayViewer.send({
+    t: "join",
+    name: "Saved",
+    room: savedReplayRoom,
+    spectator: true,
+    replayOk: true,
+  });
+  const savedReplayStart = await SavedReplayViewer.waitFor(
+    (msg) => msg.t === "start" && msg.replay,
+    4000,
+    "saved replay artifact playback",
+  );
+  ok(savedReplayStart.spectator && savedReplayStart.replay.durationTicks > 0,
+    "saved replay artifacts still enter immediate replay playback after confirmation");
+  closeClients(SavedReplayViewer);
+  await sleep(200);
+  await expectNoLobbyRow(savedReplayRoom, "saved replay artifact playback remains hidden from browser");
 
   const room = uniqueRoom("browser-flow");
 

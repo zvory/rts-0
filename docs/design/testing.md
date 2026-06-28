@@ -57,6 +57,9 @@ The replay artifact is meant to be enough to reproduce or inspect a failing run 
 playtesting first. Load an artifact with
 `/?replayArtifact=<artifact_name>` on a local server using the same Cargo target directory. The
 older `/dev/replay-artifact?replay=<artifact_name>` route redirects to that canonical launch URL.
+For DB-free group replay lobby coverage, `POST /dev/replay-lobby?replay=<artifact_name>` loads the
+same safe artifact directories and returns a `__match_replay__:*` staging room without exposing the
+artifact JSON; the normal saved-artifact URL still uses immediate replay confirmation/playback.
 By default successful runs do not write artifacts. For manual inspection,
 setting `RTS_SELFPLAY_SAVE_REPLAY=1` writes a successful run to
 `target/selfplay-artifacts/<test>-<pid>-<time>/`; setting `RTS_SELFPLAY_SAVE_REPLAY=<name>` uses

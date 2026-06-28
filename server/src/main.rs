@@ -26,6 +26,7 @@ use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
 
+mod dev_replay_pages;
 mod dev_scenario_pages;
 mod wiki;
 
@@ -179,6 +180,10 @@ async fn main() {
         .route("/wiki/{*path}", get(wiki::wiki_page_handler))
         .route("/ws", get(ws_handler))
         .route("/dev/replay-artifact", get(dev_replay_artifact_handler))
+        .route(
+            "/dev/replay-lobby",
+            post(dev_replay_pages::dev_replay_lobby_handler),
+        )
         .route(
             "/dev/scenario",
             get(dev_scenario_pages::dev_scenario_handler),
