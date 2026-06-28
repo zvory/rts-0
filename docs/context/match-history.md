@@ -37,6 +37,8 @@ scope, or the lobby front-page table.
   no-AI sandbox rows, which write `true`.
 - **Score-screen schema.** `score_screen` is JSONB holding `Vec<PlayerScore>` from
   `contract::PlayerScore`. Adding fields requires no migration.
+- **Outcome vocabulary.** `matches.outcome` is `win`, `draw`, or `aborted`; `winner_name` is
+  winner-only and stays `null` for both draws and deploy-drain aborted matches.
 - **Replay storage.** `match_replays.artifact_json` stores `ReplayArtifactV1`; summaries and
   launch strictly check artifact schema, map schema, map hash, and faction/loadout validity.
   Build-SHA mismatches stay launchable with a warning because replay playback is attempted across

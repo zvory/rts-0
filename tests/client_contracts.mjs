@@ -22,6 +22,7 @@ await import("./client_contracts/match_shell_contracts.mjs");
 await import("./client_contracts/match_replay_contracts.mjs");
 await import("./client_contracts/protocol_contracts.mjs");
 await import("./client_contracts/lobby_contracts.mjs");
+await import("./client_contracts/match_history_contracts.mjs");
 runScoreboardContracts();
 await import("./client_contracts/net_contracts.mjs");
 await import("./client_contracts/lab_contracts.mjs");

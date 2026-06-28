@@ -23,8 +23,8 @@ Supabase Postgres. Schema in `server/migrations/`. Match summaries live in `matc
 | `ended_at`      | `timestamptz`   | Wall clock at `end_match`. Default `now()`.     |
 | `duration_ms`   | `integer`       | Server-computed, clamped to non-negative i32.   |
 | `map_name`      | `text`          | `selected_map` at match start.                  |
-| `winner_name`   | `text` nullable | `null` ⇔ draw.                                  |
-| `outcome`       | `text`          | `'win'` or `'draw'` (CHECK constraint).         |
+| `winner_name`   | `text` nullable | Winner display name for wins only; `null` for draws and aborted matches. |
+| `outcome`       | `text`          | `'win'`, `'draw'`, or `'aborted'` (CHECK constraint). |
 | `participants`  | `text[]`        | Display names in seat order (humans then AI).   |
 | `score_screen`  | `jsonb`         | Whole `Vec<PlayerScore>` blob, opaque to SQL.   |
 | `human_count`   | `integer`       | Non-AI players at match start.                  |
@@ -33,6 +33,10 @@ Supabase Postgres. Schema in `server/migrations/`. Match summaries live in `matc
 
 Indexes: `(started_at desc)` for the front-page query, a partial `(started_at desc)` index for
 public rows, and `(map_name)` for future filtering.
+
+`outcome` is the source of truth for distinguishing no-winner results: `draw` is ordinary match
+resolution with no winner, while `aborted` is server-controlled shutdown finalization. `winner_name`
+must not be overloaded for that distinction.
 
 The `score_screen` JSONB intentionally stores the full payload from `Game::scores()`. The shape
 matches `contract::PlayerScore` (camelCase). Adding fields to `PlayerScore` requires no migration;
@@ -94,8 +98,9 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - `server/src/lobby/room_task.rs` — captures `match_started_at`, `match_map_name`,
   `match_participants` at `start_match`; captures `ReplayArtifactV1` from the ending `Game`;
   writes the match row and optional replay row in `end_match` via a **detached** `tokio::spawn`.
-  Detachment is load-bearing: a slow Supabase write must never stall the room transitioning back
-  to lobby.
+  Normal match completion writes explicit `win` or `draw` outcomes; deploy-drain abort
+  finalization writes `aborted`. Detachment is load-bearing: a slow Supabase write must never
+  stall the room transitioning back to lobby.
 - `client/src/match_history.js` — fetches and renders the lobby table; row click expands the
   score screen and, when compatible, exposes a replay launch action.
 - `client/src/app.js` — mounts `MatchHistory` when the lobby shows; `refresh()` is called from
@@ -123,6 +128,14 @@ write. The simulation and lobby flow are unaffected. Replay artifacts use the sa
 match rows: if a match row is skipped, no replay row is written. Stored historical debug and
 AI-only rows, plus solo sandbox rows, are filtered from `/api/matches`, but the replay row remains
 linked to the owning `matches` row.
+
+Outcome vocabulary:
+
+- `win`: normal match resolution produced a winner; `winner_name` is the display name of the first
+  living winner represented by the replay winner id.
+- `draw`: normal match resolution produced no winner; `winner_name` is `null`.
+- `aborted`: server-controlled shutdown finalization captured the match before natural
+  resolution; `winner_name` is `null`.
 
 Public reads also suppress historical bot/test rows that were written before this eligibility
 filter existed, and migration `20260609000002_suppress_automated_match_history.sql` tags those

@@ -1,6 +1,6 @@
 # Phase 1 - Aborted Outcome Contract
 
-Status: Not started.
+Status: Done.
 
 ## Goal
 

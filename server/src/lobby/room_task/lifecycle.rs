@@ -208,6 +208,7 @@ impl RoomTask {
                     .clamp(0, i32::MAX as i64) as i32;
                 let winner_name = winner_id
                     .and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
+                let outcome = crate::db::MatchOutcome::from_winner_name(winner_name.as_deref());
                 let score_json = serde_json::to_value(&scores).unwrap_or(serde_json::Value::Null);
                 let replay = if self.should_attach_match_history_replay_artifact() {
                     replay_artifact.as_ref().and_then(|artifact| {
@@ -228,6 +229,7 @@ impl RoomTask {
                     duration_ms,
                     map_name: self.match_map_name.clone(),
                     winner_name,
+                    outcome,
                     participants: self.match_participants.clone(),
                     score_screen: score_json,
                     human_count: i32::try_from(self.match_human_count).unwrap_or(i32::MAX),
