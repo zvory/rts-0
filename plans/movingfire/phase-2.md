@@ -6,21 +6,23 @@ Status: planned.
 
 ## Objective
 
-Make active `Move` and `AttackMove` orders choose and retain only targets that are currently
-fireable. Out-of-range preferred targets should not occupy `target_id` or suppress fire into an
-in-range fallback target, and target acquisition for these orders must not request a chase/repath as
-a fallback.
+Make movement-order target selection respect what the unit can actually fire at while it is
+continuing its current path. Moving-fire `Move` and `AttackMove` orders should choose and retain only
+currently fireable targets, while non-moving-fire attack-move units should keep their normal
+engagement semantics but must not hold an unreachable target while walking past a valid in-range
+fallback.
 
 ## Scope
 
-- Apply in-range/fireable target filtering to movement-order auto-acquisition and retained targets.
-- Keep movement-order acquisition side-effect-free with respect to pathing: if no target is
-  currently fireable, continue the commanded path rather than chasing a visible enemy.
+- Apply in-range/fireable target filtering to moving-fire movement-order auto-acquisition and
+  retained targets.
+- Keep moving-fire movement-order acquisition side-effect-free with respect to pathing: if no target
+  is currently fireable, continue the commanded path rather than chasing a visible enemy.
 - Treat player-issued `Move` and `AttackMove` consistently while a moving-fire unit is still
   pathing.
-- Preserve the intended difference for units that cannot fire while moving: they may stop to shoot
-  valid in-range targets on attack-move, but should not prefer unreachable targets while continuing
-  their path.
+- Preserve the intended difference for units that cannot fire while moving: they may stop or engage
+  under normal attack-move rules, but should not prefer unreachable targets while continuing past a
+  valid in-range target.
 - Add a focused regression shape based on the DV vs Soupman riflemen ignoring an in-range tank while
   holding an out-of-range soft target.
 - Keep fog, smoke, line-of-sight, blocker, and team legality filters intact.
