@@ -26,12 +26,22 @@ fn scout_car_smoke_requires_no_steelworks() {
     game.tick();
 
     assert!(
+        matches!(
+            game.entities
+                .get(scout)
+                .expect("scout should exist")
+                .ability_uses_remaining(ability::AbilityKind::Smoke),
+            Some(1)
+        ),
+        "Scout Car smoke should be available before Steelworks and spend one use"
+    );
+    assert_eq!(
         game.entities
             .get(scout)
             .expect("scout should exist")
-            .ability_cooldown_ticks(ability::AbilityKind::Smoke)
-            > 0,
-        "Scout Car smoke should be available before Steelworks and start cooldown"
+            .ability_cooldown_ticks(ability::AbilityKind::Smoke),
+        0,
+        "Scout Car smoke should not start a cooldown"
     );
 }
 
