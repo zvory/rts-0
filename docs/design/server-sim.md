@@ -514,7 +514,9 @@ widening the hook into generic scripting.
 - `launch_world_ability` — reads range/cost/cooldown from the registry, deducts resources, sets
   the caster's cooldown, clears the active order,
   and dispatches a delayed-world effect hook (currently: schedules a smoke cloud or delayed mortar
-  shell). Guards:
+  shell). A scheduled mortar shell resolves from its scheduled impact point even if the firing
+  mortar dies before impact; reveal data at impact is emitted only when the original mortar entity
+  is still alive and valid. Guards:
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
