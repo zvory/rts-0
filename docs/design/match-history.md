@@ -98,13 +98,16 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   `POST /api/matches/{id}/replay` launch handler, replay compatibility checks, and the
   `RTS_RECORD_MATCHES` gate.
 - `server/src/lobby/mod.rs` — `Lobby::with_match_history()` injects an `Option<Arc<Db>>` into
-  spawned rooms and can create persisted replay rooms from launch-approved artifacts.
+  spawned rooms and can create persisted replay rooms from launch-approved artifacts. The
+  lobby/drain state also owns the bounded match-history write tracker and exposes the shutdown
+  wait primitive for pending replay/history writes.
 - `server/src/lobby/room_task.rs` — captures `match_started_at`, `match_map_name`,
   `match_participants` at `start_match`; captures `ReplayArtifactV1` from the ending `Game`;
-  writes the match row and optional replay row in `end_match` via a **detached** `tokio::spawn`.
+  writes the match row and optional replay row in `end_match` via a tracked **detached** task.
   Normal match completion writes explicit `win` or `draw` outcomes; deploy-drain abort
   finalization writes `aborted`. Detachment is load-bearing: a slow Supabase write must never
-  stall the room transitioning back to lobby.
+  stall the room transitioning back to lobby. The tracker snapshots pending writes at shutdown
+  wait start, so writes started later do not extend that wait forever.
 - `client/src/match_history.js` — fetches and renders the lobby table; row click expands the
   score screen and, when compatible, exposes a replay launch action.
 - `client/src/app.js` — mounts `MatchHistory` when the lobby shows; `refresh()` is called from
@@ -179,8 +182,10 @@ include historical local-only rows from the request peer address. Only loopback 
   acceptable; match history is non-critical.
 - **Migration fails at boot**: `Db::connect` returns `Err`, server runs without history. Check
   `migrations/` filenames are timestamp-prefixed and sequential.
-- **Slow write**: detached task means the room is unblocked. Worst case the row appears seconds
-  later in `/api/matches`.
+- **Slow write**: tracked detached task means the room is unblocked. Worst case the row appears
+  seconds later in `/api/matches`. During graceful shutdown, the drain path can spend remaining
+  drain budget waiting for writes that were pending when the wait began; logs distinguish all
+  writes completing from timeout with the remaining pending count.
 - **Replay incompatible with current schema/map/faction/loadout**: summaries show
   `replayAvailable: false` with a reason, and launch returns `409` with the same class of
   explanation. Build-SHA drift is warning-compatible (`replayAvailable: true` with a warning);
