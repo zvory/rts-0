@@ -82,6 +82,7 @@ function renderGamePanel(root, game) {
   root.classList.add("settings-game-panel");
   if (game?.prediction) renderPredictionControl(root, game.prediction);
   if (game?.pointerLock) renderPointerLockControl(root, game.pointerLock);
+  if (game?.unitRanges) renderUnitRangeControl(root, game.unitRanges);
   renderContextSummary(root, game);
 }
 
@@ -138,6 +139,31 @@ function renderPointerLockControl(root, pointerLock) {
   };
   sync();
   pointerLock.onMount?.(sync);
+}
+
+function renderUnitRangeControl(root, unitRanges) {
+  const button = document.createElement("button");
+  button.id = "unit-range-toggle";
+  button.type = "button";
+  button.className = "settings-toggle";
+  button.setAttribute("role", "switch");
+  button.addEventListener("click", () => {
+    unitRanges.onToggle?.();
+    sync();
+  });
+  root.appendChild(button);
+
+  function sync() {
+    const state = unitRanges.state?.() || {};
+    const enabled = !!state.enabled;
+    button.hidden = !!state.hidden;
+    button.disabled = state.available === false;
+    button.setAttribute("aria-checked", String(enabled));
+    button.textContent = enabled ? "Show Unit Ranges: on" : "Show Unit Ranges: off";
+    button.title = "Draw selected units' firing ranges.";
+  }
+  sync();
+  unitRanges.onMount?.(sync);
 }
 
 function renderContextSummary(root, game) {

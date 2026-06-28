@@ -301,32 +301,29 @@ export function _drawAntiTankGunSetupPreview(view) {
     ? view.abilityTargetPreview
     : null;
 
-  for (const e of view.selectedEntities()) {
-    if (!feedbackOwner(view, e.owner) || (e.kind !== KIND.ANTI_TANK_GUN && e.kind !== KIND.ARTILLERY)) continue;
-    if (e.setupState !== SETUP.DEPLOYED) continue;
-    const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
-    if (facing == null) continue;
-    const weapon = fieldOfFireProfile(e.kind, tileSize);
-    if (!weapon) continue;
-    if (
-      pointFirePreview &&
-      e.kind === KIND.ARTILLERY &&
-      !pointInsideFieldOfFire(e, pointFirePreview.mouseX, pointFirePreview.mouseY, weapon, facing)
-    ) {
-      continue;
+  if (pointFirePreview) {
+    for (const e of view.selectedEntities()) {
+      if (!feedbackOwner(view, e.owner) || e.kind !== KIND.ARTILLERY) continue;
+      if (e.setupState !== SETUP.DEPLOYED) continue;
+      const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
+      if (facing == null) continue;
+      const weapon = fieldOfFireProfile(e.kind, tileSize);
+      if (!weapon || !pointInsideFieldOfFire(e, pointFirePreview.mouseX, pointFirePreview.mouseY, weapon, facing)) {
+        continue;
+      }
+      drawFacingWedge(
+        g,
+        e.x,
+        e.y,
+        weapon.maxRadius,
+        facing,
+        weapon.arc,
+        FIELD_OF_FIRE_COLOR,
+        0.045,
+        0.2,
+        weapon.minRadius,
+      );
     }
-    drawFacingWedge(
-      g,
-      e.x,
-      e.y,
-      weapon.maxRadius,
-      facing,
-      weapon.arc,
-      FIELD_OF_FIRE_COLOR,
-      0.045,
-      0.2,
-      weapon.minRadius,
-    );
   }
 
   const preview = view.antiTankGunSetupPreview;
@@ -604,22 +601,6 @@ function pointInsideFieldOfFire(e, x, y, weapon, facing) {
   if (dist < (weapon.minRadius || 0) || dist > weapon.maxRadius) return false;
   const targetFacing = Math.atan2(dy, dx);
   return Math.abs(angleDelta(facing, targetFacing)) <= weapon.arc / 2 + 0.001;
-}
-
-export function _drawSelectedMortarRanges(state) {
-  if (!state || typeof state.selectedEntities !== "function") return;
-  const g = this._feedbackGfx;
-  const tileSize = (this._map && this._map.tileSize) || 32;
-  const rangeTiles = ABILITIES[ABILITY.MORTAR_FIRE]?.rangeTiles || STATS[KIND.MORTAR_TEAM]?.rangeTiles || 0;
-  if (!(rangeTiles > 0)) return;
-  const radius = rangeTiles * tileSize;
-
-  for (const e of state.selectedEntities()) {
-    if (!feedbackOwner(state, e.owner) || e.kind !== KIND.MORTAR_TEAM) continue;
-    if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
-    g.lineStyle(1.4, 0x6fa3ff, 0.7);
-    dashedCircle(g, e.x, e.y, radius, 64);
-  }
 }
 
 function dashedCircle(g, cx, cy, radius, segments) {

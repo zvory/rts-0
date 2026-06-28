@@ -64,6 +64,7 @@ import {
   _drawAbilityTargetPreview,
   _drawAntiTankGunSetupPreview,
 } from "../../client/src/renderer/feedback.js";
+import { _drawSelectedUnitRanges } from "../../client/src/renderer/unit_ranges.js";
 
 import { RecordingGraphics } from "./pixi_fakes.mjs";
 
@@ -1934,15 +1935,11 @@ function buttonByLabel(card, label) {
     ARTILLERY_MIN_RANGE_TILES === 15 && ARTILLERY_MAX_RANGE_TILES === 55,
     "Artillery point-fire range mirrors the 15-55 tile balance band",
   );
-  const deployedArtillery = {
-    ...selectedArtillery,
-    setupState: SETUP.DEPLOYED,
-    setupFacing: 0,
-  };
+  const deployedArtillery = { ...selectedArtillery, setupState: SETUP.DEPLOYED, setupFacing: 0 };
   const artilleryConeGfx = new RecordingGraphics();
-  _drawAntiTankGunSetupPreview.call(
+  _drawSelectedUnitRanges.call(
     { _feedbackGfx: artilleryConeGfx, _map: { tileSize: 32 } },
-    { playerId: 1, selectedEntities: () => [deployedArtillery] },
+    { playerId: 1, showUnitRangesEnabled: true, selectedEntities: () => [deployedArtillery] },
   );
   const artilleryConeArcs = artilleryConeGfx.calls.filter((call) => call[0] === "arc");
   assert(

@@ -43,7 +43,6 @@ import {
   _drawMuzzleFlashes,
   _drawMortarImpacts,
   _drawMortarLaunches,
-  _drawSelectedMortarRanges,
   _drawMortarShells,
   _drawMortarTargets,
   _drawOrderPlan,
@@ -54,6 +53,7 @@ import {
   _drawSmokes,
   drawSelectionBox,
 } from "./feedback.js";
+import { _drawSelectedMortarRanges, _drawSelectedUnitRanges } from "./unit_ranges.js";
 import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LAYERS, _sweep } from "./layers.js";
@@ -343,7 +343,7 @@ export class Renderer {
       this._drawSafely("artilleryLaunches", () => this._drawArtilleryLaunches(feedbackView));
       this._drawSafely("artilleryTargets", () => this._drawArtilleryTargets(feedbackView));
       this._drawSafely("artilleryImpacts", () => this._drawArtilleryImpacts(feedbackView));
-      this._drawSafely("selectedMortarRanges", () => this._drawSelectedMortarRanges(feedbackView));
+      this._drawSafely("selectedUnitRanges", () => this._drawSelectedUnitRanges(feedbackView));
       this._drawSafely("breakthroughAuras", () => this._drawBreakthroughAuras(feedbackView, regularEntities));
       this._drawSafely("abilityTargetPreview", () => this._drawAbilityTargetPreview(feedbackView));
       this._drawSafely("antiTankGunSetupPreview", () => this._drawAntiTankGunSetupPreview(feedbackView));
@@ -685,6 +685,7 @@ Object.assign(Renderer.prototype, {
   _drawAbilityObjects,
   _drawAbilityTargetPreview,
   _drawBreakthroughAuras,
+  _drawSelectedUnitRanges,
   _drawSelectedMortarRanges,
   _drawSmokes,
   _drawAntiTankGunSetupPreview,

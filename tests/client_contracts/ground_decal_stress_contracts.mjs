@@ -214,6 +214,7 @@ function muteRenderOverlays(renderer) {
     "_drawArtilleryLaunches",
     "_drawArtilleryTargets",
     "_drawArtilleryImpacts",
+    "_drawSelectedUnitRanges",
     "_drawSelectedMortarRanges",
     "_drawBreakthroughAuras",
     "_drawAbilityTargetPreview",
