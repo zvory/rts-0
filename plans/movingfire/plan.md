@@ -3,7 +3,7 @@
 ## Purpose
 
 Make "fire while moving" a shared combat capability instead of a proxy for vehicle identity,
-chase behavior, or legacy Rifleman Charge state. Units executing player-issued `Move` or
+chase behavior, or legacy Rifleman Charge state. Moving-fire units executing player-issued `Move` or
 `AttackMove` orders must never repath, chase, or replace their path goal because of an auto-acquired
 enemy; they should keep their commanded destination and only fire at targets they can actually shoot
 from the current movement path. Meth riflemen should use that same moving-fire capability without
@@ -15,8 +15,11 @@ inheriting vehicle turret, standoff, or repathing behavior.
   cleanest local shape rather than following a prescriptive refactor recipe.
 - Preserve direct `Attack` command behavior unless a phase explicitly proves it must change.
 - Preserve idle-aggressive behavior separately from player-issued `Move` and `AttackMove` orders.
-- For player-issued `Move` and `AttackMove`, target acquisition may affect firing, facing, and
-  `target_id`, but it must not issue chase paths, standoff paths, or enemy-directed repaths.
+- For moving-fire units on player-issued `Move` and `AttackMove`, target acquisition may affect
+  firing, facing, and `target_id`, but it must not issue chase paths, standoff paths, or
+  enemy-directed repaths.
+- Do not globally remove normal non-moving-fire attack-move engagement behavior. Scope the no-repath
+  invariant to units that can fire while moving.
 - Do not let out-of-range auto-acquisition targets suppress valid in-range fire.
 - Keep fog and projection rules authoritative; do not expose target ids or weapon facing through
   hidden targets.
@@ -34,16 +37,17 @@ inheriting vehicle turret, standoff, or repathing behavior.
 ### [Phase 1 - Separate Moving-Fire Policy](phase-1.md)
 
 Separate "can fire while moving" from vehicle-specific behavior and chase/repath permission. Remove
-the behavior where a unit on player-issued `Move` or `AttackMove` repaths toward an auto-acquired
-enemy, including moving-fire vehicle standoff/chase paths. Vehicle turret and presentation behavior
-should remain vehicle-specific policy, not a side effect of the shared moving-fire capability.
+the behavior where a moving-fire unit on player-issued `Move` or `AttackMove` repaths toward an
+auto-acquired enemy, including moving-fire vehicle standoff/chase paths. Vehicle turret and
+presentation behavior should remain vehicle-specific policy, not a side effect of the shared
+moving-fire capability.
 
 ### [Phase 2 - Movement-Order Target Filtering](phase-2.md)
 
-Make target acquisition and retention for active `Move` and `AttackMove` orders choose only targets
-that are currently fireable. This should prevent an out-of-range preferred target from occupying
-`target_id` while an in-range fallback target is available. The DV vs Soupman rifleman/tank case
-should become a focused regression shape for this behavior.
+Make target acquisition and retention respect current fireability while units are continuing a
+movement path. Moving-fire `Move` and `AttackMove` orders should choose only fireable targets, and
+the DV vs Soupman rifleman/tank case should become a focused regression for unreachable preferred
+targets blocking valid in-range fallback fire.
 
 ### [Phase 3 - Meth Riflemen Use Shared Moving Fire](phase-3.md)
 

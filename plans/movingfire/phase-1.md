@@ -7,19 +7,20 @@ Status: planned.
 ## Objective
 
 Separate the combat capability "can fire while moving" from vehicle-specific weapon handling and
-from auto-chase pathing. A unit following a player-issued `Move` or `AttackMove` destination should
-not replace that path merely because it can fire while moving or because combat auto-acquisition saw
-an enemy.
+from auto-chase pathing. A moving-fire unit following a player-issued `Move` or `AttackMove`
+destination should not replace that path merely because combat auto-acquisition saw an enemy.
 
 ## Scope
 
 - Split or rename policy helpers so moving-fire capability, vehicle/turret handling, and chase
   permission are represented separately.
-- Remove auto-acquisition-driven repaths for player-issued `Move` and `AttackMove` orders. These
-  orders must not chase visible enemies, must not route to vehicle standoff points, and must not
-  replace the path goal with an enemy-directed goal.
-- Make active `Move` and `AttackMove` paths stay pointed at their commanded destinations for all
-  affected units, including current moving-fire vehicles.
+- Remove auto-acquisition-driven repaths for moving-fire units on player-issued `Move` and
+  `AttackMove` orders. These moving-fire orders must not chase visible enemies, must not route to
+  vehicle standoff points, and must not replace the path goal with an enemy-directed goal.
+- Make active moving-fire `Move` and `AttackMove` paths stay pointed at their commanded
+  destinations for all affected units, including current moving-fire vehicles.
+- Preserve normal non-moving-fire attack-move engagement semantics unless a later phase makes a
+  targeted target-filtering change.
 - Keep explicit `Attack` command pursuit and idle-aggressive behavior separate from movement-order
   drive-by fire.
 - Keep vehicle-only aiming, turret facing, standoff, and projection logic tied to vehicle policy
@@ -39,8 +40,10 @@ an enemy.
 ## Verification
 
 - Focused Rust tests covering moving-fire `Move` and `AttackMove` path preservation.
-- Focused Rust tests proving visible out-of-range enemies do not change `Move` or `AttackMove` path
-  goals.
+- Focused Rust tests proving visible out-of-range enemies do not change moving-fire `Move` or
+  `AttackMove` path goals.
+- Focused Rust tests proving normal non-moving-fire attack-move behavior is not accidentally
+  disabled.
 - Focused Rust tests showing explicit `Attack` still pursues as intended.
 - Sim architecture check if helper movement changes module boundaries.
 - `git diff --check`.
