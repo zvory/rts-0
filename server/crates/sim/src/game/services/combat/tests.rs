@@ -1879,8 +1879,8 @@ fn packed_anti_tank_gun_fires_with_shorter_range_and_reduced_damage() {
 
     assert_eq!(
         entities.get(tank_id).expect("enemy should exist").hp,
-        enemy_hp - 45,
-        "packed anti-tank gun should deal 75% of its deployed 60 damage"
+        enemy_hp - 60,
+        "packed anti-tank gun should deal 75% of its deployed 80 damage"
     );
 }
 

@@ -35,8 +35,8 @@ export const COMMAND_CAR_BODY = Object.freeze({
 
 // Gatherers can mine a resource only when a completed home-base mining anchor is within range.
 export const MINING_CC_RANGE_TILES = 9.0;
-export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 14;
-export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 45 * Math.PI / 180;
+export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 28;
+export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 * Math.PI / 180;
 export const ARTILLERY_MIN_RANGE_TILES = 15;
 export const ARTILLERY_MAX_RANGE_TILES = 55;
 export const ARTILLERY_FIELD_OF_FIRE_RAD = 20 * Math.PI / 180;
