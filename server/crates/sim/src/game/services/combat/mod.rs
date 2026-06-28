@@ -74,7 +74,7 @@ fn resolve_target(
     };
     let attacker_can_fire_while_moving = entities
         .get(self_id)
-        .map(|e| can_fire_while_moving(e, weapons::legacy_charge_grants_moving_fire_for_tests(e)))
+        .map(|e| can_fire_while_moving(e, false))
         .unwrap_or(false);
     resolve_target_with_obstruction(
         map,

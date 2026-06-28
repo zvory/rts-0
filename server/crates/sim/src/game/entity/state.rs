@@ -77,8 +77,6 @@ pub struct MovementState {
     pub oil_debt: f32,
     /// Ticks remaining before an oil-starved vehicle may try to advance again.
     pub oil_starved_pause_ticks: u16,
-    /// Ticks remaining for Rifleman Charge. Used only by riflemen.
-    pub charge_ticks: u16,
     /// Ticks remaining for Command Car Breakthrough movement boost.
     pub breakthrough_ticks: u16,
     /// Ticks remaining for this Command Car's active Breakthrough aura origin.
@@ -106,7 +104,6 @@ impl Default for MovementState {
             lifetime_oil_used: 0.0,
             oil_debt: 0.0,
             oil_starved_pause_ticks: 0,
-            charge_ticks: 0,
             breakthrough_ticks: 0,
             breakthrough_aura_ticks: 0,
             recent_smoke_ticks: 0,

@@ -170,12 +170,12 @@ const DEFAULT_ABILITIES: &[AbilityCatalogEntry] = &[
         label: "Charge",
         icon: "CHG",
         hotkey: None,
-        title: "Legacy Rifleman Charge",
+        title: "Legacy Charge command compatibility",
         carriers: &[],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
         min_range_tiles: None,
-        cooldown_ticks: balance::RIFLEMAN_CHARGE_COOLDOWN_TICKS,
+        cooldown_ticks: 0,
         charges: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
@@ -700,6 +700,7 @@ mod tests {
         let charge = ability_definition(CHARGE_ABILITY).unwrap();
         assert!(!charge.command_card);
         assert!(charge.carriers.is_empty());
+        assert_eq!(charge.cooldown_ticks, 0);
 
         let teleport = EKAT_CATALOG.ability(EKAT_TELEPORT_ABILITY).unwrap();
         assert_eq!(teleport.carriers, &[EntityKind::Ekat]);

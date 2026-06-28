@@ -152,9 +152,12 @@ fn legacy_charge_command_is_noop_after_removal() {
     );
 
     assert_eq!(
-        entities.get(rifle).unwrap().charge_ticks(),
+        entities
+            .get(rifle)
+            .unwrap()
+            .ability_cooldown_ticks(AbilityKind::Charge),
         0,
-        "charge should be locked before Training Centre is complete"
+        "legacy Charge should not start cooldowns before Training Centre is complete"
     );
 
     let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 6, 6);
@@ -178,31 +181,33 @@ fn legacy_charge_command_is_noop_after_removal() {
     );
 
     assert_eq!(
-        entities.get(rifle).unwrap().charge_ticks(),
+        entities
+            .get(rifle)
+            .unwrap()
+            .ability_cooldown_ticks(AbilityKind::Charge),
         0,
         "legacy Charge should no longer activate riflemen"
     );
     assert_eq!(
         entities
-            .get(rifle)
+            .get(worker)
             .unwrap()
             .ability_cooldown_ticks(AbilityKind::Charge),
-        0
-    );
-    assert_eq!(
-        entities.get(worker).unwrap().charge_ticks(),
         0,
         "non-riflemen in the selected list are ignored"
     );
     assert_eq!(
-        entities.get(enemy_rifle).unwrap().charge_ticks(),
+        entities
+            .get(enemy_rifle)
+            .unwrap()
+            .ability_cooldown_ticks(AbilityKind::Charge),
         0,
         "enemy riflemen are ignored"
     );
 }
 
 #[test]
-fn legacy_charge_command_does_not_start_cooldown() {
+fn repeated_legacy_charge_command_remains_noop() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let rifle = entities
@@ -227,11 +232,14 @@ fn legacy_charge_command_does_not_start_cooldown() {
             },
         )],
     );
-    let first_charge_ticks = entities.get(rifle).unwrap().charge_ticks();
-    let first_cooldown_ticks = entities
-        .get(rifle)
-        .unwrap()
-        .ability_cooldown_ticks(AbilityKind::Charge);
+    assert_eq!(
+        entities
+            .get(rifle)
+            .unwrap()
+            .ability_cooldown_ticks(AbilityKind::Charge),
+        0,
+        "legacy Charge should not start a cooldown"
+    );
 
     apply(
         &map,
@@ -248,45 +256,12 @@ fn legacy_charge_command_does_not_start_cooldown() {
         )],
     );
     assert_eq!(
-        entities.get(rifle).unwrap().charge_ticks(),
-        first_charge_ticks,
-        "cooldown should block immediate charge reuse"
-    );
-    assert_eq!(
         entities
             .get(rifle)
             .unwrap()
             .ability_cooldown_ticks(AbilityKind::Charge),
-        first_cooldown_ticks,
-        "retrying during cooldown must not refresh the cooldown"
-    );
-
-    for _ in 0..config::RIFLEMAN_CHARGE_COOLDOWN_TICKS {
-        entities.get_mut(rifle).unwrap().tick_ability_cooldowns();
-    }
-    entities.get_mut(rifle).unwrap().tick_charge();
-
-    apply(
-        &map,
-        &mut entities,
-        vec![(
-            1,
-            SimCommand::UseAbility {
-                ability: AbilityKind::Charge,
-                units: vec![rifle],
-                x: None,
-                y: None,
-                queued: false,
-            },
-        )],
-    );
-    assert_eq!(entities.get(rifle).unwrap().charge_ticks(), 0);
-    assert_eq!(
-        entities
-            .get(rifle)
-            .unwrap()
-            .ability_cooldown_ticks(AbilityKind::Charge),
-        0
+        0,
+        "retrying legacy Charge should remain a no-op"
     );
 }
 

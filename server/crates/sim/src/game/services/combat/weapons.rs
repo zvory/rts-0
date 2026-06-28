@@ -185,11 +185,6 @@ pub(super) fn moving_fire_movement_order_holds_path(
         && !matches!(e.move_phase(), Some(MovePhase::Arrived))
 }
 
-#[cfg(test)]
-pub(super) fn legacy_charge_grants_moving_fire_for_tests(e: &Entity) -> bool {
-    e.kind == EntityKind::Rifleman && e.charge_ticks() > 0
-}
-
 pub(super) fn moving_fire_miss_chance(_e: &Entity) -> f32 {
     0.0
 }

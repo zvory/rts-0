@@ -525,30 +525,6 @@ impl Entity {
             .and_then(|m| (self.kind == EntityKind::Tank).then_some(m.lifetime_oil_used))
     }
 
-    pub(crate) fn charge_ticks(&self) -> u16 {
-        self.movement.as_ref().map(|m| m.charge_ticks).unwrap_or(0)
-    }
-
-    pub(crate) fn start_charge(&mut self, ticks: u16) {
-        if self.kind == EntityKind::Rifleman {
-            if let Some(m) = self.movement.as_mut() {
-                m.charge_ticks = ticks;
-            }
-        }
-    }
-
-    pub(crate) fn clear_charge(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            m.charge_ticks = 0;
-        }
-    }
-
-    pub(crate) fn tick_charge(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            m.charge_ticks = m.charge_ticks.saturating_sub(1);
-        }
-    }
-
     pub(crate) fn breakthrough_ticks(&self) -> u16 {
         self.movement
             .as_ref()

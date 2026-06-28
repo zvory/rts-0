@@ -44,7 +44,6 @@ export const ARTILLERY_SETUP_TICKS = TICK_HZ * 3;
 export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
 export const ARTILLERY_OUTER_RADIUS_TILES = 3;
 export const ARTILLERY_AMMO_COST = Object.freeze({ steel: 10, oil: 0 });
-export const RIFLEMAN_CHARGE_COOLDOWN_TICKS = 150;
 export const SMOKE_ABILITY_RANGE_TILES = 9;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
 export const SMOKE_CLOUD_RADIUS_TILES = 2;

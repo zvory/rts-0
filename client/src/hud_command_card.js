@@ -93,7 +93,6 @@ export function buildCommandCardContextCatalog() {
     id: 11,
     owner: playerId,
     kind: KIND.RIFLEMAN,
-    abilities: [{ ability: ABILITY.CHARGE, cooldownLeft: 0, remainingUses: null }],
   };
   const scoutCar = {
     id: 12,
@@ -612,7 +611,6 @@ function abilityCooldownLeft(entity, ability) {
     ? entity.abilities.find((entry) => entry.ability === ability)
     : null;
   if (projected && typeof projected.cooldownLeft === "number") return projected.cooldownLeft;
-  if (ability === ABILITY.CHARGE) return entity.chargeCooldownLeft || 0;
   return 0;
 }
 

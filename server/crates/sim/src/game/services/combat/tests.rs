@@ -1310,7 +1310,7 @@ fn tank_move_order_fires_without_leaving_move_path() {
 
 #[test]
 fn shoot_while_moving_units_keep_existing_valid_target() {
-    for kind in [EntityKind::Tank, EntityKind::ScoutCar, EntityKind::Rifleman] {
+    for kind in [EntityKind::Tank, EntityKind::ScoutCar] {
         let mut entities = EntityStore::new();
         let attacker_id = entities
             .spawn_unit(1, kind, 100.0, 100.0)
@@ -1324,9 +1324,6 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
         if let Some(attacker) = entities.get_mut(attacker_id) {
             attacker.set_order(Order::move_to(300.0, 100.0));
             attacker.set_target_id(Some(retained_target_id));
-            if kind == EntityKind::Rifleman {
-                attacker.start_charge(config::RIFLEMAN_CHARGE_TICKS);
-            }
         }
 
         let map = open_map(8);
@@ -1450,7 +1447,6 @@ fn meth_rifleman_move_order_keeps_path_while_firing_without_charge_state() {
         rifleman.set_order(Order::move_to(300.0, 100.0));
         rifleman.set_path(vec![(300.0, 100.0)]);
         rifleman.set_path_goal(Some((300.0, 100.0)));
-        assert_eq!(rifleman.charge_ticks(), 0);
     }
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
 

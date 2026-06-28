@@ -96,19 +96,11 @@ pub(crate) fn movement_system_with_events(
         let Some((kind, owner)) = entities.get(id).map(|e| (e.kind, e.owner)) else {
             continue;
         };
-        let has_meth = players
-            .iter()
-            .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::Methamphetamines));
-        if kind == EntityKind::Rifleman {
-            let Some(e) = entities.get_mut(id) else {
-                continue;
-            };
-            if has_meth {
-                e.start_charge(u16::MAX);
-            } else if e.charge_ticks() > config::RIFLEMAN_CHARGE_TICKS {
-                e.clear_charge();
-            }
-        } else if kind == EntityKind::MachineGunner && has_meth {
+        let has_meth = kind == EntityKind::MachineGunner
+            && players
+                .iter()
+                .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::Methamphetamines));
+        if has_meth {
             clamp_meth_machine_gunner_setup(entities, id);
         }
     }
@@ -135,7 +127,6 @@ pub(crate) fn movement_system_with_events(
     apply_magic_anchor_stationary_pull(map, entities, occ, tick, ability_runtime);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
-            e.tick_charge();
             e.tick_breakthrough_status();
             e.tick_ability_cooldowns();
         }

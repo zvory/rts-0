@@ -221,7 +221,8 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
   100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
   use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
-  Legacy `charge` commands remain decodable but have no eligible carriers.
+  Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
+  status.
 - **Advanced research locks**: R&D Complex can queue `anti_tank_gun_unlock` for 200 steel / 75 oil
   over 600 ticks, unlocking Anti-Tank Gun training at Gun Works for that player. It can queue
   `artillery_unlock` for 300 steel / 200 oil over 900 ticks after completed

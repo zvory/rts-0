@@ -500,7 +500,7 @@ protocol id, adding the faction catalog entry, updating the client mirror/parity
 adding only the effect-specific code that the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
-effect shapes that actually exist today: self status (`charge` legacy compatibility), owned area
+effect shapes that actually exist today: legacy no-op (`charge` compatibility), owned area
 status (`breakthrough`), delayed world effects (`smoke`, `mortarFire`), dash return, line
 projectile, Magic Anchor placement, Golem consumption, and the intentionally one-off artillery
 point-fire path. The hook receives the owning player's faction id at execution time through the
@@ -523,10 +523,10 @@ widening the hook into generic scripting.
   caster exists + alive + owner + not under construction + correct kind + not on cooldown +
   required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
-- `launch_self_ability` — validates the self-targeted registry row and dispatches self-status,
-  owned-area-status, or Golem-consumption hooks. Breakthrough remains an owned-unit area buff; Ekat
-  Consume removes the nearest owned living Golem in range and restores Ekat to full HP; legacy Charge
-  remains decodable but has no current carriers.
+- `launch_self_ability` — validates the self-targeted registry row and dispatches owned-area-status
+  or Golem-consumption hooks. Breakthrough remains an owned-unit area buff; Ekat Consume removes the
+  nearest owned living Golem in range and restores Ekat to full HP; legacy Charge remains decodable
+  but has no current carriers, cooldown, or runtime status.
 - `caster_can_attempt`, `tech_requirement_met`, `caster_in_range` — pure predicates used by both
   command validation and order-queue promotion.
 
@@ -775,7 +775,8 @@ Allocation rules:
   accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap cost to the
   deconstructing player.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
-  decodable for old command logs but does not create queued or immediate ability work.
+  decodable for old command logs but does not create queued/immediate ability work, cooldowns, or
+  runtime status.
 - World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued
   commands the planner chooses an eligible selected carrier with the shortest current queue, which
   gives round-robin behavior across repeated clicks. If all eligible carriers are full, emit queue
