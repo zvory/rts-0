@@ -195,6 +195,11 @@ include historical local-only rows from the request peer address. Only loopback 
   `shutdown natural drain timeout reached; forcing remaining matches`, per-room
   `shutdown finalized active match as aborted`, aggregate `shutdown forced finalization complete`
   or `shutdown forced finalization incomplete`, and then the match-history write wait result.
+  A successful beta/mainline validation should also show `match recorded` with `outcome=aborted`
+  and `replay=true`, then Recent Matches should show `Aborted` with no winner and a working replay
+  launch. `shutdown match-history write wait timed out`, `shutdown forced finalization incomplete`,
+  or `failed to record match` means that drain event needs operator follow-up because a hard
+  platform kill can still prevent the replay upload.
 - **Replay incompatible with current schema/map/faction/loadout**: summaries show
   `replayAvailable: false` with a reason, and launch returns `409` with the same class of
   explanation. Build-SHA drift is warning-compatible (`replayAvailable: true` with a warning);

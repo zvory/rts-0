@@ -44,6 +44,10 @@ scope, or the lobby front-page table.
   Build-SHA mismatches stay launchable with a warning because replay playback is attempted across
   build drift.
 - **TLS to Supabase.** `DATABASE_URL` must include `?sslmode=require`.
+- **Drain-abort audit trail.** Interrupted deploy validation should find the forced-abort room log,
+  aggregate forced-finalization result, `match recorded` with `outcome=aborted`/`replay=true`, and
+  either completed write-wait evidence or no pending-write line. Write-wait timeout or failed
+  record logs are blockers until Recent Matches and replay launch are confirmed.
 
 ## Cross-capsule triggers
 - Changing `PlayerScore` → also update [protocol.md](protocol.md) and the score-screen renderer.

@@ -99,7 +99,7 @@ pub(super) struct RoomTask {
     /// connection id. Used when the notice is about room membership rather than sim events.
     pending_recipient_notices: HashMap<u32, Vec<Event>>,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
-    db: Option<Arc<Db>>,
+    match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
     /// When true, rows written by this room are hidden from non-localhost match-history reads.
     match_history_local_only: bool,
     /// Wall-clock start time of the currently-running match. `None` outside `Phase::InGame`.
@@ -122,7 +122,7 @@ impl RoomTask {
     pub(super) fn new(
         room: String,
         mode: RoomMode,
-        db: Option<Arc<Db>>,
+        match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
         match_history_local_only: bool,
         drain: DrainHandle,
     ) -> Self {
@@ -157,7 +157,7 @@ impl RoomTask {
             slow_tick_count: 0,
             pending_client_command_acks: Vec::new(),
             pending_recipient_notices: HashMap::new(),
-            db,
+            match_history_writer,
             match_history_local_only,
             match_started_at: None,
             match_run_id: None,
@@ -173,12 +173,18 @@ impl RoomTask {
     pub(super) fn new_with_lifecycle(
         room: String,
         mode: RoomMode,
-        db: Option<Arc<Db>>,
+        match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
         match_history_local_only: bool,
         drain: DrainHandle,
         lifecycle: RoomLifecycle,
     ) -> Self {
-        let mut task = Self::new(room, mode, db, match_history_local_only, drain);
+        let mut task = Self::new(
+            room,
+            mode,
+            match_history_writer,
+            match_history_local_only,
+            drain,
+        );
         task.lifecycle = Some(lifecycle);
         task
     }

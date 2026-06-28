@@ -605,7 +605,7 @@ pub struct Lobby {
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
     disposal_tx: mpsc::UnboundedSender<RoomDisposalRequest>,
     next_room_identity: Arc<AtomicU64>,
-    db: Option<Arc<Db>>,
+    match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
     match_history_local_only: bool,
     drain: DrainHandle,
     lab_scenario_submission: LabScenarioSubmissionService,
@@ -620,7 +620,7 @@ impl Lobby {
             rooms,
             disposal_tx,
             next_room_identity: Arc::new(AtomicU64::new(1)),
-            db: None,
+            match_history_writer: None,
             match_history_local_only: false,
             drain: DrainHandle::default(),
             lab_scenario_submission: LabScenarioSubmissionService::disabled(),
@@ -630,7 +630,7 @@ impl Lobby {
     /// Attach a database for match-history persistence. New rooms will inherit it; existing rooms
     /// (none at construction time) are unaffected.
     pub fn with_db(mut self, db: Option<Arc<Db>>) -> Self {
-        self.db = db;
+        self.match_history_writer = match_history_writes::writer_from_db(db);
         self.match_history_local_only = false;
         self
     }
@@ -638,7 +638,18 @@ impl Lobby {
     /// Attach a database for match-history persistence with the desired write visibility. New
     /// rooms inherit both the handle and scope; existing rooms are unaffected.
     pub fn with_match_history(mut self, db: Option<Arc<Db>>, local_only: bool) -> Self {
-        self.db = db;
+        self.match_history_writer = match_history_writes::writer_from_db(db);
+        self.match_history_local_only = local_only;
+        self
+    }
+
+    #[cfg(test)]
+    pub(in crate::lobby) fn with_match_history_writer_for_test(
+        mut self,
+        writer: Option<match_history_writes::SharedMatchHistoryWriter>,
+        local_only: bool,
+    ) -> Self {
+        self.match_history_writer = writer;
         self.match_history_local_only = local_only;
         self
     }
@@ -757,7 +768,7 @@ impl Lobby {
         rooms.insert(room.to_string(), handle.clone());
 
         let name = room.to_string();
-        let db = self.db.clone();
+        let match_history_writer = self.match_history_writer.clone();
         let match_history_local_only = self.match_history_local_only;
         let drain = self.drain.clone();
         let lab_scenario_submission = self.lab_scenario_submission.clone();
@@ -766,7 +777,7 @@ impl Lobby {
             let mut task = RoomTask::new_with_lifecycle(
                 name.clone(),
                 mode,
-                db,
+                match_history_writer,
                 match_history_local_only,
                 drain,
                 lifecycle,

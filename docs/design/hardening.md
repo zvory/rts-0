@@ -77,7 +77,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   current scores and replay artifact, queue a match-history row with `outcome = aborted` and no
   winner, and only then drop their active-match drain tracking. Non-eligible authoritative rooms
   ack without writing public history rows. Dev self-play/replay/scenario rooms are not tracked as
-  deploy blockers because they can intentionally run or auto-restart forever.
+  deploy blockers because they can intentionally run or auto-restart forever. Operators should
+  treat forced-finalization timeouts, match-history write wait timeouts, and `failed to record
+  match` logs as validation blockers for any interrupted live match, then confirm Recent Matches
+  shows `Aborted` and can launch the captured replay.
 - **Deploy asset hermeticity**: release Docker builds generate browser-loadable prediction WASM
   assets with `scripts/build-sim-wasm.sh` inside the builder image, then fail if
   `client/vendor/sim-wasm/rts_sim_wasm.js` or `rts_sim_wasm_bg.wasm` is missing or empty. These
