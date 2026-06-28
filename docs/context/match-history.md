@@ -25,12 +25,16 @@ scope, or the lobby front-page table.
 - **Detached write at `end_match`.** A slow Supabase write must never stall the room. Errors
   log and are dropped.
 - **Recording scope.** Beta/mainline writes are enabled only when `RTS_RECORD_MATCHES` is truthy.
-  Deployed normal matches, including solo, player-vs-AI, and AI-only matches, get replay-backed
-  rows unless they are dev/scenario/replay rooms or automated test fingerprints. Local `cargo run`
-  with the gate off can read history but does not upload rows or replay artifacts.
+  Deployed player-vs-AI and AI-only matches get replay-backed rows unless they are
+  dev/scenario/replay rooms or automated test fingerprints. One-human, no-AI sandbox matches are
+  recorded as debug sessions so their replays stay available for diagnostics without appearing in
+  Recent Matches. Local `cargo run` with the gate off can read history but does not upload rows or
+  replay artifacts.
 - **Recent Matches visibility.** `/api/matches` returns only rows with `human_count >= 1` and
-  `debug_mode = false`, so AI-only and historical debug rows can be stored for replay launch
-  without appearing in the lobby table. New live product rows always write `debug_mode = false`.
+  `debug_mode = false`, and explicitly suppresses historical one-human, one-participant rows. Solo
+  sandbox rows, AI-only rows, and historical debug rows can be stored for replay launch without
+  appearing in the lobby table. New live product rows write `debug_mode = false` except one-human,
+  no-AI sandbox rows, which write `true`.
 - **Score-screen schema.** `score_screen` is JSONB holding `Vec<PlayerScore>` from
   `contract::PlayerScore`. Adding fields requires no migration.
 - **Replay storage.** `match_replays.artifact_json` stores `ReplayArtifactV1`; summaries and

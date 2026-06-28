@@ -1,7 +1,7 @@
 use super::support::*;
 
 #[test]
-fn match_history_persistence_allows_solo_and_human_ai_matches() {
+fn match_history_persistence_marks_solo_matches_debug_and_allows_human_ai_matches() {
     let mut solo = RoomTask::new(
         "solo-history-test".to_string(),
         RoomMode::Normal,
@@ -13,6 +13,7 @@ fn match_history_persistence_allows_solo_and_human_ai_matches() {
     solo.match_human_count = 1;
     solo.match_participants = vec!["Player".to_string()];
     assert!(solo.should_persist_match_history());
+    assert!(solo.match_history_debug_mode());
 
     let mut human_ai = RoomTask::new(
         "human-ai-history-test".to_string(),
@@ -25,6 +26,7 @@ fn match_history_persistence_allows_solo_and_human_ai_matches() {
     human_ai.match_human_count = 1;
     human_ai.match_participants = vec!["Player".to_string(), "Computer 1".to_string()];
     assert!(human_ai.should_persist_match_history());
+    assert!(!human_ai.match_history_debug_mode());
 }
 
 #[test]
@@ -40,6 +42,7 @@ fn match_history_persistence_allows_ai_only_but_skips_test_matches() {
     ai_only.match_human_count = 0;
     ai_only.match_participants = vec!["Computer 1".to_string(), "Computer 2".to_string()];
     assert!(ai_only.should_persist_match_history());
+    assert!(!ai_only.match_history_debug_mode());
 
     let mut smoke = RoomTask::new(
         "smoke-history-test".to_string(),
