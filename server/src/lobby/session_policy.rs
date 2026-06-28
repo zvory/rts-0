@@ -39,6 +39,7 @@ pub(super) enum StateSource {
 pub(super) enum JoinPolicy {
     NormalLobby,
     LiveSpectatorAttach,
+    ReplayLobby,
     ReplayPromptOrAttach,
     BranchStaging,
     BranchLiveAttach,
@@ -468,18 +469,23 @@ impl SessionPolicy {
             SessionMode::Replay => {
                 if phase == SessionPhase::Lobby {
                     policy.state_source = StateSource::PersistedReplayArtifact;
+                    policy.join = JoinPolicy::ReplayLobby;
                     policy.clock = ClockCapability::ROOM_TICKER;
+                    policy.authority = AuthorityPolicy::LobbyHost;
                     policy.mutation = MutationPolicy::None;
                     policy.visibility = VisibilityPolicy::LobbyState;
                     policy.diagnostics = DiagnosticPolicy::NONE;
+                    policy.affordance = AffordancePolicy::Lobby;
+                    policy.start_payload = StartPayloadPolicy::None;
+                } else {
+                    policy.join = JoinPolicy::ReplayPromptOrAttach;
+                    policy.authority = AuthorityPolicy::ReplayViewers;
+                    policy.affordance = AffordancePolicy::ReplayViewer;
+                    policy.start_payload = StartPayloadPolicy::ReplayViewer;
                 }
-                policy.join = JoinPolicy::ReplayPromptOrAttach;
-                policy.authority = AuthorityPolicy::ReplayViewers;
                 policy.export = ExportPolicy::NONE;
-                policy.affordance = AffordancePolicy::ReplayViewer;
                 policy.persistence = PersistencePolicy::NONE;
                 policy.drain = SessionDrainPolicy::NoAuthoritativeSession;
-                policy.start_payload = StartPayloadPolicy::ReplayViewer;
                 policy.countdown_eligible = false;
             }
             SessionMode::ReplayArtifact => {
@@ -597,6 +603,10 @@ impl SessionPolicy {
         self.join == JoinPolicy::ReplayPromptOrAttach
     }
 
+    pub(super) fn uses_replay_lobby_join(self) -> bool {
+        self.join == JoinPolicy::ReplayLobby
+    }
+
     pub(super) fn uses_branch_staging_join(self) -> bool {
         self.join == JoinPolicy::BranchStaging
     }
@@ -614,8 +624,9 @@ impl SessionPolicy {
     }
 
     pub(super) fn is_public_lobby_browser_room(self) -> bool {
-        self.mode == SessionMode::Normal
-            && matches!(self.phase, SessionPhase::Lobby | SessionPhase::LiveMatch)
+        (self.mode == SessionMode::Normal
+            && matches!(self.phase, SessionPhase::Lobby | SessionPhase::LiveMatch))
+            || (self.mode == SessionMode::Replay && self.phase == SessionPhase::Lobby)
     }
 
     pub(super) fn allows_match_history(self) -> bool {
@@ -867,16 +878,16 @@ mod tests {
                 mode: SessionMode::Replay,
                 phase: SessionPhase::Lobby,
                 state_source: StateSource::PersistedReplayArtifact,
-                join: JoinPolicy::ReplayPromptOrAttach,
+                join: JoinPolicy::ReplayLobby,
                 clock: ClockCapability::ROOM_TICKER,
-                authority: AuthorityPolicy::ReplayViewers,
+                authority: AuthorityPolicy::LobbyHost,
                 visibility: VisibilityPolicy::LobbyState,
                 mutation: MutationPolicy::None,
                 diagnostics: DiagnosticPolicy::NONE,
                 export: ExportPolicy::NONE,
-                affordance: AffordancePolicy::ReplayViewer,
+                affordance: AffordancePolicy::Lobby,
                 persistence: PersistencePolicy::NONE,
-                start_payload: StartPayloadPolicy::ReplayViewer,
+                start_payload: StartPayloadPolicy::None,
                 countdown_eligible: false,
             },
             CapabilityCase {
@@ -1161,13 +1172,13 @@ mod tests {
     fn session_policy_classifies_dedicated_replay_rooms() {
         let persisted = SessionPolicy::new(SessionMode::Replay, SessionPhase::Lobby);
         assert_eq!(persisted.state_source, StateSource::PersistedReplayArtifact);
-        assert_eq!(persisted.join, JoinPolicy::ReplayPromptOrAttach);
+        assert_eq!(persisted.join, JoinPolicy::ReplayLobby);
         assert_eq!(persisted.clock, ClockCapability::ROOM_TICKER);
-        assert_eq!(persisted.authority, AuthorityPolicy::ReplayViewers);
+        assert_eq!(persisted.authority, AuthorityPolicy::LobbyHost);
         assert_eq!(persisted.visibility, VisibilityPolicy::LobbyState);
         assert_eq!(persisted.mutation, MutationPolicy::None);
         assert_eq!(persisted.persistence, PersistencePolicy::NONE);
-        assert_eq!(persisted.start_payload, StartPayloadPolicy::ReplayViewer);
+        assert_eq!(persisted.start_payload, StartPayloadPolicy::None);
         assert!(!persisted.countdown_eligible);
         assert!(!persisted.allows_match_history());
         assert!(!persisted.has_authoritative_mutation());

@@ -402,7 +402,7 @@ fn replay_vision_switch_replaces_memory_and_resource_scope() {
 }
 
 #[test]
-fn persisted_replay_room_join_prompts_before_playback() {
+fn persisted_replay_room_join_waits_in_spectator_lobby() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 3);
     let mut task = RoomTask::new(
@@ -417,17 +417,30 @@ fn persisted_replay_room_join_prompts_before_playback() {
 
     task.on_join(99, "Viewer".to_string(), false, false, msg_tx, ack);
 
-    assert_eq!(ack_rx.try_recv(), Ok(false));
+    assert_eq!(ack_rx.try_recv(), Ok(true));
     assert!(matches!(task.phase, Phase::Lobby));
-    assert!(!task.players.contains_key(&99));
+    assert!(task.players.get(&99).is_some_and(|p| p.spectator));
+    assert_eq!(task.host_id, Some(99));
     assert!(matches!(
         writer.reliable_rx.try_recv().unwrap(),
-        ServerMessage::JoinReplayPrompt { room } if room == "persisted-replay-test"
+        ServerMessage::Lobby {
+            room,
+            kind: crate::protocol::LobbyKind::Replay,
+            players,
+            can_start: true,
+            map,
+            maps,
+            ..
+        } if room == "persisted-replay-test"
+            && players.len() == 1
+            && players[0].is_spectator
+            && map == "Default"
+            && maps.is_empty()
     ));
 }
 
 #[test]
-fn persisted_replay_room_confirmed_join_starts_replay_viewer() {
+fn persisted_replay_room_host_start_begins_replay_viewer() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 3);
     let mut task = RoomTask::new(
@@ -443,6 +456,18 @@ fn persisted_replay_room_confirmed_join_starts_replay_viewer() {
     task.on_join(99, "Viewer".to_string(), false, true, msg_tx, ack);
 
     assert_eq!(ack_rx.try_recv(), Ok(true));
+    assert!(matches!(task.phase, Phase::Lobby));
+    assert!(matches!(
+        writer.reliable_rx.try_recv().unwrap(),
+        ServerMessage::Lobby {
+            kind: crate::protocol::LobbyKind::Replay,
+            can_start: true,
+            ..
+        }
+    ));
+
+    task.on_start_request(99);
+
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
     assert!(task.players.get(&99).is_some_and(|p| p.spectator));
     assert!(matches!(
@@ -477,6 +502,85 @@ fn persisted_replay_room_confirmed_join_starts_replay_viewer() {
         ServerMessage::ObserverAnalysis(analysis)
             if analysis.tick == expected.tick && analysis.players.len() == players.len()
     )));
+}
+
+#[test]
+fn persisted_replay_lobby_ignores_active_seat_controls() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 3);
+    let mut task = RoomTask::new(
+        "persisted-replay-controls-test".to_string(),
+        RoomMode::Replay { artifact },
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+    task.on_join(99, "Viewer".to_string(), false, false, msg_tx, ack);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    let _ = writer.reliable_rx.try_recv();
+
+    task.on_ready(99, false);
+    task.on_set_spectator(99, 99, false);
+    task.on_set_team(99, 99, 2);
+    task.on_set_faction(99, EKAT_FACTION_ID.to_string());
+    task.on_add_ai(99, Some(2), None);
+    task.on_select_map(99, "No Terrain".to_string());
+
+    let player = task.players.get(&99).expect("viewer should remain present");
+    assert!(player.spectator);
+    assert!(player.ready);
+    assert!(task.ai_players.is_empty());
+    assert!(!task.human_team_assignments.contains_key(&99));
+    assert!(!task.human_faction_assignments.contains_key(&99));
+    assert_eq!(task.selected_map, "Default");
+    assert!(matches!(task.phase, Phase::Lobby));
+}
+
+#[test]
+fn persisted_replay_lobby_start_is_blocked_during_drain() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 3);
+    let drain = DrainHandle::default();
+    drain.begin_draining(Duration::from_secs(295));
+    let mut task = RoomTask::new(
+        "persisted-replay-drain-test".to_string(),
+        RoomMode::Replay { artifact },
+        None,
+        false,
+        drain,
+    );
+    let (msg_tx, mut writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+    task.on_join(99, "Viewer".to_string(), true, false, msg_tx, ack);
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    let join_messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(join_messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::ShutdownWarning { .. })));
+    assert!(join_messages.iter().any(|msg| matches!(
+        msg,
+        ServerMessage::Lobby {
+            kind: crate::protocol::LobbyKind::Replay,
+            can_start: false,
+            ..
+        }
+    )));
+
+    task.on_start_request(99);
+
+    assert!(matches!(task.phase, Phase::Lobby));
+    let start_messages: Vec<_> =
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(start_messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Error { msg } if msg.contains("draining"))));
+    assert!(!start_messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
 }
 
 #[test]

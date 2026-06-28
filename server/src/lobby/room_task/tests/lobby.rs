@@ -9,6 +9,7 @@ fn lobby_summary_reports_open_waiting_room_state() {
         .expect("normal hosted lobby should be summarized");
 
     assert_eq!(summary.room, "open-summary");
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Normal);
     assert_eq!(summary.host_name.as_deref(), Some("Player 1"));
     assert_eq!(summary.map, "Default");
     assert_eq!(summary.created_at_unix_ms, 123_456);
@@ -70,9 +71,40 @@ fn lobby_summary_includes_live_normal_rooms_as_non_joinable() {
 }
 
 #[test]
-fn lobby_summary_hides_internal_room_modes() {
+fn lobby_summary_marks_persisted_replay_lobbies() {
     let replay_players = replay_test_players(2);
     let (_live, replay_artifact) = replay_test_artifact(&replay_players, 0);
+
+    let mut persisted_replay = RoomTask::new(
+        "__match_replay__:00000001".to_string(),
+        RoomMode::Replay {
+            artifact: replay_artifact,
+        },
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    persisted_replay.created_at_unix_ms = 123_456;
+    persisted_replay.host_id = Some(1);
+    add_test_room_spectator(&mut persisted_replay, 1);
+
+    let summary = persisted_replay
+        .lobby_summary()
+        .expect("persisted replay staging lobby should be summarized");
+
+    assert_eq!(summary.room, "__match_replay__:00000001");
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
+    assert_eq!(summary.map, "Default");
+    assert_eq!(summary.occupied_slots, 0);
+    assert_eq!(summary.max_slots, 0);
+    assert_eq!(summary.spectator_count, 1);
+    assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
+    assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
+}
+
+#[test]
+fn lobby_summary_hides_internal_room_modes() {
+    let replay_players = replay_test_players(2);
     let branch_seed = replay_branch_test_seed(&replay_players, 0);
 
     let mut lab = RoomTask::new(
@@ -98,19 +130,6 @@ fn lobby_summary_hides_internal_room_modes() {
     saved_replay.host_id = Some(1);
     add_test_room_spectator(&mut saved_replay, 1);
     assert!(saved_replay.lobby_summary().is_none());
-
-    let mut persisted_replay = RoomTask::new(
-        "__match_replay__:00000001".to_string(),
-        RoomMode::Replay {
-            artifact: replay_artifact,
-        },
-        None,
-        false,
-        DrainHandle::default(),
-    );
-    persisted_replay.host_id = Some(1);
-    add_test_room_spectator(&mut persisted_replay, 1);
-    assert!(persisted_replay.lobby_summary().is_none());
 
     let mut branch = RoomTask::new(
         "__replay_branch__:00000001".to_string(),

@@ -629,6 +629,7 @@ async fn lobby_summaries_collect_browser_safe_rows_from_room_tasks() {
         .expect("joined normal lobby should be summarized");
 
     assert_eq!(summary.host_name.as_deref(), Some("Browser Host"));
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Normal);
     assert_eq!(summary.phase, LobbySummaryPhase::Lobby);
     assert_eq!(summary.join_state, LobbyJoinState::Open);
     assert_eq!(summary.occupied_slots, 1);
@@ -732,7 +733,7 @@ async fn empty_recreatable_internal_rooms_are_disposed_and_hidden_from_browser()
 }
 
 #[tokio::test]
-async fn empty_persisted_replay_room_is_disposed_and_hidden_from_browser() {
+async fn empty_persisted_replay_room_is_disposed_after_visible_staging_lobby() {
     let lobby = Lobby::new();
     let room = lobby
         .create_replay_room(registry_test_replay_artifact())
@@ -743,11 +744,16 @@ async fn empty_persisted_replay_room_is_disposed_and_hidden_from_browser() {
         .expect("created replay room should be joinable");
     let _writer = join_room_handle_with_replay_ok(&handle, 7100, "Replay Viewer", true, true).await;
 
-    assert!(lobby
-        .summaries()
-        .await
+    let summaries = lobby.summaries().await;
+    let summary = summaries
         .iter()
-        .all(|summary| summary.room != room));
+        .find(|summary| summary.room == room)
+        .expect("occupied persisted replay staging lobby should be browser-visible");
+    assert_eq!(summary.kind, crate::protocol::LobbyKind::Replay);
+    assert_eq!(summary.occupied_slots, 0);
+    assert_eq!(summary.max_slots, 0);
+    assert_eq!(summary.spectator_count, 1);
+    assert_eq!(summary.join_state, LobbyJoinState::FullSpectatorOnly);
 
     handle
         .event_tx
