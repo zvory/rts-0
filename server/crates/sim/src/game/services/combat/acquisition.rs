@@ -14,9 +14,7 @@ use crate::rules::terrain::{self, TerrainKind};
 
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::projection::friendly_hard_blocker_between;
-use super::weapons::{
-    can_fire_while_moving, effective_attack_profile, moving_fire_movement_order_holds_path,
-};
+use super::weapons::{effective_attack_profile, moving_fire_movement_order_holds_path};
 
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
@@ -31,19 +29,30 @@ pub(super) enum CombatMode {
     Passive,
 }
 
-pub(super) fn combat_mode(e: &Entity) -> CombatMode {
+pub(super) fn combat_mode_with_moving_fire(e: &Entity, can_fire_while_moving: bool) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::HoldPosition => CombatMode::Opportunistic,
-        Order::AttackMove(_) if moving_fire_movement_order_holds_path(e) => {
+        Order::AttackMove(_) if moving_fire_movement_order_holds_path(e, can_fire_while_moving) => {
             CombatMode::Opportunistic
         }
         Order::AttackMove(_) => CombatMode::Aggressive,
-        Order::Move(_) if can_fire_while_moving(e) => CombatMode::Opportunistic,
+        Order::Move(_) if can_fire_while_moving => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
         Order::Idle if e.is_unit() && !is_passive_idle_unit(e.kind) => CombatMode::Aggressive,
         _ => CombatMode::Passive,
     }
+}
+
+#[cfg(test)]
+pub(super) fn combat_mode(e: &Entity) -> CombatMode {
+    combat_mode_with_moving_fire(
+        e,
+        super::weapons::can_fire_while_moving(
+            e,
+            super::weapons::legacy_charge_grants_moving_fire_for_tests(e),
+        ),
+    )
 }
 
 fn is_passive_idle_unit(kind: EntityKind) -> bool {
@@ -67,6 +76,7 @@ pub(super) fn resolve_target(
     py: f32,
     acquire_px: f32,
     mode: CombatMode,
+    attacker_can_fire_while_moving: bool,
     target_filter: &dyn Fn(u32) -> bool,
 ) -> Option<u32> {
     if smokes.point_inside(px, py) {
@@ -104,7 +114,7 @@ pub(super) fn resolve_target(
         attacker_is_vehicle_body: movement_body_class(attacker.kind)
             == MovementBodyClass::VehicleBody,
         attacker_weapon_class: combat_rules::weapon_class(attacker.kind),
-        can_retain_moving_target: can_fire_while_moving(attacker),
+        can_retain_moving_target: attacker_can_fire_while_moving,
     };
     let weapon_range_px = weapon_range_px(attacker);
     let candidates = legal_target_candidates(

@@ -167,19 +167,27 @@ pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
         || (e.kind == EntityKind::Artillery && !matches!(e.weapon_setup(), WeaponSetup::Packed))
 }
 
-pub(super) fn can_fire_while_moving(e: &Entity) -> bool {
+pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
-        || (e.kind == EntityKind::Rifleman && e.charge_ticks() > 0)
+        || (e.kind == EntityKind::Rifleman && methamphetamines_researched)
 }
 
 pub(super) fn uses_vehicle_weapon_policy(e: &Entity) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
 }
 
-pub(super) fn moving_fire_movement_order_holds_path(e: &Entity) -> bool {
-    can_fire_while_moving(e)
+pub(super) fn moving_fire_movement_order_holds_path(
+    e: &Entity,
+    can_fire_while_moving: bool,
+) -> bool {
+    can_fire_while_moving
         && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
         && !matches!(e.move_phase(), Some(MovePhase::Arrived))
+}
+
+#[cfg(test)]
+pub(super) fn legacy_charge_grants_moving_fire_for_tests(e: &Entity) -> bool {
+    e.kind == EntityKind::Rifleman && e.charge_ticks() > 0
 }
 
 pub(super) fn moving_fire_miss_chance(_e: &Entity) -> f32 {

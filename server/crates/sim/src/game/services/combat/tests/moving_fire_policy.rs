@@ -62,6 +62,81 @@ fn moving_fire_attack_move_keeps_commanded_goal_when_enemy_out_of_range() {
 }
 
 #[test]
+fn meth_rifleman_movement_orders_do_not_chase_targets_outside_weapon_range() {
+    for attack_move in [false, true] {
+        let mut entities = EntityStore::new();
+        let rifleman_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(rifleman) = entities.get_mut(rifleman_id) {
+            if attack_move {
+                rifleman.set_order(Order::attack_move_to(400.0, 100.0));
+            } else {
+                rifleman.set_order(Order::move_to(400.0, 100.0));
+            }
+            rifleman.set_path(vec![(400.0, 100.0)]);
+            rifleman.set_path_goal(Some((400.0, 100.0)));
+            rifleman.mark_move_phase(MovePhase::Moving);
+            assert_eq!(rifleman.charge_ticks(), 0);
+        }
+
+        let map = open_map(20);
+        let mut meth_player = player_state(1, false);
+        meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
+        run_combat_tick_on_map(
+            &mut entities,
+            &[meth_player, player_state(2, false)],
+            &map,
+        );
+
+        let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
+        assert_eq!(
+            rifleman.target_id(),
+            None,
+            "meth riflemen should not acquire out-of-range targets on attack_move={attack_move}"
+        );
+        assert_eq!(rifleman.path_goal(), Some((400.0, 100.0)));
+        assert_eq!(rifleman.next_waypoint(), Some((400.0, 100.0)));
+    }
+}
+
+#[test]
+fn meth_rifleman_chase_goal_uses_target_center_without_vehicle_standoff() {
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 288.0, 100.0)
+        .expect("enemy should spawn");
+    let map = open_map(20);
+    let rifleman = entities
+        .get(rifleman_id)
+        .expect("rifleman should exist");
+    let enemy = entities.get(enemy_id).expect("enemy should exist");
+    let profile = combat_rules::attack_profile(EntityKind::Rifleman);
+    let range_px =
+        profile.range_tiles as f32 * config::TILE_SIZE as f32 + rifleman.radius() + RANGE_SLACK;
+    let goal = chase_goal_for_target(
+        &map,
+        &entities,
+        rifleman_id,
+        (100.0, 100.0),
+        (enemy.pos_x, enemy.pos_y),
+        range_px,
+        dist2(100.0, 100.0, enemy.pos_x, enemy.pos_y).sqrt(),
+    );
+    assert_eq!(
+        goal,
+        (enemy.pos_x, enemy.pos_y),
+        "meth riflemen should not route direct attacks through vehicle standoff policy"
+    );
+}
+
+#[test]
 fn non_moving_fire_attack_move_still_chases_out_of_range_targets() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities

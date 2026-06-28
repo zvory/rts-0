@@ -69,7 +69,7 @@ pub(super) fn advance_moving_units(
             } else if e.kind == EntityKind::MachineGunner
                 && players
                     .iter()
-                    .any(|p| p.id == e.owner && p.upgrades.contains(&UpgradeKind::Methamphetamines))
+                    .any(|p| p.id == e.owner && p.has_upgrade(UpgradeKind::Methamphetamines))
             {
                 config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER
             } else {

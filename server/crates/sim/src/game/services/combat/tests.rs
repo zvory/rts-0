@@ -206,11 +206,17 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
             .iter()
             .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast))
     };
+    let methamphetamines_researched = |owner| {
+        players
+            .iter()
+            .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::Methamphetamines))
+    };
     combat_system(
         map,
         entities,
         &teams,
         &mortar_autocast_researched,
+        &methamphetamines_researched,
         &occ,
         &spatial,
         &mut coordinator,
@@ -1191,11 +1197,13 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
 
     let mut rng = SmallRng::seed_from_u64(0);
     let mortar_autocast_researched = |_owner| false;
+    let methamphetamines_researched = |_owner| false;
     combat_system(
         &map,
         &mut entities,
         &TeamRelations::from_player_teams([(1, 1)]),
         &mortar_autocast_researched,
+        &methamphetamines_researched,
         &occ,
         &spatial,
         &mut coordinator,
@@ -1405,7 +1413,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
 }
 
 #[test]
-fn rifleman_attack_move_without_charge_holds_position_while_firing() {
+fn rifleman_attack_move_without_meth_holds_position_while_firing() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -1425,38 +1433,46 @@ fn rifleman_attack_move_without_charge_holds_position_while_firing() {
     assert_eq!(rifleman.target_id(), Some(enemy_id));
     assert!(
         rifleman.path_is_empty(),
-        "non-charged riflemen should still stop while firing"
+        "unupgraded riflemen should still stop while firing"
     );
 }
 
 #[test]
-fn charged_rifleman_move_order_keeps_path_while_firing() {
+fn meth_rifleman_move_order_keeps_path_while_firing_without_charge_state() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("rifleman should spawn");
     let enemy_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 100.0, 120.0)
         .expect("enemy should spawn");
     if let Some(rifleman) = entities.get_mut(rifleman_id) {
         rifleman.set_order(Order::move_to(300.0, 100.0));
         rifleman.set_path(vec![(300.0, 100.0)]);
         rifleman.set_path_goal(Some((300.0, 100.0)));
-        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+        assert_eq!(rifleman.charge_ticks(), 0);
     }
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
 
-    run_combat_tick(&mut entities);
+    let mut meth_player = player_state(1, false);
+    meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
+    run_combat_tick_with_players(&mut entities, &[meth_player, player_state(2, false)]);
 
     let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     assert_eq!(rifleman.target_id(), Some(enemy_id));
     assert!(
         !rifleman.path_is_empty(),
-        "charged riflemen should keep their movement path while firing"
+        "meth riflemen should keep their movement path while firing"
+    );
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp.saturating_sub(5),
+        "meth riflemen should fire immediately without a vehicle turret alignment gate"
     );
 }
 
 #[test]
-fn moving_charged_rifleman_does_not_take_miss_penalty() {
+fn meth_rifleman_attack_move_order_keeps_path_while_firing() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -1465,19 +1481,27 @@ fn moving_charged_rifleman_does_not_take_miss_penalty() {
         .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
         .expect("enemy should spawn");
     if let Some(rifleman) = entities.get_mut(rifleman_id) {
-        rifleman.set_order(Order::move_to(300.0, 100.0));
+        rifleman.set_order(Order::attack_move_to(300.0, 100.0));
         rifleman.set_path(vec![(300.0, 100.0)]);
         rifleman.set_path_goal(Some((300.0, 100.0)));
-        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
     }
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
 
-    run_combat_tick(&mut entities);
+    let mut meth_player = player_state(1, false);
+    meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
+    run_combat_tick_with_players(&mut entities, &[meth_player, player_state(2, false)]);
+
+    let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
+    assert_eq!(rifleman.target_id(), Some(enemy_id));
+    assert!(
+        !rifleman.path_is_empty(),
+        "meth riflemen should keep their attack-move path while firing"
+    );
 
     assert_eq!(
         entities.get(enemy_id).expect("enemy should exist").hp,
         enemy_hp.saturating_sub(5),
-        "moving charged riflemen should fire with normal accuracy"
+        "moving meth riflemen should fire with normal accuracy"
     );
 }
 
