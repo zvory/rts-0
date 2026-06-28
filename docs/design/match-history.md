@@ -220,5 +220,9 @@ existing JSONB blob is unaffected.
   params. Index on `map_name` already exists.
 - **Leaderboard**: a separate aggregate query is fine; do not denormalize into `matches` until
   there's a real perf reason.
+- **Playable resume from replay**: keep this separate from replay staging. A resume contract needs
+  explicit original-seat claiming, faction/loadout validation for those seats, and a transition
+  from spectator replay playback to a playable branch/resume room. Group replay lobbies stay
+  spectator-only until that contract exists.
 - **Crash-safety**: if matches start dropping due to DB outages, add a small bounded
   in-memory outbox in `Db`. Not worth it today.

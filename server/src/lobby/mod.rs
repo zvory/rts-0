@@ -63,11 +63,15 @@ mod snapshots;
 mod tick_control;
 
 pub use connection::{ConnectionReportStats, ConnectionSink, ConnectionWriter};
-use dev_replay::room_mode_for;
+use dev_replay::{load_replay_artifact, room_mode_for};
 pub use match_history_writes::MatchHistoryWriteWaitResult;
 pub use replay_validation::faction_loadout_incompatibility_reason as replay_faction_loadout_incompatibility_reason;
 use room_task::{RoomMode, RoomTask};
 pub(crate) use snapshots::compact_snapshot_for_wire;
+
+pub fn load_saved_replay_artifact(name: &str) -> Result<ReplayArtifactV1, String> {
+    load_replay_artifact(name)
+}
 
 /// Player colors, assigned in colorblind-safer order. MUST match `client/src/config.js`
 /// `PLAYER_PALETTE`.

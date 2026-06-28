@@ -1002,6 +1002,8 @@ disabled.
 hands the returned `__match_replay__:*` room to `App`/`Lobby.joinReplayLobby` instead of redirecting
 the page into replay playback. Direct `replayArtifact` URLs still auto-join the saved artifact
 playback path; `replayRoom` URLs represent replay staging lobbies.
+The replay lobby UI is group-watch only: future playable resume work needs separate seat-claim
+controls and must not infer playable seats from replay lobby occupants or hidden active rows.
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
 `window.location`, and shows `Lobby`; on `start` it creates `Match` or `ReplayViewer`. `match.js` builds
