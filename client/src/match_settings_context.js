@@ -41,7 +41,7 @@ export function buildMatchSettingsContext({
     replay: !!replayViewer,
     actions: [
       buildPauseAction({
-        visible: !spectator && capabilities.matchControls?.pause && !livePauseState.paused,
+        visible: capabilities.matchControls?.pause && !livePauseState.paused,
         disabled: !livePauseState.canPause,
         label: livePauseActionLabel?.() || "Pause",
         title: livePauseActionTitle?.() || "",

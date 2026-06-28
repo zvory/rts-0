@@ -299,18 +299,20 @@ alive.
   observer-analysis recipient scopes; `SnapshotFanout`
   owns compacting, net status, and perf accounting. Lobby phase: broadcast `lobby` on changes.
 - Live-match pause state belongs to `RoomTask`, not `Game` and not `tick_control.rs`. Normal live
-  and branch-live active seats can spend up to three successful pause starts per match; spectators,
-  replay viewers, dev-watch viewers, and lab viewers cannot spend pauses. While paused, the room
+  and branch-live active seats plus live spectator connections can spend up to three successful
+  pause starts per match; replay viewers, dev-watch viewers, lab viewers, and AI-only room-time
+  viewers cannot spend live-match pauses. While paused, the room
   event loop continues handling reliable control messages, Give up, disconnects, and unpause, but
   the live scheduled tick returns before constructing `LiveTickDriver`, so AI thinking,
   command-ack consumption, `Game::tick`, snapshot fanout, and defeat checks do not advance.
   `prepare_live_match_launch`, live-match teardown/replay transition, and empty-room reset all
   clear pause counters and paused state.
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
-  read-only live spectator attach. Spectators receive `StartPayload.spectator = true` and live
+  gameplay-read-only live spectator attach with shared pause controls. Spectators receive
+  `StartPayload.spectator = true` and live
   `game.snapshot_for_spectator(active_player_ids)` snapshots plus event unions for those active
   player buckets, with per-player position-free non-alert notices filtered out, but are not
-  included in `PlayerInit`, command routing, elimination, pause authority, or match-player counts.
+  included in `PlayerInit`, command routing, elimination, or match-player counts.
   `RoomTask` captures the existing connected recipient ids before inserting a late spectator and
   queues a room-owned
   position-free info notice for those recipients only: `<name> has joined the match as a

@@ -655,15 +655,17 @@ impl SessionPolicy {
     }
 
     pub(super) fn start_capabilities(self, gameplay_commands: bool) -> RoomCapabilities {
+        let fixed_realtime_live_pause = matches!(
+            self.clock,
+            ClockCapability::FixedRealtime(ClockTickSource::LiveMatch)
+        ) && matches!(
+            self.mutation,
+            MutationPolicy::LiveGameplayCommands | MutationPolicy::BranchLiveSeatAliasGameplay
+        );
         RoomCapabilities {
             room_time: self.room_time_capabilities(),
             match_controls: MatchControlCapabilities {
-                pause: gameplay_commands
-                    && matches!(
-                        self.mutation,
-                        MutationPolicy::LiveGameplayCommands
-                            | MutationPolicy::BranchLiveSeatAliasGameplay
-                    ),
+                pause: fixed_realtime_live_pause,
             },
             visibility: VisibilityCapabilities {
                 vision_selection: self.visibility == VisibilityPolicy::SelectablePerspective,
@@ -990,7 +992,7 @@ mod tests {
         assert!(live.start_capabilities(true).commands.gameplay);
         assert!(live.start_capabilities(true).match_controls.pause);
         assert!(!live.start_capabilities(false).commands.gameplay);
-        assert!(!live.start_capabilities(false).match_controls.pause);
+        assert!(live.start_capabilities(false).match_controls.pause);
         assert!(!live.start_capabilities(true).room_time.available);
 
         let ai_only_live = live.with_context(SessionPolicyContext {
@@ -1037,7 +1039,7 @@ mod tests {
 
         let branch = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::LiveMatch);
         assert!(branch.start_capabilities(true).match_controls.pause);
-        assert!(!branch.start_capabilities(false).match_controls.pause);
+        assert!(branch.start_capabilities(false).match_controls.pause);
 
         let lab = SessionPolicy::new(SessionMode::Lab, SessionPhase::LiveMatch);
         let lab_caps = lab.start_capabilities(false);

@@ -974,7 +974,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     startPayload: {
       spectator: true,
       diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
-      capabilities: { commands: { gameplay: false } },
+      capabilities: { commands: { gameplay: false }, matchControls: { pause: true } },
     },
   });
   assert(!spectatorCapabilities.commands.gameplay, "spectators get read-only command affordances");
@@ -982,7 +982,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     spectatorCapabilities.diagnostics.movementPaths === MOVEMENT_PATH_DIAGNOSTICS.ALL,
     "capability parser keeps diagnostic affordances from the start payload",
   );
-  assert(!spectatorCapabilities.matchControls.pause, "spectators do not get live pause controls by default");
+  assert(spectatorCapabilities.matchControls.pause, "spectators keep advertised live pause controls");
 
   withFakeOverlayDocument(({ FakeElement }) => {
     const root = new FakeElement("section");
@@ -992,11 +992,11 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(root.children.length === 1, "live pause overlay mounts generated DOM");
     assert(!root.children[0].hidden, "live pause overlay shows when paused");
     const button = root.querySelector("#live-pause-unpause");
-    assert(button && !button.hidden && !button.disabled, "live pause overlay enables unpause for active players");
+    assert(button && !button.hidden && !button.disabled, "live pause overlay enables unpause for pause-authorized viewers");
     button.listeners.click();
     assert(unpaused, "live pause overlay calls injected unpause action");
     overlay.applyLivePauseState({ paused: true, canUnpause: false });
-    assert(button.hidden && button.disabled, "live pause overlay hides spectator unpause control");
+    assert(button.hidden && button.disabled, "live pause overlay hides unpause without authority");
     overlay.applyLivePauseState({ paused: false });
     assert(root.children[0].hidden, "live pause overlay hides when running");
     overlay.destroy();

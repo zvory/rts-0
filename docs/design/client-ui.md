@@ -614,7 +614,8 @@ spectator, and replay contexts through dependency-injected collaborators. The st
 inside the settings mount point are `#pointer-lock-toggle`, `#debug-path-toggle`, and
 `#give-up-open` plus live-match action `#live-pause-open`; they may not exist until their owning
 tab/action is visible. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
-`livePauseState` messages; the overlay is read-only for spectators and destroyed with the match.
+`livePauseState` messages; the overlay exposes resume only when the server grants
+`canUnpause` and is destroyed with the match.
 
 `state.js`
 ```js

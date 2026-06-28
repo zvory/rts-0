@@ -160,7 +160,7 @@ fn live_spectator_union_filters_owner_private_command_notices() {
 }
 
 #[test]
-fn live_pause_authorizes_active_players_and_tracks_limit() {
+fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
     let mut task = RoomTask::new(
         "live-pause-authority-test".to_string(),
         RoomMode::Normal,
@@ -178,7 +178,23 @@ fn live_pause_authorizes_active_players_and_tracks_limit() {
     while writer_spectator.reliable_rx.try_recv().is_ok() {}
 
     task.on_pause_game(99);
-    assert!(!task.live_paused, "spectators must not pause live matches");
+    assert!(task.live_paused, "spectators can pause live matches");
+    assert_eq!(task.live_paused_by, Some(99));
+    assert_eq!(task.live_pause_counts.get(&99), Some(&1));
+    let spectator_pause_state = std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok())
+        .find_map(|msg| match msg {
+            ServerMessage::LivePauseState(state) => Some(state),
+            _ => None,
+        })
+        .expect("spectator pause state");
+    assert_eq!(spectator_pause_state.pauses_remaining, Some(2));
+    assert!(!spectator_pause_state.can_pause);
+    assert!(spectator_pause_state.can_unpause);
+    task.on_unpause_game(99);
+    assert!(!task.live_paused, "spectators can unpause live matches");
+    while writer_a.reliable_rx.try_recv().is_ok() {}
+    while writer_b.reliable_rx.try_recv().is_ok() {}
+    while writer_spectator.reliable_rx.try_recv().is_ok() {}
 
     task.on_pause_game(1);
     assert!(task.live_paused);
@@ -199,8 +215,8 @@ fn live_pause_authorizes_active_players_and_tracks_limit() {
             _ => None,
         })
         .expect("spectator pause state");
-    assert_eq!(spectator_state.pauses_remaining, None);
-    assert!(!spectator_state.can_unpause);
+    assert_eq!(spectator_state.pauses_remaining, Some(2));
+    assert!(spectator_state.can_unpause);
 
     task.on_pause_game(1);
     assert_eq!(
@@ -353,7 +369,7 @@ fn normal_live_start_payloads_stamp_active_players_and_spectators() {
     assert!(spectator_payload.prediction_build_id.is_none());
     assert_eq!(spectator_payload.prediction_version, 0);
     assert!(!spectator_payload.capabilities.commands.gameplay);
-    assert!(!spectator_payload.capabilities.match_controls.pause);
+    assert!(spectator_payload.capabilities.match_controls.pause);
     assert!(!spectator_payload.capabilities.room_time.available);
     assert!(!spectator_payload.capabilities.visibility.vision_selection);
     assert!(!spectator_payload.capabilities.actions.branch_from_tick);
@@ -478,7 +494,7 @@ fn ai_only_live_room_time_speed_and_pause_control_tick_rate_without_seek() {
 }
 
 #[test]
-fn normal_live_spectator_start_payload_is_read_only() {
+fn normal_live_spectator_start_payload_has_pause_without_gameplay_commands() {
     let mut task = RoomTask::new(
         "live-spectator-readonly-test".to_string(),
         RoomMode::Normal,
@@ -492,17 +508,20 @@ fn normal_live_spectator_start_payload_is_read_only() {
     task.start_match();
     let start_messages: Vec<_> =
         std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
-    assert!(start_messages.iter().any(|msg| {
-        matches!(
-            msg,
-            ServerMessage::Start(payload)
-                if payload.player_id == 99
-                    && payload.spectator
-                    && payload.prediction_build_id.is_none()
-                    && payload.prediction_version == 0
-                    && payload.replay.is_none()
-        )
-    }));
+    let start_payload = start_messages
+        .iter()
+        .find_map(|msg| match msg {
+            ServerMessage::Start(payload) => Some(payload),
+            _ => None,
+        })
+        .expect("spectator start payload");
+    assert_eq!(start_payload.player_id, 99);
+    assert!(start_payload.spectator);
+    assert!(start_payload.prediction_build_id.is_none());
+    assert_eq!(start_payload.prediction_version, 0);
+    assert!(start_payload.replay.is_none());
+    assert!(!start_payload.capabilities.commands.gameplay);
+    assert!(start_payload.capabilities.match_controls.pause);
 
     task.on_command(
         99,
@@ -528,7 +547,7 @@ fn normal_live_spectator_start_payload_is_read_only() {
 }
 
 #[test]
-fn late_spectator_join_gets_read_only_live_start_and_snapshot() {
+fn late_spectator_join_gets_pause_control_and_read_only_snapshot() {
     let mut task = RoomTask::new(
         "late-spectator-live-test".to_string(),
         RoomMode::Normal,
@@ -566,7 +585,7 @@ fn late_spectator_join_gets_read_only_live_start_and_snapshot() {
     assert_eq!(payload.players.len(), 1);
     assert_eq!(payload.players[0].id, 1);
     assert!(!payload.capabilities.commands.gameplay);
-    assert!(!payload.capabilities.match_controls.pause);
+    assert!(payload.capabilities.match_controls.pause);
     assert!(payload.diagnostics.observer_analysis);
 
     task.on_tick(TokioInstant::now());

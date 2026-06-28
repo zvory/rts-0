@@ -913,7 +913,7 @@ export class Match {
   }
 
   syncLivePauseUi() {
-    if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
+    this.mountSettings({ keepOpen: true });
   }
 
   mountSettings({ keepOpen = false } = {}) {
