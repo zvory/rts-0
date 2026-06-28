@@ -210,16 +210,16 @@ The current implementation uses the themed unit/building names below. Combat is 
 shared attack model plus the support-weapon setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing on either `Move` or `AttackMove` orders; riflemen upgraded with
-Methamphetamines are permanently charging, keep advancing while firing with normal accuracy, and
+Methamphetamines gain permanent moving fire, keep advancing while firing with normal accuracy, and
 move at tank speed. Machine Gunners upgraded with Methamphetamines move at unupgraded Rifleman speed
 and use half-length setup/teardown timers; other mobile combat units
 still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
-Plain `Move` tanks and scout cars only fire at enemies already in
-weapon range. Active `AttackMove` tanks and scout cars use the same moving-fire policy while they
-are still following the player-issued path: auto-acquisition can aim and fire only at targets that
-are currently inside weapon range and pass hostile, visibility, smoke, line-of-sight, and blocker
+Plain `Move` tanks, scout cars, and upgraded riflemen only fire at enemies already in
+weapon range. Their active `AttackMove` orders use the same moving-fire policy while they are still
+following the player-issued path: auto-acquisition can aim and fire only at targets that are
+currently inside weapon range and pass hostile, visibility, smoke, line-of-sight, and blocker
 checks, but it cannot replace the commanded destination with a chase or standoff path. Non-moving-fire
 `AttackMove` units still chase when no current target is fireable, but while their path is active
 they prefer an in-range legal fallback over a softer out-of-range target. Direct `Attack` orders and
@@ -241,11 +241,12 @@ other anti-armor threats, armored obstacles, support weapons, and only then ordi
 Vehicle-body units treat enemy Tank Traps as high-priority breach targets only when the trap is on
 the unit's current short route window or helps close a vehicle-body gap across that route; nearby
 irrelevant traps remain attackable fallbacks but no longer outrank ordinary combat targets.
-Moving-fire retention is sticky but not absolute: Tanks, Scout Cars, and charged Riflemen keep a
-current legal target across equal-rank comparisons so they do not flicker between similar enemies,
-but higher-rank default-weapon threats still steal focus. This ranking scope is limited to default
-attacks; future grenades, satchels, or demolition attacks need separate attack profiles and explicit
-activation/autocast policy instead of being folded into default targeting.
+Moving-fire retention is sticky but not absolute: Tanks, Scout Cars, and
+Methamphetamines-upgraded Riflemen keep a current legal target across equal-rank comparisons so
+they do not flicker between similar enemies, but higher-rank default-weapon threats still steal
+focus. This ranking scope is limited to default attacks; future grenades, satchels, or demolition
+attacks need separate attack profiles and explicit activation/autocast policy instead of being
+folded into default targeting.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
@@ -291,9 +292,9 @@ activation/autocast policy instead of being folded into default targeting.
   consume 8 command supply and three Tanks fill the base budget; Command Cars still appear as weighted
   selections but their own weight is offset before their bonus is added.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
-  (~20s). Once complete, all current and future riflemen for that player are permanently charging:
-  1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
-  miss chance, and 25% faster attacks (16 tick cooldown becomes 12). It also increases that
+  (~20s). Once complete, all current and future riflemen for that player gain permanent moving fire,
+  1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 25%
+  faster attacks (16 tick cooldown becomes 12). It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15.
 - **Anti-Tank Gun Crews** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 200 steel / 75 oil

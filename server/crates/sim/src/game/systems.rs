@@ -214,11 +214,17 @@ pub(crate) fn run_tick(
                 .iter()
                 .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast))
         };
+        let methamphetamines_researched = |owner| {
+            players
+                .iter()
+                .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::Methamphetamines))
+        };
         services::combat::combat_system(
             map,
             entities,
             &teams,
             &mortar_autocast_researched,
+            &methamphetamines_researched,
             &post_movement.occupancy,
             &post_movement.spatial,
             &mut coordinator,

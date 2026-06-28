@@ -33,7 +33,11 @@ mod weapons;
 #[cfg(test)]
 mod tests;
 
-use acquisition::{combat_mode, resolve_target as resolve_target_with_obstruction, CombatMode};
+#[cfg(test)]
+use acquisition::combat_mode;
+use acquisition::{
+    combat_mode_with_moving_fire, resolve_target as resolve_target_with_obstruction, CombatMode,
+};
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
 use projection::{friendly_hard_blocker_between, shot_hits_intended_target};
@@ -68,6 +72,10 @@ fn resolve_target(
     let tank_trap_obstructs_vehicle_route = |attacker: &Entity, target: &Entity| {
         occ.tank_trap_obstructs_vehicle_route(attacker, target, &tank_trap_relation)
     };
+    let attacker_can_fire_while_moving = entities
+        .get(self_id)
+        .map(|e| can_fire_while_moving(e, weapons::legacy_charge_grants_moving_fire_for_tests(e)))
+        .unwrap_or(false);
     resolve_target_with_obstruction(
         map,
         entities,
@@ -83,6 +91,7 @@ fn resolve_target(
         py,
         acquire_px,
         mode,
+        attacker_can_fire_while_moving,
         &|_| true,
     )
 }
@@ -105,6 +114,7 @@ pub(crate) fn combat_system(
     entities: &mut EntityStore,
     teams: &TeamRelations,
     mortar_autocast_researched: &dyn Fn(u32) -> bool,
+    methamphetamines_researched: &dyn Fn(u32) -> bool,
     occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
@@ -126,7 +136,19 @@ pub(crate) fn combat_system(
 
     for id in entities.ids() {
         // Determine this attacker's combat parameters.
-        let (owner, px, py, range_px, acquire_px, dmg, cd_reset, mode, is_unit, is_mortar_team) = {
+        let (
+            owner,
+            px,
+            py,
+            range_px,
+            acquire_px,
+            dmg,
+            cd_reset,
+            mode,
+            is_unit,
+            is_mortar_team,
+            can_move_fire,
+        ) = {
             let e = match entities.get(id) {
                 Some(e) => e,
                 None => continue,
@@ -145,7 +167,9 @@ pub(crate) fn combat_system(
             }
             let profile = effective_attack_profile(e);
             let (range_tiles, dmg, cd) = (profile.range_tiles, profile.dmg, profile.cooldown);
-            let cd = if e.kind == EntityKind::Rifleman && e.charge_ticks() > 0 {
+            let owner_has_meth = methamphetamines_researched(e.owner);
+            let can_move_fire = can_fire_while_moving(e, owner_has_meth);
+            let cd = if e.kind == EntityKind::Rifleman && owner_has_meth {
                 cd.saturating_mul(config::METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR)
                     / config::METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR
             } else {
@@ -167,7 +191,7 @@ pub(crate) fn combat_system(
             } else {
                 range_px
             };
-            let mode = combat_mode(e);
+            let mode = combat_mode_with_moving_fire(e, can_move_fire);
             let acquire_px = if mode == CombatMode::Opportunistic {
                 range_px
             } else {
@@ -184,6 +208,7 @@ pub(crate) fn combat_system(
                 mode,
                 e.is_unit(),
                 e.kind == EntityKind::MortarTeam,
+                can_move_fire,
             )
         };
         if dmg == 0 {
@@ -218,6 +243,7 @@ pub(crate) fn combat_system(
             py,
             acquire_px,
             mode,
+            can_move_fire,
             &|target_id| {
                 !require_safe_mortar_autocast_target
                     || mortar_autocast_target_safe(entities, teams, spatial, owner, target_id, tick)
@@ -278,7 +304,7 @@ pub(crate) fn combat_system(
         let target_angle = (ty - py).atan2(tx - px);
         let holds_commanded_movement_path = entities
             .get(id)
-            .map(moving_fire_movement_order_holds_path)
+            .map(|e| moving_fire_movement_order_holds_path(e, can_move_fire))
             .unwrap_or(false);
         let terrain_clear = los.clear_between_world_points((px, py), (tx, ty));
         let clear_shot = if is_mortar_team {
@@ -307,9 +333,8 @@ pub(crate) fn combat_system(
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
-                // Most units hold position while firing. Vehicle weapons can track independently,
-                // and charging riflemen accept lower accuracy to keep advancing.
-                if !can_fire_while_moving(e) {
+                // Most units hold position while firing. Moving-fire units keep their ordered path.
+                if !can_move_fire {
                     e.clear_path();
                 }
             }

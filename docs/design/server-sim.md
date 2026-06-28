@@ -710,8 +710,9 @@ General rules:
   to real combat targets. The obstruction query is read-only, uses the current waypoint, `path_goal`,
   or movement intent, and does not run pathfinding during target ranking.
   Retention is intentionally a stickiness term inside the ranker rather than a separate branch:
-  Tanks, Scout Cars, and charged Riflemen keep a still-legal current target when competing targets
-  have the same material rank, but they switch when a higher-rank default-weapon threat appears.
+  Tanks, Scout Cars, and Methamphetamines-upgraded Riflemen keep a still-legal current target when
+  competing targets have the same material rank, but they switch when a higher-rank default-weapon
+  threat appears.
   Dead, friendly, hidden, smoke-covered, or non-fireable retained targets are filtered out before
   ranking and cannot bypass legality.
 - The auto-acquisition ranker chooses only for the current default attack profile. Future grenades,

@@ -1,6 +1,7 @@
 use super::PlayerState;
 use crate::config;
 use crate::game::entity::EntityKind;
+use crate::game::upgrade::UpgradeKind;
 use crate::rules::economy::ResourceCost;
 
 impl PlayerState {
@@ -51,6 +52,10 @@ impl PlayerState {
             EntityKind::Steel => self.steel = self.steel.saturating_add(amount),
             _ => {}
         }
+    }
+
+    pub(crate) fn has_upgrade(&self, upgrade: UpgradeKind) -> bool {
+        self.upgrades.contains(&upgrade)
     }
 
     pub(crate) fn reserve_supply(&mut self, supply: u32) -> bool {

@@ -98,7 +98,7 @@ pub(crate) fn movement_system_with_events(
         };
         let has_meth = players
             .iter()
-            .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::Methamphetamines));
+            .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::Methamphetamines));
         if kind == EntityKind::Rifleman {
             let Some(e) = entities.get_mut(id) else {
                 continue;
