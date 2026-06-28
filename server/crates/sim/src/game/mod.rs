@@ -200,9 +200,10 @@ impl Game {
 
     /// Advance the simulation by one tick and return per-player transient events.
     ///
-    /// Ordered per `docs/design/server-sim.md`: drain+apply commands → movement → combat → gather →
-    /// production+spawn → construction → deaths → recompute supply → recompute fog. The whole
-    /// method is panic-free: every entity lookup is fallible and stale ids are ignored.
+    /// Ordered per `docs/design/server-sim.md`: drain+apply commands → movement → queued-order
+    /// promotion → combat/economy/production → construction/deconstruction → projectile/death
+    /// cleanup → collision/supply → recompute fog. The whole method is panic-free: every entity
+    /// lookup is fallible and stale ids are ignored.
     pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {
         self.tick_inner(None)
     }

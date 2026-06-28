@@ -10,6 +10,7 @@ use crate::rules::{combat, terrain::TerrainKind};
 mod ability_runtime_tests;
 mod ai_identity_tests;
 mod artillery_tests;
+mod build_wait_tests;
 mod determinism_tests;
 mod ekat_tests;
 mod faction_ability_tests;

@@ -709,12 +709,32 @@ General rules:
   profiles with explicit activation policy; explicit-only special attacks can be added without
   changing default auto-acquisition, and autocast special attacks need their own conservative plan
   and tests.
-- Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
-  unaffordable later is skipped or rejected by the execution/promotion path. Tank Trap construction
-  is server-authoritative after Training Centre eligibility and uses vehicle-body-only placement
-  blocking. Constructed buildings spawn with their full max HP but only 10% current HP, then
-  linearly gain current HP with construction progress until completion restores them to full
-  health; prebuilt starting buildings are unchanged.
+- Resource costs are paid at execution time, not queue time. Queued abilities that become
+  unaffordable at promotion are skipped or rejected, but queued and immediate build orders do not
+  require current affordability at issue or promotion time. Build promotion checks the worker,
+  faction/build requirements, map bounds, permanent footprint blockers, and resumable matching
+  owned scaffolds; otherwise it records the build intent and walks the worker to an outside staging
+  point near the footprint.
+- When a worker reaches build-arrival range, construction re-validates the intent against the live
+  world. Resuming an owned, matching scaffold at the footprint is free even if the owner cannot
+  currently afford a new building. New scaffolds charge resources only when spawned. If the
+  footprint is legal but the player lacks resources, the worker enters `WaitingAtSite`, clears its
+  path, emits one shortage notice when entering the wait, and retries silently until resources are
+  available. Waiting does not reserve resources, so another spend can still win the race before the
+  scaffold appears.
+- Build-arrival blockers are classified. A building, scaffold, resource node, terrain/out-of-bounds
+  footprint, missing tech requirement, unknown building kind, or missing builder eligibility cancels
+  the active build order. Relevant unit bodies put the worker in `WaitingAtSite` for up to
+  three seconds (90 simulation ticks); if the unit blocker clears before timeout, normal placement
+  and resource retry resumes, and if it persists through timeout the active build order is dropped
+  with a single `Cannot build there` notice. Tank Trap placement keeps its vehicle-body-only policy:
+  infantry-like bodies do not block it, while vehicle bodies use the same three-second unit-block
+  grace. Clearing an active build order, completing construction, or losing a scaffold preserves
+  any queued handoff orders; because queued promotion runs before construction in each tick, those
+  handoffs promote on the next eligible promotion pass after the active build order becomes idle.
+  Constructed buildings spawn with their full max HP but only 10% current HP, then linearly gain
+  current HP with construction progress until completion restores them to full health; prebuilt
+  starting buildings are unchanged.
 - Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear
   future intents. `stop` always clears both active and queued unit orders.
 - Queueable commands append future unit-local intents. Unit queues are capped at 8 intents today;
