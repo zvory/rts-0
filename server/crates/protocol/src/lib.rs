@@ -108,9 +108,10 @@ pub enum ClientMessage {
     },
     /// Give up the current match, removing this player's army and showing the score screen.
     GiveUp,
-    /// Pause a live match. Honored only from active live players with pauses remaining.
+    /// Pause a live match. Honored only from live pause-capable players or spectators with pauses
+    /// remaining.
     PauseGame,
-    /// Unpause a paused live match. Honored only from active live players.
+    /// Unpause a paused live match. Honored only from live pause-capable players or spectators.
     UnpauseGame,
     /// Leave replay playback and return the room to a clean lobby.
     ReturnToLobby,

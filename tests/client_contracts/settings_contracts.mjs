@@ -18,6 +18,7 @@ import {
   buildPauseAction,
   buildSettingsTabs,
 } from "../../client/src/settings_panels.js";
+import { SettingsContainer } from "../../client/src/settings_container.js";
 import {
   readPredictionEnabled,
   writePredictionEnabled,
@@ -116,6 +117,33 @@ function hotkeyService() {
     assert(pauseSent, "settings: live pause action calls injected sender");
     assert(buildPauseAction({ visible: false }).render() === null,
       "settings: non-live contexts omit pause action");
+  });
+
+  withFakeSettingsDocument(() => {
+    const shell = document.createElement("div");
+    const button = document.createElement("button");
+    const menu = document.createElement("div");
+    button.parentElement = shell;
+    const settings = new SettingsContainer({ button, menu });
+    const tabs = buildSettingsTabs({ audio: {}, game: { kind: "match" } });
+    const pauseButton = () => menu.children[0]?.children[1]?.children[0] || null;
+
+    settings.setContext({
+      kind: "match",
+      actions: [buildPauseAction({ visible: true, disabled: true, label: "Pause (0)" })],
+      tabs,
+    });
+    assert(pauseButton()?.disabled, "settings: closed menu can render an initially disabled pause action");
+
+    settings.setContext({
+      kind: "match",
+      actions: [buildPauseAction({ visible: true, disabled: false, label: "Pause (3)" })],
+      tabs,
+    });
+    settings.open({ focus: false });
+    assert(pauseButton()?.textContent === "Pause (3)", "settings: closed context refresh updates pause label before open");
+    assert(pauseButton()?.disabled === false, "settings: closed context refresh enables pause before open");
+    settings.destroy();
   });
 
   {

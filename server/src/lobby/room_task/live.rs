@@ -223,12 +223,16 @@ impl RoomTask {
             .pause
     }
 
-    fn live_pause_seat_for_connection(&self, connection_id: u32) -> Option<u32> {
+    fn live_pause_actor_for_connection(&self, connection_id: u32) -> Option<u32> {
         if !matches!(self.phase, Phase::InGame(_)) || !self.live_pause_controls_available() {
             return None;
         }
         if self.outcome_sent.contains(&connection_id) {
             return None;
+        }
+        let player = self.players.get(&connection_id)?;
+        if player.spectator {
+            return Some(connection_id);
         }
         self.live_connection_is_player(connection_id).then(|| {
             self.live_seat_id_for_connection(connection_id)
@@ -237,10 +241,10 @@ impl RoomTask {
     }
 
     fn live_pause_state_for(&self, connection_id: u32) -> LivePauseState {
-        let seat_id = self.live_pause_seat_for_connection(connection_id);
-        let pauses_remaining = seat_id.map(|seat_id| {
+        let actor_id = self.live_pause_actor_for_connection(connection_id);
+        let pauses_remaining = actor_id.map(|actor_id| {
             LIVE_PAUSE_LIMIT
-                .saturating_sub(self.live_pause_counts.get(&seat_id).copied().unwrap_or(0))
+                .saturating_sub(self.live_pause_counts.get(&actor_id).copied().unwrap_or(0))
         });
         let can_pause = pauses_remaining
             .map(|remaining| !self.live_paused && remaining > 0)
@@ -251,7 +255,7 @@ impl RoomTask {
             pauses_remaining,
             pause_limit: LIVE_PAUSE_LIMIT,
             can_pause,
-            can_unpause: self.live_paused && seat_id.is_some(),
+            can_unpause: self.live_paused && actor_id.is_some(),
         }
     }
 
@@ -277,7 +281,7 @@ impl RoomTask {
     }
 
     pub(super) fn on_pause_game(&mut self, player_id: u32) {
-        let Some(seat_id) = self.live_pause_seat_for_connection(player_id) else {
+        let Some(actor_id) = self.live_pause_actor_for_connection(player_id) else {
             self.send_live_pause_state_to(player_id);
             return;
         };
@@ -285,21 +289,21 @@ impl RoomTask {
             self.send_live_pause_state_to(player_id);
             return;
         }
-        let used = self.live_pause_counts.get(&seat_id).copied().unwrap_or(0);
+        let used = self.live_pause_counts.get(&actor_id).copied().unwrap_or(0);
         if used >= LIVE_PAUSE_LIMIT {
             self.send_live_pause_state_to(player_id);
             return;
         }
         self.live_pause_counts
-            .insert(seat_id, used.saturating_add(1));
+            .insert(actor_id, used.saturating_add(1));
         self.live_paused = true;
-        self.live_paused_by = Some(seat_id);
-        crate::log_info!(room = %self.room, player_id, seat_id, "live match paused");
+        self.live_paused_by = Some(actor_id);
+        crate::log_info!(room = %self.room, player_id, pause_actor_id = actor_id, "live match paused");
         self.broadcast_live_pause_state();
     }
 
     pub(super) fn on_unpause_game(&mut self, player_id: u32) {
-        if self.live_pause_seat_for_connection(player_id).is_none() {
+        if self.live_pause_actor_for_connection(player_id).is_none() {
             self.send_live_pause_state_to(player_id);
             return;
         }

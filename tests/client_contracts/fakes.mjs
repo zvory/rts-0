@@ -231,6 +231,9 @@ export function withFakeSettingsDocument(fn) {
     addEventListener(type, handler) {
       this.listeners[type] = handler;
     }
+    removeEventListener(type, handler) {
+      if (this.listeners[type] === handler) delete this.listeners[type];
+    }
     replaceChildren(...children) {
       this.children = [...children];
     }

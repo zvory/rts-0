@@ -317,6 +317,34 @@ withFakeSettingsDocument(() => {
 });
 
 withFakeSettingsDocument(() => {
+  let pauseSent = 0;
+  const context = buildMatchSettingsContext({
+    replayViewer: false,
+    state: { spectator: true },
+    capabilities: {
+      matchControls: { pause: true },
+      diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.NONE },
+    },
+    livePauseState: { paused: false, canPause: true, pausesRemaining: 2 },
+    giveUpSent: false,
+    audio: {},
+    hotkeyProfiles: null,
+    prediction: { enabled: false },
+    input: null,
+    onPauseGame: () => { pauseSent += 1; },
+    livePauseActionLabel: () => "Pause (2)",
+  });
+  assert(context.kind === "spectator" && context.spectator, "match settings context identifies live spectators");
+  const [pauseAction, giveUpAction] = context.actions;
+  const pauseButton = pauseAction.render();
+  assert(pauseButton.id === "live-pause-open" && pauseButton.textContent === "Pause (2)",
+    "match settings context shows spectator live pause action");
+  assert(giveUpAction.render() === null, "match settings context still hides give-up for spectators");
+  pauseButton.listeners.click();
+  assert(pauseSent === 1, "match settings context wires spectator pause callback");
+});
+
+withFakeSettingsDocument(() => {
   let returned = 0;
   const context = buildMatchSettingsContext({
     replayViewer: true,

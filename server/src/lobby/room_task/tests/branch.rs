@@ -477,7 +477,7 @@ fn branch_launch_countdown_promotes_to_live_start_payloads() {
     assert!(spectator_start.replay.is_none());
     assert!(spectator_start.lab.is_none());
     assert!(!spectator_start.capabilities.commands.gameplay);
-    assert!(!spectator_start.capabilities.match_controls.pause);
+    assert!(spectator_start.capabilities.match_controls.pause);
     assert!(spectator_start.diagnostics.observer_analysis);
 }
 
@@ -644,7 +644,7 @@ fn branch_live_late_join_start_payload_attaches_as_observer_without_resetting_st
     );
     assert!(start.diagnostics.observer_analysis);
     assert!(!start.capabilities.commands.gameplay);
-    assert!(!start.capabilities.match_controls.pause);
+    assert!(start.capabilities.match_controls.pause);
 }
 
 #[test]
