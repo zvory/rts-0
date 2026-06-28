@@ -28,7 +28,7 @@ Supabase Postgres. Schema in `server/migrations/`. Match summaries live in `matc
 | `participants`  | `text[]`        | Display names in seat order (humans then AI).   |
 | `score_screen`  | `jsonb`         | Whole `Vec<PlayerScore>` blob, opaque to SQL.   |
 | `human_count`   | `integer`       | Non-AI players at match start.                  |
-| `debug_mode`    | `boolean`       | Historical visibility flag for removed debug rows. New live rows write `false`. |
+| `debug_mode`    | `boolean`       | Visibility flag for debug rows. One-human, no-AI sandbox rows write `true`; normal product rows write `false`. |
 | `local_only`    | `boolean`       | Hide local developer rows from public servers.  |
 
 Indexes: `(started_at desc)` for the front-page query, a partial `(started_at desc)` index for
@@ -66,13 +66,14 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - **Read**: `GET /api/matches?limit=N` — JSON array, newest first, `limit` clamped server-side to
   `[1, 100]`, defaults to 20. Returns `[]` when no DB is configured (so the client never needs
   to special-case missing-DB). The Recent Matches feed includes only rows with at least one
-  human player and `debug_mode = false`; AI-only and historical debug rows may be persisted with
-  replay artifacts but stay out of the lobby table. Local-only rows are included only when the
-  request peer address is loopback; public beta/mainline requests filter them out. Each summary
-  includes `replayAvailable` plus `replayUnavailableReason`. Availability is false when no replay
-  row exists or its artifact schema, map schema, or map content hash is incompatible with the
-  running server. Build-SHA mismatches are warning-compatible: `replayAvailable` remains true and
-  `replayUnavailableReason` carries the compatibility warning.
+  human player and `debug_mode = false`, and it explicitly suppresses historical one-human,
+  one-participant rows. Solo sandbox rows, AI-only rows, and historical debug rows may be
+  persisted with replay artifacts but stay out of the lobby table. Local-only rows are included
+  only when the request peer address is loopback; public beta/mainline requests filter them out.
+  Each summary includes `replayAvailable` plus `replayUnavailableReason`. Availability is false
+  when no replay row exists or its artifact schema, map schema, or map content hash is
+  incompatible with the running server. Build-SHA mismatches are warning-compatible:
+  `replayAvailable` remains true and `replayUnavailableReason` carries the compatibility warning.
 - **Replay launch**: `POST /api/matches/{id}/replay` — read-only launch request. The server loads
   the persisted artifact only if the match is visible to the request scope, validates it against
   the running map metadata and the shared replay faction/loadout validator used by replay rooms,
@@ -107,8 +108,10 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 A row is written when **all** of these are true:
 
 1. The lobby reached `Phase::InGame` (so `match_started_at` was captured).
-2. At least one active participant was present at match start. Solo, player-vs-AI, and AI-only
-   deployed matches record when they resolve.
+2. At least one active participant was present at match start. Player-vs-AI and AI-only deployed
+   matches record when they resolve. One-human, no-AI sandbox matches also record if they resolve,
+   but write `debug_mode = true` so they are treated as debug sessions and stay out of Recent
+   Matches.
 3. `is_dev_watch()` is false — dev scenario rooms never record.
 4. The room/participants do not match automated smoke/integration/regression test fingerprints:
    `itest-*`, `ai-itest-*`, `client-smoke-*`, `reg-*`, `smoke`, or the `Alpha`/`Bravo`
@@ -118,12 +121,15 @@ A row is written when **all** of these are true:
 Anything else (local gate off, DB failures, dev rooms, test rooms, missing DB) silently skips the
 write. The simulation and lobby flow are unaffected. Replay artifacts use the same eligibility as
 match rows: if a match row is skipped, no replay row is written. Stored historical debug and
-AI-only rows are filtered from `/api/matches`, but the replay row remains linked to the owning
-`matches` row.
+AI-only rows, plus solo sandbox rows, are filtered from `/api/matches`, but the replay row remains
+linked to the owning `matches` row.
 
 Public reads also suppress historical bot/test rows that were written before this eligibility
 filter existed, and migration `20260609000002_suppress_automated_match_history.sql` tags those
-rows `local_only` instead of deleting them.
+rows `local_only` instead of deleting them. Migration
+`20260628000001_suppress_solo_match_history.sql` marks historical one-human, no-AI sandbox rows
+as debug instead of deleting them, preserving replay artifacts while removing them from Recent
+Matches.
 
 ## Recording gate (`RTS_RECORD_MATCHES`)
 

@@ -28,7 +28,7 @@ pub struct MatchRecord {
     pub score_screen: serde_json::Value,
     /// Number of non-AI players in the match. Public recent-match reads hide rows with none.
     pub human_count: i32,
-    /// Historical visibility flag for removed debug rows. New live product rows write false.
+    /// Visibility flag for debug rows. One-human, no-AI sandbox rows write true.
     pub debug_mode: bool,
     /// True for developer-local rows that should only be visible from localhost requests.
     pub local_only: bool,
@@ -234,6 +234,10 @@ impl Db {
             where ($2 or not matches.local_only)
               and matches.human_count >= 1
               and not matches.debug_mode
+              and not (
+                matches.human_count = 1
+                and cardinality(matches.participants) = 1
+              )
               and (
                 $2
                 or (

@@ -32,6 +32,10 @@ impl RoomTask {
             && !match_history_participants_are_automated(&self.match_participants)
     }
 
+    pub(super) fn match_history_debug_mode(&self) -> bool {
+        self.match_player_count == 1 && self.match_human_count == 1
+    }
+
     fn should_capture_post_match_replay(&self) -> bool {
         let match_policy = self.live_session_policy();
         match_policy.captures_post_match_replay()
@@ -194,8 +198,8 @@ impl RoomTask {
         });
 
         // Persist replay-backed history for deploy-recorded matches. The Recent Matches endpoint
-        // filters debug and AI-only rows; persistence keeps their replay artifacts available for
-        // follow-up diagnostics without exposing them on the lobby front page.
+        // filters debug, solo, and AI-only rows; persistence keeps their replay artifacts
+        // available for follow-up diagnostics without exposing them on the lobby front page.
         if let (Some(db), Some(started_at)) = (self.db.clone(), self.match_started_at) {
             if self.should_persist_match_history() {
                 let duration_ms = ended_at
@@ -227,7 +231,7 @@ impl RoomTask {
                     participants: self.match_participants.clone(),
                     score_screen: score_json,
                     human_count: i32::try_from(self.match_human_count).unwrap_or(i32::MAX),
-                    debug_mode: false,
+                    debug_mode: self.match_history_debug_mode(),
                     local_only: self.match_history_local_only,
                     replay,
                 };
