@@ -34,7 +34,7 @@ jeffrey playtest
 
 oti vs matthew
 
-- [ ] smoke doens't always go off
+- [x] smoke doens't always go off
 
 - [x] implement pause game in live matches, 3 pauses (done: PR #190)
 
@@ -48,9 +48,7 @@ oti vs matthew
 
 - [ ] riflemen an infantry and scout cars just do too little damage to buidlings. maybe we should bump the HP of all armoed units by like 25% and then make armor block 50% of damage instead of 75% (partial: scout HP changed)
 
-- [ ] buildings should block line of sight
-
-- [ ] get this working on electron
+- [x] buildings should block line of sight
 
 
 ----
