@@ -1,7 +1,11 @@
-use crate::game::entity::{fires_while_moving, Entity, EntityStore};
+use crate::game::entity::{Entity, EntityStore};
 use crate::game::map::Map;
 
 use super::{TANK_STANDOFF_BUFFER_PX, TANK_STANDOFF_REPATH_DELTA_PX};
+
+fn uses_vehicle_standoff_policy(e: &Entity) -> bool {
+    crate::game::entity::fires_while_moving(e.kind)
+}
 
 pub(super) fn chase_goal_for_target(
     map: &Map,
@@ -14,7 +18,7 @@ pub(super) fn chase_goal_for_target(
 ) -> (f32, f32) {
     let is_out_of_range_tank = entities
         .get(attacker_id)
-        .map(|e| fires_while_moving(e.kind) && dist > range_px)
+        .map(|e| uses_vehicle_standoff_policy(e) && dist > range_px)
         .unwrap_or(false);
     if !is_out_of_range_tank {
         return target_pos;
@@ -59,7 +63,7 @@ pub(super) fn chase_path_needs_refresh(e: &Entity, chase_goal: (f32, f32)) -> bo
     if e.path_is_empty() {
         return true;
     }
-    if !fires_while_moving(e.kind) {
+    if !uses_vehicle_standoff_policy(e) {
         return false;
     }
     e.path_goal()

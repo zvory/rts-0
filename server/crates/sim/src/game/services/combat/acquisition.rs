@@ -14,7 +14,9 @@ use crate::rules::terrain::{self, TerrainKind};
 
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::projection::friendly_hard_blocker_between;
-use super::weapons::{can_fire_while_moving, effective_attack_profile};
+use super::weapons::{
+    can_fire_while_moving, effective_attack_profile, moving_fire_movement_order_holds_path,
+};
 
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
@@ -33,6 +35,9 @@ pub(super) fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::HoldPosition => CombatMode::Opportunistic,
+        Order::AttackMove(_) if moving_fire_movement_order_holds_path(e) => {
+            CombatMode::Opportunistic
+        }
         Order::AttackMove(_) => CombatMode::Aggressive,
         Order::Move(_) if can_fire_while_moving(e) => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,

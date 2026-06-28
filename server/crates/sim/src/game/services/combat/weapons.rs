@@ -1,11 +1,11 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{Entity, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
 
 use super::{
-    ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK, TANK_TURRET_FIRE_TOLERANCE_RAD,
-    TANK_TURRET_TURN_RATE_RAD_PER_TICK,
+    ANTI_TANK_GUN_FIRE_TOLERANCE_RAD, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
+    TANK_TURRET_FIRE_TOLERANCE_RAD, TANK_TURRET_TURN_RATE_RAD_PER_TICK,
 };
 
 pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
@@ -157,9 +157,7 @@ pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
 fn requires_weapon_setup(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::MachineGunner
-            | EntityKind::AntiTankGun
-            | EntityKind::Artillery
+        EntityKind::MachineGunner | EntityKind::AntiTankGun | EntityKind::Artillery
     )
 }
 
@@ -172,6 +170,16 @@ pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
 pub(super) fn can_fire_while_moving(e: &Entity) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
         || (e.kind == EntityKind::Rifleman && e.charge_ticks() > 0)
+}
+
+pub(super) fn uses_vehicle_weapon_policy(e: &Entity) -> bool {
+    crate::game::entity::fires_while_moving(e.kind)
+}
+
+pub(super) fn moving_fire_movement_order_holds_path(e: &Entity) -> bool {
+    can_fire_while_moving(e)
+        && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+        && !matches!(e.move_phase(), Some(MovePhase::Arrived))
 }
 
 pub(super) fn moving_fire_miss_chance(_e: &Entity) -> f32 {
@@ -191,8 +199,8 @@ pub(super) fn effective_attack_profile(e: &Entity) -> combat_rules::AttackProfil
     match e.weapon_setup() {
         WeaponSetup::Packed => {
             profile.range_tiles = config::ANTI_TANK_GUN_PACKED_RANGE_TILES;
-            profile.dmg =
-                ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER).round() as u32;
+            profile.dmg = ((profile.dmg as f32) * config::ANTI_TANK_GUN_PACKED_DAMAGE_MULTIPLIER)
+                .round() as u32;
         }
         WeaponSetup::Deployed => {
             profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES;

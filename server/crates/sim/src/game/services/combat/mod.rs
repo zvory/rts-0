@@ -8,9 +8,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
-use crate::game::entity::{
-    fires_while_moving, AttackPhase, Entity, EntityKind, EntityStore, Order,
-};
+use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
@@ -42,9 +40,10 @@ use projection::{friendly_hard_blocker_between, shot_hits_intended_target};
 use weapons::{
     anti_tank_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
-    mirror_weapon_to_body, moving_fire_miss_chance, relax_vehicle_weapon_toward_body,
-    rotate_anti_tank_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
-    uses_stationary_weapon_aggro,
+    mirror_weapon_to_body, moving_fire_miss_chance, moving_fire_movement_order_holds_path,
+    relax_vehicle_weapon_toward_body, rotate_anti_tank_gun_for_combat,
+    rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup, uses_stationary_weapon_aggro,
+    uses_vehicle_weapon_policy,
 };
 
 #[cfg(test)]
@@ -238,7 +237,7 @@ pub(crate) fn combat_system(
                     e.set_target_id(None);
                     begin_idle_deployed_weapon_setup(e);
                 }
-                if fires_while_moving(e.kind) {
+                if uses_vehicle_weapon_policy(e) {
                     relax_vehicle_weapon_toward_body(e);
                 }
             }
@@ -277,6 +276,10 @@ pub(crate) fn combat_system(
         }
         let dist = dist2(px, py, tx, ty).sqrt();
         let target_angle = (ty - py).atan2(tx - px);
+        let holds_commanded_movement_path = entities
+            .get(id)
+            .map(moving_fire_movement_order_holds_path)
+            .unwrap_or(false);
         let terrain_clear = los.clear_between_world_points((px, py), (tx, ty));
         let clear_shot = if is_mortar_team {
             true
@@ -292,7 +295,7 @@ pub(crate) fn combat_system(
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
             let mut weapon_aligned = true;
             if let Some(e) = entities.get_mut(id) {
-                if fires_while_moving(e.kind) {
+                if uses_vehicle_weapon_policy(e) {
                     weapon_aligned = rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::AntiTankGun {
                     weapon_aligned = rotate_anti_tank_gun_for_combat(e, target_angle);
@@ -370,18 +373,11 @@ pub(crate) fn combat_system(
                     e.set_attack_cd(cd_reset);
                 }
             }
-        } else if is_unit && mode != CombatMode::Opportunistic {
+        } else if is_unit && mode != CombatMode::Opportunistic && !holds_commanded_movement_path {
             // Out of weapon range but within aggro: chase. Tanks route to a standoff point,
             // and statically blocked targets route to a passable perimeter tile.
-            let chase_goal = chase_goal_for_target(
-                map,
-                entities,
-                id,
-                (px, py),
-                (tx, ty),
-                range_px,
-                dist,
-            );
+            let chase_goal =
+                chase_goal_for_target(map, entities, id, (px, py), (tx, ty), range_px, dist);
             let chase_goal = coordinator.attack_chase_goal(entities, id, tid, chase_goal, range_px);
             let want_repath = entities
                 .get(id)
@@ -389,7 +385,7 @@ pub(crate) fn combat_system(
                 .unwrap_or(false);
             let mut can_chase = true;
             if let Some(e) = entities.get_mut(id) {
-                if fires_while_moving(e.kind) {
+                if uses_vehicle_weapon_policy(e) {
                     rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::AntiTankGun {
                     rotate_anti_tank_gun_for_combat(e, target_angle);
