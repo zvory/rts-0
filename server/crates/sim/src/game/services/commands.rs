@@ -1669,29 +1669,22 @@ fn order_build(
     }
 
     // Feedback only; construction repeats a stricter final-placement check at arrival.
+    // Unit bodies can move away before the worker arrives, so only permanent blockers reject here.
     let can_resume_existing =
         resumable_site_for_build_intent(map, entities, player, building, tile_x, tile_y).is_some();
-    if !can_resume_existing
-        && !standability::building_site_clear_for_build_intent(
+    if !can_resume_existing {
+        match standability::building_site_status_for_build_intent(
             map, entities, building, tile_x, tile_y, worker,
-        )
-    {
-        notice(events, player, "Cannot build there");
-        return;
-    }
-
-    let ps = match players.iter().find(|p| p.id == player) {
-        Some(p) => p,
-        None => return,
-    };
-    let cost = rules::economy::resource_cost(building);
-    if !can_resume_existing && !ps.can_afford(cost.steel, cost.oil) {
-        notice(
-            events,
-            player,
-            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
-        );
-        return;
+        ) {
+            standability::BuildSiteStatus::Clear | standability::BuildSiteStatus::BlockedByUnit => {
+            }
+            standability::BuildSiteStatus::BlockedByBuilding
+            | standability::BuildSiteStatus::BlockedByResourceNode
+            | standability::BuildSiteStatus::InvalidFootprint => {
+                notice(events, player, "Cannot build there");
+                return;
+            }
+        }
     }
 
     let built = coordinator.order_build(entities, worker, building, tile_x, tile_y);

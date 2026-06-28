@@ -355,7 +355,7 @@ mod tests {
     }
 
     #[test]
-    fn construction_rejects_unit_body_before_collision_cleanup() {
+    fn construction_waits_on_unit_body_before_collision_cleanup() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let mut players = vec![player_state(1)];
@@ -406,24 +406,25 @@ mod tests {
 
         assert!(
             entities.iter().all(|e| e.kind != EntityKind::Depot),
-            "construction should reject the scaffold before collision cleanup when a unit body intersects the footprint"
+            "construction should not spawn the scaffold before collision cleanup while a unit body intersects the footprint"
         );
         assert!(
             matches!(
-                entities.get(worker).expect("worker should survive").order(),
-                Order::Idle
+                entities
+                    .get(worker)
+                    .expect("worker should survive")
+                    .build_phase(),
+                Some(crate::game::entity::BuildPhase::WaitingAtSite)
             ),
-            "blocked construction should clear the worker order"
+            "blocked construction should keep the worker order during the grace window"
         );
         assert!(
             entities.get(blocker).is_some(),
-            "blocking unit should survive the rejected construction"
+            "blocking unit should survive the delayed construction"
         );
         assert!(
-            events
-                .get(&1)
-                .is_some_and(|events| matches!(events.as_slice(), [Event::Notice { msg, .. }] if msg == "Cannot build there")),
-            "rejected construction should notify the owner"
+            events.get(&1).is_none_or(Vec::is_empty),
+            "unit-blocked construction should not notify the owner before timeout"
         );
     }
 }

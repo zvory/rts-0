@@ -1,6 +1,6 @@
 # Phase 2 - Waiting Construction Behavior
 
-Status: planned.
+Status: done.
 
 ## Goal
 

@@ -110,7 +110,7 @@ fn tank_trap_construction_charges_on_arrival_and_uses_spec_build_time() {
 }
 
 #[test]
-fn tank_trap_arrival_recheck_rejects_vehicle_body_on_site() {
+fn tank_trap_arrival_recheck_waits_on_vehicle_body_then_times_out() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (x, y) = footprint_center(&map, EntityKind::TankTrap, 6, 6);
@@ -138,6 +138,36 @@ fn tank_trap_arrival_recheck_rejects_vehicle_body_on_site() {
     fog.recompute(&[1, 2], &entities, &map);
     let mut active_sites = BTreeSet::new();
 
+    for _ in 0..config::TICK_HZ * 3 - 1 {
+        crate::game::services::construction::construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut events,
+            &fog,
+            &mut active_sites,
+        );
+        assert!(
+            matches!(
+                entities.get(worker).expect("worker should survive").order(),
+                Order::Build(_)
+            ),
+            "Tank Trap build should keep waiting before the unit-block grace expires"
+        );
+    }
+
+    assert_eq!(players[0].steel, steel_before);
+    assert!(
+        entities
+            .iter()
+            .all(|entity| entity.kind != EntityKind::TankTrap),
+        "blocked arrival must not spawn the obstacle before timeout"
+    );
+    assert!(
+        events.get(&1).is_none_or(Vec::is_empty),
+        "unit-blocked wait should not emit a failure notice before timeout"
+    );
+
     crate::game::services::construction::construction_system(
         &map,
         &mut entities,
@@ -147,13 +177,10 @@ fn tank_trap_arrival_recheck_rejects_vehicle_body_on_site() {
         &mut active_sites,
     );
 
-    assert_eq!(players[0].steel, steel_before);
-    assert!(
-        entities
-            .iter()
-            .all(|entity| entity.kind != EntityKind::TankTrap),
-        "blocked arrival must not spawn the obstacle"
-    );
+    assert!(matches!(
+        entities.get(worker).expect("worker should survive").order(),
+        Order::Idle
+    ));
     assert!(matches!(
         events.get(&1).and_then(|events| events.first()),
         Some(Event::Notice { msg, .. }) if msg == "Cannot build there"

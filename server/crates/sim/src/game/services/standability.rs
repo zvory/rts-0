@@ -119,7 +119,7 @@ pub(crate) fn building_site_clear(
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
-    building_site_status(map, entities, building, tile_x, tile_y).is_clear()
+    building_site_status_with_ignored_unit(map, entities, building, tile_x, tile_y, None).is_clear()
 }
 
 #[allow(dead_code)]
@@ -161,16 +161,7 @@ pub(crate) fn building_site_clear_spatial(
     .is_clear()
 }
 
-fn building_site_status(
-    map: &Map,
-    entities: &EntityStore,
-    building: EntityKind,
-    tile_x: u32,
-    tile_y: u32,
-) -> BuildSiteStatus {
-    building_site_status_with_ignored_unit(map, entities, building, tile_x, tile_y, None)
-}
-
+#[cfg(test)]
 pub(crate) fn building_site_clear_for_build_intent(
     map: &Map,
     entities: &EntityStore,
